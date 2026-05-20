@@ -3486,6 +3486,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const handleSharedLobContextMenu = useCallback(
     (e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
+      if (isSpectator) return;
       closeAllMenus();
       const sharedRect = mpLayout?.zones.sharedLob;
       if (!sharedRect) return;
@@ -3531,6 +3532,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
       e.cancelBubble = true;
+      if (isSpectator) return;
       leftClicksSinceContextMenuRef.current = 0;
       const stage = stageRef.current;
       if (!stage) return;
@@ -4252,6 +4254,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const labelTextWidth = zone.label.toUpperCase().length * 7;
             const myPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
+              if (isSpectator) return;
               closeAllMenus();
               const pt = { x: e.evt.clientX, y: e.evt.clientY };
               if (key === 'deck') setDeckMenu(pt);
@@ -4282,6 +4285,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? myPileClickHandler : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
+                    if (isSpectator) return;
                     // Compute spawn position as normalized 0-1 within the LOB zone
                     const layer = gameLayerRef.current;
                     const pointer = layer?.getRelativePointerPosition();
@@ -4325,6 +4329,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const labelTextWidth = zone.label.toUpperCase().length * 7;
             const oppPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
+              if (isSpectator) return;
               closeAllMenus();
               const pt = { x: e.evt.clientX, y: e.evt.clientY };
               if (key === 'deck') setOpponentDeckMenu(pt);
@@ -4353,6 +4358,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? oppPileClickHandler : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
+                    if (isSpectator) return;
                     const layer = gameLayerRef.current;
                     const pointer = layer?.getRelativePointerPosition();
                     const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
@@ -4398,6 +4404,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             opacity={0.5}
             onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
+              if (isSpectator) return;
               const stage = stageRef.current;
               if (!stage) return;
               const container = stage.container().getBoundingClientRect();
@@ -4500,6 +4507,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             opacity={0.5}
             onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
+              if (isSpectator) return;
               closeAllMenus();
               setOpponentHandMenu({
                 x: e.evt.clientX,
@@ -5953,16 +5961,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         onLoadDeck={onLoadDeck}
         isTimerVisible={isTimerVisible}
         onToggleTimer={onToggleTimer}
-        {...(viewerKind === 'player' ? {
-          spectators: gameState.spectators as Array<{ id: bigint; identity: { toHexString: () => string }; displayName: string }>,
-          myIdentityHex: gameState.identityHex,
-          shareHandWithSpectators: gameState.myPlayer?.shareHandWithSpectators,
-          gameId: gameId,
-          isGamePublic: gameState.game?.isPublic,
-          onSetShareHand: (share: boolean) => conn?.reducers.setShareHandWithSpectators({ gameId, share }),
-          onKickSpectator: (spectatorId: bigint) => conn?.reducers.kickSpectator({ gameId, spectatorId }),
-          onSetGamePrivate: (isPublic: boolean) => conn?.reducers.setGamePrivate({ gameId, isPublic }),
-        } : {})}
       />
 
       {/* ================================================================
