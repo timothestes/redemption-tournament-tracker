@@ -280,6 +280,9 @@ interface MultiplayerCanvasProps {
 
 export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep, viewerKind = 'player' }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
+  // Spectators may NEVER drag cards — even visually. Every `isDraggable` site
+  // ANDs against this flag.
+  const isSpectator = viewerKind === 'spectator';
 
   // ---- Container sizing (respects flex layout) ----
   const containerRef = useRef<HTMLDivElement>(null);
@@ -466,8 +469,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // the canonical 'T1' | 'T2' | 'Paragon' expected by the layout function.
   const normalizedFormat = normalizeDeckFormat(gameState.game?.format ?? '');
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat),
-    [virtualWidth, normalizedFormat],
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player'),
+    [virtualWidth, normalizedFormat, viewerKind],
   );
 
   // Card scale preference
@@ -3242,7 +3245,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               myHandRect,
               handCardWidth,
               handCardHeight,
-              isSpreadHand,
+              viewerKind === 'spectator' ? true : isSpreadHand,
             );
             let targetIdx = 0;
             let minDist = Infinity;
@@ -4045,7 +4048,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         myHandRect,
         handCardWidth,
         handCardHeight,
-        isSpreadHand,
+        viewerKind === 'spectator' ? true : isSpreadHand,
       );
       handCards.forEach((card, i) => {
         const pos = positions[i];
@@ -4064,7 +4067,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
 
     return bounds;
-  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, handCardWidth, handCardHeight, lobCard, isSpreadHand, myDerivedWeaponPositions, opponentDerivedWeaponPositions, normalizedFormat, sharedCards, sharedLobLayout]);
+  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, handCardWidth, handCardHeight, lobCard, isSpreadHand, viewerKind, myDerivedWeaponPositions, opponentDerivedWeaponPositions, normalizedFormat, sharedCards, sharedLobLayout]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -4629,7 +4632,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(String(card.id))}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                   nodeRef={registerCardNode}
                   onClick={handleCardClick}
@@ -4705,7 +4708,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(String(card.id))}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                   nodeRef={registerCardNode}
                   onClick={handleCardClick}
@@ -4772,7 +4775,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(cardIdStr)}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
                   lobArrivalGlow={getMyLobGlow(cardIdStr) > 0}
                   nodeRef={registerCardNode}
@@ -4845,7 +4848,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(cardIdStr)}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
                   lobArrivalGlow={getOppLobGlow(cardIdStr) > 0}
                   nodeRef={registerCardNode}
@@ -4920,7 +4923,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(cardIdStr)}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
                   nodeRef={registerCardNode}
                   onClick={handleCardClick}
@@ -5386,7 +5389,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         image={img}
                         {...(getTargetingProps(gameCard) ?? {})}
                         isSelected={isSelected(String(c.id))}
-                        isDraggable={true}
+                        isDraggable={!isSpectator}
                         nodeRef={registerCardNode}
                         hoverProgress={hoveredInstanceId === String(c.id) ? hoverProgress : 0}
                         onClick={handleCardClick}
@@ -5438,7 +5441,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             image={img}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
-                            isDraggable={isDraggableZone}
+                            isDraggable={isDraggableZone && !isSpectator}
                             nodeRef={isDraggableZone ? registerCardNode : undefined}
                             hoverProgress={hoveredInstanceId === String(c.id) ? hoverProgress : 0}
                             onDragStart={isDraggableZone ? handleCardDragStart : noopCardDrag}
@@ -5471,7 +5474,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             image={undefined}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
-                            isDraggable={true}
+                            isDraggable={!isSpectator}
                             nodeRef={registerCardNode}
                             hoverProgress={0}
                             onDragStart={handleCardDragStart}
@@ -5587,7 +5590,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         image={img}
                         {...(getTargetingProps(gameCard) ?? {})}
                         isSelected={isSelected(String(c.id))}
-                        isDraggable={true}
+                        isDraggable={!isSpectator}
                         nodeRef={registerCardNode}
                         hoverProgress={hoveredInstanceId === String(c.id) ? hoverProgress : 0}
                         onClick={handleCardClick}
@@ -5635,7 +5638,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             image={img}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
-                            isDraggable={zoneKey === 'discard'}
+                            isDraggable={zoneKey === 'discard' && !isSpectator}
                             nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
                             hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
                             onClick={zoneKey === 'reserve' && oppReserveRevealed ? (_c, e) => {
@@ -5715,7 +5718,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         cardHeight={oppHandCard.cardHeight}
                         image={getCardImage(card)}
                         {...(getTargetingProps(gameCard) ?? {})}
-                        isDraggable={true}
+                        isDraggable={!isSpectator}
                         hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
@@ -5750,7 +5753,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               myHandRect!,
               handCardWidth,
               handCardHeight,
-              isSpreadHand,
+              viewerKind === 'spectator' ? true : isSpreadHand,
             );
 
             // In spectator mode, seat-0's hand is subject to the same
@@ -5786,7 +5789,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       image={getCardImage(card)}
                       {...(getTargetingProps(gameCard) ?? {})}
                       isSelected={isSelected(String(card.id))}
-                      isDraggable={true}
+                      isDraggable={!isSpectator}
                       hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                       suppressRevealRing
                       nodeRef={registerCardNode}
