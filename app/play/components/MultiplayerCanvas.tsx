@@ -2266,7 +2266,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     if (approvedSearchRequest && approvedSearchRequest.zone === 'initiative') {
       completeZoneSearch(BigInt(approvedSearchRequest.id));
-      showGameToast('Initiative granted');
+      const passed = approvedSearchRequest.action === 'pass';
+      showGameToast(passed ? 'Opponent passed initiative to you' : 'Initiative granted');
     }
   }, [approvedSearchRequest, completeZoneSearch]);
 
@@ -6048,7 +6049,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ================================================================
           Shared context menu — positioned relative to canvas container
           ================================================================ */}
-      {contextMenu && (() => {
+      {!isSpectator && contextMenu && (() => {
         const ctxCard = contextMenu.card;
         const isSharedSoul =
           ctxCard?.zone === 'land-of-bondage' &&
@@ -6111,7 +6112,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {multiCardContextMenu && (() => {
+      {!isSpectator && multiCardContextMenu && (() => {
         const sortedIds = Array.from(selectedIds).sort((a, b) => {
           const aCard = findAnyCardById(a);
           const bCard = findAnyCardById(b);
@@ -6170,7 +6171,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {zoneMenu && (
+      {!isSpectator && zoneMenu && (
         <ZoneContextMenu
           x={zoneMenu.x}
           y={zoneMenu.y}
@@ -6183,7 +6184,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {deckMenu && (
+      {!isSpectator && deckMenu && (
         <DeckContextMenu
           x={deckMenu.x}
           y={deckMenu.y}
@@ -6209,7 +6210,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {soulDeckMenu && (
+      {!isSpectator && soulDeckMenu && (
         <DeckContextMenu
           x={soulDeckMenu.x}
           y={soulDeckMenu.y}
@@ -6239,7 +6240,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {handMenu && (
+      {!isSpectator && handMenu && (
         <HandContextMenu
           x={handMenu.x}
           y={handMenu.y}
@@ -6268,7 +6269,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {opponentHandMenu && (() => {
+      {!isSpectator && opponentHandMenu && (() => {
         const requestAction = (action: string, count: number) => {
           const params = JSON.stringify({ count });
           requestOpponentAction(action, params);
@@ -6297,7 +6298,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {reserveMenu && (
+      {!isSpectator && reserveMenu && (
         <ReserveContextMenu
           x={reserveMenu.x}
           y={reserveMenu.y}
@@ -6313,7 +6314,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {opponentReserveMenu && (() => {
+      {!isSpectator && opponentReserveMenu && (() => {
         const oppReserveRevealed = gameState.opponentPlayer?.reserveRevealed ?? false;
         const oppReserveCards = opponentCards['reserve'] ?? [];
         const oppId = gameState.opponentPlayer?.id;
@@ -6348,7 +6349,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {opponentDeckMenu && (() => {
+      {!isSpectator && opponentDeckMenu && (() => {
         const requestAction = (action: string, count?: number) => {
           const params = count != null ? JSON.stringify({ count }) : '';
           requestOpponentAction(action, params);
@@ -6387,7 +6388,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {lorMenu && (
+      {!isSpectator && lorMenu && (
         <LorContextMenu
           x={lorMenu.x}
           y={lorMenu.y}
@@ -6463,7 +6464,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ================================================================
           Opponent zone search — context menu, consent dialog, browse modal
           ================================================================ */}
-      {opponentZoneMenu && (
+      {!isSpectator && opponentZoneMenu && (
         <OpponentZoneContextMenu
           x={opponentZoneMenu.x}
           y={opponentZoneMenu.y}

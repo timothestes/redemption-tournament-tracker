@@ -725,6 +725,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'HIDE_HAND') return 'hid their hand';
   if (actionType === 'REVEAL_RESERVE') return 'revealed their reserve';
   if (actionType === 'HIDE_RESERVE') return 'hid their reserve';
+  if (actionType === 'PASS_INITIATIVE') return 'passed initiative';
   if (actionType === 'REQUEST_ZONE_SEARCH' && payload) {
     try {
       const data = JSON.parse(payload);

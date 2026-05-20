@@ -1539,6 +1539,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             hasPendingInitiative={gameState.zoneSearchRequests.some(
               (r: any) => r.zone === 'initiative' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
             )}
+            onPassInitiative={() => gameState.passInitiative()}
           />
           <GameToastContainer />
           <PauseConsentToast

@@ -49,10 +49,12 @@ export interface GameToolbarProps {
   onRequestPriority?: () => void;
   /** Whether a priority request is currently pending. */
   hasPendingPriority?: boolean;
-  /** Called to request battle initiative (multiplayer, any player). */
+  /** Called to request battle initiative for self (multiplayer, any player). */
   onRequestInitiative?: () => void;
   /** Whether an initiative request is currently pending. */
   hasPendingInitiative?: boolean;
+  /** Called to pass battle initiative to the opponent (multiplayer, any player). Instant — no approval handshake. */
+  onPassInitiative?: () => void;
   /** Game is finished — keep toolbar active for review but disable end turn. */
   isFinished?: boolean;
 }
@@ -79,6 +81,7 @@ export function GameToolbar({
   hasPendingPriority,
   onRequestInitiative,
   hasPendingInitiative,
+  onPassInitiative,
   isFinished,
 }: GameToolbarProps) {
   const isMultiplayer = mode === 'multiplayer';
@@ -152,11 +155,23 @@ export function GameToolbar({
       shortcut: '',
       hidden: isMultiplayer,
     },
-    // Initiative (any player) — multiplayer only
+    // Your initiative (give to opponent) — instant, no handshake. Icon
+    // shows the opponent's current role: skull on my turn (they're defending),
+    // book on their turn (they're attacking).
+    ...(isMultiplayer && !isFinished ? [{
+      icon: isMyTurn ? Skull : BookOpen,
+      key: 'your-initiative',
+      label: 'Your initiative',
+      onClick: onPassInitiative ?? (() => {}),
+      shortcut: '',
+    }] : []),
+    // My initiative (request from opponent) — request/approve handshake.
+    // Icon shows my current role: book on my turn (I'm attacking), skull
+    // on their turn (I'm defending).
     ...(isMultiplayer && !isFinished ? [{
       icon: isMyTurn ? BookOpen : Skull,
-      key: 'initiative',
-      label: hasPendingInitiative ? 'Pending...' : 'Initiative',
+      key: 'my-initiative',
+      label: hasPendingInitiative ? 'Pending...' : 'My initiative',
       onClick: onRequestInitiative ?? (() => {}),
       shortcut: '',
       disabled: !!hasPendingInitiative,

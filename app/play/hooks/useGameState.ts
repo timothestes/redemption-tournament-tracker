@@ -141,6 +141,7 @@ export interface GameState {
   logLookAtTop: (count: number, sourceCardName?: string, position?: 'top' | 'bottom' | 'random') => void;
   logDeckSearchNoShuffle: (topCount: number, bottomCount: number) => void;
   requestZoneSearch: (zone: string) => void;
+  passInitiative: () => void;
   requestOpponentAction: (action: string, actionParams?: string) => void;
   approveZoneSearch: (requestId: bigint) => void;
   denyZoneSearch: (requestId: bigint) => void;
@@ -773,6 +774,10 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const passInitiative = useCallback(() => {
+    conn?.reducers.passInitiative({ gameId });
+  }, [conn, gameId]);
+
   const requestOpponentAction = useCallback(
     (action: string, actionParams: string = '') => {
       conn?.reducers.requestOpponentAction({ gameId, action, actionParams });
@@ -925,6 +930,7 @@ export function useGameState(gameId: bigint): GameState {
     logLookAtTop,
     logDeckSearchNoShuffle,
     requestZoneSearch,
+    passInitiative,
     requestOpponentAction,
     approveZoneSearch,
     denyZoneSearch,

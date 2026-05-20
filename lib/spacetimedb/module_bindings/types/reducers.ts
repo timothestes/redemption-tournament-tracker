@@ -40,6 +40,7 @@ import MoveCardToTopOfDeckReducer from "../move_card_to_top_of_deck_reducer";
 import MoveCardsBatchReducer from "../move_cards_batch_reducer";
 import MoveOpponentCardReducer from "../move_opponent_card_reducer";
 import OpponentShuffleAndDrawReducer from "../opponent_shuffle_and_draw_reducer";
+import PassInitiativeReducer from "../pass_initiative_reducer";
 import PregameAcknowledgeFirstReducer from "../pregame_acknowledge_first_reducer";
 import PregameAcknowledgeRollReducer from "../pregame_acknowledge_roll_reducer";
 import PregameChangeDeckReducer from "../pregame_change_deck_reducer";
@@ -123,6 +124,7 @@ export type MoveCardToTopOfDeckParams = __Infer<typeof MoveCardToTopOfDeckReduce
 export type MoveCardsBatchParams = __Infer<typeof MoveCardsBatchReducer>;
 export type MoveOpponentCardParams = __Infer<typeof MoveOpponentCardReducer>;
 export type OpponentShuffleAndDrawParams = __Infer<typeof OpponentShuffleAndDrawReducer>;
+export type PassInitiativeParams = __Infer<typeof PassInitiativeReducer>;
 export type PregameAcknowledgeFirstParams = __Infer<typeof PregameAcknowledgeFirstReducer>;
 export type PregameAcknowledgeRollParams = __Infer<typeof PregameAcknowledgeRollReducer>;
 export type PregameChangeDeckParams = __Infer<typeof PregameChangeDeckReducer>;
