@@ -638,13 +638,20 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
           const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
           const isViewer = actorPlayerId && viewerPlayerId && actorPlayerId === viewerPlayerId;
           const fromHiddenDeck = data.fromSource === 'top-of-deck' || data.fromSource === 'bottom-of-deck' || data.fromSource === 'random-from-deck';
+          // "Drew" only applies when cards actually came from a deck. Moving from
+          // territory/discard/reserve/etc. into hand is a move, not a draw.
+          const isDrawFromDeck = fromHiddenDeck || commonFromZone === 'deck';
           // Drawing from own deck into own hand is private — don't reveal card names to the opponent.
           const hideFromOpponent = !targetName && fromHiddenDeck && !isViewer;
           if (hideFromOpponent) {
             const n = data.cards.length;
             parts.push(<span key="hand">drew {n === 1 ? 'a card' : `${n} cards`}{explicitFromSuffix}</span>);
+          } else if (targetName) {
+            parts.push(<span key="hand">moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand{explicitFromSuffix}</span>);
+          } else if (isDrawFromDeck) {
+            parts.push(<span key="hand">drew <CardNameList cards={data.cards} />{explicitFromSuffix}{isViewer && fromHiddenDeck ? <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>(only visible to you)</span> : null}</span>);
           } else {
-            parts.push(<span key="hand">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand{explicitFromSuffix}</> : <>drew <CardNameList cards={data.cards} />{explicitFromSuffix}{isViewer && fromHiddenDeck ? <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>(only visible to you)</span> : null}</>}</span>);
+            parts.push(<span key="hand">moved <CardNameList cards={data.cards} /> to hand{sharedFromSuffix}</span>);
           }
         }
         if (data.toZone === 'territory') {
