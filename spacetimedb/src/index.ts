@@ -4064,7 +4064,15 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
       compactLobIndices(ctx, gameId, deckOwnerId);
     }
 
-    logAction(ctx, gameId, player.id, 'SHUFFLE_INTO_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, deckOwnerId: deckOwnerId.toString() }), game.turnNumber, game.currentPhase);
+    // Mirror move_card's hideIdentity rule: when a player shuffles a card from
+    // their own hand into their own deck, the name is private — opponents never
+    // saw it. Cross-player shuffles (e.g. a taken card sent back to opponent's
+    // deck) reveal identity because the card was visible in play.
+    const isCrossPlayerMove = player.id !== card.ownerId || player.id !== deckOwnerId;
+    const hideIdentity = !isCrossPlayerMove && fromZone === 'hand' && player.id === card.ownerId;
+    const logName = hideIdentity ? 'a face-down card' : card.cardName;
+    const logImg = hideIdentity ? '' : card.cardImgFile;
+    logAction(ctx, gameId, player.id, 'SHUFFLE_INTO_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: logName, cardImgFile: logImg, deckOwnerId: deckOwnerId.toString() }), game.turnNumber, game.currentPhase);
   }
 );
 
