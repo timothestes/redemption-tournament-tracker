@@ -65,6 +65,7 @@ export function cardInstanceToGameCard(
       card.outlineColor === 'good' || card.outlineColor === 'evil'
         ? card.outlineColor
         : undefined,
+    imitatingName: card.imitatingName || undefined,
   };
 }
 
@@ -103,6 +104,7 @@ function gameCardEquals(a: GameCard, b: GameCard): boolean {
     a.revealUntil === b.revealUntil &&
     a.revealDurationMs === b.revealDurationMs &&
     a.outlineColor === b.outlineColor &&
+    a.imitatingName === b.imitatingName &&
     countersEqual(a.counters, b.counters)
   );
 }

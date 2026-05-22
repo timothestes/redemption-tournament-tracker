@@ -2123,11 +2123,16 @@ export const move_card = spacetimedb.reducer(
     // card onto a specific seat's LoB. Honor targetOwnerId without applying
     // home-routing, which would otherwise redirect opponent-owned cards back
     // to the opponent's LoB even when the user dropped on their own.
+    // Hand is the same: a drag onto a specific seat's hand is "take into my
+    // hand" or "give to opponent's hand" — never "send the captured card back
+    // to its original owner's hand".
     const isExplicitLobDrop =
       toZone === 'land-of-bondage' && !!targetOwnerId;
+    const isExplicitHandDrop =
+      toZone === 'hand' && !!targetOwnerId;
 
     let newOwnerId: bigint;
-    if (isExplicitLobDrop) {
+    if (isExplicitLobDrop || isExplicitHandDrop) {
       newOwnerId = BigInt(targetOwnerId);
     } else if (HOME_ZONES.includes(toZone)) {
       const droppedOnOwnZone = !targetOwnerId || BigInt(targetOwnerId) === player.id;
@@ -2573,11 +2578,15 @@ export const move_cards_batch = spacetimedb.reducer(
       // and not the actor) still win.
       // Explicit LoB drop: honor the target seat (mirror of move_card). The
       // user dragged the card onto a specific player's LoB, so home-routing
-      // shouldn't override that choice.
+      // shouldn't override that choice. Hand follows the same rule — a drag
+      // onto a specific seat's hand is "take" or "give", never "return to
+      // original owner".
       const isExplicitLobDrop =
         toZone === 'land-of-bondage' && newOwnerId !== null;
+      const isExplicitHandDrop =
+        toZone === 'hand' && newOwnerId !== null;
       let cardOwnerId: bigint;
-      if (isExplicitLobDrop) {
+      if (isExplicitLobDrop || isExplicitHandDrop) {
         cardOwnerId = newOwnerId!;
       } else if (HOME_ZONES.includes(toZone)) {
         const droppedOnOwnZone = newOwnerId === null || newOwnerId === player.id;
