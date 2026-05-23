@@ -2588,10 +2588,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // being dragged within my own territory, attached weapons come along.
       const isMultiSelectDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       // A host being dragged carries its attached accessories along.
-      // Applies to territory warriors (with weapons) and LOB souls (with sites).
-      const followerZones: readonly string[] = ['territory', 'land-of-bondage'];
+      // Only applies to territory warriors (with weapons). LOB souls do NOT
+      // drag their attached sites — when a soul is rescued or otherwise
+      // leaves LoB, the site stays put in LoB (the server's accessory
+      // cascade unlinks it in place).
       const equipFollowerIds: string[] =
-        !isMultiSelectDrag && followerZones.includes(card.zone) && card.ownerId === 'player1'
+        !isMultiSelectDrag && card.zone === 'territory' && card.ownerId === 'player1'
           ? (myCards[card.zone] ?? [])
               .filter((c) => c.equippedToInstanceId === BigInt(card.instanceId))
               .map((c) => String(c.id))
