@@ -44,7 +44,7 @@ import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePro
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
-import { getAbilitiesForCard } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities } from '@/lib/cards/cardAbilities';
 import { Link2Off } from 'lucide-react';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
@@ -144,7 +144,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         const found = zone.find(c => c.instanceId === cardId);
         if (found) { source = found; break; }
       }
-      const ability = source ? getAbilitiesForCard(source.cardName)[abilityIndex] : undefined;
+      const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
       if (ability?.type === 'reveal_own_deck' || ability?.type === 'look_at_own_deck') {
         const deck = state.zones.deck;
         if (deck.length === 0) { showGameToast('Deck is empty'); return; }

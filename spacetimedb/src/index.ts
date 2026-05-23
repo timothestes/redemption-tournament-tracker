@@ -2056,19 +2056,24 @@ export const move_card = spacetimedb.reducer(
       return;
     }
 
-    // Home zones = private per-player piles. The "home" owner depends on who
-    // currently controls the card:
-    // - If the actor controls the card, route home to the *original* owner so
-    //   a captured opponent card (e.g. a captured hero) returns to the
-    //   opponent's pile when banished/discarded.
-    // - If the actor does NOT control the card (taking from the opponent's
-    //   deck/reserve/banish/discard), the actor is *taking* the card — home
-    //   is the actor's own pile, not the opponent's.
+    // Home zones = private per-player piles. The "home" owner is the card's
+    // true owner (originalOwnerId, falling back to current ownerId) — a
+    // captured opponent card (e.g. a captured hero) returns to the opponent's
+    // pile when banished/discarded, and an opponent's in-play card banished
+    // by the actor goes to the opponent's banish pile.
+    //
+    // Narrow exception: when the actor pulls a card OUT of an opponent's
+    // hidden home pile (their deck/hand/reserve/banish/discard) without an
+    // explicit targetOwnerId, treat it as *taking* — route to the actor's
+    // pile. Public in-play zones (territory / land-of-redemption /
+    // land-of-bondage) never trigger this, so banishing an opponent's
+    // territory card sends it to the opponent's banish pile.
     const HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand', 'land-of-bondage'];
-    const homeOwnerId =
-      card.ownerId === player.id
-        ? (card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId)
-        : player.id;
+    const HIDDEN_HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand'];
+    const trueHomeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+    const isTakingFromOpponentHiddenZone =
+      HIDDEN_HOME_ZONES.includes(fromZone) && card.ownerId !== player.id;
+    const homeOwnerId = isTakingFromOpponentHiddenZone ? player.id : trueHomeOwnerId;
 
     // Lost souls sent to discard or reserve go to land-of-bondage instead
     const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
@@ -2487,19 +2492,22 @@ export const move_cards_batch = spacetimedb.reducer(
         }
       }
 
-      // Home zones = private per-player piles. The "home" owner depends on who
-      // currently controls the card:
-      // - If the actor controls the card, route home to the *original* owner
-      //   so a captured opponent card (e.g. a captured hero) returns to the
-      //   opponent's pile when banished/discarded.
-      // - If the actor does NOT control the card (taking from the opponent's
-      //   deck/reserve/banish/discard), the actor is *taking* the card — home
-      //   is the actor's own pile, not the opponent's.
+      // Home zones = private per-player piles. The "home" owner is the card's
+      // true owner (originalOwnerId, falling back to current ownerId) — a
+      // captured opponent card returns to the opponent's pile when banished/
+      // discarded, and an opponent's in-play card banished by the actor goes
+      // to the opponent's banish pile.
+      //
+      // Narrow exception: when the actor pulls a card OUT of an opponent's
+      // hidden home pile (their deck/hand/reserve/banish/discard) without an
+      // explicit targetOwnerId, treat it as *taking* — route to the actor's
+      // pile. See parallel comment in move_card.
       const HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand', 'land-of-bondage'];
-      const homeOwnerId =
-        card.ownerId === player.id
-          ? (card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId)
-          : player.id;
+      const HIDDEN_HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand'];
+      const trueHomeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+      const isTakingFromOpponentHiddenZone =
+        HIDDEN_HOME_ZONES.includes(card.zone) && card.ownerId !== player.id;
+      const homeOwnerId = isTakingFromOpponentHiddenZone ? player.id : trueHomeOwnerId;
 
       // Lost souls sent to discard or reserve go to land-of-bondage instead
       const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
