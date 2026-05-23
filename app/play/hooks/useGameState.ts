@@ -121,6 +121,7 @@ export interface GameState {
   spawnLostSoul: (testament: string, posX: string, posY: string, targetPlayerId?: string) => void;
   removeToken: (cardInstanceId: bigint) => void;
   executeCardAbility: (sourceInstanceId: string, abilityIndex: number) => void;
+  executeCardAbilityWithCount: (sourceInstanceId: string, abilityIndex: number, count: number) => void;
   imitateLostSoul: (sourceInstanceId: string, targetInstanceId: string) => void;
   stopImitatingLostSoul: (sourceInstanceId: string) => void;
   surrenderLostSoul: (cardInstanceId: bigint) => void;
@@ -667,6 +668,18 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const executeCardAbilityWithCount = useCallback(
+    (sourceInstanceId: string, abilityIndex: number, count: number) => {
+      conn?.reducers.executeCardAbilityWithCount({
+        gameId,
+        cardInstanceId: BigInt(sourceInstanceId),
+        abilityIndex: BigInt(abilityIndex),
+        chosenCount: BigInt(count),
+      });
+    },
+    [conn, gameId],
+  );
+
   const imitateLostSoul = useCallback(
     (sourceInstanceId: string, targetInstanceId: string) => {
       conn?.reducers.imitateLostSoul({
@@ -922,6 +935,7 @@ export function useGameState(gameId: bigint): GameState {
     spawnLostSoul,
     removeToken,
     executeCardAbility,
+    executeCardAbilityWithCount,
     imitateLostSoul,
     stopImitatingLostSoul,
     surrenderLostSoul,

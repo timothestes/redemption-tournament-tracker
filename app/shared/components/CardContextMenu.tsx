@@ -298,6 +298,16 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
                       },
                       onCancel: () => {},
                     });
+                  } else if (ability.type === 'draw_bottom_of_deck_choose') {
+                    actions.beginCountPrompt?.({
+                      title: 'Draw X from bottom of deck',
+                      cardName: card.cardName,
+                      defaultCount: 1,
+                      onConfirm: (count) => {
+                        actions.executeCardAbilityWithCount?.(card.instanceId, index, count);
+                      },
+                      onCancel: () => {},
+                    });
                   } else {
                     actions.executeCardAbility?.(card.instanceId, index);
                   }

@@ -35,6 +35,7 @@ export type CardAbility = AbilityBase & (
   | { type: 'reserve_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
+  | { type: 'draw_bottom_of_deck_choose' }
   | { type: 'underdeck_top_of_deck'; count: number }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
   | { type: 'play_all_lost_souls' }
@@ -120,6 +121,12 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   "Herod's Temple [2022 - GoC P]":                       [{ type: 'reserve_top_of_deck', count: 1 }],
   'Treacherous Land':                                    [{ type: 'draw_bottom_of_deck', count: 1 }],
   'Treacherous Land (2022 - 2nd Place)':                 [{ type: 'draw_bottom_of_deck', count: 1 }],
+  'Balaam Son of Beor':                                  [{ type: 'draw_bottom_of_deck', count: 2 }],
+  'Destructive Sin (GoC)':                               [{ type: 'draw_bottom_of_deck', count: 1 }],
+  'High Places (LoC)':                                   [{ type: 'draw_bottom_of_deck', count: 1 }],
+  'Choked Seed (GoC)':                                   [{ type: 'draw_bottom_of_deck_choose' }],
+  'Destroying Spirit (GoC)':                             [{ type: 'draw_bottom_of_deck_choose' }],
+  'Messenger of Satan (EC)':                             [{ type: 'draw_bottom_of_deck_choose' }],
   'Three Woes (RoJ AB)':                                 [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
   'Three Woes (RoJ)':                                    [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
   'Three Woes [Fundraiser]':                             [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],

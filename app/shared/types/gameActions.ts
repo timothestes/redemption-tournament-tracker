@@ -14,6 +14,19 @@ export interface TargetingRequest {
 }
 
 /**
+ * Numeric input prompt issued by the menu when an ability needs the player to
+ * pick a count at activation time (currently only `draw_bottom_of_deck_choose`).
+ * The canvas owns the dialog state.
+ */
+export interface CountPromptRequest {
+  title: string;
+  cardName: string;
+  defaultCount: number;
+  onConfirm: (count: number) => void;
+  onCancel: () => void;
+}
+
+/**
  * Common interface for game actions shared between goldfish and multiplayer modes.
  * All IDs are strings — multiplayer adapter converts to bigint internally.
  */
@@ -56,6 +69,13 @@ export interface GameActions {
   // Custom per-card abilities (optional — registry-driven right-click actions).
   // Implemented by both goldfish and multiplayer. See lib/cards/cardAbilities.ts.
   executeCardAbility?(sourceInstanceId: string, abilityIndex: number): void;
+
+  // Variant of executeCardAbility for abilities whose count is chosen by the
+  // player at activation time (currently only `draw_bottom_of_deck_choose`).
+  // The CardContextMenu opens a count prompt via beginCountPrompt; on confirm
+  // the canvas invokes this with the chosen count.
+  executeCardAbilityWithCount?(sourceInstanceId: string, abilityIndex: number, count: number): void;
+  beginCountPrompt?(req: CountPromptRequest): void;
 
   // Per-card hand reveal (optional — implemented by both goldfish and multiplayer).
   // Temporarily reveals a single hand card to opponents/spectators for 30 seconds.

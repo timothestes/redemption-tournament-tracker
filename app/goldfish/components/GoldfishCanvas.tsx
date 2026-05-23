@@ -34,7 +34,8 @@ import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
 import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
 import { TargetCardOverlay } from '@/app/shared/components/TargetCardOverlay';
-import { GameActions, TargetingRequest } from '@/app/shared/types/gameActions';
+import { GameActions, TargetingRequest, CountPromptRequest } from '@/app/shared/types/gameActions';
+import { CountPromptDialog } from '@/app/shared/components/CountPromptDialog';
 import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
@@ -116,6 +117,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // through `onSelect`. Cleared by Esc, the banner's Cancel button, or any
   // eligible card click.
   const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
+  const [countPrompt, setCountPrompt] = useState<CountPromptRequest | null>(null);
 
   // Adapter: bridge goldfish game context to shared GameActions interface
   const goldfishActions: GameActions = useMemo(() => ({
@@ -188,6 +190,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       dispatch(gameActionCreators.stopImitatingLostSoul(sourceInstanceId));
     },
     beginTargeting: (req) => setTargeting(req),
+    executeCardAbilityWithCount: (cardId, abilityIndex, count) => {
+      dispatch(gameActionCreators.executeCardAbilityWithCount(cardId, abilityIndex, count));
+    },
+    beginCountPrompt: (req) => setCountPrompt(req),
   }), [moveCard, moveCardsBatch, flipCard, revealCardInHand, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones, dispatch]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components
@@ -2927,6 +2933,22 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           onCancel={() => {
             targeting.onCancel();
             setTargeting(null);
+          }}
+        />
+      )}
+
+      {countPrompt && (
+        <CountPromptDialog
+          req={{
+            ...countPrompt,
+            onConfirm: (count) => {
+              countPrompt.onConfirm(count);
+              setCountPrompt(null);
+            },
+            onCancel: () => {
+              countPrompt.onCancel();
+              setCountPrompt(null);
+            },
           }}
         />
       )}

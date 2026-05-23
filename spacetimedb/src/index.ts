@@ -2717,7 +2717,13 @@ export const move_cards_batch = spacetimedb.reducer(
       // Mirror move_card's auto-reveal: cards landing in a hand via an
       // identity-revealing move flash face-up briefly. Uses cardFinalZone (not
       // toZone) so a redirect to LOB never triggers the reveal.
-      const autoReveal = cardFinalZone === 'hand' && card.zone !== 'hand' && !hideIdentity;
+      // Blind draws from the deck (right-click "Draw N from top/bottom/random")
+      // must stay face-down in hand. Searches and tutors that go through this
+      // path don't set fromSource, so they still auto-reveal as expected.
+      const isBlindDeckDraw = fromSource === 'top-of-deck'
+        || fromSource === 'bottom-of-deck' || fromSource === 'random-from-deck';
+      const autoReveal = cardFinalZone === 'hand' && card.zone !== 'hand'
+        && !isBlindDeckDraw && !hideIdentity;
       const newRevealExpiresAt = autoReveal
         ? new Timestamp(ctx.timestamp.microsSinceUnixEpoch + AUTO_REVEAL_HAND_MICROS)
         : undefined;
@@ -3192,7 +3198,9 @@ function drawBottomOfDeckImpl(
   if (deckCards.length === 0) return;
 
   let handCount = playerCards.filter((c: any) => c.zone === 'hand').length;
-  const n = Math.min(ability.count, deckCards.length);
+  const handRoom = Math.max(0, HAND_LIMIT - handCount);
+  const n = Math.min(ability.count, deckCards.length, handRoom);
+  if (n === 0) return;
 
   const bottom = deckCards.slice(deckCards.length - n);
   const movedCards: { name: string; img: string }[] = [];
@@ -3392,6 +3400,8 @@ export const execute_card_ability = spacetimedb.reducer(
         return reserveTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'draw_bottom_of_deck':
         return drawBottomOfDeckImpl(ctx, source, ability, player, gameId);
+      case 'draw_bottom_of_deck_choose':
+        throw new SenderError('draw_bottom_of_deck_choose is dispatched via execute_card_ability_with_count');
       case 'underdeck_top_of_deck':
         return underdeckTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'set_card_outline':
@@ -3401,6 +3411,53 @@ export const execute_card_ability = spacetimedb.reducer(
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: execute_card_ability_with_count
+//
+// Variant of execute_card_ability for abilities whose count is chosen by the
+// player at activation time (currently only draw_bottom_of_deck_choose).
+// Validates the same ownership/zone preconditions, then dispatches to the
+// underlying impl with the client-supplied count.
+// ---------------------------------------------------------------------------
+export const execute_card_ability_with_count = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    abilityIndex: t.u64(),
+    chosenCount: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId, abilityIndex, chosenCount }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const source = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!source) throw new SenderError('Card not found');
+    if (source.gameId !== gameId) throw new SenderError('Card not in this game');
+    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+
+    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
+    if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
+      throw new SenderError('Source card must be in play');
+    }
+
+    const abilities = getEffectiveAbilities(source);
+    const ability = abilities[Number(abilityIndex)];
+    if (!ability) throw new SenderError('No such ability');
+
+    if (ability.type !== 'draw_bottom_of_deck_choose') {
+      throw new SenderError('Ability does not accept a chosen count');
+    }
+    if (chosenCount < 1n) throw new SenderError('Count must be at least 1');
+
+    drawBottomOfDeckImpl(
+      ctx,
+      source,
+      { type: 'draw_bottom_of_deck', count: Number(chosenCount) },
+      player,
+      gameId,
+    );
   },
 );
 

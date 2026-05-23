@@ -306,7 +306,9 @@ function drawBottomOfDeckInState(
   if (state.zones.deck.length === 0) return state;
 
   const zones = cloneZones(state.zones);
-  const n = Math.min(ability.count, zones.deck.length);
+  const handRoom = Math.max(0, HAND_LIMIT - zones.hand.length);
+  const n = Math.min(ability.count, zones.deck.length, handRoom);
+  if (n === 0) return state;
   const taken = zones.deck.slice(zones.deck.length - n).map(c => ({
     ...c,
     zone: 'hand' as ZoneId,
@@ -1229,6 +1231,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return reserveTopOfDeckInState(state, source, ability, history);
         case 'draw_bottom_of_deck':
           return drawBottomOfDeckInState(state, source, ability, history);
+        case 'draw_bottom_of_deck_choose':
+          // Client opens a count dialog and dispatches EXECUTE_CARD_ABILITY_WITH_COUNT
+          // — this action carries no count, so no-op here.
+          return state;
         case 'underdeck_top_of_deck':
           return underdeckTopOfDeckInState(state, source, ability, history);
         case 'set_card_outline':
@@ -1250,6 +1256,33 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return state;
         }
       }
+    }
+
+    case 'EXECUTE_CARD_ABILITY_WITH_COUNT': {
+      const { cardInstanceId, abilityIndex, quantity } = action.payload;
+      if (!cardInstanceId || abilityIndex === undefined || typeof quantity !== 'number') return state;
+      if (quantity < 1) return state;
+
+      let source: GameCard | undefined;
+      for (const zone of Object.values(state.zones)) {
+        const found = zone.find(c => c.instanceId === cardInstanceId);
+        if (found) { source = found; break; }
+      }
+      if (!source) return state;
+
+      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
+      if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+
+      const ability = getEffectiveAbilities(source)[abilityIndex];
+      if (!ability) return state;
+      if (ability.type !== 'draw_bottom_of_deck_choose') return state;
+
+      return drawBottomOfDeckInState(
+        state,
+        source,
+        { type: 'draw_bottom_of_deck', count: quantity },
+        history,
+      );
     }
 
     case 'IMITATE_LOST_SOUL': {

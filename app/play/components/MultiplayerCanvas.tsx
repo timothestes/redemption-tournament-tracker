@@ -41,7 +41,8 @@ import { ConsentDialog } from '@/app/shared/components/ConsentDialog';
 import { OpponentBrowseModal } from '@/app/shared/components/OpponentBrowseModal';
 import { showGameToast } from '@/app/shared/components/GameToast';
 import { TargetCardOverlay } from '@/app/shared/components/TargetCardOverlay';
-import type { GameActions, TargetingRequest } from '@/app/shared/types/gameActions';
+import type { GameActions, TargetingRequest, CountPromptRequest } from '@/app/shared/types/gameActions';
+import { CountPromptDialog } from '@/app/shared/components/CountPromptDialog';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
@@ -773,6 +774,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ineligible cards and routes the next eligible click through `onSelect`.
   // Cleared by Esc, the banner's Cancel button, or any eligible card click.
   const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
+  const [countPrompt, setCountPrompt] = useState<CountPromptRequest | null>(null);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notePopover, setNotePopover] = useState<{
     cardId: string;
@@ -1409,6 +1411,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     stopImitatingLostSoul: (sourceInstanceId) => {
       gameState.stopImitatingLostSoul(sourceInstanceId);
     },
+    executeCardAbilityWithCount: (sourceInstanceId, abilityIndex, count) => {
+      gameState.executeCardAbilityWithCount(sourceInstanceId, abilityIndex, count);
+    },
+    beginCountPrompt: (req) => setCountPrompt(req),
   }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
@@ -7367,6 +7373,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onCancel={() => {
             targeting.onCancel();
             setTargeting(null);
+          }}
+        />
+      )}
+
+      {countPrompt && (
+        <CountPromptDialog
+          req={{
+            ...countPrompt,
+            onConfirm: (count) => {
+              countPrompt.onConfirm(count);
+              setCountPrompt(null);
+            },
+            onCancel: () => {
+              countPrompt.onCancel();
+              setCountPrompt(null);
+            },
           }}
         />
       )}

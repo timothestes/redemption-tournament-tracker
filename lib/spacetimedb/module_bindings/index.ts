@@ -50,6 +50,7 @@ import EndTurnReducer from "./end_turn_reducer";
 import ExchangeCardsReducer from "./exchange_cards_reducer";
 import ExchangeFromDeckReducer from "./exchange_from_deck_reducer";
 import ExecuteCardAbilityReducer from "./execute_card_ability_reducer";
+import ExecuteCardAbilityWithCountReducer from "./execute_card_ability_with_count_reducer";
 import FlipCardReducer from "./flip_card_reducer";
 import ImitateLostSoulReducer from "./imitate_lost_soul_reducer";
 import JoinAsSpectatorReducer from "./join_as_spectator_reducer";
@@ -329,6 +330,7 @@ const reducersSchema = __reducers(
   __reducerSchema("exchange_cards", ExchangeCardsReducer),
   __reducerSchema("exchange_from_deck", ExchangeFromDeckReducer),
   __reducerSchema("execute_card_ability", ExecuteCardAbilityReducer),
+  __reducerSchema("execute_card_ability_with_count", ExecuteCardAbilityWithCountReducer),
   __reducerSchema("flip_card", FlipCardReducer),
   __reducerSchema("imitate_lost_soul", ImitateLostSoulReducer),
   __reducerSchema("join_as_spectator", JoinAsSpectatorReducer),
