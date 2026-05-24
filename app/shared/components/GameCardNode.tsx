@@ -1,12 +1,13 @@
 'use client';
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { Group, Rect, Image as KonvaImage, Circle, Text, Arc } from 'react-konva';
+import { Group, Rect, Image as KonvaImage, Circle, Text, Arc, Path } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { GameCard, COUNTER_COLORS } from '../../goldfish/types';
 import { findCard } from '@/lib/cards/lookup';
 import { simplifyLostSoulName } from '@/lib/cards/cardAbilities';
+import { useCardPreview } from '../../goldfish/state/CardPreviewContext';
 
 const IMITATE_LABEL_HEIGHT = 18;
 
@@ -122,6 +123,12 @@ export const GameCardNode = memo(function GameCardNode({
   // otherwise render face-down (opponent hand view).
   const showFace = (!card.isFlipped || isActivelyRevealed) && image;
   const [isDragging, setIsDragging] = useState(false);
+
+  // Flip-preview eye: meek cards render upside-down on the table; hovering the
+  // eye un-rotates them in the preview surfaces so the opponent can read them.
+  const { setPreviewFlipped } = useCardPreview();
+  const showFlipEye = card.isMeek && hoverProgress != null && hoverProgress > 0 && !isDragging;
+  const [eyeHovered, setEyeHovered] = useState(false);
 
   // Ref for the LOB arrival glow rect — used to run an imperative Konva Tween
   const arrivalGlowRef = useRef<Konva.Rect | null>(null);
@@ -496,6 +503,78 @@ export const GameCardNode = memo(function GameCardNode({
           );
         })()}
       </Group>
+
+      {/* Flip-preview eye — only visible while hovering a meek card. Hovering
+          the eye sets the preview-flipped flag in CardPreviewContext, which the
+          floating tooltip and loupe panel read to un-rotate the meek 180°.
+          Rendered in the outer group so it sits visually top-right of the card
+          regardless of the meek rotation applied to the inner group. */}
+      {showFlipEye && (
+        <Group
+          x={cardWidth - 14}
+          y={14}
+          onMouseEnter={(e) => {
+            const stage = e.target?.getStage?.();
+            if (stage) stage.container().style.cursor = 'pointer';
+            setEyeHovered(true);
+            setPreviewFlipped(true);
+          }}
+          onMouseLeave={(e) => {
+            const stage = e.target?.getStage?.();
+            if (stage) stage.container().style.cursor = 'default';
+            setEyeHovered(false);
+            setPreviewFlipped(false);
+          }}
+          onMouseDown={(e) => {
+            // Stop the click from initiating a card drag. Walk up to find the
+            // draggable ancestor and cancel its pending drag.
+            e.cancelBubble = true;
+            let p: any = e.target?.getParent?.();
+            while (p) {
+              if (typeof p.draggable === 'function' && p.draggable()) {
+                p.stopDrag?.();
+                break;
+              }
+              p = p.getParent?.();
+            }
+          }}
+          onClick={(e) => { e.cancelBubble = true; }}
+          onContextMenu={(e) => { e.cancelBubble = true; e.evt?.preventDefault?.(); }}
+        >
+          {/* Larger transparent hit target so hover registers easily */}
+          <Circle
+            radius={16}
+            fill="rgba(0,0,0,0.001)"
+            perfectDrawEnabled={false}
+          />
+          <Circle
+            radius={12}
+            fill={eyeHovered ? 'rgba(40,28,12,0.95)' : 'rgba(0,0,0,0.78)'}
+            stroke={eyeHovered ? '#e8d5a3' : 'rgba(232,213,163,0.5)'}
+            strokeWidth={eyeHovered ? 1.5 : 1}
+            perfectDrawEnabled={false}
+            listening={false}
+          />
+          {/* ArrowDownUp (lucide) — two parallel arrows, one pointing down and
+              one pointing up. Reads as "flip top-to-bottom" / vertical swap.
+              Bbox is (3,4)→(21,20); centered on (12,12) via offset. */}
+          <Path
+            data="M3 16 L7 20 L11 16 M7 20 V4 M21 8 L17 4 L13 8 M17 4 V20"
+            stroke="#e8d5a3"
+            strokeWidth={2}
+            strokeScaleEnabled={false}
+            lineCap="round"
+            lineJoin="round"
+            fillEnabled={false}
+            offsetX={12}
+            offsetY={12}
+            scaleX={15 / 24}
+            scaleY={15 / 24}
+            perfectDrawEnabled={false}
+            listening={false}
+          />
+        </Group>
+      )}
 
       {/* Imitate-name label overlay — only when the card has imitatingName AND
           no art swap occurred (cardImgFile still matches the canonical imgFile).

@@ -76,14 +76,14 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   );
   const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
 
-  // Drive 1s re-renders while any hand card has an active per-card reveal —
-  // needed for the countdown badge to tick and the auto-expiry to render.
-  const handHasActiveReveal = useMemo(
-    () => (state.zones.hand ?? []).some(
-      c => typeof c.revealUntil === 'number' && c.revealUntil > Date.now(),
-    ),
-    [state.zones.hand],
-  );
+  // Drive 1s re-renders while any visible card has an active per-card reveal —
+  // hand (30s flash) or reserve top (10s from Herod's Temple). Needed for the
+  // countdown badge to tick and the auto-expiry flip-back to render.
+  const handHasActiveReveal = useMemo(() => {
+    const hasReveal = (cards: typeof state.zones.hand) =>
+      cards.some(c => typeof c.revealUntil === 'number' && c.revealUntil > Date.now());
+    return hasReveal(state.zones.hand ?? []) || hasReveal(state.zones.reserve ?? []);
+  }, [state.zones.hand, state.zones.reserve]);
   useRevealTick(handHasActiveReveal);
 
   const handBrigadeCounts = useMemo(
@@ -1799,32 +1799,41 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               const overlap = sorted.length <= 1
                 ? 0
                 : Math.min(sidebarCardWidth * 0.3, (availW - sidebarCardWidth) / (sorted.length - 1));
+              const nowForReveal = Date.now();
               return (
                 <Group key={zoneId}>
-                  {sorted.map((card, i) => (
-                    <GameCardNode
-                      key={card.instanceId}
-                      card={card}
-                      x={zone.x + pad + i * overlap}
-                      y={zone.y + 24}
-                      rotation={0}
-                      cardWidth={sidebarCardWidth}
-                      cardHeight={sidebarCardHeight}
-                      image={getImage(card.cardImgFile)}
-                      {...(getTargetingProps(card) ?? {})}
-                      isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
-                      nodeRef={registerCardNode}
-                      onDragStart={handleCardDragStart}
-                      onDragMove={handleCardDragMove}
-                      onDragEnd={handleCardDragEnd}
-                      onContextMenu={handleBrowseZoneCardContextMenu}
-                      onClick={handleBrowseZoneCardClick}
-                      onDblClick={handleCardDblClick}
-                      onMouseEnter={handleCardMouseEnter}
-                      onMouseLeave={handleCardMouseLeave}
-                    />
-                  ))}
+                  {sorted.map((card, i) => {
+                    // Spread the card to a fresh ref while a reveal is active
+                    // so the memoized GameCardNode re-renders each tick — the
+                    // countdown ring reads Date.now() at render time.
+                    const cardForNode = (typeof card.revealUntil === 'number' && card.revealUntil > nowForReveal)
+                      ? { ...card }
+                      : card;
+                    return (
+                      <GameCardNode
+                        key={card.instanceId}
+                        card={cardForNode}
+                        x={zone.x + pad + i * overlap}
+                        y={zone.y + 24}
+                        rotation={0}
+                        cardWidth={sidebarCardWidth}
+                        cardHeight={sidebarCardHeight}
+                        image={getImage(card.cardImgFile)}
+                        {...(getTargetingProps(card) ?? {})}
+                        isSelected={selectedIds.has(card.instanceId)}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        nodeRef={registerCardNode}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleBrowseZoneCardContextMenu}
+                        onClick={handleBrowseZoneCardClick}
+                        onDblClick={handleCardDblClick}
+                        onMouseEnter={handleCardMouseEnter}
+                        onMouseLeave={handleCardMouseLeave}
+                      />
+                    );
+                  })}
                 </Group>
               );
             }

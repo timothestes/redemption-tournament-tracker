@@ -471,20 +471,42 @@ function reserveTopOfDeckInState(
   if (state.zones.deck.length === 0) return state;
 
   // Phase 2 — build new zones. Top of deck is zones.deck[0] (matches shift()
-  // usage in shuffleAndDrawInState and drawCard).
+  // usage in shuffleAndDrawInState and drawCard). Reserved cards land face-down
+  // on top of the reserve with a 10s reveal so the player can briefly see what
+  // came off the deck (matches the per-card hand reveal mechanic). Lost Souls
+  // auto-route to Land of Bondage face-up (no reveal) when the option is on.
   const zones = cloneZones(state.zones);
   const n = Math.min(ability.count, zones.deck.length);
-  const taken = zones.deck.slice(0, n).map(c => ({
-    ...c,
-    zone: 'reserve' as ZoneId,
-    // Face-down: player didn't look at the card. Matches the initial reserve
-    // state (see buildInitialGameState / insertCardsShuffleDraw in the server).
-    isFlipped: true,
-    posX: undefined,
-    posY: undefined,
-  }));
+  const taken = zones.deck.slice(0, n);
   zones.deck = zones.deck.slice(n);
-  zones.reserve = [...taken, ...zones.reserve];
+
+  const REVEAL_MS = 10_000;
+  const revealUntil = Date.now() + REVEAL_MS;
+  const reservedCards: GameCard[] = [];
+  for (const card of taken) {
+    if (state.options.autoRouteLostSouls && isLostSoul(card)) {
+      zones['land-of-bondage'] = [...zones['land-of-bondage'], {
+        ...card,
+        zone: 'land-of-bondage',
+        isFlipped: false,
+        posX: undefined,
+        posY: undefined,
+        revealUntil: undefined,
+        revealDurationMs: undefined,
+      }];
+    } else {
+      reservedCards.push({
+        ...card,
+        zone: 'reserve',
+        isFlipped: true,
+        posX: undefined,
+        posY: undefined,
+        revealUntil,
+        revealDurationMs: REVEAL_MS,
+      });
+    }
+  }
+  zones.reserve = [...reservedCards, ...zones.reserve];
 
   return { ...state, zones, history };
 }

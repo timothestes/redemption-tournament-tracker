@@ -3135,16 +3135,35 @@ function reserveTopOfDeckImpl(
   const reserveCards = playerCards.filter((c: any) => c.zone === 'reserve');
   const n = Math.min(ability.count, deckCards.length);
 
-  // Shift existing reserve cards' zoneIndex up by n so the new arrivals
-  // occupy slots [0..n-1] — matches "top of deck" semantics in
-  // move_card_to_top_of_deck.
-  for (const rc of reserveCards) {
-    ctx.db.CardInstance.id.update({ ...rc, zoneIndex: rc.zoneIndex + BigInt(n) });
+  // Split: Lost Souls auto-route to LoB when the option is on; the rest go to
+  // reserve. Each reserved card gets a 10s reveal so the player (and opponent)
+  // can briefly see what came off the deck — matches the per-card hand reveal.
+  const taken = deckCards.slice(0, n);
+  const toReserve: any[] = [];
+  const toLob: any[] = [];
+  for (const card of taken) {
+    const isLostSoul =
+      player.autoRouteLostSouls &&
+      (card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul'));
+    if (isLostSoul) toLob.push(card);
+    else toReserve.push(card);
   }
 
-  const movedCards: { name: string; img: string }[] = [];
-  for (let i = 0; i < n; i++) {
-    const top = deckCards[i];
+  // Shift existing reserve cards' zoneIndex up by the number of new arrivals so
+  // they occupy slots [0..toReserve.length-1] — matches "top of deck" semantics
+  // in move_card_to_top_of_deck.
+  const shiftBy = BigInt(toReserve.length);
+  if (shiftBy > 0n) {
+    for (const rc of reserveCards) {
+      ctx.db.CardInstance.id.update({ ...rc, zoneIndex: rc.zoneIndex + shiftBy });
+    }
+  }
+
+  const TEN_SECONDS_MICROS = 10_000_000n;
+  const expiresAt = new Timestamp(ctx.timestamp.microsSinceUnixEpoch + TEN_SECONDS_MICROS);
+  const reservedCards: { name: string; img: string }[] = [];
+  for (let i = 0; i < toReserve.length; i++) {
+    const top = toReserve[i];
     ctx.db.CardInstance.id.update({
       ...top,
       zone: 'reserve',
@@ -3152,18 +3171,44 @@ function reserveTopOfDeckImpl(
       posX: '',
       posY: '',
       isFlipped: true,
+      revealExpiresAt: expiresAt,
+      revealStartedAt: ctx.timestamp,
     });
-    movedCards.push({ name: top.cardName, img: top.cardImgFile });
+    reservedCards.push({ name: top.cardName, img: top.cardImgFile });
+  }
+
+  // Route Lost Souls to the end of the player's LoB face-up.
+  let nextLobIdx = 0n;
+  for (const c of playerCards) {
+    if (c.zone === 'land-of-bondage' && c.zoneIndex >= nextLobIdx) {
+      nextLobIdx = c.zoneIndex + 1n;
+    }
+  }
+  const routedToLob: { name: string; img: string }[] = [];
+  for (const ls of toLob) {
+    ctx.db.CardInstance.id.update({
+      ...ls,
+      zone: 'land-of-bondage',
+      zoneIndex: nextLobIdx,
+      posX: '',
+      posY: '',
+      isFlipped: false,
+      revealExpiresAt: undefined,
+      revealStartedAt: undefined,
+    });
+    nextLobIdx += 1n;
+    routedToLob.push({ name: ls.cardName, img: ls.cardImgFile });
   }
 
   logAction(
     ctx, gameId, player.id, 'RESERVE_TOP_OF_DECK',
     JSON.stringify({
-      count: n,
+      count: reservedCards.length,
       requested: ability.count,
       sourceCardName: source.cardName,
       sourceCardImgFile: source.cardImgFile,
-      cards: movedCards,
+      cards: reservedCards,
+      routedToLob,
     }),
     game.turnNumber, game.currentPhase,
   );

@@ -178,7 +178,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const gateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Card preview hook — must be called before any early returns (Rules of Hooks)
-  const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
+  const { isLoupeVisible, toggleLoupe, previewCard, isPreviewFlipped } = useCardPreview();
   const { isSpreadHand, toggleSpreadHand } = useSpreadHand();
 
   // Client-side undo stack for multiplayer reverse actions
@@ -1221,7 +1221,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                     width: '100%',
                     height: '100%',
                     objectFit: 'fill',
-                    transform: previewCard.isMeek ? 'rotate(180deg)' : undefined,
+                    transform: previewCard.isMeek && !isPreviewFlipped ? 'rotate(180deg)' : undefined,
                   }}
                 />
                 {previewCard.notes && (

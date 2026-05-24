@@ -326,8 +326,13 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const sourceName: string = data.sourceCardName ?? '';
       const sourceImg: string = data.sourceCardImgFile ?? '';
       const cards: { name: string; img: string }[] = Array.isArray(data.cards) ? data.cards : [];
+      const routedToLob: { name: string; img: string }[] = Array.isArray(data.routedToLob) ? data.routedToLob : [];
       const hasCards = cards.length > 0;
-      const prefix = count === 1 ? 'reserved top card of deck' : `reserved top ${count} cards of deck`;
+      const prefix = count === 0
+        ? 'tried to reserve top of deck'
+        : count === 1
+          ? 'reserved top card of deck'
+          : `reserved top ${count} cards of deck`;
       return (
         <>
           {prefix}
@@ -339,6 +344,11 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
           {sourceName ? (
             <>
               {' '}via <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+          {routedToLob.length > 0 ? (
+            <>
+              {' '}— <CardNameList cards={routedToLob} /> went to land of bondage instead
             </>
           ) : null}
         </>
@@ -434,7 +444,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         const name = playerNames?.[ownerId];
         if (!name) continue;
         crossClauses.push(
-          <span key={ownerId}>; sent <CardNameList cards={cards} /> to {name}&apos;s deck</span>
+          <span key={ownerId}>; <CardNameList cards={cards} /> shuffled into {name}&apos;s deck</span>
         );
       }
 

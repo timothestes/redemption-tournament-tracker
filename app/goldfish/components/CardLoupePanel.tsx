@@ -11,7 +11,7 @@ const HEADER_HEIGHT = 40;
 export { PANEL_WIDTH as LOUPE_PANEL_WIDTH, COLLAPSED_WIDTH as LOUPE_COLLAPSED_WIDTH };
 
 export function CardLoupePanel() {
-  const { previewCard, isLoupeVisible, toggleLoupe } = useCardPreview();
+  const { previewCard, isLoupeVisible, toggleLoupe, isPreviewFlipped } = useCardPreview();
 
   const imageUrl = previewCard ? getCardImageUrl(previewCard.cardImgFile) : '';
   const totalWidth = isLoupeVisible ? PANEL_WIDTH : COLLAPSED_WIDTH;
@@ -129,7 +129,7 @@ export function CardLoupePanel() {
                     display: 'block',
                     width: '100%',
                     height: 'auto',
-                    transform: previewCard.isMeek ? 'rotate(180deg)' : undefined,
+                    transform: previewCard.isMeek && !isPreviewFlipped ? 'rotate(180deg)' : undefined,
                   }}
                 />
                 {previewCard.notes && (

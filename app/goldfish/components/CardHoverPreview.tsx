@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameCard } from '../types';
 import { getCardImageUrl } from '../../shared/utils/cardImageUrl';
+import { useCardPreview } from '../state/CardPreviewContext';
 
 interface CardHoverPreviewProps {
   card: GameCard;
@@ -12,6 +13,7 @@ interface CardHoverPreviewProps {
 }
 
 export function CardHoverPreview({ card, anchorX, anchorY }: CardHoverPreviewProps) {
+  const { isPreviewFlipped } = useCardPreview();
   const previewWidth = 280;
   const previewHeight = previewWidth * 1.4;
   const imageUrl = getCardImageUrl(card.cardImgFile);
@@ -55,7 +57,7 @@ export function CardHoverPreview({ card, anchorX, anchorY }: CardHoverPreviewPro
           style={{
             display: 'block',
             borderRadius: 6,
-            transform: card.isMeek ? 'rotate(180deg)' : undefined,
+            transform: card.isMeek && !isPreviewFlipped ? 'rotate(180deg)' : undefined,
           }}
         />
       </motion.div>
