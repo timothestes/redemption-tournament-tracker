@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
-import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
+import { SpacetimeConnectionResetWrapper } from '@/app/play/components/SpacetimeConnectionResetWrapper';
 import { useGameState } from '@/app/play/hooks/useGameState';
 import { EmoteOverlay } from '@/app/shared/components/EmoteOverlay';
 import { SpectatorBar } from '@/app/play/components/SpectatorBar';
@@ -26,29 +26,12 @@ interface SpectatorClientProps {
 // Outer component — owns the connection builder and wraps the provider
 // ---------------------------------------------------------------------------
 export function SpectatorClient({ code }: SpectatorClientProps) {
-  const { connectionBuilder, isConnected, error } = useSpacetimeConnection();
-
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-center">
-          <p className="text-lg font-semibold text-destructive">Connection error</p>
-          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-          <a
-            href="/play"
-            className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Back to lobby
-          </a>
-        </div>
-      </div>
-    );
-  }
+  const { createBuilder, isConnected } = useSpacetimeConnection();
 
   return (
-    <SpacetimeProvider connectionBuilder={connectionBuilder}>
+    <SpacetimeConnectionResetWrapper createBuilder={createBuilder}>
       <SpectatorInner code={code} isConnected={isConnected} />
-    </SpacetimeProvider>
+    </SpacetimeConnectionResetWrapper>
   );
 }
 

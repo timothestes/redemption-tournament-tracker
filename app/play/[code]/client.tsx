@@ -73,27 +73,10 @@ interface GameClientProps {
 // Outer component — owns the connection builder and wraps the provider
 // ---------------------------------------------------------------------------
 export function GameClient({ code }: GameClientProps) {
-  const { connectionBuilder, isConnected, error } = useSpacetimeConnection();
-
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-center">
-          <p className="text-lg font-semibold text-destructive">Connection error</p>
-          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-          <a
-            href="/play"
-            className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Back to lobby
-          </a>
-        </div>
-      </div>
-    );
-  }
+  const { createBuilder, isConnected } = useSpacetimeConnection();
 
   return (
-    <SpacetimeConnectionResetWrapper connectionBuilder={connectionBuilder}>
+    <SpacetimeConnectionResetWrapper createBuilder={createBuilder}>
       <ReconnectOnResume />
       <CardPreviewProvider storageKey="multiplayer-loupe-visible" defaultVisible>
         <SpreadHandProvider>
