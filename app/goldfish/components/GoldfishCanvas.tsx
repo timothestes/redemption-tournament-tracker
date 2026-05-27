@@ -40,12 +40,14 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
+import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePrompt';
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
-import { getEffectiveAbilities } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isLostSoulCard } from '@/lib/cards/cardAbilities';
 import { Link2Off } from 'lucide-react';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
@@ -75,6 +77,23 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     [state.zones],
   );
   const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
+
+  // ---- Lost Soul cinematic — full-screen flourish on arrival ----
+  // Filter to actual Lost Souls (sites can be attached to LOB cards but they
+  // shouldn't trigger the cinematic). Caller filters; hook just detects arrivals.
+  // Dep is narrowed to the LOB array specifically so unrelated zone mutations
+  // (territory drags, hand shuffles, etc.) don't re-run this work.
+  const lobSouls = useMemo(() => {
+    const cards = state.zones['land-of-bondage'] ?? [];
+    return cards
+      .filter(c => isLostSoulCard(c))
+      .map(c => ({
+        instanceId: c.instanceId,
+        cardName: c.cardName,
+        cardImgFile: c.cardImgFile,
+      }));
+  }, [state.zones['land-of-bondage']]);
+  const { activeBatch: soulCinematic } = useLostSoulCinematic(lobSouls);
 
   // Drive 1s re-renders while any visible card has an active per-card reveal —
   // hand (30s flash) or reserve top (10s from Herod's Temple). Needed for the
@@ -2935,6 +2954,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       <GameToastContainer />
       <CardChoicePromptContainer />
       <DiceRollOverlay />
+
+      {soulCinematic && (
+        <LostSoulCinematic
+          key={soulCinematic.id}
+          souls={soulCinematic.souls}
+        />
+      )}
 
       {targeting && (
         <TargetCardOverlay

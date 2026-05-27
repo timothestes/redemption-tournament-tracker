@@ -283,6 +283,18 @@ export function isNewTestamentLostSoul(reference: string): boolean {
 }
 
 /**
+ * Single source of truth for "is this card a Lost Soul?". Handles both the
+ * goldfish `type` field and the multiplayer `cardType` field so the LOB
+ * arrival cinematic can't drift between the two canvases.
+ */
+export function isLostSoulCard(card: { type?: string; cardType?: string }): boolean {
+  const t = card.type ?? card.cardType ?? '';
+  if (!t) return false;
+  if (t === 'LS' || t === 'Lost Soul') return true;
+  return t.toLowerCase().includes('lost soul');
+}
+
+/**
  * Extracts a short label from a Lost Soul cardName for the imitation overlay.
  * Priority: quoted name → first parenthetical → cardName with "Lost Soul " prefix stripped.
  */

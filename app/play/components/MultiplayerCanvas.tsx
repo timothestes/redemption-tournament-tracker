@@ -46,7 +46,7 @@ import { CountPromptDialog } from '@/app/shared/components/CountPromptDialog';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
-import { getEffectiveAbilities } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isLostSoulCard } from '@/lib/cards/cardAbilities';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
@@ -67,6 +67,8 @@ import { Link2Off } from 'lucide-react';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
+import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { cardInstanceToGameCard } from '../utils/cardAdapter';
 import type { UndoStack } from '../hooks/useUndoStack';
@@ -494,6 +496,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   );
   const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myLobIds);
   const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppLobIds);
+
+  // ---- Lost Soul cinematic — combined across both players ----
+  // Combine my + opp LOB Lost Souls into one input so simultaneous arrivals
+  // share a single cinematic moment rather than triggering two overlays.
+  // Dep is narrowed to the LOB arrays so unrelated card mutations don't
+  // re-run this work.
+  const lobSoulsForCinematic = useMemo(() => {
+    const out: { instanceId: string; cardName: string; cardImgFile: string }[] = [];
+    for (const c of (myCards['land-of-bondage'] ?? [])) {
+      if (!isLostSoulCard(c)) continue;
+      out.push({ instanceId: String(c.id), cardName: c.cardName, cardImgFile: c.cardImgFile });
+    }
+    for (const c of (opponentCards['land-of-bondage'] ?? [])) {
+      if (!isLostSoulCard(c)) continue;
+      out.push({ instanceId: String(c.id), cardName: c.cardName, cardImgFile: c.cardImgFile });
+    }
+    return out;
+  }, [myCards['land-of-bondage'], opponentCards['land-of-bondage']]);
+  // Gate detection until the subscription has applied AND we know who the
+  // local player is — otherwise the initial SpacetimeDB push of pre-existing
+  // LOB souls would register as "new arrivals" on game load / reconnect.
+  const soulsHydrated = !gameState.isLoading && !!gameState.myPlayer;
+  const { activeBatch: soulCinematic } =
+    useLostSoulCinematic(lobSoulsForCinematic, soulsHydrated);
 
   // ---- Hand → play prompt for cards with `set_card_outline` abilities ----
   // Three Woes is the v1 target. The choice routes through the same
@@ -7434,6 +7460,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               setCountPrompt(null);
             },
           }}
+        />
+      )}
+
+      {soulCinematic && (
+        <LostSoulCinematic
+          key={soulCinematic.id}
+          souls={soulCinematic.souls}
         />
       )}
     </div>
