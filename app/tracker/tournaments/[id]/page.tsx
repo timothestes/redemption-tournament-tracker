@@ -519,8 +519,8 @@ export default function TournamentPage({
   }, [id]);
 
   return (
-    <div className="flex min-h-screen px-5 w-full jayden-gradient-bg">
-      <div className="max-w-4xl max-md:max-w-full mx-auto space-y-5">
+    <div className="flex min-h-screen px-3 sm:px-5 w-full jayden-gradient-bg">
+      <div className="w-full max-w-4xl mx-auto space-y-5">
         <Breadcrumb
           items={[
             { label: "Tournaments", href: "/tracker/tournaments" },
@@ -539,7 +539,7 @@ export default function TournamentPage({
             <div className="mb-6 space-y-4">
               {/* Title row with status badge */}
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-3xl font-bold">
+                <h1 className="text-2xl sm:text-3xl font-bold">
                   <button
                     type="button"
                     onClick={() => {

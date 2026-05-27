@@ -16,7 +16,7 @@ const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
-    month: "long",
+    month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
@@ -750,10 +750,10 @@ export default function TournamentRounds({
       duration={3500}
       onClose={() => setToast((prev) => ({ ...prev, show: false }))}
     />
-    <div className="w-[800px] max-xl:w-full mx-auto">
+    <div className="w-full max-w-[800px] mx-auto">
       <Card theme={{ root: { base: "flex rounded-lg border border-border bg-card shadow-sm", children: "flex h-full flex-col justify-center gap-4 p-3 sm:p-6" } }}>
         {error.message && (
-          <div className="p-4 mb-4 text-sm text-red-800 dark:text-red-300 rounded-lg bg-red-50 dark:bg-red-900/20">
+          <div className="p-4 mb-4 text-sm text-destructive rounded-lg bg-destructive/10">
             {error.message}
           </div>
         )}
@@ -1042,7 +1042,7 @@ export default function TournamentRounds({
                                     {match.player1_id.name}
                                   </p>
                                   <p className="text-xs text-muted-foreground tabular-nums">
-                                    MP {match.player1_match_points} · Diff {match.differential ?? "N/A"}
+                                    Match Pts {match.player1_match_points} · Diff {match.differential ?? "N/A"}
                                   </p>
                                 </div>
                                 <button
@@ -1064,7 +1064,7 @@ export default function TournamentRounds({
                                     {match.player2_id.name}
                                   </p>
                                   <p className="text-xs text-muted-foreground tabular-nums">
-                                    MP {match.player2_match_points} · Diff {match.differential2 ?? "N/A"}
+                                    Match Pts {match.player2_match_points} · Diff {match.differential2 ?? "N/A"}
                                   </p>
                                 </div>
                                 <button
@@ -1111,7 +1111,7 @@ export default function TournamentRounds({
                               {bye.participant_id.name}
                             </p>
                             <p className="text-xs text-muted-foreground tabular-nums">
-                              MP {bye.match_points} · Diff {bye.differential} · Bye
+                              Match Pts {bye.match_points} · Diff {bye.differential} · Bye
                             </p>
                           </div>
                           <button

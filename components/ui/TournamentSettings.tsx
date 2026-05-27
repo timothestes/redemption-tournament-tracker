@@ -121,7 +121,7 @@ export default function TournamentSettings({
     "w-full bg-background border border-border text-foreground rounded-lg p-2.5 focus:outline-none focus:border-primary/60 transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
 
   return (
-    <div className="w-[800px] max-xl:w-full mx-auto">
+    <div className="w-full max-w-[800px] mx-auto">
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
         <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <svg

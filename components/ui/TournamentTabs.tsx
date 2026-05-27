@@ -188,7 +188,7 @@ export default function TournamentTabs({
         {loading ? (
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
-          <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
+          <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
             <div className="rounded-lg border border-border bg-card jayden-gradient-bg shadow-sm">
               <div className="flex flex-col items-center justify-center py-12 px-6">
                 <p className="text-foreground font-medium mb-2">No participants found</p>
@@ -199,7 +199,7 @@ export default function TournamentTabs({
             </div>
           </div>
         ) : (
-          <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
+          <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
             <ParticipantTable
               tournamentStarted={tournamentStarted}
               tournamentEnded={tournamentEnded}
@@ -230,7 +230,7 @@ export default function TournamentTabs({
         icon={MdPeople}
         disabled={!tournamentStarted}
       >
-        <div className="min-w-[800px] max-xl:min-w-full w-full mx-auto overflow-x-auto">
+        <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
           <TournamentRounds
             tournamentId={tournamentId}
             isActive={activeTab === 1}

@@ -202,7 +202,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                   </div>
                   <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
                     <span>
-                      <span className="text-muted-foreground/70">MP</span>{" "}
+                      <span className="text-muted-foreground/70">Match Pts</span>{" "}
                       <span className="text-foreground font-medium">
                         {participant.match_points ?? 0}
                       </span>
@@ -263,7 +263,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
               return (
                 <Table.Row
                   key={participant.id}
-                  className={`${isWinner && tournamentEnded ? "dark:border-yellow-700 dark:bg-yellow-500/50" : ""} `}
+                  className={`${isWinner && tournamentEnded ? "bg-yellow-500/5 dark:bg-yellow-500/10 border-yellow-500/20" : ""} `}
                 >
                   <Table.Cell className="font-medium text-foreground py-3">
                     <div className="flex items-center gap-2 min-w-0">
@@ -272,7 +272,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                       )}
                       <span className="truncate">{participant.name}</span>
                       {participant.dropped_out && (
-                        <span className="text-red-500 text-[12px] flex-shrink-0">( Dropped )</span>
+                        <span className="text-destructive text-[11px] flex-shrink-0 uppercase tracking-wide">Dropped</span>
                       )}
                     </div>
                   </Table.Cell>
