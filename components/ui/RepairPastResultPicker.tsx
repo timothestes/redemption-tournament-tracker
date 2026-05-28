@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export interface PickerMatch {
   id: string;
@@ -21,6 +21,15 @@ export function RepairPastResultPicker({ open, onClose, completedRounds, matches
   const [round, setRound] = useState<number | "">(completedRounds[0] ?? "");
   const [search, setSearch] = useState("");
 
+  // Sync internal round state when completedRounds populates after mount.
+  // Without this, the picker is constructed with an empty completedRounds array
+  // and the filter below returns no matches even once data arrives.
+  useEffect(() => {
+    if (round === "" && completedRounds.length > 0) {
+      setRound(completedRounds[0]);
+    }
+  }, [completedRounds, round]);
+
   const filtered = useMemo(() => {
     if (round === "") return [];
     const lc = search.trim().toLowerCase();
@@ -36,42 +45,48 @@ export function RepairPastResultPicker({ open, onClose, completedRounds, matches
       <div className="w-full max-w-md rounded-t-lg sm:rounded-lg bg-card border border-border p-4">
         <h2 className="text-lg font-medium text-foreground">Repair past result</h2>
 
-        <label className="block mt-3 text-sm text-muted-foreground">Round</label>
-        <select
-          value={round}
-          onChange={(e) => setRound(e.target.value === "" ? "" : Number(e.target.value))}
-          className="mt-1 w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
-        >
-          {completedRounds.map(r => (
-            <option key={r} value={r}>Round {r}</option>
-          ))}
-        </select>
+        {completedRounds.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">Loading completed rounds…</p>
+        ) : (
+          <>
+            <label className="block mt-3 text-sm text-muted-foreground">Round</label>
+            <select
+              value={round}
+              onChange={(e) => setRound(e.target.value === "" ? "" : Number(e.target.value))}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
+            >
+              {completedRounds.map(r => (
+                <option key={r} value={r}>Round {r}</option>
+              ))}
+            </select>
 
-        <label className="block mt-3 text-sm text-muted-foreground">Search player</label>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Player name"
-          className="mt-1 w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
-        />
+            <label className="block mt-3 text-sm text-muted-foreground">Search player</label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Player name"
+              className="mt-1 w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
+            />
 
-        <ul className="mt-3 max-h-60 overflow-y-auto divide-y divide-border">
-          {filtered.map(m => (
-            <li key={m.id}>
-              <button
-                type="button"
-                onClick={() => { onPick(m.id); onClose(); }}
-                className="w-full text-left px-2 py-3 hover:bg-muted text-sm text-foreground"
-              >
-                {m.player1Name} vs {m.player2Name}
-              </button>
-            </li>
-          ))}
-          {filtered.length === 0 && (
-            <li className="px-2 py-3 text-sm text-muted-foreground">No matches found.</li>
-          )}
-        </ul>
+            <ul className="mt-3 max-h-60 overflow-y-auto divide-y divide-border">
+              {filtered.map(m => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => { onPick(m.id); onClose(); }}
+                    className="w-full text-left px-2 py-3 hover:bg-muted text-sm text-foreground"
+                  >
+                    {m.player1Name} vs {m.player2Name}
+                  </button>
+                </li>
+              ))}
+              {filtered.length === 0 && (
+                <li className="px-2 py-3 text-sm text-muted-foreground">No matches found.</li>
+              )}
+            </ul>
+          </>
+        )}
 
         <div className="mt-4 flex justify-end">
           <button type="button" onClick={onClose} className="px-3 py-2 rounded-md border border-border text-foreground">Close</button>

@@ -26,7 +26,7 @@ const formatDateTime = (timestamp: string | null) => {
 interface TournamentRoundsProps {
   tournamentId: string;
   isActive: boolean;
-  onTournamentEnd?: () => void;
+  onTournamentEnd?: () => void | Promise<void>;
   onRoundActiveChange?: (
     isActive: boolean,
     roundStartTime: string | null
@@ -436,8 +436,6 @@ export default function TournamentRounds({
           ...prev,
           has_ended: true,
         }));
-
-        onTournamentEnd?.();
       } else {
         await createPairing(currentPage + 1);
 
@@ -450,6 +448,13 @@ export default function TournamentRounds({
 
         if (tournamentError) throw tournamentError;
       }
+
+      // Refresh parent tournament state BEFORE updating local state so the
+      // header pill (which reads from the parent's `tournament`) reflects the
+      // new current_round / has_ended before we toggle our own round-active
+      // flag and re-render. Awaiting the parent's refetch closes the desync
+      // window that previously made the title-row badge lag the round panel.
+      await onTournamentEnd?.();
 
       setRoundInfo((prev) => ({
         ...prev,
@@ -898,16 +903,16 @@ export default function TournamentRounds({
                           Table
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Name
+                          Player 1
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Opponent
+                          Player 2
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Match Points
+                          Match Points (P1 / P2)
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Differential
+                          Differential (P1 / P2)
                         </th>
                         <th scope="col" className="px-4 py-2 text-right">
                           <span className="sr-only">Actions</span>
@@ -916,153 +921,123 @@ export default function TournamentRounds({
                     </thead>
                     <tbody>
                       {matches.length > 0 &&
-                        matches.map((match, index) => (
-                          <Fragment key={match.id}>
-                            <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {index + (tournamentInfo.starting_table_number || 1)}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player1_id.name}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player2_id.name}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player1_match_points}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.differential ?? "N/A"}
-                              </td>
-                              <td className="px-2">
-                                <div className="flex items-center space-x-1">
-                                  <MatchEditModal
-                                    key={match.player1_score + match.player2_score}
-                                    match={match}
-                                    fetchCurrentRoundData={fetchCurrentRoundData}
-                                    setMatchErrorIndex={setMatchErrorIndex}
-                                    isRoundActive={isRoundActive}
-                                    index={index}
-                                    tournament={tournamentInfo}
-                                  />
-                                  <button
-                                    title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? "Re-pair pairing" : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
-                                    className={`p-2 rounded-md flex items-center justify-center ${
-                                      currentPage === tournamentInfo.current_round && !roundInfo.started_at
-                                        ? repairMode && repairSourceMatch &&
-                                          (repairSourceMatch.isBye
-                                            ? false
-                                            : (repairSourceMatch.match && repairSourceMatch.match.id === match.id && !repairSourceMatch.isPlayer2))
-                                          ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
-                                          : repairMode
-                                            ? "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                            : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                        : "text-muted-foreground cursor-not-allowed"
-                                    }`}
-                                    onClick={() => {
-                                      if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
-                                        handleRepairClick(match, false);
-                                      }
-                                    }}
-                                    disabled={currentPage !== tournamentInfo.current_round || !!roundInfo.started_at}
-                                  >
-                                    <ArrowUpDown className="h-4 w-4" />
-                                  </button>
-                                  {isHost && isRoundCompleted && (
+                        matches.map((match, index) => {
+                          const repairEnabled =
+                            currentPage === tournamentInfo.current_round && !roundInfo.started_at;
+                          const isP1Selected =
+                            repairMode &&
+                            repairSourceMatch &&
+                            !repairSourceMatch.isBye &&
+                            repairSourceMatch.match?.id === match.id &&
+                            !repairSourceMatch.isPlayer2;
+                          const isP2Selected =
+                            repairMode &&
+                            repairSourceMatch &&
+                            !repairSourceMatch.isBye &&
+                            repairSourceMatch.match?.id === match.id &&
+                            repairSourceMatch.isPlayer2;
+                          const swapButtonClass = (selected: boolean) =>
+                            `p-2 rounded-md flex items-center justify-center ${
+                              repairEnabled
+                                ? selected
+                                  ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
+                                  : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
+                                : "text-muted-foreground cursor-not-allowed"
+                            }`;
+                          return (
+                            <Fragment key={match.id}>
+                              <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
+                                <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {index + (tournamentInfo.starting_table_number || 1)}
+                                </td>
+                                <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {match.player1_id.name}
+                                </td>
+                                <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {match.player2_id.name}
+                                </td>
+                                <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {match.player1_match_points} / {match.player2_match_points}
+                                </td>
+                                <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {match.differential ?? "N/A"} / {match.differential2 ?? "N/A"}
+                                </td>
+                                <td className="px-2">
+                                  <div className="flex items-center justify-end gap-1 flex-wrap">
                                     <MatchEditModal
-                                      key={`repair-${match.id}`}
+                                      key={match.player1_score + match.player2_score}
                                       match={match}
                                       fetchCurrentRoundData={fetchCurrentRoundData}
                                       setMatchErrorIndex={setMatchErrorIndex}
-                                      isRoundActive={false}
+                                      isRoundActive={isRoundActive}
                                       index={index}
                                       tournament={tournamentInfo}
-                                      mode="repair"
-                                      onRepairSuccess={() => {
-                                        showToast("Result repaired.", "success");
-                                        fetchMatchEdits();
-                                        onRepairCompleted?.();
-                                      }}
                                     />
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                            <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-card"}`}>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {index + (tournamentInfo.starting_table_number || 1)}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player2_id.name}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player1_id.name}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player2_match_points}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.differential2 ?? "N/A"}
-                              </td>
-                              <td className="px-2">
-                                <div className="flex items-center space-x-1">
-                                  <MatchEditModal
-                                    key={match.player1_score + match.player2_score}
-                                    match={match}
-                                    fetchCurrentRoundData={fetchCurrentRoundData}
-                                    setMatchErrorIndex={setMatchErrorIndex}
-                                    isRoundActive={isRoundActive}
-                                    index={index}
-                                    tournament={tournamentInfo}
-                                  />
-                                  <button
-                                    title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? "Re-pair pairing" : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
-                                    className={`p-2 rounded-md flex items-center justify-center ${
-                                      currentPage === tournamentInfo.current_round && !roundInfo.started_at
-                                        ? repairMode && repairSourceMatch &&
-                                          (repairSourceMatch.isBye
-                                            ? false
-                                            : (repairSourceMatch.match && repairSourceMatch.match.id === match.id && repairSourceMatch.isPlayer2))
-                                          ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
-                                          : repairMode
-                                            ? "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                            : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                        : "text-muted-foreground cursor-not-allowed"
-                                    }`}
-                                    onClick={() => {
-                                      if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
-                                        handleRepairClick(match, true);
-                                      }
-                                    }}
-                                    disabled={currentPage !== tournamentInfo.current_round || !!roundInfo.started_at}
-                                  >
-                                    <ArrowUpDown className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                            {isHost && (matchEditsByMatch[match.id]?.length ?? 0) > 0 && (
-                              <tr className="border-b border-border bg-muted/30">
-                                <td colSpan={6} className="px-4 py-1">
-                                  <details className="text-xs">
-                                    <summary className="cursor-pointer text-muted-foreground">
-                                      Edit history ({matchEditsByMatch[match.id]!.length})
-                                    </summary>
-                                    <ul className="mt-1 ml-3 space-y-1">
-                                      {matchEditsByMatch[match.id]!.map(e => (
-                                        <li key={e.id} className="text-muted-foreground">
-                                          {e.old_player1_score}-{e.old_player2_score} → {e.new_player1_score}-{e.new_player2_score}
-                                          {" · "}{new Date(e.edited_at).toLocaleString()}
-                                          {e.reason ? ` · ${e.reason}` : ""}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </details>
+                                    <button
+                                      title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? `Swap ${match.player1_id.name}` : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
+                                      aria-label={`Swap ${match.player1_id.name}`}
+                                      className={swapButtonClass(!!isP1Selected)}
+                                      onClick={() => {
+                                        if (repairEnabled) handleRepairClick(match, false);
+                                      }}
+                                      disabled={!repairEnabled}
+                                    >
+                                      <ArrowUpDown className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? `Swap ${match.player2_id.name}` : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
+                                      aria-label={`Swap ${match.player2_id.name}`}
+                                      className={swapButtonClass(!!isP2Selected)}
+                                      onClick={() => {
+                                        if (repairEnabled) handleRepairClick(match, true);
+                                      }}
+                                      disabled={!repairEnabled}
+                                    >
+                                      <ArrowUpDown className="h-4 w-4" />
+                                    </button>
+                                    {isHost && isRoundCompleted && (
+                                      <MatchEditModal
+                                        key={`repair-${match.id}`}
+                                        match={match}
+                                        fetchCurrentRoundData={fetchCurrentRoundData}
+                                        setMatchErrorIndex={setMatchErrorIndex}
+                                        isRoundActive={false}
+                                        index={index}
+                                        tournament={tournamentInfo}
+                                        mode="repair"
+                                        onRepairSuccess={() => {
+                                          showToast("Result repaired.", "success");
+                                          fetchMatchEdits();
+                                          onRepairCompleted?.();
+                                        }}
+                                      />
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
-                            )}
-                          </Fragment>
-                        ))}
+                              {isHost && (matchEditsByMatch[match.id]?.length ?? 0) > 0 && (
+                                <tr className="border-b border-border bg-muted/30">
+                                  <td colSpan={6} className="px-4 py-1">
+                                    <details className="text-xs">
+                                      <summary className="cursor-pointer text-muted-foreground">
+                                        Edit history ({matchEditsByMatch[match.id]!.length})
+                                      </summary>
+                                      <ul className="mt-1 ml-3 space-y-1">
+                                        {matchEditsByMatch[match.id]!.map(e => (
+                                          <li key={e.id} className="text-muted-foreground">
+                                            {e.old_player1_score}-{e.old_player2_score} → {e.new_player1_score}-{e.new_player2_score}
+                                            {" · "}{new Date(e.edited_at).toLocaleString()}
+                                            {e.reason ? ` · ${e.reason}` : ""}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </details>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
                     </tbody>
                   </table>}
 

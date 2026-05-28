@@ -22,6 +22,7 @@ import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/
 import { RepairTournamentBanner } from "../../../../components/ui/RepairTournamentBanner";
 import { RepairPastResultPicker, type PickerMatch } from "../../../../components/ui/RepairPastResultPicker";
 import MatchEditModal from "../../../../components/ui/match-edit";
+import ConfirmationDialog from "../../../../components/ui/confirmation-dialog";
 
 const supabase = createClient();
 
@@ -65,6 +66,9 @@ export default function TournamentPage({
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Confirmation dialogs
+  const [endTournamentConfirmOpen, setEndTournamentConfirmOpen] = useState(false);
 
   // Picker state for "Repair past result"
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -214,7 +218,13 @@ export default function TournamentPage({
       return;
     }
 
-    // Handle tournament end
+    // Destructive end-tournament path — confirm first.
+    setEndTournamentConfirmOpen(true);
+  };
+
+  const performEndTournament = async () => {
+    if (!tournament) return;
+
     const now = new Date().toISOString();
     if (latestRound && !latestRound?.is_completed) {
       const client = await createClient();
@@ -888,6 +898,18 @@ export default function TournamentPage({
           participantCount={participants.length}
           suggestedRounds={suggestNumberOfRounds(participants.length)}
         />
+        {tournament && (
+          <ConfirmationDialog
+            open={endTournamentConfirmOpen}
+            onOpenChange={setEndTournamentConfirmOpen}
+            onConfirm={performEndTournament}
+            variant="destructive"
+            title={`End ${tournament.name}?`}
+            description={`This will close Round ${tournament.current_round || 1} and lock all results. Players will see the tournament as ended.`}
+            confirmLabel="End tournament"
+            cancelLabel="Cancel"
+          />
+        )}
       </div>
     </div>
   );
