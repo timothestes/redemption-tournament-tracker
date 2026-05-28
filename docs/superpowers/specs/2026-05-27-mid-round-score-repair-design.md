@@ -29,6 +29,8 @@ We want hosts to be able to repair past-round scores mid-tournament, with predic
 - When safe (current round has no submitted results), let the host optionally regenerate the current round's pairings from the corrected standings.
 - Display a non-administrative "amended" indicator on standings for any round containing a corrected match, so players understand standings movement without exposing administrative detail.
 - Provide a complete audit log to hosts (who, when, old → new, optional reason).
+- Every new UI surface is fully usable on mobile viewports and in both light and dark themes.
+- Load-bearing correctness paths and major user-facing flows are covered by unit + integration + end-to-end tests respectively.
 
 ## Non-goals
 
@@ -208,15 +210,26 @@ After `repairMatchScore` succeeds, if the current round currently meets the "no 
 **Host-only audit log panel.**
 Rendered under the host controls panel in [app/tracker/tournaments/[id]/page.tsx](app/tracker/tournaments/[id]/page.tsx). Chronological list of all `match_edits` rows for the tournament, newest first. Each row shows round, the two participants, old score → new score, who edited, when, and the reason (if provided). No pagination in v1; typical events have a handful of entries.
 
-### Mobile
+### Mobile and dark mode
 
-The project is mobile-first per [CLAUDE.md](CLAUDE.md). Explicit mobile contract:
+Every UI surface introduced or modified by this feature must work correctly in mobile viewports and in dark mode. The project is mobile-first per [CLAUDE.md](CLAUDE.md) and supports both themes via `next-themes`.
+
+**Mobile contract:**
 
 - **Pencil icon hit area:** minimum 44×44 px.
 - **Repair dialog and confirm dialogs:** render as bottom sheets on viewports < 768 px, full-page on smaller phones if more vertical space is needed for the score selectors plus reason input.
 - **Primary action placement:** all confirm/save buttons at the bottom of the sheet, within thumb reach.
 - **Discoverability picker:** also renders as a bottom sheet on mobile.
 - **Audit log panel and inline edit history:** scrollable, with each row collapsible to fit narrow screens.
+- **Tournament-wide banner:** wraps cleanly at narrow widths; dismissible with a touch-friendly target.
+
+**Dark mode contract:**
+
+- All new UI uses the project's Tailwind design tokens (semantic colors like `bg-background`, `text-foreground`, `bg-muted`, `text-muted-foreground`, `border-border`) — no hardcoded color values. Tokens already resolve correctly for both themes; staying on tokens means dark mode is automatic.
+- The "amended" badge and tournament-wide banner must have sufficient contrast in both themes (verify against WCAG AA at minimum).
+- Disabled states (re-pair button when locked, regenerate button before checkbox is ticked) must be visibly disabled in both themes — not just lower opacity, since dark mode swallows opacity reductions.
+- Audit log rows, inline edit-history disclosures, and the picker dropdown all match existing dialog/panel surface styling so theme switching is uniform.
+- New components are spot-checked in both themes during implementation; the UI test suite verifies render correctness in both (see Testing).
 
 ### Realtime contract
 
@@ -249,20 +262,44 @@ The "amended" badge predicate (does this participant + round have any `match_edi
 
 ## Testing
 
-- **Unit:** `recomputeTotalsFromHistory` is idempotent under repeated edits to the same match (regression guard against the double-count hazard).
-- **Unit:** The chronological snapshot rewrite produces correct cumulative `matches.player1_match_points` / `differential` values for a participant's full match history, verified against a hand-computed sequence.
-- **Unit:** `repair_match_score` rejects non-host callers.
-- **Unit:** `repair_match_score` validates scores against `tournament.max_score`.
-- **Integration:** Edit a round-1 score after round 2 has started. Assert: round-1 `matches` row updated; all participant `match_points`/`differential` match a fresh `recomputeTotalsFromHistory`; per-match snapshots on every affected match are correct; `match_edits` row recorded.
-- **Integration:** Edit a round-1 score, then generate pairings for round 3. Assert pairing input reflects the corrected round-1 totals.
-- **Integration:** `regenerate_current_round_pairings` succeeds when no scores submitted; rejects when any score is non-null (without the unlock flag); succeeds with the unlock flag and deletes the prior scored rows.
-- **Integration:** RLS rejects a non-host attempting to insert a `match_edits` row.
-- **Integration:** Concurrent calls to `repair_match_score` for the same match serialize via the row lock; the second call sees the first call's writes.
-- **UI:** Pencil icon appears only for the host, only on rounds where `is_completed = true`.
-- **UI:** Re-pair button is enabled iff `round.is_completed = false` AND no `matches` row for the current round has a non-null `player1_score`; otherwise disabled with the documented tooltip.
-- **UI:** Re-pair confirm button is disabled until the confirmation checkbox is ticked.
-- **UI:** Amended badge renders on the row of any participant who played in a match referenced by a `match_edits` row, and only those rows.
-- **UI:** Tournament-wide banner appears when a `match_edits` row is inserted while a round is in progress, and disappears at the next round-end.
+Coverage is required at three levels: unit (pure functions and RPC inputs/outputs), integration (RPC + DB behavior under realistic conditions), and end-to-end (full host workflow through the UI). Anything load-bearing for correctness gets unit + integration coverage; the major user-facing flows get E2E coverage.
+
+**Unit:**
+
+- `recomputeTotalsFromHistory` is idempotent under repeated edits to the same match (regression guard against the double-count hazard).
+- The chronological snapshot rewrite produces correct cumulative `matches.player1_match_points` / `differential` values for a participant's full match history, verified against a hand-computed sequence.
+- `repair_match_score` rejects non-host callers.
+- `repair_match_score` validates scores against `tournament.max_score`.
+- The amended-badge predicate (does this participant + round have any `match_edits`?) returns correct booleans for representative cases.
+
+**Integration:**
+
+- Edit a round-1 score after round 2 has started. Assert: round-1 `matches` row updated; all participant `match_points`/`differential` match a fresh `recomputeTotalsFromHistory`; per-match snapshots on every affected match are correct; `match_edits` row recorded.
+- Edit a round-1 score, then generate pairings for round 3. Assert pairing input reflects the corrected round-1 totals.
+- `regenerate_current_round_pairings` succeeds when no scores submitted; rejects when any score is non-null (without the unlock flag); succeeds with the unlock flag and deletes the prior scored rows.
+- RLS rejects a non-host attempting to insert a `match_edits` row.
+- Concurrent calls to `repair_match_score` for the same match serialize via the row lock; the second call sees the first call's writes.
+
+**End-to-end (where it makes sense):**
+
+E2E tests cover the full host workflow through the UI, hitting a real database. Use the existing project E2E harness (Playwright or equivalent); skip E2E for anything already fully covered by unit + integration tests.
+
+- **Repair past-round score, golden path.** Host opens an in-progress tournament with completed rounds. Clicks the pencil on a past-round match card. Edits both scores. Adds a reason. Submits. Asserts: dialog closes, success toast appears, standings reflect the new totals, amended badge appears on the affected participants' standings rows, tournament-wide banner appears, audit log panel shows the new entry.
+- **Repair + inline re-pair from toast.** Same as above, but current round has no submitted scores. Click the inline "Re-pair current round?" button in the success toast. Confirm with the checkbox. Asserts: new pairings render, old pairings gone, standings unchanged from the repair.
+- **Unlock and re-pair escape hatch.** Current round has one submitted result. Click the re-pair button (disabled state), then the "Unlock and re-pair…" link. Asserts: the dialog lists the affected match with player names and scores; the regenerate button is disabled until the checkbox is ticked; on confirm, the prior result is deleted and new pairings render.
+- **Discoverability picker.** Click "Repair past result" in host controls. Select a round and search a player name. Assert: the match card with that player is scrolled into view and the pencil is highlighted.
+- **Just-ended round.** Host ends a round, immediately notices a fat-finger entry. Asserts: the just-ended round's matches now show the pencil icon; editing routes through repair (writes a `match_edits` row), not through the live-entry flow.
+- **Player view, no host affordances.** Sign in as a non-host participant viewing the same tournament. Asserts: no pencil icons, no re-pair button, no audit log panel, no "Unlock and re-pair" link. Amended badges still visible. Tournament-wide banner visible.
+- **Mobile viewport.** Run the repair golden-path test at 375×667 (iPhone SE viewport). Asserts: pencil hit area ≥ 44×44, dialog renders as a bottom sheet, primary action is reachable in the bottom half of the viewport, confirm checkbox is tappable without horizontal scroll.
+- **Dark mode.** Run the repair golden-path test with the theme set to dark. Asserts: all new UI renders without contrast or token-resolution issues; disabled-state buttons are visibly disabled; banner and badge meet contrast thresholds. Snapshot or visual-regression check against the light-mode equivalent to catch token-drift.
+
+**UI (component-level, lighter than E2E):**
+
+- Pencil icon appears only for the host, only on rounds where `is_completed = true`.
+- Re-pair button is enabled iff `round.is_completed = false` AND no `matches` row for the current round has a non-null `player1_score`; otherwise disabled with the documented tooltip.
+- Re-pair confirm button is disabled until the confirmation checkbox is ticked.
+- Amended badge renders on the row of any participant who played in a match referenced by a `match_edits` row, and only those rows.
+- Tournament-wide banner appears when a `match_edits` row is inserted while a round is in progress, and disappears at the next round-end.
 
 ## Rollout
 
