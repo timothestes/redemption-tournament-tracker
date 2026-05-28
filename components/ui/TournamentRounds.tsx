@@ -901,7 +901,7 @@ export default function TournamentRounds({
                     </div>
                   )}
                   {matches && matches.length > 0 && <table className="hidden md:table min-w-full text-sm text-left text-muted-foreground border-2 border-border">
-                    <thead className="text-xs uppercase font-normal text-foreground bg-muted border-b-2 border-border rounded-t-lg">
+                    <thead className="sticky top-0 z-10 text-xs uppercase font-normal text-foreground bg-muted border-b-2 border-border rounded-t-lg">
                       <tr>
                         <th scope="col" className="px-4 py-2 text-center">
                           Table
@@ -910,16 +910,27 @@ export default function TournamentRounds({
                           Player 1
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
+                          Result
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-center">
                           Player 2
                         </th>
-                        <th scope="col" className="px-4 py-2 text-center">
-                          Match Points (P1 / P2)
+                        <th
+                          scope="col"
+                          className="px-4 py-2 text-center"
+                          title="Cumulative match points after this round"
+                        >
+                          MP (P1 / P2)
                         </th>
-                        <th scope="col" className="px-4 py-2 text-center">
-                          Differential (P1 / P2)
+                        <th
+                          scope="col"
+                          className="px-4 py-2 text-center"
+                          title="Match-point differential after this round"
+                        >
+                          Diff (P1 / P2)
                         </th>
                         <th scope="col" className="px-4 py-2 text-right">
-                          <span className="sr-only">Actions</span>
+                          Actions
                         </th>
                       </tr>
                     </thead>
@@ -948,6 +959,20 @@ export default function TournamentRounds({
                                   : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
                                 : "text-muted-foreground cursor-not-allowed"
                             }`;
+                          const hasResult =
+                            match.player1_score !== null && match.player2_score !== null;
+                          const swapP1Title =
+                            currentPage === tournamentInfo.current_round
+                              ? !roundInfo.started_at
+                                ? `Swap ${match.player1_id.name}`
+                                : "Cannot re-pair pairing once round has started"
+                              : "Can only re-pair current round";
+                          const swapP2Title =
+                            currentPage === tournamentInfo.current_round
+                              ? !roundInfo.started_at
+                                ? `Swap ${match.player2_id.name}`
+                                : "Cannot re-pair pairing once round has started"
+                              : "Can only re-pair current round";
                           return (
                             <Fragment key={match.id}>
                               <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
@@ -956,6 +981,15 @@ export default function TournamentRounds({
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                   {match.player1_id.name}
+                                </td>
+                                <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {hasResult ? (
+                                    <span className="font-medium text-foreground">
+                                      {match.player1_score}&ndash;{match.player2_score}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">&mdash;</span>
+                                  )}
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                   {match.player2_id.name}
@@ -978,28 +1012,36 @@ export default function TournamentRounds({
                                       tournament={tournamentInfo}
                                       mode="edit"
                                     />
-                                    <button
-                                      title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? `Swap ${match.player1_id.name}` : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
-                                      aria-label={`Swap ${match.player1_id.name}`}
-                                      className={swapButtonClass(!!isP1Selected)}
-                                      onClick={() => {
-                                        if (repairEnabled) handleRepairClick(match, false);
-                                      }}
-                                      disabled={!repairEnabled}
-                                    >
-                                      <ArrowUpDown className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? `Swap ${match.player2_id.name}` : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
-                                      aria-label={`Swap ${match.player2_id.name}`}
-                                      className={swapButtonClass(!!isP2Selected)}
-                                      onClick={() => {
-                                        if (repairEnabled) handleRepairClick(match, true);
-                                      }}
-                                      disabled={!repairEnabled}
-                                    >
-                                      <ArrowUpDown className="h-4 w-4" />
-                                    </button>
+                                    <div className="relative group">
+                                      <button
+                                        aria-label={`Swap ${match.player1_id.name}`}
+                                        className={swapButtonClass(!!isP1Selected)}
+                                        onClick={() => {
+                                          if (repairEnabled) handleRepairClick(match, false);
+                                        }}
+                                        disabled={!repairEnabled}
+                                      >
+                                        <ArrowUpDown className="h-4 w-4" />
+                                      </button>
+                                      <div className="pointer-events-none absolute right-0 bottom-full mb-2 px-2 py-1 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap z-20">
+                                        {swapP1Title}
+                                      </div>
+                                    </div>
+                                    <div className="relative group">
+                                      <button
+                                        aria-label={`Swap ${match.player2_id.name}`}
+                                        className={swapButtonClass(!!isP2Selected)}
+                                        onClick={() => {
+                                          if (repairEnabled) handleRepairClick(match, true);
+                                        }}
+                                        disabled={!repairEnabled}
+                                      >
+                                        <ArrowUpDown className="h-4 w-4" />
+                                      </button>
+                                      <div className="pointer-events-none absolute right-0 bottom-full mb-2 px-2 py-1 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap z-20">
+                                        {swapP2Title}
+                                      </div>
+                                    </div>
                                     {isHost && isRoundCompleted && (
                                       <MatchEditModal
                                         key={`repair-${match.id}`}
@@ -1022,7 +1064,7 @@ export default function TournamentRounds({
                               </tr>
                               {isHost && (matchEditsByMatch[match.id]?.length ?? 0) > 0 && (
                                 <tr className="border-b border-border bg-muted/30">
-                                  <td colSpan={6} className="px-4 py-1">
+                                  <td colSpan={7} className="px-4 py-1">
                                     <details className="text-xs">
                                       <summary className="cursor-pointer text-muted-foreground">
                                         Edit history ({matchEditsByMatch[match.id]!.length})
