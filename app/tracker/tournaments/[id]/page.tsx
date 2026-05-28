@@ -18,6 +18,7 @@ import { recomputeTotalsFromHistory } from "../../../../lib/tournament/results";
 import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
 import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
 import { AuditLogPanel } from "../../../../components/ui/AuditLogPanel";
+import { RegeneratePairingsButton } from "../../../../components/ui/RegeneratePairingsButton";
 
 const supabase = createClient();
 
@@ -56,6 +57,7 @@ export default function TournamentPage({
   });
 
   const [latestRound, setLatestRound] = useState<any>(null);
+  const [scoredMatchCount, setScoredMatchCount] = useState(0);
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -500,6 +502,16 @@ export default function TournamentPage({
             setIsRoundActive(true);
           }
         }
+
+        if (tournament.current_round) {
+          const { data: matchData } = await client
+            .from("matches")
+            .select("player1_score")
+            .eq("tournament_id", tournament.id)
+            .eq("round", tournament.current_round)
+            .not("player1_score", "is", null);
+          setScoredMatchCount(matchData?.length ?? 0);
+        }
       })();
     }
   }, [tournament]);
@@ -684,6 +696,17 @@ export default function TournamentPage({
                     fetchTournamentDetails();
                     fetchDecklists();
                   }}
+                />
+              )}
+
+              {/* Re-pair button — host only, active tournaments only */}
+              {isHost && tournament.has_started && !tournament.has_ended && (
+                <RegeneratePairingsButton
+                  tournamentId={tournament.id}
+                  currentRound={tournament.current_round ?? 1}
+                  scoredMatchCount={scoredMatchCount}
+                  isRoundCompleted={latestRound?.is_completed ?? false}
+                  onComplete={fetchTournamentDetails}
                 />
               )}
 
