@@ -21,6 +21,8 @@ import { AuditLogPanel } from "../../../../components/ui/AuditLogPanel";
 import { RegeneratePairingsButton } from "../../../../components/ui/RegeneratePairingsButton";
 import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/ui/UnlockAndRepairDialog";
 import { RepairTournamentBanner } from "../../../../components/ui/RepairTournamentBanner";
+import { RepairPastResultPicker, type PickerMatch } from "../../../../components/ui/RepairPastResultPicker";
+import MatchEditModal from "../../../../components/ui/match-edit";
 
 const supabase = createClient();
 
@@ -64,6 +66,13 @@ export default function TournamentPage({
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Picker state for "Repair past result"
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerRepairMatchId, setPickerRepairMatchId] = useState<string | null>(null);
+  const [pickerRepairMatch, setPickerRepairMatch] = useState<any>(null);
+  const [allCompletedMatches, setAllCompletedMatches] = useState<PickerMatch[]>([]);
+  const [completedRoundNumbers, setCompletedRoundNumbers] = useState<number[]>([]);
 
   const showToast = (
     message: string,
@@ -525,6 +534,51 @@ export default function TournamentPage({
     }
   }, [tournament]);
 
+  // Fetch data for the repair picker (completed rounds + all matches with names)
+  useEffect(() => {
+    if (!tournament?.id) return;
+    const fetchPickerData = async () => {
+      const client = createClient();
+      const { data: rounds } = await client
+        .from("rounds")
+        .select("round_number")
+        .eq("tournament_id", tournament.id)
+        .eq("is_completed", true)
+        .order("round_number", { ascending: false });
+      setCompletedRoundNumbers((rounds ?? []).map((r: any) => r.round_number));
+
+      const { data: ms } = await client
+        .from("matches")
+        .select("id, round, player1:participants!matches_player1_id_fkey(name), player2:participants!matches_player2_id_fkey(name)")
+        .eq("tournament_id", tournament.id);
+      setAllCompletedMatches((ms ?? []).map((m: any) => ({
+        id: m.id,
+        round: m.round,
+        player1Name: m.player1?.name ?? "?",
+        player2Name: m.player2?.name ?? "?",
+      })));
+    };
+    fetchPickerData();
+  }, [tournament?.id, scoredCurrentRoundMatches]);
+
+  // Fetch full match row when picker selects a match
+  useEffect(() => {
+    if (!pickerRepairMatchId) {
+      setPickerRepairMatch(null);
+      return;
+    }
+    const fetchMatch = async () => {
+      const client = createClient();
+      const { data } = await client
+        .from("matches")
+        .select("id, round, player1_score, player2_score, player1_id:participants!matches_player1_id_fkey(id, name), player2_id:participants!matches_player2_id_fkey(id, name)")
+        .eq("id", pickerRepairMatchId)
+        .single();
+      setPickerRepairMatch(data ?? null);
+    };
+    fetchMatch();
+  }, [pickerRepairMatchId]);
+
   const fetchDecklists = useCallback(async () => {
     if (!id) return;
     const res = await loadTournamentDecklistsAction(id);
@@ -734,6 +788,17 @@ export default function TournamentPage({
                 />
               )}
 
+              {/* Repair past result — host only, after tournament has at least one completed round */}
+              {isHost && completedRoundNumbers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className="px-3 py-2 rounded-md border border-border text-foreground hover:bg-muted text-sm w-fit"
+                >
+                  Repair past result
+                </button>
+              )}
+
               {/* Audit log — host only */}
               {isHost && <AuditLogPanel tournamentId={tournament.id} />}
             </div>
@@ -777,6 +842,25 @@ export default function TournamentPage({
             onDecklistsChange={fetchDecklists}
           />
         </div>
+        <RepairPastResultPicker
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          completedRounds={completedRoundNumbers}
+          matches={allCompletedMatches}
+          onPick={(matchId) => setPickerRepairMatchId(matchId)}
+        />
+        {pickerRepairMatch && tournament && (
+          <MatchEditModal
+            match={pickerRepairMatch}
+            tournament={tournament}
+            mode="repair"
+            open={true}
+            onOpenChange={(v) => { if (!v) setPickerRepairMatchId(null); }}
+            isRoundActive={false}
+            setMatchErrorIndex={() => {}}
+            index={-1}
+          />
+        )}
         <EditParticipantModal
           isOpen={isEditParticipantModalOpen}
           onClose={() => setIsEditParticipantModalOpen(false)}

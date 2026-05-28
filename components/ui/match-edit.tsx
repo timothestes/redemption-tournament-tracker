@@ -13,16 +13,29 @@ export default function MatchEditModal({
   index,
   tournament,
   mode = "live",
+  open: controlledOpen,
+  onOpenChange,
 }: {
   match: any;
-  fetchCurrentRoundData: any;
+  fetchCurrentRoundData?: any;
   setMatchErrorIndex: Dispatch<SetStateAction<number[]>>;
   isRoundActive: boolean;
   index: number;
   tournament: any;
   mode?: "live" | "repair";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (v: boolean) => {
+    if (isControlled) {
+      onOpenChange?.(v);
+    } else {
+      setInternalOpen(v);
+    }
+  };
   const [player1Score, setPlayer1Score] = useState(match.player1_score);
   const [player2Score, setPlayer2Score] = useState(match.player2_score);
   const [reason, setReason] = useState("");
@@ -81,7 +94,7 @@ export default function MatchEditModal({
         return;
       }
       setOpen(false);
-      if (typeof fetchCurrentRoundData === "function") fetchCurrentRoundData();
+      fetchCurrentRoundData?.();
       return;
     }
 
@@ -173,7 +186,7 @@ export default function MatchEditModal({
       alert("Some error occurred!");
     }
 
-    fetchCurrentRoundData();
+    fetchCurrentRoundData?.();
   };
 
   // Generate score options based on tournament.max_score
