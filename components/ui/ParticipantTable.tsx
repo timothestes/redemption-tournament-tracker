@@ -8,6 +8,7 @@ import { attachDeckToParticipantAction, detachDeckFromParticipantAction } from "
 import { createClient } from "@/utils/supabase/client";
 import { AmendedBadge } from "@/components/ui/AmendedBadge";
 import { participantsWithAmendedBadge } from "@/lib/tournament/repairBadges";
+import ConfirmationDialog from "./confirmation-dialog";
 
 interface Participant {
   id: string;
@@ -44,6 +45,8 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
 }) => {
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
   const [attachTarget, setAttachTarget] = useState<Participant | null>(null);
+  const [dropTarget, setDropTarget] = useState<Participant | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Participant | null>(null);
 
   const [matchEdits, setMatchEdits] = useState<{ match_id: string; round: number; edited_at: string }[]>([]);
   const [allMatches, setAllMatches] = useState<{ id: string; round: number; player1_id: string; player2_id: string }[]>([]);
@@ -164,7 +167,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
             </button>
           ) : (
             <button
-              onClick={() => onDropOut(participant.id)}
+              onClick={() => setDropTarget(participant)}
               className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 touch-manipulation transition-colors"
               aria-label={`Drop ${participant.name}`}
               title="Drop from tournament"
@@ -174,7 +177,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
           )
         ) : (
           <button
-            onClick={() => onDelete(participant.id)}
+            onClick={() => setDeleteTarget(participant)}
             className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 touch-manipulation transition-colors"
             aria-label={`Delete ${participant.name}`}
             title="Remove participant"
@@ -364,6 +367,32 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
         onOpenChange={setAttachDialogOpen}
         participantName={attachTarget?.name || ""}
         onSelect={handleAttachDeck}
+      />
+
+      <ConfirmationDialog
+        open={dropTarget !== null}
+        onOpenChange={(open) => { if (!open) setDropTarget(null); }}
+        onConfirm={() => {
+          if (dropTarget) onDropOut(dropTarget.id);
+        }}
+        variant="warning"
+        title={dropTarget ? `Drop ${dropTarget.name}?` : ""}
+        description="They will not appear in next round's pairings. You can restore them later from this list."
+        confirmLabel="Drop player"
+        cancelLabel="Cancel"
+      />
+
+      <ConfirmationDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        onConfirm={() => {
+          if (deleteTarget) onDelete(deleteTarget.id);
+        }}
+        variant="destructive"
+        title={deleteTarget ? `Delete ${deleteTarget.name}?` : ""}
+        description="This permanently removes them from the tournament."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
       />
     </>
   );

@@ -82,7 +82,8 @@ export default function TournamentPage({
     type: "success" | "error" | "warning" | "info" = "success"
   ) => {
     setToast({ message, show: true, type });
-    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2000);
+    const duration = type === "success" ? 2000 : 4500;
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), duration);
   };
 
   useEffect(() => {
@@ -200,7 +201,7 @@ export default function TournamentPage({
         .eq("id", id);
       if (error) throw error;
       fetchParticipants();
-      showToast("Participant deleted successfully!", "error");
+      showToast("Participant deleted successfully!", "success");
     } catch (error) {
       showToast("Error deleting participant.", "error");
       console.error("Error deleting participant:", error);

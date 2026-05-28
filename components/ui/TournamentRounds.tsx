@@ -11,6 +11,7 @@ import { ArrowUpDown } from "lucide-react";
 import { printTournamentPairings, printFinalStandings, printMatchSlips } from "../../utils/printUtils";
 import { Button } from "./button";
 import ToastNotification from "./toast-notification";
+import ConfirmationDialog from "./confirmation-dialog";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -110,6 +111,7 @@ export default function TournamentRounds({
     show: boolean;
     type: "success" | "error" | "warning" | "info";
   }>({ message: "", show: false, type: "warning" });
+  const [endRoundConfirmOpen, setEndRoundConfirmOpen] = useState(false);
 
   interface MatchEditRow {
     id: string;
@@ -868,7 +870,9 @@ export default function TournamentRounds({
                               variant={isRoundActive ? "destructive" : "success"}
                               size="sm"
                               onClick={
-                                isRoundActive ? handleEndRound : handleStartRound
+                                isRoundActive
+                                  ? () => setEndRoundConfirmOpen(true)
+                                  : handleStartRound
                               }
                               disabled={matchEnding}
                             >
@@ -1351,6 +1355,16 @@ export default function TournamentRounds({
           isRoundActive={isRoundActive}
         />
       )}
+      <ConfirmationDialog
+        open={endRoundConfirmOpen}
+        onOpenChange={setEndRoundConfirmOpen}
+        onConfirm={handleEndRound}
+        variant="destructive"
+        title={`End Round ${currentPage}?`}
+        description="All matches will be locked and new pairings will be generated for the next round."
+        confirmLabel="End round"
+        cancelLabel="Cancel"
+      />
     </div >
     </>
   );

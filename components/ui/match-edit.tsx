@@ -41,6 +41,7 @@ export default function MatchEditModal({
   const [player1Score, setPlayer1Score] = useState(match.player1_score);
   const [player2Score, setPlayer2Score] = useState(match.player2_score);
   const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -63,12 +64,14 @@ export default function MatchEditModal({
       setPlayer1Score(match.player1_score !== null ? match.player1_score : 0);
       setPlayer2Score(match.player2_score !== null ? match.player2_score : 0);
       setReason("");
+      setError(null);
       setOpen(true);
     }
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     if (mode === "repair") {
       if (
@@ -76,11 +79,11 @@ export default function MatchEditModal({
         player1Score > tournament.max_score ||
         player2Score > tournament.max_score
       ) {
-        alert(`Invalid scores. Scores must be between 0 and ${tournament.max_score}, inclusive.`);
+        setError(`Invalid scores. Scores must be between 0 and ${tournament.max_score}, inclusive.`);
         return;
       }
       if (player1Score === tournament.max_score && player2Score === tournament.max_score) {
-        alert("Score cannot be " + tournament.max_score + "-" + tournament.max_score + ".");
+        setError(`Score cannot be ${tournament.max_score}-${tournament.max_score}.`);
         return;
       }
       const { repairMatchScoreAction } = await import("@/app/tracker/tournaments/repair-actions");
@@ -92,7 +95,7 @@ export default function MatchEditModal({
         tournamentId: tournament.id,
       });
       if (!result.ok) {
-        alert(`Repair failed: ${result.error}`);
+        setError(`Repair failed: ${result.error}`);
         return;
       }
       // Await the parent's refresh BEFORE closing the modal so the table
@@ -111,11 +114,11 @@ export default function MatchEditModal({
       player1Score > tournament.max_score ||
       player2Score > tournament.max_score
     ) {
-      alert(`Invalid scores. Scores must be between 0 and ${tournament.max_score}, inclusive.`);
+      setError(`Invalid scores. Scores must be between 0 and ${tournament.max_score}, inclusive.`);
       return;
     }
     if (player1Score === tournament.max_score && player2Score === tournament.max_score) {
-      alert("Score cannot be " + tournament.max_score + "-" + tournament.max_score + ".");
+      setError(`Score cannot be ${tournament.max_score}-${tournament.max_score}.`);
       return;
     }
     const client = createClient();
@@ -189,7 +192,8 @@ export default function MatchEditModal({
       setOpen(false);
     } else {
       console.log(error);
-      alert("Some error occurred!");
+      setError("Failed to save match scores. Please try again.");
+      return;
     }
 
     fetchCurrentRoundData?.();
@@ -257,6 +261,11 @@ export default function MatchEditModal({
             </h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
               <div className="block space-y-5">
+                {error && (
+                  <p className="text-destructive text-sm" role="alert">
+                    {error}
+                  </p>
+                )}
                 <ScoreSelector
                   player={match.player1_id.name}
                   selectedScore={player1Score}
