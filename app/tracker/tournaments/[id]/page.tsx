@@ -987,8 +987,6 @@ export default function TournamentPage({
           setNewMatchPoints={setNewMatchPoints}
           newDifferential={newDifferential}
           setNewDifferential={setNewDifferential}
-          newDroppedOut={newDroppedOut}
-          setNewDroppedOut={setNewDroppedOut}
           isTournamentStarted={tournament?.has_started}
         />
         <TournamentStartModal

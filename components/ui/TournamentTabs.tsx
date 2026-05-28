@@ -10,8 +10,10 @@ import TournamentSettings from "./TournamentSettings";
 import TournamentRounds from "./TournamentRounds";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
+import StandingsTable from "./StandingsTable";
 import { HiPlus } from "react-icons/hi";
 import { GiCardPickup } from "react-icons/gi";
+import { HiOutlineChartBar } from "react-icons/hi2";
 import { printFinalStandings } from "../../utils/printUtils";
 import { Button } from "./button";
 import { AuditLogPanel } from "./AuditLogPanel";
@@ -254,6 +256,17 @@ export default function TournamentTabs({
           />
         </div>
       </Tabs.Item>
+      {tournamentStarted && (
+        <Tabs.Item title="Standings" icon={HiOutlineChartBar}>
+          <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
+            <StandingsTable
+              tournamentId={tournamentId}
+              participants={participants as any}
+              tournamentEnded={tournamentEnded}
+            />
+          </div>
+        </Tabs.Item>
+      )}
       <Tabs.Item title="Settings" icon={FaGear}>
         <div className="w-full">
           <TournamentSettings

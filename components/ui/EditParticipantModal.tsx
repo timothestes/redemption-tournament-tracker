@@ -20,8 +20,6 @@ interface EditParticipantModalProps {
   setNewMatchPoints: (points: string) => void;
   newDifferential: string;
   setNewDifferential: (differential: string) => void;
-  newDroppedOut: boolean;
-  setNewDroppedOut: (droppedOut: boolean) => void;
   isTournamentStarted: boolean;
 }
 
@@ -82,8 +80,9 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
                 type="number"
                 value={newMatchPoints}
                 onChange={(e) => setNewMatchPoints(e.target.value)}
+                readOnly={isTournamentStarted}
                 disabled={!isTournamentStarted}
-                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50"
+                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50 read-only:opacity-70 read-only:cursor-not-allowed"
               />
             </div>
             <div className="space-y-1">
@@ -94,10 +93,21 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
                 type="number"
                 value={newDifferential}
                 onChange={(e) => setNewDifferential(e.target.value)}
+                readOnly={isTournamentStarted}
                 disabled={!isTournamentStarted}
-                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50"
+                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50 read-only:opacity-70 read-only:cursor-not-allowed"
               />
             </div>
+            {isTournamentStarted && (
+              <p className="text-xs text-muted-foreground">
+                Match points and differential are derived from match history once
+                the tournament starts. To change scores, use{" "}
+                <span className="font-medium text-foreground">
+                  Repair past result
+                </span>{" "}
+                from the round view.
+              </p>
+            )}
           </DialogBody>
           <DialogFooter className="justify-end">
             <Button type="submit" variant="success">
