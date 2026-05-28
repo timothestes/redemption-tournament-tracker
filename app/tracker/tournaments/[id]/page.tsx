@@ -17,6 +17,7 @@ import { buildStateFromSupabase } from "../../../../utils/tournament/stateAdapte
 import { recomputeTotalsFromHistory } from "../../../../lib/tournament/results";
 import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
 import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
+import { AuditLogPanel } from "../../../../components/ui/AuditLogPanel";
 
 const supabase = createClient();
 
@@ -522,6 +523,8 @@ export default function TournamentPage({
     }
   }, [id]);
 
+  const isHost = !!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId);
+
   return (
     <div className="flex min-h-screen px-3 sm:px-5 w-full jayden-gradient-bg">
       <div className="w-full max-w-4xl mx-auto space-y-5">
@@ -683,6 +686,9 @@ export default function TournamentPage({
                   }}
                 />
               )}
+
+              {/* Audit log — host only */}
+              {isHost && <AuditLogPanel tournamentId={tournament.id} />}
             </div>
           )}
           <TournamentTabs
@@ -690,7 +696,7 @@ export default function TournamentPage({
             participants={participants}
             isModalOpen={isModalOpen}
             setIsModalOpen={setIsModalOpen}
-            isHost={!!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId)}
+            isHost={isHost}
             onAddParticipant={handleAddParticipant}
             onEdit={(participant) => {
               setCurrentParticipant(participant);
