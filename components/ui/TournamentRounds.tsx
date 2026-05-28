@@ -16,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 
@@ -986,7 +987,18 @@ export default function TournamentRounds({
                                 <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                   {index + (tournamentInfo.starting_table_number || 1)}
                                 </td>
-                                <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                <td
+                                  className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"} ${
+                                    repairMode
+                                      ? (repairSourceMatch?.match?.id === match.id && !repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)
+                                        ? "bg-primary/15 cursor-pointer"
+                                        : "cursor-pointer hover:bg-muted/70"
+                                      : ""
+                                  }`}
+                                  onClick={repairMode ? () => handleRepairClick(match, false) : undefined}
+                                  role={repairMode ? "button" : undefined}
+                                  tabIndex={repairMode ? 0 : undefined}
+                                >
                                   {match.player1_id.name}
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
@@ -998,7 +1010,18 @@ export default function TournamentRounds({
                                     <span className="text-muted-foreground">&mdash;</span>
                                   )}
                                 </td>
-                                <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                <td
+                                  className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"} ${
+                                    repairMode
+                                      ? (repairSourceMatch?.match?.id === match.id && repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)
+                                        ? "bg-primary/15 cursor-pointer"
+                                        : "cursor-pointer hover:bg-muted/70"
+                                      : ""
+                                  }`}
+                                  onClick={repairMode ? () => handleRepairClick(match, true) : undefined}
+                                  role={repairMode ? "button" : undefined}
+                                  tabIndex={repairMode ? 0 : undefined}
+                                >
                                   {match.player2_id.name}
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
@@ -1065,6 +1088,13 @@ export default function TournamentRounds({
                                           >
                                             <ArrowDown className="h-4 w-4 mr-2" aria-hidden="true" />
                                             Swap with pair below
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onSelect={() => handleRepairClick(match, false)}
+                                          >
+                                            <ArrowUpDown className="h-4 w-4 mr-2" aria-hidden="true" />
+                                            Swap with another pair…
                                           </DropdownMenuItem>
                                         </DropdownMenuContent>
                                       </DropdownMenu>
