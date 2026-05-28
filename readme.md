@@ -150,8 +150,5 @@ battle phase/zone could be better
 
 
 # Tournament tracker improvements
-fix pairing bugs
 add ability to re-pair mid-round
-mobile support
-double checking colors
 add place where all tournament timers could be seen in one place
