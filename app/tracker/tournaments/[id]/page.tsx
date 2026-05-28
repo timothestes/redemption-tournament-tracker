@@ -859,6 +859,11 @@ export default function TournamentPage({
             isRoundActive={false}
             setMatchErrorIndex={() => {}}
             index={-1}
+            onRepairSuccess={() => {
+              fetchTournamentDetails();
+              fetchParticipants();
+              setPickerRepairMatchId(null);
+            }}
           />
         )}
         <EditParticipantModal
