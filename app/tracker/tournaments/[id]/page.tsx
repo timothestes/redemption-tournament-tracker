@@ -82,6 +82,10 @@ export default function TournamentPage({
   const [tournamentNotFound, setTournamentNotFound] = useState(false);
   // Header overflow-menu controls the Re-pair dialog
   const [repairDialogOpen, setRepairDialogOpen] = useState(false);
+  // Bumped after re-pair RPC succeeds so TournamentRounds re-fetches matches.
+  // Without this nonce, the matches table only re-fetches on currentPage /
+  // tournamentId change, so the host sees stale pairings until they refresh.
+  const [pairingsRefreshNonce, setPairingsRefreshNonce] = useState(0);
 
   // Picker state for "Repair past result"
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -688,7 +692,7 @@ export default function TournamentPage({
               >
                 {/* Row 1: identity + status + timer + overflow menu */}
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                  <h1 className="text-xl sm:text-2xl font-bold min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-bold max-w-full">
                     <button
                       type="button"
                       onClick={() => {
@@ -891,7 +895,10 @@ export default function TournamentPage({
                   currentRound={tournament.current_round ?? 1}
                   scoredMatchCount={scoredCurrentRoundMatches.length}
                   isRoundCompleted={latestRound?.is_completed ?? false}
-                  onComplete={fetchTournamentDetails}
+                  onComplete={() => {
+                    fetchTournamentDetails();
+                    setPairingsRefreshNonce((n) => n + 1);
+                  }}
                   onUnlockRequest={() => setUnlockDialogOpen(true)}
                   hideTrigger
                   open={repairDialogOpen}
@@ -904,7 +911,10 @@ export default function TournamentPage({
                   onClose={() => setUnlockDialogOpen(false)}
                   tournamentId={tournament.id}
                   scoredMatches={scoredCurrentRoundMatches}
-                  onComplete={() => { fetchTournamentDetails(); }}
+                  onComplete={() => {
+                    fetchTournamentDetails();
+                    setPairingsRefreshNonce((n) => n + 1);
+                  }}
                 />
               )}
             </>
@@ -950,6 +960,7 @@ export default function TournamentPage({
               fetchParticipants();
               fetchTournamentDetails();
             }}
+            matchesRefreshNonce={pairingsRefreshNonce}
           />}
         </div>
         <RepairPastResultPicker

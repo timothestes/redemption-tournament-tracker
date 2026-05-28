@@ -47,6 +47,10 @@ interface TournamentRoundsProps {
   tournamentName?: string | null;
   isHost?: boolean;
   onRepairCompleted?: () => void;
+  /** Bumped by the page after a re-pair RPC succeeds to force matches/byes
+   * to re-fetch. The default deps ([currentPage, tournamentId]) don't change
+   * when only the row contents change. */
+  matchesRefreshNonce?: number;
 }
 
 interface TournamentInfo {
@@ -82,6 +86,7 @@ export default function TournamentRounds({
   tournamentName,
   isHost = false,
   onRepairCompleted,
+  matchesRefreshNonce,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     id: null,
@@ -264,13 +269,17 @@ export default function TournamentRounds({
   const handleStartRound = async () => {
     try {
       const now = new Date().toISOString();
-      const { error: roundError } = await client.from("rounds").insert([
+      // The rounds row is pre-created when pairings are generated (see
+      // ensureRoundRow in pairingUtilsV2). Upsert handles legacy tournaments
+      // started before that change.
+      const { error: roundError } = await client.from("rounds").upsert(
         {
           tournament_id: tournamentId,
           round_number: currentPage,
           started_at: now,
         },
-      ]);
+        { onConflict: "tournament_id,round_number" },
+      );
 
       if (roundError) throw roundError;
 
@@ -316,7 +325,7 @@ export default function TournamentRounds({
   useEffect(() => {
     if (!tournamentId) return;
     fetchCurrentRoundData();
-  }, [currentPage, tournamentId]);
+  }, [currentPage, tournamentId, matchesRefreshNonce]);
 
   const handleEndRound = useCallback(async () => {
     const client = createClient();

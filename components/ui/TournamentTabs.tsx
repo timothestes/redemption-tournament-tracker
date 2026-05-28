@@ -49,6 +49,7 @@ interface TournamentTabsProps {
   onDecklistsChange: () => void;
   isHost?: boolean;
   onRepairCompleted?: () => void;
+  matchesRefreshNonce?: number;
 }
 
 export default function TournamentTabs({
@@ -77,6 +78,7 @@ export default function TournamentTabs({
   onDecklistsChange,
   isHost = false,
   onRepairCompleted,
+  matchesRefreshNonce,
 }: TournamentTabsProps) {
   // state for booster draft pods
   const [showPodsModal, setShowPodsModal] = useState(false);
@@ -255,6 +257,7 @@ export default function TournamentTabs({
             tournamentName={tournamentName}
             isHost={isHost}
             onRepairCompleted={onRepairCompleted}
+            matchesRefreshNonce={matchesRefreshNonce}
           />
         </div>
       </Tabs.Item>
