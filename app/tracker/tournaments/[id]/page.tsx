@@ -69,6 +69,7 @@ export default function TournamentPage({
 
   // Confirmation dialogs
   const [endTournamentConfirmOpen, setEndTournamentConfirmOpen] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
 
   // Picker state for "Repair past result"
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -225,6 +226,7 @@ export default function TournamentPage({
 
   const performEndTournament = async () => {
     if (!tournament) return;
+    setTogglingStatus(true);
 
     const now = new Date().toISOString();
     if (latestRound && !latestRound?.is_completed) {
@@ -270,6 +272,8 @@ export default function TournamentPage({
     } catch (error) {
       showToast("Error updating tournament status.", "error");
       console.error("Error updating tournament status:", error);
+    } finally {
+      setTogglingStatus(false);
     }
   };
 
@@ -741,7 +745,7 @@ export default function TournamentPage({
               {/* End Tournament — destructive styling, less prominent */}
               {!tournament?.has_ended && (
                 <Button
-                  disabled={participants.length === 0}
+                  disabled={participants.length === 0 || togglingStatus}
                   variant={
                     Boolean(tournament?.has_started)
                       ? "destructive"
@@ -751,9 +755,19 @@ export default function TournamentPage({
                   className={`w-fit ${tournament?.has_started ? "opacity-80" : ""}`}
                   size={tournament?.has_started ? "sm" : "default"}
                 >
-                  {Boolean(tournament?.has_started)
-                    ? "End Tournament"
-                    : "Start Tournament"}
+                  {togglingStatus && tournament?.has_started ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin"
+                        aria-hidden="true"
+                      />
+                      Ending…
+                    </span>
+                  ) : Boolean(tournament?.has_started) ? (
+                    "End Tournament"
+                  ) : (
+                    "Start Tournament"
+                  )}
                 </Button>
               )}
               {tournament?.has_ended && (

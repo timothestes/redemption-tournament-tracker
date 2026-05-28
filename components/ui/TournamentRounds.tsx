@@ -876,7 +876,19 @@ export default function TournamentRounds({
                               }
                               disabled={matchEnding}
                             >
-                              {isRoundActive ? "End Round" : "Start Round"}
+                              {matchEnding && isRoundActive ? (
+                                <span className="inline-flex items-center gap-2">
+                                  <span
+                                    className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin"
+                                    aria-hidden="true"
+                                  />
+                                  Ending…
+                                </span>
+                              ) : isRoundActive ? (
+                                "End Round"
+                              ) : (
+                                "Start Round"
+                              )}
                             </Button>
                           </>
                         )}

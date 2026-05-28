@@ -39,8 +39,15 @@ export default function MatchEditModal({
       setInternalOpen(v);
     }
   };
-  const [player1Score, setPlayer1Score] = useState(match.player1_score);
-  const [player2Score, setPlayer2Score] = useState(match.player2_score);
+  // Explicit null sentinel for "no choice yet" — never conflate with 0.
+  // The ScoreSelector compares strictly against the selected score, so an
+  // unscored match opens with no button highlighted at all.
+  const [player1Score, setPlayer1Score] = useState<number | null>(
+    match.player1_score ?? null,
+  );
+  const [player2Score, setPlayer2Score] = useState<number | null>(
+    match.player2_score ?? null,
+  );
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +56,8 @@ export default function MatchEditModal({
   // even while dirty (handled below + the user clicking Cancel calls
   // setOpen(false) directly, bypassing the guard).
   const hasUnsavedChanges =
-    player1Score !== match.player1_score || player2Score !== match.player2_score;
+    player1Score !== (match.player1_score ?? null) ||
+    player2Score !== (match.player2_score ?? null);
 
   // Suppress the next onOpenChange(false) call when ESC fires, so the
   // primitive's ESC handler can close the dialog even while the unsaved
@@ -65,12 +73,14 @@ export default function MatchEditModal({
     return () => document.removeEventListener("keydown", handleEscape, { capture: true } as any);
   }, [open]);
 
-  // Reset scores to 0 only if they haven't been set yet
+  // Always seed both scores from the match on open so reopening an already-
+  // scored match preselects the saved value. Use a null sentinel for unset
+  // scores — never default to 0, which would visually claim a choice the
+  // user hasn't made and risk a silent "0–0" submission.
   const handleOpenModal = () => {
     if (isRoundActive || mode === "repair") {
-      // Use existing scores if available, otherwise default to 0
-      setPlayer1Score(match.player1_score !== null ? match.player1_score : 0);
-      setPlayer2Score(match.player2_score !== null ? match.player2_score : 0);
+      setPlayer1Score(match.player1_score ?? null);
+      setPlayer2Score(match.player2_score ?? null);
       setReason("");
       setError(null);
       setOpen(true);
@@ -90,6 +100,14 @@ export default function MatchEditModal({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Require an explicit choice — null sentinel guard. Without this, the
+    // < / > comparisons below would treat null as 0 and silently submit a
+    // 0–0 result the user never selected.
+    if (player1Score === null || player2Score === null) {
+      setError("Select a score for both players before submitting.");
+      return;
+    }
 
     if (mode === "repair") {
       if (
@@ -227,13 +245,13 @@ export default function MatchEditModal({
     setScore
   }: {
     player: string,
-    selectedScore: number,
+    selectedScore: number | null,
     setScore: (score: number) => void
   }) => {
     return (
       <div className="mb-4">
         <h3 className="text-lg text-muted-foreground font-normal mb-2">
-          <span className="text-foreground font-medium">{player}</span> Lost Souls:
+          <span className="text-foreground font-medium">{player}</span> Lost Souls (score):
         </h3>
         <div className="flex gap-2">
           {scoreOptions.map((score) => (
