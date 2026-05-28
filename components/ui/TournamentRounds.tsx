@@ -304,8 +304,9 @@ export default function TournamentRounds({
   };
 
   useEffect(() => {
+    if (!tournamentId) return;
     fetchCurrentRoundData();
-  }, [currentPage]);
+  }, [currentPage, tournamentId]);
 
   const handleEndRound = useCallback(async () => {
     const client = createClient();
