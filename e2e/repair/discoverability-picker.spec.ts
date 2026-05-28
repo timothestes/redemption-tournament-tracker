@@ -3,8 +3,9 @@ import { test, expect } from "../fixtures";
 test("picker lets host jump to a specific past match's repair dialog", async ({ page, seeded }) => {
   await page.goto(`/tracker/tournaments/${seeded.tournamentId}`);
 
-  // Open the picker.
-  await page.getByRole("button", { name: /repair past result/i }).click();
+  // Open the picker via the host overflow menu.
+  await page.getByRole("button", { name: /more host actions/i }).click();
+  await page.getByRole("menuitem", { name: /repair past result/i }).click();
 
   const picker = page.getByRole("dialog").filter({ hasText: /repair past result/i });
   await expect(picker).toBeVisible();

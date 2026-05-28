@@ -2,7 +2,9 @@
 
 import { Button } from "../../../../components/ui/button";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { HiPencil } from "react-icons/hi";
+import { MoreHorizontal } from "lucide-react";
 import CountdownTimer from "../../../../components/ui/CountdownTimer";
 import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
 import EditTournamentNameModal from "../../../../components/ui/EditTournamentNameModal";
@@ -23,6 +25,13 @@ import { RepairTournamentBanner } from "../../../../components/ui/RepairTourname
 import { RepairPastResultPicker, type PickerMatch } from "../../../../components/ui/RepairPastResultPicker";
 import MatchEditModal from "../../../../components/ui/match-edit";
 import ConfirmationDialog from "../../../../components/ui/confirmation-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../../../components/ui/dropdown-menu";
 
 const supabase = createClient();
 
@@ -70,6 +79,9 @@ export default function TournamentPage({
   // Confirmation dialogs
   const [endTournamentConfirmOpen, setEndTournamentConfirmOpen] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
+  const [tournamentNotFound, setTournamentNotFound] = useState(false);
+  // Header overflow-menu controls the Re-pair dialog
+  const [repairDialogOpen, setRepairDialogOpen] = useState(false);
 
   // Picker state for "Repair past result"
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -133,9 +145,19 @@ export default function TournamentPage({
         .eq("id", id)
         .single();
       if (error) throw error;
+      if (!data) {
+        setTournamentNotFound(true);
+        return;
+      }
       setTournament(data);
+      setTournamentNotFound(false);
     } catch (error) {
+      // Supabase returns a PGRST116 error code when .single() hits 0 rows.
+      // Treat any fetch failure on a fresh load (no tournament loaded yet)
+      // as a "not found" so the user gets a real error state instead of
+      // an indefinite "Loading…" breadcrumb.
       console.error("Error fetching tournament details:", error);
+      setTournamentNotFound(true);
     }
   };
 
@@ -631,44 +653,182 @@ export default function TournamentPage({
         />
         
         <div className="flex-grow max-w-4xl mx-auto">
+          {tournamentNotFound && !tournament && (
+            <div className="my-12 rounded-lg border border-border bg-card p-8 text-center">
+              <h2 className="text-xl font-semibold text-foreground">
+                Tournament not found
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                It may have been deleted, or the link is wrong.
+              </p>
+              <Link
+                href="/tracker/tournaments"
+                className="mt-4 inline-block px-3 py-2 rounded-md border border-border text-foreground hover:bg-muted text-sm"
+              >
+                Back to tournaments
+              </Link>
+            </div>
+          )}
+          {!tournament && !tournamentNotFound && (
+            <header
+              className="print:hidden sticky top-0 z-30 -mx-3 sm:-mx-5 mb-4 px-3 sm:px-5 py-3 backdrop-blur bg-background/80 border-b border-border"
+            >
+              <div className="h-16 animate-pulse rounded-md bg-muted/30" />
+            </header>
+          )}
           {tournament && (
-            <div className="mb-6 space-y-4">
+            <>
               <RepairTournamentBanner
                 tournamentId={tournament.id}
                 currentRound={tournament.current_round ?? 1}
                 isRoundActive={isRoundActive}
               />
-              {/* Title row with status badge */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl font-bold">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewTournamentName(tournament.name);
-                      setIsEditTournamentModalOpen(true);
-                    }}
-                    className="group inline-flex items-center gap-2 -mx-2 px-2 py-1 rounded-md text-left hover:bg-muted transition-colors"
-                    aria-label="Edit tournament name"
+              <header
+                className="print:hidden sticky top-0 z-30 -mx-3 sm:-mx-5 mb-4 px-3 sm:px-5 py-3 backdrop-blur bg-background/80 border-b border-border"
+              >
+                {/* Row 1: identity + status + timer + overflow menu */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                  <h1 className="text-xl sm:text-2xl font-bold min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewTournamentName(tournament.name);
+                        setIsEditTournamentModalOpen(true);
+                      }}
+                      className="group inline-flex items-center gap-2 -mx-1 px-1 py-0.5 rounded-md text-left hover:bg-muted transition-colors max-w-full"
+                      aria-label="Edit tournament name"
+                    >
+                      <span className="truncate">{tournament.name}</span>
+                      <HiPencil className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                    </button>
+                  </h1>
+                  {/* Status pill — neutral hierarchy:
+                      amber=not started, foreground=in progress, muted=ended. */}
+                  <span
+                    className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${
+                      tournament.has_ended
+                        ? "bg-muted text-muted-foreground"
+                        : tournament.has_started
+                          ? "bg-foreground/10 text-foreground"
+                          : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    }`}
                   >
-                    <span>{tournament.name}</span>
-                    <HiPencil className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  </button>
-                </h1>
-                {/* Status badge */}
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                  tournament.has_ended
-                    ? "bg-muted text-muted-foreground"
-                    : tournament.has_started
-                      ? "bg-primary/15 text-primary"
-                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                }`}>
-                  {tournament.has_ended
-                    ? "Ended"
-                    : tournament.has_started
-                      ? `Round ${tournament.current_round || 1} of ${tournament.n_rounds || "?"}`
-                      : "Not Started"}
-                </span>
-              </div>
+                    {tournament.has_ended
+                      ? "Ended"
+                      : tournament.has_started
+                        ? `Round ${tournament.current_round || 1} of ${tournament.n_rounds || "?"}`
+                        : "Not Started"}
+                  </span>
+
+                  {/* Timer — only render while a round is actually in progress.
+                      Without these guards the timer shows a fake "00:45:00"
+                      between rounds (F4). */}
+                  {tournament?.has_started &&
+                    !tournament?.has_ended &&
+                    tournament?.round_length &&
+                    latestRound?.started_at &&
+                    !latestRound?.is_completed && (
+                      <div className="flex-shrink-0 min-w-0">
+                        <CountdownTimer
+                          key={latestRound?.started_at || "inactive"}
+                          startTime={latestRound?.started_at || null}
+                          durationMinutes={tournament.round_length}
+                          soundNotifications={tournament.sound_notifications ?? false}
+                        />
+                      </div>
+                    )}
+
+                  {/* Push actions to the right */}
+                  <div className="ml-auto flex items-center gap-2">
+                    {/* Start Tournament — primary pre-start action stays inline so
+                        a host can see it without opening the menu. */}
+                    {!tournament?.has_started && !tournament?.has_ended && (
+                      <Button
+                        disabled={participants.length === 0 || togglingStatus}
+                        variant="success"
+                        onClick={handleTournamentStatusToggle}
+                        size="sm"
+                      >
+                        Start Tournament
+                      </Button>
+                    )}
+                    {/* Overflow menu — host-only destructive + repair actions */}
+                    {isHost && tournament?.has_started && !tournament?.has_ended && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="More host actions"
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-md border border-border text-foreground hover:bg-muted"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem
+                            onSelect={() => setRepairDialogOpen(true)}
+                            disabled={
+                              (latestRound?.is_completed ?? false) ||
+                              scoredCurrentRoundMatches.length > 0
+                            }
+                          >
+                            Re-pair current round
+                          </DropdownMenuItem>
+                          {scoredCurrentRoundMatches.length > 0 && (
+                            <DropdownMenuItem onSelect={() => setUnlockDialogOpen(true)}>
+                              Unlock and re-pair…
+                            </DropdownMenuItem>
+                          )}
+                          {completedRoundNumbers.length > 0 && (
+                            <DropdownMenuItem onSelect={() => setPickerOpen(true)}>
+                              Repair past result
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={() => setEndTournamentConfirmOpen(true)}
+                            disabled={togglingStatus}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            {togglingStatus ? "Ending…" : "End tournament"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                    {tournament?.has_ended && (
+                      <span className="text-xs text-muted-foreground italic whitespace-nowrap">
+                        Tournament has ended
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Row 2: condensed dates — hidden on mobile to reclaim chrome. */}
+                <p className="hidden sm:block text-xs text-muted-foreground mt-1">
+                  Created {new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  }).format(new Date(tournament.created_at))}
+                  {tournament.started_at && (
+                    <> · Started {new Intl.DateTimeFormat("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }).format(new Date(tournament.started_at))}</>
+                  )}
+                  {tournament.ended_at && (
+                    <> · Ended {new Intl.DateTimeFormat("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }).format(new Date(tournament.ended_at))}</>
+                  )}
+                </p>
+              </header>
+
               <EditTournamentNameModal
                 isOpen={isEditTournamentModalOpen}
                 onClose={() => setIsEditTournamentModalOpen(false)}
@@ -699,99 +859,32 @@ export default function TournamentPage({
                 setTournamentName={setNewTournamentName}
               />
 
-              {/* Dates — single condensed line */}
-              <p className="text-sm text-muted-foreground">
-                Created {new Intl.DateTimeFormat("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                }).format(new Date(tournament.created_at))}
-                {tournament.started_at && (
-                  <> · Started {new Intl.DateTimeFormat("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(tournament.started_at))}</>
-                )}
-                {tournament.ended_at && (
-                  <> · Ended {new Intl.DateTimeFormat("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(tournament.ended_at))}</>
-                )}
-              </p>
-
               {participants.length === 0 && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mb-4">
                   Add participants to get started
                 </p>
               )}
 
-              {/* Timer — full width, prominent when active */}
-              {tournament?.has_started &&
-                !tournament?.has_ended &&
-                tournament?.round_length && (
-                  <CountdownTimer
-                    key={latestRound?.started_at || "inactive"}
-                    startTime={latestRound?.started_at || null}
-                    durationMinutes={tournament.round_length}
-                    soundNotifications={tournament.sound_notifications ?? false}
+              {/* Publish decklists section — kept inline below the header since
+                  it's a substantial post-tournament panel, not a quick action. */}
+              {tournament?.has_ended && (
+                <div className="mb-4">
+                  <PublishDecklistsSection
+                    tournamentId={tournament.id}
+                    tournamentEnded={tournament.has_ended}
+                    decklistCount={decklists.length}
+                    isPublished={tournament.decklists_published || false}
+                    currentFormat={tournament.deck_format || null}
+                    onPublishChange={() => {
+                      fetchTournamentDetails();
+                      fetchDecklists();
+                    }}
                   />
-                )}
-
-              {/* End Tournament — destructive styling, less prominent */}
-              {!tournament?.has_ended && (
-                <Button
-                  disabled={participants.length === 0 || togglingStatus}
-                  variant={
-                    Boolean(tournament?.has_started)
-                      ? "destructive"
-                      : "success"
-                  }
-                  onClick={handleTournamentStatusToggle}
-                  className={`w-fit ${tournament?.has_started ? "opacity-80" : ""}`}
-                  size={tournament?.has_started ? "sm" : "default"}
-                >
-                  {togglingStatus && tournament?.has_started ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin"
-                        aria-hidden="true"
-                      />
-                      Ending…
-                    </span>
-                  ) : Boolean(tournament?.has_started) ? (
-                    "End Tournament"
-                  ) : (
-                    "Start Tournament"
-                  )}
-                </Button>
-              )}
-              {tournament?.has_ended && (
-                <span className="text-sm text-muted-foreground italic">
-                  Tournament has ended
-                </span>
+                </div>
               )}
 
-              {/* Publish decklists section */}
-              {tournament?.has_ended && (
-                <PublishDecklistsSection
-                  tournamentId={tournament.id}
-                  tournamentEnded={tournament.has_ended}
-                  decklistCount={decklists.length}
-                  isPublished={tournament.decklists_published || false}
-                  currentFormat={tournament.deck_format || null}
-                  onPublishChange={() => {
-                    fetchTournamentDetails();
-                    fetchDecklists();
-                  }}
-                />
-              )}
-
-              {/* Re-pair button — host only, active tournaments only */}
+              {/* Re-pair dialog — controlled by overflow menu; the dialog UI
+                  itself stays in RegeneratePairingsButton. */}
               {isHost && tournament.has_started && !tournament.has_ended && (
                 <RegeneratePairingsButton
                   tournamentId={tournament.id}
@@ -800,6 +893,9 @@ export default function TournamentPage({
                   isRoundCompleted={latestRound?.is_completed ?? false}
                   onComplete={fetchTournamentDetails}
                   onUnlockRequest={() => setUnlockDialogOpen(true)}
+                  hideTrigger
+                  open={repairDialogOpen}
+                  onOpenChange={setRepairDialogOpen}
                 />
               )}
               {isHost && tournament && (
@@ -811,20 +907,9 @@ export default function TournamentPage({
                   onComplete={() => { fetchTournamentDetails(); }}
                 />
               )}
-
-              {/* Repair past result — host only, after tournament has at least one completed round */}
-              {isHost && completedRoundNumbers.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen(true)}
-                  className="px-3 py-2 rounded-md border border-border text-foreground hover:bg-muted text-sm w-fit"
-                >
-                  Repair past result
-                </button>
-              )}
-            </div>
+            </>
           )}
-          <TournamentTabs
+          {!tournamentNotFound && <TournamentTabs
             key={activeTab}
             participants={participants}
             isModalOpen={isModalOpen}
@@ -865,7 +950,7 @@ export default function TournamentPage({
               fetchParticipants();
               fetchTournamentDetails();
             }}
-          />
+          />}
         </div>
         <RepairPastResultPicker
           open={pickerOpen}

@@ -821,9 +821,8 @@ export default function TournamentRounds({
               <>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
                   <div className="min-w-0">
-                    <h3 className="text-xl font-semibold mb-1">
-                      Round {currentPage} of {tournamentInfo.n_rounds}
-                    </h3>
+                    {/* Round number/label is carried by the page-level sticky
+                        header pill + the round pagination below. */}
                     <div className="text-sm text-muted-foreground space-y-0.5">
                       {roundInfo.started_at && (
                         <p>

@@ -18,13 +18,15 @@ test("host unlocks and re-pairs when current round has scored matches", async ({
 
   await page.goto(`/tracker/tournaments/${seeded.tournamentId}`);
 
-  // Main re-pair button should be disabled because scores exist.
-  const rePair = page.getByRole("button", { name: /^re-pair current round$/i });
+  // Open the host overflow menu.
+  await page.getByRole("button", { name: /more host actions/i }).click();
+
+  // Re-pair menu item should be disabled because scores exist.
+  const rePair = page.getByRole("menuitem", { name: /^re-pair current round$/i });
   await expect(rePair).toBeDisabled();
 
-  // Unlock link is rendered when scores exist.
-  const unlockLink = page.getByRole("button", { name: /unlock and re-pair/i });
-  await unlockLink.click();
+  // Unlock entry is rendered in the same menu when scores exist.
+  await page.getByRole("menuitem", { name: /unlock and re-pair/i }).click();
 
   const dialog = page.getByRole("dialog").filter({ hasText: /unlock and re-pair/i });
   await expect(dialog).toBeVisible();

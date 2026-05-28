@@ -11,6 +11,12 @@ interface Props {
   isRoundCompleted: boolean;
   onComplete?: () => void;
   onUnlockRequest?: () => void;
+  /** When true, the inline button trigger is omitted and the dialog is
+   * controlled by `open` / `onOpenChange` — used when an overflow menu owns
+   * the trigger. */
+  hideTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function RegeneratePairingsButton({
@@ -20,8 +26,17 @@ export function RegeneratePairingsButton({
   isRoundCompleted,
   onComplete,
   onUnlockRequest,
+  hideTrigger = false,
+  open: controlledOpen,
+  onOpenChange,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (v: boolean) => {
+    if (isControlled) onOpenChange?.(v);
+    else setInternalOpen(v);
+  };
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,26 +62,28 @@ export function RegeneratePairingsButton({
 
   return (
     <>
-      <div className="inline-flex items-center gap-2">
-        <button
-          type="button"
-          disabled={!enabled}
-          onClick={() => setOpen(true)}
-          title={tooltip}
-          className="px-3 py-2 rounded-md bg-primary text-primary-foreground disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
-        >
-          Re-pair current round
-        </button>
-        {!enabled && scoredMatchCount > 0 && onUnlockRequest && (
+      {!hideTrigger && (
+        <div className="inline-flex items-center gap-2">
           <button
             type="button"
-            onClick={onUnlockRequest}
-            className="text-sm underline text-muted-foreground hover:text-foreground"
+            disabled={!enabled}
+            onClick={() => setOpen(true)}
+            title={tooltip}
+            className="px-3 py-2 rounded-md border border-border bg-background text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed text-sm"
           >
-            Unlock and re-pair…
+            Re-pair current round
           </button>
-        )}
-      </div>
+          {!enabled && scoredMatchCount > 0 && onUnlockRequest && (
+            <button
+              type="button"
+              onClick={onUnlockRequest}
+              className="text-sm underline text-muted-foreground hover:text-foreground"
+            >
+              Unlock and re-pair…
+            </button>
+          )}
+        </div>
+      )}
 
       <Dialog
         open={open}

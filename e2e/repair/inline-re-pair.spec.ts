@@ -27,10 +27,11 @@ test("repair followed by re-pair button regenerates current round pairings", asy
   await expect(dialog).toBeHidden({ timeout: 5_000 });
   await expect(page.getByText(/result repaired/i)).toBeVisible({ timeout: 5_000 });
 
-  // Step 2: click the standalone Re-pair current round button.
-  // (Project toast has no inline action button per Task 18; using the standalone button.)
-  const repairCurrentBtn = page.getByRole("button", { name: /re-pair current round/i });
-  await repairCurrentBtn.click();
+  // Step 2: open the host overflow menu, then choose Re-pair current round.
+  // (Project toast has no inline action button per Task 18; the destructive
+  // actions live behind the ⋯ overflow menu post-WS4.)
+  await page.getByRole("button", { name: /more host actions/i }).click();
+  await page.getByRole("menuitem", { name: /re-pair current round/i }).click();
 
   // Confirm dialog with checkbox.
   const confirmDialog = page.getByRole("dialog").filter({ hasText: /re-pair round 2/i });
