@@ -4,7 +4,7 @@ import { Tabs } from "flowbite-react";
 import PodGenerationModal from "./PodGenerationModal";
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
-import { FaGear } from "react-icons/fa6";
+import { FaGear, FaClipboardList } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
 import TournamentSettings from "./TournamentSettings";
 import TournamentRounds from "./TournamentRounds";
@@ -14,6 +14,7 @@ import { HiPlus } from "react-icons/hi";
 import { GiCardPickup } from "react-icons/gi";
 import { printFinalStandings } from "../../utils/printUtils";
 import { Button } from "./button";
+import { AuditLogPanel } from "./AuditLogPanel";
 import type { TournamentDecklistRow } from "../../app/tracker/tournaments/actions";
 
 interface TournamentTabsProps {
@@ -45,6 +46,7 @@ interface TournamentTabsProps {
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
   isHost?: boolean;
+  onRepairCompleted?: () => void;
 }
 
 export default function TournamentTabs({
@@ -72,6 +74,7 @@ export default function TournamentTabs({
   decklists,
   onDecklistsChange,
   isHost = false,
+  onRepairCompleted,
 }: TournamentTabsProps) {
   // state for booster draft pods
   const [showPodsModal, setShowPodsModal] = useState(false);
@@ -245,6 +248,7 @@ export default function TournamentTabs({
             activeTab={activeTab}
             tournamentName={tournamentName}
             isHost={isHost}
+            onRepairCompleted={onRepairCompleted}
           />
         </div>
       </Tabs.Item>
@@ -257,6 +261,13 @@ export default function TournamentTabs({
           />
         </div>
       </Tabs.Item>
+      {isHost && (
+        <Tabs.Item title="Audit log" icon={FaClipboardList}>
+          <div className="w-full max-w-[800px] mx-auto">
+            <AuditLogPanel tournamentId={tournamentId} />
+          </div>
+        </Tabs.Item>
+      )}
     </Tabs>
     {/* use external pod generation modal */}
     <PodGenerationModal

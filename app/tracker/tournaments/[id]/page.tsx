@@ -836,6 +836,10 @@ export default function TournamentPage({
             fetchParticipants={fetchParticipants}
             decklists={decklists}
             onDecklistsChange={fetchDecklists}
+            onRepairCompleted={() => {
+              fetchParticipants();
+              fetchTournamentDetails();
+            }}
           />
         </div>
         <RepairPastResultPicker

@@ -39,6 +39,7 @@ interface TournamentRoundsProps {
   activeTab: number;
   tournamentName?: string | null;
   isHost?: boolean;
+  onRepairCompleted?: () => void;
 }
 
 interface TournamentInfo {
@@ -73,6 +74,7 @@ export default function TournamentRounds({
   activeTab,
   tournamentName,
   isHost = false,
+  onRepairCompleted,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     id: null,
@@ -979,6 +981,7 @@ export default function TournamentRounds({
                                       onRepairSuccess={() => {
                                         showToast("Result repaired.", "success");
                                         fetchMatchEdits();
+                                        onRepairCompleted?.();
                                       }}
                                     />
                                   )}
@@ -1130,6 +1133,7 @@ export default function TournamentRounds({
                                       onRepairSuccess={() => {
                                         showToast("Result repaired.", "success");
                                         fetchMatchEdits();
+                                        onRepairCompleted?.();
                                       }}
                                     />
                                   </div>
