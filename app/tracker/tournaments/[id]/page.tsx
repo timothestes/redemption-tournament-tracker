@@ -57,6 +57,7 @@ export default function TournamentPage({
   const [latestRound, setLatestRound] = useState<any>(null);
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const showToast = (
     message: string,
@@ -515,6 +516,9 @@ export default function TournamentPage({
       fetchTournamentDetails();
       fetchParticipants();
       fetchDecklists();
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        setCurrentUserId(user?.id ?? null);
+      });
     }
   }, [id]);
 
@@ -686,6 +690,7 @@ export default function TournamentPage({
             participants={participants}
             isModalOpen={isModalOpen}
             setIsModalOpen={setIsModalOpen}
+            isHost={!!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId)}
             onAddParticipant={handleAddParticipant}
             onEdit={(participant) => {
               setCurrentParticipant(participant);

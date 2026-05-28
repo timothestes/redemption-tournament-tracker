@@ -44,6 +44,7 @@ interface TournamentTabsProps {
   fetchParticipants: () => void;
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
+  isHost?: boolean;
 }
 
 export default function TournamentTabs({
@@ -70,6 +71,7 @@ export default function TournamentTabs({
   fetchParticipants,
   decklists,
   onDecklistsChange,
+  isHost = false,
 }: TournamentTabsProps) {
   // state for booster draft pods
   const [showPodsModal, setShowPodsModal] = useState(false);
@@ -242,6 +244,7 @@ export default function TournamentTabs({
             setMatchErrorIndex={setMatchErrorIndex}
             activeTab={activeTab}
             tournamentName={tournamentName}
+            isHost={isHost}
           />
         </div>
       </Tabs.Item>

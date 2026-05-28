@@ -38,9 +38,11 @@ interface TournamentRoundsProps {
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
   activeTab: number;
   tournamentName?: string | null;
+  isHost?: boolean;
 }
 
 interface TournamentInfo {
+  id: string | null;
   n_rounds: number | null;
   current_round: number | null;
   has_ended: boolean;
@@ -69,9 +71,11 @@ export default function TournamentRounds({
   matchErrorIndex,
   setMatchErrorIndex,
   activeTab,
-  tournamentName
+  tournamentName,
+  isHost = false,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
+    id: null,
     n_rounds: null,
     current_round: null,
     has_ended: false,
@@ -85,6 +89,7 @@ export default function TournamentRounds({
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(tournamentInfo.current_round || 1);
   const [isRoundActive, setIsRoundActive] = useState(false);
+  const [isRoundCompleted, setIsRoundCompleted] = useState(false);
   const [roundInfo, setRoundInfo] = useState<RoundInfo>({
     started_at: null,
     ended_at: null,
@@ -134,7 +139,7 @@ export default function TournamentRounds({
       const [tournamentResult, roundResult] = await Promise.all([
         client
           .from("tournaments")
-          .select("n_rounds, current_round, has_ended, max_score, starting_table_number, name")
+          .select("id, n_rounds, current_round, has_ended, max_score, starting_table_number, name")
           .eq("id", tournamentId)
           .single(),
         client
@@ -158,14 +163,15 @@ export default function TournamentRounds({
       });
 
       const shouldBeActive = !!(
-        roundData && 
-        !roundData.is_completed && 
+        roundData &&
+        !roundData.is_completed &&
         !tournamentData.has_ended &&
-        roundData.started_at && 
+        roundData.started_at &&
         !roundData.ended_at
       );
-      
+
       setIsRoundActive(shouldBeActive);
+      setIsRoundCompleted(!!(roundData?.is_completed));
       
       if (shouldBeActive) {
         await fetchCurrentRoundData();
@@ -921,6 +927,18 @@ export default function TournamentRounds({
                                   >
                                     <ArrowUpDown className="h-4 w-4" />
                                   </button>
+                                  {isHost && isRoundCompleted && (
+                                    <MatchEditModal
+                                      key={`repair-${match.id}`}
+                                      match={match}
+                                      fetchCurrentRoundData={fetchCurrentRoundData}
+                                      setMatchErrorIndex={setMatchErrorIndex}
+                                      isRoundActive={false}
+                                      index={index}
+                                      tournament={tournamentInfo}
+                                      mode="repair"
+                                    />
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -1023,16 +1041,32 @@ export default function TournamentRounds({
                               <span className="text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                                 Table {tableNum}
                               </span>
-                              <div className="flex-shrink-0 w-10 h-10">
-                                <MatchEditModal
-                                  key={match.player1_score + match.player2_score}
-                                  match={match}
-                                  fetchCurrentRoundData={fetchCurrentRoundData}
-                                  setMatchErrorIndex={setMatchErrorIndex}
-                                  isRoundActive={isRoundActive}
-                                  index={index}
-                                  tournament={tournamentInfo}
-                                />
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <div className="w-10 h-10">
+                                  <MatchEditModal
+                                    key={match.player1_score + match.player2_score}
+                                    match={match}
+                                    fetchCurrentRoundData={fetchCurrentRoundData}
+                                    setMatchErrorIndex={setMatchErrorIndex}
+                                    isRoundActive={isRoundActive}
+                                    index={index}
+                                    tournament={tournamentInfo}
+                                  />
+                                </div>
+                                {isHost && isRoundCompleted && (
+                                  <div className="w-11 h-11">
+                                    <MatchEditModal
+                                      key={`repair-${match.id}`}
+                                      match={match}
+                                      fetchCurrentRoundData={fetchCurrentRoundData}
+                                      setMatchErrorIndex={setMatchErrorIndex}
+                                      isRoundActive={false}
+                                      index={index}
+                                      tournament={tournamentInfo}
+                                      mode="repair"
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="space-y-2">
