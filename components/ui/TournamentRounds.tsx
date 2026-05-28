@@ -7,7 +7,7 @@ import { recomputeTotalsFromHistory } from "../../lib/tournament/results";
 import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
 import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Printer } from "lucide-react";
 import { printTournamentPairings, printFinalStandings, printMatchSlips } from "../../utils/printUtils";
 import { Button } from "./button";
 import ToastNotification from "./toast-notification";
@@ -837,37 +837,50 @@ export default function TournamentRounds({
                     </div>
                   </div>
                   {currentPage === tournamentInfo.current_round && (
-                      <div className="flex gap-2 flex-wrap">
+                      // Round-control tiering: prints are outline (secondary),
+                      // Start/End Round is the only solid button in the row
+                      // (the primary action in this context). On mobile the
+                      // prints wrap above the primary action via flex-wrap.
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                         {tournamentInfo.has_ended ? (
                           <Button
-                            variant="accent"
+                            variant="outline"
                             size="sm"
                             onClick={handlePrintFinalStandings}
+                            className="gap-1.5"
                           >
+                            <Printer className="w-4 h-4" aria-hidden="true" />
                             <span className="hidden sm:inline">Print Final Standings</span>
                             <span className="sm:hidden">Print</span>
                           </Button>
                         ) : (
                           <>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handlePrintPairings}
+                                className="gap-1.5"
+                              >
+                                <Printer className="w-4 h-4" aria-hidden="true" />
+                                <span className="hidden sm:inline">Print Pairings</span>
+                                <span className="sm:hidden">Pairings</span>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handlePrintMatchSlips}
+                                className="gap-1.5"
+                              >
+                                <Printer className="w-4 h-4" aria-hidden="true" />
+                                <span className="hidden sm:inline">Print Match Slips</span>
+                                <span className="sm:hidden">Slips</span>
+                              </Button>
+                            </div>
                             <Button
-                              variant="accent"
+                              variant={isRoundActive ? "destructive" : "default"}
                               size="sm"
-                              onClick={handlePrintPairings}
-                            >
-                              <span className="hidden sm:inline">Print Pairings</span>
-                              <span className="sm:hidden">Pairings</span>
-                            </Button>
-                            <Button
-                              variant="accent"
-                              size="sm"
-                              onClick={handlePrintMatchSlips}
-                            >
-                              <span className="hidden sm:inline">Print Match Slips</span>
-                              <span className="sm:hidden">Slips</span>
-                            </Button>
-                            <Button
-                              variant={isRoundActive ? "destructive" : "success"}
-                              size="sm"
+                              className="sm:ml-auto"
                               onClick={
                                 isRoundActive
                                   ? () => setEndRoundConfirmOpen(true)
