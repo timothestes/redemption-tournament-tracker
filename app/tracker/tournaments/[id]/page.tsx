@@ -20,6 +20,7 @@ import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsS
 import { AuditLogPanel } from "../../../../components/ui/AuditLogPanel";
 import { RegeneratePairingsButton } from "../../../../components/ui/RegeneratePairingsButton";
 import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/ui/UnlockAndRepairDialog";
+import { RepairTournamentBanner } from "../../../../components/ui/RepairTournamentBanner";
 
 const supabase = createClient();
 
@@ -564,6 +565,11 @@ export default function TournamentPage({
         <div className="flex-grow max-w-4xl mx-auto">
           {tournament && (
             <div className="mb-6 space-y-4">
+              <RepairTournamentBanner
+                tournamentId={tournament.id}
+                currentRound={tournament.current_round ?? 1}
+                isRoundActive={isRoundActive}
+              />
               {/* Title row with status badge */}
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl sm:text-3xl font-bold">
