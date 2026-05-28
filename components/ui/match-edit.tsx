@@ -293,7 +293,7 @@ export default function MatchEditModal({
           <button
             className={`inline-flex items-center justify-center w-11 h-11 rounded-md transition-colors ${
               isRoundActive || mode === "repair"
-                ? "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary/80 cursor-pointer"
+                ? "text-foreground hover:text-primary hover:bg-muted cursor-pointer"
                 : "text-muted-foreground/50"
             }`}
             onClick={handleOpenModal}

@@ -265,40 +265,48 @@ export default function StandingsTable({
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full text-sm text-left text-muted-foreground border border-border rounded-lg overflow-hidden">
-          <thead className="text-xs uppercase font-medium bg-muted text-foreground">
+          {/*
+            Sort-hierarchy convention: active sort columns (MP primary, Diff
+            tiebreaker) read as `text-foreground` with a muted chevron;
+            inactive headers stay muted with no chevron. Communicates active
+            sort via header tint rather than a bright accent on the icon.
+          */}
+          <thead className="text-xs uppercase font-medium bg-muted">
             <tr>
-              <th scope="col" className="px-4 py-3 text-left">
+              <th scope="col" className="px-4 py-3 text-left text-muted-foreground">
                 Rank
               </th>
-              <th scope="col" className="px-4 py-3 text-left">
+              <th scope="col" className="px-4 py-3 text-left text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   Player
                 </span>
               </th>
-              <th scope="col" className="px-4 py-3 text-center">
+              <th scope="col" className="px-4 py-3 text-center text-muted-foreground">
                 Record (W-L-T)
               </th>
               <th
                 scope="col"
                 className="px-4 py-3 text-center"
                 title="Cumulative match points across all rounds. Primary sort key."
+                aria-sort="descending"
               >
-                <span className="inline-flex items-center gap-1 text-foreground">
-                  MP <ChevronDown className="w-3 h-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+                  MP <ChevronDown className="w-3 h-3 text-muted-foreground" aria-hidden="true" />
                 </span>
               </th>
               <th
                 scope="col"
                 className="px-4 py-3 text-center"
                 title="Cumulative lost-soul-score differential. Tiebreaker after MP."
+                aria-sort="descending"
               >
-                <span className="inline-flex items-center gap-1 text-foreground">
-                  Diff <ChevronDown className="w-3 h-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+                  Diff <ChevronDown className="w-3 h-3 text-muted-foreground" aria-hidden="true" />
                 </span>
               </th>
               <th
                 scope="col"
-                className="px-4 py-3 text-center"
+                className="px-4 py-3 text-center text-muted-foreground"
                 title="Head-to-head record against players tied on match points. The official Redemption algorithm applies head-to-head before falling back to lost-soul-score among tied players."
               >
                 Tiebreaker (H2H)

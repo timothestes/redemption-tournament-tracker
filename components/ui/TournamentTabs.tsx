@@ -109,13 +109,15 @@ export default function TournamentTabs({
             default: "border-b border-border",
           },
           tabitem: {
-            base: "flex items-center justify-center rounded-t-lg px-3 py-2.5 sm:px-4 sm:py-4 text-sm font-medium first:ml-0 focus:outline-none disabled:cursor-not-allowed disabled:text-muted-foreground whitespace-nowrap",
+            base: "flex items-center justify-center px-3 py-2.5 sm:px-4 sm:py-4 text-sm font-medium first:ml-0 focus:outline-none disabled:cursor-not-allowed disabled:text-muted-foreground whitespace-nowrap -mb-px border-b-2 border-transparent",
             variant: {
               default: {
-                base: "rounded-t-lg",
+                base: "",
                 active: {
-                  on: "bg-muted text-primary",
-                  off: "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  // The active tab now signals primacy via foreground text +
+                  // a thin foreground underline rather than the bright accent.
+                  on: "text-foreground font-semibold border-foreground",
+                  off: "text-muted-foreground hover:text-foreground",
                 },
               },
             },
