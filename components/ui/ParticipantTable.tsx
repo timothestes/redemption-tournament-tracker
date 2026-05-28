@@ -53,7 +53,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
       const client = createClient();
       const [editsResult, matchesResult] = await Promise.all([
         client
-          .from("match_edits")
+          .from("match_edits_public")
           .select("match_id, round, edited_at")
           .eq("tournament_id", tournamentId),
         client
