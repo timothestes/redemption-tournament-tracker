@@ -95,9 +95,12 @@ export default function MatchEditModal({
         alert(`Repair failed: ${result.error}`);
         return;
       }
-      setOpen(false);
-      fetchCurrentRoundData?.();
+      // Await the parent's refresh BEFORE closing the modal so the table
+      // re-renders with corrected scores. Without await, setOpen(false) fires
+      // first and the table keeps the pre-repair data until manual refresh.
+      await fetchCurrentRoundData?.();
       onRepairSuccess?.();
+      setOpen(false);
       return;
     }
 
