@@ -15,6 +15,7 @@ export default function MatchEditModal({
   mode = "live",
   open: controlledOpen,
   onOpenChange,
+  onRepairSuccess,
 }: {
   match: any;
   fetchCurrentRoundData?: any;
@@ -25,6 +26,7 @@ export default function MatchEditModal({
   mode?: "live" | "repair";
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onRepairSuccess?: () => void;
 }) {
   const isControlled = controlledOpen !== undefined;
   const [internalOpen, setInternalOpen] = useState(false);
@@ -95,6 +97,7 @@ export default function MatchEditModal({
       }
       setOpen(false);
       fetchCurrentRoundData?.();
+      onRepairSuccess?.();
       return;
     }
 
@@ -231,9 +234,9 @@ export default function MatchEditModal({
     <>
       <div className="flex items-center justify-center w-full h-full" title={isRoundActive || mode === "repair" ? "Edit match scores" : "Cannot input scores until round is started"}>
         <button
-          className={`p-2 rounded-md flex items-center justify-center ${
+          className={`inline-flex items-center justify-center w-11 h-11 rounded-md transition-colors ${
             isRoundActive || mode === "repair"
-              ? "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary/80 transition cursor-pointer"
+              ? "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary/80 cursor-pointer"
               : "text-muted-foreground/50"
           }`}
           onClick={handleOpenModal}

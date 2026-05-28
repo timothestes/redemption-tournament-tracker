@@ -109,6 +109,17 @@ export default function TournamentRounds({
     type: "success" | "error" | "warning" | "info";
   }>({ message: "", show: false, type: "warning" });
 
+  interface MatchEditRow {
+    id: string;
+    old_player1_score: number;
+    old_player2_score: number;
+    new_player1_score: number;
+    new_player2_score: number;
+    edited_at: string;
+    reason: string | null;
+  }
+  const [matchEditsByMatch, setMatchEditsByMatch] = useState<Record<string, MatchEditRow[]>>({});
+
   const showToast = useCallback(
     (
       message: string,
@@ -118,6 +129,33 @@ export default function TournamentRounds({
     },
     []
   );
+
+  const fetchMatchEdits = useCallback(async () => {
+    if (!tournamentInfo.id || !isHost) return;
+    const { data } = await client
+      .from("match_edits")
+      .select("id, match_id, old_player1_score, old_player2_score, new_player1_score, new_player2_score, edited_at, reason")
+      .eq("tournament_id", tournamentInfo.id)
+      .order("edited_at", { ascending: false });
+    const grouped: Record<string, MatchEditRow[]> = {};
+    for (const e of (data ?? [])) {
+      const row = e as any;
+      (grouped[row.match_id] ??= []).push({
+        id: row.id,
+        old_player1_score: row.old_player1_score,
+        old_player2_score: row.old_player2_score,
+        new_player1_score: row.new_player1_score,
+        new_player2_score: row.new_player2_score,
+        edited_at: row.edited_at,
+        reason: row.reason,
+      });
+    }
+    setMatchEditsByMatch(grouped);
+  }, [tournamentInfo.id, isHost]);
+
+  useEffect(() => {
+    fetchMatchEdits();
+  }, [fetchMatchEdits]);
 
   useEffect(() => {
     setMounted(true);
@@ -937,6 +975,10 @@ export default function TournamentRounds({
                                       index={index}
                                       tournament={tournamentInfo}
                                       mode="repair"
+                                      onRepairSuccess={() => {
+                                        showToast("Result repaired.", "success");
+                                        fetchMatchEdits();
+                                      }}
                                     />
                                   )}
                                 </div>
@@ -995,6 +1037,26 @@ export default function TournamentRounds({
                                 </div>
                               </td>
                             </tr>
+                            {isHost && (matchEditsByMatch[match.id]?.length ?? 0) > 0 && (
+                              <tr className="border-b border-border bg-muted/30">
+                                <td colSpan={6} className="px-4 py-1">
+                                  <details className="text-xs">
+                                    <summary className="cursor-pointer text-muted-foreground">
+                                      Edit history ({matchEditsByMatch[match.id]!.length})
+                                    </summary>
+                                    <ul className="mt-1 ml-3 space-y-1">
+                                      {matchEditsByMatch[match.id]!.map(e => (
+                                        <li key={e.id} className="text-muted-foreground">
+                                          {e.old_player1_score}-{e.old_player2_score} → {e.new_player1_score}-{e.new_player2_score}
+                                          {" · "}{new Date(e.edited_at).toLocaleString()}
+                                          {e.reason ? ` · ${e.reason}` : ""}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </details>
+                                </td>
+                              </tr>
+                            )}
                           </Fragment>
                         ))}
                     </tbody>
@@ -1064,6 +1126,10 @@ export default function TournamentRounds({
                                       index={index}
                                       tournament={tournamentInfo}
                                       mode="repair"
+                                      onRepairSuccess={() => {
+                                        showToast("Result repaired.", "success");
+                                        fetchMatchEdits();
+                                      }}
                                     />
                                   </div>
                                 )}
@@ -1115,6 +1181,22 @@ export default function TournamentRounds({
                                 </button>
                               </div>
                             </div>
+                            {isHost && (matchEditsByMatch[match.id]?.length ?? 0) > 0 && (
+                              <details className="mt-2 text-xs">
+                                <summary className="cursor-pointer text-muted-foreground">
+                                  Edit history ({matchEditsByMatch[match.id]!.length})
+                                </summary>
+                                <ul className="mt-1 ml-3 space-y-1">
+                                  {matchEditsByMatch[match.id]!.map(e => (
+                                    <li key={e.id} className="text-muted-foreground">
+                                      {e.old_player1_score}-{e.old_player2_score} → {e.new_player1_score}-{e.new_player2_score}
+                                      {" · "}{new Date(e.edited_at).toLocaleString()}
+                                      {e.reason ? ` · ${e.reason}` : ""}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </details>
+                            )}
                           </div>
                         );
                       })}
