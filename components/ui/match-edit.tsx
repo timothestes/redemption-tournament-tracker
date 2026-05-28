@@ -11,7 +11,8 @@ export default function MatchEditModal({
   setMatchErrorIndex,
   isRoundActive,
   index,
-  tournament
+  tournament,
+  mode = "live",
 }: {
   match: any;
   fetchCurrentRoundData: any;
@@ -19,10 +20,12 @@ export default function MatchEditModal({
   isRoundActive: boolean;
   index: number;
   tournament: any;
+  mode?: "live" | "repair";
 }) {
   const [open, setOpen] = useState(false);
   const [player1Score, setPlayer1Score] = useState(match.player1_score);
   const [player2Score, setPlayer2Score] = useState(match.player2_score);
+  const [reason, setReason] = useState("");
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -40,16 +43,48 @@ export default function MatchEditModal({
 
   // Reset scores to 0 only if they haven't been set yet
   const handleOpenModal = () => {
-    if (isRoundActive) {
+    if (isRoundActive || mode === "repair") {
       // Use existing scores if available, otherwise default to 0
       setPlayer1Score(match.player1_score !== null ? match.player1_score : 0);
       setPlayer2Score(match.player2_score !== null ? match.player2_score : 0);
+      setReason("");
       setOpen(true);
     }
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    if (mode === "repair") {
+      if (
+        player1Score < 0 || player2Score < 0 ||
+        player1Score > tournament.max_score ||
+        player2Score > tournament.max_score
+      ) {
+        alert(`Invalid scores. Scores must be between 0 and ${tournament.max_score}, inclusive.`);
+        return;
+      }
+      if (player1Score === tournament.max_score && player2Score === tournament.max_score) {
+        alert("Score cannot be " + tournament.max_score + "-" + tournament.max_score + ".");
+        return;
+      }
+      const { repairMatchScoreAction } = await import("@/app/tracker/tournaments/repair-actions");
+      const result = await repairMatchScoreAction({
+        matchId: match.id,
+        newP1Score: player1Score,
+        newP2Score: player2Score,
+        reason: reason || undefined,
+        tournamentId: tournament.id,
+      });
+      if (!result.ok) {
+        alert(`Repair failed: ${result.error}`);
+        return;
+      }
+      setOpen(false);
+      if (typeof fetchCurrentRoundData === "function") fetchCurrentRoundData();
+      return;
+    }
+
     if (
       isNaN(player2Score) ||
       player1Score < 0 ||
@@ -181,15 +216,15 @@ export default function MatchEditModal({
 
   return (
     <>
-      <div className="flex items-center justify-center w-full h-full" title={isRoundActive ? "Edit match scores" : "Cannot input scores until round is started"}>
+      <div className="flex items-center justify-center w-full h-full" title={isRoundActive || mode === "repair" ? "Edit match scores" : "Cannot input scores until round is started"}>
         <button
           className={`p-2 rounded-md flex items-center justify-center ${
-            isRoundActive
+            isRoundActive || mode === "repair"
               ? "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary/80 transition cursor-pointer"
               : "text-muted-foreground/50"
           }`}
           onClick={handleOpenModal}
-          disabled={!isRoundActive}
+          disabled={!isRoundActive && mode !== "repair"}
           aria-label="Edit match scores"
         >
           <Pencil size={20} />
@@ -198,7 +233,9 @@ export default function MatchEditModal({
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-card border-2 border-border py-8 px-8 rounded-lg shadow-lg max-w-md w-full">
-            <h2 className="text-xl font-bold mb-6 text-foreground">Edit Match</h2>
+            <h2 className="text-xl font-bold mb-6 text-foreground">
+              {mode === "repair" ? "Repair result" : "Edit Match"}
+            </h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
               <div className="block space-y-5">
                 <ScoreSelector
@@ -216,10 +253,23 @@ export default function MatchEditModal({
                     Score cannot be {tournament.max_score}-{tournament.max_score}.
                   </p>
                 )}
+                {mode === "repair" && (
+                  <div className="mb-4">
+                    <label className="block text-sm text-muted-foreground mb-1">Reason (optional)</label>
+                    <input
+                      type="text"
+                      maxLength={240}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Why are you repairing this?"
+                      className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-3 mt-2">
                 <Button type="submit" variant="success">
-                  Update
+                  {mode === "repair" ? "Repair" : "Update"}
                 </Button>
                 <Button type="button" variant="cancel" onClick={() => setOpen(false)}>
                   Cancel
