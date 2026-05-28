@@ -19,6 +19,7 @@ import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../ac
 import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
 import { AuditLogPanel } from "../../../../components/ui/AuditLogPanel";
 import { RegeneratePairingsButton } from "../../../../components/ui/RegeneratePairingsButton";
+import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/ui/UnlockAndRepairDialog";
 
 const supabase = createClient();
 
@@ -57,7 +58,8 @@ export default function TournamentPage({
   });
 
   const [latestRound, setLatestRound] = useState<any>(null);
-  const [scoredMatchCount, setScoredMatchCount] = useState(0);
+  const [scoredCurrentRoundMatches, setScoredCurrentRoundMatches] = useState<ScoredMatch[]>([]);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -504,13 +506,19 @@ export default function TournamentPage({
         }
 
         if (tournament.current_round) {
-          const { data: matchData } = await client
+          const { data: scoredMatchesData } = await client
             .from("matches")
-            .select("player1_score")
+            .select("id, player1_score, player2_score, player1:participants!matches_player1_id_fkey(name), player2:participants!matches_player2_id_fkey(name)")
             .eq("tournament_id", tournament.id)
             .eq("round", tournament.current_round)
             .not("player1_score", "is", null);
-          setScoredMatchCount(matchData?.length ?? 0);
+          setScoredCurrentRoundMatches((scoredMatchesData ?? []).map((m: any) => ({
+            id: m.id,
+            player1Name: m.player1?.name ?? "?",
+            player2Name: m.player2?.name ?? "?",
+            player1Score: m.player1_score,
+            player2Score: m.player2_score,
+          })));
         }
       })();
     }
@@ -704,9 +712,19 @@ export default function TournamentPage({
                 <RegeneratePairingsButton
                   tournamentId={tournament.id}
                   currentRound={tournament.current_round ?? 1}
-                  scoredMatchCount={scoredMatchCount}
+                  scoredMatchCount={scoredCurrentRoundMatches.length}
                   isRoundCompleted={latestRound?.is_completed ?? false}
                   onComplete={fetchTournamentDetails}
+                  onUnlockRequest={() => setUnlockDialogOpen(true)}
+                />
+              )}
+              {isHost && tournament && (
+                <UnlockAndRepairDialog
+                  open={unlockDialogOpen}
+                  onClose={() => setUnlockDialogOpen(false)}
+                  tournamentId={tournament.id}
+                  scoredMatches={scoredCurrentRoundMatches}
+                  onComplete={() => { fetchTournamentDetails(); }}
                 />
               )}
 
