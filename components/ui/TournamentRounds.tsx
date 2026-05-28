@@ -976,6 +976,7 @@ export default function TournamentRounds({
                                       isRoundActive={isRoundActive}
                                       index={index}
                                       tournament={tournamentInfo}
+                                      mode="edit"
                                     />
                                     <button
                                       title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? `Swap ${match.player1_id.name}` : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
@@ -1096,6 +1097,7 @@ export default function TournamentRounds({
                                     isRoundActive={isRoundActive}
                                     index={index}
                                     tournament={tournamentInfo}
+                                    mode="edit"
                                   />
                                 </div>
                                 {isHost && isRoundCompleted && (

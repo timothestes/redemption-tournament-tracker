@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Dialog, DialogContent } from "./dialog";
 
 export interface PickerMatch {
   id: string;
@@ -38,11 +39,9 @@ export function RepairPastResultPicker({ open, onClose, completedRounds, matches
       .filter(m => !lc || m.player1Name.toLowerCase().includes(lc) || m.player2Name.toLowerCase().includes(lc));
   }, [round, search, matches]);
 
-  if (!open) return null;
-
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80">
-      <div className="w-full max-w-md rounded-t-lg sm:rounded-lg bg-card border border-border p-4">
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent size="md" className="rounded-t-lg sm:rounded-lg bg-card border border-border p-4">
         <h2 className="text-lg font-medium text-foreground">Repair past result</h2>
 
         {completedRounds.length === 0 ? (
@@ -91,7 +90,7 @@ export function RepairPastResultPicker({ open, onClose, completedRounds, matches
         <div className="mt-4 flex justify-end">
           <button type="button" onClick={onClose} className="px-3 py-2 rounded-md border border-border text-foreground">Close</button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

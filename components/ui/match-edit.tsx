@@ -2,8 +2,9 @@
 
 import { Button } from "./button";
 import { Pencil } from "lucide-react";
-import { Dispatch, FormEvent, SetStateAction, useState, useEffect } from "react";
+import { Dispatch, FormEvent, SetStateAction, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
+import { Dialog, DialogContent } from "./dialog";
 
 export default function MatchEditModal({
   match,
@@ -12,7 +13,7 @@ export default function MatchEditModal({
   isRoundActive,
   index,
   tournament,
-  mode = "live",
+  mode = "edit",
   open: controlledOpen,
   onOpenChange,
   onRepairSuccess,
@@ -23,7 +24,7 @@ export default function MatchEditModal({
   isRoundActive: boolean;
   index: number;
   tournament: any;
-  mode?: "live" | "repair";
+  mode?: "edit" | "repair";
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onRepairSuccess?: () => void;
@@ -43,18 +44,25 @@ export default function MatchEditModal({
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Handle ESC key to close modal
+  // Unsaved-edit guard: prevent backdrop click from silently discarding
+  // score changes. ESC and the explicit Cancel button are still valid exits
+  // even while dirty (handled below + the user clicking Cancel calls
+  // setOpen(false) directly, bypassing the guard).
+  const hasUnsavedChanges =
+    player1Score !== match.player1_score || player2Score !== match.player2_score;
+
+  // Suppress the next onOpenChange(false) call when ESC fires, so the
+  // primitive's ESC handler can close the dialog even while the unsaved
+  // edits guard is in effect.
+  const allowNextClose = useRef(false);
+
   useEffect(() => {
     if (!open) return;
-
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-      }
+      if (e.key === "Escape") allowNextClose.current = true;
     };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener("keydown", handleEscape, { capture: true });
+    return () => document.removeEventListener("keydown", handleEscape, { capture: true } as any);
   }, [open]);
 
   // Reset scores to 0 only if they haven't been set yet
@@ -67,6 +75,16 @@ export default function MatchEditModal({
       setError(null);
       setOpen(true);
     }
+  };
+
+  const handleDialogOpenChange = (next: boolean) => {
+    // The Dialog primitive fires onOpenChange(false) for both ESC and
+    // backdrop clicks. If the user has unsaved score changes, block the
+    // backdrop close path so a stray click can't discard pending input.
+    // ESC sets allowNextClose so it remains a valid exit.
+    if (!next && hasUnsavedChanges && !allowNextClose.current) return;
+    allowNextClose.current = false;
+    setOpen(next);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -237,76 +255,89 @@ export default function MatchEditModal({
     );
   };
 
+  const p1Name = match.player1_id?.name ?? "Player 1";
+  const p2Name = match.player2_id?.name ?? "Player 2";
+  const triggerAriaLabel =
+    mode === "repair"
+      ? `Repair result for ${p1Name} vs ${p2Name}`
+      : `Edit score: ${p1Name} vs ${p2Name}`;
+  const triggerTitle =
+    mode === "repair"
+      ? "Repair past result"
+      : isRoundActive
+        ? "Edit match scores"
+        : "Cannot input scores until round is started";
+
   return (
     <>
-      <div className="flex items-center justify-center w-full h-full" title={isRoundActive || mode === "repair" ? "Edit match scores" : "Cannot input scores until round is started"}>
-        <button
-          className={`inline-flex items-center justify-center w-11 h-11 rounded-md transition-colors ${
-            isRoundActive || mode === "repair"
-              ? "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary/80 cursor-pointer"
-              : "text-muted-foreground/50"
-          }`}
-          onClick={handleOpenModal}
-          disabled={!isRoundActive && mode !== "repair"}
-          aria-label="Edit match scores"
-        >
-          <Pencil size={20} />
-        </button>
-      </div>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-card border-2 border-border py-8 px-8 rounded-lg shadow-lg max-w-md w-full">
-            <h2 className="text-xl font-bold mb-6 text-foreground">
-              {mode === "repair" ? "Repair result" : "Edit Match"}
-            </h2>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-              <div className="block space-y-5">
-                {error && (
-                  <p className="text-destructive text-sm" role="alert">
-                    {error}
-                  </p>
-                )}
-                <ScoreSelector
-                  player={match.player1_id.name}
-                  selectedScore={player1Score}
-                  setScore={setPlayer1Score}
-                />
-                <ScoreSelector
-                  player={match.player2_id.name}
-                  selectedScore={player2Score}
-                  setScore={setPlayer2Score}
-                />
-                {player1Score === tournament.max_score && player2Score === tournament.max_score && (
-                  <p className="text-red-500 text-sm">
-                    Score cannot be {tournament.max_score}-{tournament.max_score}.
-                  </p>
-                )}
-                {mode === "repair" && (
-                  <div className="mb-4">
-                    <label className="block text-sm text-muted-foreground mb-1">Reason (optional)</label>
-                    <input
-                      type="text"
-                      maxLength={240}
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Why are you repairing this?"
-                      className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
-                    />
-                  </div>
-                )}
-              </div>
-              <div className="flex justify-end gap-3 mt-2">
-                <Button type="submit" variant="success">
-                  {mode === "repair" ? "Repair" : "Update"}
-                </Button>
-                <Button type="button" variant="cancel" onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </div>
+      {!isControlled && (
+        <div className="flex items-center justify-center w-full h-full" title={triggerTitle}>
+          <button
+            className={`inline-flex items-center justify-center w-11 h-11 rounded-md transition-colors ${
+              isRoundActive || mode === "repair"
+                ? "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary/80 cursor-pointer"
+                : "text-muted-foreground/50"
+            }`}
+            onClick={handleOpenModal}
+            disabled={!isRoundActive && mode !== "repair"}
+            aria-label={triggerAriaLabel}
+          >
+            <Pencil size={20} />
+          </button>
         </div>
       )}
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+        <DialogContent size="md" className="bg-card border-2 border-border py-8 px-8">
+          <h2 className="text-xl font-bold mb-6 text-foreground">
+            {mode === "repair" ? "Repair result" : "Edit Match"}
+          </h2>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <div className="block space-y-5">
+              {error && (
+                <p className="text-destructive text-sm" role="alert">
+                  {error}
+                </p>
+              )}
+              <ScoreSelector
+                player={match.player1_id.name}
+                selectedScore={player1Score}
+                setScore={setPlayer1Score}
+              />
+              <ScoreSelector
+                player={match.player2_id.name}
+                selectedScore={player2Score}
+                setScore={setPlayer2Score}
+              />
+              {player1Score === tournament.max_score && player2Score === tournament.max_score && (
+                <p className="text-red-500 text-sm">
+                  Score cannot be {tournament.max_score}-{tournament.max_score}.
+                </p>
+              )}
+              {mode === "repair" && (
+                <div className="mb-4">
+                  <label className="block text-sm text-muted-foreground mb-1">Reason (optional)</label>
+                  <input
+                    type="text"
+                    maxLength={240}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Why are you repairing this?"
+                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 mt-2">
+              <Button type="submit" variant="success">
+                {mode === "repair" ? "Repair" : "Update"}
+              </Button>
+              <Button type="button" variant="cancel" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

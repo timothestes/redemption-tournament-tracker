@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { regenerateCurrentRoundPairingsAction } from "@/app/tracker/tournaments/repair-actions";
+import { Dialog, DialogContent } from "./dialog";
 
 interface Props {
   tournamentId: string;
@@ -67,54 +68,57 @@ export function RegeneratePairingsButton({
         )}
       </div>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80"
-        >
-          <div className="w-full max-w-md rounded-t-lg sm:rounded-lg bg-card border border-border p-4">
-            <h2 className="text-lg font-medium text-foreground">
-              Regenerate pairings for round {currentRound}?
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              This will replace the current pairings using the corrected
-              standings. The existing pairings will be discarded.
-            </p>
-            <label className="mt-3 flex items-start gap-2 text-sm text-foreground">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-                className="mt-1"
-              />
-              <span>I confirm no players have started current-round matches.</span>
-            </label>
-            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  setConfirmed(false);
-                  setError(null);
-                }}
-                className="px-3 py-2 rounded-md border border-border text-foreground"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!confirmed || busy}
-                onClick={handleSubmit}
-                className="px-3 py-2 rounded-md bg-primary text-primary-foreground disabled:bg-muted disabled:text-muted-foreground"
-              >
-                {busy ? "Regenerating…" : "Regenerate"}
-              </button>
-            </div>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) {
+            setOpen(false);
+            setConfirmed(false);
+            setError(null);
+          }
+        }}
+      >
+        <DialogContent size="md" className="rounded-t-lg sm:rounded-lg bg-card border border-border p-4">
+          <h2 className="text-lg font-medium text-foreground">
+            Re-pair Round {currentRound}?
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This will replace the current pairings using the corrected
+            standings. The existing pairings will be discarded.
+          </p>
+          <label className="mt-3 flex items-start gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+              className="mt-1"
+            />
+            <span>I confirm no players have started current-round matches.</span>
+          </label>
+          {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setConfirmed(false);
+                setError(null);
+              }}
+              className="px-3 py-2 rounded-md border border-border text-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!confirmed || busy}
+              onClick={handleSubmit}
+              className="px-3 py-2 rounded-md bg-primary text-primary-foreground disabled:bg-muted disabled:text-muted-foreground"
+            >
+              {busy ? "Re-pairing…" : "Re-pair"}
+            </button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

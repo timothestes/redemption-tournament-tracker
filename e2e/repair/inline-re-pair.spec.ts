@@ -33,10 +33,10 @@ test("repair followed by re-pair button regenerates current round pairings", asy
   await repairCurrentBtn.click();
 
   // Confirm dialog with checkbox.
-  const confirmDialog = page.getByRole("dialog").filter({ hasText: /regenerate pairings for round 2/i });
+  const confirmDialog = page.getByRole("dialog").filter({ hasText: /re-pair round 2/i });
   await expect(confirmDialog).toBeVisible();
   await confirmDialog.getByLabel(/i confirm no players have started/i).check();
-  await confirmDialog.getByRole("button", { name: /^regenerate$/i }).click();
+  await confirmDialog.getByRole("button", { name: /^re-pair$/i }).click();
 
   // Verify success: matches table for round 2 still has 2 rows (pairings replaced, not deleted).
   // We re-fetch via admin (back-channel verify) to avoid flaky UI assertions.
