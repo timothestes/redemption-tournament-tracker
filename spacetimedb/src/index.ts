@@ -3106,6 +3106,80 @@ function underdeckTopOfDeckImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: drawAndTopdeckSelfImpl
+// Topdecks the source Lost Soul onto its owner's Soul Deck (zoneIndex 0,
+// shifting existing soul-deck cards up by 1) and draws 1 from the top of the
+// owner's main deck into their hand.
+// ---------------------------------------------------------------------------
+function drawAndTopdeckSelfImpl(
+  ctx: any,
+  source: any,
+  player: any,
+  gameId: bigint,
+) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+
+  const fromZone = source.zone;
+  const gameCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+
+  // Shift this player's existing soul-deck cards up by 1 so the source can
+  // land at index 0 (top). Excludes the source itself defensively.
+  const soulCards = gameCards.filter(
+    (c: any) => c.ownerId === player.id && c.zone === 'soul-deck' && c.id !== source.id
+  );
+  for (const sc of soulCards) {
+    ctx.db.CardInstance.id.update({ ...sc, zoneIndex: sc.zoneIndex + 1n });
+  }
+
+  // Move source to top of soul-deck, clearing in-play state.
+  ctx.db.CardInstance.id.update({
+    ...source,
+    ...leavePlayFieldOverrides(source, fromZone, 'soul-deck'),
+    zone: 'soul-deck',
+    zoneIndex: 0n,
+    posX: '',
+    posY: '',
+    isFlipped: true,
+  });
+  clearCountersIfLeavingPlay(ctx, source.id, fromZone, 'soul-deck');
+  if (fromZone === 'land-of-bondage') {
+    compactLobIndices(ctx, gameId, source.ownerId, gameCards, source.id);
+  }
+
+  // Draw 1 from top of own main deck into hand, respecting HAND_LIMIT.
+  const handCards = gameCards.filter((c: any) => c.ownerId === player.id && c.zone === 'hand');
+  let drawnCard: { name: string; img: string } | null = null;
+  if (handCards.length < HAND_LIMIT) {
+    const deckCards = gameCards
+      .filter((c: any) => c.ownerId === player.id && c.zone === 'deck')
+      .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+    if (deckCards.length > 0) {
+      const top = deckCards[0];
+      ctx.db.CardInstance.id.update({
+        ...top,
+        zone: 'hand',
+        zoneIndex: BigInt(handCards.length),
+        posX: '',
+        posY: '',
+        isFlipped: false,
+      });
+      drawnCard = { name: top.cardName, img: top.cardImgFile };
+    }
+  }
+
+  logAction(
+    ctx, gameId, player.id, 'DRAW_AND_TOPDECK_SELF',
+    JSON.stringify({
+      sourceCardName: source.cardName,
+      sourceCardImgFile: source.cardImgFile,
+      drewCard: drawnCard,
+    }),
+    game.turnNumber, game.currentPhase,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Helper: reserveTopOfDeckImpl
 // Moves the top `count` cards of the acting player's deck into their reserve.
 // "Top" is defined by ascending zoneIndex (same convention as drawCardsForPlayer).
@@ -3453,6 +3527,8 @@ export const execute_card_ability = spacetimedb.reducer(
         return setCardOutlineImpl(ctx, source, ability, player, gameId);
       case 'play_all_lost_souls':
         return playAllLostSoulsImpl(ctx, source, player, gameId);
+      case 'draw_and_topdeck_self':
+        return drawAndTopdeckSelfImpl(ctx, source, player, gameId);
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }

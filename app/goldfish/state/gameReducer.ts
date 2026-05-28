@@ -435,6 +435,47 @@ function threeNailsResetInState(
   return { ...state, zones, history };
 }
 
+function drawAndTopdeckSelfInState(
+  state: GameState,
+  source: GameCard,
+  history: GameState[],
+): GameState {
+  // Phase 1 — validate.
+  const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
+  if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+
+  // Phase 2 — build.
+  const zones = cloneZones(state.zones);
+
+  // Pull source out of its current zone and topdeck onto soul-deck (index 0 = top).
+  // Clear in-play state (counters, outline, notes, meek) since the card is leaving play.
+  zones[source.zone] = zones[source.zone].filter(c => c.instanceId !== source.instanceId);
+  const topdecked: GameCard = {
+    ...source,
+    zone: 'soul-deck',
+    isFlipped: true,
+    posX: undefined,
+    posY: undefined,
+    counters: [],
+    outlineColor: undefined,
+    notes: '',
+    isMeek: false,
+  };
+  zones['soul-deck'] = [topdecked, ...zones['soul-deck']];
+
+  // Draw 1 from top of deck → hand. No auto-route; matches other ability draws.
+  if (zones.deck.length > 0 && zones.hand.length < HAND_LIMIT) {
+    const drawn = zones.deck.shift()!;
+    drawn.zone = 'hand';
+    drawn.isFlipped = false;
+    drawn.posX = undefined;
+    drawn.posY = undefined;
+    zones.hand = [...zones.hand, drawn];
+  }
+
+  return { ...state, zones, history };
+}
+
 function underdeckTopOfDeckInState(
   state: GameState,
   _source: GameCard,
@@ -1273,6 +1314,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // Targeting variant — dispatched via the dedicated IMITATE_LOST_SOUL
           // action which carries a target. No-op here.
           return state;
+        case 'draw_and_topdeck_self':
+          return drawAndTopdeckSelfInState(state, source, history);
         default: {
           const _exhaustive: never = ability;
           return state;

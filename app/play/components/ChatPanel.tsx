@@ -355,6 +355,29 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       );
     } catch { /* fall through */ }
   }
+  if (actionType === 'DRAW_AND_TOPDECK_SELF' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const drew = data.drewCard;
+      return (
+        <>
+          drew 1 and topdecked
+          {sourceName ? (
+            <>
+              {' '}<HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+          {drew ? (
+            <>
+              {' '}— drew <HoverableCard name={drew.name} img={drew.img} />
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
   if (actionType === 'SET_CARD_OUTLINE' && payload) {
     try {
       const data = JSON.parse(payload);
