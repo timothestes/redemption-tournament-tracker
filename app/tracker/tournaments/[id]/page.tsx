@@ -24,7 +24,7 @@ import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/
 import { RepairTournamentBanner } from "../../../../components/ui/RepairTournamentBanner";
 import { RepairPastResultPicker, type PickerMatch } from "../../../../components/ui/RepairPastResultPicker";
 import MatchEditModal from "../../../../components/ui/match-edit";
-import ConfirmationDialog from "../../../../components/ui/confirmation-dialog";
+import { EndTournamentDialog } from "../../../../components/ui/EndTournamentDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -997,15 +997,18 @@ export default function TournamentPage({
           suggestedRounds={suggestNumberOfRounds(participants.length)}
         />
         {tournament && (
-          <ConfirmationDialog
+          // Typed-confirmation gate — owner explicitly wanted a higher bar
+          // than the standard ConfirmationDialog primitive for the only host
+          // action that's truly irreversible.
+          <EndTournamentDialog
             open={endTournamentConfirmOpen}
             onOpenChange={setEndTournamentConfirmOpen}
-            onConfirm={performEndTournament}
-            variant="destructive"
-            title={`End ${tournament.name}?`}
-            description={`This will close Round ${tournament.current_round || 1} and lock all results. Players will see the tournament as ended.`}
-            confirmLabel="End tournament"
-            cancelLabel="Cancel"
+            tournamentName={tournament.name ?? ""}
+            isEnding={togglingStatus}
+            onConfirm={async () => {
+              await performEndTournament();
+              setEndTournamentConfirmOpen(false);
+            }}
           />
         )}
       </div>
