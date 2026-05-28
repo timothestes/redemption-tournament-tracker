@@ -17,7 +17,6 @@ import { buildStateFromSupabase } from "../../../../utils/tournament/stateAdapte
 import { recomputeTotalsFromHistory } from "../../../../lib/tournament/results";
 import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
 import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
-import { AuditLogPanel } from "../../../../components/ui/AuditLogPanel";
 import { RegeneratePairingsButton } from "../../../../components/ui/RegeneratePairingsButton";
 import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/ui/UnlockAndRepairDialog";
 import { RepairTournamentBanner } from "../../../../components/ui/RepairTournamentBanner";
@@ -501,12 +500,12 @@ export default function TournamentPage({
       (async () => {
         const client = createClient();
 
-        const { data, error } = await client
+        const { data } = await client
           .from("rounds")
           .select("round_number, started_at, ended_at, is_completed")
           .eq("tournament_id", tournament.id)
           .eq("round_number", tournament.current_round)
-          .single();
+          .maybeSingle();
 
         if (data) {
           setLatestRound(data);
@@ -798,9 +797,6 @@ export default function TournamentPage({
                   Repair past result
                 </button>
               )}
-
-              {/* Audit log — host only */}
-              {isHost && <AuditLogPanel tournamentId={tournament.id} />}
             </div>
           )}
           <TournamentTabs
