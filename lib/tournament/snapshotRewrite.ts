@@ -24,8 +24,14 @@ export interface SnapshotUpdate {
   cumulative_differential: number;
 }
 
+export interface ByeRow {
+  participant_id: string;
+  round_number: number;
+}
+
 interface Options {
   maxScore: number;
+  byes?: ByeRow[];
 }
 
 function pointsForResult(p1Score: number, p2Score: number, maxScore: number): [number, number] {
@@ -41,31 +47,58 @@ export function computeSnapshotRewrites(
   allMatches: MatchRow[],
   options: Options,
 ): SnapshotUpdate[] {
-  const ordered = allMatches
-    .filter(m => m.player1_id === participantId || m.player2_id === participantId)
-    .slice()
-    .sort((a, b) => (a.round - b.round) || (a.match_order - b.match_order));
+  const { maxScore, byes = [] } = options;
+
+  // Build a unified chronological event list: matches and byes for this participant.
+  type MatchEvent = { kind: 'match'; match: MatchRow };
+  type ByeEvent   = { kind: 'bye'; round: number };
+  type Event = MatchEvent | ByeEvent;
+
+  const events: Event[] = [
+    ...allMatches
+      .filter(m => m.player1_id === participantId || m.player2_id === participantId)
+      .map((m): MatchEvent => ({ kind: 'match', match: m })),
+    ...byes
+      .filter(b => b.participant_id === participantId)
+      .map((b): ByeEvent => ({ kind: 'bye', round: b.round_number })),
+  ];
+
+  events.sort((a, b) => {
+    const roundA = a.kind === 'match' ? a.match.round : a.round;
+    const roundB = b.kind === 'match' ? b.match.round : b.round;
+    if (roundA !== roundB) return roundA - roundB;
+    // Byes get match_order 0; matches use their own match_order.
+    const orderA = a.kind === 'match' ? a.match.match_order : 0;
+    const orderB = b.kind === 'match' ? b.match.match_order : 0;
+    return orderA - orderB;
+  });
 
   let cumMp = 0;
   let cumDiff = 0;
   const out: SnapshotUpdate[] = [];
 
-  for (const m of ordered) {
-    const [p1Pts, p2Pts] = pointsForResult(m.player1_score, m.player2_score, options.maxScore);
-    const isP1 = m.player1_id === participantId;
-    if (isP1) {
-      cumMp += p1Pts;
-      cumDiff += m.player1_score - m.player2_score;
+  for (const event of events) {
+    if (event.kind === 'bye') {
+      cumMp += 3;
+      // Byes do not produce a snapshot row — no match row to write back.
     } else {
-      cumMp += p2Pts;
-      cumDiff += m.player2_score - m.player1_score;
+      const m = event.match;
+      const [p1Pts, p2Pts] = pointsForResult(m.player1_score, m.player2_score, maxScore);
+      const isP1 = m.player1_id === participantId;
+      if (isP1) {
+        cumMp += p1Pts;
+        cumDiff += m.player1_score - m.player2_score;
+      } else {
+        cumMp += p2Pts;
+        cumDiff += m.player2_score - m.player1_score;
+      }
+      out.push({
+        match_id: m.id,
+        is_player1: isP1,
+        cumulative_match_points: cumMp,
+        cumulative_differential: cumDiff,
+      });
     }
-    out.push({
-      match_id: m.id,
-      is_player1: isP1,
-      cumulative_match_points: cumMp,
-      cumulative_differential: cumDiff,
-    });
   }
 
   return out;

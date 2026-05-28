@@ -59,4 +59,17 @@ describe('computeSnapshotRewrites', () => {
     ];
     expect(computeSnapshotRewrites('A', matches, { maxScore: 5 })).toEqual([]);
   });
+
+  it('includes bye points in cumulative totals', () => {
+    const matches: MatchRow[] = [
+      { id: 'm2', round: 2, match_order: 1, player1_id: 'A', player2_id: 'B', player1_score: 5, player2_score: 0 },
+    ];
+    const byes = [{ participant_id: 'A', round_number: 1 }];
+    const result = computeSnapshotRewrites('A', matches, { maxScore: 5, byes });
+    // After bye in round 1: A has 3 MP (no match row written)
+    // After m2 in round 2: A wins → 3+3 = 6 MP, differential +5
+    expect(result).toEqual([
+      { match_id: 'm2', is_player1: true, cumulative_match_points: 6, cumulative_differential: 5 },
+    ]);
+  });
 });
