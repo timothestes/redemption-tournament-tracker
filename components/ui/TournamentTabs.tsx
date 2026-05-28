@@ -127,8 +127,8 @@ export default function TournamentTabs({
             Participants{participants.length > 0 && ` (${participants.length})`}
           </h2>
           <div className="flex items-center gap-2 justify-end flex-wrap">
-            {/* generate pods button only if more than one participant */}
-            {participants.length > 1 && (
+            {/* generate pods button only if more than one participant and tournament hasn't ended */}
+            {participants.length > 1 && !tournamentEnded && (
               <Button
                 type="button"
                 onClick={() => setShowPodsModal(true)}
@@ -150,27 +150,29 @@ export default function TournamentTabs({
                 <span className="sm:hidden">Print</span>
               </Button>
             )}
-            <div className="relative group">
-              <Button
-                ref={addParticipantButtonRef}
-                onClick={() => !tournamentStarted && setIsModalOpen(true)}
-                className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
-                variant="success"
-                disabled={tournamentStarted}
-              >
-                <div className="flex items-center gap-2">
-                  <HiPlus className="w-5 h-5" />
-                  <span className="hidden sm:inline">Add Participant</span>
-                  <span className="sm:hidden">Add</span>
-                </div>
-              </Button>
-              {tournamentStarted && (
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-foreground text-background text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                  Cannot add participants after tournament has started
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-foreground"></div>
-                </div>
-              )}
-            </div>
+            {!tournamentEnded && (
+              <div className="relative group">
+                <Button
+                  ref={addParticipantButtonRef}
+                  onClick={() => !tournamentStarted && setIsModalOpen(true)}
+                  className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
+                  variant="success"
+                  disabled={tournamentStarted}
+                >
+                  <div className="flex items-center gap-2">
+                    <HiPlus className="w-5 h-5" />
+                    <span className="hidden sm:inline">Add Participant</span>
+                    <span className="sm:hidden">Add</span>
+                  </div>
+                </Button>
+                {tournamentStarted && (
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-foreground text-background text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                    Cannot add participants after tournament has started
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-foreground"></div>
+                  </div>
+                )}
+              </div>
+            )}
             <ParticipantFormModal
               isOpen={isModalOpen}
               existingNames={participants.map((p) => p.name)}
@@ -262,7 +264,15 @@ export default function TournamentTabs({
         </div>
       </Tabs.Item>
       {isHost && (
-        <Tabs.Item title="Audit log" icon={FaClipboardList}>
+        <Tabs.Item
+          title={
+            <>
+              <span className="hidden sm:inline">Audit log</span>
+              <span className="sm:hidden">History</span>
+            </>
+          }
+          icon={FaClipboardList}
+        >
           <div className="w-full max-w-[800px] mx-auto">
             <AuditLogPanel tournamentId={tournamentId} />
           </div>
