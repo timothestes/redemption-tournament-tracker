@@ -289,7 +289,7 @@ export default function MatchEditModal({
   return (
     <>
       {!isControlled && (
-        <div className="flex items-center justify-center w-full h-full" title={triggerTitle}>
+        <div className="inline-flex items-center justify-center" title={triggerTitle}>
           <button
             className={`inline-flex items-center justify-center w-11 h-11 rounded-md transition-colors ${
               isRoundActive || mode === "repair"
