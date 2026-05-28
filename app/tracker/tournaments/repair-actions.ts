@@ -4,7 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { buildStateFromSupabase } from "@/utils/tournament/stateAdapter";
 import { pairFirstRound, pairLaterRound } from "@/lib/tournament/pairing";
-import { rngForRound } from "@/lib/tournament/rng";
+import { mulberry32 } from "@/lib/tournament/rng";
 
 export interface RepairResult {
   ok: boolean;
@@ -57,7 +57,11 @@ export async function regenerateCurrentRoundPairingsAction(input: {
   if (!state) return { ok: false, error: "Tournament not found" };
 
   const round = state.currentRound;
-  const rng = rngForRound(input.tournamentId, round);
+  // Fresh random seed per regenerate. The deterministic rngForRound seed used by
+  // createPairing exists for reproducibility of the *initial* pairing; regenerate
+  // is an explicit host re-shuffle and must produce different output each time,
+  // especially for round 1 where standings provide no other variability.
+  const rng = mulberry32(Math.floor(Math.random() * 0xffffffff));
   const result =
     round === 1
       ? pairFirstRound(state.participants.filter((p) => !p.droppedOut), rng)
