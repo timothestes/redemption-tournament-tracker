@@ -7,11 +7,17 @@ import { recomputeTotalsFromHistory } from "../../lib/tournament/results";
 import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
 import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
-import { ArrowUpDown, Printer } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, Printer } from "lucide-react";
 import { printTournamentPairings, printFinalStandings, printMatchSlips } from "../../utils/printUtils";
 import { Button } from "./button";
 import ToastNotification from "./toast-notification";
 import ConfirmationDialog from "./confirmation-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./dropdown-menu";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -963,40 +969,8 @@ export default function TournamentRounds({
                         matches.map((match, index) => {
                           const repairEnabled =
                             currentPage === tournamentInfo.current_round && !roundInfo.started_at;
-                          const isP1Selected =
-                            repairMode &&
-                            repairSourceMatch &&
-                            !repairSourceMatch.isBye &&
-                            repairSourceMatch.match?.id === match.id &&
-                            !repairSourceMatch.isPlayer2;
-                          const isP2Selected =
-                            repairMode &&
-                            repairSourceMatch &&
-                            !repairSourceMatch.isBye &&
-                            repairSourceMatch.match?.id === match.id &&
-                            repairSourceMatch.isPlayer2;
-                          const swapButtonClass = (selected: boolean) =>
-                            `p-2 rounded-md flex items-center justify-center ${
-                              repairEnabled
-                                ? selected
-                                  ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
-                                  : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                : "text-muted-foreground cursor-not-allowed"
-                            }`;
                           const hasResult =
                             match.player1_score !== null && match.player2_score !== null;
-                          const swapP1Title =
-                            currentPage === tournamentInfo.current_round
-                              ? !roundInfo.started_at
-                                ? `Swap ${match.player1_id.name}`
-                                : "Cannot re-pair pairing once round has started"
-                              : "Can only re-pair current round";
-                          const swapP2Title =
-                            currentPage === tournamentInfo.current_round
-                              ? !roundInfo.started_at
-                                ? `Swap ${match.player2_id.name}`
-                                : "Cannot re-pair pairing once round has started"
-                              : "Can only re-pair current round";
                           return (
                             <Fragment key={match.id}>
                               <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
@@ -1036,36 +1010,56 @@ export default function TournamentRounds({
                                       tournament={tournamentInfo}
                                       mode="edit"
                                     />
-                                    <div className="relative group">
-                                      <button
-                                        aria-label={`Swap ${match.player1_id.name}`}
-                                        className={swapButtonClass(!!isP1Selected)}
-                                        onClick={() => {
-                                          if (repairEnabled) handleRepairClick(match, false);
-                                        }}
-                                        disabled={!repairEnabled}
-                                      >
-                                        <ArrowUpDown className="h-4 w-4" />
-                                      </button>
-                                      <div className="pointer-events-none absolute right-0 bottom-full mb-2 px-2 py-1 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap z-20">
-                                        {swapP1Title}
-                                      </div>
-                                    </div>
-                                    <div className="relative group">
-                                      <button
-                                        aria-label={`Swap ${match.player2_id.name}`}
-                                        className={swapButtonClass(!!isP2Selected)}
-                                        onClick={() => {
-                                          if (repairEnabled) handleRepairClick(match, true);
-                                        }}
-                                        disabled={!repairEnabled}
-                                      >
-                                        <ArrowUpDown className="h-4 w-4" />
-                                      </button>
-                                      <div className="pointer-events-none absolute right-0 bottom-full mb-2 px-2 py-1 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap z-20">
-                                        {swapP2Title}
-                                      </div>
-                                    </div>
+                                    {/*
+                                      Kebab collapses the previous stack of two
+                                      ArrowUpDown buttons into a single overflow
+                                      affordance. Rendering rule: if no swap is
+                                      possible in this context (round started,
+                                      not current round, or single-pair table)
+                                      the kebab is omitted entirely — the pencil
+                                      stands alone. Each item swaps this pair's
+                                      P1 with the neighboring pair's P1; that
+                                      re-pairs both matches in a single click.
+                                    */}
+                                    {repairEnabled && matches.length > 1 && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <button
+                                            type="button"
+                                            aria-label="More actions"
+                                            className="inline-flex items-center justify-center w-9 h-9 rounded-md text-foreground hover:bg-muted hover:text-primary"
+                                          >
+                                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                                          </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-56">
+                                          <DropdownMenuItem
+                                            disabled={index === 0}
+                                            onSelect={() => {
+                                              const above = matches[index - 1];
+                                              if (above) {
+                                                handleSwapPlayers(match, above, false, false);
+                                              }
+                                            }}
+                                          >
+                                            <ArrowUp className="h-4 w-4 mr-2" aria-hidden="true" />
+                                            Swap with pair above
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            disabled={index === matches.length - 1}
+                                            onSelect={() => {
+                                              const below = matches[index + 1];
+                                              if (below) {
+                                                handleSwapPlayers(match, below, false, false);
+                                              }
+                                            }}
+                                          >
+                                            <ArrowDown className="h-4 w-4 mr-2" aria-hidden="true" />
+                                            Swap with pair below
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
                                     {isHost && isRoundCompleted && (
                                       <MatchEditModal
                                         key={`repair-${match.id}`}
