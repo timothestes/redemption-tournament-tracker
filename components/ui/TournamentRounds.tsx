@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, Pagination } from "flowbite-react";
-import { Dispatch, Fragment, ReactNode, SetStateAction, useCallback, useEffect, useState } from "react";
+import { Dispatch, Fragment, ReactNode, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 import { recomputeTotalsFromHistory } from "../../lib/tournament/results";
 import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
@@ -131,6 +131,13 @@ export default function TournamentRounds({
   const [currentPage, setCurrentPage] = useState(tournamentInfo.current_round || 1);
   const [isRoundActive, setIsRoundActive] = useState(false);
   const [isRoundCompleted, setIsRoundCompleted] = useState(false);
+  // Monotonic id for round-info fetches. fetchTournamentAndRoundInfo is async
+  // and fires on both tab-activation and page navigation; without this guard an
+  // out-of-order response for a *different* round can clobber isRoundCompleted/
+  // roundInfo/isRoundActive — e.g. a completed round's is_completed=true landing
+  // on the current round's view, surfacing the repair UI on a round that was
+  // never completed. Only the latest request applies its results.
+  const latestRoundFetch = useRef(0);
   const [roundInfo, setRoundInfo] = useState<RoundInfo>({
     started_at: null,
     ended_at: null,
@@ -212,6 +219,7 @@ export default function TournamentRounds({
   const fetchTournamentAndRoundInfo = useCallback(async () => {
     if (!tournamentId) return;
 
+    const seq = ++latestRoundFetch.current;
     setIsLoading(true);
     setError({ message: null, type: null });
     // Clear stale round dates before the fetch resolves. Otherwise switching
@@ -234,6 +242,10 @@ export default function TournamentRounds({
           .eq("round_number", currentPage)
           .maybeSingle()
       ]);
+
+      // A newer fetch (page navigation / tab switch) superseded this one —
+      // discard its results so we never apply a different round's state.
+      if (seq !== latestRoundFetch.current) return;
 
       if (tournamentResult.error) throw tournamentResult.error;
       if (roundResult.error) throw roundResult.error;
@@ -262,13 +274,16 @@ export default function TournamentRounds({
         await fetchCurrentRoundData();
       }
     } catch (err) {
+      if (seq !== latestRoundFetch.current) return;
       setError({
         message: "Failed to fetch tournament and round information",
         type: "fetch",
       });
       console.error("Error fetching data:", err);
     } finally {
-      setIsLoading(false);
+      // Only the latest fetch owns the loading flag; a superseded one must not
+      // flip it off while the current request is still in flight.
+      if (seq === latestRoundFetch.current) setIsLoading(false);
     }
   }, [tournamentId, currentPage]);
 
@@ -835,6 +850,28 @@ export default function TournamentRounds({
     }
   }, [tournamentInfo.has_ended]);
 
+  // Re-pairing is allowed on the current round until a result has actually been
+  // recorded. Originally it was locked the moment the round started; we now keep
+  // it open while every match is still unscored, so a host can fix pairings
+  // after starting the round as long as no games have been entered yet.
+  const noScoresEntered = !matches.some(
+    (m) => m.player1_score !== null && m.player2_score !== null,
+  );
+  const canRepairCurrentRound =
+    currentPage === tournamentInfo.current_round &&
+    (!roundInfo.started_at || noScoresEntered);
+
+  // In repair mode player names read as click-to-swap links — primary color
+  // with an underline — without changing the row size. The selected source is
+  // bold with a solid underline; the other selectable players get a dotted
+  // underline that turns solid on hover.
+  const swapTargetClass = (isSource: boolean) =>
+    `underline underline-offset-4 transition-colors ${
+      isSource
+        ? "text-primary font-semibold decoration-solid"
+        : "text-primary/90 decoration-dotted group-hover:text-primary group-hover:decoration-solid"
+    }`;
+
   return (
     <>
     <ToastNotification
@@ -1009,8 +1046,7 @@ export default function TournamentRounds({
                     <tbody>
                       {matches.length > 0 &&
                         matches.map((match, index) => {
-                          const repairEnabled =
-                            currentPage === tournamentInfo.current_round && !roundInfo.started_at;
+                          const repairEnabled = canRepairCurrentRound;
                           const hasResult =
                             match.player1_score !== null && match.player2_score !== null;
                           return (
@@ -1021,17 +1057,19 @@ export default function TournamentRounds({
                                 </td>
                                 <td
                                   className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"} ${
-                                    repairMode
-                                      ? (repairSourceMatch?.match?.id === match.id && !repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)
-                                        ? "bg-primary/15 cursor-pointer"
-                                        : "cursor-pointer hover:bg-muted/70"
-                                      : ""
+                                    repairMode ? "group cursor-pointer" : ""
                                   }`}
                                   onClick={repairMode ? () => handleRepairClick(match, false) : undefined}
                                   role={repairMode ? "button" : undefined}
                                   tabIndex={repairMode ? 0 : undefined}
                                 >
-                                  {match.player1_id.name}
+                                  {repairMode ? (
+                                    <span className={swapTargetClass(repairSourceMatch?.match?.id === match.id && !repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)}>
+                                      {match.player1_id.name}
+                                    </span>
+                                  ) : (
+                                    match.player1_id.name
+                                  )}
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                   {hasResult ? (
@@ -1044,17 +1082,19 @@ export default function TournamentRounds({
                                 </td>
                                 <td
                                   className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"} ${
-                                    repairMode
-                                      ? (repairSourceMatch?.match?.id === match.id && repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)
-                                        ? "bg-primary/15 cursor-pointer"
-                                        : "cursor-pointer hover:bg-muted/70"
-                                      : ""
+                                    repairMode ? "group cursor-pointer" : ""
                                   }`}
                                   onClick={repairMode ? () => handleRepairClick(match, true) : undefined}
                                   role={repairMode ? "button" : undefined}
                                   tabIndex={repairMode ? 0 : undefined}
                                 >
-                                  {match.player2_id.name}
+                                  {repairMode ? (
+                                    <span className={swapTargetClass(repairSourceMatch?.match?.id === match.id && repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)}>
+                                      {match.player2_id.name}
+                                    </span>
+                                  ) : (
+                                    match.player2_id.name
+                                  )}
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                   {match.player1_match_points} / {match.player2_match_points}
@@ -1148,6 +1188,7 @@ export default function TournamentRounds({
                                         index={index}
                                         tournament={tournamentInfo}
                                         mode="repair"
+                                        showReason={currentPage !== tournamentInfo.current_round}
                                         onRepairSuccess={() => {
                                           showToast("Result repaired.", "success");
                                           fetchMatchEdits();
@@ -1190,8 +1231,7 @@ export default function TournamentRounds({
                       {matches.map((match, index) => {
                         const isError = matchErrorIndex.includes(index);
                         const tableNum = index + (tournamentInfo.starting_table_number || 1);
-                        const repairEnabled =
-                          currentPage === tournamentInfo.current_round && !roundInfo.started_at;
+                        const repairEnabled = canRepairCurrentRound;
                         const isP1Selected =
                           repairMode &&
                           repairSourceMatch &&
@@ -1254,6 +1294,7 @@ export default function TournamentRounds({
                                       index={index}
                                       tournament={tournamentInfo}
                                       mode="repair"
+                                      showReason={currentPage !== tournamentInfo.current_round}
                                       onRepairSuccess={() => {
                                         showToast("Result repaired.", "success");
                                         fetchMatchEdits();
@@ -1278,7 +1319,7 @@ export default function TournamentRounds({
                                   title={
                                     repairEnabled
                                       ? "Re-pair pairing"
-                                      : "Cannot re-pair after round started"
+                                      : "Cannot re-pair once results have been entered"
                                   }
                                   className={swapButtonClass(!!isP1Selected)}
                                   onClick={() => repairEnabled && handleRepairClick(match, false)}
@@ -1300,7 +1341,7 @@ export default function TournamentRounds({
                                   title={
                                     repairEnabled
                                       ? "Re-pair pairing"
-                                      : "Cannot re-pair after round started"
+                                      : "Cannot re-pair once results have been entered"
                                   }
                                   className={swapButtonClass(!!isP2Selected)}
                                   onClick={() => repairEnabled && handleRepairClick(match, true)}
@@ -1339,8 +1380,7 @@ export default function TournamentRounds({
                   {/* Mobile bye cards */}
                   <div className="md:hidden space-y-2">
                     {byes.map((bye) => {
-                      const repairEnabled =
-                        currentPage === tournamentInfo.current_round && !roundInfo.started_at;
+                      const repairEnabled = canRepairCurrentRound;
                       const isSelected =
                         repairMode &&
                         repairSourceMatch &&
@@ -1363,7 +1403,7 @@ export default function TournamentRounds({
                             title={
                               repairEnabled
                                 ? "Re-pair pairing"
-                                : "Cannot re-pair after round started"
+                                : "Cannot re-pair once results have been entered"
                             }
                             className={`p-2 rounded-md flex items-center justify-center flex-shrink-0 ${
                               repairEnabled
@@ -1431,9 +1471,9 @@ export default function TournamentRounds({
                                 </td>
                                 <td className="px-2">
                                   <button
-                                    title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? "Re-pair pairing" : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
+                                    title={currentPage === tournamentInfo.current_round ? (canRepairCurrentRound ? "Re-pair pairing" : "Cannot re-pair once results have been entered") : "Can only re-pair current round"}
                                     className={`p-2 rounded-md flex items-center justify-center ${
-                                      currentPage === tournamentInfo.current_round && !roundInfo.started_at
+                                      canRepairCurrentRound
                                         ? repairMode && repairSourceMatch && repairSourceMatch.isBye && repairSourceMatch.byeId === bye.id
                                           ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
                                           : repairMode
@@ -1442,11 +1482,11 @@ export default function TournamentRounds({
                                         : "text-muted-foreground cursor-not-allowed"
                                     }`}
                                     onClick={() => {
-                                      if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
+                                      if (canRepairCurrentRound) {
                                         handleByeRepairClick(bye);
                                       }
                                     }}
-                                    disabled={currentPage !== tournamentInfo.current_round || !!roundInfo.started_at}
+                                    disabled={!canRepairCurrentRound}
                                   >
                                     <ArrowUpDown className="h-4 w-4" />
                                   </button>

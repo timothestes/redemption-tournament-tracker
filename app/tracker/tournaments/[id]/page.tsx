@@ -1039,6 +1039,9 @@ export default function TournamentPage({
             match={pickerRepairMatch}
             tournament={tournament}
             mode="repair"
+            // Reason only applies when correcting a PAST round; a current-round
+            // match (e.g. the final round) doesn't need one.
+            showReason={pickerRepairMatch.round !== tournament.current_round}
             open={true}
             onOpenChange={(v) => { if (!v) setPickerRepairMatchId(null); }}
             isRoundActive={false}

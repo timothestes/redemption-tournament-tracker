@@ -8,6 +8,10 @@
 // helper. If those three implementations ever drift, this assertion will catch it.
 
 import { expect } from "vitest";
+import {
+  gameScoreForMatch as gameScoreFor,
+  differentialForMatch as differentialFor,
+} from "../../../../lib/tournament/standingsScoring";
 
 type AdminClient = any; // service-role Supabase client used in tests
 
@@ -27,34 +31,6 @@ interface ParticipantRow {
   name: string;
   match_points: number;
   differential: number;
-}
-
-function gameScoreFor(
-  participantId: string,
-  m: MatchRow,
-  maxScore: number,
-): number {
-  if (m.player1_score === null || m.player2_score === null) return 0;
-  const isP1 = m.player1_id === participantId;
-  const isP2 = m.player2_id === participantId;
-  if (!isP1 && !isP2) return 0;
-  if (m.player1_score === m.player2_score) return 1.5;
-  if (isP1 && m.player1_score === maxScore) return 3;
-  if (isP2 && m.player2_score === maxScore) return 3;
-  if (isP1 && m.player2_score === maxScore) return 0;
-  if (isP2 && m.player1_score === maxScore) return 0;
-  if (isP1 && m.player1_score > m.player2_score) return 2;
-  if (isP1 && m.player1_score < m.player2_score) return 1;
-  if (isP2 && m.player2_score > m.player1_score) return 2;
-  if (isP2 && m.player2_score < m.player1_score) return 1;
-  return 0;
-}
-
-function differentialFor(participantId: string, m: MatchRow): number {
-  if (m.player1_score === null || m.player2_score === null) return 0;
-  if (m.player1_id === participantId) return m.player1_score - m.player2_score;
-  if (m.player2_id === participantId) return m.player2_score - m.player1_score;
-  return 0;
 }
 
 export async function assertParticipantTotalsConsistent(

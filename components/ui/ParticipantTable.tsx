@@ -1,13 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Table } from "flowbite-react";
 import { HiPencil, HiTrash } from "react-icons/hi";
 import { BookOpen, CircleMinus, CirclePlus, Crown, Link2Off } from "lucide-react";
 import AttachDeckDialog from "./AttachDeckDialog";
 import type { TournamentDecklistRow, DeckSearchResult } from "../../app/tracker/tournaments/actions";
 import { attachDeckToParticipantAction, detachDeckFromParticipantAction } from "../../app/tracker/tournaments/actions";
-import { createClient } from "@/utils/supabase/client";
-import { AmendedBadge } from "@/components/ui/AmendedBadge";
-import { participantsWithAmendedBadge } from "@/lib/tournament/repairBadges";
 import ConfirmationDialog from "./confirmation-dialog";
 
 interface Participant {
@@ -48,28 +45,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
   const [dropTarget, setDropTarget] = useState<Participant | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Participant | null>(null);
 
-  const [matchEdits, setMatchEdits] = useState<{ match_id: string; round: number; edited_at: string }[]>([]);
-  const [allMatches, setAllMatches] = useState<{ id: string; round: number; player1_id: string; player2_id: string }[]>([]);
-
-  useEffect(() => {
-    const fetchRepairData = async () => {
-      const client = createClient();
-      const [editsResult, matchesResult] = await Promise.all([
-        client
-          .from("match_edits_public")
-          .select("match_id, round, edited_at")
-          .eq("tournament_id", tournamentId),
-        client
-          .from("matches")
-          .select("id, round, player1_id, player2_id")
-          .eq("tournament_id", tournamentId),
-      ]);
-      setMatchEdits(editsResult.data ?? []);
-      setAllMatches(matchesResult.data ?? []);
-    };
-    fetchRepairData();
-  }, [tournamentId]);
-
   const decklistMap = useMemo(() => {
     const map = new Map<string, TournamentDecklistRow>();
     for (const dl of decklists) {
@@ -103,39 +78,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
       winnerDifferential: ranked[0]?.differential ?? 0,
     };
   }, [participants]);
-
-  // Union of all participant IDs whose match was amended in any round
-  const allAmended = useMemo(() => {
-    const rounds = new Set(matchEdits.map(e => e.round));
-    const result = new Set<string>();
-    for (const r of rounds) {
-      const perRound = participantsWithAmendedBadge(matchEdits, allMatches, r);
-      perRound.forEach(id => result.add(id));
-    }
-    return result;
-  }, [matchEdits, allMatches]);
-
-  function mostRecentEditFor(participantId: string): string | null {
-    const matchIds = new Set(
-      allMatches
-        .filter(m => m.player1_id === participantId || m.player2_id === participantId)
-        .map(m => m.id)
-    );
-    const edits = matchEdits.filter(e => matchIds.has(e.match_id));
-    if (edits.length === 0) return null;
-    return edits.sort((a, b) => b.edited_at.localeCompare(a.edited_at))[0].edited_at;
-  }
-
-  function mostRecentRoundFor(participantId: string): number {
-    const matchIds = new Set(
-      allMatches
-        .filter(m => m.player1_id === participantId || m.player2_id === participantId)
-        .map(m => m.id)
-    );
-    const edits = matchEdits.filter(e => matchIds.has(e.match_id));
-    if (edits.length === 0) return 0;
-    return edits.sort((a, b) => b.edited_at.localeCompare(a.edited_at))[0].round;
-  }
 
   async function handleAttachDeck(deck: DeckSearchResult) {
     if (!attachTarget) return;
@@ -267,11 +209,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                         Dropped
                       </span>
                     )}
-                    {allAmended.has(participant.id) && (() => {
-                      const editedAt = mostRecentEditFor(participant.id);
-                      const round = mostRecentRoundFor(participant.id);
-                      return editedAt ? <AmendedBadge round={round} editedAt={editedAt} /> : null;
-                    })()}
                   </div>
                   <div className="mt-2">{renderDeckCell(participant)}</div>
                 </div>
@@ -331,11 +268,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                       {participant.dropped_out && (
                         <span className="text-destructive text-[11px] flex-shrink-0 uppercase tracking-wide">Dropped</span>
                       )}
-                      {allAmended.has(participant.id) && (() => {
-                        const editedAt = mostRecentEditFor(participant.id);
-                        const round = mostRecentRoundFor(participant.id);
-                        return editedAt ? <AmendedBadge round={round} editedAt={editedAt} /> : null;
-                      })()}
                     </div>
                   </Table.Cell>
 

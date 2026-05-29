@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Crown } from "lucide-react";
 import { createClient } from "../../utils/supabase/client";
 import InfoHint, { MP_HINT, DIFF_HINT } from "./InfoHint";
+import {
+  gameScoreForMatch,
+  differentialForMatch,
+} from "../../lib/tournament/standingsScoring";
 
 interface Participant {
   id: string;
@@ -51,7 +55,16 @@ interface StandingRow {
   losses: number;
   ties: number;
   byes: number;
+  /** Match points computed LIVE from matches + gated byes (mirrors the stored
+   * participants.match_points written by End Round; see migration 039). */
+  mp: number;
+  /** Differential computed LIVE from matches (mirrors stored differential). */
+  diff: number;
 }
+
+/** Default tournament win threshold; only used when max_score isn't supplied
+ * (older callsites / tests). Matches the app's standard 5-soul win. */
+const DEFAULT_MAX_SCORE = 5;
 
 /**
  * Per-player W/L/T computed strictly from match + bye history.
@@ -129,8 +142,10 @@ function directHeadToHead(
  * Round N completes (createPairing inserts it), but it shouldn't show as
  * a "win" before round N+1 is played. Only byes for completed rounds
  * (round_number < currentRound) count. The MP/differential numbers are
- * sourced from the participant rows (recomputed server-side) and are
- * unaffected — only the displayed record is filtered here.
+ * computed LIVE here from the same matches + gated byes (per migration 039's
+ * recompute_participant_totals formula), so they always agree with the W-L-T
+ * record the instant a score is entered — the stored
+ * participants.match_points/differential are not read for display.
  *
  * Exported for unit testing.
  */
@@ -140,6 +155,7 @@ export function buildStandings(
   byes: ByeRow[],
   currentRound?: number | null,
   startedRounds?: number[] | null,
+  maxScore: number = DEFAULT_MAX_SCORE,
 ): StandingRow[] {
   // Active participants only — drop-outs are excluded from standings per
   // algorithm.md §"Determining Final Standings" step 1.
@@ -154,10 +170,36 @@ export function buildStandings(
     : currentRound && currentRound > 0
       ? byes.filter((b) => b.round_number < currentRound)
       : byes;
+
+  // Compute MP and DIFF LIVE from the same matches + gated byes used for the
+  // W-L-T record, so every column stays consistent the instant a score is
+  // entered (the stored participants.match_points/differential only update on
+  // End Round). The per-match formula mirrors migration 039's
+  // recompute_participant_totals; gated byes add +3 MP / +0 DIFF each.
+  const liveTotals = (participantId: string): { mp: number; diff: number } => {
+    let mp = 0;
+    let diff = 0;
+    for (const m of matches) {
+      mp += gameScoreForMatch(participantId, m, maxScore);
+      diff += differentialForMatch(participantId, m);
+    }
+    const byeCount = playedByes.filter(
+      (b) => b.participant_id === participantId,
+    ).length;
+    mp += 3 * byeCount;
+    return { mp, diff };
+  };
+
+  const totals = new Map<string, { mp: number; diff: number }>(
+    active.map((p) => [p.id, liveTotals(p.id)]),
+  );
+
   const sorted = [...active].sort((a, b) => {
-    const mp = (b.match_points ?? 0) - (a.match_points ?? 0);
+    const at = totals.get(a.id)!;
+    const bt = totals.get(b.id)!;
+    const mp = bt.mp - at.mp;
     if (mp !== 0) return mp;
-    const diff = (b.differential ?? 0) - (a.differential ?? 0);
+    const diff = bt.diff - at.diff;
     if (diff !== 0) return diff;
     // Both tied on MP and differential — apply direct head-to-head.
     return directHeadToHead(b.id, a.id, matches);
@@ -165,6 +207,7 @@ export function buildStandings(
   return sorted.map((p, idx) => {
     const record = computeRecord(p.id, matches, playedByes);
     const byeCount = playedByes.filter((b) => b.participant_id === p.id).length;
+    const t = totals.get(p.id)!;
     return {
       participant: p,
       rank: idx + 1,
@@ -172,6 +215,8 @@ export function buildStandings(
       losses: record.losses,
       ties: record.ties,
       byes: byeCount,
+      mp: t.mp,
+      diff: t.diff,
     };
   });
 }
@@ -186,6 +231,7 @@ export default function StandingsTable({
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [byes, setByes] = useState<ByeRow[]>([]);
   const [startedRounds, setStartedRounds] = useState<number[]>([]);
+  const [maxScore, setMaxScore] = useState<number>(DEFAULT_MAX_SCORE);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -193,7 +239,7 @@ export default function StandingsTable({
     const client = createClient();
     let cancelled = false;
     (async () => {
-      const [matchesRes, byesRes, roundsRes] = await Promise.all([
+      const [matchesRes, byesRes, roundsRes, tournamentRes] = await Promise.all([
         client
           .from("matches")
           .select(
@@ -210,6 +256,13 @@ export default function StandingsTable({
           .from("rounds")
           .select("round_number, started_at")
           .eq("tournament_id", tournamentId),
+        // max_score is the win threshold ("full win") used by the live MP
+        // formula — same value migration 039 reads from tournaments.max_score.
+        client
+          .from("tournaments")
+          .select("max_score")
+          .eq("id", tournamentId)
+          .single(),
       ]);
       if (cancelled) return;
       setMatches((matchesRes.data ?? []) as MatchRow[]);
@@ -219,6 +272,8 @@ export default function StandingsTable({
           .filter((r: any) => r.started_at != null)
           .map((r: any) => Number(r.round_number)),
       );
+      const ms = (tournamentRes.data as any)?.max_score;
+      if (ms != null) setMaxScore(Number(ms));
       setLoading(false);
     })();
     return () => {
@@ -227,8 +282,16 @@ export default function StandingsTable({
   }, [tournamentId, matchesRefreshNonce]);
 
   const rows: StandingRow[] = useMemo(
-    () => buildStandings(participants, matches, byes, currentRound, startedRounds),
-    [participants, matches, byes, currentRound, startedRounds],
+    () =>
+      buildStandings(
+        participants,
+        matches,
+        byes,
+        currentRound,
+        startedRounds,
+        maxScore,
+      ),
+    [participants, matches, byes, currentRound, startedRounds, maxScore],
   );
 
   if (loading) {
@@ -282,14 +345,14 @@ export default function StandingsTable({
                     <span className="inline-flex items-center gap-1">
                       <span className="text-muted-foreground/70">MP</span>{" "}
                       <span className="text-foreground font-medium">
-                        {row.participant.match_points ?? 0}
+                        {row.mp}
                       </span>
                       <InfoHint text={MP_HINT} />
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <span className="text-muted-foreground/70">Diff</span>{" "}
                       <span className="text-foreground font-medium">
-                        {row.participant.differential ?? 0}
+                        {row.diff}
                       </span>
                       <InfoHint text={DIFF_HINT} />
                     </span>
@@ -386,10 +449,10 @@ export default function StandingsTable({
                     {row.wins}-{row.losses}-{row.ties}
                   </td>
                   <td className="px-4 py-3 text-center tabular-nums text-foreground">
-                    {row.participant.match_points ?? 0}
+                    {row.mp}
                   </td>
                   <td className="px-4 py-3 text-center tabular-nums text-foreground">
-                    {row.participant.differential ?? 0}
+                    {row.diff}
                   </td>
                   <td className="px-4 py-3 text-center tabular-nums">
                     {row.byes}

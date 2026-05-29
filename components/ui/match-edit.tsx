@@ -17,6 +17,7 @@ export default function MatchEditModal({
   open: controlledOpen,
   onOpenChange,
   onRepairSuccess,
+  showReason,
 }: {
   match: any;
   fetchCurrentRoundData?: any;
@@ -28,6 +29,11 @@ export default function MatchEditModal({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onRepairSuccess?: () => void;
+  /** Whether to show the "Reason" field. Only meaningful in repair mode.
+   * Reserved for correcting a result in a PAST round (round < current round);
+   * current-round score entry/fixes don't need a reason. Defaults to
+   * `mode === "repair"` when not provided. */
+  showReason?: boolean;
 }) {
   const isControlled = controlledOpen !== undefined;
   const [internalOpen, setInternalOpen] = useState(false);
@@ -331,7 +337,7 @@ export default function MatchEditModal({
                   Score cannot be {tournament.max_score}-{tournament.max_score}.
                 </p>
               )}
-              {mode === "repair" && (
+              {(showReason ?? mode === "repair") && (
                 <div className="mb-4">
                   <label className="block text-sm text-muted-foreground mb-1">Reason (optional)</label>
                   <input

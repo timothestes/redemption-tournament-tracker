@@ -101,7 +101,7 @@ export default function CountdownTimer({ startTime, durationMinutes, soundNotifi
       aria-label={isExpired ? "Time's up" : `Round timer: ${timeString} remaining`}
       role="status"
     >
-      {isExpired ? "Time's up" : timeString}
+      {timeString}
     </span>
   );
 }
