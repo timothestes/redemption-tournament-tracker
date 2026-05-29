@@ -732,14 +732,12 @@ export default function TournamentPage({
                     tournament?.round_length &&
                     latestRound?.started_at &&
                     !latestRound?.is_completed && (
-                      <div className="flex-shrink-0 min-w-0">
-                        <CountdownTimer
-                          key={latestRound?.started_at || "inactive"}
-                          startTime={latestRound?.started_at || null}
-                          durationMinutes={tournament.round_length}
-                          soundNotifications={tournament.sound_notifications ?? false}
-                        />
-                      </div>
+                      <CountdownTimer
+                        key={latestRound?.started_at || "inactive"}
+                        startTime={latestRound?.started_at || null}
+                        durationMinutes={tournament.round_length}
+                        soundNotifications={tournament.sound_notifications ?? false}
+                      />
                     )}
 
                   {/* Push actions to the right */}
