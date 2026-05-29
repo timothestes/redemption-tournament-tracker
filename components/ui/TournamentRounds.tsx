@@ -1,16 +1,26 @@
 "use client";
 
 import { Card, Pagination } from "flowbite-react";
-import { Dispatch, Fragment, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
+import { Dispatch, Fragment, ReactNode, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 import { recomputeTotalsFromHistory } from "../../lib/tournament/results";
+import { gameScoreForMatch, differentialForMatch } from "../../lib/tournament/standingsScoring";
 import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
 import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, Printer } from "lucide-react";
 import { printTournamentPairings, printFinalStandings, printMatchSlips } from "../../utils/printUtils";
 import { Button } from "./button";
 import ToastNotification from "./toast-notification";
+import ConfirmationDialog from "./confirmation-dialog";
+import InfoHint, { MP_ROUND_HINT, DIFF_ROUND_HINT } from "./InfoHint";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./dropdown-menu";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -23,10 +33,35 @@ const formatDateTime = (timestamp: string | null) => {
   }).format(new Date(timestamp));
 };
 
+/**
+ * MP and differential each player EARNED in this single match — NOT the
+ * cumulative running total. Cumulative numbers live on the Standings tab,
+ * which is the source of truth. Returns null when the match is unscored.
+ * Uses the canonical per-match formula (see standingsScoring.ts).
+ */
+const perRoundScores = (match: any, maxScore: number) => {
+  if (match.player1_score === null || match.player2_score === null) return null;
+  const sc = {
+    player1_id: match.player1_id.id,
+    player2_id: match.player2_id.id,
+    player1_score: match.player1_score,
+    player2_score: match.player2_score,
+  };
+  return {
+    p1Mp: gameScoreForMatch(sc.player1_id, sc, maxScore),
+    p2Mp: gameScoreForMatch(sc.player2_id, sc, maxScore),
+    p1Diff: differentialForMatch(sc.player1_id, sc),
+    p2Diff: differentialForMatch(sc.player2_id, sc),
+  };
+};
+
 interface TournamentRoundsProps {
   tournamentId: string;
   isActive: boolean;
-  onTournamentEnd?: () => void;
+  onTournamentEnd?: () => void | Promise<void>;
+  /** Fired only when ending the FINAL round completes the tournament (not on
+   * every round end). Used to auto-switch to the Standings tab. */
+  onTournamentEnded?: () => void;
   onRoundActiveChange?: (
     isActive: boolean,
     roundStartTime: string | null
@@ -38,9 +73,32 @@ interface TournamentRoundsProps {
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
   activeTab: number;
   tournamentName?: string | null;
+  isHost?: boolean;
+  onRepairCompleted?: () => void;
+  /** Bumped by the page after a re-pair RPC succeeds to force matches/byes
+   * to re-fetch. The default deps ([currentPage, tournamentId]) don't change
+   * when only the row contents change. */
+  matchesRefreshNonce?: number;
+  /** Called after End Round writes the next round's pairings so the page can
+   * bump its pairingsRefreshNonce, forcing this component (and Standings) to
+   * pick up the freshly-staged round on the next render. */
+  onRoundEnded?: () => void | Promise<void>;
+  /** Host admin menu (re-pair / end tournament). Rendered left-justified in
+   * the round-control row. Lives in the page so its actions stay wired to the
+   * page's dialog state; passed in as a node to avoid threading handlers. */
+  adminMenu?: ReactNode;
+  /** Fired after a result is entered/cleared so the page can refresh its
+   * re-pair gating (scoredCurrentRoundMatches). Without this the page's gate
+   * is stale and "Regenerate pairings" stays wrongly enabled. */
+  onMatchesChanged?: () => void;
+  /** Fired after a round is started. Starting a round makes that round's bye
+   * score (Option C: byes count once their round has started), so the page
+   * must refresh participants + bump the standings nonce to reflect it. */
+  onRoundStarted?: () => void;
 }
 
 interface TournamentInfo {
+  id: string | null;
   n_rounds: number | null;
   current_round: number | null;
   has_ended: boolean;
@@ -63,15 +121,24 @@ export default function TournamentRounds({
   tournamentId,
   isActive,
   onTournamentEnd,
+  onTournamentEnded,
   onRoundActiveChange,
   setLatestRound,
   createPairing,
   matchErrorIndex,
   setMatchErrorIndex,
   activeTab,
-  tournamentName
+  tournamentName,
+  isHost = false,
+  onRepairCompleted,
+  matchesRefreshNonce,
+  onRoundEnded,
+  adminMenu,
+  onMatchesChanged,
+  onRoundStarted,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
+    id: null,
     n_rounds: null,
     current_round: null,
     has_ended: false,
@@ -79,12 +146,25 @@ export default function TournamentRounds({
     starting_table_number: 1,
     name: tournamentName || null,
   });
-  const hasFetchedTournament = useRef<boolean>(false);
+  // Tracks whether we've completed the initial tournament fetch and synced
+  // currentPage to tournamentInfo.current_round. Used as a render gate so the
+  // panel never renders with currentPage=1 while the tournament's true
+  // current_round is 2+ (which would flash "Round 1 of 3" with Round 1's dates
+  // for one frame before the second fetch kicks in).
+  const [hasInitialized, setHasInitialized] = useState(false);
   const client = createClient();
   const [error, setError] = useState<ErrorState>({ message: null, type: null });
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(tournamentInfo.current_round || 1);
   const [isRoundActive, setIsRoundActive] = useState(false);
+  const [isRoundCompleted, setIsRoundCompleted] = useState(false);
+  // Monotonic id for round-info fetches. fetchTournamentAndRoundInfo is async
+  // and fires on both tab-activation and page navigation; without this guard an
+  // out-of-order response for a *different* round can clobber isRoundCompleted/
+  // roundInfo/isRoundActive — e.g. a completed round's is_completed=true landing
+  // on the current round's view, surfacing the repair UI on a round that was
+  // never completed. Only the latest request applies its results.
+  const latestRoundFetch = useRef(0);
   const [roundInfo, setRoundInfo] = useState<RoundInfo>({
     started_at: null,
     ended_at: null,
@@ -103,6 +183,18 @@ export default function TournamentRounds({
     show: boolean;
     type: "success" | "error" | "warning" | "info";
   }>({ message: "", show: false, type: "warning" });
+  const [endRoundConfirmOpen, setEndRoundConfirmOpen] = useState(false);
+
+  interface MatchEditRow {
+    id: string;
+    old_player1_score: number;
+    old_player2_score: number;
+    new_player1_score: number;
+    new_player2_score: number;
+    edited_at: string;
+    reason: string | null;
+  }
+  const [matchEditsByMatch, setMatchEditsByMatch] = useState<Record<string, MatchEditRow[]>>({});
 
   const showToast = useCallback(
     (
@@ -113,6 +205,33 @@ export default function TournamentRounds({
     },
     []
   );
+
+  const fetchMatchEdits = useCallback(async () => {
+    if (!tournamentInfo.id || !isHost) return;
+    const { data } = await client
+      .from("match_edits")
+      .select("id, match_id, old_player1_score, old_player2_score, new_player1_score, new_player2_score, edited_at, reason")
+      .eq("tournament_id", tournamentInfo.id)
+      .order("edited_at", { ascending: false });
+    const grouped: Record<string, MatchEditRow[]> = {};
+    for (const e of (data ?? [])) {
+      const row = e as any;
+      (grouped[row.match_id] ??= []).push({
+        id: row.id,
+        old_player1_score: row.old_player1_score,
+        old_player2_score: row.old_player2_score,
+        new_player1_score: row.new_player1_score,
+        new_player2_score: row.new_player2_score,
+        edited_at: row.edited_at,
+        reason: row.reason,
+      });
+    }
+    setMatchEditsByMatch(grouped);
+  }, [tournamentInfo.id, isHost]);
+
+  useEffect(() => {
+    fetchMatchEdits();
+  }, [fetchMatchEdits]);
 
   useEffect(() => {
     setMounted(true);
@@ -127,14 +246,20 @@ export default function TournamentRounds({
   const fetchTournamentAndRoundInfo = useCallback(async () => {
     if (!tournamentId) return;
 
+    const seq = ++latestRoundFetch.current;
     setIsLoading(true);
     setError({ message: null, type: null });
+    // Clear stale round dates before the fetch resolves. Otherwise switching
+    // tabs (or the initial currentPage=1 → current_round transition) flashes
+    // the previous round's started_at/ended_at for a frame before the new
+    // round's row arrives.
+    setRoundInfo({ started_at: null, ended_at: null });
 
     try {
       const [tournamentResult, roundResult] = await Promise.all([
         client
           .from("tournaments")
-          .select("n_rounds, current_round, has_ended, max_score, starting_table_number, name")
+          .select("id, n_rounds, current_round, has_ended, max_score, starting_table_number, name")
           .eq("id", tournamentId)
           .single(),
         client
@@ -144,6 +269,10 @@ export default function TournamentRounds({
           .eq("round_number", currentPage)
           .maybeSingle()
       ]);
+
+      // A newer fetch (page navigation / tab switch) superseded this one —
+      // discard its results so we never apply a different round's state.
+      if (seq !== latestRoundFetch.current) return;
 
       if (tournamentResult.error) throw tournamentResult.error;
       if (roundResult.error) throw roundResult.error;
@@ -158,26 +287,30 @@ export default function TournamentRounds({
       });
 
       const shouldBeActive = !!(
-        roundData && 
-        !roundData.is_completed && 
+        roundData &&
+        !roundData.is_completed &&
         !tournamentData.has_ended &&
-        roundData.started_at && 
+        roundData.started_at &&
         !roundData.ended_at
       );
-      
+
       setIsRoundActive(shouldBeActive);
+      setIsRoundCompleted(!!(roundData?.is_completed));
       
       if (shouldBeActive) {
         await fetchCurrentRoundData();
       }
     } catch (err) {
+      if (seq !== latestRoundFetch.current) return;
       setError({
         message: "Failed to fetch tournament and round information",
         type: "fetch",
       });
       console.error("Error fetching data:", err);
     } finally {
-      setIsLoading(false);
+      // Only the latest fetch owns the loading flag; a superseded one must not
+      // flip it off while the current request is still in flight.
+      if (seq === latestRoundFetch.current) setIsLoading(false);
     }
   }, [tournamentId, currentPage]);
 
@@ -188,11 +321,25 @@ export default function TournamentRounds({
   }, [isRoundActive, isActive, onRoundActiveChange, roundInfo.started_at]);
 
   useEffect(() => {
-    if (tournamentInfo.current_round && !hasFetchedTournament.current) {
-      setCurrentPage(tournamentInfo.current_round);
-      hasFetchedTournament.current = true;
+    if (tournamentInfo.current_round && !hasInitialized) {
+      // Keep isLoading true through the currentPage flip — without this, the
+      // brief window between the first fetch finishing (with currentPage=1's
+      // data) and the second fetch starting (for the correct current_round)
+      // renders stale round data for one frame. The second fetch fires
+      // automatically because fetchTournamentAndRoundInfo's deps include
+      // currentPage.
+      //
+      // Only raise isLoading when currentPage will ACTUALLY change. At round 1,
+      // current_round already equals currentPage (1), so setCurrentPage is a
+      // no-op, no second fetch fires, and a spurious setIsLoading(true) here
+      // would never be cleared — an infinite spinner right after starting.
+      if (tournamentInfo.current_round !== currentPage) {
+        setIsLoading(true);
+        setCurrentPage(tournamentInfo.current_round);
+      }
+      setHasInitialized(true);
     }
-  }, [tournamentInfo, hasFetchedTournament]);
+  }, [tournamentInfo, hasInitialized]);
 
   useEffect(() => {
     if (isActive) {
@@ -210,15 +357,30 @@ export default function TournamentRounds({
   const handleStartRound = async () => {
     try {
       const now = new Date().toISOString();
-      const { error: roundError } = await client.from("rounds").insert([
+      // The rounds row is pre-created when pairings are generated (see
+      // ensureRoundRow in pairingUtilsV2). Upsert handles legacy tournaments
+      // started before that change.
+      const { error: roundError } = await client.from("rounds").upsert(
         {
           tournament_id: tournamentId,
           round_number: currentPage,
           started_at: now,
         },
-      ]);
+        { onConflict: "tournament_id,round_number" },
+      );
 
       if (roundError) throw roundError;
+
+      // A bye for this round only scores once the round has started (Option C).
+      // Recompute now so the bye holder's match_points include their +3 the
+      // moment the round goes live, keeping MP consistent with the W-L-T /
+      // Byes columns (which gate on started rounds). Best-effort: a failure
+      // here shouldn't block starting the round.
+      const { error: recomputeError } = await client.rpc(
+        "recompute_participant_totals",
+        { p_tournament_id: tournamentId },
+      );
+      if (recomputeError) console.error("recompute on start round failed:", recomputeError);
 
       setRoundInfo({
         started_at: now,
@@ -228,6 +390,7 @@ export default function TournamentRounds({
       setIsRoundActive(true);
       setLatestRound((prev) => ({ round_number: currentPage, started_at: now }));
       onRoundActiveChange?.(true, now);
+      onRoundStarted?.();
 
       setMatchLoading(true);
     } catch (error) {
@@ -259,9 +422,20 @@ export default function TournamentRounds({
     setByes(byeData);
   };
 
+  // Used as the post-save callback for the score editors: refresh this
+  // component's local match rows AND notify the page so its re-pair gating
+  // (scoredCurrentRoundMatches) stays in sync. Deliberately NOT used by the
+  // deps-effect below — the page bumps matchesRefreshNonce, and notifying from
+  // a nonce-driven refetch would loop.
+  const refreshMatchesAndNotify = async () => {
+    await fetchCurrentRoundData();
+    onMatchesChanged?.();
+  };
+
   useEffect(() => {
+    if (!tournamentId) return;
     fetchCurrentRoundData();
-  }, [currentPage]);
+  }, [currentPage, tournamentId, matchesRefreshNonce]);
 
   const handleEndRound = useCallback(async () => {
     const client = createClient();
@@ -390,9 +564,22 @@ export default function TournamentRounds({
           has_ended: true,
         }));
 
-        onTournamentEnd?.();
+        // Tournament is now complete — surface the final results.
+        onTournamentEnded?.();
       } else {
         await createPairing(currentPage + 1);
+
+        // createPairing inserts the next round's bye row, but the
+        // recomputeTotalsFromHistory loop above ran BEFORE that insert and so
+        // didn't award the bye recipient their +3 MP. Call the recompute RPC
+        // now so participants.match_points reflects the staged bye before any
+        // Standings/Rounds reader fires. (RPC is host-only; handleEndRound
+        // already runs only on the host's machine, so the auth check passes.)
+        const { error: recomputeError } = await client.rpc(
+          "recompute_participant_totals",
+          { p_tournament_id: tournamentId },
+        );
+        if (recomputeError) console.log(recomputeError);
 
         const { error: tournamentError } = await client
           .from("tournaments")
@@ -403,6 +590,21 @@ export default function TournamentRounds({
 
         if (tournamentError) throw tournamentError;
       }
+
+      // Refresh parent tournament state BEFORE updating local state so the
+      // header pill (which reads from the parent's `tournament`) reflects the
+      // new current_round / has_ended before we toggle our own round-active
+      // flag and re-render. Awaiting the parent's refetch closes the desync
+      // window that previously made the title-row badge lag the round panel.
+      await onTournamentEnd?.();
+
+      // Bump the page's pairings refresh nonce so Standings and any
+      // sibling components that read matches/byes pick up the new round's
+      // pairings + bye row. The local fetchCurrentRoundData useEffect handles
+      // this component's own matches via the currentPage bump below, but
+      // sibling state (e.g. page-level scoredCurrentRoundMatches feeding the
+      // header menu) needs an explicit kick.
+      await onRoundEnded?.();
 
       setRoundInfo((prev) => ({
         ...prev,
@@ -545,6 +747,15 @@ export default function TournamentRounds({
         }).eq("id", targetByeId),
       ]);
 
+      // Recompute participant totals from history so the swapped byes are
+      // reflected in each participant's standings. Without this, participants
+      // keep the bye contribution from their pre-swap assignment.
+      const { error: recomputeError } = await client.rpc(
+        "recompute_participant_totals",
+        { p_tournament_id: tournamentId },
+      );
+      if (recomputeError) throw recomputeError;
+
       await fetchCurrentRoundData();
     } catch (error) {
       console.error("Error swapping players with bye:", error);
@@ -569,110 +780,45 @@ export default function TournamentRounds({
       if (tournamentError) throw tournamentError;
 
       const playerId = isSourcePlayer2 ? sourceMatch.player2_id.id : sourceMatch.player1_id.id;
-      const playerName = isSourcePlayer2 ? sourceMatch.player2_id.name : sourceMatch.player1_id.name;
-      const playerMatchPoints = isSourcePlayer2 ? sourceMatch.player2_match_points : sourceMatch.player1_match_points;
-      const playerDiff = isSourcePlayer2 ? sourceMatch.differential2 : sourceMatch.differential;
-      
-      const { data: byePlayerData, error: byePlayerError } = await client
-        .from("participants")
-        .select("match_points, differential")
-        .eq("id", bye.participant_id.id)
-        .single();
-      
-      if (byePlayerError) throw byePlayerError;
-      
-      const byePlayerOriginalPoints = Math.max(0, (byePlayerData.match_points || 0) - tournament.bye_points);
-      const byePlayerOriginalDiff = (byePlayerData.differential || 0) - tournament.bye_differential;
-      
-      const newByePlayerPoints = playerMatchPoints + tournament.bye_points;
-      const newByePlayerDiff = playerDiff + tournament.bye_differential;
-      
+
+      // Structural mutation 1: swap the match's player seat with the bye holder
+      // and reset scores. Don't touch the per-match cumulative snapshots
+      // (player*_match_points, differential, differential2) — they're stale
+      // for unscored rows and the recompute below makes the participant row
+      // the source of truth. When the match is later scored, match-edit will
+      // compute fresh snapshots from participants.match_points.
       if (isSourcePlayer2) {
         await client.from("matches").update({
           player2_id: bye.participant_id.id,
-          player2_match_points: byePlayerOriginalPoints,
-          differential2: byePlayerOriginalDiff,
           player1_score: null,
           player2_score: null,
         }).eq("id", sourceMatch.id);
       } else {
         await client.from("matches").update({
           player1_id: bye.participant_id.id,
-          player1_match_points: byePlayerOriginalPoints,
-          differential: byePlayerOriginalDiff,
           player1_score: null,
           player2_score: null,
         }).eq("id", sourceMatch.id);
       }
 
+      // Structural mutation 2: reassign the bye to the swapped-in player.
+      // Per-bye match_points/differential store the bye CONTRIBUTION, not
+      // cumulative — match the regenerate_current_round_pairings convention.
       await client.from("byes").update({
         participant_id: playerId,
-        match_points: newByePlayerPoints,
-        differential: newByePlayerDiff,
+        match_points: tournament.bye_points,
+        differential: tournament.bye_differential,
       }).eq("id", targetByeId);
 
-      await Promise.all([
-        client.from("participants").update({
-          match_points: byePlayerOriginalPoints,
-          differential: byePlayerOriginalDiff,
-        }).eq("id", bye.participant_id.id),
-        
-        client.from("participants").update({
-          match_points: newByePlayerPoints,
-          differential: newByePlayerDiff,
-        }).eq("id", playerId)
-      ]);
-
-      setByes(prevByes => {
-        const updatedByes = [...prevByes];
-        const byeIndex = updatedByes.findIndex(b => b.id === targetByeId);
-        
-        if (byeIndex !== -1) {
-          updatedByes[byeIndex] = {
-            ...updatedByes[byeIndex],
-            participant_id: {
-              id: playerId,
-              name: playerName
-            },
-            match_points: newByePlayerPoints,
-            differential: newByePlayerDiff
-          };
-        }
-        
-        return updatedByes;
-      });
-      
-      setMatches(prevMatches => {
-        const updatedMatches = [...prevMatches];
-        const matchIndex = updatedMatches.findIndex(m => m.id === sourceMatch.id);
-        
-        if (matchIndex !== -1) {
-          const updatedMatch = {...updatedMatches[matchIndex]};
-          
-          if (isSourcePlayer2) {
-            updatedMatch.player2_id = {
-              id: bye.participant_id.id,
-              name: bye.participant_id.name
-            };
-            updatedMatch.player2_match_points = byePlayerOriginalPoints;
-            updatedMatch.differential2 = byePlayerOriginalDiff;
-          } else {
-            updatedMatch.player1_id = {
-              id: bye.participant_id.id,
-              name: bye.participant_id.name
-            };
-            updatedMatch.player1_match_points = byePlayerOriginalPoints;
-            updatedMatch.differential = byePlayerOriginalDiff;
-          }
-          
-          updatedMatch.player1_score = null;
-          updatedMatch.player2_score = null;
-          
-          updatedMatches[matchIndex] = updatedMatch;
-        }
-        
-        return updatedMatches;
-      });
+      // Now derive participant totals from history. This is what was missing
+      // before — the old code did incremental math against stale per-match
+      // snapshots, which produced wrong totals when scores had been repaired
+      // in earlier rounds.
+      const { error: recomputeError } = await client.rpc(
+        "recompute_participant_totals",
+        { p_tournament_id: tournamentId },
+      );
+      if (recomputeError) throw recomputeError;
 
       await fetchCurrentRoundData();
     } catch (error) {
@@ -741,6 +887,28 @@ export default function TournamentRounds({
     }
   }, [tournamentInfo.has_ended]);
 
+  // Re-pairing is allowed on the current round until a result has actually been
+  // recorded. Originally it was locked the moment the round started; we now keep
+  // it open while every match is still unscored, so a host can fix pairings
+  // after starting the round as long as no games have been entered yet.
+  const noScoresEntered = !matches.some(
+    (m) => m.player1_score !== null && m.player2_score !== null,
+  );
+  const canRepairCurrentRound =
+    currentPage === tournamentInfo.current_round &&
+    (!roundInfo.started_at || noScoresEntered);
+
+  // In repair mode player names read as click-to-swap links — primary color
+  // with an underline — without changing the row size. The selected source is
+  // bold with a solid underline; the other selectable players get a dotted
+  // underline that turns solid on hover.
+  const swapTargetClass = (isSource: boolean) =>
+    `underline underline-offset-4 transition-colors ${
+      isSource
+        ? "text-primary font-semibold decoration-solid"
+        : "text-primary/90 decoration-dotted group-hover:text-primary group-hover:decoration-solid"
+    }`;
+
   return (
     <>
     <ToastNotification
@@ -757,7 +925,7 @@ export default function TournamentRounds({
             {error.message}
           </div>
         )}
-        {isLoading ? (
+        {isLoading || !hasInitialized ? (
           <div className="flex items-center justify-center p-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
           </div>
@@ -766,61 +934,99 @@ export default function TournamentRounds({
             {tournamentInfo.n_rounds && (
               <>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
-                  <div className="min-w-0">
-                    <h3 className="text-xl font-semibold mb-1">
-                      Round {currentPage} of {tournamentInfo.n_rounds}
-                    </h3>
-                    <div className="text-sm text-muted-foreground space-y-0.5">
-                      {roundInfo.started_at && (
-                        <p>
-                          Started <span className="text-foreground">{formatDateTime(roundInfo.started_at)}</span>
-                        </p>
-                      )}
-                      {roundInfo.ended_at && (
-                        <p>
-                          Ended <span className="text-foreground">{formatDateTime(roundInfo.ended_at)}</span>
-                        </p>
-                      )}
+                  <div className="min-w-0 flex flex-col items-start gap-2">
+                    {/* Wrench + Round label — anchors the panel so a host
+                        scrolled past the page-level sticky header still sees
+                        which round they're looking at. */}
+                    <div className="flex items-center gap-3">
+                      {adminMenu}
+                      <h2 className="text-lg font-semibold text-foreground whitespace-nowrap">
+                        Round {currentPage} of {tournamentInfo.n_rounds}
+                      </h2>
                     </div>
+                    {/* Status line — always one row so the panel header height
+                        stays consistent across upcoming / live / completed
+                        rounds (no layout jump when paging). */}
+                    <p className="text-sm text-muted-foreground">
+                      {roundInfo.started_at ? (
+                        <>
+                          Started <span className="text-foreground">{formatDateTime(roundInfo.started_at)}</span>
+                          {roundInfo.ended_at && (
+                            <>
+                              {" · "}Ended <span className="text-foreground">{formatDateTime(roundInfo.ended_at)}</span>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <span className="italic">Awaiting start</span>
+                      )}
+                    </p>
                   </div>
                   {currentPage === tournamentInfo.current_round && (
-                      <div className="flex gap-2 flex-wrap">
+                      // Round-control tiering: prints are outline (secondary),
+                      // Start/End Round is the only solid button in the row
+                      // (the primary action in this context). On mobile the
+                      // prints wrap above the primary action via flex-wrap.
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                         {tournamentInfo.has_ended ? (
                           <Button
-                            variant="accent"
+                            variant="outline"
                             size="sm"
                             onClick={handlePrintFinalStandings}
+                            className="gap-1.5"
                           >
+                            <Printer className="w-4 h-4" aria-hidden="true" />
                             <span className="hidden sm:inline">Print Final Standings</span>
                             <span className="sm:hidden">Print</span>
                           </Button>
                         ) : (
                           <>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handlePrintPairings}
+                                className="gap-1.5"
+                              >
+                                <Printer className="w-4 h-4" aria-hidden="true" />
+                                <span className="hidden sm:inline">Print Pairings</span>
+                                <span className="sm:hidden">Pairings</span>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handlePrintMatchSlips}
+                                className="gap-1.5"
+                              >
+                                <Printer className="w-4 h-4" aria-hidden="true" />
+                                <span className="hidden sm:inline">Print Match Slips</span>
+                                <span className="sm:hidden">Slips</span>
+                              </Button>
+                            </div>
                             <Button
-                              variant="accent"
+                              variant={isRoundActive ? "destructive" : "default"}
                               size="sm"
-                              onClick={handlePrintPairings}
-                            >
-                              <span className="hidden sm:inline">Print Pairings</span>
-                              <span className="sm:hidden">Pairings</span>
-                            </Button>
-                            <Button
-                              variant="accent"
-                              size="sm"
-                              onClick={handlePrintMatchSlips}
-                            >
-                              <span className="hidden sm:inline">Print Match Slips</span>
-                              <span className="sm:hidden">Slips</span>
-                            </Button>
-                            <Button
-                              variant={isRoundActive ? "destructive" : "success"}
-                              size="sm"
+                              className="sm:ml-auto"
                               onClick={
-                                isRoundActive ? handleEndRound : handleStartRound
+                                isRoundActive
+                                  ? () => setEndRoundConfirmOpen(true)
+                                  : handleStartRound
                               }
                               disabled={matchEnding}
                             >
-                              {isRoundActive ? "End Round" : "Start Round"}
+                              {matchEnding && isRoundActive ? (
+                                <span className="inline-flex items-center gap-2">
+                                  <span
+                                    className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin"
+                                    aria-hidden="true"
+                                  />
+                                  Ending…
+                                </span>
+                              ) : isRoundActive ? (
+                                "End Round"
+                              ) : (
+                                "Start Round"
+                              )}
                             </Button>
                           </>
                         )}
@@ -845,140 +1051,215 @@ export default function TournamentRounds({
                     </div>
                   )}
                   {matches && matches.length > 0 && <table className="hidden md:table min-w-full text-sm text-left text-muted-foreground border-2 border-border">
-                    <thead className="text-xs uppercase font-normal text-foreground bg-muted border-b-2 border-border rounded-t-lg">
+                    <thead className="sticky top-0 z-10 text-xs uppercase font-normal text-foreground bg-muted border-b-2 border-border rounded-t-lg">
                       <tr>
                         <th scope="col" className="px-4 py-2 text-center">
                           Table
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Name
+                          Player 1
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Opponent
+                          Result
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Match Points
+                          Player 2
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Differential
+                          <span className="inline-flex items-center justify-center gap-1">
+                            MP (P1 / P2) <InfoHint text={MP_ROUND_HINT} />
+                          </span>
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-center">
+                          <span className="inline-flex items-center justify-center gap-1">
+                            Diff (P1 / P2) <InfoHint text={DIFF_ROUND_HINT} />
+                          </span>
                         </th>
                         <th scope="col" className="px-4 py-2 text-right">
-                          <span className="sr-only">Actions</span>
+                          Actions
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {matches.length > 0 &&
-                        matches.map((match, index) => (
-                          <Fragment key={match.id}>
-                            <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {index + (tournamentInfo.starting_table_number || 1)}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player1_id.name}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player2_id.name}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player1_match_points}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.differential ?? "N/A"}
-                              </td>
-                              <td className="px-2">
-                                <div className="flex items-center space-x-1">
-                                  <MatchEditModal
-                                    key={match.player1_score + match.player2_score}
-                                    match={match}
-                                    fetchCurrentRoundData={fetchCurrentRoundData}
-                                    setMatchErrorIndex={setMatchErrorIndex}
-                                    isRoundActive={isRoundActive}
-                                    index={index}
-                                    tournament={tournamentInfo}
-                                  />
-                                  <button
-                                    title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? "Re-pair pairing" : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
-                                    className={`p-2 rounded-md flex items-center justify-center ${
-                                      currentPage === tournamentInfo.current_round && !roundInfo.started_at
-                                        ? repairMode && repairSourceMatch &&
-                                          (repairSourceMatch.isBye
-                                            ? false
-                                            : (repairSourceMatch.match && repairSourceMatch.match.id === match.id && !repairSourceMatch.isPlayer2))
-                                          ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
-                                          : repairMode
-                                            ? "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                            : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                        : "text-muted-foreground cursor-not-allowed"
-                                    }`}
-                                    onClick={() => {
-                                      if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
-                                        handleRepairClick(match, false);
-                                      }
-                                    }}
-                                    disabled={currentPage !== tournamentInfo.current_round || !!roundInfo.started_at}
-                                  >
-                                    <ArrowUpDown className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                            <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-card"}`}>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {index + (tournamentInfo.starting_table_number || 1)}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player2_id.name}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player1_id.name}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.player2_match_points}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                {match.differential2 ?? "N/A"}
-                              </td>
-                              <td className="px-2">
-                                <div className="flex items-center space-x-1">
-                                  <MatchEditModal
-                                    key={match.player1_score + match.player2_score}
-                                    match={match}
-                                    fetchCurrentRoundData={fetchCurrentRoundData}
-                                    setMatchErrorIndex={setMatchErrorIndex}
-                                    isRoundActive={isRoundActive}
-                                    index={index}
-                                    tournament={tournamentInfo}
-                                  />
-                                  <button
-                                    title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? "Re-pair pairing" : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
-                                    className={`p-2 rounded-md flex items-center justify-center ${
-                                      currentPage === tournamentInfo.current_round && !roundInfo.started_at
-                                        ? repairMode && repairSourceMatch &&
-                                          (repairSourceMatch.isBye
-                                            ? false
-                                            : (repairSourceMatch.match && repairSourceMatch.match.id === match.id && repairSourceMatch.isPlayer2))
-                                          ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
-                                          : repairMode
-                                            ? "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                            : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                        : "text-muted-foreground cursor-not-allowed"
-                                    }`}
-                                    onClick={() => {
-                                      if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
-                                        handleRepairClick(match, true);
-                                      }
-                                    }}
-                                    disabled={currentPage !== tournamentInfo.current_round || !!roundInfo.started_at}
-                                  >
-                                    <ArrowUpDown className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          </Fragment>
-                        ))}
+                        matches.map((match, index) => {
+                          const repairEnabled = canRepairCurrentRound;
+                          const hasResult =
+                            match.player1_score !== null && match.player2_score !== null;
+                          const perRound = perRoundScores(match, tournamentInfo.max_score ?? 5);
+                          return (
+                            <Fragment key={match.id}>
+                              <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
+                                <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {index + (tournamentInfo.starting_table_number || 1)}
+                                </td>
+                                <td
+                                  className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"} ${
+                                    repairMode ? "group cursor-pointer" : ""
+                                  }`}
+                                  onClick={repairMode ? () => handleRepairClick(match, false) : undefined}
+                                  role={repairMode ? "button" : undefined}
+                                  tabIndex={repairMode ? 0 : undefined}
+                                >
+                                  {repairMode ? (
+                                    <span className={swapTargetClass(repairSourceMatch?.match?.id === match.id && !repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)}>
+                                      {match.player1_id.name}
+                                    </span>
+                                  ) : (
+                                    match.player1_id.name
+                                  )}
+                                </td>
+                                <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {hasResult ? (
+                                    <span className="font-medium text-foreground">
+                                      {match.player1_score}&ndash;{match.player2_score}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">&mdash;</span>
+                                  )}
+                                </td>
+                                <td
+                                  className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"} ${
+                                    repairMode ? "group cursor-pointer" : ""
+                                  }`}
+                                  onClick={repairMode ? () => handleRepairClick(match, true) : undefined}
+                                  role={repairMode ? "button" : undefined}
+                                  tabIndex={repairMode ? 0 : undefined}
+                                >
+                                  {repairMode ? (
+                                    <span className={swapTargetClass(repairSourceMatch?.match?.id === match.id && repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)}>
+                                      {match.player2_id.name}
+                                    </span>
+                                  ) : (
+                                    match.player2_id.name
+                                  )}
+                                </td>
+                                <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {perRound ? `${perRound.p1Mp} / ${perRound.p2Mp}` : "N/A"}
+                                </td>
+                                <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
+                                  {perRound ? `${perRound.p1Diff} / ${perRound.p2Diff}` : "N/A"}
+                                </td>
+                                <td className="px-2">
+                                  <div className="flex items-center justify-end gap-1 flex-wrap">
+                                    {/* On a completed round the edit pencil is
+                                        disabled (scores can only be entered while
+                                        the round is active) and the repair pencil
+                                        below replaces it, so suppress the dead
+                                        edit pencil to avoid two redundant icons. */}
+                                    {!(isHost && isRoundCompleted) && (
+                                      <MatchEditModal
+                                        key={match.player1_score + match.player2_score}
+                                        match={match}
+                                        fetchCurrentRoundData={refreshMatchesAndNotify}
+                                        setMatchErrorIndex={setMatchErrorIndex}
+                                        isRoundActive={isRoundActive}
+                                        index={index}
+                                        tournament={tournamentInfo}
+                                        mode="edit"
+                                      />
+                                    )}
+                                    {/*
+                                      Kebab collapses the previous stack of two
+                                      ArrowUpDown buttons into a single overflow
+                                      affordance. Rendering rule: if no swap is
+                                      possible in this context (round started,
+                                      not current round, or single-pair table)
+                                      the kebab is omitted entirely — the pencil
+                                      stands alone. Each item swaps this pair's
+                                      P1 with the neighboring pair's P1; that
+                                      re-pairs both matches in a single click.
+                                    */}
+                                    {repairEnabled && matches.length > 1 && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <button
+                                            type="button"
+                                            aria-label="More actions"
+                                            className="inline-flex items-center justify-center w-9 h-9 rounded-md text-foreground hover:bg-muted hover:text-primary"
+                                          >
+                                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                                          </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-56">
+                                          <DropdownMenuItem
+                                            disabled={index === 0}
+                                            onSelect={() => {
+                                              const above = matches[index - 1];
+                                              if (above) {
+                                                handleSwapPlayers(match, above, false, false);
+                                              }
+                                            }}
+                                          >
+                                            <ArrowUp className="h-4 w-4 mr-2" aria-hidden="true" />
+                                            Swap with pair above
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            disabled={index === matches.length - 1}
+                                            onSelect={() => {
+                                              const below = matches[index + 1];
+                                              if (below) {
+                                                handleSwapPlayers(match, below, false, false);
+                                              }
+                                            }}
+                                          >
+                                            <ArrowDown className="h-4 w-4 mr-2" aria-hidden="true" />
+                                            Swap with pair below
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onSelect={() => handleRepairClick(match, false)}
+                                          >
+                                            <ArrowUpDown className="h-4 w-4 mr-2" aria-hidden="true" />
+                                            Swap with another pair…
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
+                                    {isHost && isRoundCompleted && (
+                                      <MatchEditModal
+                                        key={`repair-${match.id}`}
+                                        match={match}
+                                        fetchCurrentRoundData={fetchCurrentRoundData}
+                                        setMatchErrorIndex={setMatchErrorIndex}
+                                        isRoundActive={false}
+                                        index={index}
+                                        tournament={tournamentInfo}
+                                        mode="repair"
+                                        showReason={currentPage !== tournamentInfo.current_round}
+                                        onRepairSuccess={() => {
+                                          showToast("Match updated.", "success");
+                                          fetchMatchEdits();
+                                          onRepairCompleted?.();
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                              {isHost && (matchEditsByMatch[match.id]?.length ?? 0) > 0 && (
+                                <tr className="border-b border-border bg-muted/30">
+                                  <td colSpan={7} className="px-4 py-1">
+                                    <details className="text-xs">
+                                      <summary className="cursor-pointer text-muted-foreground">
+                                        Edit history ({matchEditsByMatch[match.id]!.length})
+                                      </summary>
+                                      <ul className="mt-1 ml-3 space-y-1">
+                                        {matchEditsByMatch[match.id]!.map(e => (
+                                          <li key={e.id} className="text-muted-foreground">
+                                            {e.old_player1_score}-{e.old_player2_score} → {e.new_player1_score}-{e.new_player2_score}
+                                            {" · "}{new Date(e.edited_at).toLocaleString()}
+                                            {e.reason ? ` · ${e.reason}` : ""}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </details>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
                     </tbody>
                   </table>}
 
@@ -988,8 +1269,8 @@ export default function TournamentRounds({
                       {matches.map((match, index) => {
                         const isError = matchErrorIndex.includes(index);
                         const tableNum = index + (tournamentInfo.starting_table_number || 1);
-                        const repairEnabled =
-                          currentPage === tournamentInfo.current_round && !roundInfo.started_at;
+                        const repairEnabled = canRepairCurrentRound;
+                        const perRound = perRoundScores(match, tournamentInfo.max_score ?? 5);
                         const isP1Selected =
                           repairMode &&
                           repairSourceMatch &&
@@ -1023,16 +1304,44 @@ export default function TournamentRounds({
                               <span className="text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                                 Table {tableNum}
                               </span>
-                              <div className="flex-shrink-0 w-10 h-10">
-                                <MatchEditModal
-                                  key={match.player1_score + match.player2_score}
-                                  match={match}
-                                  fetchCurrentRoundData={fetchCurrentRoundData}
-                                  setMatchErrorIndex={setMatchErrorIndex}
-                                  isRoundActive={isRoundActive}
-                                  index={index}
-                                  tournament={tournamentInfo}
-                                />
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                {/* See desktop note: hide the disabled edit
+                                    pencil on completed rounds where the repair
+                                    pencil replaces it. */}
+                                {!(isHost && isRoundCompleted) && (
+                                  <div className="w-10 h-10">
+                                    <MatchEditModal
+                                      key={match.player1_score + match.player2_score}
+                                      match={match}
+                                      fetchCurrentRoundData={refreshMatchesAndNotify}
+                                      setMatchErrorIndex={setMatchErrorIndex}
+                                      isRoundActive={isRoundActive}
+                                      index={index}
+                                      tournament={tournamentInfo}
+                                      mode="edit"
+                                    />
+                                  </div>
+                                )}
+                                {isHost && isRoundCompleted && (
+                                  <div className="w-11 h-11">
+                                    <MatchEditModal
+                                      key={`repair-${match.id}`}
+                                      match={match}
+                                      fetchCurrentRoundData={fetchCurrentRoundData}
+                                      setMatchErrorIndex={setMatchErrorIndex}
+                                      isRoundActive={false}
+                                      index={index}
+                                      tournament={tournamentInfo}
+                                      mode="repair"
+                                      showReason={currentPage !== tournamentInfo.current_round}
+                                      onRepairSuccess={() => {
+                                        showToast("Match updated.", "success");
+                                        fetchMatchEdits();
+                                        onRepairCompleted?.();
+                                      }}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="space-y-2">
@@ -1042,14 +1351,14 @@ export default function TournamentRounds({
                                     {match.player1_id.name}
                                   </p>
                                   <p className="text-xs text-muted-foreground tabular-nums">
-                                    Match Pts {match.player1_match_points} · Diff {match.differential ?? "N/A"}
+                                    Match Pts {perRound ? perRound.p1Mp : "N/A"} · Diff {perRound ? perRound.p1Diff : "N/A"}
                                   </p>
                                 </div>
                                 <button
                                   title={
                                     repairEnabled
                                       ? "Re-pair pairing"
-                                      : "Cannot re-pair after round started"
+                                      : "Cannot re-pair once results have been entered"
                                   }
                                   className={swapButtonClass(!!isP1Selected)}
                                   onClick={() => repairEnabled && handleRepairClick(match, false)}
@@ -1064,14 +1373,14 @@ export default function TournamentRounds({
                                     {match.player2_id.name}
                                   </p>
                                   <p className="text-xs text-muted-foreground tabular-nums">
-                                    Match Pts {match.player2_match_points} · Diff {match.differential2 ?? "N/A"}
+                                    Match Pts {perRound ? perRound.p2Mp : "N/A"} · Diff {perRound ? perRound.p2Diff : "N/A"}
                                   </p>
                                 </div>
                                 <button
                                   title={
                                     repairEnabled
                                       ? "Re-pair pairing"
-                                      : "Cannot re-pair after round started"
+                                      : "Cannot re-pair once results have been entered"
                                   }
                                   className={swapButtonClass(!!isP2Selected)}
                                   onClick={() => repairEnabled && handleRepairClick(match, true)}
@@ -1081,6 +1390,22 @@ export default function TournamentRounds({
                                 </button>
                               </div>
                             </div>
+                            {isHost && (matchEditsByMatch[match.id]?.length ?? 0) > 0 && (
+                              <details className="mt-2 text-xs">
+                                <summary className="cursor-pointer text-muted-foreground">
+                                  Edit history ({matchEditsByMatch[match.id]!.length})
+                                </summary>
+                                <ul className="mt-1 ml-3 space-y-1">
+                                  {matchEditsByMatch[match.id]!.map(e => (
+                                    <li key={e.id} className="text-muted-foreground">
+                                      {e.old_player1_score}-{e.old_player2_score} → {e.new_player1_score}-{e.new_player2_score}
+                                      {" · "}{new Date(e.edited_at).toLocaleString()}
+                                      {e.reason ? ` · ${e.reason}` : ""}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </details>
+                            )}
                           </div>
                         );
                       })}
@@ -1094,8 +1419,7 @@ export default function TournamentRounds({
                   {/* Mobile bye cards */}
                   <div className="md:hidden space-y-2">
                     {byes.map((bye) => {
-                      const repairEnabled =
-                        currentPage === tournamentInfo.current_round && !roundInfo.started_at;
+                      const repairEnabled = canRepairCurrentRound;
                       const isSelected =
                         repairMode &&
                         repairSourceMatch &&
@@ -1118,7 +1442,7 @@ export default function TournamentRounds({
                             title={
                               repairEnabled
                                 ? "Re-pair pairing"
-                                : "Cannot re-pair after round started"
+                                : "Cannot re-pair once results have been entered"
                             }
                             className={`p-2 rounded-md flex items-center justify-center flex-shrink-0 ${
                               repairEnabled
@@ -1151,10 +1475,14 @@ export default function TournamentRounds({
                             Opponent
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
-                            Match Points
+                            <span className="inline-flex items-center justify-center gap-1">
+                              Match Points <InfoHint text={MP_ROUND_HINT} />
+                            </span>
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
-                            Differential
+                            <span className="inline-flex items-center justify-center gap-1">
+                              Differential <InfoHint text={DIFF_ROUND_HINT} />
+                            </span>
                           </th>
                           <th scope="col" className="px-4 py-2 text-right">
                           </th>
@@ -1182,9 +1510,9 @@ export default function TournamentRounds({
                                 </td>
                                 <td className="px-2">
                                   <button
-                                    title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? "Re-pair pairing" : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
+                                    title={currentPage === tournamentInfo.current_round ? (canRepairCurrentRound ? "Re-pair pairing" : "Cannot re-pair once results have been entered") : "Can only re-pair current round"}
                                     className={`p-2 rounded-md flex items-center justify-center ${
-                                      currentPage === tournamentInfo.current_round && !roundInfo.started_at
+                                      canRepairCurrentRound
                                         ? repairMode && repairSourceMatch && repairSourceMatch.isBye && repairSourceMatch.byeId === bye.id
                                           ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
                                           : repairMode
@@ -1193,11 +1521,11 @@ export default function TournamentRounds({
                                         : "text-muted-foreground cursor-not-allowed"
                                     }`}
                                     onClick={() => {
-                                      if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
+                                      if (canRepairCurrentRound) {
                                         handleByeRepairClick(bye);
                                       }
                                     }}
-                                    disabled={currentPage !== tournamentInfo.current_round || !!roundInfo.started_at}
+                                    disabled={!canRepairCurrentRound}
                                   >
                                     <ArrowUpDown className="h-4 w-4" />
                                   </button>
@@ -1255,6 +1583,24 @@ export default function TournamentRounds({
           isRoundActive={isRoundActive}
         />
       )}
+      <ConfirmationDialog
+        open={endRoundConfirmOpen}
+        onOpenChange={setEndRoundConfirmOpen}
+        onConfirm={handleEndRound}
+        variant="destructive"
+        title={`End Round ${currentPage}?`}
+        description={
+          // On the final round, there is no next round — the tournament
+          // auto-finalises (see handleEndRound). Reflect that in the copy
+          // rather than promising next-round pairings that won't come.
+          tournamentInfo.n_rounds !== null &&
+          currentPage === tournamentInfo.n_rounds
+            ? "The tournament will be ended."
+            : "New pairings will be generated for the next round."
+        }
+        confirmLabel="End round"
+        cancelLabel="Cancel"
+      />
     </div >
     </>
   );

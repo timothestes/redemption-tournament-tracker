@@ -50,6 +50,22 @@ async function persistMatches(
   await client.from("matches").insert(rows);
 }
 
+/**
+ * Ensure a rounds row exists for the round. started_at stays NULL until the
+ * host clicks "Start Round" — repair RPCs require this row to exist (see
+ * migration 036).
+ */
+async function ensureRoundRow(
+  client: AnyClient,
+  tournamentId: string,
+  round: number,
+) {
+  await client.from("rounds").upsert(
+    { tournament_id: tournamentId, round_number: round, started_at: null },
+    { onConflict: "tournament_id,round_number", ignoreDuplicates: true },
+  );
+}
+
 /** Public API: create pairings for a Swiss tournament round. */
 export const createPairing = async (
   tournamentId: string,
@@ -71,6 +87,7 @@ export const createPairing = async (
       await persistBye(client, tournamentId, round, result.bye);
     }
     await persistMatches(client, tournamentId, result.matches);
+    await ensureRoundRow(client, tournamentId, round);
     return true;
   } catch (error) {
     console.error("Error in createPairing v2:", error);

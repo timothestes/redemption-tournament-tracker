@@ -89,6 +89,17 @@ export async function buildStateFromSupabase(
     round: Number(b.round_number),
   }));
 
+  // Rounds that have actually started. A bye only scores once its round has
+  // started (Option C) — a round staged by End Round but not yet started must
+  // not award its bye's points. recomputeTotalsFromHistory reads this.
+  const { data: roundRows } = await client
+    .from("rounds")
+    .select("round_number, started_at")
+    .eq("tournament_id", tournamentId);
+  const startedRounds: number[] = (roundRows || [])
+    .filter((r: any) => r.started_at != null)
+    .map((r: any) => Number(r.round_number));
+
   return {
     id: t.id,
     nRounds: t.n_rounds ?? 0,
@@ -99,5 +110,6 @@ export async function buildStateFromSupabase(
     participants,
     matches,
     byes,
+    startedRounds,
   };
 }
