@@ -124,6 +124,79 @@ function computeHeadToHead(
   return { wins, losses, ties };
 }
 
+/**
+ * Direct head-to-head between two participants (across all matches in the
+ * tournament, not just within a tier). Used as the final tiebreaker after MP
+ * and differential: if A beat B head-to-head, A ranks above B.
+ */
+function directHeadToHead(
+  aId: string,
+  bId: string,
+  matches: MatchRow[],
+): number {
+  let aWins = 0;
+  let bWins = 0;
+  for (const m of matches) {
+    if (m.player1_score === null || m.player2_score === null) continue;
+    if (m.is_tie) continue;
+    const isAvsB =
+      (m.player1_id === aId && m.player2_id === bId) ||
+      (m.player1_id === bId && m.player2_id === aId);
+    if (!isAvsB) continue;
+    if (m.winner_id === aId) aWins++;
+    else if (m.winner_id === bId) bWins++;
+  }
+  return aWins - bWins;
+}
+
+/**
+ * Build sorted standings rows. Sort order:
+ *   1. MP desc
+ *   2. Differential desc
+ *   3. Direct head-to-head (A beat B → A ranks higher)
+ *
+ * The H2H column shown in the UI summarises performance against the entire
+ * MP tier, which is good for explaining tied placements at a glance; but for
+ * the *sort* tiebreaker we need the deterministic A-vs-B record so the
+ * column the table renders agrees with the order the rows appear in.
+ *
+ * Exported for unit testing.
+ */
+export function buildStandings(
+  participants: Participant[],
+  matches: MatchRow[],
+  byes: ByeRow[],
+): StandingRow[] {
+  // Active participants only — drop-outs are excluded from standings per
+  // algorithm.md §"Determining Final Standings" step 1.
+  const active = participants.filter((p) => !p.dropped_out);
+  const sorted = [...active].sort((a, b) => {
+    const mp = (b.match_points ?? 0) - (a.match_points ?? 0);
+    if (mp !== 0) return mp;
+    const diff = (b.differential ?? 0) - (a.differential ?? 0);
+    if (diff !== 0) return diff;
+    // Both tied on MP and differential — apply direct head-to-head.
+    return directHeadToHead(b.id, a.id, matches);
+  });
+  return sorted.map((p, idx) => {
+    const record = computeRecord(p.id, matches, byes);
+    const h2h = computeHeadToHead(p, active, matches);
+    const inTiedGroup = h2h.wins + h2h.losses + h2h.ties > 0;
+    const tiebreaker = inTiedGroup
+      ? `${h2h.wins}-${h2h.losses}${h2h.ties ? `-${h2h.ties}` : ""}`
+      : "—";
+    return {
+      participant: p,
+      rank: idx + 1,
+      wins: record.wins,
+      losses: record.losses,
+      ties: record.ties,
+      tiebreaker,
+      tiebreakerSort: h2h.wins - h2h.losses,
+    };
+  });
+}
+
 export default function StandingsTable({
   tournamentId,
   participants,
@@ -160,33 +233,10 @@ export default function StandingsTable({
     };
   }, [tournamentId]);
 
-  const rows: StandingRow[] = useMemo(() => {
-    // Active participants only — drop-outs are excluded from standings per
-    // algorithm.md §"Determining Final Standings" step 1.
-    const active = participants.filter((p) => !p.dropped_out);
-    const sorted = [...active].sort((a, b) => {
-      const mp = (b.match_points ?? 0) - (a.match_points ?? 0);
-      if (mp !== 0) return mp;
-      return (b.differential ?? 0) - (a.differential ?? 0);
-    });
-    return sorted.map((p, idx) => {
-      const record = computeRecord(p.id, matches, byes);
-      const h2h = computeHeadToHead(p, active, matches);
-      const inTiedGroup = h2h.wins + h2h.losses + h2h.ties > 0;
-      const tiebreaker = inTiedGroup
-        ? `${h2h.wins}-${h2h.losses}${h2h.ties ? `-${h2h.ties}` : ""}`
-        : "—";
-      return {
-        participant: p,
-        rank: idx + 1,
-        wins: record.wins,
-        losses: record.losses,
-        ties: record.ties,
-        tiebreaker,
-        tiebreakerSort: h2h.wins - h2h.losses,
-      };
-    });
-  }, [participants, matches, byes]);
+  const rows: StandingRow[] = useMemo(
+    () => buildStandings(participants, matches, byes),
+    [participants, matches, byes],
+  );
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading standings…</p>;
