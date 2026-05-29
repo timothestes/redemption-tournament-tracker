@@ -615,6 +615,15 @@ export default function TournamentRounds({
         }).eq("id", targetByeId),
       ]);
 
+      // Recompute participant totals from history so the swapped byes are
+      // reflected in each participant's standings. Without this, participants
+      // keep the bye contribution from their pre-swap assignment.
+      const { error: recomputeError } = await client.rpc(
+        "recompute_participant_totals",
+        { p_tournament_id: tournamentId },
+      );
+      if (recomputeError) throw recomputeError;
+
       await fetchCurrentRoundData();
     } catch (error) {
       console.error("Error swapping players with bye:", error);
@@ -639,110 +648,45 @@ export default function TournamentRounds({
       if (tournamentError) throw tournamentError;
 
       const playerId = isSourcePlayer2 ? sourceMatch.player2_id.id : sourceMatch.player1_id.id;
-      const playerName = isSourcePlayer2 ? sourceMatch.player2_id.name : sourceMatch.player1_id.name;
-      const playerMatchPoints = isSourcePlayer2 ? sourceMatch.player2_match_points : sourceMatch.player1_match_points;
-      const playerDiff = isSourcePlayer2 ? sourceMatch.differential2 : sourceMatch.differential;
-      
-      const { data: byePlayerData, error: byePlayerError } = await client
-        .from("participants")
-        .select("match_points, differential")
-        .eq("id", bye.participant_id.id)
-        .single();
-      
-      if (byePlayerError) throw byePlayerError;
-      
-      const byePlayerOriginalPoints = Math.max(0, (byePlayerData.match_points || 0) - tournament.bye_points);
-      const byePlayerOriginalDiff = (byePlayerData.differential || 0) - tournament.bye_differential;
-      
-      const newByePlayerPoints = playerMatchPoints + tournament.bye_points;
-      const newByePlayerDiff = playerDiff + tournament.bye_differential;
-      
+
+      // Structural mutation 1: swap the match's player seat with the bye holder
+      // and reset scores. Don't touch the per-match cumulative snapshots
+      // (player*_match_points, differential, differential2) — they're stale
+      // for unscored rows and the recompute below makes the participant row
+      // the source of truth. When the match is later scored, match-edit will
+      // compute fresh snapshots from participants.match_points.
       if (isSourcePlayer2) {
         await client.from("matches").update({
           player2_id: bye.participant_id.id,
-          player2_match_points: byePlayerOriginalPoints,
-          differential2: byePlayerOriginalDiff,
           player1_score: null,
           player2_score: null,
         }).eq("id", sourceMatch.id);
       } else {
         await client.from("matches").update({
           player1_id: bye.participant_id.id,
-          player1_match_points: byePlayerOriginalPoints,
-          differential: byePlayerOriginalDiff,
           player1_score: null,
           player2_score: null,
         }).eq("id", sourceMatch.id);
       }
 
+      // Structural mutation 2: reassign the bye to the swapped-in player.
+      // Per-bye match_points/differential store the bye CONTRIBUTION, not
+      // cumulative — match the regenerate_current_round_pairings convention.
       await client.from("byes").update({
         participant_id: playerId,
-        match_points: newByePlayerPoints,
-        differential: newByePlayerDiff,
+        match_points: tournament.bye_points,
+        differential: tournament.bye_differential,
       }).eq("id", targetByeId);
 
-      await Promise.all([
-        client.from("participants").update({
-          match_points: byePlayerOriginalPoints,
-          differential: byePlayerOriginalDiff,
-        }).eq("id", bye.participant_id.id),
-        
-        client.from("participants").update({
-          match_points: newByePlayerPoints,
-          differential: newByePlayerDiff,
-        }).eq("id", playerId)
-      ]);
-
-      setByes(prevByes => {
-        const updatedByes = [...prevByes];
-        const byeIndex = updatedByes.findIndex(b => b.id === targetByeId);
-        
-        if (byeIndex !== -1) {
-          updatedByes[byeIndex] = {
-            ...updatedByes[byeIndex],
-            participant_id: {
-              id: playerId,
-              name: playerName
-            },
-            match_points: newByePlayerPoints,
-            differential: newByePlayerDiff
-          };
-        }
-        
-        return updatedByes;
-      });
-      
-      setMatches(prevMatches => {
-        const updatedMatches = [...prevMatches];
-        const matchIndex = updatedMatches.findIndex(m => m.id === sourceMatch.id);
-        
-        if (matchIndex !== -1) {
-          const updatedMatch = {...updatedMatches[matchIndex]};
-          
-          if (isSourcePlayer2) {
-            updatedMatch.player2_id = {
-              id: bye.participant_id.id,
-              name: bye.participant_id.name
-            };
-            updatedMatch.player2_match_points = byePlayerOriginalPoints;
-            updatedMatch.differential2 = byePlayerOriginalDiff;
-          } else {
-            updatedMatch.player1_id = {
-              id: bye.participant_id.id,
-              name: bye.participant_id.name
-            };
-            updatedMatch.player1_match_points = byePlayerOriginalPoints;
-            updatedMatch.differential = byePlayerOriginalDiff;
-          }
-          
-          updatedMatch.player1_score = null;
-          updatedMatch.player2_score = null;
-          
-          updatedMatches[matchIndex] = updatedMatch;
-        }
-        
-        return updatedMatches;
-      });
+      // Now derive participant totals from history. This is what was missing
+      // before — the old code did incremental math against stale per-match
+      // snapshots, which produced wrong totals when scores had been repaired
+      // in earlier rounds.
+      const { error: recomputeError } = await client.rpc(
+        "recompute_participant_totals",
+        { p_tournament_id: tournamentId },
+      );
+      if (recomputeError) throw recomputeError;
 
       await fetchCurrentRoundData();
     } catch (error) {
