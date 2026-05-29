@@ -16,20 +16,39 @@ interface Props {
   completedRounds: number[];
   matches: PickerMatch[];
   onPick: (matchId: string) => void;
+  /** Current (in-progress) round. The picker defaults to the previous round
+   * (currentRound − 1) since that's the most likely target for a correction. */
+  currentRound?: number | null;
 }
 
-export function RepairPastResultPicker({ open, onClose, completedRounds, matches, onPick }: Props) {
-  const [round, setRound] = useState<number | "">(completedRounds[0] ?? "");
+export function RepairPastResultPicker({ open, onClose, completedRounds, matches, onPick, currentRound }: Props) {
+  // Newest-completed first, independent of the caller's ordering.
+  const rounds = useMemo(
+    () => [...completedRounds].sort((a, b) => b - a),
+    [completedRounds]
+  );
+
+  // Default to the previous round (current − 1) — the round just finished and
+  // the most likely one to correct — falling back to the most recent completed
+  // round when current − 1 isn't a completed round.
+  const defaultRound = useMemo<number | "">(() => {
+    if (rounds.length === 0) return "";
+    const prev = (currentRound ?? 0) - 1;
+    return rounds.includes(prev) ? prev : rounds[0];
+  }, [rounds, currentRound]);
+
+  const [round, setRound] = useState<number | "">(defaultRound);
   const [search, setSearch] = useState("");
 
-  // Sync internal round state when completedRounds populates after mount.
-  // Without this, the picker is constructed with an empty completedRounds array
-  // and the filter below returns no matches even once data arrives.
+  // Re-seed the selection to the previous round each time the picker opens (and
+  // once the completed-rounds list arrives after mount). Clearing search avoids
+  // a stale filter hiding that round's matches.
   useEffect(() => {
-    if (round === "" && completedRounds.length > 0) {
-      setRound(completedRounds[0]);
+    if (open) {
+      setRound(defaultRound);
+      setSearch("");
     }
-  }, [completedRounds, round]);
+  }, [open, defaultRound]);
 
   const filtered = useMemo(() => {
     if (round === "") return [];
@@ -42,7 +61,7 @@ export function RepairPastResultPicker({ open, onClose, completedRounds, matches
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent size="md" className="rounded-t-lg sm:rounded-lg bg-card border border-border p-4">
-        <h2 className="text-lg font-medium text-foreground">Repair past result</h2>
+        <h2 className="text-lg font-medium text-foreground">Edit a past result</h2>
 
         {completedRounds.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">Loading completed rounds…</p>
@@ -54,7 +73,7 @@ export function RepairPastResultPicker({ open, onClose, completedRounds, matches
               onChange={(e) => setRound(e.target.value === "" ? "" : Number(e.target.value))}
               className="mt-1 w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
             >
-              {completedRounds.map(r => (
+              {rounds.map(r => (
                 <option key={r} value={r}>Round {r}</option>
               ))}
             </select>

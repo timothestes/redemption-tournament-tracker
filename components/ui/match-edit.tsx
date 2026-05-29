@@ -131,7 +131,7 @@ export default function MatchEditModal({
         tournamentId: tournament.id,
       });
       if (!result.ok) {
-        setError(`Repair failed: ${result.error}`);
+        setError(`Edit failed: ${result.error}`);
         return;
       }
       // Await the parent's refresh BEFORE closing the modal so the table
@@ -277,11 +277,11 @@ export default function MatchEditModal({
   const p2Name = match.player2_id?.name ?? "Player 2";
   const triggerAriaLabel =
     mode === "repair"
-      ? `Repair result for ${p1Name} vs ${p2Name}`
+      ? `Edit result for ${p1Name} vs ${p2Name}`
       : `Edit score: ${p1Name} vs ${p2Name}`;
   const triggerTitle =
     mode === "repair"
-      ? "Repair past result"
+      ? "Edit a past result"
       : isRoundActive
         ? "Edit match scores"
         : "Cannot input scores until round is started";
@@ -307,7 +307,7 @@ export default function MatchEditModal({
       <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent size="md" className="bg-card border-2 border-border py-8 px-8">
           <h2 className="text-xl font-bold mb-6 text-foreground">
-            {mode === "repair" ? "Repair result" : "Edit Match"}
+            {mode === "repair" ? "Edit result" : "Edit Match"}
           </h2>
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <div className="block space-y-5">
@@ -339,7 +339,7 @@ export default function MatchEditModal({
                     maxLength={240}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="Why are you repairing this?"
+                    placeholder="Why are you editing this?"
                     className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
                   />
                 </div>
@@ -347,7 +347,7 @@ export default function MatchEditModal({
             </div>
             <div className="flex justify-end gap-3 mt-2">
               <Button type="submit" variant="success">
-                {mode === "repair" ? "Repair" : "Update"}
+                {mode === "repair" ? "Save" : "Update"}
               </Button>
               <Button type="button" variant="cancel" onClick={() => setOpen(false)}>
                 Cancel

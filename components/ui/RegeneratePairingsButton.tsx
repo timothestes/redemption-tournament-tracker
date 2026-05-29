@@ -43,7 +43,7 @@ export function RegeneratePairingsButton({
 
   const enabled = !isRoundCompleted && scoredMatchCount === 0;
   const tooltip = !enabled
-    ? "Re-pair is unavailable because results have already been submitted."
+    ? "Regenerating pairings is unavailable because results have already been submitted."
     : undefined;
 
   const handleSubmit = async () => {
@@ -52,7 +52,15 @@ export function RegeneratePairingsButton({
     const result = await regenerateCurrentRoundPairingsAction({ tournamentId });
     setBusy(false);
     if (!result.ok) {
-      setError(result.error ?? "Failed");
+      // The RPC raises a raw "N match(es) already scored; pass p_unlock=true…"
+      // message that leaks the SQL function internals. Translate it into a
+      // host-facing instruction; surface other errors verbatim.
+      const raw = result.error ?? "Failed";
+      setError(
+        /already scored/i.test(raw)
+          ? "A result has already been entered for this round. Use “Unlock & regenerate…” to discard the existing results and regenerate pairings anyway."
+          : raw
+      );
       return;
     }
     setOpen(false);
@@ -71,7 +79,7 @@ export function RegeneratePairingsButton({
             title={tooltip}
             className="px-3 py-2 rounded-md border border-border bg-background text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed text-sm"
           >
-            Re-pair current round
+            Regenerate pairings
           </button>
           {!enabled && scoredMatchCount > 0 && onUnlockRequest && (
             <button
@@ -97,7 +105,7 @@ export function RegeneratePairingsButton({
       >
         <DialogContent size="md" className="rounded-t-lg sm:rounded-lg bg-card border border-border p-4">
           <h2 className="text-lg font-medium text-foreground">
-            Re-pair Round {currentRound}?
+            Regenerate pairings for Round {currentRound}?
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             This will replace the current pairings using the corrected
@@ -131,7 +139,7 @@ export function RegeneratePairingsButton({
               onClick={handleSubmit}
               className="px-3 py-2 rounded-md bg-primary text-primary-foreground disabled:bg-muted disabled:text-muted-foreground"
             >
-              {busy ? "Re-pairing…" : "Re-pair"}
+              {busy ? "Regenerating…" : "Regenerate"}
             </button>
           </div>
         </DialogContent>

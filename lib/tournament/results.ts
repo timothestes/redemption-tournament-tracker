@@ -48,10 +48,13 @@ export function recomputeTotalsFromHistory(
     }
   }
   for (const b of state.byes) {
-    if (b.participantId === participantId) {
-      gameScore += 3;
-      // bye lost soul score = 0; no change.
-    }
+    if (b.participantId !== participantId) continue;
+    // A bye only scores once its round has started (Option C), matching the
+    // server recompute. When startedRounds is absent (hand-built test states)
+    // fall back to counting all byes — the pre-Option-C behavior.
+    if (state.startedRounds && !state.startedRounds.includes(b.round)) continue;
+    gameScore += 3;
+    // bye lost soul score = 0; no change.
   }
   return { participantId, gameScore, lostSoulScore };
 }

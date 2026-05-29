@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Crown } from "lucide-react";
 import { createClient } from "../../utils/supabase/client";
+import InfoHint, { MP_HINT, DIFF_HINT } from "./InfoHint";
 
 interface Participant {
   id: string;
@@ -49,8 +50,7 @@ interface StandingRow {
   wins: number;
   losses: number;
   ties: number;
-  tiebreaker: string;
-  tiebreakerSort: number;
+  byes: number;
 }
 
 /**
@@ -91,49 +91,6 @@ function computeRecord(
 }
 
 /**
- * Head-to-head among players in the same match-points tier.
- * Returns (wins, losses, ties) restricted to opponents who share this
- * player's exact match_points total. Used as the post-MP/Diff tiebreaker
- * the official Redemption algorithm describes (algorithm.md §"Determining
- * Final Standings"). The tracker doesn't apply h2h to rank order, but
- * surfacing it here lets a host explain a tied placement at a glance.
- */
-function computeHeadToHead(
-  participant: Participant,
-  participants: Participant[],
-  matches: MatchRow[],
-): { wins: number; losses: number; ties: number } {
-  const samePts = new Set(
-    participants
-      .filter(
-        (p) =>
-          p.id !== participant.id &&
-          (p.match_points ?? 0) === (participant.match_points ?? 0),
-      )
-      .map((p) => p.id),
-  );
-
-  let wins = 0;
-  let losses = 0;
-  let ties = 0;
-  for (const m of matches) {
-    if (m.player1_score === null || m.player2_score === null) continue;
-    const isP1 = m.player1_id === participant.id;
-    const isP2 = m.player2_id === participant.id;
-    if (!isP1 && !isP2) continue;
-    const oppId = isP1 ? m.player2_id : m.player1_id;
-    if (!samePts.has(oppId)) continue;
-    if (m.is_tie) {
-      ties++;
-      continue;
-    }
-    if (m.winner_id === participant.id) wins++;
-    else if (m.winner_id) losses++;
-  }
-  return { wins, losses, ties };
-}
-
-/**
  * Direct head-to-head between two participants (across all matches in the
  * tournament, not just within a tier). Used as the final tiebreaker after MP
  * and differential: if A beat B head-to-head, A ranks above B.
@@ -164,10 +121,8 @@ function directHeadToHead(
  *   2. Differential desc
  *   3. Direct head-to-head (A beat B → A ranks higher)
  *
- * The H2H column shown in the UI summarises performance against the entire
- * MP tier, which is good for explaining tied placements at a glance; but for
- * the *sort* tiebreaker we need the deterministic A-vs-B record so the
- * column the table renders agrees with the order the rows appear in.
+ * The Byes column shown in the UI reports how many byes each player has been
+ * awarded in completed rounds (each counts as a win in the W-L-T record).
  *
  * `currentRound` (1-indexed, the round being played) gates which byes count
  * toward the W-L-T display: a bye for round N+1 is staged the moment End
@@ -184,15 +139,19 @@ export function buildStandings(
   matches: MatchRow[],
   byes: ByeRow[],
   currentRound?: number | null,
+  startedRounds?: number[] | null,
 ): StandingRow[] {
   // Active participants only — drop-outs are excluded from standings per
   // algorithm.md §"Determining Final Standings" step 1.
   const active = participants.filter((p) => !p.dropped_out);
-  // Filter byes whose round hasn't been played yet. When currentRound is
-  // undefined (e.g. tournament ended, or callsites without the prop) all
-  // byes are kept — the round-cutoff is only meaningful mid-tournament.
-  const playedByes =
-    currentRound && currentRound > 0
+  // A bye only counts once its round has actually started (Option C) — a round
+  // staged by End Round but not yet started must not show the bye as a win or
+  // award its points. This mirrors the server recompute exactly. Fall back to
+  // the older current-round cutoff (then to "count all") for callsites/tests
+  // that don't supply startedRounds.
+  const playedByes = startedRounds
+    ? byes.filter((b) => startedRounds.includes(b.round_number))
+    : currentRound && currentRound > 0
       ? byes.filter((b) => b.round_number < currentRound)
       : byes;
   const sorted = [...active].sort((a, b) => {
@@ -205,19 +164,14 @@ export function buildStandings(
   });
   return sorted.map((p, idx) => {
     const record = computeRecord(p.id, matches, playedByes);
-    const h2h = computeHeadToHead(p, active, matches);
-    const inTiedGroup = h2h.wins + h2h.losses + h2h.ties > 0;
-    const tiebreaker = inTiedGroup
-      ? `${h2h.wins}-${h2h.losses}${h2h.ties ? `-${h2h.ties}` : ""}`
-      : "—";
+    const byeCount = playedByes.filter((b) => b.participant_id === p.id).length;
     return {
       participant: p,
       rank: idx + 1,
       wins: record.wins,
       losses: record.losses,
       ties: record.ties,
-      tiebreaker,
-      tiebreakerSort: h2h.wins - h2h.losses,
+      byes: byeCount,
     };
   });
 }
@@ -231,6 +185,7 @@ export default function StandingsTable({
 }: StandingsTableProps) {
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [byes, setByes] = useState<ByeRow[]>([]);
+  const [startedRounds, setStartedRounds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -238,7 +193,7 @@ export default function StandingsTable({
     const client = createClient();
     let cancelled = false;
     (async () => {
-      const [matchesRes, byesRes] = await Promise.all([
+      const [matchesRes, byesRes, roundsRes] = await Promise.all([
         client
           .from("matches")
           .select(
@@ -249,10 +204,21 @@ export default function StandingsTable({
           .from("byes")
           .select("participant_id, round_number")
           .eq("tournament_id", tournamentId),
+        // Started rounds gate which byes count — a bye only scores once its
+        // round has actually started (Option C), matching the server recompute.
+        client
+          .from("rounds")
+          .select("round_number, started_at")
+          .eq("tournament_id", tournamentId),
       ]);
       if (cancelled) return;
       setMatches((matchesRes.data ?? []) as MatchRow[]);
       setByes((byesRes.data ?? []) as ByeRow[]);
+      setStartedRounds(
+        (roundsRes.data ?? [])
+          .filter((r: any) => r.started_at != null)
+          .map((r: any) => Number(r.round_number)),
+      );
       setLoading(false);
     })();
     return () => {
@@ -261,8 +227,8 @@ export default function StandingsTable({
   }, [tournamentId, matchesRefreshNonce]);
 
   const rows: StandingRow[] = useMemo(
-    () => buildStandings(participants, matches, byes, currentRound),
-    [participants, matches, byes, currentRound],
+    () => buildStandings(participants, matches, byes, currentRound, startedRounds),
+    [participants, matches, byes, currentRound, startedRounds],
   );
 
   if (loading) {
@@ -313,22 +279,24 @@ export default function StandingsTable({
                         {row.wins}-{row.losses}-{row.ties}
                       </span>
                     </span>
-                    <span>
+                    <span className="inline-flex items-center gap-1">
                       <span className="text-muted-foreground/70">MP</span>{" "}
                       <span className="text-foreground font-medium">
                         {row.participant.match_points ?? 0}
                       </span>
+                      <InfoHint text={MP_HINT} />
                     </span>
-                    <span>
+                    <span className="inline-flex items-center gap-1">
                       <span className="text-muted-foreground/70">Diff</span>{" "}
                       <span className="text-foreground font-medium">
                         {row.participant.differential ?? 0}
                       </span>
+                      <InfoHint text={DIFF_HINT} />
                     </span>
-                    <span title="Head-to-head record against players tied on match points (the algorithm's primary tiebreaker after match points and lost-soul score).">
-                      <span className="text-muted-foreground/70">H2H</span>{" "}
+                    <span title="Number of byes awarded in completed rounds (each counts as a win).">
+                      <span className="text-muted-foreground/70">Byes</span>{" "}
                       <span className="text-foreground font-medium">
-                        {row.tiebreaker}
+                        {row.byes}
                       </span>
                     </span>
                   </div>
@@ -364,29 +332,29 @@ export default function StandingsTable({
               <th
                 scope="col"
                 className="px-4 py-3 text-center"
-                title="Cumulative match points across all rounds. Primary sort key."
                 aria-sort="descending"
               >
                 <span className="inline-flex items-center gap-1 font-semibold text-foreground">
                   MP <ChevronDown className="w-3 h-3 text-muted-foreground" aria-hidden="true" />
+                  <InfoHint text={MP_HINT} />
                 </span>
               </th>
               <th
                 scope="col"
                 className="px-4 py-3 text-center"
-                title="Cumulative lost-soul-score differential. Tiebreaker after MP."
                 aria-sort="descending"
               >
                 <span className="inline-flex items-center gap-1 font-semibold text-foreground">
                   Diff <ChevronDown className="w-3 h-3 text-muted-foreground" aria-hidden="true" />
+                  <InfoHint text={DIFF_HINT} />
                 </span>
               </th>
               <th
                 scope="col"
                 className="px-4 py-3 text-center text-muted-foreground"
-                title="Head-to-head record against players tied on match points. The official Redemption algorithm applies head-to-head before falling back to lost-soul-score among tied players."
+                title="Number of byes awarded in completed rounds. Each bye counts as a win in the W-L-T record."
               >
-                Tiebreaker (H2H)
+                Byes
               </th>
             </tr>
           </thead>
@@ -424,7 +392,7 @@ export default function StandingsTable({
                     {row.participant.differential ?? 0}
                   </td>
                   <td className="px-4 py-3 text-center tabular-nums">
-                    {row.tiebreaker}
+                    {row.byes}
                   </td>
                 </tr>
               );

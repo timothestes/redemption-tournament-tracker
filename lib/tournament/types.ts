@@ -65,6 +65,11 @@ export interface TournamentState {
   participants: Participant[];
   matches: Match[];
   byes: Bye[];
+  /** Round numbers that have actually started (rounds.started_at set). A bye
+   * only scores once its round has started; staged-but-not-started rounds are
+   * excluded. Optional for back-compat with hand-built test states — when
+   * absent, all byes count (the pre-Option-C behavior). */
+  startedRounds?: number[];
 }
 
 /** Per-participant aggregate computed from match history. */

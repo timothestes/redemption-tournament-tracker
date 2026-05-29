@@ -58,7 +58,7 @@ export function AuditLogPanel({ tournamentId }: Props) {
     return (
       <section className="rounded-md border border-border bg-card p-4">
         <h3 className="text-sm font-medium text-foreground">Audit log</h3>
-        <p className="mt-1 text-sm text-muted-foreground">No repairs yet.</p>
+        <p className="mt-1 text-sm text-muted-foreground">No edits yet.</p>
       </section>
     );
   }

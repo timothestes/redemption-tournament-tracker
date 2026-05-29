@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
-import { Timer } from 'lucide-react';
 
 interface CountdownTimerProps {
   startTime: string | null;
@@ -83,22 +82,25 @@ export default function CountdownTimer({ startTime, durationMinutes, soundNotifi
   const isWarning = !isExpired && percentRemaining <= 0.1; // last 10%
   const isUrgent = !isExpired && !isWarning && percentRemaining <= 0.25; // last 25%
 
-  // Quiet by default; escalate as the round winds down. The bright accent is
-  // reserved for the primary CTA on the page, so the timer uses neutral
-  // foreground until it crosses an urgency threshold.
-  const pillClass = isExpired || isWarning
-    ? "bg-destructive/15 text-destructive animate-pulse"
+  // Resting: confident foreground digits, no pill, no icon — typography (mono +
+  // tabular) carries the "this is data" signal. Color escalates with urgency;
+  // size only escalates when seconds genuinely matter, so the loud state isn't
+  // wasted as the resting baseline.
+  const sizeClass = isExpired || isWarning
+    ? "text-3xl sm:text-4xl font-bold"
+    : "text-xl sm:text-2xl font-semibold";
+  const colorClass = isExpired || isWarning
+    ? "text-destructive animate-pulse"
     : isUrgent
-      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-      : "bg-muted text-foreground";
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-foreground";
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-base font-semibold whitespace-nowrap font-mono tabular-nums ${pillClass}`}
+      className={`font-mono tabular-nums leading-none whitespace-nowrap ${sizeClass} ${colorClass}`}
       aria-label={isExpired ? "Time's up" : `Round timer: ${timeString} remaining`}
       role="status"
     >
-      <Timer className="w-4 h-4" aria-hidden="true" />
       {isExpired ? "Time's up" : timeString}
     </span>
   );

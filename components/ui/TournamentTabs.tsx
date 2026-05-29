@@ -2,7 +2,7 @@
 
 import { Tabs } from "flowbite-react";
 import PodGenerationModal from "./PodGenerationModal";
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
+import { Dispatch, ReactNode, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear, FaClipboardList } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
@@ -52,6 +52,12 @@ interface TournamentTabsProps {
   matchesRefreshNonce?: number;
   onRoundEnded?: () => void | Promise<void>;
   currentRound?: number | null;
+  /** Host admin menu (wrench) rendered inside the Rounds tab. */
+  adminMenu?: ReactNode;
+  /** Fired when a match result changes so the page can refresh re-pair gating. */
+  onMatchesChanged?: () => void;
+  /** Fired after a round is started (a started round's bye begins scoring). */
+  onRoundStarted?: () => void;
 }
 
 export default function TournamentTabs({
@@ -83,6 +89,9 @@ export default function TournamentTabs({
   matchesRefreshNonce,
   onRoundEnded,
   currentRound,
+  adminMenu,
+  onMatchesChanged,
+  onRoundStarted,
 }: TournamentTabsProps) {
   // state for booster draft pods
   const [showPodsModal, setShowPodsModal] = useState(false);
@@ -263,6 +272,9 @@ export default function TournamentTabs({
             onRepairCompleted={onRepairCompleted}
             matchesRefreshNonce={matchesRefreshNonce}
             onRoundEnded={onRoundEnded}
+            adminMenu={adminMenu}
+            onMatchesChanged={onMatchesChanged}
+            onRoundStarted={onRoundStarted}
           />
         </div>
       </Tabs.Item>

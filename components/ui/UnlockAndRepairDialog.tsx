@@ -49,7 +49,7 @@ export function UnlockAndRepairDialog({ open, onClose, tournamentId, scoredMatch
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80">
       <div className="w-full max-w-md rounded-t-lg sm:rounded-lg bg-card border border-border p-4">
-        <h2 className="text-lg font-medium text-foreground">Unlock and re-pair?</h2>
+        <h2 className="text-lg font-medium text-foreground">Unlock &amp; regenerate?</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Unlocking will discard the following {scoredMatches.length} result{scoredMatches.length === 1 ? "" : "s"} and regenerate pairings:
         </p>

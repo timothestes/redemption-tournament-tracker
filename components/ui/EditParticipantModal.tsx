@@ -16,11 +16,6 @@ interface EditParticipantModalProps {
   onSave: () => void;
   newParticipantName: string;
   setNewParticipantName: (name: string) => void;
-  newMatchPoints: string;
-  setNewMatchPoints: (points: string) => void;
-  newDifferential: string;
-  setNewDifferential: (differential: string) => void;
-  isTournamentStarted: boolean;
 }
 
 const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
@@ -30,11 +25,6 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
   onSave,
   newParticipantName,
   setNewParticipantName,
-  newMatchPoints,
-  setNewMatchPoints,
-  newDifferential,
-  setNewDifferential,
-  isTournamentStarted
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -69,45 +59,9 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
                 onChange={(e) => setNewParticipantName(e.target.value)}
                 required
                 ref={inputRef}
-                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
+                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none"
               />
             </div>
-            <div className="space-y-1">
-              <label htmlFor="match_points" className="text-sm font-medium text-foreground">Match Points</label>
-              <input
-                id="match_points"
-                name="match_points"
-                type="number"
-                value={newMatchPoints}
-                onChange={(e) => setNewMatchPoints(e.target.value)}
-                readOnly={isTournamentStarted}
-                disabled={!isTournamentStarted}
-                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50 read-only:opacity-70 read-only:cursor-not-allowed"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="differential" className="text-sm font-medium text-foreground">Differential</label>
-              <input
-                id="differential"
-                name="differential"
-                type="number"
-                value={newDifferential}
-                onChange={(e) => setNewDifferential(e.target.value)}
-                readOnly={isTournamentStarted}
-                disabled={!isTournamentStarted}
-                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50 read-only:opacity-70 read-only:cursor-not-allowed"
-              />
-            </div>
-            {isTournamentStarted && (
-              <p className="text-xs text-muted-foreground">
-                Match points and differential are derived from match history once
-                the tournament starts. To change scores, use{" "}
-                <span className="font-medium text-foreground">
-                  Repair past result
-                </span>{" "}
-                from the round view.
-              </p>
-            )}
           </DialogBody>
           <DialogFooter className="justify-end">
             <Button type="submit" variant="success">

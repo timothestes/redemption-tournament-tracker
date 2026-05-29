@@ -78,24 +78,31 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
     return map;
   }, [decklists]);
 
+  // Participants tab is a roster view — sort alphabetically so hosts can find
+  // players by name. Score-based ranking lives in the Standings tab.
   const sortedParticipants = useMemo(() =>
-    [...participants].sort((a, b) => {
-      const mpA = a.match_points !== null ? a.match_points : -Infinity;
-      const mpB = b.match_points !== null ? b.match_points : -Infinity;
-
-      if (mpA !== mpB) {
-        return mpB - mpA;
-      }
-
-      const diffA = a.differential !== null ? a.differential : -Infinity;
-      const diffB = b.differential !== null ? b.differential : -Infinity;
-      return diffB - diffA;
-    }),
+    [...participants].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    ),
     [participants]
   );
 
-  const winnerMatchPoints = sortedParticipants[0]?.match_points || 0;
-  const winnerDifferential = sortedParticipants[0]?.differential || 0;
+  // Winner crown still highlights the final-standings leader; compute it from
+  // raw match_points/differential regardless of the alphabetical display order.
+  const { winnerMatchPoints, winnerDifferential } = useMemo(() => {
+    const ranked = [...participants].sort((a, b) => {
+      const mpA = a.match_points !== null ? a.match_points : -Infinity;
+      const mpB = b.match_points !== null ? b.match_points : -Infinity;
+      if (mpA !== mpB) return mpB - mpA;
+      const diffA = a.differential !== null ? a.differential : -Infinity;
+      const diffB = b.differential !== null ? b.differential : -Infinity;
+      return diffB - diffA;
+    });
+    return {
+      winnerMatchPoints: ranked[0]?.match_points ?? 0,
+      winnerDifferential: ranked[0]?.differential ?? 0,
+    };
+  }, [participants]);
 
   // Union of all participant IDs whose match was amended in any round
   const allAmended = useMemo(() => {
@@ -266,20 +273,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                       return editedAt ? <AmendedBadge round={round} editedAt={editedAt} /> : null;
                     })()}
                   </div>
-                  <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
-                    <span>
-                      <span className="text-muted-foreground/70">Match Pts</span>{" "}
-                      <span className="text-foreground font-medium">
-                        {participant.match_points ?? 0}
-                      </span>
-                    </span>
-                    <span>
-                      <span className="text-muted-foreground/70">Diff</span>{" "}
-                      <span className="text-foreground font-medium">
-                        {participant.differential ?? 0}
-                      </span>
-                    </span>
-                  </div>
                   <div className="mt-2">{renderDeckCell(participant)}</div>
                 </div>
                 <div className="flex-shrink-0">{renderActionButtons(participant)}</div>
@@ -314,8 +307,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
           <Table.Head>
             <Table.HeadCell className="py-3">Name</Table.HeadCell>
             <Table.HeadCell className="py-3">Deck</Table.HeadCell>
-            <Table.HeadCell className="py-3">Match Points</Table.HeadCell>
-            <Table.HeadCell className="py-3">Differential</Table.HeadCell>
             <Table.HeadCell className="py-3">
               <span className="sr-only">Actions</span>
             </Table.HeadCell>
@@ -352,8 +343,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                     <div className="max-w-[200px]">{renderDeckCell(participant)}</div>
                   </Table.Cell>
 
-                  <Table.Cell className="py-3 tabular-nums">{participant.match_points ?? 0}</Table.Cell>
-                  <Table.Cell className="py-3 tabular-nums">{participant.differential ?? 0}</Table.Cell>
                   <Table.Cell className="py-3">{renderActionButtons(participant)}</Table.Cell>
                 </Table.Row>
               );

@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, Pagination } from "flowbite-react";
-import { Dispatch, Fragment, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
+import { Dispatch, Fragment, ReactNode, SetStateAction, useCallback, useEffect, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 import { recomputeTotalsFromHistory } from "../../lib/tournament/results";
 import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
@@ -12,6 +12,7 @@ import { printTournamentPairings, printFinalStandings, printMatchSlips } from ".
 import { Button } from "./button";
 import ToastNotification from "./toast-notification";
 import ConfirmationDialog from "./confirmation-dialog";
+import InfoHint, { MP_HINT, DIFF_HINT } from "./InfoHint";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +57,18 @@ interface TournamentRoundsProps {
    * bump its pairingsRefreshNonce, forcing this component (and Standings) to
    * pick up the freshly-staged round on the next render. */
   onRoundEnded?: () => void | Promise<void>;
+  /** Host admin menu (re-pair / end tournament). Rendered left-justified in
+   * the round-control row. Lives in the page so its actions stay wired to the
+   * page's dialog state; passed in as a node to avoid threading handlers. */
+  adminMenu?: ReactNode;
+  /** Fired after a result is entered/cleared so the page can refresh its
+   * re-pair gating (scoredCurrentRoundMatches). Without this the page's gate
+   * is stale and "Regenerate pairings" stays wrongly enabled. */
+  onMatchesChanged?: () => void;
+  /** Fired after a round is started. Starting a round makes that round's bye
+   * score (Option C: byes count once their round has started), so the page
+   * must refresh participants + bump the standings nonce to reflect it. */
+  onRoundStarted?: () => void;
 }
 
 interface TournamentInfo {
@@ -93,6 +106,9 @@ export default function TournamentRounds({
   onRepairCompleted,
   matchesRefreshNonce,
   onRoundEnded,
+  adminMenu,
+  onMatchesChanged,
+  onRoundStarted,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     id: null,
@@ -103,7 +119,12 @@ export default function TournamentRounds({
     starting_table_number: 1,
     name: tournamentName || null,
   });
-  const hasFetchedTournament = useRef<boolean>(false);
+  // Tracks whether we've completed the initial tournament fetch and synced
+  // currentPage to tournamentInfo.current_round. Used as a render gate so the
+  // panel never renders with currentPage=1 while the tournament's true
+  // current_round is 2+ (which would flash "Round 1 of 3" with Round 1's dates
+  // for one frame before the second fetch kicks in).
+  const [hasInitialized, setHasInitialized] = useState(false);
   const client = createClient();
   const [error, setError] = useState<ErrorState>({ message: null, type: null });
   const [isLoading, setIsLoading] = useState(true);
@@ -193,6 +214,11 @@ export default function TournamentRounds({
 
     setIsLoading(true);
     setError({ message: null, type: null });
+    // Clear stale round dates before the fetch resolves. Otherwise switching
+    // tabs (or the initial currentPage=1 → current_round transition) flashes
+    // the previous round's started_at/ended_at for a frame before the new
+    // round's row arrives.
+    setRoundInfo({ started_at: null, ended_at: null });
 
     try {
       const [tournamentResult, roundResult] = await Promise.all([
@@ -253,11 +279,18 @@ export default function TournamentRounds({
   }, [isRoundActive, isActive, onRoundActiveChange, roundInfo.started_at]);
 
   useEffect(() => {
-    if (tournamentInfo.current_round && !hasFetchedTournament.current) {
+    if (tournamentInfo.current_round && !hasInitialized) {
+      // Keep isLoading true through the currentPage flip — without this, the
+      // brief window between the first fetch finishing (with currentPage=1's
+      // data) and the second fetch starting (for the correct current_round)
+      // renders stale round data for one frame. The second fetch fires
+      // automatically because fetchTournamentAndRoundInfo's deps include
+      // currentPage.
+      setIsLoading(true);
       setCurrentPage(tournamentInfo.current_round);
-      hasFetchedTournament.current = true;
+      setHasInitialized(true);
     }
-  }, [tournamentInfo, hasFetchedTournament]);
+  }, [tournamentInfo, hasInitialized]);
 
   useEffect(() => {
     if (isActive) {
@@ -289,6 +322,17 @@ export default function TournamentRounds({
 
       if (roundError) throw roundError;
 
+      // A bye for this round only scores once the round has started (Option C).
+      // Recompute now so the bye holder's match_points include their +3 the
+      // moment the round goes live, keeping MP consistent with the W-L-T /
+      // Byes columns (which gate on started rounds). Best-effort: a failure
+      // here shouldn't block starting the round.
+      const { error: recomputeError } = await client.rpc(
+        "recompute_participant_totals",
+        { p_tournament_id: tournamentId },
+      );
+      if (recomputeError) console.error("recompute on start round failed:", recomputeError);
+
       setRoundInfo({
         started_at: now,
         ended_at: null,
@@ -297,6 +341,7 @@ export default function TournamentRounds({
       setIsRoundActive(true);
       setLatestRound((prev) => ({ round_number: currentPage, started_at: now }));
       onRoundActiveChange?.(true, now);
+      onRoundStarted?.();
 
       setMatchLoading(true);
     } catch (error) {
@@ -326,6 +371,16 @@ export default function TournamentRounds({
     
     if (byeError) console.log(byeError);
     setByes(byeData);
+  };
+
+  // Used as the post-save callback for the score editors: refresh this
+  // component's local match rows AND notify the page so its re-pair gating
+  // (scoredCurrentRoundMatches) stays in sync. Deliberately NOT used by the
+  // deps-effect below — the page bumps matchesRefreshNonce, and notifying from
+  // a nonce-driven refetch would loop.
+  const refreshMatchesAndNotify = async () => {
+    await fetchCurrentRoundData();
+    onMatchesChanged?.();
   };
 
   useEffect(() => {
@@ -796,7 +851,7 @@ export default function TournamentRounds({
             {error.message}
           </div>
         )}
-        {isLoading ? (
+        {isLoading || !hasInitialized ? (
           <div className="flex items-center justify-center p-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
           </div>
@@ -805,21 +860,33 @@ export default function TournamentRounds({
             {tournamentInfo.n_rounds && (
               <>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
-                  <div className="min-w-0">
-                    {/* Round number/label is carried by the page-level sticky
-                        header pill + the round pagination below. */}
-                    <div className="text-sm text-muted-foreground space-y-0.5">
-                      {roundInfo.started_at && (
-                        <p>
-                          Started <span className="text-foreground">{formatDateTime(roundInfo.started_at)}</span>
-                        </p>
-                      )}
-                      {roundInfo.ended_at && (
-                        <p>
-                          Ended <span className="text-foreground">{formatDateTime(roundInfo.ended_at)}</span>
-                        </p>
-                      )}
+                  <div className="min-w-0 flex flex-col items-start gap-2">
+                    {/* Wrench + Round label — anchors the panel so a host
+                        scrolled past the page-level sticky header still sees
+                        which round they're looking at. */}
+                    <div className="flex items-center gap-3">
+                      {adminMenu}
+                      <h2 className="text-lg font-semibold text-foreground whitespace-nowrap">
+                        Round {currentPage} of {tournamentInfo.n_rounds}
+                      </h2>
                     </div>
+                    {/* Status line — always one row so the panel header height
+                        stays consistent across upcoming / live / completed
+                        rounds (no layout jump when paging). */}
+                    <p className="text-sm text-muted-foreground">
+                      {roundInfo.started_at ? (
+                        <>
+                          Started <span className="text-foreground">{formatDateTime(roundInfo.started_at)}</span>
+                          {roundInfo.ended_at && (
+                            <>
+                              {" · "}Ended <span className="text-foreground">{formatDateTime(roundInfo.ended_at)}</span>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <span className="italic">Awaiting start</span>
+                      )}
+                    </p>
                   </div>
                   {currentPage === tournamentInfo.current_round && (
                       // Round-control tiering: prints are outline (secondary),
@@ -924,19 +991,15 @@ export default function TournamentRounds({
                         <th scope="col" className="px-4 py-2 text-center">
                           Player 2
                         </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-2 text-center"
-                          title="Cumulative match points after this round"
-                        >
-                          MP (P1 / P2)
+                        <th scope="col" className="px-4 py-2 text-center">
+                          <span className="inline-flex items-center justify-center gap-1">
+                            MP (P1 / P2) <InfoHint text={MP_HINT} />
+                          </span>
                         </th>
-                        <th
-                          scope="col"
-                          className="px-4 py-2 text-center"
-                          title="Match-point differential after this round"
-                        >
-                          Diff (P1 / P2)
+                        <th scope="col" className="px-4 py-2 text-center">
+                          <span className="inline-flex items-center justify-center gap-1">
+                            Diff (P1 / P2) <InfoHint text={DIFF_HINT} />
+                          </span>
                         </th>
                         <th scope="col" className="px-4 py-2 text-right">
                           Actions
@@ -1001,16 +1064,23 @@ export default function TournamentRounds({
                                 </td>
                                 <td className="px-2">
                                   <div className="flex items-center justify-end gap-1 flex-wrap">
-                                    <MatchEditModal
-                                      key={match.player1_score + match.player2_score}
-                                      match={match}
-                                      fetchCurrentRoundData={fetchCurrentRoundData}
-                                      setMatchErrorIndex={setMatchErrorIndex}
-                                      isRoundActive={isRoundActive}
-                                      index={index}
-                                      tournament={tournamentInfo}
-                                      mode="edit"
-                                    />
+                                    {/* On a completed round the edit pencil is
+                                        disabled (scores can only be entered while
+                                        the round is active) and the repair pencil
+                                        below replaces it, so suppress the dead
+                                        edit pencil to avoid two redundant icons. */}
+                                    {!(isHost && isRoundCompleted) && (
+                                      <MatchEditModal
+                                        key={match.player1_score + match.player2_score}
+                                        match={match}
+                                        fetchCurrentRoundData={refreshMatchesAndNotify}
+                                        setMatchErrorIndex={setMatchErrorIndex}
+                                        isRoundActive={isRoundActive}
+                                        index={index}
+                                        tournament={tournamentInfo}
+                                        mode="edit"
+                                      />
+                                    )}
                                     {/*
                                       Kebab collapses the previous stack of two
                                       ArrowUpDown buttons into a single overflow
@@ -1156,18 +1226,23 @@ export default function TournamentRounds({
                                 Table {tableNum}
                               </span>
                               <div className="flex items-center gap-1 flex-shrink-0">
-                                <div className="w-10 h-10">
-                                  <MatchEditModal
-                                    key={match.player1_score + match.player2_score}
-                                    match={match}
-                                    fetchCurrentRoundData={fetchCurrentRoundData}
-                                    setMatchErrorIndex={setMatchErrorIndex}
-                                    isRoundActive={isRoundActive}
-                                    index={index}
-                                    tournament={tournamentInfo}
-                                    mode="edit"
-                                  />
-                                </div>
+                                {/* See desktop note: hide the disabled edit
+                                    pencil on completed rounds where the repair
+                                    pencil replaces it. */}
+                                {!(isHost && isRoundCompleted) && (
+                                  <div className="w-10 h-10">
+                                    <MatchEditModal
+                                      key={match.player1_score + match.player2_score}
+                                      match={match}
+                                      fetchCurrentRoundData={refreshMatchesAndNotify}
+                                      setMatchErrorIndex={setMatchErrorIndex}
+                                      isRoundActive={isRoundActive}
+                                      index={index}
+                                      tournament={tournamentInfo}
+                                      mode="edit"
+                                    />
+                                  </div>
+                                )}
                                 {isHost && isRoundCompleted && (
                                   <div className="w-11 h-11">
                                     <MatchEditModal
@@ -1321,10 +1396,14 @@ export default function TournamentRounds({
                             Opponent
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
-                            Match Points
+                            <span className="inline-flex items-center justify-center gap-1">
+                              Match Points <InfoHint text={MP_HINT} />
+                            </span>
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
-                            Differential
+                            <span className="inline-flex items-center justify-center gap-1">
+                              Differential <InfoHint text={DIFF_HINT} />
+                            </span>
                           </th>
                           <th scope="col" className="px-4 py-2 text-right">
                           </th>
