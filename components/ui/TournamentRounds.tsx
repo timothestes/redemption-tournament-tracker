@@ -52,6 +52,10 @@ interface TournamentRoundsProps {
    * to re-fetch. The default deps ([currentPage, tournamentId]) don't change
    * when only the row contents change. */
   matchesRefreshNonce?: number;
+  /** Called after End Round writes the next round's pairings so the page can
+   * bump its pairingsRefreshNonce, forcing this component (and Standings) to
+   * pick up the freshly-staged round on the next render. */
+  onRoundEnded?: () => void | Promise<void>;
 }
 
 interface TournamentInfo {
@@ -88,6 +92,7 @@ export default function TournamentRounds({
   isHost = false,
   onRepairCompleted,
   matchesRefreshNonce,
+  onRoundEnded,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     id: null,
@@ -473,6 +478,14 @@ export default function TournamentRounds({
       // flag and re-render. Awaiting the parent's refetch closes the desync
       // window that previously made the title-row badge lag the round panel.
       await onTournamentEnd?.();
+
+      // Bump the page's pairings refresh nonce so Standings and any
+      // sibling components that read matches/byes pick up the new round's
+      // pairings + bye row. The local fetchCurrentRoundData useEffect handles
+      // this component's own matches via the currentPage bump below, but
+      // sibling state (e.g. page-level scoredCurrentRoundMatches feeding the
+      // header menu) needs an explicit kick.
+      await onRoundEnded?.();
 
       setRoundInfo((prev) => ({
         ...prev,

@@ -520,6 +520,10 @@ export default function TournamentPage({
       return false;
     }
     fetchParticipants();
+    // Bump the pairings refresh nonce so the Rounds tab re-fetches matches/byes
+    // and reflects the dropped player on next render (the current-round pairings
+    // table doesn't re-render on participants change otherwise).
+    setPairingsRefreshNonce((n) => n + 1);
     return true;
   }
 
@@ -533,6 +537,8 @@ export default function TournamentPage({
       return false;
     }
     fetchParticipants();
+    // Same reason as dropOutParticipant — keep the Rounds tab in sync.
+    setPairingsRefreshNonce((n) => n + 1);
     return true;
   }
 
@@ -963,6 +969,13 @@ export default function TournamentPage({
               fetchTournamentDetails();
             }}
             matchesRefreshNonce={pairingsRefreshNonce}
+            onRoundEnded={() => {
+              // End Round writes the next round's pairings + bye. Bump the
+              // pairings nonce so the matches/byes fetch picks them up
+              // (the local fetchCurrentRoundData refetches via currentPage
+              // changing, but Standings and any other readers need the nonce).
+              setPairingsRefreshNonce((n) => n + 1);
+            }}
           />}
         </div>
         <RepairPastResultPicker

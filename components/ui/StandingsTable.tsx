@@ -32,6 +32,10 @@ interface StandingsTableProps {
   tournamentId: string;
   participants: Participant[];
   tournamentEnded: boolean;
+  /** Bumped by the page on data-changing events (drop player, End Round, repair)
+   * so this component re-fetches matches/byes. Without it the standings only
+   * refetch on tournamentId change. */
+  matchesRefreshNonce?: number;
 }
 
 interface StandingRow {
@@ -201,6 +205,7 @@ export default function StandingsTable({
   tournamentId,
   participants,
   tournamentEnded,
+  matchesRefreshNonce,
 }: StandingsTableProps) {
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [byes, setByes] = useState<ByeRow[]>([]);
@@ -231,7 +236,7 @@ export default function StandingsTable({
     return () => {
       cancelled = true;
     };
-  }, [tournamentId]);
+  }, [tournamentId, matchesRefreshNonce]);
 
   const rows: StandingRow[] = useMemo(
     () => buildStandings(participants, matches, byes),
