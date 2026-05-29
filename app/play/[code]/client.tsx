@@ -38,6 +38,7 @@ import { useUndoStack } from '../hooks/useUndoStack';
 import { useGameTimer } from '../hooks/useGameTimer';
 import { useChatScale } from '@/app/shared/hooks/useChatScale';
 import { normalizeDeckFormat } from '@/lib/deck-format';
+import { finishedGameToReuseOnCreate } from '@/app/play/lib/gameEntryDecision';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -518,6 +519,22 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         setGameId(existingGame.id);
         return; // lifecycle sync effect handles the rest
       }
+    }
+
+    // Guard against re-creating a duplicate after the game has already
+    // finished. A connection-reset remount can replay the stale `role:'create'`
+    // sessionStorage instruction; the reconnect lookup above ignores finished
+    // games, so without this we'd call createGame again and spawn a duplicate
+    // under the same code (the 'Z6NJ' incident). Reuse the finished row instead.
+    const reuseFinishedId = finishedGameToReuseOnCreate(
+      gameParams.role,
+      (gameState.allGames || []) as any,
+      code
+    );
+    if (reuseFinishedId !== null) {
+      console.log('[game-debug] create replayed after finish — reusing finished game:', String(reuseFinishedId));
+      setGameId(reuseFinishedId);
+      return; // lifecycle sync effect shows the ended state
     }
 
     try {
