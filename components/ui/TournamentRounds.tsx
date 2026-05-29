@@ -328,8 +328,15 @@ export default function TournamentRounds({
       // renders stale round data for one frame. The second fetch fires
       // automatically because fetchTournamentAndRoundInfo's deps include
       // currentPage.
-      setIsLoading(true);
-      setCurrentPage(tournamentInfo.current_round);
+      //
+      // Only raise isLoading when currentPage will ACTUALLY change. At round 1,
+      // current_round already equals currentPage (1), so setCurrentPage is a
+      // no-op, no second fetch fires, and a spurious setIsLoading(true) here
+      // would never be cleared — an infinite spinner right after starting.
+      if (tournamentInfo.current_round !== currentPage) {
+        setIsLoading(true);
+        setCurrentPage(tournamentInfo.current_round);
+      }
       setHasInitialized(true);
     }
   }, [tournamentInfo, hasInitialized]);
@@ -1588,8 +1595,8 @@ export default function TournamentRounds({
           // rather than promising next-round pairings that won't come.
           tournamentInfo.n_rounds !== null &&
           currentPage === tournamentInfo.n_rounds
-            ? "All matches will be locked and the tournament will be ended."
-            : "All matches will be locked and new pairings will be generated for the next round."
+            ? "The tournament will be ended."
+            : "New pairings will be generated for the next round."
         }
         confirmLabel="End round"
         cancelLabel="Cancel"

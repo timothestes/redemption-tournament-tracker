@@ -942,7 +942,16 @@ export default function TournamentPage({
             }}
             matchesRefreshNonce={pairingsRefreshNonce}
             currentRound={tournament?.current_round ?? null}
-            onMatchesChanged={fetchScoredCurrentRoundMatches}
+            onMatchesChanged={() => {
+              fetchScoredCurrentRoundMatches();
+              // A score was just entered/edited mid-round. Bump the standings
+              // nonce so StandingsTable re-fetches matches and updates MP / Diff
+              // / W-L-T live — otherwise it keeps the scoreless matches it
+              // fetched at round start and only the bye shows until End Round.
+              // Loop-safe: the nonce-driven refetch in TournamentRounds calls
+              // fetchCurrentRoundData (which does NOT re-notify).
+              setPairingsRefreshNonce((n) => n + 1);
+            }}
             onRoundStarted={() => {
               // Starting a round makes its bye score (Option C). Pull fresh
               // participant totals and bump the standings nonce so MP and the
