@@ -462,6 +462,18 @@ export default function TournamentRounds({
       } else {
         await createPairing(currentPage + 1);
 
+        // createPairing inserts the next round's bye row, but the
+        // recomputeTotalsFromHistory loop above ran BEFORE that insert and so
+        // didn't award the bye recipient their +3 MP. Call the recompute RPC
+        // now so participants.match_points reflects the staged bye before any
+        // Standings/Rounds reader fires. (RPC is host-only; handleEndRound
+        // already runs only on the host's machine, so the auth check passes.)
+        const { error: recomputeError } = await client.rpc(
+          "recompute_participant_totals",
+          { p_tournament_id: tournamentId },
+        );
+        if (recomputeError) console.log(recomputeError);
+
         const { error: tournamentError } = await client
           .from("tournaments")
           .update({

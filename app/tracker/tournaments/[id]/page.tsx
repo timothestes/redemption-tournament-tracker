@@ -437,6 +437,17 @@ export default function TournamentPage({
         // Creating the pairing for the next round
         await createPairingForRound(round + 1);
 
+        // Same reason as handleEndRound in TournamentRounds: the recompute
+        // a few lines above ran before the next round's bye was staged, so
+        // the bye recipient's match_points lag by +3 until the next recompute
+        // fires. Re-run it now to keep the standings invariant from breaking
+        // transiently during round N+1.
+        const { error: recomputeError } = await client.rpc(
+          "recompute_participant_totals",
+          { p_tournament_id: tournament.id },
+        );
+        if (recomputeError) console.log(recomputeError);
+
         const { error: tournamentError } = await client
           .from("tournaments")
           .update({
