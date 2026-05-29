@@ -48,9 +48,6 @@ export function RepairPastResultPicker({ open, onClose, completedRounds, matches
           <p className="mt-3 text-sm text-muted-foreground">Loading completed rounds…</p>
         ) : (
           <>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Tip: you can also repair from any completed round&rsquo;s row pencil.
-            </p>
             <label className="block mt-3 text-sm text-muted-foreground">Round</label>
             <select
               value={round}
