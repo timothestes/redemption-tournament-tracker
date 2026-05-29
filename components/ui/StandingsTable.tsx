@@ -36,6 +36,11 @@ interface StandingsTableProps {
    * so this component re-fetches matches/byes. Without it the standings only
    * refetch on tournamentId change. */
   matchesRefreshNonce?: number;
+  /** The currently-in-progress round (1-indexed). Used to filter the W-L-T
+   * display so byes pre-staged for the upcoming round (after End Round writes
+   * the next round's pairings) don't count as wins before that round is
+   * played. When undefined or 0, all byes are counted. */
+  currentRound?: number | null;
 }
 
 interface StandingRow {
@@ -164,16 +169,32 @@ function directHeadToHead(
  * the *sort* tiebreaker we need the deterministic A-vs-B record so the
  * column the table renders agrees with the order the rows appear in.
  *
+ * `currentRound` (1-indexed, the round being played) gates which byes count
+ * toward the W-L-T display: a bye for round N+1 is staged the moment End
+ * Round N completes (createPairing inserts it), but it shouldn't show as
+ * a "win" before round N+1 is played. Only byes for completed rounds
+ * (round_number < currentRound) count. The MP/differential numbers are
+ * sourced from the participant rows (recomputed server-side) and are
+ * unaffected — only the displayed record is filtered here.
+ *
  * Exported for unit testing.
  */
 export function buildStandings(
   participants: Participant[],
   matches: MatchRow[],
   byes: ByeRow[],
+  currentRound?: number | null,
 ): StandingRow[] {
   // Active participants only — drop-outs are excluded from standings per
   // algorithm.md §"Determining Final Standings" step 1.
   const active = participants.filter((p) => !p.dropped_out);
+  // Filter byes whose round hasn't been played yet. When currentRound is
+  // undefined (e.g. tournament ended, or callsites without the prop) all
+  // byes are kept — the round-cutoff is only meaningful mid-tournament.
+  const playedByes =
+    currentRound && currentRound > 0
+      ? byes.filter((b) => b.round_number < currentRound)
+      : byes;
   const sorted = [...active].sort((a, b) => {
     const mp = (b.match_points ?? 0) - (a.match_points ?? 0);
     if (mp !== 0) return mp;
@@ -183,7 +204,7 @@ export function buildStandings(
     return directHeadToHead(b.id, a.id, matches);
   });
   return sorted.map((p, idx) => {
-    const record = computeRecord(p.id, matches, byes);
+    const record = computeRecord(p.id, matches, playedByes);
     const h2h = computeHeadToHead(p, active, matches);
     const inTiedGroup = h2h.wins + h2h.losses + h2h.ties > 0;
     const tiebreaker = inTiedGroup
@@ -206,6 +227,7 @@ export default function StandingsTable({
   participants,
   tournamentEnded,
   matchesRefreshNonce,
+  currentRound,
 }: StandingsTableProps) {
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [byes, setByes] = useState<ByeRow[]>([]);
@@ -239,8 +261,8 @@ export default function StandingsTable({
   }, [tournamentId, matchesRefreshNonce]);
 
   const rows: StandingRow[] = useMemo(
-    () => buildStandings(participants, matches, byes),
-    [participants, matches, byes],
+    () => buildStandings(participants, matches, byes, currentRound),
+    [participants, matches, byes, currentRound],
   );
 
   if (loading) {

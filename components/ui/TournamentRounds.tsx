@@ -1431,7 +1431,15 @@ export default function TournamentRounds({
         onConfirm={handleEndRound}
         variant="destructive"
         title={`End Round ${currentPage}?`}
-        description="All matches will be locked and new pairings will be generated for the next round."
+        description={
+          // On the final round, there is no next round — the tournament
+          // auto-finalises (see handleEndRound). Reflect that in the copy
+          // rather than promising next-round pairings that won't come.
+          tournamentInfo.n_rounds !== null &&
+          currentPage === tournamentInfo.n_rounds
+            ? "All matches will be locked and the tournament will be ended."
+            : "All matches will be locked and new pairings will be generated for the next round."
+        }
         confirmLabel="End round"
         cancelLabel="Cancel"
       />

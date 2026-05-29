@@ -89,4 +89,46 @@ describe("StandingsTable buildStandings", () => {
     const rows = buildStandings(participants, [], []);
     expect(rows.map((r) => r.participant.id)).toEqual(["first", "second"]);
   });
+
+  it("W-L-T excludes byes pre-staged for the upcoming round (bug #2)", () => {
+    // Bob played R1 (lost to Alice) and has a bye row for R2 that End Round R1
+    // just inserted. Standings should show 0-1-0 for Bob, not 1-1-0, until R2
+    // is actually played.
+    const participants: Participant[] = [
+      p("alice", 3, 5),
+      p("bob", 0, -5),
+    ];
+    const matches: MatchRow[] = [fullWin(1, "alice", "bob")];
+    const byes: ByeRow[] = [{ participant_id: "bob", round_number: 2 }];
+    // current_round = 2 → R1 byes (none here) count, R2 byes (bob's) don't.
+    const rows = buildStandings(participants, matches, byes, 2);
+    const bob = rows.find((r) => r.participant.id === "bob")!;
+    expect(`${bob.wins}-${bob.losses}-${bob.ties}`).toBe("0-1-0");
+  });
+
+  it("W-L-T includes byes for completed rounds", () => {
+    // After R2 is played, current_round becomes 3, so the R2 bye now counts.
+    const participants: Participant[] = [
+      p("alice", 6, 5),
+      p("bob", 3, -5),
+    ];
+    const matches: MatchRow[] = [fullWin(1, "alice", "bob")];
+    const byes: ByeRow[] = [{ participant_id: "bob", round_number: 2 }];
+    const rows = buildStandings(participants, matches, byes, 3);
+    const bob = rows.find((r) => r.participant.id === "bob")!;
+    expect(`${bob.wins}-${bob.losses}-${bob.ties}`).toBe("1-1-0");
+  });
+
+  it("counts all byes when tournament has ended (currentRound null)", () => {
+    // End-of-tournament view: every bye is in a completed round; no filter
+    // should apply.
+    const participants: Participant[] = [p("solo", 9, 0)];
+    const byes: ByeRow[] = [
+      { participant_id: "solo", round_number: 1 },
+      { participant_id: "solo", round_number: 2 },
+      { participant_id: "solo", round_number: 3 },
+    ];
+    const rows = buildStandings(participants, [], byes, null);
+    expect(rows[0].wins).toBe(3);
+  });
 });

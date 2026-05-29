@@ -51,6 +51,7 @@ interface TournamentTabsProps {
   onRepairCompleted?: () => void;
   matchesRefreshNonce?: number;
   onRoundEnded?: () => void | Promise<void>;
+  currentRound?: number | null;
 }
 
 export default function TournamentTabs({
@@ -81,6 +82,7 @@ export default function TournamentTabs({
   onRepairCompleted,
   matchesRefreshNonce,
   onRoundEnded,
+  currentRound,
 }: TournamentTabsProps) {
   // state for booster draft pods
   const [showPodsModal, setShowPodsModal] = useState(false);
@@ -272,6 +274,7 @@ export default function TournamentTabs({
               participants={participants as any}
               tournamentEnded={tournamentEnded}
               matchesRefreshNonce={matchesRefreshNonce}
+              currentRound={tournamentEnded ? null : currentRound}
             />
           </div>
         </Tabs.Item>

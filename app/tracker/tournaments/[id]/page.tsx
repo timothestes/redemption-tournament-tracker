@@ -980,6 +980,7 @@ export default function TournamentPage({
               fetchTournamentDetails();
             }}
             matchesRefreshNonce={pairingsRefreshNonce}
+            currentRound={tournament?.current_round ?? null}
             onRoundEnded={() => {
               // End Round writes the next round's pairings + bye. Bump the
               // pairings nonce so the matches/byes fetch picks them up
