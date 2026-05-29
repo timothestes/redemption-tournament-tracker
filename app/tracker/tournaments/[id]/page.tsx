@@ -702,7 +702,7 @@ export default function TournamentPage({
                       className="group inline-flex items-center gap-2 -mx-1 px-1 py-0.5 rounded-md text-left hover:bg-muted transition-colors max-w-full"
                       aria-label="Edit tournament name"
                     >
-                      <span className="truncate">{tournament.name}</span>
+                      <span>{tournament.name}</span>
                       <HiPencil className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                     </button>
                   </h1>
