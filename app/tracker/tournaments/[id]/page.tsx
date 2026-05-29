@@ -726,7 +726,7 @@ export default function TournamentPage({
                   {/* Status pill — neutral hierarchy:
                       amber=not started, foreground=in progress, muted=ended. */}
                   <span
-                    className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${
+                    className={`text-base font-semibold px-3 py-1.5 rounded-full whitespace-nowrap ${
                       tournament.has_ended
                         ? "bg-muted text-muted-foreground"
                         : tournament.has_started

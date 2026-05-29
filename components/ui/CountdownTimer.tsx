@@ -94,11 +94,11 @@ export default function CountdownTimer({ startTime, durationMinutes, soundNotifi
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap font-mono tabular-nums ${pillClass}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-base font-semibold whitespace-nowrap font-mono tabular-nums ${pillClass}`}
       aria-label={isExpired ? "Time's up" : `Round timer: ${timeString} remaining`}
       role="status"
     >
-      <Timer className="w-3.5 h-3.5" aria-hidden="true" />
+      <Timer className="w-4 h-4" aria-hidden="true" />
       {isExpired ? "Time's up" : timeString}
     </span>
   );
