@@ -4,6 +4,7 @@ import { Card, Pagination } from "flowbite-react";
 import { Dispatch, Fragment, ReactNode, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 import { recomputeTotalsFromHistory } from "../../lib/tournament/results";
+import { gameScoreForMatch, differentialForMatch } from "../../lib/tournament/standingsScoring";
 import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
 import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
@@ -12,7 +13,7 @@ import { printTournamentPairings, printFinalStandings, printMatchSlips } from ".
 import { Button } from "./button";
 import ToastNotification from "./toast-notification";
 import ConfirmationDialog from "./confirmation-dialog";
-import InfoHint, { MP_HINT, DIFF_HINT } from "./InfoHint";
+import InfoHint, { MP_ROUND_HINT, DIFF_ROUND_HINT } from "./InfoHint";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,10 +33,35 @@ const formatDateTime = (timestamp: string | null) => {
   }).format(new Date(timestamp));
 };
 
+/**
+ * MP and differential each player EARNED in this single match — NOT the
+ * cumulative running total. Cumulative numbers live on the Standings tab,
+ * which is the source of truth. Returns null when the match is unscored.
+ * Uses the canonical per-match formula (see standingsScoring.ts).
+ */
+const perRoundScores = (match: any, maxScore: number) => {
+  if (match.player1_score === null || match.player2_score === null) return null;
+  const sc = {
+    player1_id: match.player1_id.id,
+    player2_id: match.player2_id.id,
+    player1_score: match.player1_score,
+    player2_score: match.player2_score,
+  };
+  return {
+    p1Mp: gameScoreForMatch(sc.player1_id, sc, maxScore),
+    p2Mp: gameScoreForMatch(sc.player2_id, sc, maxScore),
+    p1Diff: differentialForMatch(sc.player1_id, sc),
+    p2Diff: differentialForMatch(sc.player2_id, sc),
+  };
+};
+
 interface TournamentRoundsProps {
   tournamentId: string;
   isActive: boolean;
   onTournamentEnd?: () => void | Promise<void>;
+  /** Fired only when ending the FINAL round completes the tournament (not on
+   * every round end). Used to auto-switch to the Standings tab. */
+  onTournamentEnded?: () => void;
   onRoundActiveChange?: (
     isActive: boolean,
     roundStartTime: string | null
@@ -95,6 +121,7 @@ export default function TournamentRounds({
   tournamentId,
   isActive,
   onTournamentEnd,
+  onTournamentEnded,
   onRoundActiveChange,
   setLatestRound,
   createPairing,
@@ -529,6 +556,9 @@ export default function TournamentRounds({
           ...prev,
           has_ended: true,
         }));
+
+        // Tournament is now complete — surface the final results.
+        onTournamentEnded?.();
       } else {
         await createPairing(currentPage + 1);
 
@@ -1030,12 +1060,12 @@ export default function TournamentRounds({
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
                           <span className="inline-flex items-center justify-center gap-1">
-                            MP (P1 / P2) <InfoHint text={MP_HINT} />
+                            MP (P1 / P2) <InfoHint text={MP_ROUND_HINT} />
                           </span>
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
                           <span className="inline-flex items-center justify-center gap-1">
-                            Diff (P1 / P2) <InfoHint text={DIFF_HINT} />
+                            Diff (P1 / P2) <InfoHint text={DIFF_ROUND_HINT} />
                           </span>
                         </th>
                         <th scope="col" className="px-4 py-2 text-right">
@@ -1049,6 +1079,7 @@ export default function TournamentRounds({
                           const repairEnabled = canRepairCurrentRound;
                           const hasResult =
                             match.player1_score !== null && match.player2_score !== null;
+                          const perRound = perRoundScores(match, tournamentInfo.max_score ?? 5);
                           return (
                             <Fragment key={match.id}>
                               <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
@@ -1097,10 +1128,10 @@ export default function TournamentRounds({
                                   )}
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                  {match.player1_match_points} / {match.player2_match_points}
+                                  {perRound ? `${perRound.p1Mp} / ${perRound.p2Mp}` : "N/A"}
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                  {match.differential ?? "N/A"} / {match.differential2 ?? "N/A"}
+                                  {perRound ? `${perRound.p1Diff} / ${perRound.p2Diff}` : "N/A"}
                                 </td>
                                 <td className="px-2">
                                   <div className="flex items-center justify-end gap-1 flex-wrap">
@@ -1232,6 +1263,7 @@ export default function TournamentRounds({
                         const isError = matchErrorIndex.includes(index);
                         const tableNum = index + (tournamentInfo.starting_table_number || 1);
                         const repairEnabled = canRepairCurrentRound;
+                        const perRound = perRoundScores(match, tournamentInfo.max_score ?? 5);
                         const isP1Selected =
                           repairMode &&
                           repairSourceMatch &&
@@ -1312,7 +1344,7 @@ export default function TournamentRounds({
                                     {match.player1_id.name}
                                   </p>
                                   <p className="text-xs text-muted-foreground tabular-nums">
-                                    Match Pts {match.player1_match_points} · Diff {match.differential ?? "N/A"}
+                                    Match Pts {perRound ? perRound.p1Mp : "N/A"} · Diff {perRound ? perRound.p1Diff : "N/A"}
                                   </p>
                                 </div>
                                 <button
@@ -1334,7 +1366,7 @@ export default function TournamentRounds({
                                     {match.player2_id.name}
                                   </p>
                                   <p className="text-xs text-muted-foreground tabular-nums">
-                                    Match Pts {match.player2_match_points} · Diff {match.differential2 ?? "N/A"}
+                                    Match Pts {perRound ? perRound.p2Mp : "N/A"} · Diff {perRound ? perRound.p2Diff : "N/A"}
                                   </p>
                                 </div>
                                 <button
@@ -1437,12 +1469,12 @@ export default function TournamentRounds({
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
                             <span className="inline-flex items-center justify-center gap-1">
-                              Match Points <InfoHint text={MP_HINT} />
+                              Match Points <InfoHint text={MP_ROUND_HINT} />
                             </span>
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
                             <span className="inline-flex items-center justify-center gap-1">
-                              Differential <InfoHint text={DIFF_HINT} />
+                              Differential <InfoHint text={DIFF_ROUND_HINT} />
                             </span>
                           </th>
                           <th scope="col" className="px-4 py-2 text-right">

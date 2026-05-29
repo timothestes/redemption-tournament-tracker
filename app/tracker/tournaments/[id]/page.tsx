@@ -276,6 +276,7 @@ export default function TournamentPage({
         .single();
       if (error) throw error;
       setTournament(data);
+      setActiveTab(2); // jump to Standings — the tournament is now complete
       showToast("Tournament ended successfully!", "success");
     } catch (error) {
       showToast("Error updating tournament status.", "error");

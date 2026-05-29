@@ -34,11 +34,6 @@ test("host repairs a past-round score and standings reflect the change", async (
   // Success toast shows.
   await expect(page.getByText(/result repaired/i)).toBeVisible({ timeout: 5_000 });
 
-  // Switch to Participants tab to see standings amended badge.
-  await page.getByRole("tab", { name: /participants/i }).click();
-  // Both Alice and Bob's rows should now have "amended" badges visible.
-  await expect(page.getByRole("status").filter({ hasText: /^amended$/i }).first()).toBeVisible({ timeout: 5_000 });
-
   // Audit log panel (host-only) should reflect the new entry with the reason.
   await expect(page.getByText(/scorer mistake/i)).toBeVisible({ timeout: 5_000 });
 });

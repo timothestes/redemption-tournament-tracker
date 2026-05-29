@@ -262,6 +262,7 @@ export default function TournamentTabs({
             isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
             onTournamentEnd={onTournamentEnd}
+            onTournamentEnded={() => setActiveTab(2)} // jump to Standings (index 2) when the tournament finishes
             setLatestRound={setLatestRound}
             createPairing={createPairing}
             matchErrorIndex={matchErrorIndex}
@@ -281,6 +282,18 @@ export default function TournamentTabs({
       {tournamentStarted && (
         <Tabs.Item title="Standings" icon={HiOutlineChartBar}>
           <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
+            {tournamentEnded && (
+              <div className="flex justify-end mb-4">
+                <Button
+                  onClick={() => printFinalStandings(participants, tournamentName || "Tournament")}
+                  variant="accent"
+                  size="sm"
+                >
+                  <span className="hidden sm:inline">Print Final Standings</span>
+                  <span className="sm:hidden">Print</span>
+                </Button>
+              </div>
+            )}
             <StandingsTable
               tournamentId={tournamentId}
               participants={participants as any}

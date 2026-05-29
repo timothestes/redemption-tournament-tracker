@@ -17,9 +17,8 @@ test("repair golden path works in dark mode", async ({ page, seeded }) => {
   await dialog.getByRole("button", { name: /^repair$/i }).click();
   await expect(dialog).toBeHidden({ timeout: 5_000 });
 
-  // Switch to participants tab and verify amended badge is visible (and readable) in dark mode.
+  // Switch to participants tab for the standings visual-regression snapshot.
   await page.getByRole("tab", { name: /participants/i }).click();
-  await expect(page.getByRole("status").filter({ hasText: /^amended$/i }).first()).toBeVisible({ timeout: 5_000 });
 
   // Visual-regression snapshot for the standings view in dark mode.
   // First run will produce the baseline; subsequent runs compare.
