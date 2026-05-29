@@ -1228,7 +1228,7 @@ export default function TournamentRounds({
                                         mode="repair"
                                         showReason={currentPage !== tournamentInfo.current_round}
                                         onRepairSuccess={() => {
-                                          showToast("Result repaired.", "success");
+                                          showToast("Match updated.", "success");
                                           fetchMatchEdits();
                                           onRepairCompleted?.();
                                         }}
@@ -1335,7 +1335,7 @@ export default function TournamentRounds({
                                       mode="repair"
                                       showReason={currentPage !== tournamentInfo.current_round}
                                       onRepairSuccess={() => {
-                                        showToast("Result repaired.", "success");
+                                        showToast("Match updated.", "success");
                                         fetchMatchEdits();
                                         onRepairCompleted?.();
                                       }}

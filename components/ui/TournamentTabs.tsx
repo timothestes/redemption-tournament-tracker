@@ -324,7 +324,10 @@ export default function TournamentTabs({
           icon={FaClipboardList}
         >
           <div className="w-full max-w-[800px] mx-auto">
-            <AuditLogPanel tournamentId={tournamentId} />
+            <AuditLogPanel
+              tournamentId={tournamentId}
+              key={activeTab} // Re-fetch edits when the tab becomes active
+            />
           </div>
         </Tabs.Item>
       )}
