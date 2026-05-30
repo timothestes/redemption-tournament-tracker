@@ -5,7 +5,7 @@ import Breadcrumb from "../../../components/ui/breadcrumb";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
 import { Button } from "../../../components/ui/button";
-import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
+import { HiPencil, HiTrash, HiPlus, HiOutlineDesktopComputer } from "react-icons/hi";
 import { useRouter, useSearchParams } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
 
@@ -125,15 +125,23 @@ function TournamentsPageInner() {
         />
         <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
           <h1 className="text-2xl font-bold mt-2">Your Tournaments</h1>
-          <Button
-            onClick={() => setisAddTournamentModalOpen(true)}
-            className="flex items-center gap-3 mt-2 bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <div className="flex items-center gap-1">
-              <HiPlus className="w-4 h-4" />
-              <span>Host a Tournament</span>
-            </div>
-          </Button>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <Button variant="outline" className="flex items-center gap-2" asChild>
+              <a href="/board" target="_blank" rel="noopener noreferrer">
+                <HiOutlineDesktopComputer className="w-4 h-4" />
+                <span>Projector view</span>
+              </a>
+            </Button>
+            <Button
+              onClick={() => setisAddTournamentModalOpen(true)}
+              className="flex items-center gap-3 bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <div className="flex items-center gap-1">
+                <HiPlus className="w-4 h-4" />
+                <span>Host a Tournament</span>
+              </div>
+            </Button>
+          </div>
           <TournamentFormModal
             isOpen={isAddTournamentModalOpen}
             onClose={() => {

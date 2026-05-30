@@ -6,7 +6,7 @@ import { useTheme } from "next-themes";
 import Image from "next/image";
 
 // Routes where the background image is fully covered and doesn't need to render
-const SKIP_BACKGROUND_PREFIXES = ["/decklist/", "/tracker/", "/admin/", "/play"];
+const SKIP_BACKGROUND_PREFIXES = ["/decklist/", "/tracker/", "/admin/", "/play", "/board"];
 
 const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
