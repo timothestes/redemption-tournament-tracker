@@ -20,6 +20,7 @@ function gridClassFor(count: number): string {
 
 export function ProjectorBoard() {
   const [tournaments, setTournaments] = useState<BoardTournament[]>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [hidden, setHidden] = useState<string[]>([]);
   const [showControls, setShowControls] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -40,7 +41,9 @@ export function ProjectorBoard() {
   }, []);
 
   const refetch = useCallback(async () => {
-    setTournaments(await fetchActiveBoardData());
+    const data = await fetchActiveBoardData();
+    setTournaments(data);
+    setHasLoaded(true);
   }, []);
 
   // Initial fetch + realtime: refetch the whole active set on any change.
@@ -90,7 +93,13 @@ export function ProjectorBoard() {
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-background p-4 text-foreground">
-      {visible.length === 0 ? (
+      {!hasLoaded ? (
+        <div className="flex h-full w-full items-center justify-center">
+          <p className="font-cinzel text-3xl text-muted-foreground sm:text-4xl">
+            Loading…
+          </p>
+        </div>
+      ) : visible.length === 0 ? (
         <div className="flex h-full w-full items-center justify-center">
           <p className="font-cinzel text-3xl text-muted-foreground sm:text-4xl">
             No active tournaments
