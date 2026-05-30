@@ -29,6 +29,7 @@ import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
 import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
+import { useCardSounds } from '@/app/shared/hooks/useCardSounds';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
@@ -70,6 +71,9 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
+
+  // ---- Card sound effects (joke easter-egg, once per game) ----
+  useCardSounds(state.zones['territory'] ?? [], state.sessionId);
 
   // ---- LOB arrival glow effect ----
   const lobCardIds = useMemo(
