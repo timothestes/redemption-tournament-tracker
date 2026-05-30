@@ -126,12 +126,12 @@ function TournamentsPageInner() {
         <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
           <h1 className="text-2xl font-bold mt-2">Your Tournaments</h1>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <a href="/board" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="flex items-center gap-2">
+            <Button variant="outline" className="flex items-center gap-2" asChild>
+              <a href="/board" target="_blank" rel="noopener noreferrer">
                 <HiOutlineDesktopComputer className="w-4 h-4" />
                 <span>Projector view</span>
-              </Button>
-            </a>
+              </a>
+            </Button>
             <Button
               onClick={() => setisAddTournamentModalOpen(true)}
               className="flex items-center gap-3 bg-primary text-primary-foreground hover:bg-primary/90"
