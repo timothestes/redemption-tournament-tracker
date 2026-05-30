@@ -17,7 +17,7 @@ export function BoardPanel({ tournament }: { tournament: BoardTournament }) {
     <div
       className={cn(
         "flex h-full w-full flex-col items-center justify-center gap-4 rounded-2xl border p-6 text-center transition-colors",
-        expired ? "border-red-500 bg-red-700" : "border-neutral-800 bg-neutral-900",
+        expired ? "border-2 border-red-600 bg-neutral-900" : "border-neutral-800 bg-neutral-900",
       )}
     >
       <h2 className="line-clamp-2 font-cinzel text-2xl font-bold text-neutral-50 sm:text-3xl md:text-4xl">
@@ -33,7 +33,7 @@ export function BoardPanel({ tournament }: { tournament: BoardTournament }) {
         </span>
       )}
       {expired && (
-        <span className="font-mono text-[12vw] font-extrabold leading-none tabular-nums text-white md:text-[9vw] animate-pulse">
+        <span className="font-mono text-[12vw] font-extrabold leading-none tabular-nums text-red-500 md:text-[9vw] animate-pulse">
           TIME
         </span>
       )}
