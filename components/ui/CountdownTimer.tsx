@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoundCountdown } from "./useRoundCountdown";
 
 interface CountdownTimerProps {
@@ -17,16 +17,20 @@ export default function CountdownTimer({
   const { remainingSeconds, timeString, isExpired, isWarning, isUrgent } =
     useRoundCountdown(startTime, durationMinutes);
   const [soundPlayed, setSoundPlayed] = useState(false);
+  const prevRemainingRef = useRef(remainingSeconds);
 
   // Reset the once-per-round sound guard whenever a new round starts.
   useEffect(() => {
     setSoundPlayed(false);
   }, [startTime]);
 
-  // Play the alert once when the running round hits zero.
+  // Play the alert once, only on the live transition from >0 to 0 (not on mount
+  // while already expired) — matches the original CountdownTimer behavior.
   useEffect(() => {
+    const prev = prevRemainingRef.current;
+    prevRemainingRef.current = remainingSeconds;
     if (!soundNotifications || soundPlayed || !startTime) return;
-    if (remainingSeconds !== 0) return;
+    if (!(prev > 0 && remainingSeconds === 0)) return;
     setSoundPlayed(true);
     try {
       const audio = new Audio("/notification-alert.mp3");
