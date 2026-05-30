@@ -114,7 +114,7 @@ export function ProjectorBoard() {
           <BsPinAngleFill className="h-3.5 w-3.5" />
         </button>
         {showControls && (
-          <div className="mt-1 max-h-[60vh] w-64 overflow-auto rounded-md border border-border bg-popover p-2 text-sm text-popover-foreground shadow-lg">
+          <div className="absolute right-0 top-full mt-1 max-h-[60vh] w-64 overflow-auto rounded-md border border-border bg-popover p-2 text-sm text-popover-foreground shadow-lg">
             {tournaments.length === 0 ? (
               <p className="p-2 text-muted-foreground">No tournaments</p>
             ) : (
