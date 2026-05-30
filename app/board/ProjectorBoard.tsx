@@ -39,13 +39,30 @@ export function ProjectorBoard() {
   useEffect(() => {
     refetch();
     const supabase = createClient();
-    const channel = supabase
-      .channel("projector-board")
-      .on("postgres_changes", { event: "*", schema: "public", table: "rounds" }, () => refetch())
-      .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, () => refetch())
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    (async () => {
+      // postgres_changes on RLS-protected tables only delivers rows the socket's
+      // JWT can SELECT. Apply the host's token before subscribing — otherwise the
+      // connection uses the anon key and every event is filtered out (the channel
+      // still reports SUBSCRIBED, so the failure is silent).
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session?.access_token) {
+        await supabase.realtime.setAuth(data.session.access_token);
+        if (cancelled) return;
+      }
+      channel = supabase
+        .channel("projector-board")
+        .on("postgres_changes", { event: "*", schema: "public", table: "rounds" }, () => refetch())
+        .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, () => refetch())
+        .subscribe();
+    })();
+
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
     };
   }, [refetch]);
 
