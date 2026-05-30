@@ -65,6 +65,7 @@ import { normalizeDeckFormat } from '@/lib/deck-format';
 import { SOUL_DECK_BACK_IMG } from '@/app/shared/paragon/soulDeck';
 import { Link2Off } from 'lucide-react';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
+import { useCardSounds } from '@/app/shared/hooks/useCardSounds';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
 import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
@@ -277,6 +278,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     shuffleOpponentDeck,
     zoneSearchRequests,
   } = gameState;
+
+  // ---- Card sound effects (joke easter-egg, once per game; fires on each
+  // client independently so both players hear it). ----
+  const territorySoundCards = useMemo(
+    () => [...(myCards['territory'] ?? []), ...(opponentCards['territory'] ?? [])],
+    [myCards, opponentCards],
+  );
+  useCardSounds(territorySoundCards, String(gameId));
 
   // ---- Adapter: get GameCard for a CardInstance ----
   // Looks up the reference-stable adapted card from `useStableAdaptedCards` first
