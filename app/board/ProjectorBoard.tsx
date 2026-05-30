@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { BsPinAngleFill } from "react-icons/bs";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
 import { fetchActiveBoardData, type BoardTournament } from "./boardData";
@@ -101,9 +102,9 @@ export function ProjectorBoard() {
         <button
           onClick={() => setShowControls((s) => !s)}
           aria-label="Board settings"
-          className="rounded-md bg-neutral-800/70 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-700"
+          className="rounded-md bg-neutral-800/70 p-1.5 text-neutral-300 hover:bg-neutral-700"
         >
-          &#9881;
+          <BsPinAngleFill className="h-3.5 w-3.5" />
         </button>
         {showControls && (
           <div className="mt-1 max-h-[60vh] w-64 overflow-auto rounded-md bg-neutral-900 p-2 text-sm shadow-lg">
