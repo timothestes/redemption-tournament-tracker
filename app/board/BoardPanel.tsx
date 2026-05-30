@@ -17,33 +17,33 @@ export function BoardPanel({ tournament }: { tournament: BoardTournament }) {
     <div
       className={cn(
         "flex h-full w-full flex-col items-center justify-center gap-4 rounded-2xl border p-6 text-center transition-colors",
-        expired ? "border-2 border-red-600 bg-neutral-900" : "border-neutral-800 bg-neutral-900",
+        expired ? "border-2 border-destructive bg-card" : "border-border bg-card",
       )}
     >
-      <h2 className="line-clamp-2 font-cinzel text-2xl font-bold text-neutral-50 sm:text-3xl md:text-4xl">
+      <h2 className="line-clamp-2 font-cinzel text-2xl font-bold text-foreground sm:text-3xl md:text-4xl">
         {tournament.name}
       </h2>
-      <p className="text-lg text-neutral-400 sm:text-xl">
+      <p className="text-lg text-muted-foreground sm:text-xl">
         Round {tournament.current_round} of {tournament.n_rounds}
       </p>
 
       {state === "running" && !expired && (
-        <span className="font-mono text-[12vw] font-bold leading-none tabular-nums text-neutral-50 md:text-[9vw]">
+        <span className="font-mono text-[12vw] font-bold leading-none tabular-nums text-foreground md:text-[9vw]">
           {timeString}
         </span>
       )}
       {expired && (
-        <span className="font-mono text-[12vw] font-extrabold leading-none tabular-nums text-red-500 md:text-[9vw] animate-pulse">
+        <span className="font-mono text-[12vw] font-extrabold leading-none tabular-nums text-destructive md:text-[9vw] animate-pulse">
           TIME
         </span>
       )}
       {state === "not-started" && (
-        <span className="text-2xl text-neutral-400 sm:text-3xl">
+        <span className="text-2xl text-muted-foreground sm:text-3xl">
           Round {tournament.current_round} — starting soon
         </span>
       )}
       {state === "between-rounds" && (
-        <span className="text-2xl text-neutral-400 sm:text-3xl">
+        <span className="text-2xl text-muted-foreground sm:text-3xl">
           Round {tournament.current_round} complete — pairings coming
         </span>
       )}
