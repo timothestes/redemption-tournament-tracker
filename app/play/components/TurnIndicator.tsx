@@ -1050,7 +1050,9 @@ export default function TurnIndicator({
               fontFamily: 'Georgia, serif',
               fontSize: FZ.bodyLg,
               color: 'rgba(196, 149, 90, 0.5)',
-            }}>This will end the game and count as a resignation.</p>
+            }}>{readOnly
+              ? 'You will stop spectating. The game will continue.'
+              : 'This will end the game and count as a resignation.'}</p>
 
             <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
               <button

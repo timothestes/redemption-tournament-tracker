@@ -10,14 +10,17 @@ export const admin = adminAvailable
   : null;
 
 // A few real cards (name | set | imgFile) pulled from lib/cards/generated/cardData.ts.
-// findCard() enriches these into game card data during loadDeckForGame.
-const SAMPLE_CARDS: Array<{ name: string; set: string; img: string }> = [
-  { name: "Angel at Shur (Wa)", set: "War", img: "Angel_at_Shur_(Wa)" },
-  { name: "Angel at the Tomb (Wa)", set: "War", img: "Angel_at_the_Tomb_(Wa)" },
-  { name: "Angel Chariots (Wa)", set: "War", img: "Angel_Chariots_(Wa)" },
-  { name: "Angel Departed", set: "AW", img: "Angel_Departed_(AW)" },
-  { name: "Angel Food (L)", set: "Main", img: "Angel_Food_(B)" },
+// findCard() enriches these into game card data during loadDeckForGame. Each is
+// seeded at a quantity that totals ~50 cards so the opening-hand draw (8 cards)
+// works when a game reaches the `playing` state.
+const SAMPLE_CARDS: Array<{ name: string; set: string; img: string; qty: number }> = [
+  { name: "Angel at Shur (Wa)", set: "War", img: "Angel_at_Shur_(Wa)", qty: 10 },
+  { name: "Angel at the Tomb (Wa)", set: "War", img: "Angel_at_the_Tomb_(Wa)", qty: 10 },
+  { name: "Angel Chariots (Wa)", set: "War", img: "Angel_Chariots_(Wa)", qty: 10 },
+  { name: "Angel Departed", set: "AW", img: "Angel_Departed_(AW)", qty: 10 },
+  { name: "Angel Food (L)", set: "Main", img: "Angel_Food_(B)", qty: 10 },
 ];
+const DECK_CARD_COUNT = SAMPLE_CARDS.reduce((n, c) => n + c.qty, 0);
 
 export interface SeededPlayer {
   userId: string;
@@ -62,7 +65,7 @@ export async function seedPlayer(label: string): Promise<SeededPlayer> {
       user_id: userId,
       name: `Spec Deck ${label} ${stamp}`,
       format: "Type 1",
-      card_count: SAMPLE_CARDS.length,
+      card_count: DECK_CARD_COUNT,
       is_public: false,
     })
     .select("id")
@@ -75,7 +78,7 @@ export async function seedPlayer(label: string): Promise<SeededPlayer> {
       card_name: c.name,
       card_set: c.set,
       card_img_file: c.img,
-      quantity: 1,
+      quantity: c.qty,
       zone: "main",
     })),
   );

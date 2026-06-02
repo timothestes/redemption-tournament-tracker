@@ -330,8 +330,8 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
         <TopNav />
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black px-4">
           <div
-            className="absolute inset-0 bg-cover bg-no-repeat"
-            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center' }}
+            className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
+            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
           />
           <div
             className="absolute inset-0 pointer-events-none"
