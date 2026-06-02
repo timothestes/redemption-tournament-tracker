@@ -37,6 +37,7 @@ import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages'
 import { ArrowLeft } from 'lucide-react';
 import { loadDeckForGame } from '../actions';
 import { useUndoStack } from '../hooks/useUndoStack';
+import { shouldClearUndoStack } from '../hooks/undoStackCore';
 import { useGameTimer } from '../hooks/useGameTimer';
 import { useChatScale } from '@/app/shared/hooks/useChatScale';
 import { normalizeDeckFormat } from '@/lib/deck-format';
@@ -415,23 +416,33 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   }, [isLoupeVisible]);
 
-  // Undo handler — pops the stack and shows toast
+  // Undo handler — runs the top reverse and maps the result to a toast.
   const handleUndo = useCallback(() => {
-    const description = undoStack.undo();
-    if (description) {
-      showGameToast(`Undo: ${description}`);
+    const r = undoStack.undo();
+    switch (r.status) {
+      case 'applied': showGameToast(`Undo: ${r.description}`); break;
+      case 'empty':   showGameToast('Nothing to undo'); break;
+      case 'refused': showGameToast("Can't undo — the board changed"); break;
+      case 'threw':
+        console.warn('Undo threw', r.error);
+        showGameToast("Couldn't undo — the action can't be reversed");
+        break;
     }
   }, [undoStack]);
 
-  // Clear undo stack on turn change
-  const prevTurnRef = useRef<bigint | undefined>(undefined);
+  // Clear the undo stack when the LOCAL player's turn ends (isMyTurn true→false),
+  // not on every turnNumber change (that fires for both players and on reconnect
+  // snapshots). Gate on a present, playing game so a reconnect that momentarily
+  // drops `game` to undefined can't synthesize a false true→false edge.
+  const prevIsMyTurnRef = useRef<boolean | undefined>(undefined);
   useEffect(() => {
-    const currentTurn = gameState.game?.turnNumber;
-    if (currentTurn !== undefined && prevTurnRef.current !== undefined && currentTurn !== prevTurnRef.current) {
+    const hasGame = !!gameState.game;
+    const isMyTurn = gameState.isMyTurn;
+    if (lifecycle === 'playing' && hasGame && shouldClearUndoStack(prevIsMyTurnRef.current, isMyTurn)) {
       undoStack.clear();
     }
-    prevTurnRef.current = currentTurn;
-  }, [gameState.game?.turnNumber, undoStack]);
+    if (lifecycle === 'playing' && hasGame) prevIsMyTurnRef.current = isMyTurn;
+  }, [gameState.isMyTurn, gameState.game, lifecycle, undoStack]);
 
   // Clear undo stack when leaving the playing state
   useEffect(() => {

@@ -73,7 +73,8 @@ import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
 import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { cardInstanceToGameCard } from '../utils/cardAdapter';
-import type { UndoStack } from '../hooks/useUndoStack';
+import type { UndoStack, Captured } from '../hooks/useUndoStack';
+import { makeReverseAction, makeBatchReverseAction, reverseIsSafe } from '../hooks/useUndoStack';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -413,6 +414,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return undefined;
   }, [myCards, opponentCards]);
 
+  // Live lookup + move dispatcher bound into the undo guard. `lookupForUndo`
+  // reports a card's CURRENT zone/owner (or undefined if it's gone) so the
+  // guard can refuse a reverse whose target has since moved or been deleted.
+  const lookupForUndo = useCallback((id: string) => {
+    const c = findCardForUndo(id);
+    return c ? { zone: c.zone, ownerId: String(c.ownerId) } : undefined;
+  }, [findCardForUndo]);
+
+  const undoMove = useCallback(
+    (id: string, toZone: string, posX?: string, posY?: string, ownerId?: string) =>
+      rawMoveCard(BigInt(id), toZone, undefined, posX, posY, ownerId),
+    [rawMoveCard],
+  );
+
   // Warm up the imitate-souls art cache once an Imitate Lost Soul exists
   // anywhere on either side. Avoids a ~1s placeholder flash when the player
   // triggers the swap. preloadImitateSouls is idempotent.
@@ -429,81 +444,91 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (undoStack) {
         const card = findCardForUndo(String(cardInstanceId));
         if (card && card.zone !== toZone) {
+          const captured: Captured = {
+            cardId: String(cardInstanceId),
+            fromZone: card.zone,
+            prevOwnerId: String(card.ownerId),
+            posX: card.posX,
+            posY: card.posY,
+            expectedZone: toZone,
+            expectedOwnerId: targetOwnerId ?? String(card.ownerId),
+          };
           undoStack.push({
             description: `Moved ${card.cardName || 'card'} to ${toZone}`,
-            reverseAction: () => rawMoveCard(cardInstanceId, card.zone, undefined, card.posX, card.posY, String(card.ownerId)),
+            reverseAction: makeReverseAction({ captured, lookup: lookupForUndo, move: undoMove }),
           });
         }
       }
       rawMoveCard(cardInstanceId, toZone, zoneIndex, posX, posY, targetOwnerId);
     },
-    [rawMoveCard, undoStack, findCardForUndo],
+    [rawMoveCard, undoStack, findCardForUndo, lookupForUndo, undoMove],
   );
 
   const moveCardsBatch: typeof rawMoveCardsBatch = useCallback(
     (cardInstanceIds, toZone, positions, targetOwnerId, fromSource) => {
       if (undoStack) {
         const ids: string[] = JSON.parse(cardInstanceIds);
-        const originals = ids.map(id => {
+        const captured = ids.flatMap((id): Array<{ captured: Captured; name?: string }> => {
           const card = findCardForUndo(id);
-          return { id, zone: card?.zone, posX: card?.posX, posY: card?.posY, name: card?.cardName, ownerId: card?.ownerId };
-        }).filter(o => o.zone && o.zone !== toZone);
-        if (originals.length > 0) {
-          const desc = originals.length === 1
-            ? `Moved ${originals[0].name || 'card'} to ${toZone}`
-            : `Moved ${originals.length} cards to ${toZone}`;
+          if (!card || card.zone === toZone) return [];
+          return [{
+            name: card.cardName,
+            captured: {
+              cardId: id,
+              fromZone: card.zone,
+              prevOwnerId: String(card.ownerId),
+              posX: card.posX,
+              posY: card.posY,
+              expectedZone: toZone,
+              expectedOwnerId: targetOwnerId ?? String(card.ownerId),
+            },
+          }];
+        });
+        if (captured.length > 0) {
+          const desc = captured.length === 1
+            ? `Moved ${captured[0].name || 'card'} to ${toZone}`
+            : `Moved ${captured.length} cards to ${toZone}`;
           undoStack.push({
             description: desc,
-            reverseAction: () => {
-              const byZone: Record<string, { id: string; posX: string; posY: string; ownerId: string }[]> = {};
-              for (const o of originals) {
-                const z = o.zone!;
-                if (!byZone[z]) byZone[z] = [];
-                byZone[z].push({ id: o.id, posX: o.posX || '', posY: o.posY || '', ownerId: String(o.ownerId ?? '') });
-              }
-              for (const [zone, cards] of Object.entries(byZone)) {
-                if (cards.length === 1) {
-                  rawMoveCard(BigInt(cards[0].id), zone, undefined, cards[0].posX, cards[0].posY, cards[0].ownerId);
-                } else {
-                  const positionsMap: Record<string, { posX: string; posY: string }> = {};
-                  for (const c of cards) {
-                    positionsMap[c.id] = { posX: c.posX, posY: c.posY };
-                  }
-                  rawMoveCardsBatch(
-                    JSON.stringify(cards.map(c => c.id)),
-                    zone,
-                    JSON.stringify(positionsMap),
-                    cards[0].ownerId,
-                  );
-                }
-              }
-            },
+            reverseAction: makeBatchReverseAction({
+              items: captured.map(c => c.captured),
+              lookup: lookupForUndo,
+              move: undoMove,
+            }),
           });
         }
       }
       rawMoveCardsBatch(cardInstanceIds, toZone, positions, targetOwnerId, fromSource);
     },
-    [rawMoveCardsBatch, rawMoveCard, undoStack, findCardForUndo],
+    [rawMoveCardsBatch, undoStack, findCardForUndo, lookupForUndo, undoMove],
   );
 
   // Push an undo entry for an opponent-card move. Captures the card's current
   // zone/position/owner BEFORE the forward action runs, so undo can restore it
   // even after the search request is closed.
-  const recordOpponentCardUndo = useCallback((cardId: string | bigint) => {
+  const recordOpponentCardUndo = useCallback((cardId: string | bigint, toZone: string, expectedOwnerId?: string) => {
     if (!undoStack) return;
     const idStr = String(cardId);
     const card = findCardForUndo(idStr);
     if (!card) return;
-    const fromZone = card.zone;
-    const posX = card.posX ?? '';
-    const posY = card.posY ?? '';
-    const ownerId = String(card.ownerId ?? '');
-    const name = card.cardName || 'card';
+    if (card.zone === toZone) return; // no-op move, nothing to undo
+    const prevOwnerId = String(card.ownerId ?? '');
+    const captured: Captured = {
+      cardId: idStr,
+      fromZone: card.zone,
+      prevOwnerId,
+      posX: card.posX ?? '',
+      posY: card.posY ?? '',
+      expectedZone: toZone,
+      // Post-move owner: a "take" routes ownership to the acting player; an
+      // in-place opponent move leaves the original owner.
+      expectedOwnerId: expectedOwnerId ?? prevOwnerId,
+    };
     undoStack.push({
-      description: `Moved ${name} back to ${fromZone}`,
-      reverseAction: () => rawMoveCard(BigInt(idStr), fromZone, undefined, posX, posY, ownerId),
+      description: `Moved ${card.cardName || 'card'} back to ${card.zone}`,
+      reverseAction: makeReverseAction({ captured, lookup: lookupForUndo, move: undoMove }),
     });
-  }, [undoStack, findCardForUndo, rawMoveCard]);
+  }, [undoStack, findCardForUndo, lookupForUndo, undoMove]);
 
   // ---- Layout ----
   // Normalize the raw game.format string (e.g. "Paragon Type 1", "Type 2") to
@@ -1196,16 +1221,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const card = findMyCardById(cardId);
       const fromZone = card?.zone;
       const execute = () => {
-        // Record undo entry before executing. Capture pre-move ownerId so a
-        // taken opponent card undoes back to the acting player, not to the
-        // original-owner routing the reducer would otherwise apply.
+        // Record undo entry before executing. This path never reassigns
+        // ownership (no targetOwnerId on the forward move), so the post-move
+        // owner equals the pre-move owner.
         if (undoStack && card && fromZone && fromZone !== toZone) {
-          const prevPosX = card.posX;
-          const prevPosY = card.posY;
-          const prevOwnerId = String(card.ownerId);
+          const ownerId = String(card.ownerId);
+          const captured: Captured = {
+            cardId,
+            fromZone,
+            prevOwnerId: ownerId,
+            posX: card.posX,
+            posY: card.posY,
+            expectedZone: toZone,
+            expectedOwnerId: ownerId,
+          };
           undoStack.push({
             description: `Moved ${card.cardName || 'card'} to ${toZone}`,
-            reverseAction: () => gameState.moveCard(BigInt(cardId), fromZone, undefined, prevPosX, prevPosY, prevOwnerId),
+            reverseAction: makeReverseAction({ captured, lookup: lookupForUndo, move: undoMove }),
           });
         }
         gameState.moveCard(BigInt(cardId), toZone, undefined, posX, posY);
@@ -1216,44 +1248,36 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     moveCardsBatch: (cardIds, toZone) => {
       const execute = () => {
         // Record undo entry: reverse each card back to its original zone + owner.
+        // Guard per card; restore only the cards still where this batch left them.
         if (undoStack && cardIds.length > 0) {
-          const originals = cardIds.map(id => {
+          const captured = cardIds.flatMap((id): Array<{ captured: Captured; name?: string }> => {
             const card = findMyCardById(id);
-            return { id, zone: card?.zone, posX: card?.posX, posY: card?.posY, name: card?.cardName, ownerId: card?.ownerId };
-          }).filter(o => o.zone && o.zone !== toZone);
-          if (originals.length > 0) {
-            const desc = originals.length === 1
-              ? `Moved ${originals[0].name || 'card'} to ${toZone}`
-              : `Moved ${originals.length} cards to ${toZone}`;
+            if (!card || card.zone === toZone) return [];
+            const ownerId = String(card.ownerId);
+            return [{
+              name: card.cardName,
+              captured: {
+                cardId: id,
+                fromZone: card.zone,
+                prevOwnerId: ownerId,
+                posX: card.posX,
+                posY: card.posY,
+                expectedZone: toZone,
+                expectedOwnerId: ownerId,
+              },
+            }];
+          });
+          if (captured.length > 0) {
+            const desc = captured.length === 1
+              ? `Moved ${captured[0].name || 'card'} to ${toZone}`
+              : `Moved ${captured.length} cards to ${toZone}`;
             undoStack.push({
               description: desc,
-              reverseAction: () => {
-                // Group by (zone, owner) so each group restores correctly
-                const byKey: Record<string, { id: string; posX: string; posY: string; zone: string; ownerId: string }[]> = {};
-                for (const o of originals) {
-                  const zone = o.zone!;
-                  const ownerId = String(o.ownerId ?? '');
-                  const key = `${zone}::${ownerId}`;
-                  if (!byKey[key]) byKey[key] = [];
-                  byKey[key].push({ id: o.id, posX: o.posX || '', posY: o.posY || '', zone, ownerId });
-                }
-                for (const cards of Object.values(byKey)) {
-                  if (cards.length === 1) {
-                    gameState.moveCard(BigInt(cards[0].id), cards[0].zone, undefined, cards[0].posX, cards[0].posY, cards[0].ownerId);
-                  } else {
-                    const positions: Record<string, { posX: string; posY: string }> = {};
-                    for (const c of cards) {
-                      positions[c.id] = { posX: c.posX, posY: c.posY };
-                    }
-                    gameState.moveCardsBatch(
-                      JSON.stringify(cards.map(c => c.id)),
-                      cards[0].zone,
-                      JSON.stringify(positions),
-                      cards[0].ownerId,
-                    );
-                  }
-                }
-              },
+              reverseAction: makeBatchReverseAction({
+                items: captured.map(c => c.captured),
+                lookup: lookupForUndo,
+                move: undoMove,
+              }),
             });
           }
         }
@@ -1268,7 +1292,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         const card = findMyCardById(cardId);
         undoStack.push({
           description: `Flipped ${card?.cardName || 'card'}`,
-          reverseAction: () => gameState.flipCard(BigInt(cardId)),
+          reverseAction: () => {
+            if (!lookupForUndo(cardId)) return false; // card gone → refuse
+            gameState.flipCard(BigInt(cardId));
+            return true;
+          },
         });
       }
       gameState.flipCard(BigInt(cardId));
@@ -1283,7 +1311,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         const card = findMyCardById(cardId);
         undoStack.push({
           description: `Set ${card?.cardName || 'card'} meek`,
-          reverseAction: () => gameState.unmeekCard(BigInt(cardId)),
+          reverseAction: () => {
+            if (!lookupForUndo(cardId)) return false;
+            gameState.unmeekCard(BigInt(cardId));
+            return true;
+          },
         });
       }
       gameState.meekCard(BigInt(cardId));
@@ -1293,7 +1325,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         const card = findMyCardById(cardId);
         undoStack.push({
           description: `Removed meek from ${card?.cardName || 'card'}`,
-          reverseAction: () => gameState.meekCard(BigInt(cardId)),
+          reverseAction: () => {
+            if (!lookupForUndo(cardId)) return false;
+            gameState.meekCard(BigInt(cardId));
+            return true;
+          },
         });
       }
       gameState.unmeekCard(BigInt(cardId));
@@ -1303,7 +1339,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         const card = findMyCardById(cardId);
         undoStack.push({
           description: `Added ${color} counter to ${card?.cardName || 'card'}`,
-          reverseAction: () => gameState.removeCounter(BigInt(cardId), color),
+          reverseAction: () => {
+            if (!lookupForUndo(cardId)) return false;
+            gameState.removeCounter(BigInt(cardId), color);
+            return true;
+          },
         });
       }
       gameState.addCounter(BigInt(cardId), color);
@@ -1313,7 +1353,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         const card = findMyCardById(cardId);
         undoStack.push({
           description: `Removed ${color} counter from ${card?.cardName || 'card'}`,
-          reverseAction: () => gameState.addCounter(BigInt(cardId), color),
+          reverseAction: () => {
+            if (!lookupForUndo(cardId)) return false;
+            gameState.addCounter(BigInt(cardId), color);
+            return true;
+          },
         });
       }
       gameState.removeCounter(BigInt(cardId), color);
@@ -1321,12 +1365,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     shuffleCardIntoDeck: (cardId) => {
       if (undoStack) {
         const card = findMyCardById(cardId);
-        const fromZone = card?.zone;
-        if (card && fromZone && fromZone !== 'deck') {
-          const prevOwnerId = String(card.ownerId);
+        if (card && card.zone !== 'deck') {
+          const ownerId = String(card.ownerId);
+          const captured: Captured = {
+            cardId, fromZone: card.zone, prevOwnerId: ownerId,
+            posX: card.posX, posY: card.posY,
+            expectedZone: 'deck', expectedOwnerId: ownerId,
+          };
           undoStack.push({
             description: `Shuffled ${card.cardName || 'card'} into deck`,
-            reverseAction: () => gameState.moveCard(BigInt(cardId), fromZone, undefined, card.posX, card.posY, prevOwnerId),
+            reverseAction: makeReverseAction({ captured, lookup: lookupForUndo, move: undoMove }),
           });
         }
       }
@@ -1340,12 +1388,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     moveCardToTopOfDeck: (cardId) => {
       if (undoStack) {
         const card = findMyCardById(cardId);
-        const fromZone = card?.zone;
-        if (card && fromZone && fromZone !== 'deck') {
-          const prevOwnerId = String(card.ownerId);
+        if (card && card.zone !== 'deck') {
+          const ownerId = String(card.ownerId);
+          const captured: Captured = {
+            cardId, fromZone: card.zone, prevOwnerId: ownerId,
+            posX: card.posX, posY: card.posY,
+            expectedZone: 'deck', expectedOwnerId: ownerId,
+          };
           undoStack.push({
             description: `Moved ${card.cardName || 'card'} to top of deck`,
-            reverseAction: () => gameState.moveCard(BigInt(cardId), fromZone, undefined, card.posX, card.posY, prevOwnerId),
+            reverseAction: makeReverseAction({ captured, lookup: lookupForUndo, move: undoMove }),
           });
         }
       }
@@ -1354,15 +1406,25 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     moveCardToBottomOfDeck: (cardId) => {
       if (undoStack) {
         const card = findMyCardById(cardId);
-        const fromZone = card?.zone;
-        if (card && fromZone) {
-          // When the card is already in the deck (e.g. dragged out of a peek/look
-          // modal), the reverse action sends it back to the top — the position
-          // that matches where the user was peeking.
-          const prevOwnerId = String(card.ownerId);
+        if (card) {
+          // The card ends up in the deck either way, so the guard checks it is
+          // still in 'deck'. When it was already in the deck (e.g. dragged out
+          // of a peek/look modal), the reverse sends it back to the top — the
+          // position that matches where the user was peeking.
+          const fromZone = card.zone;
+          const ownerId = String(card.ownerId);
+          const captured: Captured = {
+            cardId, fromZone, prevOwnerId: ownerId,
+            posX: card.posX, posY: card.posY,
+            expectedZone: 'deck', expectedOwnerId: ownerId,
+          };
           const reverseAction = fromZone === 'deck'
-            ? () => gameState.moveCardToTopOfDeck(BigInt(cardId))
-            : () => gameState.moveCard(BigInt(cardId), fromZone, undefined, card.posX, card.posY, prevOwnerId);
+            ? () => {
+                if (!reverseIsSafe(captured, lookupForUndo(cardId))) return false;
+                gameState.moveCardToTopOfDeck(BigInt(cardId));
+                return true;
+              }
+            : makeReverseAction({ captured, lookup: lookupForUndo, move: undoMove });
           undoStack.push({
             description: `Moved ${card.cardName || 'card'} to bottom of deck`,
             reverseAction,
@@ -1498,6 +1560,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             undoStack.push({
               description: `Played all Lost Souls via ${sourceName}`,
               reverseAction: () => {
+                // Guard per soul: only restore souls still sitting in
+                // land-of-bondage under the same owner (i.e. still where
+                // play_all_lost_souls left them). Refuse entirely if none are.
+                const safe = reverseEntries.filter(e =>
+                  reverseIsSafe(
+                    { expectedZone: 'land-of-bondage', expectedOwnerId: e.ownerId },
+                    lookupForUndo(String(e.id)),
+                  ),
+                );
+                if (safe.length === 0) return false;
                 // Group by (ownerId, zone) so each affected deck gets exactly
                 // one shuffle. shuffle_card_into_deck routes by
                 // originalOwnerId — works for opponent cards without consent —
@@ -1507,7 +1579,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 // trigger. soul-deck groups can't auto-shuffle (no per-player
                 // soul-deck shuffle reducer exists), so just moveCard them.
                 const groups = new Map<string, typeof reverseEntries>();
-                for (const e of reverseEntries) {
+                for (const e of safe) {
                   const key = `${e.ownerId}:${e.zone}`;
                   const list = groups.get(key) ?? [];
                   list.push(e);
@@ -1526,6 +1598,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     }
                   }
                 }
+                return true;
               },
             });
           }
@@ -1608,12 +1681,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       moveCardToTopOfDeck: (id) => {
         if (undoStack) {
           const card = findMyCardById(id);
-          const fromZone = card?.zone;
-          if (card && fromZone && fromZone !== 'deck') {
-            const prevOwnerId = String(card.ownerId);
+          if (card && card.zone !== 'deck') {
+            const ownerId = String(card.ownerId);
+            const captured: Captured = {
+              cardId: id, fromZone: card.zone, prevOwnerId: ownerId,
+              posX: card.posX, posY: card.posY,
+              expectedZone: 'deck', expectedOwnerId: ownerId,
+            };
             undoStack.push({
               description: `Moved ${card.cardName || 'card'} to top of deck`,
-              reverseAction: () => gameState.moveCard(BigInt(id), fromZone, undefined, card.posX, card.posY, prevOwnerId),
+              reverseAction: makeReverseAction({ captured, lookup: lookupForUndo, move: undoMove }),
             });
           }
         }
@@ -1622,12 +1699,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       moveCardToBottomOfDeck: (id) => {
         if (undoStack) {
           const card = findMyCardById(id);
-          const fromZone = card?.zone;
-          if (card && fromZone) {
-            const prevOwnerId = String(card.ownerId);
+          if (card) {
+            const fromZone = card.zone;
+            const ownerId = String(card.ownerId);
+            const captured: Captured = {
+              cardId: id, fromZone, prevOwnerId: ownerId,
+              posX: card.posX, posY: card.posY,
+              expectedZone: 'deck', expectedOwnerId: ownerId,
+            };
             const reverseAction = fromZone === 'deck'
-              ? () => gameState.moveCardToTopOfDeck(BigInt(id))
-              : () => gameState.moveCard(BigInt(id), fromZone, undefined, card.posX, card.posY, prevOwnerId);
+              ? () => {
+                  if (!reverseIsSafe(captured, lookupForUndo(id))) return false;
+                  gameState.moveCardToTopOfDeck(BigInt(id));
+                  return true;
+                }
+              : makeReverseAction({ captured, lookup: lookupForUndo, move: undoMove });
             undoStack.push({
               description: `Moved ${card.cardName || 'card'} to bottom of deck`,
               reverseAction,
@@ -1640,12 +1726,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       shuffleCardIntoDeck: (id) => {
         if (undoStack) {
           const card = findMyCardById(id);
-          const fromZone = card?.zone;
-          if (card && fromZone && fromZone !== 'deck') {
-            const prevOwnerId = String(card.ownerId);
+          if (card && card.zone !== 'deck') {
+            const ownerId = String(card.ownerId);
+            const captured: Captured = {
+              cardId: id, fromZone: card.zone, prevOwnerId: ownerId,
+              posX: card.posX, posY: card.posY,
+              expectedZone: 'deck', expectedOwnerId: ownerId,
+            };
             undoStack.push({
               description: `Shuffled ${card.cardName || 'card'} into deck`,
-              reverseAction: () => gameState.moveCard(BigInt(id), fromZone, undefined, card.posX, card.posY, prevOwnerId),
+              reverseAction: makeReverseAction({ captured, lookup: lookupForUndo, move: undoMove }),
             });
           }
         }
@@ -1668,14 +1758,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             undoStack.push({
               description: desc,
               reverseAction: () => {
-                // Put replacements back onto the deck (top), then send each
-                // exchange card back to its source zone with its original owner.
+                // Best-effort: put surviving replacements back onto the deck
+                // (top), then send each exchange card still sitting in the deck
+                // back to its source zone with its original owner.
+                let any = false;
                 for (const rid of replacementIds) {
+                  if (!lookupForUndo(rid)) continue;
                   gameState.moveCardToTopOfDeck(BigInt(rid));
+                  any = true;
                 }
                 for (const o of originals) {
+                  if (!reverseIsSafe({ expectedZone: 'deck', expectedOwnerId: o.ownerId }, lookupForUndo(o.id))) continue;
                   gameState.moveCard(BigInt(o.id), o.zone, undefined, o.posX, o.posY, o.ownerId);
+                  any = true;
                 }
+                return any;
               },
             });
           }
@@ -2244,7 +2341,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               ? (gameState.opponentPlayer ? String(gameState.opponentPlayer.id) : '')
               : (gameState.myPlayer ? String(gameState.myPlayer.id) : ''))
             : (gameState.myPlayer ? String(gameState.myPlayer.id) : '');
-          recordOpponentCardUndo(id);
+          recordOpponentCardUndo(id, String(toZone), newOwnerId);
           moveOpponentCard(
             BigInt(approvedSearchRequest.id),
             BigInt(id),
@@ -2291,7 +2388,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 : (gameState.myPlayer ? String(gameState.myPlayer.id) : '');
               for (const id of ids) {
                 const p = positions[id];
-                recordOpponentCardUndo(id);
+                recordOpponentCardUndo(id, String(toZone), newOwnerId);
                 if (!p) {
                   moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone), undefined, undefined, newOwnerId);
                   continue;
@@ -2303,7 +2400,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             }
           }
           for (const id of ids) {
-            recordOpponentCardUndo(id);
+            recordOpponentCardUndo(id, String(toZone));
             moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone));
           }
         };
@@ -6935,7 +7032,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             cards={zoneCards}
             onMoveCard={(cardId, action) => {
               const reqId = BigInt(approvedSearchRequest.id);
-              recordOpponentCardUndo(cardId);
+              const destZone = action === 'discard' ? 'discard' : action === 'banish' ? 'banish' : 'deck';
+              recordOpponentCardUndo(cardId, destZone);
               if (action === 'discard') {
                 moveOpponentCard(reqId, BigInt(cardId), 'discard');
               } else if (action === 'banish') {
@@ -6952,7 +7050,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             onMoveCardsBatch={(cardIds, action) => {
               const reqId = BigInt(approvedSearchRequest.id);
               for (const cardId of cardIds) {
-                recordOpponentCardUndo(cardId);
+                const destZone = action === 'discard' ? 'discard' : action === 'banish' ? 'banish' : 'deck';
+                recordOpponentCardUndo(cardId, destZone);
                 if (action === 'discard') {
                   moveOpponentCard(reqId, BigInt(cardId), 'discard');
                 } else if (action === 'banish') {
