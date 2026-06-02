@@ -13,8 +13,9 @@ import {
 //   - a reachable, healthy SpacetimeDB dev module
 //
 // The "watch a live game" tests keep a real host browser context open for the
-// duration so the game stays in `waiting` (the host-abandoned redirect fires
-// the moment the creator disconnects).
+// duration so the game stays in `waiting`. (When the host context closes, the
+// server only finishes the abandoned game after a ~30s disconnect grace window,
+// which the host-abandoned test budgets for.)
 
 test.describe.configure({ mode: "serial" });
 
@@ -141,6 +142,95 @@ test.describe("spectator mode", () => {
       await viewerCtx?.close();
       await hostCtx?.close();
       await cleanupPlayer(viewer);
+      await cleanupPlayer(host);
+    }
+  });
+
+  test("spectator is redirected to /play when the host abandons the lobby", async ({
+    browser,
+  }) => {
+    // The server only finishes the abandoned waiting game after the host's
+    // 30s disconnect grace window expires (clientDisconnected schedules a
+    // DisconnectTimeout; closing the context may not fire a clean leave_game).
+    // So the redirect can take ~30s+ — budget the whole test generously.
+    test.setTimeout(120_000);
+    requireSeed();
+    const host = await seedPlayer("host");
+    let hostCtx: BrowserContext | null = null;
+    let watchCtx: BrowserContext | null = null;
+    try {
+      hostCtx = await browser.newContext();
+      const hostPage = await hostCtx.newPage();
+      await login(hostPage, host);
+      const code = await hostGame(hostPage);
+
+      watchCtx = await browser.newContext();
+      const watchPage = await watchCtx.newPage();
+      await watchPage.goto(`/play/spectate/${code}`);
+      await expect(watchPage.getByText("SPECTATING")).toBeVisible({
+        timeout: 20_000,
+      });
+
+      // Closing the host context drops the only player connection. The server
+      // immediately flips a `waiting` game to `finished`, and the spectator
+      // client reacts by toasting "Host left the lobby" and redirecting to /play.
+      await hostCtx.close();
+      hostCtx = null;
+
+      await expect(watchPage).toHaveURL(/\/play(\?|$)/, { timeout: 45_000 });
+    } finally {
+      await watchCtx?.close();
+      await hostCtx?.close();
+      await cleanupPlayer(host);
+    }
+  });
+
+  test("host's spectator count tracks multiple spectators joining and leaving", async ({
+    browser,
+  }) => {
+    // Two spectator contexts plus the join/leave propagation exceed the default.
+    test.setTimeout(90_000);
+    requireSeed();
+    const host = await seedPlayer("host");
+    let hostCtx: BrowserContext | null = null;
+    let watchCtxA: BrowserContext | null = null;
+    let watchCtxB: BrowserContext | null = null;
+    try {
+      hostCtx = await browser.newContext();
+      const hostPage = await hostCtx.newPage();
+      await login(hostPage, host);
+      const code = await hostGame(hostPage);
+
+      // Two independent (anonymous) spectators watch the same game.
+      watchCtxA = await browser.newContext();
+      const watchPageA = await watchCtxA.newPage();
+      await watchPageA.goto(`/play/spectate/${code}`);
+      await expect(watchPageA.getByText("SPECTATING")).toBeVisible({
+        timeout: 20_000,
+      });
+
+      watchCtxB = await browser.newContext();
+      const watchPageB = await watchCtxB.newPage();
+      await watchPageB.goto(`/play/spectate/${code}`);
+      await expect(watchPageB.getByText("SPECTATING")).toBeVisible({
+        timeout: 20_000,
+      });
+
+      // Host's waiting-room debug line reflects both spectators.
+      await expect(hostPage.getByText(/spectators:\s*2/)).toBeVisible({
+        timeout: 20_000,
+      });
+
+      // One spectator leaves — the count decrements back to 1.
+      await watchCtxB.close();
+      watchCtxB = null;
+      await expect(hostPage.getByText(/spectators:\s*1/)).toBeVisible({
+        timeout: 20_000,
+      });
+    } finally {
+      await watchCtxA?.close();
+      await watchCtxB?.close();
+      await hostCtx?.close();
       await cleanupPlayer(host);
     }
   });
