@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, sanitizeImgFile } from "../utils";
-import { Deck, DeckCard, DeckStats, DeckZone } from "../types/deck";
+import { Deck, DeckCard, DeckStats, DeckZone, DeckVisibility } from "../types/deck";
 import { saveDeckAction, loadDeckByIdAction, DeckCardData } from "../../actions";
 import { CARD_BY_FULL_KEY } from "../data/cardIndex";
 
@@ -157,6 +157,8 @@ export function useDeckState(
           paragon: cloudDeck.paragon,
           folderId: cloudDeck.folder_id,
           isPublic: cloudDeck.is_public ?? false,
+          // Non-owners get a fresh copy, so their copy starts private.
+          visibility: isOwner ? (cloudDeck.visibility ?? "private") : "private",
           previewCard1: cloudDeck.preview_card_1 ?? null,
           previewCard2: cloudDeck.preview_card_2 ?? null,
           cards: cloudDeck.cards.map((dbCard: any) => {
@@ -533,6 +535,19 @@ export function useDeckState(
     setDeck((prevDeck) => ({
       ...prevDeck,
       isPublic,
+      visibility: isPublic ? "public" : "private",
+    }));
+  }, []);
+
+  /**
+   * Update three-state deck visibility (local state only — the server action
+   * setDeckVisibilityAction is called separately by the caller).
+   */
+  const setDeckVisibility = useCallback((visibility: DeckVisibility) => {
+    setDeck((prevDeck) => ({
+      ...prevDeck,
+      visibility,
+      isPublic: visibility === "unlisted" || visibility === "public",
     }));
   }, []);
 
@@ -561,6 +576,7 @@ export function useDeckState(
       format: undefined,
       folderId: undefined,
       isPublic: false,
+      visibility: "private",
       previewCard1: null,
       previewCard2: null,
       createdAt: new Date(),
@@ -662,6 +678,7 @@ export function useDeckState(
     setDeckFormat,
     setDeckParagon,
     setDeckPublic,
+    setDeckVisibility,
     setPreviewCards,
     clearDeck,
     newDeck,
@@ -719,6 +736,7 @@ function getDefaultDeck(): Deck {
     cards: [],
     description: "",
     format: undefined,
+    visibility: "private",
     createdAt: new Date(),
     updatedAt: new Date(),
   };

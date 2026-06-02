@@ -13,11 +13,12 @@ import {
   deleteFolderAction,
   moveDeckToFolderAction,
   loadDeckByIdAction,
-  toggleDeckPublicAction,
+  setDeckVisibilityAction,
   loadGlobalTagsAction,
   updateDeckPreviewCardsAction,
   DeckData,
   DeckCardData,
+  DeckVisibility,
   FolderData,
   GlobalTag,
 } from "../actions";
@@ -29,6 +30,22 @@ import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
+
+// Derive three-state visibility from a deck row (falls back to the is_public mirror).
+function deckVisibility(deck: DeckData): DeckVisibility {
+  return deck.visibility ?? (deck.is_public ? "public" : "private");
+}
+
+// Badge label + tailwind classes for a visibility state.
+function visibilityBadge(vis: DeckVisibility): { label: string; classes: string } {
+  if (vis === "public") {
+    return { label: "Public", classes: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300" };
+  }
+  if (vis === "unlisted") {
+    return { label: "Unlisted", classes: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300" };
+  }
+  return { label: "Private", classes: "bg-muted text-muted-foreground" };
+}
 
 // Helper function to normalize deck format display
 function formatDeckType(format?: string): string {
@@ -226,11 +243,13 @@ export default function MyDecksClient() {
     }
   }
 
-  async function handleTogglePublic(deckId: string, currentlyPublic: boolean) {
-    const result = await toggleDeckPublicAction(deckId, !currentlyPublic);
+  async function handleSetVisibility(deckId: string, visibility: DeckVisibility) {
+    const result = await setDeckVisibilityAction(deckId, visibility);
     if (result.success) {
       setDecks(decks.map(d =>
-        d.id === deckId ? { ...d, is_public: !currentlyPublic } : d
+        d.id === deckId
+          ? { ...d, visibility, is_public: visibility === "unlisted" || visibility === "public" }
+          : d
       ));
     } else if ((result as any).needsUsername) {
       setUsernameModalDeckId(deckId);
@@ -243,10 +262,10 @@ export default function MyDecksClient() {
     const deckId = usernameModalDeckId;
     setUsernameModalDeckId(null);
     if (deckId) {
-      const result = await toggleDeckPublicAction(deckId, true);
+      const result = await setDeckVisibilityAction(deckId, "public");
       if (result.success) {
         setDecks(prev => prev.map(d =>
-          d.id === deckId ? { ...d, is_public: true } : d
+          d.id === deckId ? { ...d, visibility: "public", is_public: true } : d
         ));
       } else {
         alert(result.error || "Failed to update deck visibility");
@@ -818,7 +837,7 @@ export default function MyDecksClient() {
                   onGeneratePDF={handleGeneratePDF}
                   onGenerateImage={handleGenerateImage}
                   onDownload={handleDownload}
-                  onTogglePublic={handleTogglePublic}
+                  onSetVisibility={handleSetVisibility}
                   onCopyLink={handleCopyLink}
                   onViewPublic={handleViewPublic}
                   onEditCover={(id) => setCoverPickerDeckId(id)}
@@ -839,7 +858,7 @@ export default function MyDecksClient() {
                   onGeneratePDF={handleGeneratePDF}
                   onGenerateImage={handleGenerateImage}
                   onDownload={handleDownload}
-                  onTogglePublic={handleTogglePublic}
+                  onSetVisibility={handleSetVisibility}
                   onCopyLink={handleCopyLink}
                   onViewPublic={handleViewPublic}
                 />
@@ -1024,7 +1043,7 @@ function DeckCard({
   onGeneratePDF,
   onGenerateImage,
   onDownload,
-  onTogglePublic,
+  onSetVisibility,
   onCopyLink,
   onViewPublic,
   onEditCover,
@@ -1038,7 +1057,7 @@ function DeckCard({
   onGeneratePDF: (deckId: string) => void;
   onGenerateImage: (deckId: string) => void;
   onDownload: (deckId: string) => void;
-  onTogglePublic: (deckId: string, currentlyPublic: boolean) => void;
+  onSetVisibility: (deckId: string, visibility: DeckVisibility) => void;
   onCopyLink: (deckId: string) => void;
   onViewPublic: (deckId: string) => void;
   onEditCover: (deckId: string) => void;
@@ -1091,18 +1110,14 @@ function DeckCard({
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <h3 className="font-semibold text-lg truncate">{deck.name}</h3>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
-              deck.is_public
-                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                : "bg-muted text-muted-foreground"
-            }`}>
-              {deck.is_public ? "Public" : "Private"}
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${visibilityBadge(deckVisibility(deck)).classes}`}>
+              {visibilityBadge(deckVisibility(deck)).label}
             </span>
           </div>
           <DropdownMenu
             folders={folders}
             currentFolderId={deck.folder_id}
-            isPublic={!!deck.is_public}
+            visibility={deckVisibility(deck)}
             onEdit={() => onEdit(deck.id!)}
             onDelete={() => onDelete(deck.id!, deck.name)}
             onDuplicate={() => onDuplicate(deck.id!)}
@@ -1110,7 +1125,7 @@ function DeckCard({
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
             onGenerateImage={() => onGenerateImage(deck.id!)}
             onDownload={() => onDownload(deck.id!)}
-            onTogglePublic={() => onTogglePublic(deck.id!, !!deck.is_public)}
+            onSetVisibility={(v) => onSetVisibility(deck.id!, v)}
             onCopyLink={() => onCopyLink(deck.id!)}
             onViewPublic={() => onViewPublic(deck.id!)}
           />
@@ -1182,7 +1197,7 @@ function DeckListItem({
   onGeneratePDF,
   onGenerateImage,
   onDownload,
-  onTogglePublic,
+  onSetVisibility,
   onCopyLink,
   onViewPublic,
 }: {
@@ -1195,7 +1210,7 @@ function DeckListItem({
   onGeneratePDF: (deckId: string) => void;
   onGenerateImage: (deckId: string) => void;
   onDownload: (deckId: string) => void;
-  onTogglePublic: (deckId: string, currentlyPublic: boolean) => void;
+  onSetVisibility: (deckId: string, visibility: DeckVisibility) => void;
   onCopyLink: (deckId: string) => void;
   onViewPublic: (deckId: string) => void;
 }) {
@@ -1210,12 +1225,8 @@ function DeckListItem({
               {formatDeckType(deck.format)}
             </span>
             <h3 className="font-semibold truncate text-sm md:text-base">{deck.name}</h3>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
-              deck.is_public
-                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                : "bg-muted text-muted-foreground"
-            }`}>
-              {deck.is_public ? "Public" : "Private"}
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${visibilityBadge(deckVisibility(deck)).classes}`}>
+              {visibilityBadge(deckVisibility(deck)).label}
             </span>
           </div>
           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground md:hidden">
@@ -1267,7 +1278,7 @@ function DeckListItem({
           <DropdownMenu
             folders={folders}
             currentFolderId={deck.folder_id}
-            isPublic={!!deck.is_public}
+            visibility={deckVisibility(deck)}
             onEdit={() => onEdit(deck.id!)}
             onDelete={() => onDelete(deck.id!, deck.name)}
             onDuplicate={() => onDuplicate(deck.id!)}
@@ -1275,7 +1286,7 @@ function DeckListItem({
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
             onGenerateImage={() => onGenerateImage(deck.id!)}
             onDownload={() => onDownload(deck.id!)}
-            onTogglePublic={() => onTogglePublic(deck.id!, !!deck.is_public)}
+            onSetVisibility={(v) => onSetVisibility(deck.id!, v)}
             onCopyLink={() => onCopyLink(deck.id!)}
             onViewPublic={() => onViewPublic(deck.id!)}
           />
@@ -1289,7 +1300,7 @@ function DeckListItem({
 function DropdownMenu({
   folders,
   currentFolderId,
-  isPublic,
+  visibility,
   onEdit,
   onDelete,
   onDuplicate,
@@ -1297,13 +1308,13 @@ function DropdownMenu({
   onGeneratePDF,
   onGenerateImage,
   onDownload,
-  onTogglePublic,
+  onSetVisibility,
   onCopyLink,
   onViewPublic,
 }: {
   folders: FolderData[];
   currentFolderId?: string | null;
-  isPublic: boolean;
+  visibility: DeckVisibility;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -1311,7 +1322,7 @@ function DropdownMenu({
   onGeneratePDF: () => void;
   onGenerateImage: () => void;
   onDownload: () => void;
-  onTogglePublic: () => void;
+  onSetVisibility: (visibility: DeckVisibility) => void;
   onCopyLink: () => void;
   onViewPublic: () => void;
 }) {
@@ -1465,30 +1476,49 @@ function DropdownMenu({
 
             {/* Sharing section */}
             <div className="border-t border-border my-1"></div>
-            <button
-              onClick={() => {
-                onTogglePublic();
-                setIsOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
-            >
-              {isPublic ? (
-                <>
-                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  Make Private
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Make Public
-                </>
-              )}
-            </button>
-            {isPublic && (
+            <div className="px-4 pt-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Visibility
+            </div>
+            {(["private", "unlisted", "public"] as DeckVisibility[]).map((v) => {
+              const active = visibility === v;
+              const label = v === "public" ? "Public" : v === "unlisted" ? "Unlisted" : "Private";
+              return (
+                <button
+                  key={v}
+                  onClick={() => onSetVisibility(v)}
+                  className={`w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2 ${active ? "bg-muted/60" : ""}`}
+                  aria-pressed={active}
+                >
+                  {v === "private" && (
+                    <svg className={`w-4 h-4 ${active ? "text-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  )}
+                  {v === "unlisted" && (
+                    <svg className={`w-4 h-4 ${active ? "text-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  )}
+                  {v === "public" && (
+                    <svg className={`w-4 h-4 ${active ? "text-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                  <span className="flex-1">{label}</span>
+                  {active && (
+                    <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+            {visibility === "unlisted" && (
+              <p className="px-4 py-1 text-xs text-muted-foreground">
+                Anyone with the link can view. Hidden from community search.
+              </p>
+            )}
+            {visibility !== "private" && (
               <>
                 <button
                   onClick={() => {
@@ -1514,7 +1544,7 @@ function DropdownMenu({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
-                  View Public Page
+                  View Deck Page
                 </button>
               </>
             )}

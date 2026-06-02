@@ -3,6 +3,14 @@ import { Card } from "../utils";
 export type DeckZone = "main" | "reserve" | "maybeboard";
 
 /**
+ * Three-state deck visibility (mirrors the DB `visibility` column):
+ * - private: owner only
+ * - unlisted: anyone with the link can view; hidden from community search
+ * - public: viewable by link AND listed in community search
+ */
+export type DeckVisibility = "private" | "unlisted" | "public";
+
+/**
  * Represents a card in a deck with its quantity and zone.
  * - main: counts toward legality, copy limits, paragon rules
  * - reserve: sideboard
@@ -33,8 +41,10 @@ export interface Deck {
   paragon?: string;
   /** Optional folder ID for organization */
   folderId?: string | null;
-  /** Whether this deck is publicly visible */
+  /** Whether this deck is viewable by anyone with the link (unlisted or public). Derived mirror of `visibility`. */
   isPublic?: boolean;
+  /** Three-state visibility: private / unlisted / public */
+  visibility?: DeckVisibility;
   /** User-selected cover card img files for community listing thumbnails */
   previewCard1?: string | null;
   previewCard2?: string | null;
