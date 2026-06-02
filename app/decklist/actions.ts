@@ -6,6 +6,12 @@ import { checkDeck } from "@/utils/deckcheck";
 import type { DeckCheckCard, DeckCheckResult } from "@/utils/deckcheck/types";
 import type { DeckZone } from "./card-search/types/deck";
 
+// Three-state deck visibility. Mirrors the `visibility` column on `decks`.
+//   private  -> owner only
+//   unlisted -> anyone with the link can view; hidden from community/sitemap
+//   public   -> viewable by link AND listed in community search
+export type DeckVisibility = "private" | "unlisted" | "public";
+
 // Types matching the database schema
 export interface DeckData {
   id?: string;
@@ -16,6 +22,7 @@ export interface DeckData {
   paragon?: string;
   folder_id?: string | null;
   is_public?: boolean;
+  visibility?: DeckVisibility;
   card_count?: number;
   preview_card_1?: string | null;
   preview_card_2?: string | null;
@@ -843,8 +850,15 @@ export async function deleteFolderAction(folderId: string) {
 /**
  * Toggle a deck's public/private status
  */
-export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) {
+export async function setDeckVisibilityAction(
+  deckId: string,
+  visibility: DeckVisibility,
+) {
   try {
+    if (!["private", "unlisted", "public"].includes(visibility)) {
+      return { success: false, error: "Invalid visibility" };
+    }
+
     const supabase = await createClient();
 
     const {
@@ -859,8 +873,11 @@ export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) 
       };
     }
 
-    // If making public, check that user has a username set
-    if (isPublic) {
+    const isShared = visibility === "unlisted" || visibility === "public";
+
+    // Listing a deck publicly requires a username (shown as attribution in the
+    // community gallery). Unlisted/private don't require one.
+    if (visibility === "public") {
       const { data: profile } = await supabase
         .from("profiles")
         .select("username")
@@ -872,11 +889,12 @@ export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) 
       }
     }
 
-    // Build the update payload
-    const updatePayload: Record<string, unknown> = { is_public: isPublic };
+    // Writing `visibility` fires the trigger that mirrors `is_public`.
+    const updatePayload: Record<string, unknown> = { visibility };
 
-    // When making public, auto-set default preview cards if none are set
-    if (isPublic) {
+    // When the deck becomes viewable (unlisted or public), auto-set default
+    // preview cards if none are set — they power the share-link OG image.
+    if (isShared) {
       const { data: existingDeck } = await supabase
         .from("decks")
         .select("preview_card_1, preview_card_2")
@@ -907,7 +925,7 @@ export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) 
       .eq("user_id", user.id);
 
     if (error) {
-      console.error("Error toggling deck public:", error);
+      console.error("Error setting deck visibility:", error);
       return {
         success: false,
         error: "Failed to update deck visibility",
@@ -919,17 +937,29 @@ export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) 
     revalidateTag("public-decks-list");
     revalidateTag(`public-deck:${deckId}`);
 
-    return {
-      success: true,
-      message: isPublic ? "Deck is now public" : "Deck is now private",
-    };
+    const message =
+      visibility === "public"
+        ? "Deck is now public"
+        : visibility === "unlisted"
+          ? "Deck is now unlisted — anyone with the link can view it"
+          : "Deck is now private";
+
+    return { success: true, visibility, message };
   } catch (error) {
-    console.error("Error in toggleDeckPublicAction:", error);
+    console.error("Error in setDeckVisibilityAction:", error);
     return {
       success: false,
       error: "An unexpected error occurred",
     };
   }
+}
+
+/**
+ * Backward-compatible binary toggle. Maps the old public/private boolean onto
+ * the three-state visibility model. New UI should call setDeckVisibilityAction.
+ */
+export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) {
+  return setDeckVisibilityAction(deckId, isPublic ? "public" : "private");
 }
 
 /**
@@ -1287,7 +1317,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
     let query = supabase
       .from("decks")
       .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, user_id, created_at, updated_at, is_legal", { count: "exact" })
-      .eq("is_public", true);
+      .eq("visibility", "public");
 
     if (tagFilteredDeckIds) {
       query = query.in("id", tagFilteredDeckIds);

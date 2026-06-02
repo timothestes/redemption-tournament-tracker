@@ -105,11 +105,11 @@ export async function searchDecksForTournamentAction(query: string) {
     .order("updated_at", { ascending: false })
     .limit(10);
 
-  // Search public decks (excluding own)
+  // Search public decks (excluding own; unlisted decks aren't discoverable here)
   const { data: publicDecks } = await supabase
     .from("decks")
     .select("id, name, format, card_count, preview_card_1, preview_card_2, is_public, user_id")
-    .eq("is_public", true)
+    .eq("visibility", "public")
     .neq("user_id", user.id)
     .ilike("name", `%${term}%`)
     .order("view_count", { ascending: false })
@@ -298,7 +298,7 @@ export async function publishTournamentDecklistsAction(
       // All copies still exist — just make them public again
       await admin
         .from("decks")
-        .update({ is_public: true })
+        .update({ visibility: "public" })
         .in("id", existingPublishedIds)
         .eq("user_id", REDEMPTIONCCG_USER_ID);
 
@@ -355,7 +355,7 @@ export async function publishTournamentDecklistsAction(
         preview_card_1: origDeck.preview_card_1 || null,
         preview_card_2: origDeck.preview_card_2 || null,
         card_count: origDeck.card_count || 0,
-        is_public: true,
+        visibility: "public",
         is_legal: origDeck.is_legal ?? null,
         deckcheck_issues: origDeck.deckcheck_issues ?? null,
       })

@@ -421,6 +421,7 @@ export default function CardSearchClient() {
     setDeckFormat,
     setDeckParagon,
     setDeckPublic,
+    setDeckVisibility,
     setPreviewCards,
     clearDeck,
     newDeck,
@@ -2587,6 +2588,7 @@ export default function CardSearchClient() {
             onDeckFormatChange={handleDeckFormatChange}
             onParagonChange={setDeckParagon}
             onDeckPublicChange={setDeckPublic}
+            onDeckVisibilityChange={setDeckVisibility}
             onSaveDeck={saveDeckToCloud}
             onAddCard={(cardName, cardSet, zone) => {
               // Find the card in the cards array
@@ -2683,6 +2685,7 @@ export default function CardSearchClient() {
               onDeckFormatChange={handleDeckFormatChange}
               onParagonChange={setDeckParagon}
               onDeckPublicChange={setDeckPublic}
+            onDeckVisibilityChange={setDeckVisibility}
               onSaveDeck={saveDeckToCloud}
               onAddCard={(cardName, cardSet, zone) => {
                 const card = cards.find(c => c.name === cardName && c.set === cardSet);

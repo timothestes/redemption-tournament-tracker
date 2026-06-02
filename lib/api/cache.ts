@@ -167,7 +167,7 @@ async function loadListFresh(params: ListParams): Promise<ListPayload> {
   let q = supabase
     .from("decks")
     .select(DECK_COLUMNS, { count: "exact" })
-    .eq("is_public", true);
+    .eq("visibility", "public");
 
   if (params.format) {
     if (params.format === "Type 1") {
@@ -202,7 +202,7 @@ async function loadListFresh(params: ListParams): Promise<ListPayload> {
     let countQ = supabase
       .from("decks")
       .select("id", { head: true, count: "exact" })
-      .eq("is_public", true);
+      .eq("visibility", "public");
     if (params.format) {
       countQ = params.format === "Type 1"
         ? countQ.or("format.is.null,format.eq.Type 1")

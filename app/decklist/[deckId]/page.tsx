@@ -33,9 +33,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const previewImg = deck.preview_card_1 || mainCards[0]?.card_img_file;
   const ogImage = getCardImageUrlOrNull(previewImg) ?? undefined;
 
+  // Unlisted decks are viewable by link but must not be indexed by search
+  // engines. Public decks remain indexable.
+  const isUnlisted = deck.visibility === "unlisted";
+
   return {
     title: `${deck.name} - Redemption Decklist`,
     description,
+    ...(isUnlisted && { robots: { index: false, follow: false } }),
     openGraph: {
       title: deck.name,
       description,

@@ -59,11 +59,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // Dynamic routes: public community decks
+  // Dynamic routes: public community decks (unlisted decks are excluded)
   const { data: decks } = await supabase
     .from("decks")
     .select("id, updated_at")
-    .eq("is_public", true)
+    .eq("visibility", "public")
     .order("updated_at", { ascending: false })
     .limit(1000);
 
