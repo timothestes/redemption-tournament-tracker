@@ -28,6 +28,7 @@ import FolderModal from "./FolderModal";
 import UsernameModal from "./UsernameModal";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
+import ShareDeckModal from "../card-search/components/ShareDeckModal";
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
 
@@ -116,6 +117,7 @@ export default function MyDecksClient() {
   const [imageDeck, setImageDeck] = useState<Deck | null>(null); // For image generation modal
   const [imageDeckLegal, setImageDeckLegal] = useState<boolean | null>(null);
   const [usernameModalDeckId, setUsernameModalDeckId] = useState<string | null>(null);
+  const [shareDeckId, setShareDeckId] = useState<string | null>(null);
   const [coverPickerDeckId, setCoverPickerDeckId] = useState<string | null>(null);
 
   // Tag filter state
@@ -271,15 +273,6 @@ export default function MyDecksClient() {
         alert(result.error || "Failed to update deck visibility");
       }
     }
-  }
-
-  function handleCopyLink(deckId: string) {
-    const url = `${window.location.origin}/decklist/${deckId}`;
-    navigator.clipboard.writeText(url);
-  }
-
-  function handleViewPublic(deckId: string) {
-    router.push(`/decklist/${deckId}`);
   }
 
   async function loadDeckForModal(deckId: string): Promise<{ deck: Deck; isLegal: boolean | null } | null> {
@@ -837,9 +830,7 @@ export default function MyDecksClient() {
                   onGeneratePDF={handleGeneratePDF}
                   onGenerateImage={handleGenerateImage}
                   onDownload={handleDownload}
-                  onSetVisibility={handleSetVisibility}
-                  onCopyLink={handleCopyLink}
-                  onViewPublic={handleViewPublic}
+                  onShare={(id) => setShareDeckId(id)}
                   onEditCover={(id) => setCoverPickerDeckId(id)}
                 />
               ))}
@@ -858,9 +849,7 @@ export default function MyDecksClient() {
                   onGeneratePDF={handleGeneratePDF}
                   onGenerateImage={handleGenerateImage}
                   onDownload={handleDownload}
-                  onSetVisibility={handleSetVisibility}
-                  onCopyLink={handleCopyLink}
-                  onViewPublic={handleViewPublic}
+                  onShare={(id) => setShareDeckId(id)}
                 />
               ))}
             </div>
@@ -919,6 +908,21 @@ export default function MyDecksClient() {
           isLegal={imageDeckLegal}
         />
       )}
+
+      {/* Share / visibility modal */}
+      {(() => {
+        const shareDeck = decks.find(d => d.id === shareDeckId);
+        return shareDeck ? (
+          <ShareDeckModal
+            open={true}
+            onOpenChange={(open) => { if (!open) setShareDeckId(null); }}
+            deckId={shareDeck.id!}
+            deckName={shareDeck.name}
+            visibility={deckVisibility(shareDeck)}
+            onSetVisibility={(v) => handleSetVisibility(shareDeck.id!, v)}
+          />
+        ) : null;
+      })()}
 
       {/* Username Modal */}
       {usernameModalDeckId && (
@@ -1043,9 +1047,7 @@ function DeckCard({
   onGeneratePDF,
   onGenerateImage,
   onDownload,
-  onSetVisibility,
-  onCopyLink,
-  onViewPublic,
+  onShare,
   onEditCover,
 }: {
   deck: DeckData;
@@ -1057,9 +1059,7 @@ function DeckCard({
   onGeneratePDF: (deckId: string) => void;
   onGenerateImage: (deckId: string) => void;
   onDownload: (deckId: string) => void;
-  onSetVisibility: (deckId: string, visibility: DeckVisibility) => void;
-  onCopyLink: (deckId: string) => void;
-  onViewPublic: (deckId: string) => void;
+  onShare: (deckId: string) => void;
   onEditCover: (deckId: string) => void;
 }) {
   const updatedDate = formatDateTime(deck.updated_at!);
@@ -1117,7 +1117,6 @@ function DeckCard({
           <DropdownMenu
             folders={folders}
             currentFolderId={deck.folder_id}
-            visibility={deckVisibility(deck)}
             onEdit={() => onEdit(deck.id!)}
             onDelete={() => onDelete(deck.id!, deck.name)}
             onDuplicate={() => onDuplicate(deck.id!)}
@@ -1125,9 +1124,7 @@ function DeckCard({
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
             onGenerateImage={() => onGenerateImage(deck.id!)}
             onDownload={() => onDownload(deck.id!)}
-            onSetVisibility={(v) => onSetVisibility(deck.id!, v)}
-            onCopyLink={() => onCopyLink(deck.id!)}
-            onViewPublic={() => onViewPublic(deck.id!)}
+            onShare={() => onShare(deck.id!)}
           />
         </div>
 
@@ -1197,9 +1194,7 @@ function DeckListItem({
   onGeneratePDF,
   onGenerateImage,
   onDownload,
-  onSetVisibility,
-  onCopyLink,
-  onViewPublic,
+  onShare,
 }: {
   deck: DeckData;
   folders: FolderData[];
@@ -1210,9 +1205,7 @@ function DeckListItem({
   onGeneratePDF: (deckId: string) => void;
   onGenerateImage: (deckId: string) => void;
   onDownload: (deckId: string) => void;
-  onSetVisibility: (deckId: string, visibility: DeckVisibility) => void;
-  onCopyLink: (deckId: string) => void;
-  onViewPublic: (deckId: string) => void;
+  onShare: (deckId: string) => void;
 }) {
   const updatedDate = formatDateTime(deck.updated_at!);
 
@@ -1278,7 +1271,6 @@ function DeckListItem({
           <DropdownMenu
             folders={folders}
             currentFolderId={deck.folder_id}
-            visibility={deckVisibility(deck)}
             onEdit={() => onEdit(deck.id!)}
             onDelete={() => onDelete(deck.id!, deck.name)}
             onDuplicate={() => onDuplicate(deck.id!)}
@@ -1286,9 +1278,7 @@ function DeckListItem({
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
             onGenerateImage={() => onGenerateImage(deck.id!)}
             onDownload={() => onDownload(deck.id!)}
-            onSetVisibility={(v) => onSetVisibility(deck.id!, v)}
-            onCopyLink={() => onCopyLink(deck.id!)}
-            onViewPublic={() => onViewPublic(deck.id!)}
+            onShare={() => onShare(deck.id!)}
           />
         </div>
       </div>
@@ -1300,7 +1290,6 @@ function DeckListItem({
 function DropdownMenu({
   folders,
   currentFolderId,
-  visibility,
   onEdit,
   onDelete,
   onDuplicate,
@@ -1308,13 +1297,10 @@ function DropdownMenu({
   onGeneratePDF,
   onGenerateImage,
   onDownload,
-  onSetVisibility,
-  onCopyLink,
-  onViewPublic,
+  onShare,
 }: {
   folders: FolderData[];
   currentFolderId?: string | null;
-  visibility: DeckVisibility;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -1322,14 +1308,11 @@ function DropdownMenu({
   onGeneratePDF: () => void;
   onGenerateImage: () => void;
   onDownload: () => void;
-  onSetVisibility: (visibility: DeckVisibility) => void;
-  onCopyLink: () => void;
-  onViewPublic: () => void;
+  onShare: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [submenuOnLeft, setSubmenuOnLeft] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -1476,78 +1459,18 @@ function DropdownMenu({
 
             {/* Sharing section */}
             <div className="border-t border-border my-1"></div>
-            <div className="px-4 pt-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Visibility
-            </div>
-            {(["private", "unlisted", "public"] as DeckVisibility[]).map((v) => {
-              const active = visibility === v;
-              const label = v === "public" ? "Public" : v === "unlisted" ? "Unlisted" : "Private";
-              return (
-                <button
-                  key={v}
-                  onClick={() => onSetVisibility(v)}
-                  className={`w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2 ${active ? "bg-muted/60" : ""}`}
-                  aria-pressed={active}
-                >
-                  {v === "private" && (
-                    <svg className={`w-4 h-4 ${active ? "text-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  )}
-                  {v === "unlisted" && (
-                    <svg className={`w-4 h-4 ${active ? "text-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
-                  )}
-                  {v === "public" && (
-                    <svg className={`w-4 h-4 ${active ? "text-primary" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  )}
-                  <span className="flex-1">{label}</span>
-                  {active && (
-                    <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-              );
-            })}
-            {visibility === "unlisted" && (
-              <p className="px-4 py-1 text-xs text-muted-foreground">
-                Anyone with the link can view. Hidden from community search.
-              </p>
-            )}
-            {visibility !== "private" && (
-              <>
-                <button
-                  onClick={() => {
-                    onCopyLink();
-                    setLinkCopied(true);
-                    setTimeout(() => setLinkCopied(false), 2000);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  {linkCopied ? "Link Copied!" : "Copy Share Link"}
-                </button>
-                <button
-                  onClick={() => {
-                    onViewPublic();
-                    setIsOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  View Deck Page
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => {
+                onShare();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
+            >
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              Share…
+            </button>
 
             {/* Move to Folder submenu */}
             <div className="border-t border-border my-1"></div>
