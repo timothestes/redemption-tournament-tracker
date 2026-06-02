@@ -183,7 +183,7 @@ export function GameToolbar({
     ...(isMultiplayer && !isFinished ? [{
       icon: isMyTurn ? BookOpen : Skull,
       key: 'my-initiative',
-      label: 'My init',
+      label: hasPendingInitiative ? 'Pending...' : 'My init',
       onClick: onRequestInitiative ?? (() => {}),
       shortcut: '',
       disabled: !!hasPendingInitiative,

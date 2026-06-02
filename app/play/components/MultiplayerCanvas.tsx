@@ -5,7 +5,8 @@ import { Stage, Layer, Rect, Text, Group, Image as KonvaImage } from 'react-konv
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 
-import { useGameState } from '../hooks/useGameState';
+import { useGameState, useSpectatorGameState } from '../hooks/useGameState';
+import { useSpacetimeDB } from 'spacetimedb/react';
 import { useSpreadHand } from '../contexts/SpreadHandContext';
 import {
   calculateMultiplayerLayout,
@@ -202,6 +203,78 @@ function describeRequesterAction(action: string, paramsJson: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Hand-card visibility predicate
+// ---------------------------------------------------------------------------
+
+type ViewerKind = 'self' | 'opponent' | 'spectator';
+
+/**
+ * Decide whether a hand card should render face-up for a given viewer.
+ * - 'self': always face-up (you see your own hand).
+ * - 'opponent': face-up iff owner.handRevealed AND the card is in the snapshot,
+ *   OR the card has an active revealExpiresAt (per-card flash).
+ * - 'spectator': face-up iff owner.shareHandWithSpectators, OR the card has
+ *   an active revealExpiresAt.
+ */
+export function isHandCardFaceVisible(
+  card: { id: bigint; revealExpiresAt?: { microsSinceUnixEpoch: bigint } | null },
+  viewerKind: ViewerKind,
+  ownerPlayer: { handRevealed: boolean; handRevealSnapshot: string; shareHandWithSpectators?: boolean } | null | undefined,
+  nowMicros: bigint,
+): boolean {
+  if (viewerKind === 'self') return true;
+  if (!ownerPlayer) return false;
+
+  const flashActive =
+    card.revealExpiresAt !== undefined &&
+    card.revealExpiresAt !== null &&
+    card.revealExpiresAt.microsSinceUnixEpoch > nowMicros;
+  if (flashActive) return true;
+
+  let snapshot: Set<string>;
+  try {
+    snapshot = new Set<string>((JSON.parse(ownerPlayer.handRevealSnapshot || '[]') as unknown[]).map(String));
+  } catch {
+    snapshot = new Set<string>();
+  }
+  const inSnapshot = snapshot.has(String(card.id));
+
+  if (viewerKind === 'opponent') {
+    return ownerPlayer.handRevealed && inSnapshot;
+  }
+  // spectator
+  return ownerPlayer.shareHandWithSpectators === true || inSnapshot;
+}
+
+/**
+ * Decide whether a FACE-DOWN in-play card's identity may be shown to the viewer
+ * (e.g. in the hover loupe). Face-up / actively-revealed cards are public and
+ * handled by the caller; this only governs cards that are face-down on the table.
+ * - 'player': sees their own face-down cards ('player1'), never the opponent's.
+ * - 'spectator': sees neither side's UNLESS that card's owner has opted to share
+ *   with spectators (the same consent flag as hand/reserve).
+ */
+export function isFaceDownInPlayCardVisible(
+  viewerKind: 'player' | 'spectator',
+  ownerId: string,
+  share: { myShareHand: boolean; oppShareHand: boolean },
+): boolean {
+  if (viewerKind === 'player') return ownerId === 'player1';
+  return ownerId === 'player1' ? share.myShareHand : share.oppShareHand;
+}
+
+/**
+ * Whether a double-click may toggle "meek" on a card. Only a player acting on
+ * their own card ('player1') may — spectators are strictly read-only.
+ */
+export function canViewerToggleMeek(
+  viewerKind: 'player' | 'spectator',
+  ownerId: string,
+): boolean {
+  return viewerKind === 'player' && ownerId === 'player1';
+}
+
+// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
@@ -229,14 +302,19 @@ interface MultiplayerCanvasProps {
    * awaiting-start → playing).
    */
   getImage: (url: string) => HTMLImageElement | null;
+  /** 'spectator' when mounted from /play/spectate/[code]. Defaults to 'player'. */
+  viewerKind?: 'player' | 'spectator';
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep }: MultiplayerCanvasProps) {
+export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep, viewerKind = 'player' }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible, isPreviewFlipped } = useCardPreview();
+  // Spectators may NEVER drag cards — even visually. Every `isDraggable` site
+  // ANDs against this flag.
+  const isSpectator = viewerKind === 'spectator';
 
   // ---- Container sizing (respects flex layout) ----
   const containerRef = useRef<HTMLDivElement>(null);
@@ -254,8 +332,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const fs = (virtualSize: number) => Math.max(virtualSize, MIN_TEXT_PX / safeScale);
   const fsGrowth = (virtualSize: number) => fs(virtualSize) / virtualSize;
 
+  // ---- Connection (for spectator-management reducer calls) ----
+  const spacetimeCtx = useSpacetimeDB() as any;
+  const conn = spacetimeCtx?.getConnection?.() ?? null;
+
   // ---- Game state ----
-  const gameState = useGameState(gameId);
+  // Both hooks must always be called (rules of hooks). Pass null to the unused
+  // one — its subscriptions will match zero rows when effectiveGameId === 0n.
+  const playerGameState = useGameState(viewerKind === 'spectator' ? 0n : gameId);
+  const spectatorGameState = useSpectatorGameState(viewerKind === 'spectator' ? gameId : null);
+  const gameState = viewerKind === 'spectator' ? spectatorGameState : playerGameState;
   const {
     myCards,
     opponentCards,
@@ -419,22 +505,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     });
   }, [undoStack, findCardForUndo, rawMoveCard]);
 
-  const [claimBannerDismissed, setClaimBannerDismissed] = useState(false);
-
-  // Reset claim banner when opponent reconnects
-  useEffect(() => {
-    if (!gameState.disconnectTimeoutFired) {
-      setClaimBannerDismissed(false);
-    }
-  }, [gameState.disconnectTimeoutFired]);
-
   // ---- Layout ----
   // Normalize the raw game.format string (e.g. "Paragon Type 1", "Type 2") to
   // the canonical 'T1' | 'T2' | 'Paragon' expected by the layout function.
   const normalizedFormat = normalizeDeckFormat(gameState.game?.format ?? '');
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat),
-    [virtualWidth, normalizedFormat],
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player'),
+    [virtualWidth, normalizedFormat, viewerKind],
   );
 
   // Card scale preference
@@ -570,17 +647,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }, [myCards, opponentCards]);
   useRevealTick(anyHandActiveReveal);
 
-  const myHandBrigadeCounts = useMemo(
-    () => computeHandBrigades(
+  const myHandBrigadeCounts = useMemo(() => {
+    // In spectator mode, only reveal brigade counts when the player has
+    // explicitly shared their hand; otherwise return empty to avoid leaking
+    // card-face data indirectly.
+    if (viewerKind === 'spectator' && !gameState.myPlayer?.shareHandWithSpectators) {
+      return { total: 0, good: 0, evil: 0, neutral: 0 };
+    }
+    return computeHandBrigades(
       (myCards['hand'] ?? []).map(c => ({
         cardName: c.cardName,
         brigade: c.brigade,
         alignment: c.alignment,
         type: c.cardType,
       })),
-    ),
-    [myCards],
-  );
+    );
+  }, [myCards, viewerKind, gameState.myPlayer?.shareHandWithSpectators]);
 
   // Opponent brigade counts — only meaningful when their hand is revealed to
   // me, and only over cards captured in the reveal snapshot (cards drawn
@@ -588,6 +670,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const opponentHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
   const opponentHandRevealSnapshotRaw = gameState.opponentPlayer?.handRevealSnapshot;
   const opponentHandBrigadeCounts = useMemo(() => {
+    // In spectator mode, only reveal brigade counts when the opponent has
+    // explicitly shared their hand.
+    if (viewerKind === 'spectator') {
+      if (!gameState.opponentPlayer?.shareHandWithSpectators) {
+        return { total: 0, good: 0, evil: 0, neutral: 0 };
+      }
+      return computeHandBrigades(
+        (opponentCards['hand'] ?? []).map(c => ({
+          cardName: c.cardName,
+          brigade: c.brigade,
+          alignment: c.alignment,
+          type: c.cardType,
+        })),
+      );
+    }
     if (!opponentHandRevealed) return { total: 0, good: 0, evil: 0, neutral: 0 };
     const snapshot = new Set<string>();
     try {
@@ -605,7 +702,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         type: c.cardType,
       })),
     );
-  }, [opponentCards, opponentHandRevealed, opponentHandRevealSnapshotRaw]);
+  }, [opponentCards, opponentHandRevealed, opponentHandRevealSnapshotRaw, viewerKind, gameState.opponentPlayer?.shareHandWithSpectators]);
+
+  // ---- Reserve privacy for spectators ----
+  // A player's reserve (its top-card face and the click-to-browse modal) stays
+  // hidden from spectators until that player shares their hand with spectators —
+  // the same consent flag that reveals the hand. When sharing is on, spectators
+  // may open the reserve read-only (no actions; see readOnly on ZoneBrowseModal).
+  // Player-side rules are unchanged: a player always sees their own reserve, and
+  // an opponent's reserve stays gated by reserveRevealed.
+  const myShareHand = gameState.myPlayer?.shareHandWithSpectators ?? false;
+  const oppShareHand = gameState.opponentPlayer?.shareHandWithSpectators ?? false;
+  const canViewMyReserve = !isSpectator || myShareHand;
+  const canViewOppReserve = isSpectator
+    ? oppShareHand
+    : (gameState.opponentPlayer?.reserveRevealed ?? false);
 
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
@@ -1736,9 +1847,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     (e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
       e.cancelBubble = true;
+      if (isSpectator) return;
       setSoulDeckMenu({ x: e.evt.clientX, y: e.evt.clientY });
     },
-    [],
+    [isSpectator],
   );
 
   const pickSoulDeckIds = useCallback(
@@ -3232,7 +3344,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               myHandRect,
               handCardWidth,
               handCardHeight,
-              isSpreadHand,
+              viewerKind === 'spectator' ? true : isSpreadHand,
             );
             let targetIdx = 0;
             let minDist = Infinity;
@@ -3473,6 +3585,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const handleSharedLobContextMenu = useCallback(
     (e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
+      if (isSpectator) return;
       closeAllMenus();
       const sharedRect = mpLayout?.zones.sharedLob;
       if (!sharedRect) return;
@@ -3518,6 +3631,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
       e.cancelBubble = true;
+      if (isSpectator) return;
       leftClicksSinceContextMenuRef.current = 0;
       const stage = stageRef.current;
       if (!stage) return;
@@ -3549,7 +3663,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Double-click toggles meek on your own cards
   const handleDblClick = useCallback((card: GameCard) => {
     if (leftClicksSinceContextMenuRef.current < 2) return;
-    if (card.ownerId !== 'player1') return; // only your own cards
+    // Only a player acting on their own card may toggle meek (spectators read-only).
+    if (!canViewerToggleMeek(isSpectator ? 'spectator' : 'player', card.ownerId)) return;
     const willBeMeek = !card.isMeek;
     if (card.isMeek) {
       multiplayerActions.unmeekCard(card.instanceId);
@@ -3562,7 +3677,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       isMeek: willBeMeek,
       notes: card.notes,
     });
-  }, [multiplayerActions, setPreviewCard]);
+  }, [multiplayerActions, setPreviewCard, isSpectator]);
   const noopDblClick = useCallback((_card: GameCard) => {}, []);
   const noopContextMenu = useCallback((_card: GameCard, _e: Konva.KonvaEventObject<PointerEvent>) => {}, []);
   const noopMouseEnter = useCallback((_card: GameCard, _e: Konva.KonvaEventObject<MouseEvent>) => {}, []);
@@ -3576,11 +3691,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       setHoveredInstanceId(card.instanceId);
       startHoverAnimation();
 
-      // Don't show card preview for face-down opponent cards (hidden info) —
-      // but actively revealed cards ARE public, so allow preview on those.
+      // Don't preview face-down (hidden-info) cards. A player never sees the
+      // opponent's; a spectator sees neither side's UNLESS that card's owner has
+      // shared with spectators (same consent flag as the hand/reserve). Actively
+      // revealed cards (revealUntil) are public to everyone, so always allowed.
       const revealedNow =
         typeof card.revealUntil === 'number' && card.revealUntil > Date.now();
-      if (card.isFlipped && card.ownerId === 'player2' && !revealedNow) {
+      if (
+        card.isFlipped &&
+        !revealedNow &&
+        !isFaceDownInPlayCardVisible(
+          isSpectator ? 'spectator' : 'player',
+          card.ownerId,
+          { myShareHand, oppShareHand },
+        )
+      ) {
         setHoveredCard(null);
         return;
       }
@@ -3595,7 +3720,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       setHoverReady(false);
       hoverTimerRef.current = setTimeout(() => setHoverReady(true), 250);
     },
-    [startHoverAnimation],
+    [startHoverAnimation, isSpectator, myShareHand, oppShareHand],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -4035,7 +4160,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         myHandRect,
         handCardWidth,
         handCardHeight,
-        isSpreadHand,
+        viewerKind === 'spectator' ? true : isSpreadHand,
       );
       handCards.forEach((card, i) => {
         const pos = positions[i];
@@ -4054,7 +4179,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
 
     return bounds;
-  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, handCardWidth, handCardHeight, lobCard, isSpreadHand, myDerivedWeaponPositions, opponentDerivedWeaponPositions, normalizedFormat, sharedCards, sharedLobLayout]);
+  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, handCardWidth, handCardHeight, lobCard, isSpreadHand, viewerKind, myDerivedWeaponPositions, opponentDerivedWeaponPositions, normalizedFormat, sharedCards, sharedLobLayout]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -4239,6 +4364,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const labelTextWidth = zone.label.toUpperCase().length * 7;
             const myPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
+              if (isSpectator) return;
               closeAllMenus();
               const pt = { x: e.evt.clientX, y: e.evt.clientY };
               if (key === 'deck') setDeckMenu(pt);
@@ -4248,7 +4374,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             };
             const myPileClickHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
               if (e.evt.button !== 0) return;
-              if (key === 'discard' || key === 'banish' || key === 'reserve') setBrowseMyZone(key);
+              if (key === 'discard' || key === 'banish') setBrowseMyZone(key);
+              else if (key === 'reserve' && canViewMyReserve) setBrowseMyZone('reserve');
             };
             return (
               <Group key={`my-${key}`}>
@@ -4269,6 +4396,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? myPileClickHandler : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
+                    if (isSpectator) return;
                     // Compute spawn position as normalized 0-1 within the LOB zone
                     const layer = gameLayerRef.current;
                     const pointer = layer?.getRelativePointerPosition();
@@ -4312,17 +4440,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const labelTextWidth = zone.label.toUpperCase().length * 7;
             const oppPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
+              if (isSpectator) return;
               closeAllMenus();
               const pt = { x: e.evt.clientX, y: e.evt.clientY };
               if (key === 'deck') setOpponentDeckMenu(pt);
               else if (key === 'reserve') setOpponentReserveMenu(pt);
               else if (key === 'discard' || key === 'banish') setBrowseOpponentZone(key);
             };
-            const oppReserveRevealedBg = gameState.opponentPlayer?.reserveRevealed ?? false;
             const oppPileClickHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
               if (e.evt.button !== 0) return;
               if (key === 'discard' || key === 'banish') setBrowseOpponentZone(key);
-              else if (key === 'reserve' && oppReserveRevealedBg) setBrowseOpponentZone('reserve');
+              else if (key === 'reserve' && canViewOppReserve) setBrowseOpponentZone('reserve');
             };
             return (
               <Group key={`opp-${key}`}>
@@ -4340,6 +4468,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? oppPileClickHandler : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
+                    if (isSpectator) return;
                     const layer = gameLayerRef.current;
                     const pointer = layer?.getRelativePointerPosition();
                     const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
@@ -4385,6 +4514,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             opacity={0.5}
             onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
+              if (isSpectator) return;
               const stage = stageRef.current;
               if (!stage) return;
               const container = stage.container().getBoundingClientRect();
@@ -4487,6 +4617,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             opacity={0.5}
             onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
+              if (isSpectator) return;
               closeAllMenus();
               setOpponentHandMenu({
                 x: e.evt.clientX,
@@ -4619,7 +4750,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(String(card.id))}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                   nodeRef={registerCardNode}
                   onClick={handleCardClick}
@@ -4695,7 +4826,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(String(card.id))}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                   nodeRef={registerCardNode}
                   onClick={handleCardClick}
@@ -4762,7 +4893,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(cardIdStr)}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
                   lobArrivalGlow={getMyLobGlow(cardIdStr) > 0}
                   nodeRef={registerCardNode}
@@ -4835,7 +4966,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(cardIdStr)}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
                   lobArrivalGlow={getOppLobGlow(cardIdStr) > 0}
                   nodeRef={registerCardNode}
@@ -4910,7 +5041,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   image={getCardImage(card)}
                   {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(cardIdStr)}
-                  isDraggable={true}
+                  isDraggable={!isSpectator}
                   hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
                   nodeRef={registerCardNode}
                   onClick={handleCardClick}
@@ -5286,12 +5417,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 })
               : cards;
             const topCard = sortedCards[sortedCards.length - 1];
-            const showFace = topCard && ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') ? !topCard.isFlipped : zoneKey === 'reserve');
+            const showFace = topCard && ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') ? !topCard.isFlipped : (zoneKey === 'reserve' && canViewMyReserve));
 
             return (
               <Group
                 key={`my-pile-${zoneKey}`}
-                onClick={zoneKey !== 'deck' ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                onClick={zoneKey !== 'deck' && !(zoneKey === 'reserve' && !canViewMyReserve) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                   if (e.evt.button !== 0) return;
                   setBrowseMyZone(zoneKey);
                 } : undefined}
@@ -5385,7 +5516,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         image={img}
                         {...(getTargetingProps(gameCard) ?? {})}
                         isSelected={isSelected(String(c.id))}
-                        isDraggable={true}
+                        isDraggable={!isSpectator}
                         nodeRef={registerCardNode}
                         hoverProgress={hoveredInstanceId === String(c.id) ? hoverProgress : 0}
                         onClick={handleCardClick}
@@ -5437,7 +5568,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             image={img}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
-                            isDraggable={isDraggableZone}
+                            isDraggable={isDraggableZone && !isSpectator}
                             nodeRef={isDraggableZone ? registerCardNode : undefined}
                             hoverProgress={hoveredInstanceId === String(c.id) ? hoverProgress : 0}
                             onDragStart={isDraggableZone ? handleCardDragStart : noopCardDrag}
@@ -5470,7 +5601,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             image={undefined}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
-                            isDraggable={true}
+                            isDraggable={!isSpectator}
                             nodeRef={registerCardNode}
                             hoverProgress={0}
                             onDragStart={handleCardDragStart}
@@ -5516,13 +5647,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const topCard = revealedReserveCard ?? cards[cards.length - 1];
             const topReserveCardRevealed = !!revealedReserveCard;
             const showFace = ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') && topCard && !topCard.isFlipped)
-              || (zoneKey === 'reserve' && (oppReserveRevealed || topReserveCardRevealed) && topCard);
+              || (zoneKey === 'reserve' && topCard && (isSpectator ? oppShareHand : (oppReserveRevealed || topReserveCardRevealed)));
 
             return (
               <Group
                 key={`opp-pile-${zoneKey}`}
                 name="zone-click"
-                onClick={zoneKey !== 'deck' && !(zoneKey === 'reserve' && !oppReserveRevealed) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                onClick={zoneKey !== 'deck' && !(zoneKey === 'reserve' && !canViewOppReserve) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                   if (e.evt.button !== 0) return;
                   setBrowseOpponentZone(zoneKey);
                 } : undefined}
@@ -5595,7 +5726,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         image={img}
                         {...(getTargetingProps(gameCard) ?? {})}
                         isSelected={isSelected(String(c.id))}
-                        isDraggable={true}
+                        isDraggable={!isSpectator}
                         nodeRef={registerCardNode}
                         hoverProgress={hoveredInstanceId === String(c.id) ? hoverProgress : 0}
                         onClick={handleCardClick}
@@ -5648,10 +5779,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             image={img}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
-                            isDraggable={zoneKey === 'discard'}
+                            isDraggable={zoneKey === 'discard' && !isSpectator}
                             nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
                             hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
-                            onClick={zoneKey === 'reserve' && oppReserveRevealed ? (_c, e) => {
+                            onClick={zoneKey === 'reserve' && canViewOppReserve ? (_c, e) => {
                               if ((e.evt as MouseEvent).button !== 0) return;
                               setBrowseOpponentZone('reserve');
                             } : undefined}
@@ -5695,19 +5826,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               true, // flat spread — no fan arc for opponent
             );
 
-            const oppHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
-            // Snapshot of card IDs visible at reveal time. Cards drawn into the
-            // hand after reveal are not in this set and stay face-down.
-            const oppHandRevealSnapshot = new Set<string>();
-            if (oppHandRevealed) {
-              try {
-                const raw = gameState.opponentPlayer?.handRevealSnapshot;
-                if (raw) {
-                  const ids = JSON.parse(raw);
-                  if (Array.isArray(ids)) for (const id of ids) oppHandRevealSnapshot.add(String(id));
-                }
-              } catch { /* ignore malformed snapshot */ }
-            }
+            const oppHandViewerKind: ViewerKind = viewerKind === 'spectator' ? 'spectator' : 'opponent';
 
             return (
               <Group
@@ -5726,17 +5845,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               >
                 {oppHandPositions.map((pos, i) => {
                   const card = opponentHandCards[i];
-                  // Per-card reveal: an individual hand card can be revealed
-                  // temporarily via revealExpiresAt. When active (or when the
-                  // whole hand is revealed), route through GameCardNode so
-                  // the face + countdown badge render correctly.
                   const nowMicros = BigInt(Date.now()) * 1000n;
-                  const cardRevealed =
-                    !!card &&
-                    card.revealExpiresAt !== undefined &&
-                    card.revealExpiresAt.microsSinceUnixEpoch > nowMicros;
-                  const inSnapshot = !!card && oppHandRevealSnapshot.has(String(card.id));
-                  if (((oppHandRevealed && inSnapshot) || cardRevealed) && card) {
+                  if (card && isHandCardFaceVisible(card, oppHandViewerKind, gameState.opponentPlayer, nowMicros)) {
                     const gameCard = adaptCard(card, 'player2');
                     return (
                       <GameCardNode
@@ -5749,7 +5859,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         cardHeight={oppHandCard.cardHeight}
                         image={getCardImage(card)}
                         {...(getTargetingProps(gameCard) ?? {})}
-                        isDraggable={true}
+                        isDraggable={!isSpectator}
                         hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
@@ -5784,14 +5894,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               myHandRect!,
               handCardWidth,
               handCardHeight,
-              isSpreadHand,
+              viewerKind === 'spectator' ? true : isSpreadHand,
             );
+
+            // In spectator mode, seat-0's hand is subject to the same
+            // visibility predicate as any other hand — face-up only when
+            // the player has shared it with spectators (or a per-card flash).
+            const myHandViewerKind: ViewerKind = viewerKind === 'spectator' ? 'spectator' : 'self';
 
             return (
               <Group>
                 {handCards.map((card, i) => {
                   const pos = positions[i];
                   if (!pos) return null;
+                  if (myHandViewerKind === 'spectator') {
+                    const nowMicros = BigInt(Date.now()) * 1000n;
+                    if (!isHandCardFaceVisible(card, 'spectator', gameState.myPlayer, nowMicros)) {
+                      return (
+                        <Group key={`my-hand-${i}`} x={pos.x} y={pos.y}>
+                          <CardBackShape width={handCardWidth} height={handCardHeight} />
+                        </Group>
+                      );
+                    }
+                  }
                   const gameCard = adaptCard(card, 'player1');
                   return (
                     <GameCardNode
@@ -5805,7 +5930,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       image={getCardImage(card)}
                       {...(getTargetingProps(gameCard) ?? {})}
                       isSelected={isSelected(String(card.id))}
-                      isDraggable={true}
+                      isDraggable={!isSpectator}
                       hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                       suppressRevealRing
                       nodeRef={registerCardNode}
@@ -5897,7 +6022,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               lineHeight: 1,
             }}
           >
-            {gameState.isMyTurn
+            {viewerKind === 'spectator'
+              ? gameState.isMyTurn
+                ? `${gameState.myPlayer.displayName ?? 'Player 1'}'s turn`
+                : `${gameState.opponentPlayer?.displayName ?? 'Player 2'}'s turn`
+              : gameState.isMyTurn
               ? `${gameState.myPlayer.displayName ?? 'You'}'s turn (you)`
               : `${gameState.opponentPlayer?.displayName ?? 'Opponent'}'s turn`}
           </span>
@@ -6052,7 +6181,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ================================================================
           Shared context menu — positioned relative to canvas container
           ================================================================ */}
-      {contextMenu && (() => {
+      {!isSpectator && contextMenu && (() => {
         const ctxCard = contextMenu.card;
         const isSharedSoul =
           ctxCard?.zone === 'land-of-bondage' &&
@@ -6115,7 +6244,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {multiCardContextMenu && (() => {
+      {!isSpectator && multiCardContextMenu && (() => {
         const sortedIds = Array.from(selectedIds).sort((a, b) => {
           const aCard = findAnyCardById(a);
           const bCard = findAnyCardById(b);
@@ -6174,7 +6303,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {zoneMenu && (
+      {!isSpectator && zoneMenu && (
         <ZoneContextMenu
           x={zoneMenu.x}
           y={zoneMenu.y}
@@ -6187,7 +6316,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {deckMenu && (
+      {!isSpectator && deckMenu && (
         <DeckContextMenu
           x={deckMenu.x}
           y={deckMenu.y}
@@ -6213,7 +6342,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {soulDeckMenu && (
+      {!isSpectator && soulDeckMenu && (
         <DeckContextMenu
           x={soulDeckMenu.x}
           y={soulDeckMenu.y}
@@ -6243,7 +6372,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {handMenu && (
+      {!isSpectator && handMenu && (
         <HandContextMenu
           x={handMenu.x}
           y={handMenu.y}
@@ -6272,7 +6401,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {opponentHandMenu && (() => {
+      {!isSpectator && opponentHandMenu && (() => {
         const requestAction = (action: string, count: number) => {
           const params = JSON.stringify({ count });
           requestOpponentAction(action, params);
@@ -6301,7 +6430,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {reserveMenu && (
+      {!isSpectator && reserveMenu && (
         <ReserveContextMenu
           x={reserveMenu.x}
           y={reserveMenu.y}
@@ -6317,7 +6446,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {opponentReserveMenu && (() => {
+      {!isSpectator && opponentReserveMenu && (() => {
         const oppReserveRevealed = gameState.opponentPlayer?.reserveRevealed ?? false;
         const oppReserveCards = opponentCards['reserve'] ?? [];
         const oppId = gameState.opponentPlayer?.id;
@@ -6352,7 +6481,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {opponentDeckMenu && (() => {
+      {!isSpectator && opponentDeckMenu && (() => {
         const requestAction = (action: string, count?: number) => {
           const params = count != null ? JSON.stringify({ count }) : '';
           requestOpponentAction(action, params);
@@ -6391,7 +6520,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {lorMenu && (
+      {!isSpectator && lorMenu && (
         <LorContextMenu
           x={lorMenu.x}
           y={lorMenu.y}
@@ -6467,7 +6596,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ================================================================
           Opponent zone search — context menu, consent dialog, browse modal
           ================================================================ */}
-      {opponentZoneMenu && (
+      {!isSpectator && opponentZoneMenu && (
         <OpponentZoneContextMenu
           x={opponentZoneMenu.x}
           y={opponentZoneMenu.y}
@@ -6871,6 +7000,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+            readOnly={isSpectator}
           />
         </ModalGameProvider>
       )}
@@ -6887,6 +7017,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+            readOnly={isSpectator}
           />
         )}
 
@@ -6981,6 +7112,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+            readOnly={isSpectator}
           />
         )}
         {soulDeckLookState && (
@@ -7300,53 +7432,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-
-      {/* Disconnect timeout — notification banner */}
-      {gameState.disconnectTimeoutFired && !claimBannerDismissed && (
-        <div
-          style={{
-            position: 'absolute',
-            top: opponentHandRect.y + opponentHandRect.height + 8,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 900,
-            background: 'rgba(10, 8, 5, 0.95)',
-            border: '1px solid rgba(180, 140, 60, 0.6)',
-            borderRadius: 8,
-            padding: '12px 20px',
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 13,
-            color: '#e8dcc8',
-            textAlign: 'center' as const,
-            display: 'flex',
-            flexDirection: 'column' as const,
-            alignItems: 'center',
-            gap: 10,
-            maxWidth: 360,
-          }}
-        >
-          <span style={{ letterSpacing: '0.04em' }}>
-            Your opponent has been disconnected for 5 minutes.
-          </span>
-          <button
-            onClick={() => setClaimBannerDismissed(true)}
-            style={{
-              background: 'rgba(50, 45, 35, 0.8)',
-              border: '1px solid rgba(107, 78, 39, 0.4)',
-              borderRadius: 5,
-              padding: '6px 14px',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 11,
-              color: '#a89878',
-              cursor: 'pointer',
-              letterSpacing: '0.04em',
-            }}
-          >
-            Dismiss
-          </button>
         </div>
       )}
 

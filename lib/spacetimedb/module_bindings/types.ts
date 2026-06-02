@@ -158,6 +158,7 @@ export const Player = __t.object("Player", {
   revealedCards: __t.string(),
   reserveRevealed: __t.bool(),
   handRevealSnapshot: __t.string(),
+  shareHandWithSpectators: __t.bool(),
 });
 export type Player = __Infer<typeof Player>;
 
@@ -168,6 +169,31 @@ export const Spectator = __t.object("Spectator", {
   displayName: __t.string(),
 });
 export type Spectator = __Infer<typeof Spectator>;
+
+export const SpectatorBan = __t.object("SpectatorBan", {
+  id: __t.u64(),
+  gameId: __t.u64(),
+  identity: __t.identity(),
+  bannedBySeat: __t.u64(),
+  bannedAt: __t.timestamp(),
+});
+export type SpectatorBan = __Infer<typeof SpectatorBan>;
+
+export const SpectatorHandRequest = __t.object("SpectatorHandRequest", {
+  id: __t.u64(),
+  gameId: __t.u64(),
+  spectatorId: __t.u64(),
+  spectatorName: __t.string(),
+  requestedAt: __t.timestamp(),
+});
+export type SpectatorHandRequest = __Infer<typeof SpectatorHandRequest>;
+
+export const SpectatorHandRequestExpiry = __t.object("SpectatorHandRequestExpiry", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  requestId: __t.u64(),
+});
+export type SpectatorHandRequestExpiry = __Infer<typeof SpectatorHandRequestExpiry>;
 
 export const ZoneSearchRequest = __t.object("ZoneSearchRequest", {
   id: __t.u64(),

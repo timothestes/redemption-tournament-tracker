@@ -26,7 +26,7 @@ interface GameAction {
   timestamp: { microsSinceUnixEpoch: bigint };
 }
 
-type TabKey = 'chat' | 'log' | 'all';
+type TabKey = 'chat' | 'log' | 'all' | 'spectators';
 
 interface ChatPanelProps {
   chatMessages: ChatMessage[];
@@ -38,6 +38,21 @@ interface ChatPanelProps {
   onActiveTabChange?: (tab: TabKey) => void;
   /** Font scale for chat/log content. Defaults to 1.0. */
   chatScale?: number;
+  /** When true, the chat input is disabled (read-only). Defaults to false. */
+  chatDisabled?: boolean;
+  // ---- Spectator-controls subsection (player-mode only) ----
+  /** Spectators in the current game. When provided, the Spectators tab renders. */
+  spectators?: Array<{ id: bigint; identity: { toHexString: () => string }; displayName: string }>;
+  /** Local player's identity hex — used to filter own row from the list. */
+  myIdentityHex?: string;
+  /** Local player's shareHandWithSpectators flag. */
+  shareHandWithSpectators?: boolean;
+  /** Whether the game is currently public. */
+  isGamePublic?: boolean;
+  /** Reducer callbacks. */
+  onSetShareHand?: (share: boolean) => void;
+  onKickSpectator?: (spectatorId: bigint) => void;
+  onSetGamePrivate?: (isPublic: boolean) => void;
 }
 
 // Discriminated union for interleaved timeline entries
@@ -955,7 +970,16 @@ export default function ChatPanel({
   activeTab: controlledTab,
   onActiveTabChange,
   chatScale = 1,
+  chatDisabled = false,
+  spectators,
+  myIdentityHex,
+  shareHandWithSpectators,
+  isGamePublic,
+  onSetShareHand,
+  onKickSpectator,
+  onSetGamePrivate,
 }: ChatPanelProps) {
+  const showSpectatorsTab = spectators !== undefined;
   const [isOpen, setIsOpen] = useState(true);
   const [internalTab, setInternalTab] = useState<TabKey>('all');
   const activeTab = controlledTab ?? internalTab;
@@ -1035,12 +1059,26 @@ export default function ChatPanel({
 
   const matchesQuery = (text: string) => !isSearching || text.includes(normalizedQuery);
 
+  const senderNameOf = (msg: { senderId: bigint }) =>
+    msg.senderId === 0n ? '' : (playerNames[msg.senderId.toString()] ?? '');
+
   const filteredChat = isSearching
-    ? chatMessages.filter((msg) => {
-        const senderName = playerNames[msg.senderId.toString()] ?? '';
-        return `${senderName} ${msg.text}`.toLowerCase().includes(normalizedQuery);
-      })
+    ? chatMessages.filter((msg) =>
+        `${senderNameOf(msg)} ${msg.text}`.toLowerCase().includes(normalizedQuery),
+      )
     : chatMessages;
+
+  // System messages (senderId === 0n) are spectator/admin notifications —
+  // they belong in the LOG tab next to game actions, not in the user-to-user
+  // CHAT tab. They still appear in the ALL tab via filteredChat.
+  const userChat = useMemo(
+    () => filteredChat.filter((m) => m.senderId !== 0n),
+    [filteredChat],
+  );
+  const systemChat = useMemo(
+    () => filteredChat.filter((m) => m.senderId === 0n),
+    [filteredChat],
+  );
 
   const filteredActions = isSearching
     ? visibleGameActions.filter((a) => matchesQuery(actionSearchText.get(a.id.toString()) ?? ''))
@@ -1096,16 +1134,22 @@ export default function ChatPanel({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
   const allEndRef = useRef<HTMLDivElement>(null);
-  const prevChatLengthRef = useRef(chatMessages.length);
+  // System messages (senderId === 0n) render in LOG, not CHAT — don't count
+  // them toward the CHAT unread badge.
+  const userChatCount = useMemo(
+    () => chatMessages.reduce((n, m) => (m.senderId !== 0n ? n + 1 : n), 0),
+    [chatMessages],
+  );
+  const prevChatLengthRef = useRef(userChatCount);
 
   // Track unread messages when chat isn't actively visible
   useEffect(() => {
     const chatVisible = isOpen && (activeTab === 'chat' || activeTab === 'all');
-    if (!chatVisible && chatMessages.length > prevChatLengthRef.current) {
-      setUnreadCount((n) => n + (chatMessages.length - prevChatLengthRef.current));
+    if (!chatVisible && userChatCount > prevChatLengthRef.current) {
+      setUnreadCount((n) => n + (userChatCount - prevChatLengthRef.current));
     }
-    prevChatLengthRef.current = chatMessages.length;
-  }, [chatMessages.length, isOpen, activeTab]);
+    prevChatLengthRef.current = userChatCount;
+  }, [userChatCount, isOpen, activeTab]);
 
   // Clear unread when opening chat or all tab
   useEffect(() => {
@@ -1293,9 +1337,15 @@ export default function ChatPanel({
             <span aria-hidden />
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4 }}>
-              {(['all', 'chat', 'log'] as const).map((tab) => {
+              {((showSpectatorsTab
+                ? (['all', 'chat', 'log', 'spectators'] as const)
+                : (['all', 'chat', 'log'] as const)) as readonly TabKey[]).map((tab) => {
                 const isActive = activeTab === tab;
-                const label = tab === 'chat' ? 'Chat' : tab === 'log' ? 'Log' : 'All';
+                const label =
+                  tab === 'chat' ? 'Chat'
+                  : tab === 'log' ? 'Log'
+                  : tab === 'spectators' ? 'Spectators'
+                  : 'All';
                 return (
                   <button
                     key={tab}
@@ -1453,7 +1503,7 @@ export default function ChatPanel({
                   gap: 8,
                 }}
               >
-                {filteredChat.length === 0 && (
+                {userChat.length === 0 && (
                   <p
                     style={{
                       color: 'rgba(232, 213, 163, 0.3)',
@@ -1466,7 +1516,24 @@ export default function ChatPanel({
                     {isSearching ? 'No matches.' : 'No messages yet.'}
                   </p>
                 )}
-                {filteredChat.map((msg) => {
+                {userChat.map((msg) => {
+                  if (msg.senderId === 0n) {
+                    return (
+                      <div
+                        key={msg.id.toString()}
+                        style={{
+                          textAlign: 'center',
+                          fontStyle: 'italic',
+                          opacity: 0.6,
+                          fontSize: 11,
+                          margin: '4px 0',
+                          padding: '0 8px',
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+                    );
+                  }
                   const isMe = msg.senderId === myPlayerId;
                   const senderName =
                     playerNames[msg.senderId.toString()] ??
@@ -1554,8 +1621,9 @@ export default function ChatPanel({
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Message..."
+                  placeholder={chatDisabled ? "Spectators can't chat" : "Message..."}
                   maxLength={500}
+                  disabled={chatDisabled}
                   style={{
                     flex: 1,
                     minWidth: 0,
@@ -1567,12 +1635,14 @@ export default function ChatPanel({
                     fontSize: 'calc(12px * var(--chat-fs, 1))',
                     fontFamily: 'inherit',
                     outline: 'none',
+                    opacity: chatDisabled ? 0.5 : 1,
+                    cursor: chatDisabled ? 'not-allowed' : 'text',
                   }}
                   aria-label="Chat message"
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!inputText.trim()}
+                  disabled={chatDisabled || !inputText.trim()}
                   aria-label="Send message"
                   style={{
                     padding: '5px 8px',
@@ -1610,7 +1680,7 @@ export default function ChatPanel({
                 gap: 4,
               }}
             >
-              {filteredActions.length === 0 && (
+              {filteredActions.length === 0 && systemChat.length === 0 && (
                 <p
                   style={{
                     color: 'rgba(232, 213, 163, 0.3)',
@@ -1620,46 +1690,78 @@ export default function ChatPanel({
                     fontStyle: 'italic',
                   }}
                 >
-                  {isSearching ? 'No matches.' : 'No actions yet.'}
+                  {isSearching ? 'No matches.' : 'No activity yet.'}
                 </p>
               )}
-              {displayActions.map((action) => {
-                const playerName =
-                  playerNames[action.playerId.toString()] ??
-                  `Player ${action.playerId}`;
-                const verb = formatActionType(action.actionType, action.payload, playerNames, action.playerId.toString(), myPlayerId.toString());
-                const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
-                const turn = Number(action.turnNumber);
+              {(() => {
+                // Interleave system messages (spectator events, private
+                // toggle, etc.) with game actions, chronologically.
+                const timeline: TimelineEntry[] = [];
+                for (const msg of systemChat) {
+                  timeline.push({ kind: 'chat', msg, micros: msg.sentAt.microsSinceUnixEpoch });
+                }
+                for (const action of displayActions) {
+                  timeline.push({ kind: 'action', action, micros: action.timestamp.microsSinceUnixEpoch });
+                }
+                timeline.sort((a, b) => (a.micros < b.micros ? -1 : a.micros > b.micros ? 1 : 0));
 
-                return (
-                  <div
-                    key={action.id.toString()}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 1,
-                      padding: '4px 6px',
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      borderRadius: 4,
-                      borderLeft: '2px solid rgba(107, 78, 39, 0.3)',
-                    }}
-                  >
-                    <span style={{ fontSize: 'calc(11px * var(--chat-fs, 1))', color: '#c8b882', lineHeight: 1.35 }}>
-                      <strong style={{ color: '#e8d5a3' }}>{playerName}</strong>{' '}
-                      {verb}
-                    </span>
-                    <span
+                return timeline.map((entry) => {
+                  if (entry.kind === 'chat') {
+                    const msg = entry.msg;
+                    return (
+                      <div
+                        key={`sys-${msg.id.toString()}`}
+                        style={{
+                          textAlign: 'center',
+                          fontStyle: 'italic',
+                          opacity: 0.6,
+                          fontSize: 'calc(11px * var(--chat-fs, 1))',
+                          color: '#e8d5a3',
+                          margin: '4px 0',
+                          padding: '0 8px',
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+                    );
+                  }
+                  const action = entry.action;
+                  const playerName =
+                    playerNames[action.playerId.toString()] ??
+                    `Player ${action.playerId}`;
+                  const verb = formatActionType(action.actionType, action.payload, playerNames, action.playerId.toString(), myPlayerId.toString());
+                  const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
+                  const turn = Number(action.turnNumber);
+                  return (
+                    <div
+                      key={action.id.toString()}
                       style={{
-                        fontSize: 'calc(9px * var(--chat-fs, 1))',
-                        color: 'rgba(232, 213, 163, 0.3)',
-                        fontVariantNumeric: 'tabular-nums',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1,
+                        padding: '4px 6px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        borderRadius: 4,
+                        borderLeft: '2px solid rgba(107, 78, 39, 0.3)',
                       }}
                     >
-                      T{turn} · {action.phase} · {time}
-                    </span>
-                  </div>
-                );
-              })}
+                      <span style={{ fontSize: 'calc(11px * var(--chat-fs, 1))', color: '#c8b882', lineHeight: 1.35 }}>
+                        <strong style={{ color: '#e8d5a3' }}>{playerName}</strong>{' '}
+                        {verb}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 'calc(9px * var(--chat-fs, 1))',
+                          color: 'rgba(232, 213, 163, 0.3)',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        T{turn} · {action.phase} · {time}
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
               <div ref={logEndRef} />
             </div>
           )}
@@ -1705,6 +1807,23 @@ export default function ChatPanel({
                   return timeline.map((entry) => {
                     if (entry.kind === 'chat') {
                       const msg = entry.msg;
+                      if (msg.senderId === 0n) {
+                        return (
+                          <div
+                            key={`chat-${msg.id.toString()}`}
+                            style={{
+                              textAlign: 'center',
+                              fontStyle: 'italic',
+                              opacity: 0.6,
+                              fontSize: 11,
+                              margin: '4px 0',
+                              padding: '0 8px',
+                            }}
+                          >
+                            {msg.text}
+                          </div>
+                        );
+                      }
                       const isMe = msg.senderId === myPlayerId;
                       const senderName =
                         playerNames[msg.senderId.toString()] ??
@@ -1838,8 +1957,9 @@ export default function ChatPanel({
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Message..."
+                  placeholder={chatDisabled ? "Spectators can't chat" : "Message..."}
                   maxLength={500}
+                  disabled={chatDisabled}
                   style={{
                     flex: 1,
                     minWidth: 0,
@@ -1851,12 +1971,14 @@ export default function ChatPanel({
                     fontSize: 'calc(12px * var(--chat-fs, 1))',
                     fontFamily: 'inherit',
                     outline: 'none',
+                    opacity: chatDisabled ? 0.5 : 1,
+                    cursor: chatDisabled ? 'not-allowed' : 'text',
                   }}
                   aria-label="Chat message"
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!inputText.trim()}
+                  disabled={chatDisabled || !inputText.trim()}
                   aria-label="Send message"
                   style={{
                     padding: '5px 8px',
@@ -1881,6 +2003,174 @@ export default function ChatPanel({
               </div>
             </>
           )}
+
+          {/* ---- Tab: Spectators ---- */}
+          {activeTab === 'spectators' && showSpectatorsTab && (() => {
+            const sectionLabelStyle: CSSProperties = {
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 'calc(10px * var(--chat-fs, 1))',
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'rgba(232, 213, 163, 0.55)',
+              marginBottom: 8,
+            };
+            const checkboxRowStyle: CSSProperties = {
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              cursor: 'pointer',
+              padding: '6px 8px',
+              borderRadius: 4,
+              border: '1px solid rgba(107, 78, 39, 0.3)',
+              background: 'rgba(196, 149, 90, 0.04)',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 'calc(11px * var(--chat-fs, 1))',
+              letterSpacing: '0.04em',
+              color: '#e8d5a3',
+              transition: 'background 0.15s, border-color 0.15s',
+            };
+            const checkboxStyle: CSSProperties = {
+              accentColor: '#c4955a',
+              width: 14,
+              height: 14,
+              cursor: 'pointer',
+              flexShrink: 0,
+            };
+            const dividerStyle: CSSProperties = {
+              height: 1,
+              background: 'rgba(107, 78, 39, 0.3)',
+              margin: '4px 0',
+            };
+            const watchersList = spectators!.filter(
+              s => s.identity.toHexString() !== myIdentityHex,
+            );
+            return (
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '14px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 16,
+                }}
+              >
+                <div>
+                  <div style={sectionLabelStyle}>Sharing</div>
+                  <label style={checkboxRowStyle}>
+                    <input
+                      type="checkbox"
+                      checked={!!shareHandWithSpectators}
+                      onChange={(e) => onSetShareHand?.(e.target.checked)}
+                      style={checkboxStyle}
+                    />
+                    <span>Share my hand with spectators</span>
+                  </label>
+                </div>
+
+                <div style={dividerStyle} />
+
+                <div>
+                  <div style={sectionLabelStyle}>Access</div>
+                  <label style={checkboxRowStyle}>
+                    <input
+                      type="checkbox"
+                      checked={isGamePublic === false}
+                      onChange={(e) => onSetGamePrivate?.(!e.target.checked)}
+                      style={checkboxStyle}
+                    />
+                    <span>Private game (no new spectators)</span>
+                  </label>
+                </div>
+
+                <div style={dividerStyle} />
+
+                <div>
+                  <div style={sectionLabelStyle}>
+                    Watching ({watchersList.length})
+                  </div>
+                  {watchersList.length === 0 ? (
+                    <p
+                      style={{
+                        fontFamily: 'var(--font-cinzel), Georgia, serif',
+                        fontSize: 'calc(11px * var(--chat-fs, 1))',
+                        color: 'rgba(232, 213, 163, 0.3)',
+                        fontStyle: 'italic',
+                        margin: 0,
+                        textAlign: 'center',
+                        padding: '12px 0',
+                      }}
+                    >
+                      No spectators yet
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {watchersList.map(s => (
+                        <div
+                          key={s.id.toString()}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '6px 8px',
+                            borderRadius: 4,
+                            border: '1px solid rgba(107, 78, 39, 0.3)',
+                            background: 'rgba(196, 149, 90, 0.04)',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-cinzel), Georgia, serif',
+                              fontSize: 'calc(11px * var(--chat-fs, 1))',
+                              letterSpacing: '0.03em',
+                              color: '#e8d5a3',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              minWidth: 0,
+                              flex: 1,
+                              marginRight: 8,
+                            }}
+                          >
+                            {s.displayName}
+                          </span>
+                          <button
+                            onClick={() => onKickSpectator?.(s.id)}
+                            style={{
+                              background: 'transparent',
+                              color: 'rgba(220, 120, 120, 0.75)',
+                              border: '1px solid rgba(180, 60, 60, 0.5)',
+                              borderRadius: 4,
+                              padding: '3px 10px',
+                              cursor: 'pointer',
+                              fontFamily: 'var(--font-cinzel), Georgia, serif',
+                              fontSize: 'calc(10px * var(--chat-fs, 1))',
+                              letterSpacing: '0.08em',
+                              textTransform: 'uppercase',
+                              flexShrink: 0,
+                              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(60, 10, 10, 0.5)';
+                              e.currentTarget.style.borderColor = 'rgba(220, 80, 80, 0.6)';
+                              e.currentTarget.style.color = 'rgba(240, 150, 150, 0.9)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.borderColor = 'rgba(180, 60, 60, 0.5)';
+                              e.currentTarget.style.color = 'rgba(220, 120, 120, 0.75)';
+                            }}
+                          >
+                            Kick
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

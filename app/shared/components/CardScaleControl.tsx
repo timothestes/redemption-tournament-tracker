@@ -376,6 +376,7 @@ export function CardScaleControl({
               </button>
             </>
           )}
+
         </div>
       )}
     </div>

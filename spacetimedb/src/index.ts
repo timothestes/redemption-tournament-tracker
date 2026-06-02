@@ -1,6 +1,6 @@
 import spacetimedb from './schema';
 export default spacetimedb;
-import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer } from './schema';
+import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
@@ -604,6 +604,7 @@ export const create_game = spacetimedb.reducer(
       reserveRevealed: false,
       pendingDeckData: deckData,
       revealedCards: '',
+      shareHandWithSpectators: false,
     });
 
     logAction(ctx, game.id, player.id, 'GAME_CREATED', JSON.stringify({ code }), 0n, 'draw');
@@ -675,6 +676,7 @@ export const join_game = spacetimedb.reducer(
       reserveRevealed: false,
       pendingDeckData: deckData,
       revealedCards: '',
+      shareHandWithSpectators: false,
     });
 
     // Log join
@@ -1496,15 +1498,43 @@ export const join_as_spectator = spacetimedb.reducer(
       game = g;
       break;
     }
-    if (!game) {
-      throw new SenderError('No game found with that code');
+    if (!game) throw new SenderError('No game found with that code');
+
+    // Ban check
+    for (const ban of ctx.db.SpectatorBan.spectator_ban_game_id.filter(game.id)) {
+      if (ban.identity.toHexString() === ctx.sender.toHexString()) {
+        throw new SenderError('You have been removed from this game');
+      }
     }
+
+    // Idempotent reconnect: if a row already exists for (gameId, sender),
+    // refresh displayName so renames propagate and return without inserting
+    // a second row.
+    for (const existing of ctx.db.Spectator.spectator_game_id.filter(game.id)) {
+      if (existing.identity.toHexString() === ctx.sender.toHexString()) {
+        if (existing.displayName !== displayName) {
+          ctx.db.Spectator.id.update({ ...existing, displayName });
+        }
+        return;
+      }
+    }
+
+    // Private games block new spectators (existing ones already returned above)
+    if (!game.isPublic) throw new SenderError('This game is private');
 
     ctx.db.Spectator.insert({
       id: 0n,
       gameId: game.id,
       identity: ctx.sender,
       displayName,
+    });
+
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId: game.id,
+      senderId: 0n,
+      text: `${displayName} started spectating`,
+      sentAt: ctx.timestamp,
     });
   }
 );
@@ -1535,12 +1565,48 @@ export const leave_game = spacetimedb.reducer(
     // Try to find as spectator
     for (const spectator of ctx.db.Spectator.spectator_game_id.filter(gameId)) {
       if (spectator.identity.toHexString() === ctx.sender.toHexString()) {
+        const displayName = spectator.displayName;
         ctx.db.Spectator.id.delete(spectator.id);
+        ctx.db.ChatMessage.insert({
+          id: 0n,
+          gameId,
+          senderId: 0n,
+          text: `${displayName} stopped spectating`,
+          sentAt: ctx.timestamp,
+        });
         return;
       }
     }
 
     throw new SenderError('Not a participant in this game');
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: leave_as_spectator
+// Spectator-only leave path. Used by the spectator tab on unmount so that
+// self-spectate works: leave_game above hits the Player branch first when
+// the same identity has both rows, so spectators need a dedicated reducer.
+// Silent no-op if no Spectator row exists (e.g. ban-rejected join, double
+// fire on unmount).
+// ---------------------------------------------------------------------------
+export const leave_as_spectator = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    for (const spectator of ctx.db.Spectator.spectator_game_id.filter(gameId)) {
+      if (spectator.identity.toHexString() === ctx.sender.toHexString()) {
+        const displayName = spectator.displayName;
+        ctx.db.Spectator.id.delete(spectator.id);
+        ctx.db.ChatMessage.insert({
+          id: 0n,
+          gameId,
+          senderId: 0n,
+          text: `${displayName} stopped spectating`,
+          sentAt: ctx.timestamp,
+        });
+        return;
+      }
+    }
   }
 );
 
@@ -5609,6 +5675,83 @@ export const send_chat = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: set_share_hand_with_spectators
+// Per-player toggle that controls hand visibility to all current and future
+// spectators. Global per player (not per-spectator).
+// ---------------------------------------------------------------------------
+export const set_share_hand_with_spectators = spacetimedb.reducer(
+  { gameId: t.u64(), share: t.bool() },
+  (ctx, { gameId, share }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.shareHandWithSpectators === share) return;
+    ctx.db.Player.id.update({ ...player, shareHandWithSpectators: share });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: set_game_private
+// Either seated player flips Game.isPublic. Existing spectators stay; new
+// joins via join_as_spectator are blocked while isPublic=false.
+// ---------------------------------------------------------------------------
+export const set_game_private = spacetimedb.reducer(
+  { gameId: t.u64(), isPublic: t.bool() },
+  (ctx, { gameId, isPublic }) => {
+    const caller = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.isPublic === isPublic) return;
+
+    ctx.db.Game.id.update({ ...game, isPublic });
+
+    const text = isPublic
+      ? `Game set to public by ${caller.displayName}`
+      : `Game set to private by ${caller.displayName}`;
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId,
+      senderId: 0n, // 0n = system message sentinel; autoInc IDs start at 1
+      text,
+      sentAt: ctx.timestamp,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: kick_spectator
+// Either seated player removes a spectator and bans their identity from
+// rejoining for the remainder of this game.
+// ---------------------------------------------------------------------------
+export const kick_spectator = spacetimedb.reducer(
+  { gameId: t.u64(), spectatorId: t.u64() },
+  (ctx, { gameId, spectatorId }) => {
+    const caller = findPlayerBySender(ctx, gameId);
+
+    const target = ctx.db.Spectator.id.find(spectatorId);
+    if (!target || target.gameId !== gameId) {
+      throw new SenderError('Spectator not found in this game');
+    }
+
+    ctx.db.SpectatorBan.insert({
+      id: 0n,
+      gameId,
+      identity: target.identity,
+      bannedBySeat: caller.seat,
+      bannedAt: ctx.timestamp,
+    });
+
+    ctx.db.Spectator.id.delete(target.id);
+
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId,
+      senderId: 0n,
+      text: `${target.displayName} was removed from spectators by ${caller.displayName}`,
+      sentAt: ctx.timestamp,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: set_player_option
 // ---------------------------------------------------------------------------
 export const set_player_option = spacetimedb.reducer(
@@ -6264,6 +6407,73 @@ export const shuffle_opponent_deck = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: request_spectator_hand_reveal
+// Spectator-initiated request that prompts both players via a banner.
+// Rate-limited: if a request from this spectator is already pending,
+// silently no-op (client-side disable is bypassable; this is the real gate).
+// ---------------------------------------------------------------------------
+export const request_spectator_hand_reveal = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    // Find the spectator row for the caller
+    let spectator: any = null;
+    for (const s of ctx.db.Spectator.spectator_game_id.filter(gameId)) {
+      if (s.identity.toHexString() === ctx.sender.toHexString()) {
+        spectator = s;
+        break;
+      }
+    }
+    if (!spectator) throw new SenderError('Not a spectator in this game');
+
+    // Rate limit: silently no-op if an active request already exists for
+    // this (gameId, spectatorId).
+    for (const req of ctx.db.SpectatorHandRequest.spectator_hand_request_game_id.filter(gameId)) {
+      if (req.spectatorId === spectator.id) return;
+    }
+
+    const row = ctx.db.SpectatorHandRequest.insert({
+      id: 0n,
+      gameId,
+      spectatorId: spectator.id,
+      spectatorName: spectator.displayName,
+      requestedAt: ctx.timestamp,
+    });
+
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId,
+      senderId: 0n,
+      text: `${spectator.displayName} requested to see hands`,
+      sentAt: ctx.timestamp,
+    });
+
+    // Schedule expiry 30s out
+    const future = ctx.timestamp.microsSinceUnixEpoch + 30_000_000n;
+    ctx.db.SpectatorHandRequestExpiry.insert({
+      scheduledId: 0n,
+      scheduledAt: ScheduleAt.time(future),
+      requestId: row.id,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Scheduled reducer: expire_spectator_hand_request
+// Auto-cleanup of SpectatorHandRequest 30s after creation. .find() before
+// .delete() to no-op safely if the row was already removed elsewhere.
+// ---------------------------------------------------------------------------
+export const expire_spectator_hand_request = spacetimedb.reducer(
+  { arg: SpectatorHandRequestExpiry.rowType },
+  (ctx, { arg }) => {
+    const row = ctx.db.SpectatorHandRequest.id.find(arg.requestId);
+    if (row) ctx.db.SpectatorHandRequest.id.delete(arg.requestId);
+  }
+);
+
+// Wire the scheduled reducer to the schema's forward reference
+setSpectatorHandRequestExpiryReducer(expire_spectator_hand_request);
+
+// ---------------------------------------------------------------------------
 // Lifecycle: clientDisconnected
 // ---------------------------------------------------------------------------
 export const onDisconnect = spacetimedb.clientDisconnected((ctx) => {
@@ -6298,6 +6508,24 @@ export const onDisconnect = spacetimedb.clientDisconnected((ctx) => {
       scheduledAt: ScheduleAt.time(futureTime),
       gameId: player.gameId,
       playerId: player.id,
+    });
+  }
+
+  // Safety net for spectators when leave_as_spectator never fires
+  // (mobile backgrounding, crashes, network drops). Unlike Players,
+  // Spectators get no reconnect grace — their only persistent state is
+  // the row itself, so reconnect = re-call joinAsSpectator.
+  for (const spectator of ctx.db.Spectator.iter()) {
+    if (spectator.identity.toHexString() !== ctx.sender.toHexString()) continue;
+    const displayName = spectator.displayName;
+    const gameId = spectator.gameId;
+    ctx.db.Spectator.id.delete(spectator.id);
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId,
+      senderId: 0n,
+      text: `${displayName} stopped spectating`,
+      sentAt: ctx.timestamp,
     });
   }
 });

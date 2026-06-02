@@ -93,3 +93,7 @@ tmp/*
 test_shopify.py
 .mcp.json
 .playwright-mcp/
+
+# Playwright e2e artifacts (root outputDir)
+/test-results
+/playwright-report

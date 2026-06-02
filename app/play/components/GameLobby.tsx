@@ -134,6 +134,10 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
     setPendingLobbyCode(null);
   }
 
+  function handleWatchFromLobby(code: string) {
+    router.push(`/play/spectate/${code}`);
+  }
+
   function handleJoinFromLobby(code: string, overrideDisplayName?: string) {
     if (!hasUsername && !overrideDisplayName) {
       setPendingAction('lobby-join');
@@ -473,25 +477,26 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                   )}
                 </Button>
               </div>
-              {/* Spectate toggle — disabled until spectator mode is ready */}
-              <div className="relative group flex items-center gap-2.5 justify-center opacity-50">
+              {/* Spectate toggle */}
+              <div className="flex items-center gap-2.5 justify-center">
                 <label htmlFor="spectate-toggle" className="text-sm text-muted-foreground">
                   Spectate
                 </label>
                 <button
                   id="spectate-toggle"
                   role="switch"
-                  aria-checked={false}
-                  disabled
-                  className="relative inline-flex h-6 w-10 items-center rounded-full transition-colors bg-muted cursor-not-allowed"
+                  aria-checked={isSpectate}
+                  onClick={() => setIsSpectate(!isSpectate)}
+                  className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
+                    isSpectate ? 'bg-primary' : 'bg-muted'
+                  }`}
                 >
                   <span
-                    className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-[3px]"
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isSpectate ? 'translate-x-[22px]' : 'translate-x-[3px]'
+                    }`}
                   />
                 </button>
-                <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-muted-foreground bg-popover border rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  Coming soon
-                </span>
               </div>
             </div>
           </div>
@@ -515,6 +520,7 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                 selectedDeckFormat={selectedDeck?.format ?? null}
                 joiningCode={isJoining ? gameCode : null}
                 onJoinGame={handleJoinFromLobby}
+                onWatchGame={handleWatchFromLobby}
               />
             </div>
           )}

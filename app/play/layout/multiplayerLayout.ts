@@ -283,8 +283,19 @@ export function calculateMultiplayerLayout(
   stageWidth: number,
   stageHeight: number,
   format: 'T1' | 'T2' | 'Paragon' = 'T1',
+  viewerKind: 'player' | 'spectator' = 'player',
 ): MultiplayerLayout {
-  const profile = getProfile(stageWidth);
+  const baseProfile = getProfile(stageWidth);
+  // Spectators have no toolbar and no personal hand — rebalance some height
+  // from the bottom hand zone to the top so opponent-style hands aren't
+  // clipped and seat-0/seat-1 hands feel more symmetric.
+  const profile: LayoutProfile = viewerKind === 'spectator'
+    ? {
+        ...baseProfile,
+        oppHandRatio: baseProfile.oppHandRatio + 0.035,
+        playerHandRatio: baseProfile.playerHandRatio - 0.035,
+      }
+    : baseProfile;
   const pad = 6;
   const zonePad = 4;
 

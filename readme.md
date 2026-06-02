@@ -115,12 +115,6 @@ Card-specific rulings
 Card groupings
 AoD calculations
 
-## Bugs
-Ending tournament early bug
-CA State T1 bug
-jayden mode tournament
-redemptionccg app logo (Top nav) takes a while to load in 
-bright green in dark mode needs dimming
 
 ## short term
 add aod button
@@ -128,7 +122,6 @@ Fallow audit: https://github.com/fallow-rs/fallow
 Pre-bake duplicate card groups at build time (static JSON) instead of fetching from Supabase at runtime — eliminates cold-start connection pressure on deckcheck
 
 ## long term
-add maybeboard
 add deck versioning
 Collection Tracker
 add wishlist
@@ -148,7 +141,3 @@ Offline intallable app on phone (Progressive Web app with offline capabilities)
 save game, load game, invite to game?
 battle phase/zone could be better
 
-
-# Tournament tracker improvements
-add ability to re-pair mid-round
-add place where all tournament timers could be seen in one place
