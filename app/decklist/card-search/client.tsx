@@ -25,6 +25,7 @@ import type { User } from "@supabase/supabase-js";
 import { deleteDeckAction } from "../actions";
 import { MobileBottomNav } from "./components/MobileBottomNav";
 import { useCardPrices } from "./hooks/useCardPrices";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const supabase = createClient();
 
@@ -268,6 +269,9 @@ export default function CardSearchClient() {
   const [mode, setMode] = useState<"deck" | "spotlight">("deck");
   const [spotlightCard, setSpotlightCard] = useState<Card | null>(null);
   const isSpotlight = mode === "spotlight";
+  // Drag-to-deck is disabled on mobile — touch drag doesn't work reliably and
+  // the tap/stepper controls cover adding cards.
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const [player1Name, setPlayer1Name] = useState("Player 1");
   const [player2Name, setPlayer2Name] = useState("Player 2");
   const [player1Score, setPlayer1Score] = useState(0);
@@ -2207,9 +2211,9 @@ export default function CardSearchClient() {
               return (
                 <div
                   key={c.dataLine}
-                  draggable={!isSpotlight}
+                  draggable={!isSpotlight && !isMobile}
                   onDragStart={(e) => {
-                    if (isSpotlight) return;
+                    if (isSpotlight || isMobile) return;
                     // Native HTML5 drag — picked up by `useExternalDropTarget`
                     // on the deck-panel zones. No @dnd-kit dependency, so this
                     // works across the search↔deck context boundary without

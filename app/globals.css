@@ -125,9 +125,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* No horizontal page give: clip stray sub-pixel overflow (without
+       creating a scroll container, so sticky/fixed still work) and stop
+       iOS Safari's horizontal overscroll rubber-banding. */
+    overflow-x: clip;
+    overscroll-behavior-x: none;
   }
   html {
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    overscroll-behavior-x: none;
   }
 }
 

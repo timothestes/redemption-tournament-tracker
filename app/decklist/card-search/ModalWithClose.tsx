@@ -7,6 +7,7 @@ import { useCardRulings, type CardRuling } from "./hooks/useCardRulings";
 import { useDuplicateCards } from "./hooks/useDuplicateCards";
 import { SEARCH_DRAG_MIME } from "./hooks/useExternalDropTarget";
 import { useIsAdmin } from "../../../hooks/useIsAdmin";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { createRuling, updateRuling, deleteRuling } from "../../admin/rulings/actions";
 import { DuplicateCards, DuplicateCardsMobile } from "./components/DuplicateCards";
 import type { Card } from "./utils";
@@ -523,6 +524,9 @@ export default function ModalWithClose({
   const { siblings: duplicateSiblings } = useDuplicateCards(modalCard?.name ?? null);
   const { isAdmin, permissions } = useIsAdmin();
   const canManageRulings = isAdmin && permissions.includes('manage_rulings');
+  // Drag-to-deck from the modal image is disabled on mobile (touch drag is unreliable).
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const canDragToDeck = !!onAddCard && !isMobile;
   const [showMenu, setShowMenu] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
@@ -1234,9 +1238,9 @@ export default function ModalWithClose({
               <img
                 src={getImageUrl(modalCard.imgFile)}
                 alt={modalCard.name}
-                className={`max-w-full max-h-full object-contain rounded shadow-lg ${onAddCard ? "cursor-grab active:cursor-grabbing" : ""}`}
-                draggable={!!onAddCard}
-                onDragStart={onAddCard ? (e) => {
+                className={`max-w-full max-h-full object-contain rounded shadow-lg ${canDragToDeck ? "cursor-grab active:cursor-grabbing" : ""}`}
+                draggable={canDragToDeck}
+                onDragStart={canDragToDeck ? (e) => {
                   e.dataTransfer.setData(
                     SEARCH_DRAG_MIME,
                     JSON.stringify({ name: modalCard.name, set: modalCard.set }),

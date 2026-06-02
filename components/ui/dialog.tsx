@@ -74,6 +74,9 @@ function DialogContent({
     <div
       className={cn(
         "bg-[hsl(var(--dialog-bg))] border border-[hsl(var(--dialog-border))] rounded-lg shadow-xl ring-1 ring-black/5 dark:ring-white/5 w-full mx-4 overflow-hidden",
+        // Never exceed the viewport — cap height and let the body scroll so the
+        // header/footer stay pinned and tall modals are fully usable on mobile.
+        "flex flex-col max-h-[calc(100dvh-2rem)]",
         sizeClasses[size],
         className
       )}
@@ -97,7 +100,7 @@ function DialogHeader({
   return (
     <div
       className={cn(
-        "bg-[hsl(var(--dialog-header-bg))] border-b border-[hsl(var(--dialog-border))] px-6 py-4",
+        "shrink-0 bg-[hsl(var(--dialog-header-bg))] border-b border-[hsl(var(--dialog-border))] px-6 py-4",
         className
       )}
       {...props}
@@ -155,7 +158,7 @@ function DialogBody({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("px-6 py-4", className)} {...props}>
+    <div className={cn("min-h-0 overflow-y-auto px-6 py-4", className)} {...props}>
       {children}
     </div>
   );
@@ -173,7 +176,7 @@ function DialogFooter({
   return (
     <div
       className={cn(
-        "border-t border-[hsl(var(--dialog-border))] px-6 py-4 flex gap-3",
+        "shrink-0 border-t border-[hsl(var(--dialog-border))] px-6 py-4 flex gap-3",
         className
       )}
       {...props}

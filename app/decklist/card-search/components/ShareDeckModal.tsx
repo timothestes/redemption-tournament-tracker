@@ -90,15 +90,22 @@ export default function ShareDeckModal({
     setPending(v);
     try {
       await onSetVisibility(v);
+      // Switching to a shared state mints a link — drop it straight onto the
+      // clipboard so the user can paste it immediately, with a confirmation.
+      if (v === "unlisted" || v === "public") copyLink();
     } finally {
       setPending(null);
     }
   }
 
   function copyLink() {
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard
+      .writeText(shareUrl)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
   }
 
   return (

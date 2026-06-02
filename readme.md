@@ -132,7 +132,6 @@ metagame snapshot
 Teaching new players how to play
 add animations to goldfish/play mode
 Cube builder
-tournament tracker mobile ux support
 Deck upvoting
 Offline intallable app on phone (Progressive Web app with offline capabilities)
 

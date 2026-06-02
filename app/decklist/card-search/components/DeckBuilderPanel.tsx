@@ -22,6 +22,7 @@ import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
 import FullDeckView from "./FullDeckView";
 import DragGhost from "./DragGhost";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { Switch } from "@headlessui/react";
 import { Card, normalizeBrigadeField } from "../utils";
 import { validateDeck } from "../utils/deckValidation";
@@ -57,6 +58,9 @@ function getTagContrastColor(hex: string): string {
 }
 
 export type TabType = "main" | "reserve" | "maybe" | "info" | "cover";
+
+// Stable reference so DndContext doesn't re-init when drag is disabled on mobile.
+const EMPTY_SENSORS: never[] = [];
 
 /**
  * Wrapper that registers a @dnd-kit droppable. Must be used inside a DndContext —
@@ -269,6 +273,11 @@ export default function DeckBuilderPanel({
   // for both in-deck @dnd-kit drags AND external HTML5 drags from the search
   // column, so users see drop affordances regardless of source.
   const isDragging = activeDragCard !== null || isExternalDragActive;
+  // Drag-and-drop is disabled on mobile: touch drag is fiddly, fights scroll,
+  // and the stepper/tap controls cover every action drag would. Sensors must be
+  // created unconditionally (hooks rules); we drop them from DndContext below
+  // when on mobile so no drag can ever activate.
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const dndSensors = useSensors(
     // Mouse/pen: 10px movement before drag activates — gives twitchy hands
     // and precision trackpads more room before a click becomes a drag.
@@ -884,7 +893,7 @@ export default function DeckBuilderPanel({
 
   return (
     <DndContext
-      sensors={dndSensors}
+      sensors={isMobile ? EMPTY_SENSORS : dndSensors}
       collisionDetection={dndCollisionDetection}
       autoScroll={false}
       onDragStart={handleDragStart}
