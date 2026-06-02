@@ -265,21 +265,16 @@ button:focus, button:focus-visible,
   .deck-tabbar .tab-view-label  { display: inline; }
 }
 
-/* Deck builder header row: collapse Save button text and hide "New Deck"
-   label when the row is too narrow to fit them alongside the format pill
-   (T1 / T2 / Paragon). Same panel-width-not-viewport-width approach. */
+/* Deck builder header row: hide the "New Deck" label when the row is too
+   narrow to fit it alongside the format pill (T1 / T2 / Paragon) and the
+   action toolbar. Panel-width-not-viewport-width approach. */
 .deck-header-row {
   container-type: inline-size;
   container-name: deck-header;
 }
-.deck-header-row .save-label-long     { display: none; }
-.deck-header-row .save-label-short    { display: inline; }
 .deck-header-row .new-deck-label-long { display: none; }
 @container deck-header (min-width: 500px) {
-  .deck-header-row .save-label-long     { display: inline; }
-  .deck-header-row .save-label-short    { display: none; }
   .deck-header-row .new-deck-label-long { display: inline; }
-  .deck-header-row .save-btn            { min-width: 140px; }
 }
 
 /* Touch devices (no real :hover) can't trigger Tailwind's group-hover
