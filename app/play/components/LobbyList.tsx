@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTable, useSpacetimeDB } from 'spacetimedb/react';
 import { tables } from '@/lib/spacetimedb/module_bindings';
-import type { Game, Spectator } from '@/lib/spacetimedb/module_bindings/types';
+import type { Game, Player, Spectator } from '@/lib/spacetimedb/module_bindings/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Eye, Loader2 } from 'lucide-react';
@@ -27,6 +27,15 @@ export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJ
   // (it may never flip to true). Don't gate rendering on it.
   const [games] = useTable(tables.Game) as [Game[], boolean];
   const [spectators] = useTable(tables.Spectator) as [Spectator[], boolean];
+  // Only games with at least one connected player should be advertised. The
+  // predicate lives on the hook (not just the subscription SQL) so a player
+  // whose isConnected flips false drops from this view immediately, regardless
+  // of what other subscriptions keep cached. This is what stops abandoned games
+  // (host left, ghost connection, reaper not yet run) from lingering as
+  // watchable "LIVE" zombies in the lobby.
+  const [livePlayers] = useTable(
+    tables.Player.where((p) => p.isConnected.eq(true)),
+  ) as [Player[], boolean];
   const [now, setNow] = useState(Date.now());
   const [watchingCode, setWatchingCode] = useState<string | null>(null);
   const didSubscribe = useRef(false);
@@ -68,10 +77,24 @@ export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJ
     };
   }, []);
 
+  // Games with a live (connected) player. A game whose players have all
+  // dropped leaves this set within a few seconds (the server flips isConnected
+  // on websocket close), so it stops being listed long before the much slower
+  // status -> 'finished' reaper would have hidden it.
+  const liveGameIds = useMemo(
+    () => new Set((livePlayers || []).map((p) => p.gameId)),
+    [livePlayers],
+  );
+
   // Client-side filter as safety net (subscription already filters server-side)
   // Sort newest first so freshest games appear at top
   const openGames = (games || [])
-    .filter((g) => (g.status === 'waiting' || g.status === 'pregame' || g.status === 'playing') && g.isPublic)
+    .filter(
+      (g) =>
+        (g.status === 'waiting' || g.status === 'pregame' || g.status === 'playing') &&
+        g.isPublic &&
+        liveGameIds.has(g.id),
+    )
     .sort((a, b) => {
       const aTime = Number(a.createdAt.microsSinceUnixEpoch);
       const bTime = Number(b.createdAt.microsSinceUnixEpoch);

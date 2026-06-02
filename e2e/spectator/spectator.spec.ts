@@ -1,10 +1,10 @@
-import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { test, expect, type BrowserContext } from "@playwright/test";
 import {
   seedPlayer,
   cleanupPlayer,
   adminAvailable,
-  type SeededPlayer,
 } from "../spectatorSeed";
+import { login, hostGame } from "./playHelpers";
 
 // These tests exercise the spectator feature end-to-end against the live
 // SpacetimeDB dev module (NEXT_PUBLIC_SPACETIMEDB_DB_NAME=redemption-multiplayer-dev).
@@ -26,35 +26,6 @@ const requireSeed = () => {
     );
   }
 };
-
-/** Log a seeded user in through the sign-in UI on the given page. */
-async function login(page: Page, user: SeededPlayer) {
-  await page.goto("/sign-in");
-  await page.getByLabel(/email/i).fill(user.email);
-  await page.getByLabel(/password/i).fill(user.password);
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
-    timeout: 15_000,
-  });
-}
-
-/**
- * Host a public game and return its 4-char code. The passed page stays in the
- * waiting room afterwards, holding the host connection (and thus the game)
- * alive until the caller closes its context.
- */
-async function hostGame(page: Page): Promise<string> {
-  await page.goto("/play");
-  const createBtn = page.getByRole("button", { name: /create game/i });
-  await expect(createBtn).toBeEnabled({ timeout: 15_000 });
-  await createBtn.click();
-  await page.waitForURL(/\/play\/[A-Z0-9]{4}$/, { timeout: 20_000 });
-  const code = page.url().split("/").pop()!;
-  // Confirm the waiting room actually mounted with this code.
-  await expect(page.getByText("GAME CODE")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(code, { exact: true })).toBeVisible();
-  return code;
-}
 
 test.describe("spectator mode", () => {
   test("anonymous user can open the spectate route (no auth wall)", async ({
