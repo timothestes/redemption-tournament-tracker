@@ -14,7 +14,11 @@ vi.mock('react-konva', () => ({
   Image: () => null,
 }));
 
-import { isHandCardFaceVisible } from '../MultiplayerCanvas';
+import {
+  isHandCardFaceVisible,
+  isFaceDownInPlayCardVisible,
+  canViewerToggleMeek,
+} from '../MultiplayerCanvas';
 
 // Unit coverage for the hand-card visibility predicate that gates whether a
 // hand card renders face-up for self / opponent / spectator viewers. This is
@@ -189,5 +193,95 @@ describe('isHandCardFaceVisible', () => {
         NOW,
       ),
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isFaceDownInPlayCardVisible — gates hover-preview of FACE-DOWN in-play cards.
+// The caller handles face-up / actively-revealed cards; this only decides
+// whether a face-down card's identity may leak to the viewer.
+// ---------------------------------------------------------------------------
+
+const NEITHER = { myShareHand: false, oppShareHand: false };
+
+describe('isFaceDownInPlayCardVisible', () => {
+  describe("viewerKind 'player'", () => {
+    it('sees its own face-down card (player1), regardless of share flags', () => {
+      expect(isFaceDownInPlayCardVisible('player', 'player1', NEITHER)).toBe(true);
+      expect(
+        isFaceDownInPlayCardVisible('player', 'player1', {
+          myShareHand: true,
+          oppShareHand: true,
+        }),
+      ).toBe(true);
+    });
+
+    it("never sees the opponent's face-down card (player2)", () => {
+      expect(isFaceDownInPlayCardVisible('player', 'player2', NEITHER)).toBe(false);
+      // Share flags are a spectator concept and must not affect the player view.
+      expect(
+        isFaceDownInPlayCardVisible('player', 'player2', {
+          myShareHand: true,
+          oppShareHand: true,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("viewerKind 'spectator'", () => {
+    it('hidden for both seats by default (nobody sharing)', () => {
+      expect(isFaceDownInPlayCardVisible('spectator', 'player1', NEITHER)).toBe(false);
+      expect(isFaceDownInPlayCardVisible('spectator', 'player2', NEITHER)).toBe(false);
+    });
+
+    it("sees seat0's (player1) card only when seat0 shares", () => {
+      expect(
+        isFaceDownInPlayCardVisible('spectator', 'player1', {
+          myShareHand: true,
+          oppShareHand: false,
+        }),
+      ).toBe(true);
+      // seat1 sharing must not expose seat0.
+      expect(
+        isFaceDownInPlayCardVisible('spectator', 'player1', {
+          myShareHand: false,
+          oppShareHand: true,
+        }),
+      ).toBe(false);
+    });
+
+    it("sees seat1's (player2) card only when seat1 shares", () => {
+      expect(
+        isFaceDownInPlayCardVisible('spectator', 'player2', {
+          myShareHand: false,
+          oppShareHand: true,
+        }),
+      ).toBe(true);
+      expect(
+        isFaceDownInPlayCardVisible('spectator', 'player2', {
+          myShareHand: true,
+          oppShareHand: false,
+        }),
+      ).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// canViewerToggleMeek — only a player acting on their own card may toggle meek.
+// ---------------------------------------------------------------------------
+
+describe('canViewerToggleMeek', () => {
+  it('allows a player on their own card (player1)', () => {
+    expect(canViewerToggleMeek('player', 'player1')).toBe(true);
+  });
+
+  it("forbids a player on the opponent's card (player2)", () => {
+    expect(canViewerToggleMeek('player', 'player2')).toBe(false);
+  });
+
+  it('forbids a spectator on either card (read-only)', () => {
+    expect(canViewerToggleMeek('spectator', 'player1')).toBe(false);
+    expect(canViewerToggleMeek('spectator', 'player2')).toBe(false);
   });
 });

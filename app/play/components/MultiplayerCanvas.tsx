@@ -246,6 +246,34 @@ export function isHandCardFaceVisible(
   return ownerPlayer.shareHandWithSpectators === true || inSnapshot;
 }
 
+/**
+ * Decide whether a FACE-DOWN in-play card's identity may be shown to the viewer
+ * (e.g. in the hover loupe). Face-up / actively-revealed cards are public and
+ * handled by the caller; this only governs cards that are face-down on the table.
+ * - 'player': sees their own face-down cards ('player1'), never the opponent's.
+ * - 'spectator': sees neither side's UNLESS that card's owner has opted to share
+ *   with spectators (the same consent flag as hand/reserve).
+ */
+export function isFaceDownInPlayCardVisible(
+  viewerKind: 'player' | 'spectator',
+  ownerId: string,
+  share: { myShareHand: boolean; oppShareHand: boolean },
+): boolean {
+  if (viewerKind === 'player') return ownerId === 'player1';
+  return ownerId === 'player1' ? share.myShareHand : share.oppShareHand;
+}
+
+/**
+ * Whether a double-click may toggle "meek" on a card. Only a player acting on
+ * their own card ('player1') may — spectators are strictly read-only.
+ */
+export function canViewerToggleMeek(
+  viewerKind: 'player' | 'spectator',
+  ownerId: string,
+): boolean {
+  return viewerKind === 'player' && ownerId === 'player1';
+}
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -476,15 +504,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       reverseAction: () => rawMoveCard(BigInt(idStr), fromZone, undefined, posX, posY, ownerId),
     });
   }, [undoStack, findCardForUndo, rawMoveCard]);
-
-  const [claimBannerDismissed, setClaimBannerDismissed] = useState(false);
-
-  // Reset claim banner when opponent reconnects
-  useEffect(() => {
-    if (!gameState.disconnectTimeoutFired) {
-      setClaimBannerDismissed(false);
-    }
-  }, [gameState.disconnectTimeoutFired]);
 
   // ---- Layout ----
   // Normalize the raw game.format string (e.g. "Paragon Type 1", "Type 2") to
@@ -3644,7 +3663,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Double-click toggles meek on your own cards
   const handleDblClick = useCallback((card: GameCard) => {
     if (leftClicksSinceContextMenuRef.current < 2) return;
-    if (card.ownerId !== 'player1') return; // only your own cards
+    // Only a player acting on their own card may toggle meek (spectators read-only).
+    if (!canViewerToggleMeek(isSpectator ? 'spectator' : 'player', card.ownerId)) return;
     const willBeMeek = !card.isMeek;
     if (card.isMeek) {
       multiplayerActions.unmeekCard(card.instanceId);
@@ -3657,7 +3677,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       isMeek: willBeMeek,
       notes: card.notes,
     });
-  }, [multiplayerActions, setPreviewCard]);
+  }, [multiplayerActions, setPreviewCard, isSpectator]);
   const noopDblClick = useCallback((_card: GameCard) => {}, []);
   const noopContextMenu = useCallback((_card: GameCard, _e: Konva.KonvaEventObject<PointerEvent>) => {}, []);
   const noopMouseEnter = useCallback((_card: GameCard, _e: Konva.KonvaEventObject<MouseEvent>) => {}, []);
@@ -3671,11 +3691,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       setHoveredInstanceId(card.instanceId);
       startHoverAnimation();
 
-      // Don't show card preview for face-down opponent cards (hidden info) —
-      // but actively revealed cards ARE public, so allow preview on those.
+      // Don't preview face-down (hidden-info) cards. A player never sees the
+      // opponent's; a spectator sees neither side's UNLESS that card's owner has
+      // shared with spectators (same consent flag as the hand/reserve). Actively
+      // revealed cards (revealUntil) are public to everyone, so always allowed.
       const revealedNow =
         typeof card.revealUntil === 'number' && card.revealUntil > Date.now();
-      if (card.isFlipped && card.ownerId === 'player2' && !revealedNow) {
+      if (
+        card.isFlipped &&
+        !revealedNow &&
+        !isFaceDownInPlayCardVisible(
+          isSpectator ? 'spectator' : 'player',
+          card.ownerId,
+          { myShareHand, oppShareHand },
+        )
+      ) {
         setHoveredCard(null);
         return;
       }
@@ -3690,7 +3720,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       setHoverReady(false);
       hoverTimerRef.current = setTimeout(() => setHoverReady(true), 250);
     },
-    [startHoverAnimation],
+    [startHoverAnimation, isSpectator, myShareHand, oppShareHand],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -7402,53 +7432,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-
-      {/* Disconnect timeout — notification banner */}
-      {gameState.disconnectTimeoutFired && !claimBannerDismissed && (
-        <div
-          style={{
-            position: 'absolute',
-            top: opponentHandRect.y + opponentHandRect.height + 8,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 900,
-            background: 'rgba(10, 8, 5, 0.95)',
-            border: '1px solid rgba(180, 140, 60, 0.6)',
-            borderRadius: 8,
-            padding: '12px 20px',
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 13,
-            color: '#e8dcc8',
-            textAlign: 'center' as const,
-            display: 'flex',
-            flexDirection: 'column' as const,
-            alignItems: 'center',
-            gap: 10,
-            maxWidth: 360,
-          }}
-        >
-          <span style={{ letterSpacing: '0.04em' }}>
-            Your opponent has been disconnected for 5 minutes.
-          </span>
-          <button
-            onClick={() => setClaimBannerDismissed(true)}
-            style={{
-              background: 'rgba(50, 45, 35, 0.8)',
-              border: '1px solid rgba(107, 78, 39, 0.4)',
-              borderRadius: 5,
-              padding: '6px 14px',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 11,
-              color: '#a89878',
-              cursor: 'pointer',
-              letterSpacing: '0.04em',
-            }}
-          >
-            Dismiss
-          </button>
         </div>
       )}
 
