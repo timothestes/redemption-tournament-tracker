@@ -2,8 +2,11 @@
 
 import { Button } from "../../../../components/ui/button";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { HiPencil } from "react-icons/hi";
+import { Wrench, RefreshCw, Unlock, SquarePen } from "lucide-react";
 import CountdownTimer from "../../../../components/ui/CountdownTimer";
+import RoundProgressBar from "../../../../components/ui/RoundProgressBar";
 import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
 import EditTournamentNameModal from "../../../../components/ui/EditTournamentNameModal";
 import TournamentStartModal from "../../../../components/ui/TournamentStartModal";
@@ -17,6 +20,21 @@ import { buildStateFromSupabase } from "../../../../utils/tournament/stateAdapte
 import { recomputeTotalsFromHistory } from "../../../../lib/tournament/results";
 import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
 import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
+import { RegeneratePairingsButton } from "../../../../components/ui/RegeneratePairingsButton";
+import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/ui/UnlockAndRepairDialog";
+import { RepairTournamentBanner } from "../../../../components/ui/RepairTournamentBanner";
+import { RepairPastResultPicker, type PickerMatch } from "../../../../components/ui/RepairPastResultPicker";
+import MatchEditModal from "../../../../components/ui/match-edit";
+import { EndTournamentDialog } from "../../../../components/ui/EndTournamentDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../../../components/ui/dropdown-menu";
 
 const supabase = createClient();
 
@@ -34,9 +52,6 @@ export default function TournamentPage({
   const [activeTab, setActiveTab] = useState(0);
   const [isEditParticipantModalOpen, setIsEditParticipantModalOpen] =
     useState<boolean>(false);
-  const [newMatchPoints, setNewMatchPoints] = useState<string>("");
-  const [newDifferential, setNewDifferential] = useState<string>("");
-  const [newDroppedOut, setNewDroppedOut] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,15 +70,37 @@ export default function TournamentPage({
   });
 
   const [latestRound, setLatestRound] = useState<any>(null);
+  const [scoredCurrentRoundMatches, setScoredCurrentRoundMatches] = useState<ScoredMatch[]>([]);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Confirmation dialogs
+  const [endTournamentConfirmOpen, setEndTournamentConfirmOpen] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
+  const [tournamentNotFound, setTournamentNotFound] = useState(false);
+  // Header overflow-menu controls the Re-pair dialog
+  const [repairDialogOpen, setRepairDialogOpen] = useState(false);
+  // Bumped after re-pair RPC succeeds so TournamentRounds re-fetches matches.
+  // Without this nonce, the matches table only re-fetches on currentPage /
+  // tournamentId change, so the host sees stale pairings until they refresh.
+  const [pairingsRefreshNonce, setPairingsRefreshNonce] = useState(0);
+
+  // Picker state for "Edit a past result"
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerRepairMatchId, setPickerRepairMatchId] = useState<string | null>(null);
+  const [pickerRepairMatch, setPickerRepairMatch] = useState<any>(null);
+  const [allCompletedMatches, setAllCompletedMatches] = useState<PickerMatch[]>([]);
+  const [completedRoundNumbers, setCompletedRoundNumbers] = useState<number[]>([]);
 
   const showToast = (
     message: string,
     type: "success" | "error" | "warning" | "info" = "success"
   ) => {
     setToast({ message, show: true, type });
-    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2000);
+    const duration = type === "success" ? 2000 : 4500;
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), duration);
   };
 
   useEffect(() => {
@@ -112,9 +149,19 @@ export default function TournamentPage({
         .eq("id", id)
         .single();
       if (error) throw error;
+      if (!data) {
+        setTournamentNotFound(true);
+        return;
+      }
       setTournament(data);
+      setTournamentNotFound(false);
     } catch (error) {
+      // Supabase returns a PGRST116 error code when .single() hits 0 rows.
+      // Treat any fetch failure on a fresh load (no tournament loaded yet)
+      // as a "not found" so the user gets a real error state instead of
+      // an indefinite "Loading…" breadcrumb.
       console.error("Error fetching tournament details:", error);
+      setTournamentNotFound(true);
     }
   };
 
@@ -138,28 +185,10 @@ export default function TournamentPage({
   const updateParticipant = async () => {
     if (!currentParticipant || !newParticipantName.trim()) return;
 
-    const updateData: {
-      name?: string;
-      match_points?: number;
-      differential?: number;
-      dropped_out?: boolean;
-    } = {
-      name: newParticipantName,
-      dropped_out: newDroppedOut,
-    };
-
-    if (newMatchPoints !== "") {
-      updateData.match_points = Number(newMatchPoints);
-    }
-
-    if (newDifferential !== "") {
-      updateData.differential = Number(newDifferential);
-    }
-
     try {
       const { error } = await supabase
         .from("participants")
-        .update(updateData)
+        .update({ name: newParticipantName })
         .eq("id", currentParticipant.id);
 
       if (error) throw error;
@@ -181,7 +210,7 @@ export default function TournamentPage({
         .eq("id", id);
       if (error) throw error;
       fetchParticipants();
-      showToast("Participant deleted successfully!", "error");
+      showToast("Participant deleted successfully!", "success");
     } catch (error) {
       showToast("Error deleting participant.", "error");
       console.error("Error deleting participant:", error);
@@ -199,7 +228,14 @@ export default function TournamentPage({
       return;
     }
 
-    // Handle tournament end
+    // Destructive end-tournament path — confirm first.
+    setEndTournamentConfirmOpen(true);
+  };
+
+  const performEndTournament = async () => {
+    if (!tournament) return;
+    setTogglingStatus(true);
+
     const now = new Date().toISOString();
     if (latestRound && !latestRound?.is_completed) {
       const client = await createClient();
@@ -240,10 +276,13 @@ export default function TournamentPage({
         .single();
       if (error) throw error;
       setTournament(data);
+      setActiveTab(2); // jump to Standings — the tournament is now complete
       showToast("Tournament ended successfully!", "success");
     } catch (error) {
       showToast("Error updating tournament status.", "error");
       console.error("Error updating tournament status:", error);
+    } finally {
+      setTogglingStatus(false);
     }
   };
 
@@ -381,6 +420,17 @@ export default function TournamentPage({
         // Creating the pairing for the next round
         await createPairingForRound(round + 1);
 
+        // Same reason as handleEndRound in TournamentRounds: the recompute
+        // a few lines above ran before the next round's bye was staged, so
+        // the bye recipient's match_points lag by +3 until the next recompute
+        // fires. Re-run it now to keep the standings invariant from breaking
+        // transiently during round N+1.
+        const { error: recomputeError } = await client.rpc(
+          "recompute_participant_totals",
+          { p_tournament_id: tournament.id },
+        );
+        if (recomputeError) console.log(recomputeError);
+
         const { error: tournamentError } = await client
           .from("tournaments")
           .update({
@@ -464,6 +514,10 @@ export default function TournamentPage({
       return false;
     }
     fetchParticipants();
+    // Bump the pairings refresh nonce so the Rounds tab re-fetches matches/byes
+    // and reflects the dropped player on next render (the current-round pairings
+    // table doesn't re-render on participants change otherwise).
+    setPairingsRefreshNonce((n) => n + 1);
     return true;
   }
 
@@ -477,20 +531,43 @@ export default function TournamentPage({
       return false;
     }
     fetchParticipants();
+    // Same reason as dropOutParticipant — keep the Rounds tab in sync.
+    setPairingsRefreshNonce((n) => n + 1);
     return true;
   }
+
+  // Re-fetch the current round's scored matches. This drives the re-pair
+  // gating (disable "Re-pair current round" / surface "Unlock and re-pair…"),
+  // so it must run whenever a result is entered — not just when the tournament
+  // object changes. Exposed to the Rounds tab via onMatchesChanged below.
+  const fetchScoredCurrentRoundMatches = useCallback(async () => {
+    if (!tournament?.id || !tournament?.current_round) return;
+    const { data: scoredMatchesData } = await supabase
+      .from("matches")
+      .select("id, player1_score, player2_score, player1:participants!matches_player1_id_fkey(name), player2:participants!matches_player2_id_fkey(name)")
+      .eq("tournament_id", tournament.id)
+      .eq("round", tournament.current_round)
+      .not("player1_score", "is", null);
+    setScoredCurrentRoundMatches((scoredMatchesData ?? []).map((m: any) => ({
+      id: m.id,
+      player1Name: m.player1?.name ?? "?",
+      player2Name: m.player2?.name ?? "?",
+      player1Score: m.player1_score,
+      player2Score: m.player2_score,
+    })));
+  }, [tournament?.id, tournament?.current_round]);
 
   useEffect(() => {
     if (tournament) {
       (async () => {
         const client = createClient();
 
-        const { data, error } = await client
+        const { data } = await client
           .from("rounds")
           .select("round_number, started_at, ended_at, is_completed")
           .eq("tournament_id", tournament.id)
           .eq("round_number", tournament.current_round)
-          .single();
+          .maybeSingle();
 
         if (data) {
           setLatestRound(data);
@@ -498,9 +575,56 @@ export default function TournamentPage({
             setIsRoundActive(true);
           }
         }
+
+        await fetchScoredCurrentRoundMatches();
       })();
     }
-  }, [tournament]);
+  }, [tournament, fetchScoredCurrentRoundMatches]);
+
+  // Fetch data for the repair picker (completed rounds + all matches with names)
+  useEffect(() => {
+    if (!tournament?.id) return;
+    const fetchPickerData = async () => {
+      const client = createClient();
+      const { data: rounds } = await client
+        .from("rounds")
+        .select("round_number")
+        .eq("tournament_id", tournament.id)
+        .eq("is_completed", true)
+        .order("round_number", { ascending: false });
+      setCompletedRoundNumbers((rounds ?? []).map((r: any) => r.round_number));
+
+      const { data: ms } = await client
+        .from("matches")
+        .select("id, round, player1:participants!matches_player1_id_fkey(name), player2:participants!matches_player2_id_fkey(name)")
+        .eq("tournament_id", tournament.id);
+      setAllCompletedMatches((ms ?? []).map((m: any) => ({
+        id: m.id,
+        round: m.round,
+        player1Name: m.player1?.name ?? "?",
+        player2Name: m.player2?.name ?? "?",
+      })));
+    };
+    fetchPickerData();
+  }, [tournament?.id, scoredCurrentRoundMatches]);
+
+  // Fetch full match row when picker selects a match
+  useEffect(() => {
+    if (!pickerRepairMatchId) {
+      setPickerRepairMatch(null);
+      return;
+    }
+    const fetchMatch = async () => {
+      const client = createClient();
+      const { data } = await client
+        .from("matches")
+        .select("id, round, player1_score, player2_score, player1_id:participants!matches_player1_id_fkey(id, name), player2_id:participants!matches_player2_id_fkey(id, name)")
+        .eq("id", pickerRepairMatchId)
+        .single();
+      setPickerRepairMatch(data ?? null);
+    };
+    fetchMatch();
+  }, [pickerRepairMatchId]);
 
   const fetchDecklists = useCallback(async () => {
     if (!id) return;
@@ -515,12 +639,17 @@ export default function TournamentPage({
       fetchTournamentDetails();
       fetchParticipants();
       fetchDecklists();
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        setCurrentUserId(user?.id ?? null);
+      });
     }
   }, [id]);
 
+  const isHost = !!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId);
+
   return (
-    <div className="flex min-h-screen px-5 w-full jayden-gradient-bg">
-      <div className="max-w-4xl max-md:max-w-full mx-auto space-y-5">
+    <div className="flex min-h-screen px-3 sm:px-5 w-full jayden-gradient-bg">
+      <div className="w-full max-w-4xl mx-auto space-y-5">
         <Breadcrumb
           items={[
             { label: "Tournaments", href: "/tracker/tournaments" },
@@ -535,39 +664,150 @@ export default function TournamentPage({
         />
         
         <div className="flex-grow max-w-4xl mx-auto">
+          {tournamentNotFound && !tournament && (
+            <div className="my-12 rounded-lg border border-border bg-card p-8 text-center">
+              <h2 className="text-xl font-semibold text-foreground">
+                Tournament not found
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                It may have been deleted, or the link is wrong.
+              </p>
+              <Link
+                href="/tracker/tournaments"
+                className="mt-4 inline-block px-3 py-2 rounded-md border border-border text-foreground hover:bg-muted text-sm"
+              >
+                Back to tournaments
+              </Link>
+            </div>
+          )}
+          {!tournament && !tournamentNotFound && (
+            <header
+              className="print:hidden sticky top-0 z-30 -mx-3 sm:-mx-5 mb-4 px-3 sm:px-5 py-3 backdrop-blur bg-background/80 border-b border-border"
+            >
+              <div className="h-16 animate-pulse rounded-md bg-muted/30" />
+            </header>
+          )}
           {tournament && (
-            <div className="mb-6 space-y-4">
-              {/* Title row with status badge */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-3xl font-bold">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewTournamentName(tournament.name);
-                      setIsEditTournamentModalOpen(true);
-                    }}
-                    className="group inline-flex items-center gap-2 -mx-2 px-2 py-1 rounded-md text-left hover:bg-muted transition-colors"
-                    aria-label="Edit tournament name"
+            <>
+              <RepairTournamentBanner
+                tournamentId={tournament.id}
+                currentRound={tournament.current_round ?? 1}
+                isRoundActive={isRoundActive}
+              />
+              <header
+                className="print:hidden relative sticky top-0 z-30 -mx-3 sm:-mx-5 mb-4 px-3 sm:px-5 py-3 backdrop-blur bg-background/80 border-b border-border"
+              >
+                {/* Thin progress bar at the very top edge — ambient "how much
+                    time is left" signal, only mounted while a round is live. */}
+                {tournament?.has_started &&
+                  !tournament?.has_ended &&
+                  tournament?.round_length &&
+                  latestRound?.started_at &&
+                  !latestRound?.is_completed && (
+                    <RoundProgressBar
+                      key={latestRound?.started_at || "inactive"}
+                      startTime={latestRound?.started_at || null}
+                      durationMinutes={tournament.round_length}
+                    />
+                  )}
+                {/* Row 1: identity + status + timer + overflow menu */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                  <h1 className="text-xl sm:text-2xl font-bold max-w-full">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewTournamentName(tournament.name);
+                        setIsEditTournamentModalOpen(true);
+                      }}
+                      className="group inline-flex items-center gap-2 -mx-1 px-1 py-0.5 rounded-md text-left hover:bg-muted transition-colors max-w-full"
+                      aria-label="Edit tournament name"
+                    >
+                      <span>{tournament.name}</span>
+                      <HiPencil className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                    </button>
+                  </h1>
+                  {/* Status pill — neutral hierarchy:
+                      amber=not started, foreground=in progress, muted=ended. */}
+                  <span
+                    className={`text-base font-semibold px-3 py-1.5 rounded-full whitespace-nowrap ${
+                      tournament.has_ended
+                        ? "bg-muted text-muted-foreground"
+                        : tournament.has_started
+                          ? "bg-foreground/10 text-foreground"
+                          : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    }`}
                   >
-                    <span>{tournament.name}</span>
-                    <HiPencil className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  </button>
-                </h1>
-                {/* Status badge */}
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                  tournament.has_ended
-                    ? "bg-muted text-muted-foreground"
-                    : tournament.has_started
-                      ? "bg-primary/15 text-primary"
-                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                }`}>
-                  {tournament.has_ended
-                    ? "Ended"
-                    : tournament.has_started
-                      ? `Round ${tournament.current_round || 1} of ${tournament.n_rounds || "?"}`
-                      : "Not Started"}
-                </span>
-              </div>
+                    {tournament.has_ended
+                      ? "Ended"
+                      : tournament.has_started
+                        ? `Round ${tournament.current_round || 1} of ${tournament.n_rounds || "?"}`
+                        : "Not Started"}
+                  </span>
+
+                  {/* Timer — only render while a round is actually in progress.
+                      Without these guards the timer shows a fake "00:45:00"
+                      between rounds (F4). */}
+                  {tournament?.has_started &&
+                    !tournament?.has_ended &&
+                    tournament?.round_length &&
+                    latestRound?.started_at &&
+                    !latestRound?.is_completed && (
+                      <CountdownTimer
+                        key={latestRound?.started_at || "inactive"}
+                        startTime={latestRound?.started_at || null}
+                        durationMinutes={tournament.round_length}
+                        soundNotifications={tournament.sound_notifications ?? false}
+                      />
+                    )}
+
+                  {/* Push actions to the right */}
+                  <div className="ml-auto flex items-center gap-2">
+                    {/* Start Tournament — primary pre-start action stays inline so
+                        a host can see it without opening the menu. */}
+                    {!tournament?.has_started && !tournament?.has_ended && (
+                      <Button
+                        disabled={participants.length === 0 || togglingStatus}
+                        variant="success"
+                        onClick={handleTournamentStatusToggle}
+                        size="sm"
+                      >
+                        Start Tournament
+                      </Button>
+                    )}
+                    {tournament?.has_ended && (
+                      <span className="text-xs text-muted-foreground italic whitespace-nowrap">
+                        Tournament has ended
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Row 2: condensed dates — hidden on mobile to reclaim chrome. */}
+                <p className="hidden sm:block text-xs text-muted-foreground mt-1">
+                  Created {new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  }).format(new Date(tournament.created_at))}
+                  {tournament.started_at && (
+                    <> · Started {new Intl.DateTimeFormat("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }).format(new Date(tournament.started_at))}</>
+                  )}
+                  {tournament.ended_at && (
+                    <> · Ended {new Intl.DateTimeFormat("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }).format(new Date(tournament.ended_at))}</>
+                  )}
+                </p>
+              </header>
+
               <EditTournamentNameModal
                 isOpen={isEditTournamentModalOpen}
                 onClose={() => setIsEditTournamentModalOpen(false)}
@@ -598,101 +838,71 @@ export default function TournamentPage({
                 setTournamentName={setNewTournamentName}
               />
 
-              {/* Dates — single condensed line */}
-              <p className="text-sm text-muted-foreground">
-                Created {new Intl.DateTimeFormat("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                }).format(new Date(tournament.created_at))}
-                {tournament.started_at && (
-                  <> · Started {new Intl.DateTimeFormat("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(tournament.started_at))}</>
-                )}
-                {tournament.ended_at && (
-                  <> · Ended {new Intl.DateTimeFormat("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(tournament.ended_at))}</>
-                )}
-              </p>
-
               {participants.length === 0 && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mb-4">
                   Add participants to get started
                 </p>
               )}
 
-              {/* Timer — full width, prominent when active */}
-              {tournament?.has_started &&
-                !tournament?.has_ended &&
-                tournament?.round_length && (
-                  <CountdownTimer
-                    key={latestRound?.started_at || "inactive"}
-                    startTime={latestRound?.started_at || null}
-                    durationMinutes={tournament.round_length}
-                    soundNotifications={tournament.sound_notifications ?? false}
+              {/* Publish decklists section — kept inline below the header since
+                  it's a substantial post-tournament panel, not a quick action. */}
+              {tournament?.has_ended && (
+                <div className="mb-4">
+                  <PublishDecklistsSection
+                    tournamentId={tournament.id}
+                    tournamentEnded={tournament.has_ended}
+                    decklistCount={decklists.length}
+                    isPublished={tournament.decklists_published || false}
+                    currentFormat={tournament.deck_format || null}
+                    onPublishChange={() => {
+                      fetchTournamentDetails();
+                      fetchDecklists();
+                    }}
                   />
-                )}
-
-              {/* End Tournament — destructive styling, less prominent */}
-              {!tournament?.has_ended && (
-                <Button
-                  disabled={participants.length === 0}
-                  variant={
-                    Boolean(tournament?.has_started)
-                      ? "destructive"
-                      : "success"
-                  }
-                  onClick={handleTournamentStatusToggle}
-                  className={`w-fit ${tournament?.has_started ? "opacity-80" : ""}`}
-                  size={tournament?.has_started ? "sm" : "default"}
-                >
-                  {Boolean(tournament?.has_started)
-                    ? "End Tournament"
-                    : "Start Tournament"}
-                </Button>
-              )}
-              {tournament?.has_ended && (
-                <span className="text-sm text-muted-foreground italic">
-                  Tournament has ended
-                </span>
+                </div>
               )}
 
-              {/* Publish decklists section */}
-              {tournament?.has_ended && (
-                <PublishDecklistsSection
+              {/* Re-pair dialog — controlled by overflow menu; the dialog UI
+                  itself stays in RegeneratePairingsButton. */}
+              {isHost && tournament.has_started && !tournament.has_ended && (
+                <RegeneratePairingsButton
                   tournamentId={tournament.id}
-                  tournamentEnded={tournament.has_ended}
-                  decklistCount={decklists.length}
-                  isPublished={tournament.decklists_published || false}
-                  currentFormat={tournament.deck_format || null}
-                  onPublishChange={() => {
+                  currentRound={tournament.current_round ?? 1}
+                  scoredMatchCount={scoredCurrentRoundMatches.length}
+                  isRoundCompleted={latestRound?.is_completed ?? false}
+                  onComplete={() => {
                     fetchTournamentDetails();
-                    fetchDecklists();
+                    setPairingsRefreshNonce((n) => n + 1);
+                  }}
+                  onUnlockRequest={() => setUnlockDialogOpen(true)}
+                  hideTrigger
+                  open={repairDialogOpen}
+                  onOpenChange={setRepairDialogOpen}
+                />
+              )}
+              {isHost && tournament && (
+                <UnlockAndRepairDialog
+                  open={unlockDialogOpen}
+                  onClose={() => setUnlockDialogOpen(false)}
+                  tournamentId={tournament.id}
+                  scoredMatches={scoredCurrentRoundMatches}
+                  onComplete={() => {
+                    fetchTournamentDetails();
+                    setPairingsRefreshNonce((n) => n + 1);
                   }}
                 />
               )}
-            </div>
+            </>
           )}
-          <TournamentTabs
-            key={activeTab}
+          {!tournamentNotFound && <TournamentTabs
             participants={participants}
             isModalOpen={isModalOpen}
             setIsModalOpen={setIsModalOpen}
+            isHost={isHost}
             onAddParticipant={handleAddParticipant}
             onEdit={(participant) => {
               setCurrentParticipant(participant);
               setNewParticipantName(participant.name);
-              setNewMatchPoints(participant.match_points?.toString() || "");
-              setNewDifferential(participant.differential?.toString() || "");
-              setNewDroppedOut(participant.dropped_out || false);
               setIsEditParticipantModalOpen(true);
             }}
             setLatestRound={setLatestRound}
@@ -704,7 +914,11 @@ export default function TournamentPage({
             tournamentStarted={tournament?.has_started || false}
             tournamentEnded={tournament?.has_ended || false}
             tournamentName={tournament?.name}
-            onTournamentEnd={fetchTournamentDetails}
+            onTournamentEnd={async () => {
+              // End Round writes new match_points/differential to participants;
+              // refresh both so Standings doesn't render stale zeros.
+              await Promise.all([fetchTournamentDetails(), fetchParticipants()]);
+            }}
             onRoundActiveChange={(isActive, roundStartTime) => {
               setIsRoundActive(isActive);
               fetchTournamentDetails();
@@ -717,8 +931,142 @@ export default function TournamentPage({
             fetchParticipants={fetchParticipants}
             decklists={decklists}
             onDecklistsChange={fetchDecklists}
-          />
+            onRepairCompleted={() => {
+              fetchParticipants();
+              fetchTournamentDetails();
+              // Editing a result rewrites the match's winner_id/is_tie. Standings
+              // computes the W-L-T record from its own matches fetch (keyed on
+              // this nonce), so without the bump MP updates but the record goes
+              // stale — showing a win as a loss until a full reload.
+              setPairingsRefreshNonce((n) => n + 1);
+            }}
+            matchesRefreshNonce={pairingsRefreshNonce}
+            currentRound={tournament?.current_round ?? null}
+            onMatchesChanged={() => {
+              fetchScoredCurrentRoundMatches();
+              // A score was just entered/edited mid-round. Bump the standings
+              // nonce so StandingsTable re-fetches matches and updates MP / Diff
+              // / W-L-T live — otherwise it keeps the scoreless matches it
+              // fetched at round start and only the bye shows until End Round.
+              // Loop-safe: the nonce-driven refetch in TournamentRounds calls
+              // fetchCurrentRoundData (which does NOT re-notify).
+              setPairingsRefreshNonce((n) => n + 1);
+            }}
+            onRoundStarted={() => {
+              // Starting a round makes its bye score (Option C). Pull fresh
+              // participant totals and bump the standings nonce so MP and the
+              // W-L-T / Byes columns reflect the now-counting bye together.
+              fetchParticipants();
+              setPairingsRefreshNonce((n) => n + 1);
+            }}
+            adminMenu={
+              isHost && tournament?.has_started && !tournament?.has_ended ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Admin actions"
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-md border border-border text-foreground hover:bg-muted"
+                    >
+                      <Wrench className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-60">
+                    {/* Two distinct families: "Pairings" actions change who
+                        plays whom this round; "Results" actions correct a
+                        recorded score. Grouped + relabeled so "re-pair" (the
+                        pairing verb) no longer collides with fixing a result. */}
+                    <DropdownMenuLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Pairings
+                    </DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        onSelect={() => setRepairDialogOpen(true)}
+                        disabled={
+                          (latestRound?.is_completed ?? false) ||
+                          scoredCurrentRoundMatches.length > 0
+                        }
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
+                        Regenerate pairings
+                      </DropdownMenuItem>
+                      {scoredCurrentRoundMatches.length > 0 && (
+                        <DropdownMenuItem onSelect={() => setUnlockDialogOpen(true)}>
+                          <Unlock className="w-4 h-4 mr-2" aria-hidden="true" />
+                          Unlock &amp; regenerate…
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuGroup>
+                    {completedRoundNumbers.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Results
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem onSelect={() => setPickerOpen(true)}>
+                          <SquarePen className="w-4 h-4 mr-2" aria-hidden="true" />
+                          Edit a past result
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {/* End tournament is only exposed on the final round —
+                        no always-present "master end" control. */}
+                    {(tournament?.current_round ?? 0) >= (tournament?.n_rounds ?? 0) && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onSelect={() => setEndTournamentConfirmOpen(true)}
+                          disabled={togglingStatus}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          {togglingStatus ? "Ending…" : "End tournament"}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null
+            }
+            onRoundEnded={() => {
+              // End Round writes the next round's pairings + bye. Bump the
+              // pairings nonce so the matches/byes fetch picks them up
+              // (the local fetchCurrentRoundData refetches via currentPage
+              // changing, but Standings and any other readers need the nonce).
+              setPairingsRefreshNonce((n) => n + 1);
+            }}
+          />}
         </div>
+        <RepairPastResultPicker
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          completedRounds={completedRoundNumbers}
+          currentRound={tournament?.current_round ?? null}
+          matches={allCompletedMatches}
+          onPick={(matchId) => setPickerRepairMatchId(matchId)}
+        />
+        {pickerRepairMatch && tournament && (
+          <MatchEditModal
+            match={pickerRepairMatch}
+            tournament={tournament}
+            mode="repair"
+            // Reason only applies when correcting a PAST round; a current-round
+            // match (e.g. the final round) doesn't need one.
+            showReason={pickerRepairMatch.round !== tournament.current_round}
+            open={true}
+            onOpenChange={(v) => { if (!v) setPickerRepairMatchId(null); }}
+            isRoundActive={false}
+            setMatchErrorIndex={() => {}}
+            index={-1}
+            onRepairSuccess={() => {
+              fetchTournamentDetails();
+              fetchParticipants();
+              // Refresh Standings' matches fetch so the W-L-T record picks up
+              // the new winner_id/is_tie (see onRepairCompleted above).
+              setPairingsRefreshNonce((n) => n + 1);
+              setPickerRepairMatchId(null);
+            }}
+          />
+        )}
         <EditParticipantModal
           isOpen={isEditParticipantModalOpen}
           onClose={() => setIsEditParticipantModalOpen(false)}
@@ -726,13 +1074,6 @@ export default function TournamentPage({
           onSave={updateParticipant}
           newParticipantName={newParticipantName}
           setNewParticipantName={setNewParticipantName}
-          newMatchPoints={newMatchPoints}
-          setNewMatchPoints={setNewMatchPoints}
-          newDifferential={newDifferential}
-          setNewDifferential={setNewDifferential}
-          newDroppedOut={newDroppedOut}
-          setNewDroppedOut={setNewDroppedOut}
-          isTournamentStarted={tournament?.has_started}
         />
         <TournamentStartModal
           isOpen={showStartModal}
@@ -741,6 +1082,21 @@ export default function TournamentPage({
           participantCount={participants.length}
           suggestedRounds={suggestNumberOfRounds(participants.length)}
         />
+        {tournament && (
+          // Typed-confirmation gate — owner explicitly wanted a higher bar
+          // than the standard ConfirmationDialog primitive for the only host
+          // action that's truly irreversible.
+          <EndTournamentDialog
+            open={endTournamentConfirmOpen}
+            onOpenChange={setEndTournamentConfirmOpen}
+            tournamentName={tournament.name ?? ""}
+            isEnding={togglingStatus}
+            onConfirm={async () => {
+              await performEndTournament();
+              setEndTournamentConfirmOpen(false);
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -850,26 +850,40 @@ export default function CardSearchClient() {
           let result: boolean;
           const firstQuery = activeQueries[0];
           const norm = (s: string) => s.toLowerCase().replace(/[\u2018\u2019\u201B\u2032\u0060]/g, "'");
+          const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          // A query wrapped in double quotes (straight "..." or smart curly quotes)
+          // switches from substring matching to whole-word matching on word
+          // boundaries. e.g. "Angel" matches "Angel" / "Angel of the Lord" but
+          // not "Angela" or "Evangelist".
+          const fieldMatches = (value: string, queryObj: QueryWithOp): boolean => {
+            const raw = queryObj.text.trim();
+            const quoted = raw.length >= 2 && /^["“]/.test(raw) && /["”]$/.test(raw);
+            if (quoted) {
+              const phrase = norm(raw.slice(1, -1).trim());
+              if (!phrase) return true;
+              return new RegExp(`\\b${escapeRegExp(phrase)}\\b`).test(norm(value));
+            }
+            return norm(value).includes(norm(queryObj.text));
+          };
           const firstMatches = (queryObj: QueryWithOp): boolean => {
-            const q = norm(queryObj.text);
             const searchField = queryObj.field;
             switch (searchField) {
               case 'name':
-                return norm(c.name).includes(q);
+                return fieldMatches(c.name, queryObj);
               case 'type':
-                return norm(c.type).includes(q);
+                return fieldMatches(c.type, queryObj);
               case 'brigade':
-                return norm(c.brigade).includes(q);
+                return fieldMatches(c.brigade, queryObj);
               case 'specialAbility':
-                return norm(c.specialAbility).includes(q);
+                return fieldMatches(c.specialAbility, queryObj);
               case 'setName':
-                return norm(c.officialSet).includes(q) || norm(c.set).includes(q);
+                return fieldMatches(c.officialSet, queryObj) || fieldMatches(c.set, queryObj);
               case 'identifier':
-                return norm(c.identifier).includes(q);
+                return fieldMatches(c.identifier, queryObj);
               case 'reference':
-                return norm(c.reference).includes(q);
+                return fieldMatches(c.reference, queryObj);
               default:
-                return norm(Object.values(c).join(" ")).includes(q);
+                return fieldMatches(Object.values(c).join(" "), queryObj);
             }
           };
           

@@ -17,6 +17,7 @@ import { CardPreviewProvider, useCardPreview } from '@/app/goldfish/state/CardPr
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import TopNav from '@/components/top-nav';
 import { GameToolbar } from '@/app/shared/components/GameToolbar';
+import { EmoteOverlay } from '@/app/shared/components/EmoteOverlay';
 import { useGameHotkeys } from '@/app/shared/hooks/useGameHotkeys';
 import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
 import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePrompt';
@@ -39,6 +40,7 @@ import { useUndoStack } from '../hooks/useUndoStack';
 import { useGameTimer } from '../hooks/useGameTimer';
 import { useChatScale } from '@/app/shared/hooks/useChatScale';
 import { normalizeDeckFormat } from '@/lib/deck-format';
+import { finishedGameToReuseOnCreate } from '@/app/play/lib/gameEntryDecision';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -74,27 +76,10 @@ interface GameClientProps {
 // Outer component — owns the connection builder and wraps the provider
 // ---------------------------------------------------------------------------
 export function GameClient({ code }: GameClientProps) {
-  const { connectionBuilder, isConnected, error } = useSpacetimeConnection();
-
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-center">
-          <p className="text-lg font-semibold text-destructive">Connection error</p>
-          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-          <a
-            href="/play"
-            className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Back to lobby
-          </a>
-        </div>
-      </div>
-    );
-  }
+  const { createBuilder, isConnected } = useSpacetimeConnection();
 
   return (
-    <SpacetimeConnectionResetWrapper connectionBuilder={connectionBuilder}>
+    <SpacetimeConnectionResetWrapper createBuilder={createBuilder}>
       <ReconnectOnResume />
       <CardPreviewProvider storageKey="multiplayer-loupe-visible" defaultVisible>
         <SpreadHandProvider>
@@ -179,7 +164,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const gateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Card preview hook — must be called before any early returns (Rules of Hooks)
-  const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
+  const { isLoupeVisible, toggleLoupe, previewCard, isPreviewFlipped } = useCardPreview();
   const { isSpreadHand, toggleSpreadHand } = useSpreadHand();
 
   // Client-side undo stack for multiplayer reverse actions
@@ -533,6 +518,22 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         setGameId(existingGame.id);
         return; // lifecycle sync effect handles the rest
       }
+    }
+
+    // Guard against re-creating a duplicate after the game has already
+    // finished. A connection-reset remount can replay the stale `role:'create'`
+    // sessionStorage instruction; the reconnect lookup above ignores finished
+    // games, so without this we'd call createGame again and spawn a duplicate
+    // under the same code (the 'Z6NJ' incident). Reuse the finished row instead.
+    const reuseFinishedId = finishedGameToReuseOnCreate(
+      gameParams.role,
+      (gameState.allGames || []) as any,
+      code
+    );
+    if (reuseFinishedId !== null) {
+      console.log('[game-debug] create replayed after finish — reusing finished game:', String(reuseFinishedId));
+      setGameId(reuseFinishedId);
+      return; // lifecycle sync effect shows the ended state
     }
 
     try {
@@ -1565,8 +1566,20 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             hasPendingInitiative={gameState.zoneSearchRequests.some(
               (r: any) => r.zone === 'initiative' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
             )}
-            onPassInitiative={() => gameState.passInitiative()}
+            onPassInitiative={() => {
+              const pendingInit = gameState.zoneSearchRequests.find(
+                (r: any) => r.zone === 'initiative' && r.status === 'pending' && r.targetPlayerId === gameState.myPlayer?.id
+              );
+              if (pendingInit) {
+                gameState.approveZoneSearch(BigInt(pendingInit.id));
+                showGameToast('Initiative granted');
+                return;
+              }
+              gameState.passInitiative();
+            }}
+            onSendEmote={(kind) => gameState.sendEmote(kind)}
           />
+          <EmoteOverlay emotes={gameState.emotes} myPlayerId={gameState.myPlayer?.id ?? null} />
           <GameToastContainer />
           <PauseConsentToast
             game={gameState.game}

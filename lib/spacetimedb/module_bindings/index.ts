@@ -50,6 +50,7 @@ import EndTurnReducer from "./end_turn_reducer";
 import ExchangeCardsReducer from "./exchange_cards_reducer";
 import ExchangeFromDeckReducer from "./exchange_from_deck_reducer";
 import ExecuteCardAbilityReducer from "./execute_card_ability_reducer";
+import ExecuteCardAbilityWithCountReducer from "./execute_card_ability_with_count_reducer";
 import FlipCardReducer from "./flip_card_reducer";
 import ImitateLostSoulReducer from "./imitate_lost_soul_reducer";
 import JoinAsSpectatorReducer from "./join_as_spectator_reducer";
@@ -99,6 +100,7 @@ import RevealCardInHandReducer from "./reveal_card_in_hand_reducer";
 import RevealCardsReducer from "./reveal_cards_reducer";
 import RollDiceReducer from "./roll_dice_reducer";
 import SendChatReducer from "./send_chat_reducer";
+import SendEmoteReducer from "./send_emote_reducer";
 import SetGamePrivateReducer from "./set_game_private_reducer";
 import SetNoteReducer from "./set_note_reducer";
 import SetPhaseReducer from "./set_phase_reducer";
@@ -128,6 +130,7 @@ import ChatMessageRow from "./chat_message_table";
 import ChooseFirstTimeoutRow from "./choose_first_timeout_table";
 import CleanupScheduleRow from "./cleanup_schedule_table";
 import DisconnectTimeoutRow from "./disconnect_timeout_table";
+import EmoteRow from "./emote_table";
 import GameRow from "./game_table";
 import GameActionRow from "./game_action_table";
 import PlayerRow from "./player_table";
@@ -225,6 +228,20 @@ const tablesSchema = __schema({
       { name: 'disconnect_timeout_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
     ],
   }, DisconnectTimeoutRow),
+  Emote: __table({
+    name: 'emote',
+    indexes: [
+      { accessor: 'emote_game_id', name: 'emote_game_id_idx_btree', algorithm: 'btree', columns: [
+        'gameId',
+      ] },
+      { accessor: 'id', name: 'emote_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'emote_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, EmoteRow),
   Game: __table({
     name: 'game',
     indexes: [
@@ -363,6 +380,7 @@ const reducersSchema = __reducers(
   __reducerSchema("exchange_cards", ExchangeCardsReducer),
   __reducerSchema("exchange_from_deck", ExchangeFromDeckReducer),
   __reducerSchema("execute_card_ability", ExecuteCardAbilityReducer),
+  __reducerSchema("execute_card_ability_with_count", ExecuteCardAbilityWithCountReducer),
   __reducerSchema("flip_card", FlipCardReducer),
   __reducerSchema("imitate_lost_soul", ImitateLostSoulReducer),
   __reducerSchema("join_as_spectator", JoinAsSpectatorReducer),
@@ -412,6 +430,7 @@ const reducersSchema = __reducers(
   __reducerSchema("reveal_cards", RevealCardsReducer),
   __reducerSchema("roll_dice", RollDiceReducer),
   __reducerSchema("send_chat", SendChatReducer),
+  __reducerSchema("send_emote", SendEmoteReducer),
   __reducerSchema("set_game_private", SetGamePrivateReducer),
   __reducerSchema("set_note", SetNoteReducer),
   __reducerSchema("set_phase", SetPhaseReducer),

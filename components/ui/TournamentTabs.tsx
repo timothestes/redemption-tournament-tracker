@@ -2,18 +2,21 @@
 
 import { Tabs } from "flowbite-react";
 import PodGenerationModal from "./PodGenerationModal";
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
+import { Dispatch, ReactNode, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
-import { FaGear } from "react-icons/fa6";
+import { FaGear, FaClipboardList } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
 import TournamentSettings from "./TournamentSettings";
 import TournamentRounds from "./TournamentRounds";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
+import StandingsTable from "./StandingsTable";
 import { HiPlus } from "react-icons/hi";
 import { GiCardPickup } from "react-icons/gi";
+import { HiOutlineChartBar } from "react-icons/hi2";
 import { printFinalStandings } from "../../utils/printUtils";
 import { Button } from "./button";
+import { AuditLogPanel } from "./AuditLogPanel";
 import type { TournamentDecklistRow } from "../../app/tracker/tournaments/actions";
 
 interface TournamentTabsProps {
@@ -44,6 +47,17 @@ interface TournamentTabsProps {
   fetchParticipants: () => void;
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
+  isHost?: boolean;
+  onRepairCompleted?: () => void;
+  matchesRefreshNonce?: number;
+  onRoundEnded?: () => void | Promise<void>;
+  currentRound?: number | null;
+  /** Host admin menu (wrench) rendered inside the Rounds tab. */
+  adminMenu?: ReactNode;
+  /** Fired when a match result changes so the page can refresh re-pair gating. */
+  onMatchesChanged?: () => void;
+  /** Fired after a round is started (a started round's bye begins scoring). */
+  onRoundStarted?: () => void;
 }
 
 export default function TournamentTabs({
@@ -70,6 +84,14 @@ export default function TournamentTabs({
   fetchParticipants,
   decklists,
   onDecklistsChange,
+  isHost = false,
+  onRepairCompleted,
+  matchesRefreshNonce,
+  onRoundEnded,
+  currentRound,
+  adminMenu,
+  onMatchesChanged,
+  onRoundStarted,
 }: TournamentTabsProps) {
   // state for booster draft pods
   const [showPodsModal, setShowPodsModal] = useState(false);
@@ -102,13 +124,15 @@ export default function TournamentTabs({
             default: "border-b border-border",
           },
           tabitem: {
-            base: "flex items-center justify-center rounded-t-lg px-3 py-2.5 sm:px-4 sm:py-4 text-sm font-medium first:ml-0 focus:outline-none disabled:cursor-not-allowed disabled:text-muted-foreground whitespace-nowrap",
+            base: "flex items-center justify-center px-3 py-2.5 sm:px-4 sm:py-4 text-sm font-medium first:ml-0 focus:outline-none disabled:cursor-not-allowed disabled:text-muted-foreground whitespace-nowrap -mb-px border-b-2 border-transparent",
             variant: {
               default: {
-                base: "rounded-t-lg",
+                base: "",
                 active: {
-                  on: "bg-muted text-primary",
-                  off: "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  // The active tab now signals primacy via foreground text +
+                  // a thin foreground underline rather than the bright accent.
+                  on: "text-foreground font-semibold border-foreground",
+                  off: "text-muted-foreground hover:text-foreground",
                 },
               },
             },
@@ -122,8 +146,8 @@ export default function TournamentTabs({
             Participants{participants.length > 0 && ` (${participants.length})`}
           </h2>
           <div className="flex items-center gap-2 justify-end flex-wrap">
-            {/* generate pods button only if more than one participant */}
-            {participants.length > 1 && (
+            {/* generate pods button only if more than one participant and tournament hasn't ended */}
+            {participants.length > 1 && !tournamentEnded && (
               <Button
                 type="button"
                 onClick={() => setShowPodsModal(true)}
@@ -145,27 +169,29 @@ export default function TournamentTabs({
                 <span className="sm:hidden">Print</span>
               </Button>
             )}
-            <div className="relative group">
-              <Button
-                ref={addParticipantButtonRef}
-                onClick={() => !tournamentStarted && setIsModalOpen(true)}
-                className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
-                variant="success"
-                disabled={tournamentStarted}
-              >
-                <div className="flex items-center gap-2">
-                  <HiPlus className="w-5 h-5" />
-                  <span className="hidden sm:inline">Add Participant</span>
-                  <span className="sm:hidden">Add</span>
-                </div>
-              </Button>
-              {tournamentStarted && (
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-foreground text-background text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                  Cannot add participants after tournament has started
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-foreground"></div>
-                </div>
-              )}
-            </div>
+            {!tournamentEnded && (
+              <div className="relative group">
+                <Button
+                  ref={addParticipantButtonRef}
+                  onClick={() => !tournamentStarted && setIsModalOpen(true)}
+                  className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
+                  variant="success"
+                  disabled={tournamentStarted}
+                >
+                  <div className="flex items-center gap-2">
+                    <HiPlus className="w-5 h-5" />
+                    <span className="hidden sm:inline">Add Participant</span>
+                    <span className="sm:hidden">Add</span>
+                  </div>
+                </Button>
+                {tournamentStarted && (
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-foreground text-background text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                    Cannot add participants after tournament has started
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-foreground"></div>
+                  </div>
+                )}
+              </div>
+            )}
             <ParticipantFormModal
               isOpen={isModalOpen}
               existingNames={participants.map((p) => p.name)}
@@ -188,7 +214,7 @@ export default function TournamentTabs({
         {loading ? (
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
-          <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
+          <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
             <div className="rounded-lg border border-border bg-card jayden-gradient-bg shadow-sm">
               <div className="flex flex-col items-center justify-center py-12 px-6">
                 <p className="text-foreground font-medium mb-2">No participants found</p>
@@ -199,7 +225,7 @@ export default function TournamentTabs({
             </div>
           </div>
         ) : (
-          <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
+          <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
             <ParticipantTable
               tournamentStarted={tournamentStarted}
               tournamentEnded={tournamentEnded}
@@ -230,21 +256,54 @@ export default function TournamentTabs({
         icon={MdPeople}
         disabled={!tournamentStarted}
       >
-        <div className="min-w-[800px] max-xl:min-w-full w-full mx-auto overflow-x-auto">
+        <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
           <TournamentRounds
             tournamentId={tournamentId}
             isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
             onTournamentEnd={onTournamentEnd}
+            onTournamentEnded={() => setActiveTab(2)} // jump to Standings (index 2) when the tournament finishes
             setLatestRound={setLatestRound}
             createPairing={createPairing}
             matchErrorIndex={matchErrorIndex}
             setMatchErrorIndex={setMatchErrorIndex}
             activeTab={activeTab}
             tournamentName={tournamentName}
+            isHost={isHost}
+            onRepairCompleted={onRepairCompleted}
+            matchesRefreshNonce={matchesRefreshNonce}
+            onRoundEnded={onRoundEnded}
+            adminMenu={adminMenu}
+            onMatchesChanged={onMatchesChanged}
+            onRoundStarted={onRoundStarted}
           />
         </div>
       </Tabs.Item>
+      {tournamentStarted && (
+        <Tabs.Item title="Standings" icon={HiOutlineChartBar}>
+          <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
+            {tournamentEnded && (
+              <div className="flex justify-end mb-4">
+                <Button
+                  onClick={() => printFinalStandings(participants, tournamentName || "Tournament")}
+                  variant="accent"
+                  size="sm"
+                >
+                  <span className="hidden sm:inline">Print Final Standings</span>
+                  <span className="sm:hidden">Print</span>
+                </Button>
+              </div>
+            )}
+            <StandingsTable
+              tournamentId={tournamentId}
+              participants={participants as any}
+              tournamentEnded={tournamentEnded}
+              matchesRefreshNonce={matchesRefreshNonce}
+              currentRound={tournamentEnded ? null : currentRound}
+            />
+          </div>
+        </Tabs.Item>
+      )}
       <Tabs.Item title="Settings" icon={FaGear}>
         <div className="w-full">
           <TournamentSettings
@@ -254,6 +313,24 @@ export default function TournamentTabs({
           />
         </div>
       </Tabs.Item>
+      {isHost && (
+        <Tabs.Item
+          title={
+            <>
+              <span className="hidden sm:inline">Audit log</span>
+              <span className="sm:hidden">History</span>
+            </>
+          }
+          icon={FaClipboardList}
+        >
+          <div className="w-full max-w-[800px] mx-auto">
+            <AuditLogPanel
+              tournamentId={tournamentId}
+              key={activeTab} // Re-fetch edits when the tab becomes active
+            />
+          </div>
+        </Tabs.Item>
+      )}
     </Tabs>
     {/* use external pod generation modal */}
     <PodGenerationModal

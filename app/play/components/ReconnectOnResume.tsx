@@ -20,12 +20,13 @@ const PING_TIMEOUT_MS = 5_000;
  * AND inside <SpacetimeProvider> (for getConnection().procedures.ping).
  */
 export default function ReconnectOnResume() {
-  const { triggerReset } = useConnectionReset();
+  const { triggerReset, gaveUp } = useConnectionReset();
   const spacetimeCtx = useSpacetimeDB() as any;
   const lastHiddenAtRef = useRef<number | null>(null);
   // Stable refs so the effect below has empty deps (event listeners must
   // not be re-attached on every render).
   const triggerResetRef = useRef(triggerReset);
+  const gaveUpRef = useRef(gaveUp);
   const getConnectionRef = useRef<() => DbConnection | null>(
     () => spacetimeCtx?.getConnection?.() ?? null
   );
@@ -33,6 +34,9 @@ export default function ReconnectOnResume() {
   useEffect(() => {
     triggerResetRef.current = triggerReset;
   }, [triggerReset]);
+  useEffect(() => {
+    gaveUpRef.current = gaveUp;
+  }, [gaveUp]);
   useEffect(() => {
     getConnectionRef.current = () => spacetimeCtx?.getConnection?.() ?? null;
   }, [spacetimeCtx]);
@@ -42,6 +46,9 @@ export default function ReconnectOnResume() {
 
     async function handleResume() {
       if (document.visibilityState !== 'visible') return;
+      // Once the wrapper has given up, only an explicit user click (manualRetry)
+      // should kick a reconnect — don't loop in the background.
+      if (gaveUpRef.current) return;
 
       const hiddenDuration = lastHiddenAtRef.current
         ? Date.now() - lastHiddenAtRef.current

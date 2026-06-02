@@ -306,7 +306,9 @@ function drawBottomOfDeckInState(
   if (state.zones.deck.length === 0) return state;
 
   const zones = cloneZones(state.zones);
-  const n = Math.min(ability.count, zones.deck.length);
+  const handRoom = Math.max(0, HAND_LIMIT - zones.hand.length);
+  const n = Math.min(ability.count, zones.deck.length, handRoom);
+  if (n === 0) return state;
   const taken = zones.deck.slice(zones.deck.length - n).map(c => ({
     ...c,
     zone: 'hand' as ZoneId,
@@ -433,6 +435,47 @@ function threeNailsResetInState(
   return { ...state, zones, history };
 }
 
+function drawAndTopdeckSelfInState(
+  state: GameState,
+  source: GameCard,
+  history: GameState[],
+): GameState {
+  // Phase 1 — validate.
+  const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
+  if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+
+  // Phase 2 — build.
+  const zones = cloneZones(state.zones);
+
+  // Pull source out of its current zone and topdeck onto soul-deck (index 0 = top).
+  // Clear in-play state (counters, outline, notes, meek) since the card is leaving play.
+  zones[source.zone] = zones[source.zone].filter(c => c.instanceId !== source.instanceId);
+  const topdecked: GameCard = {
+    ...source,
+    zone: 'soul-deck',
+    isFlipped: true,
+    posX: undefined,
+    posY: undefined,
+    counters: [],
+    outlineColor: undefined,
+    notes: '',
+    isMeek: false,
+  };
+  zones['soul-deck'] = [topdecked, ...zones['soul-deck']];
+
+  // Draw 1 from top of deck → hand. No auto-route; matches other ability draws.
+  if (zones.deck.length > 0 && zones.hand.length < HAND_LIMIT) {
+    const drawn = zones.deck.shift()!;
+    drawn.zone = 'hand';
+    drawn.isFlipped = false;
+    drawn.posX = undefined;
+    drawn.posY = undefined;
+    zones.hand = [...zones.hand, drawn];
+  }
+
+  return { ...state, zones, history };
+}
+
 function underdeckTopOfDeckInState(
   state: GameState,
   _source: GameCard,
@@ -469,20 +512,42 @@ function reserveTopOfDeckInState(
   if (state.zones.deck.length === 0) return state;
 
   // Phase 2 — build new zones. Top of deck is zones.deck[0] (matches shift()
-  // usage in shuffleAndDrawInState and drawCard).
+  // usage in shuffleAndDrawInState and drawCard). Reserved cards land face-down
+  // on top of the reserve with a 10s reveal so the player can briefly see what
+  // came off the deck (matches the per-card hand reveal mechanic). Lost Souls
+  // auto-route to Land of Bondage face-up (no reveal) when the option is on.
   const zones = cloneZones(state.zones);
   const n = Math.min(ability.count, zones.deck.length);
-  const taken = zones.deck.slice(0, n).map(c => ({
-    ...c,
-    zone: 'reserve' as ZoneId,
-    // Face-down: player didn't look at the card. Matches the initial reserve
-    // state (see buildInitialGameState / insertCardsShuffleDraw in the server).
-    isFlipped: true,
-    posX: undefined,
-    posY: undefined,
-  }));
+  const taken = zones.deck.slice(0, n);
   zones.deck = zones.deck.slice(n);
-  zones.reserve = [...taken, ...zones.reserve];
+
+  const REVEAL_MS = 10_000;
+  const revealUntil = Date.now() + REVEAL_MS;
+  const reservedCards: GameCard[] = [];
+  for (const card of taken) {
+    if (state.options.autoRouteLostSouls && isLostSoul(card)) {
+      zones['land-of-bondage'] = [...zones['land-of-bondage'], {
+        ...card,
+        zone: 'land-of-bondage',
+        isFlipped: false,
+        posX: undefined,
+        posY: undefined,
+        revealUntil: undefined,
+        revealDurationMs: undefined,
+      }];
+    } else {
+      reservedCards.push({
+        ...card,
+        zone: 'reserve',
+        isFlipped: true,
+        posX: undefined,
+        posY: undefined,
+        revealUntil,
+        revealDurationMs: REVEAL_MS,
+      });
+    }
+  }
+  zones.reserve = [...reservedCards, ...zones.reserve];
 
   return { ...state, zones, history };
 }
@@ -1229,6 +1294,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return reserveTopOfDeckInState(state, source, ability, history);
         case 'draw_bottom_of_deck':
           return drawBottomOfDeckInState(state, source, ability, history);
+        case 'draw_bottom_of_deck_choose':
+          // Client opens a count dialog and dispatches EXECUTE_CARD_ABILITY_WITH_COUNT
+          // — this action carries no count, so no-op here.
+          return state;
         case 'underdeck_top_of_deck':
           return underdeckTopOfDeckInState(state, source, ability, history);
         case 'set_card_outline':
@@ -1245,11 +1314,40 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // Targeting variant — dispatched via the dedicated IMITATE_LOST_SOUL
           // action which carries a target. No-op here.
           return state;
+        case 'draw_and_topdeck_self':
+          return drawAndTopdeckSelfInState(state, source, history);
         default: {
           const _exhaustive: never = ability;
           return state;
         }
       }
+    }
+
+    case 'EXECUTE_CARD_ABILITY_WITH_COUNT': {
+      const { cardInstanceId, abilityIndex, quantity } = action.payload;
+      if (!cardInstanceId || abilityIndex === undefined || typeof quantity !== 'number') return state;
+      if (quantity < 1) return state;
+
+      let source: GameCard | undefined;
+      for (const zone of Object.values(state.zones)) {
+        const found = zone.find(c => c.instanceId === cardInstanceId);
+        if (found) { source = found; break; }
+      }
+      if (!source) return state;
+
+      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
+      if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+
+      const ability = getEffectiveAbilities(source)[abilityIndex];
+      if (!ability) return state;
+      if (ability.type !== 'draw_bottom_of_deck_choose') return state;
+
+      return drawBottomOfDeckInState(
+        state,
+        source,
+        { type: 'draw_bottom_of_deck', count: quantity },
+        history,
+      );
     }
 
     case 'IMITATE_LOST_SOUL': {

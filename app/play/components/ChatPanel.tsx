@@ -341,8 +341,13 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const sourceName: string = data.sourceCardName ?? '';
       const sourceImg: string = data.sourceCardImgFile ?? '';
       const cards: { name: string; img: string }[] = Array.isArray(data.cards) ? data.cards : [];
+      const routedToLob: { name: string; img: string }[] = Array.isArray(data.routedToLob) ? data.routedToLob : [];
       const hasCards = cards.length > 0;
-      const prefix = count === 1 ? 'reserved top card of deck' : `reserved top ${count} cards of deck`;
+      const prefix = count === 0
+        ? 'tried to reserve top of deck'
+        : count === 1
+          ? 'reserved top card of deck'
+          : `reserved top ${count} cards of deck`;
       return (
         <>
           {prefix}
@@ -354,6 +359,34 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
           {sourceName ? (
             <>
               {' '}via <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+          {routedToLob.length > 0 ? (
+            <>
+              {' '}— <CardNameList cards={routedToLob} /> went to land of bondage instead
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'DRAW_AND_TOPDECK_SELF' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const drew = data.drewCard;
+      return (
+        <>
+          drew 1 and topdecked
+          {sourceName ? (
+            <>
+              {' '}<HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+          {drew ? (
+            <>
+              {' '}— drew <HoverableCard name={drew.name} img={drew.img} />
             </>
           ) : null}
         </>
@@ -449,7 +482,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         const name = playerNames?.[ownerId];
         if (!name) continue;
         crossClauses.push(
-          <span key={ownerId}>; sent <CardNameList cards={cards} /> to {name}&apos;s deck</span>
+          <span key={ownerId}>; <CardNameList cards={cards} /> shuffled into {name}&apos;s deck</span>
         );
       }
 
@@ -653,13 +686,20 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
           const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
           const isViewer = actorPlayerId && viewerPlayerId && actorPlayerId === viewerPlayerId;
           const fromHiddenDeck = data.fromSource === 'top-of-deck' || data.fromSource === 'bottom-of-deck' || data.fromSource === 'random-from-deck';
+          // "Drew" only applies when cards actually came from a deck. Moving from
+          // territory/discard/reserve/etc. into hand is a move, not a draw.
+          const isDrawFromDeck = fromHiddenDeck || commonFromZone === 'deck';
           // Drawing from own deck into own hand is private — don't reveal card names to the opponent.
           const hideFromOpponent = !targetName && fromHiddenDeck && !isViewer;
           if (hideFromOpponent) {
             const n = data.cards.length;
             parts.push(<span key="hand">drew {n === 1 ? 'a card' : `${n} cards`}{explicitFromSuffix}</span>);
+          } else if (targetName) {
+            parts.push(<span key="hand">moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand{explicitFromSuffix}</span>);
+          } else if (isDrawFromDeck) {
+            parts.push(<span key="hand">drew <CardNameList cards={data.cards} />{explicitFromSuffix}{isViewer && fromHiddenDeck ? <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>(only visible to you)</span> : null}</span>);
           } else {
-            parts.push(<span key="hand">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand{explicitFromSuffix}</> : <>drew <CardNameList cards={data.cards} />{explicitFromSuffix}{isViewer && fromHiddenDeck ? <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>(only visible to you)</span> : null}</>}</span>);
+            parts.push(<span key="hand">moved <CardNameList cards={data.cards} /> to hand{sharedFromSuffix}</span>);
           }
         }
         if (data.toZone === 'territory') {

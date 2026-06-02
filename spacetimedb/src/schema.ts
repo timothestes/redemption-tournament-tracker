@@ -394,7 +394,28 @@ export const ChooseFirstTimeout = table(
 );
 
 // ---------------------------------------------------------------------------
-// 11. CleanupSchedule (scheduled table)
+// 11. Emote — ephemeral player emotes (e.g. thumbs_up). Public so opponent
+// and spectators can render the animation.
+// ---------------------------------------------------------------------------
+export const Emote = table(
+  {
+    name: 'emote',
+    public: true,
+    indexes: [
+      { accessor: 'emote_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+    ],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    gameId: t.u64(),
+    senderId: t.u64(),
+    kind: t.string(),
+    createdAt: t.timestamp(),
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 12. CleanupSchedule (scheduled table)
 // ---------------------------------------------------------------------------
 
 let _handleCleanupStaleGames: any;
@@ -431,6 +452,7 @@ const spacetimedb = schema({
   DisconnectTimeout,
   ZoneSearchRequest,
   ChooseFirstTimeout,
+  Emote,
   CleanupSchedule,
 });
 

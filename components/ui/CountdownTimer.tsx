@@ -1,112 +1,66 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from "react";
+import { useRoundCountdown } from "./useRoundCountdown";
 
 interface CountdownTimerProps {
   startTime: string | null;
   durationMinutes: number;
   soundNotifications?: boolean;
-  key?: string; // Add key prop
 }
 
-export default function CountdownTimer({ startTime, durationMinutes, soundNotifications = false }: CountdownTimerProps) {
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(durationMinutes * 60);
-  const [soundPlayed, setSoundPlayed] = useState<boolean>(false);
+export default function CountdownTimer({
+  startTime,
+  durationMinutes,
+  soundNotifications = false,
+}: CountdownTimerProps) {
+  const { remainingSeconds, timeString, isExpired, isWarning, isUrgent } =
+    useRoundCountdown(startTime, durationMinutes);
+  const [soundPlayed, setSoundPlayed] = useState(false);
+  const prevRemainingRef = useRef(remainingSeconds);
 
-  const playNotificationSound = useCallback(() => {
-    if (!soundNotifications || soundPlayed) return;
-
-    try {
-      // Play MP3 notification sound
-      const audio = new Audio('/notification-alert.mp3');
-      audio.volume = 0.5; // Set volume to 50%
-
-      // Ensure we only play once
-      audio.addEventListener('loadstart', () => {
-        setSoundPlayed(true);
-      });
-
-      audio.play().catch((error) => {
-        console.warn('Could not play notification sound:', error);
-      });
-
-    } catch (error) {
-      console.warn('Could not play notification sound:', error);
-    }
-  }, [soundNotifications, soundPlayed]);
-
-  const calculateRemainingTime = useCallback(() => {
-    if (!startTime) {
-      return durationMinutes * 60;
-    }
-
-    const startTimeMs = new Date(startTime).getTime();
-    const endTimeMs = startTimeMs + (durationMinutes * 60 * 1000);
-    const nowMs = new Date().getTime();
-    const remainingMs = Math.max(0, endTimeMs - nowMs);
-    return Math.floor(remainingMs / 1000);
-  }, [startTime, durationMinutes]);
-
+  // Reset the once-per-round sound guard whenever a new round starts.
   useEffect(() => {
-    // Immediately set initial time
-    const initialTime = calculateRemainingTime();
-    setRemainingSeconds(initialTime);
-
-    // Reset sound played state when timer restarts
     setSoundPlayed(false);
+  }, [startTime]);
 
-    // Only set up interval if we have a start time
-    if (!startTime) {
-      return;
+  // Play the alert once, only on the live transition from >0 to 0 (not on mount
+  // while already expired) — matches the original CountdownTimer behavior.
+  useEffect(() => {
+    const prev = prevRemainingRef.current;
+    prevRemainingRef.current = remainingSeconds;
+    if (!soundNotifications || soundPlayed || !startTime) return;
+    if (!(prev > 0 && remainingSeconds === 0)) return;
+    setSoundPlayed(true);
+    try {
+      const audio = new Audio("/notification-alert.mp3");
+      audio.volume = 0.5;
+      audio.play().catch((error) => {
+        console.warn("Could not play notification sound:", error);
+      });
+    } catch (error) {
+      console.warn("Could not play notification sound:", error);
     }
+  }, [remainingSeconds, startTime, soundNotifications, soundPlayed]);
 
-    const intervalId = setInterval(() => {
-      const currentTime = calculateRemainingTime();
-      const previousTime = remainingSeconds;
-
-      setRemainingSeconds(currentTime);
-
-      // Play sound only when timer transitions from 1 to 0 (not when it stays at 0)
-      if (previousTime > 0 && currentTime === 0 && !soundPlayed) {
-        playNotificationSound();
-      }
-    }, 1000);
-
-    return () => clearInterval(intervalId);
-  }, [startTime, calculateRemainingTime, playNotificationSound]);
-
-  // Format the time
-  const hours = Math.floor(remainingSeconds / 3600);
-  const minutes = Math.floor((remainingSeconds % 3600) / 60);
-  const seconds = remainingSeconds % 60;
-
-  const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-  // Color states based on remaining time
-  const totalSeconds = durationMinutes * 60;
-  const percentRemaining = totalSeconds > 0 ? remainingSeconds / totalSeconds : 0;
-  const isExpired = remainingSeconds === 0;
-  const isWarning = !isExpired && percentRemaining <= 0.1; // last 10%
-  const isUrgent = !isExpired && !isWarning && percentRemaining <= 0.25; // last 25%
-
-  const timerColorClass = isExpired
-    ? "text-destructive border-destructive/30 bg-destructive/5"
-    : isWarning
-      ? "text-red-500 dark:text-red-400 border-red-500/30 bg-red-500/5"
+  const sizeClass =
+    isExpired || isWarning
+      ? "text-3xl sm:text-4xl font-bold"
+      : "text-xl sm:text-2xl font-semibold";
+  const colorClass =
+    isExpired || isWarning
+      ? "text-destructive animate-pulse"
       : isUrgent
-        ? "text-amber-500 dark:text-amber-400 border-amber-500/30 bg-amber-500/5"
-        : "text-foreground border-border bg-muted/50";
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-foreground";
 
   return (
-    <div className="w-full">
-      <div className={`flex items-center justify-between rounded-lg border px-5 py-3 ${timerColorClass}`}>
-        <span className="text-sm font-medium text-muted-foreground">
-          {isExpired ? "Time's Up" : "Round Timer"}
-        </span>
-        <span className={`text-4xl sm:text-5xl font-mono font-bold tracking-tight tabular-nums ${isExpired ? "text-destructive" : ""}`}>
-          {timeString}
-        </span>
-      </div>
-    </div>
+    <span
+      className={`font-mono tabular-nums leading-none whitespace-nowrap ${sizeClass} ${colorClass}`}
+      aria-label={isExpired ? "Time's up" : `Round timer: ${timeString} remaining`}
+      role="status"
+    >
+      {timeString}
+    </span>
   );
 }

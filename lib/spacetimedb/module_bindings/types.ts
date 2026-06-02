@@ -81,6 +81,15 @@ export const DisconnectTimeout = __t.object("DisconnectTimeout", {
 });
 export type DisconnectTimeout = __Infer<typeof DisconnectTimeout>;
 
+export const Emote = __t.object("Emote", {
+  id: __t.u64(),
+  gameId: __t.u64(),
+  senderId: __t.u64(),
+  kind: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type Emote = __Infer<typeof Emote>;
+
 export const Game = __t.object("Game", {
   id: __t.u64(),
   code: __t.string(),

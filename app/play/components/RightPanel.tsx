@@ -72,7 +72,7 @@ export default function RightPanel({
   onKickSpectator,
   onSetGamePrivate,
 }: RightPanelProps) {
-  const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
+  const { isLoupeVisible, toggleLoupe, previewCard, isPreviewFlipped } = useCardPreview();
   const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all' | 'spectators'>('all');
 
   return (
@@ -181,7 +181,7 @@ export default function RightPanel({
                     width: '100%',
                     height: '100%',
                     objectFit: 'fill',
-                    transform: previewCard.isMeek ? 'rotate(180deg)' : undefined,
+                    transform: previewCard.isMeek && !isPreviewFlipped ? 'rotate(180deg)' : undefined,
                   }}
                 />
                 {previewCard.notes && (

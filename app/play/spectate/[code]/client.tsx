@@ -8,6 +8,7 @@ import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useSpectatorGameState } from '@/app/play/hooks/useGameState';
 import { SpectatorPregameView, SpectatorPregameCeremonyOverlay, GameCodeHeader } from '@/app/play/components/PregameScreen';
 import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
+import { EmoteOverlay } from '@/app/shared/components/EmoteOverlay';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import { showGameToast } from '@/app/shared/components/GameToast';
 import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerImagePreloader';
@@ -415,6 +416,8 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
               tone="amber"
               text={`code: ${code} · gameId: ${gameId === null ? 'none' : String(gameId)} · phase: ${lifecycle} · conn: ${isConnected ? 'live' : (isActive ? 'reconnecting' : 'down')} · games seen: ${(gameState.allGames ?? []).length}`}
             />
+
+            <EmoteOverlay emotes={gameState.emotes} myPlayerId={null} />
           </>
         ) : status === 'pregame' && game.pregamePhase !== 'rolling' && game.pregamePhase !== 'choosing' && game.pregamePhase !== 'revealing' ? (
           // Pre-deal stage (deck selection / ready-up). No hands dealt yet,

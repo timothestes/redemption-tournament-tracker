@@ -149,6 +149,16 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
   // game board cards underneath).
   const modalBoxRef = useRef<HTMLDivElement>(null);
 
+  // Ref for the search input so we can focus it on open and after the field
+  // dropdown changes.
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the search input when the modal first mounts. A ref + effect is more
+  // reliable than the autoFocus attribute inside this framer-motion modal.
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
+
   // Refs for card DOM elements (for lasso hit-testing)
   const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const registerCardEl = useCallback((instanceId: string, el: HTMLDivElement | null) => {
@@ -303,6 +313,12 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
         } else {
           handleClose();
         }
+      } else if (e.key === '/') {
+        // "/" clears the search and refocuses the input — works even while
+        // typing in the box (we don't expect literal "/" searches).
+        e.preventDefault();
+        setSearch('');
+        searchInputRef.current?.focus();
       }
     };
     document.addEventListener('keydown', handleKey);
@@ -557,7 +573,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <select
               value={searchField}
-              onChange={(e) => { setSearchField(e.target.value as typeof searchField); setSearch(''); }}
+              onChange={(e) => { setSearchField(e.target.value as typeof searchField); setSearch(''); searchInputRef.current?.focus(); }}
               style={{
                 appearance: 'none',
                 WebkitAppearance: 'none',
@@ -600,11 +616,11 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
               }}
             />
             <input
+              ref={searchInputRef}
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={searchField === 'all' ? 'Search all fields...' : `Search by ${SEARCH_FIELDS.find(f => f.id === searchField)?.label.toLowerCase()}...`}
-              autoFocus
               style={{
                 width: '100%',
                 padding: '8px 30px 8px 30px',
@@ -616,7 +632,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 outline: 'none',
               }}
             />
-            {search && (
+            {search ? (
               <button
                 onClick={() => setSearch('')}
                 style={{
@@ -635,6 +651,31 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
               >
                 <X size={14} />
               </button>
+            ) : (
+              <kbd
+                aria-hidden="true"
+                title="Press / to clear the search"
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  minWidth: 16,
+                  height: 16,
+                  padding: '0 4px',
+                  borderRadius: 3,
+                  border: '1px solid var(--gf-border)',
+                  background: '#1e1610',
+                  color: 'var(--gf-text-dim)',
+                  fontSize: 10,
+                  lineHeight: '14px',
+                  textAlign: 'center',
+                  fontFamily: 'inherit',
+                  pointerEvents: 'none',
+                }}
+              >
+                /
+              </kbd>
             )}
           </div>
         </div>

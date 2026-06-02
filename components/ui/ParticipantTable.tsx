@@ -5,6 +5,7 @@ import { BookOpen, CircleMinus, CirclePlus, Crown, Link2Off } from "lucide-react
 import AttachDeckDialog from "./AttachDeckDialog";
 import type { TournamentDecklistRow, DeckSearchResult } from "../../app/tracker/tournaments/actions";
 import { attachDeckToParticipantAction, detachDeckFromParticipantAction } from "../../app/tracker/tournaments/actions";
+import ConfirmationDialog from "./confirmation-dialog";
 
 interface Participant {
   id: string;
@@ -41,6 +42,8 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
 }) => {
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
   const [attachTarget, setAttachTarget] = useState<Participant | null>(null);
+  const [dropTarget, setDropTarget] = useState<Participant | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Participant | null>(null);
 
   const decklistMap = useMemo(() => {
     const map = new Map<string, TournamentDecklistRow>();
@@ -50,24 +53,31 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
     return map;
   }, [decklists]);
 
+  // Participants tab is a roster view — sort alphabetically so hosts can find
+  // players by name. Score-based ranking lives in the Standings tab.
   const sortedParticipants = useMemo(() =>
-    [...participants].sort((a, b) => {
-      const mpA = a.match_points !== null ? a.match_points : -Infinity;
-      const mpB = b.match_points !== null ? b.match_points : -Infinity;
-
-      if (mpA !== mpB) {
-        return mpB - mpA;
-      }
-
-      const diffA = a.differential !== null ? a.differential : -Infinity;
-      const diffB = b.differential !== null ? b.differential : -Infinity;
-      return diffB - diffA;
-    }),
+    [...participants].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    ),
     [participants]
   );
 
-  const winnerMatchPoints = sortedParticipants[0]?.match_points || 0;
-  const winnerDifferential = sortedParticipants[0]?.differential || 0;
+  // Winner crown still highlights the final-standings leader; compute it from
+  // raw match_points/differential regardless of the alphabetical display order.
+  const { winnerMatchPoints, winnerDifferential } = useMemo(() => {
+    const ranked = [...participants].sort((a, b) => {
+      const mpA = a.match_points !== null ? a.match_points : -Infinity;
+      const mpB = b.match_points !== null ? b.match_points : -Infinity;
+      if (mpA !== mpB) return mpB - mpA;
+      const diffA = a.differential !== null ? a.differential : -Infinity;
+      const diffB = b.differential !== null ? b.differential : -Infinity;
+      return diffB - diffA;
+    });
+    return {
+      winnerMatchPoints: ranked[0]?.match_points ?? 0,
+      winnerDifferential: ranked[0]?.differential ?? 0,
+    };
+  }, [participants]);
 
   async function handleAttachDeck(deck: DeckSearchResult) {
     if (!attachTarget) return;
@@ -106,7 +116,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
             </button>
           ) : (
             <button
-              onClick={() => onDropOut(participant.id)}
+              onClick={() => setDropTarget(participant)}
               className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 touch-manipulation transition-colors"
               aria-label={`Drop ${participant.name}`}
               title="Drop from tournament"
@@ -116,7 +126,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
           )
         ) : (
           <button
-            onClick={() => onDelete(participant.id)}
+            onClick={() => setDeleteTarget(participant)}
             className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 touch-manipulation transition-colors"
             aria-label={`Delete ${participant.name}`}
             title="Remove participant"
@@ -187,7 +197,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
                     {isWinner && tournamentEnded && (
                       <Crown className="w-4 h-4 text-orange-300 flex-shrink-0" />
                     )}
@@ -199,20 +209,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                         Dropped
                       </span>
                     )}
-                  </div>
-                  <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
-                    <span>
-                      <span className="text-muted-foreground/70">MP</span>{" "}
-                      <span className="text-foreground font-medium">
-                        {participant.match_points ?? 0}
-                      </span>
-                    </span>
-                    <span>
-                      <span className="text-muted-foreground/70">Diff</span>{" "}
-                      <span className="text-foreground font-medium">
-                        {participant.differential ?? 0}
-                      </span>
-                    </span>
                   </div>
                   <div className="mt-2">{renderDeckCell(participant)}</div>
                 </div>
@@ -248,8 +244,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
           <Table.Head>
             <Table.HeadCell className="py-3">Name</Table.HeadCell>
             <Table.HeadCell className="py-3">Deck</Table.HeadCell>
-            <Table.HeadCell className="py-3">Match Points</Table.HeadCell>
-            <Table.HeadCell className="py-3">Differential</Table.HeadCell>
             <Table.HeadCell className="py-3">
               <span className="sr-only">Actions</span>
             </Table.HeadCell>
@@ -263,16 +257,16 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
               return (
                 <Table.Row
                   key={participant.id}
-                  className={`${isWinner && tournamentEnded ? "dark:border-yellow-700 dark:bg-yellow-500/50" : ""} `}
+                  className={`${isWinner && tournamentEnded ? "bg-yellow-500/5 dark:bg-yellow-500/10 border-yellow-500/20" : ""} `}
                 >
                   <Table.Cell className="font-medium text-foreground py-3">
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
                       {isWinner && tournamentEnded && (
                         <Crown className="w-4 h-4 text-orange-300 flex-shrink-0" />
                       )}
                       <span className="truncate">{participant.name}</span>
                       {participant.dropped_out && (
-                        <span className="text-red-500 text-[12px] flex-shrink-0">( Dropped )</span>
+                        <span className="text-destructive text-[11px] flex-shrink-0 uppercase tracking-wide">Dropped</span>
                       )}
                     </div>
                   </Table.Cell>
@@ -281,8 +275,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                     <div className="max-w-[200px]">{renderDeckCell(participant)}</div>
                   </Table.Cell>
 
-                  <Table.Cell className="py-3 tabular-nums">{participant.match_points ?? 0}</Table.Cell>
-                  <Table.Cell className="py-3 tabular-nums">{participant.differential ?? 0}</Table.Cell>
                   <Table.Cell className="py-3">{renderActionButtons(participant)}</Table.Cell>
                 </Table.Row>
               );
@@ -296,6 +288,32 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
         onOpenChange={setAttachDialogOpen}
         participantName={attachTarget?.name || ""}
         onSelect={handleAttachDeck}
+      />
+
+      <ConfirmationDialog
+        open={dropTarget !== null}
+        onOpenChange={(open) => { if (!open) setDropTarget(null); }}
+        onConfirm={() => {
+          if (dropTarget) onDropOut(dropTarget.id);
+        }}
+        variant="warning"
+        title={dropTarget ? `Drop ${dropTarget.name}?` : ""}
+        description="They will not appear in next round's pairings. You can restore them later from this list."
+        confirmLabel="Drop player"
+        cancelLabel="Cancel"
+      />
+
+      <ConfirmationDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        onConfirm={() => {
+          if (deleteTarget) onDelete(deleteTarget.id);
+        }}
+        variant="destructive"
+        title={deleteTarget ? `Delete ${deleteTarget.name}?` : ""}
+        description="This permanently removes them from the tournament."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
       />
     </>
   );

@@ -55,6 +55,16 @@ export default function TournamentStartModal({
     setNumberOfRounds(prev => Math.max(1, prev - 1));
   };
 
+  const ROUND_LENGTH_STEP = 5;
+
+  const handleRoundLengthIncrement = () => {
+    setRoundLength(prev => Math.min(120, Math.floor(prev / ROUND_LENGTH_STEP) * ROUND_LENGTH_STEP + ROUND_LENGTH_STEP));
+  };
+
+  const handleRoundLengthDecrement = () => {
+    setRoundLength(prev => Math.max(0, Math.ceil(prev / ROUND_LENGTH_STEP) * ROUND_LENGTH_STEP - ROUND_LENGTH_STEP));
+  };
+
   const inputClasses = "w-full bg-background border border-border text-foreground rounded-lg p-2.5 focus:outline-none focus:border-primary/60 transition-colors";
 
   return (
@@ -99,13 +109,27 @@ export default function TournamentStartModal({
 
           {/* Round Length */}
           <div className="flex flex-col items-center jayden-gradient-bg rounded-lg border border-border p-5">
-            <label htmlFor="round-length" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+            <label htmlFor="round-length" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Round Length (minutes)
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 mb-4">
+              <span>Steps by {ROUND_LENGTH_STEP}</span>
+              <span aria-hidden>&bull;</span>
+              <span>max 120</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleRoundLengthDecrement}
+                disabled={roundLength <= 0}
+                className="w-11 h-11 rounded-full border border-border bg-background text-foreground hover:border-primary/60 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-background disabled:hover:text-foreground transition-colors flex items-center justify-center"
+                aria-label="Decrease round length"
+              >
+                <span className="text-xl leading-none">&minus;</span>
+              </button>
               <input
                 id="round-length"
                 type="number"
+                inputMode="numeric"
                 value={roundLength}
                 onChange={(e) => {
                   const value = Math.min(120, Math.max(0, parseInt(e.target.value) || 0));
@@ -113,10 +137,17 @@ export default function TournamentStartModal({
                 }}
                 min="0"
                 max="120"
-                className="w-24 bg-background border border-border text-foreground text-2xl font-semibold rounded-lg p-2 focus:outline-none focus:border-primary/60 transition-colors text-center tabular-nums"
-                placeholder="45"
+                aria-label="Round length in minutes"
+                className="w-[3ch] bg-transparent border-0 text-4xl font-bold text-foreground tabular-nums text-center p-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              <span className="text-sm text-muted-foreground">max 120</span>
+              <button
+                onClick={handleRoundLengthIncrement}
+                disabled={roundLength >= 120}
+                className="w-11 h-11 rounded-full border border-border bg-background text-foreground hover:border-primary/60 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-background disabled:hover:text-foreground transition-colors flex items-center justify-center"
+                aria-label="Increase round length"
+              >
+                <span className="text-xl leading-none">+</span>
+              </button>
             </div>
           </div>
 

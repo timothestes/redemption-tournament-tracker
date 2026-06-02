@@ -30,11 +30,13 @@ export type CardAbility = AbilityBase & (
   | { type: 'reserve_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
+  | { type: 'draw_bottom_of_deck_choose' }
   | { type: 'underdeck_top_of_deck'; count: number }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
   | { type: 'play_all_lost_souls' }
   | { type: 'three_nails_reset' }
   | { type: 'imitate_lost_soul' }
+  | { type: 'draw_and_topdeck_self' }
   | { type: 'custom'; reducerName: string; label: string }
 );
 
@@ -58,6 +60,7 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Lost Soul "Harvest" [John 4:35] [2023 - 2nd Place]':  [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
   'Lost Soul "Imitate" [III John 1:11]':                 [{ type: 'imitate_lost_soul' }],
   'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]':     [{ type: 'imitate_lost_soul' }],
+  'Lost Soul "The First" [Luke 13:30]':                  [{ type: 'draw_and_topdeck_self' }],
   'Lost Soul "Lost Souls" [Proverbs 2:16-17]':           [{ type: 'spawn_token', tokenName: 'Lost Souls Token' }],
   'Mayhem':                                              [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
   'Mayhem (2020 Promo)':                                 [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
@@ -125,6 +128,12 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   "Herod's Temple [2022 - GoC P]":                       [{ type: 'reserve_top_of_deck', count: 1 }],
   'Treacherous Land':                                    [{ type: 'draw_bottom_of_deck', count: 1 }],
   'Treacherous Land (2022 - 2nd Place)':                 [{ type: 'draw_bottom_of_deck', count: 1 }],
+  'Balaam Son of Beor':                                  [{ type: 'draw_bottom_of_deck', count: 2 }],
+  'Destructive Sin (GoC)':                               [{ type: 'draw_bottom_of_deck', count: 1 }],
+  'High Places (LoC)':                                   [{ type: 'draw_bottom_of_deck', count: 1 }],
+  'Choked Seed (GoC)':                                   [{ type: 'draw_bottom_of_deck_choose' }],
+  'Destroying Spirit (GoC)':                             [{ type: 'draw_bottom_of_deck_choose' }],
+  'Messenger of Satan (EC)':                             [{ type: 'draw_bottom_of_deck_choose' }],
   'Three Woes (RoJ AB)':                                 [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
   'Three Woes (RoJ)':                                    [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
   'Three Woes [Fundraiser]':                             [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
@@ -276,6 +285,18 @@ export function isNewTestamentLostSoul(reference: string): boolean {
 }
 
 /**
+ * Single source of truth for "is this card a Lost Soul?". Handles both the
+ * goldfish `type` field and the multiplayer `cardType` field so the LOB
+ * arrival cinematic can't drift between the two canvases.
+ */
+export function isLostSoulCard(card: { type?: string; cardType?: string }): boolean {
+  const t = card.type ?? card.cardType ?? '';
+  if (!t) return false;
+  if (t === 'LS' || t === 'Lost Soul') return true;
+  return t.toLowerCase().includes('lost soul');
+}
+
+/**
  * Extracts a short label from a Lost Soul cardName for the imitation overlay.
  * Priority: quoted name → first parenthetical → cardName with "Lost Soul " prefix stripped.
  */
@@ -346,6 +367,8 @@ export function abilityLabel(a: CardAbility): string {
       return `Reserve top ${a.count} card${a.count === 1 ? '' : 's'} of deck`;
     case 'draw_bottom_of_deck':
       return `Draw ${a.count} from bottom of deck`;
+    case 'draw_bottom_of_deck_choose':
+      return 'Draw X from bottom of deck…';
     case 'underdeck_top_of_deck':
       return a.count === 1
         ? 'Underdeck top card of deck'
@@ -358,6 +381,8 @@ export function abilityLabel(a: CardAbility): string {
       return 'Reset (banishes Nails, both players draw 8)';
     case 'imitate_lost_soul':
       return 'Imitate...';
+    case 'draw_and_topdeck_self':
+      return 'Draw 1 and topdeck this Lost Soul';
     case 'custom':
       return a.label;
   }

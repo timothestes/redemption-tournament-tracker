@@ -29,22 +29,26 @@ import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
 import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
+import { useCardSounds } from '@/app/shared/hooks/useCardSounds';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
 import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
 import { TargetCardOverlay } from '@/app/shared/components/TargetCardOverlay';
-import { GameActions, TargetingRequest } from '@/app/shared/types/gameActions';
+import { GameActions, TargetingRequest, CountPromptRequest } from '@/app/shared/types/gameActions';
+import { CountPromptDialog } from '@/app/shared/components/CountPromptDialog';
 import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
+import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePrompt';
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
-import { getAbilitiesForCard } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isLostSoulCard } from '@/lib/cards/cardAbilities';
 import { Link2Off } from 'lucide-react';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
@@ -68,6 +72,9 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
 
+  // ---- Card sound effects (joke easter-egg, once per game) ----
+  useCardSounds(state.zones['territory'] ?? [], state.sessionId);
+
   // ---- LOB arrival glow effect ----
   const lobCardIds = useMemo(
     () => (state.zones['land-of-bondage'] ?? []).map(c => c.instanceId),
@@ -75,14 +82,31 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   );
   const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
 
-  // Drive 1s re-renders while any hand card has an active per-card reveal —
-  // needed for the countdown badge to tick and the auto-expiry to render.
-  const handHasActiveReveal = useMemo(
-    () => (state.zones.hand ?? []).some(
-      c => typeof c.revealUntil === 'number' && c.revealUntil > Date.now(),
-    ),
-    [state.zones.hand],
-  );
+  // ---- Lost Soul cinematic — full-screen flourish on arrival ----
+  // Filter to actual Lost Souls (sites can be attached to LOB cards but they
+  // shouldn't trigger the cinematic). Caller filters; hook just detects arrivals.
+  // Dep is narrowed to the LOB array specifically so unrelated zone mutations
+  // (territory drags, hand shuffles, etc.) don't re-run this work.
+  const lobSouls = useMemo(() => {
+    const cards = state.zones['land-of-bondage'] ?? [];
+    return cards
+      .filter(c => isLostSoulCard(c))
+      .map(c => ({
+        instanceId: c.instanceId,
+        cardName: c.cardName,
+        cardImgFile: c.cardImgFile,
+      }));
+  }, [state.zones['land-of-bondage']]);
+  const { activeBatch: soulCinematic } = useLostSoulCinematic(lobSouls);
+
+  // Drive 1s re-renders while any visible card has an active per-card reveal —
+  // hand (30s flash) or reserve top (10s from Herod's Temple). Needed for the
+  // countdown badge to tick and the auto-expiry flip-back to render.
+  const handHasActiveReveal = useMemo(() => {
+    const hasReveal = (cards: typeof state.zones.hand) =>
+      cards.some(c => typeof c.revealUntil === 'number' && c.revealUntil > Date.now());
+    return hasReveal(state.zones.hand ?? []) || hasReveal(state.zones.reserve ?? []);
+  }, [state.zones.hand, state.zones.reserve]);
   useRevealTick(handHasActiveReveal);
 
   const handBrigadeCounts = useMemo(
@@ -116,6 +140,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // through `onSelect`. Cleared by Esc, the banner's Cancel button, or any
   // eligible card click.
   const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
+  const [countPrompt, setCountPrompt] = useState<CountPromptRequest | null>(null);
 
   // Adapter: bridge goldfish game context to shared GameActions interface
   const goldfishActions: GameActions = useMemo(() => ({
@@ -144,7 +169,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         const found = zone.find(c => c.instanceId === cardId);
         if (found) { source = found; break; }
       }
-      const ability = source ? getAbilitiesForCard(source.cardName)[abilityIndex] : undefined;
+      const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
       if (ability?.type === 'reveal_own_deck' || ability?.type === 'look_at_own_deck') {
         const deck = state.zones.deck;
         if (deck.length === 0) { showGameToast('Deck is empty'); return; }
@@ -188,6 +213,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       dispatch(gameActionCreators.stopImitatingLostSoul(sourceInstanceId));
     },
     beginTargeting: (req) => setTargeting(req),
+    executeCardAbilityWithCount: (cardId, abilityIndex, count) => {
+      dispatch(gameActionCreators.executeCardAbilityWithCount(cardId, abilityIndex, count));
+    },
+    beginCountPrompt: (req) => setCountPrompt(req),
   }), [moveCard, moveCardsBatch, flipCard, revealCardInHand, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones, dispatch]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components
@@ -1793,32 +1822,41 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               const overlap = sorted.length <= 1
                 ? 0
                 : Math.min(sidebarCardWidth * 0.3, (availW - sidebarCardWidth) / (sorted.length - 1));
+              const nowForReveal = Date.now();
               return (
                 <Group key={zoneId}>
-                  {sorted.map((card, i) => (
-                    <GameCardNode
-                      key={card.instanceId}
-                      card={card}
-                      x={zone.x + pad + i * overlap}
-                      y={zone.y + 24}
-                      rotation={0}
-                      cardWidth={sidebarCardWidth}
-                      cardHeight={sidebarCardHeight}
-                      image={getImage(card.cardImgFile)}
-                      {...(getTargetingProps(card) ?? {})}
-                      isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
-                      nodeRef={registerCardNode}
-                      onDragStart={handleCardDragStart}
-                      onDragMove={handleCardDragMove}
-                      onDragEnd={handleCardDragEnd}
-                      onContextMenu={handleBrowseZoneCardContextMenu}
-                      onClick={handleBrowseZoneCardClick}
-                      onDblClick={handleCardDblClick}
-                      onMouseEnter={handleCardMouseEnter}
-                      onMouseLeave={handleCardMouseLeave}
-                    />
-                  ))}
+                  {sorted.map((card, i) => {
+                    // Spread the card to a fresh ref while a reveal is active
+                    // so the memoized GameCardNode re-renders each tick — the
+                    // countdown ring reads Date.now() at render time.
+                    const cardForNode = (typeof card.revealUntil === 'number' && card.revealUntil > nowForReveal)
+                      ? { ...card }
+                      : card;
+                    return (
+                      <GameCardNode
+                        key={card.instanceId}
+                        card={cardForNode}
+                        x={zone.x + pad + i * overlap}
+                        y={zone.y + 24}
+                        rotation={0}
+                        cardWidth={sidebarCardWidth}
+                        cardHeight={sidebarCardHeight}
+                        image={getImage(card.cardImgFile)}
+                        {...(getTargetingProps(card) ?? {})}
+                        isSelected={selectedIds.has(card.instanceId)}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        nodeRef={registerCardNode}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleBrowseZoneCardContextMenu}
+                        onClick={handleBrowseZoneCardClick}
+                        onDblClick={handleCardDblClick}
+                        onMouseEnter={handleCardMouseEnter}
+                        onMouseLeave={handleCardMouseLeave}
+                      />
+                    );
+                  })}
                 </Group>
               );
             }
@@ -2921,12 +2959,35 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       <CardChoicePromptContainer />
       <DiceRollOverlay />
 
+      {soulCinematic && (
+        <LostSoulCinematic
+          key={soulCinematic.id}
+          souls={soulCinematic.souls}
+        />
+      )}
+
       {targeting && (
         <TargetCardOverlay
           prompt={targeting.prompt}
           onCancel={() => {
             targeting.onCancel();
             setTargeting(null);
+          }}
+        />
+      )}
+
+      {countPrompt && (
+        <CountPromptDialog
+          req={{
+            ...countPrompt,
+            onConfirm: (count) => {
+              countPrompt.onConfirm(count);
+              setCountPrompt(null);
+            },
+            onCancel: () => {
+              countPrompt.onCancel();
+              setCountPrompt(null);
+            },
           }}
         />
       )}

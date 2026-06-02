@@ -42,11 +42,12 @@ import { ConsentDialog } from '@/app/shared/components/ConsentDialog';
 import { OpponentBrowseModal } from '@/app/shared/components/OpponentBrowseModal';
 import { showGameToast } from '@/app/shared/components/GameToast';
 import { TargetCardOverlay } from '@/app/shared/components/TargetCardOverlay';
-import type { GameActions, TargetingRequest } from '@/app/shared/types/gameActions';
+import type { GameActions, TargetingRequest, CountPromptRequest } from '@/app/shared/types/gameActions';
+import { CountPromptDialog } from '@/app/shared/components/CountPromptDialog';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
-import { getAbilitiesForCard } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isLostSoulCard } from '@/lib/cards/cardAbilities';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
@@ -65,8 +66,11 @@ import { normalizeDeckFormat } from '@/lib/deck-format';
 import { SOUL_DECK_BACK_IMG } from '@/app/shared/paragon/soulDeck';
 import { Link2Off } from 'lucide-react';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
+import { useCardSounds } from '@/app/shared/hooks/useCardSounds';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
+import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { cardInstanceToGameCard } from '../utils/cardAdapter';
 import type { UndoStack } from '../hooks/useUndoStack';
@@ -279,7 +283,7 @@ interface MultiplayerCanvasProps {
 // ---------------------------------------------------------------------------
 
 export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep, viewerKind = 'player' }: MultiplayerCanvasProps) {
-  const { setPreviewCard, isLoupeVisible } = useCardPreview();
+  const { setPreviewCard, isLoupeVisible, isPreviewFlipped } = useCardPreview();
   // Spectators may NEVER drag cards — even visually. Every `isDraggable` site
   // ANDs against this flag.
   const isSpectator = viewerKind === 'spectator';
@@ -333,6 +337,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     zoneSearchRequests,
   } = gameState;
 
+  // ---- Card sound effects (joke easter-egg, once per game; fires on each
+  // client independently so both players hear it). ----
+  const territorySoundCards = useMemo(
+    () => [...(myCards['territory'] ?? []), ...(opponentCards['territory'] ?? [])],
+    [myCards, opponentCards],
+  );
+  useCardSounds(territorySoundCards, String(gameId));
+
   // ---- Adapter: get GameCard for a CardInstance ----
   // Looks up the reference-stable adapted card from `useStableAdaptedCards` first
   // so every render-path consumer hits the same GameCard reference for unchanged
@@ -342,8 +354,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // shared-soul-deck modal — rare; correctness over speed).
   const adaptCard = useCallback(
     (card: CardInstance, owner: 'player1' | 'player2'): GameCard => {
-      const cached = adaptedCardsById.get(card.id);
-      if (cached && cached.ownerId === owner) return cached;
+      // Skip the stable cache for cards with active per-card reveals — the
+      // countdown ring inside GameCardNode reads Date.now() at render time, so
+      // it needs a fresh card reference each frame (driven by useRevealTick)
+      // to bust the memo and tick down. Non-revealed cards keep the cached
+      // reference so memo(GameCardNode) short-circuits as intended.
+      const nowMicros = BigInt(Date.now()) * 1000n;
+      const hasActiveReveal = card.revealExpiresAt !== undefined
+        && card.revealExpiresAt.microsSinceUnixEpoch > nowMicros;
+      if (!hasActiveReveal) {
+        const cached = adaptedCardsById.get(card.id);
+        if (cached && cached.ownerId === owner) return cached;
+      }
       const cardCounters = counters.get(card.id) ?? [];
       return cardInstanceToGameCard(card, cardCounters, owner);
     },
@@ -542,6 +564,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myLobIds);
   const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppLobIds);
 
+  // ---- Lost Soul cinematic — combined across both players ----
+  // Combine my + opp LOB Lost Souls into one input so simultaneous arrivals
+  // share a single cinematic moment rather than triggering two overlays.
+  // Dep is narrowed to the LOB arrays so unrelated card mutations don't
+  // re-run this work.
+  const lobSoulsForCinematic = useMemo(() => {
+    const out: { instanceId: string; cardName: string; cardImgFile: string }[] = [];
+    for (const c of (myCards['land-of-bondage'] ?? [])) {
+      if (!isLostSoulCard(c)) continue;
+      out.push({ instanceId: String(c.id), cardName: c.cardName, cardImgFile: c.cardImgFile });
+    }
+    for (const c of (opponentCards['land-of-bondage'] ?? [])) {
+      if (!isLostSoulCard(c)) continue;
+      out.push({ instanceId: String(c.id), cardName: c.cardName, cardImgFile: c.cardImgFile });
+    }
+    return out;
+  }, [myCards['land-of-bondage'], opponentCards['land-of-bondage']]);
+  // Gate detection until the subscription has applied AND we know who the
+  // local player is — otherwise the initial SpacetimeDB push of pre-existing
+  // LOB souls would register as "new arrivals" on game load / reconnect.
+  const soulsHydrated = !gameState.isLoading && !!gameState.myPlayer;
+  const { activeBatch: soulCinematic } =
+    useLostSoulCinematic(lobSoulsForCinematic, soulsHydrated);
+
   // ---- Hand → play prompt for cards with `set_card_outline` abilities ----
   // Three Woes is the v1 target. The choice routes through the same
   // executeCardAbility flow that powers the right-click menu.
@@ -561,14 +607,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       gameState.executeCardAbility(instanceId, abilityIndex),
   });
 
-  // Drive 1s re-renders while any visible hand card has an active per-card
-  // reveal. Both own and opponent hands can carry reveals — opponent cards
-  // need to flip back at T+30s on the viewer's side without a state change.
+  // Drive 1s re-renders while any visible card has an active per-card reveal.
+  // Hand reveals (own and opponent) flip back at expiry; reserve top reveals
+  // (e.g. Herod's Temple) need the same tick so the opponent's face flip and
+  // the countdown ring update without a server message.
   const anyHandActiveReveal = useMemo(() => {
     const nowMicros = BigInt(Date.now()) * 1000n;
     const hasActive = (cards: readonly { zone: string; revealExpiresAt?: { microsSinceUnixEpoch: bigint } }[]) =>
-      cards.some(c => c.zone === 'hand' && c.revealExpiresAt !== undefined && c.revealExpiresAt.microsSinceUnixEpoch > nowMicros);
-    return hasActive(myCards['hand'] ?? []) || hasActive(opponentCards['hand'] ?? []);
+      cards.some(c =>
+        (c.zone === 'hand' || c.zone === 'reserve')
+        && c.revealExpiresAt !== undefined
+        && c.revealExpiresAt.microsSinceUnixEpoch > nowMicros,
+      );
+    return hasActive(myCards['hand'] ?? [])
+      || hasActive(opponentCards['hand'] ?? [])
+      || hasActive(myCards['reserve'] ?? [])
+      || hasActive(opponentCards['reserve'] ?? []);
     // myCards/opponentCards identities update on each server tick, so this
     // re-computes when reveals arrive or expire.
   }, [myCards, opponentCards]);
@@ -851,6 +905,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ineligible cards and routes the next eligible click through `onSelect`.
   // Cleared by Esc, the banner's Cancel button, or any eligible card click.
   const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
+  const [countPrompt, setCountPrompt] = useState<CountPromptRequest | null>(null);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notePopover, setNotePopover] = useState<{
     cardId: string;
@@ -1292,7 +1347,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // server reducer throws SenderError for these. setPeekState → existing
       // useEffect broadcasts via revealCards so the opponent sees the reveal.
       const source = findMyCardById(sourceInstanceId);
-      const ability = source ? getAbilitiesForCard(source.cardName)[abilityIndex] : undefined;
+      // Use effective abilities so imitated souls' right-click abilities (e.g.
+      // Lawless reveal-top-6 on an Imitate) dispatch correctly. Mirrors the
+      // server's execute_card_ability dispatcher and the goldfish path.
+      const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
       // (Star) abilities fired from hand also reveal the source card to
       // opponents/spectators so the implicit "reveal from hand" cost is
       // visible. Reveal duration matches the standard 30s — see
@@ -1487,6 +1545,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     stopImitatingLostSoul: (sourceInstanceId) => {
       gameState.stopImitatingLostSoul(sourceInstanceId);
     },
+    executeCardAbilityWithCount: (sourceInstanceId, abilityIndex, count) => {
+      gameState.executeCardAbilityWithCount(sourceInstanceId, abilityIndex, count);
+    },
+    beginCountPrompt: (req) => setCountPrompt(req),
   }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
@@ -2666,10 +2728,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // being dragged within my own territory, attached weapons come along.
       const isMultiSelectDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       // A host being dragged carries its attached accessories along.
-      // Applies to territory warriors (with weapons) and LOB souls (with sites).
-      const followerZones: readonly string[] = ['territory', 'land-of-bondage'];
+      // Only applies to territory warriors (with weapons). LOB souls do NOT
+      // drag their attached sites — when a soul is rescued or otherwise
+      // leaves LoB, the site stays put in LoB (the server's accessory
+      // cascade unlinks it in place).
       const equipFollowerIds: string[] =
-        !isMultiSelectDrag && followerZones.includes(card.zone) && card.ownerId === 'player1'
+        !isMultiSelectDrag && card.zone === 'territory' && card.ownerId === 'player1'
           ? (myCards[card.zone] ?? [])
               .filter((c) => c.equippedToInstanceId === BigInt(card.instanceId))
               .map((c) => String(c.id))
@@ -5294,9 +5358,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
             // Discard, LOR, and Reserve show top card face-up; everything else shows card back
             // Reserve always shows face-up to the owner regardless of isFlipped
-            // Reserve sorts by type then name to match the browse modal order
+            // Reserve sorts by type then name to match the browse modal order. While a
+            // per-card reveal is active (e.g. Herod's Temple), pin the revealed card
+            // to the end so it renders on top of the visual stack instead of being
+            // buried by the alphabetical sort.
+            const nowMicrosForSort = BigInt(Date.now()) * 1000n;
             const sortedCards = zoneKey === 'reserve'
-              ? [...cards].sort((a, b) => (a.cardType ?? '').localeCompare(b.cardType ?? '') || (a.cardName ?? '').localeCompare(b.cardName ?? ''))
+              ? [...cards].sort((a, b) => {
+                  const aRevealed = a.revealExpiresAt !== undefined && a.revealExpiresAt.microsSinceUnixEpoch > nowMicrosForSort ? 1 : 0;
+                  const bRevealed = b.revealExpiresAt !== undefined && b.revealExpiresAt.microsSinceUnixEpoch > nowMicrosForSort ? 1 : 0;
+                  if (aRevealed !== bRevealed) return aRevealed - bRevealed;
+                  return (a.cardType ?? '').localeCompare(b.cardType ?? '') || (a.cardName ?? '').localeCompare(b.cardName ?? '');
+                })
               : cards;
             const topCard = sortedCards[sortedCards.length - 1];
             const showFace = topCard && ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') ? !topCard.isFlipped : zoneKey === 'reserve');
@@ -5517,10 +5590,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             // Center card vertically in remaining space after count badge (18px top)
             const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
 
-            const topCard = cards[cards.length - 1];
             const oppReserveRevealed = gameState.opponentPlayer?.reserveRevealed ?? false;
+            const nowMicrosForReveal = BigInt(Date.now()) * 1000n;
+            // For per-card reveals on opponent reserve (e.g. Herod's Temple),
+            // pick the revealed card as the displayed top card so the actual
+            // revealed card shows on the visual stack — not whichever card
+            // happens to be last in DB insertion order.
+            const revealedReserveCard = zoneKey === 'reserve'
+              ? cards.find(c => c.revealExpiresAt !== undefined && c.revealExpiresAt.microsSinceUnixEpoch > nowMicrosForReveal)
+              : undefined;
+            const topCard = revealedReserveCard ?? cards[cards.length - 1];
+            const topReserveCardRevealed = !!revealedReserveCard;
             const showFace = ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') && topCard && !topCard.isFlipped)
-              || (zoneKey === 'reserve' && oppReserveRevealed && topCard);
+              || (zoneKey === 'reserve' && (oppReserveRevealed || topReserveCardRevealed) && topCard);
 
             return (
               <Group
@@ -5629,8 +5711,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     )}
                     {showFace && topCard ? (
                       (() => {
-                        // When opponent reserve is revealed, force face-up even if card has isFlipped=true
-                        const effectiveTop = zoneKey === 'reserve' && oppReserveRevealed && topCard.isFlipped
+                        // Force face-up for opponent reserve when either the whole
+                        // pile is revealed OR this specific card has an active
+                        // per-card reveal (e.g. Herod's Temple). Needed because
+                        // getCardImage() returns undefined for isFlipped cards,
+                        // which would route this branch to CardBackShape and the
+                        // opponent would never see the revealed face.
+                        const effectiveTop = zoneKey === 'reserve' && (oppReserveRevealed || topReserveCardRevealed) && topCard.isFlipped
                           ? { ...topCard, isFlipped: false }
                           : topCard;
                         const img = getCardImage(effectiveTop);
@@ -6794,7 +6881,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {approvedSearchRequest && !approvedSearchRequest.action && approvedSearchRequest.zone !== 'hand-reveal' && approvedSearchRequest.zone !== 'action-priority' && (() => {
+      {approvedSearchRequest && !approvedSearchRequest.action && approvedSearchRequest.zone !== 'hand-reveal' && approvedSearchRequest.zone !== 'action-priority' && approvedSearchRequest.zone !== 'initiative' && (() => {
         const zoneCards = (opponentCards[approvedSearchRequest.zone] ?? [])
           .map((c: CardInstance) => adaptCard(c, 'player2'));
         return (
@@ -7413,7 +7500,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 width: previewWidth,
                 height: previewHeight,
                 borderRadius: 6,
-                transform: hoveredCard.isMeek ? 'rotate(180deg)' : undefined,
+                transform: hoveredCard.isMeek && !isPreviewFlipped ? 'rotate(180deg)' : undefined,
               }}
             />
             {hoveredCard.notes && (
@@ -7450,6 +7537,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             targeting.onCancel();
             setTargeting(null);
           }}
+        />
+      )}
+
+      {countPrompt && (
+        <CountPromptDialog
+          req={{
+            ...countPrompt,
+            onConfirm: (count) => {
+              countPrompt.onConfirm(count);
+              setCountPrompt(null);
+            },
+            onCancel: () => {
+              countPrompt.onCancel();
+              setCountPrompt(null);
+            },
+          }}
+        />
+      )}
+
+      {soulCinematic && (
+        <LostSoulCinematic
+          key={soulCinematic.id}
+          souls={soulCinematic.souls}
         />
       )}
     </div>
