@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import type { GameActions } from '../types/gameActions';
 import { showGameToast } from '../components/GameToast';
+import { shouldRunUndo } from './gameHotkeysCore';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -91,12 +92,16 @@ export function useGameHotkeys(config: GameHotkeysConfig) {
         return;
       }
 
-      // Ctrl/Cmd+Z — undo (both modes)
+      // Ctrl/Cmd+Z — undo (both modes). preventDefault is unconditional so
+      // Shift+Cmd+Z (browser redo) is also swallowed — there is no redo feature.
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        if (onUndo) {
-          e.preventDefault();
-          onUndo();
+        e.preventDefault();
+        if (e.repeat) return; // ignore held-key autorepeat → exactly one undo
+        if (!shouldRunUndo({ mode, isMyTurn, repeat: e.repeat })) {
+          showGameToast("Wait for your turn");
+          return;
         }
+        onUndo?.();
         return;
       }
 

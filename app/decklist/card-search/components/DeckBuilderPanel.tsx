@@ -29,6 +29,7 @@ import GeneratePDFModal from "./GeneratePDFModal";
 import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
 import LoadDeckModal from "./LoadDeckModal";
+import ShareDeckModal from "./ShareDeckModal";
 import { duplicateDeckAction, setDeckVisibilityAction, loadGlobalTagsAction, updateDeckTagsAction, GlobalTag } from "../../actions";
 import { DeckVisibility } from "../types/deck";
 import { createGlobalTagAction } from "../../../admin/tags/actions";
@@ -166,125 +167,6 @@ interface DeckBuilderPanelProps {
   onIgnoreLegalityChecksChange?: (value: boolean) => void;
 }
 
-const VISIBILITY_OPTIONS: {
-  value: DeckVisibility;
-  label: string;
-  hint: string;
-  icon: React.ReactNode;
-}[] = [
-  {
-    value: "private",
-    label: "Private",
-    hint: "Only you can see this deck.",
-    icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-      </svg>
-    ),
-  },
-  {
-    value: "unlisted",
-    label: "Unlisted",
-    hint: "Anyone with the link can view this deck. It won't appear in community search.",
-    icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-      </svg>
-    ),
-  },
-  {
-    value: "public",
-    label: "Public",
-    hint: "Viewable by anyone and listed in community search.",
-    icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-];
-
-/**
- * Three-state visibility selector + share-link actions for the deck builder
- * menu. Shared between the desktop and mobile dropdowns.
- */
-function DeckVisibilitySection({
-  deckId,
-  visibility,
-  linkCopied,
-  dense = false,
-  onSelect,
-  onCopyLink,
-  onCloseMenu,
-}: {
-  deckId: string;
-  visibility: DeckVisibility;
-  linkCopied: boolean;
-  dense?: boolean;
-  onSelect: (v: DeckVisibility) => void;
-  onCopyLink: () => void;
-  onCloseMenu: () => void;
-}) {
-  const itemCls = `w-full ${dense ? "px-4 py-2 gap-2" : "px-4 py-2.5 gap-2.5"} text-left hover:bg-muted flex items-center text-foreground text-sm`;
-  const isShared = visibility === "unlisted" || visibility === "public";
-
-  return (
-    <>
-      <div className="border-t border-border my-1" />
-      <div className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Visibility
-      </div>
-      {VISIBILITY_OPTIONS.map((opt) => {
-        const active = visibility === opt.value;
-        return (
-          <button
-            key={opt.value}
-            onClick={() => onSelect(opt.value)}
-            className={`${itemCls} ${active ? "bg-muted/60" : ""}`}
-            aria-pressed={active}
-          >
-            <span className={active ? "text-primary" : "text-muted-foreground"}>{opt.icon}</span>
-            <span className="flex-1">{opt.label}</span>
-            {active && (
-              <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-          </button>
-        );
-      })}
-      {visibility === "unlisted" && (
-        <p className="px-4 py-1 text-xs text-muted-foreground">
-          Anyone with the link can view this deck. It won&apos;t appear in community search.
-        </p>
-      )}
-      {isShared && (
-        <>
-          <button onClick={onCopyLink} className={itemCls}>
-            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-            {linkCopied ? "Link Copied!" : "Copy Share Link"}
-          </button>
-          <a
-            href={`/decklist/${deckId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={onCloseMenu}
-            className={itemCls}
-          >
-            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-            View Deck Page
-          </a>
-        </>
-      )}
-    </>
-  );
-}
-
 /**
  * Right sidebar panel for deck building
  */
@@ -351,14 +233,13 @@ export default function DeckBuilderPanel({
   const [fullViewPreviewCard, setFullViewPreviewCard] = useState<Card | null>(null);
   const [showParagonDropdown, setShowParagonDropdown] = useState(false);
   const [showParagonModal, setShowParagonModal] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const currentVisibility: DeckVisibility =
     deck.visibility ?? (deck.isPublic ? "public" : "private");
 
-  // Change the deck's three-state visibility. Keeps the dropdown open so the
-  // share-link actions appear inline after choosing Unlisted/Public.
+  // Change the deck's three-state visibility. Used by the Share modal.
   const handleSelectVisibility = async (v: DeckVisibility) => {
     if (!deck.id || v === currentVisibility) return;
     const result = await setDeckVisibilityAction(deck.id, v);
@@ -371,14 +252,6 @@ export default function DeckBuilderPanel({
     } else {
       onNotify?.(result.error || "Failed to change visibility", "error");
     }
-  };
-
-  const handleCopyShareLink = () => {
-    if (!deck.id) return;
-    const url = `${window.location.origin}/decklist/${deck.id}`;
-    navigator.clipboard.writeText(url);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const { getImageUrl } = useCardImageUrl();
@@ -1238,6 +1111,20 @@ export default function DeckBuilderPanel({
               </svg>
             </button>
 
+            {/* Share button (opens the share/visibility modal) */}
+            {isAuthenticated && deck.id && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                title="Share deck"
+                aria-label="Share deck"
+              >
+                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              </button>
+            )}
+
             {/* More menu */}
             <div className="relative">
               <button
@@ -1331,14 +1218,15 @@ export default function DeckBuilderPanel({
                     </button>
                   )}
                   {isAuthenticated && deck.id && (
-                    <DeckVisibilitySection
-                      deckId={deck.id}
-                      visibility={currentVisibility}
-                      linkCopied={linkCopied}
-                      onSelect={handleSelectVisibility}
-                      onCopyLink={handleCopyShareLink}
-                      onCloseMenu={() => setShowMenu(false)}
-                    />
+                    <button
+                      onClick={() => { setShowShareModal(true); setShowMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                    >
+                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                      Share…
+                    </button>
                   )}
                   <div className="border-t border-border my-1" />
                   <button
@@ -1699,6 +1587,20 @@ export default function DeckBuilderPanel({
               </svg>
             </button>
 
+            {/* Share button (opens the share/visibility modal) */}
+            {isAuthenticated && deck.id && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="px-3 py-1.5 rounded border border-border bg-card hover:bg-muted text-muted-foreground transition-colors flex items-center"
+                title="Share deck"
+                aria-label="Share deck"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              </button>
+            )}
+
             {/* Menu Dropdown */}
             <div className="relative">
               <button
@@ -1817,15 +1719,15 @@ export default function DeckBuilderPanel({
               
               {/* Sharing Section */}
               {isAuthenticated && deck.id && (
-                <DeckVisibilitySection
-                  deckId={deck.id}
-                  visibility={currentVisibility}
-                  linkCopied={linkCopied}
-                  dense
-                  onSelect={handleSelectVisibility}
-                  onCopyLink={handleCopyShareLink}
-                  onCloseMenu={() => setShowMenu(false)}
-                />
+                <button
+                  onClick={() => { setShowShareModal(true); setShowMenu(false); }}
+                  className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
+                >
+                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  Share…
+                </button>
               )}
 
               <div className="border-t border-border my-1"></div>
@@ -3557,6 +3459,18 @@ export default function DeckBuilderPanel({
             />
           </div>
         </div>
+      )}
+
+      {/* Share / visibility modal */}
+      {deck.id && (
+        <ShareDeckModal
+          open={showShareModal}
+          onOpenChange={setShowShareModal}
+          deckId={deck.id}
+          deckName={deck.name}
+          visibility={currentVisibility}
+          onSetVisibility={handleSelectVisibility}
+        />
       )}
 
       {/* Username Modal */}
