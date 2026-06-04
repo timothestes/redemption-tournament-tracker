@@ -367,19 +367,14 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                 'Join as Player'
               )}
             </Button>
-            <div className="relative flex-1 group">
-              <Button
-                size="lg"
-                variant="outline"
-                disabled
-                className="w-full h-12 text-base opacity-50 cursor-not-allowed"
-              >
-                Watch as Spectator
-              </Button>
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-muted-foreground bg-popover border rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                Coming soon
-              </span>
-            </div>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => router.push(`/play/spectate/${joinCode}`)}
+              className="flex-1 h-12 text-base"
+            >
+              Watch as Spectator
+            </Button>
           </div>
           <a
             href="/play"
