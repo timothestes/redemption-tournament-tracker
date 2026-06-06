@@ -272,10 +272,33 @@ export default function CardSearchClient() {
   // Drag-to-deck is disabled on mobile — touch drag doesn't work reliably and
   // the tap/stepper controls cover adding cards.
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const [player1Name, setPlayer1Name] = useState("Player 1");
-  const [player2Name, setPlayer2Name] = useState("Player 2");
-  const [player1Score, setPlayer1Score] = useState(0);
-  const [player2Score, setPlayer2Score] = useState(0);
+  const [player1Name, setPlayer1Name] = useState(() => {
+    if (typeof window === 'undefined') return "Player 1";
+    return localStorage.getItem('spotlight-p1-name') ?? "Player 1";
+  });
+  const [player2Name, setPlayer2Name] = useState(() => {
+    if (typeof window === 'undefined') return "Player 2";
+    return localStorage.getItem('spotlight-p2-name') ?? "Player 2";
+  });
+  const [player1Score, setPlayer1Score] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const saved = parseInt(localStorage.getItem('spotlight-p1-score') ?? '', 10);
+    return Number.isNaN(saved) ? 0 : saved;
+  });
+  const [player2Score, setPlayer2Score] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const saved = parseInt(localStorage.getItem('spotlight-p2-score') ?? '', 10);
+    return Number.isNaN(saved) ? 0 : saved;
+  });
+
+  // Persist scoreboard state across refresh / mode toggles
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('spotlight-p1-name', player1Name);
+    localStorage.setItem('spotlight-p2-name', player2Name);
+    localStorage.setItem('spotlight-p1-score', String(player1Score));
+    localStorage.setItem('spotlight-p2-score', String(player2Score));
+  }, [player1Name, player2Name, player1Score, player2Score]);
 
   // Spotlight mode is desktop-only — reset on mobile
   const modeRef = useRef(mode);
@@ -294,14 +317,12 @@ export default function CardSearchClient() {
     return () => mediaQuery.removeEventListener("change", handler);
   }, []);
 
-  // Clear spotlight state when leaving spotlight mode
+  // Clear spotlighted card when leaving spotlight mode.
+  // Scoreboard names/scores intentionally persist (see localStorage above) so a
+  // mode toggle mid-stream doesn't wipe the live score.
   useEffect(() => {
     if (mode === "deck") {
       setSpotlightCard(null);
-      setPlayer1Name("Player 1");
-      setPlayer2Name("Player 2");
-      setPlayer1Score(0);
-      setPlayer2Score(0);
     }
   }, [mode]);
 
@@ -1530,7 +1551,6 @@ export default function CardSearchClient() {
     }
   }
 
-  // ...existing code...
   return (
     <>
       {/* Modal - Rendered outside main container to avoid z-index issues */}
@@ -2571,6 +2591,12 @@ export default function CardSearchClient() {
                 setPlayer2Name("Player 2");
                 setPlayer1Score(0);
                 setPlayer2Score(0);
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('spotlight-p1-name');
+                  localStorage.removeItem('spotlight-p2-name');
+                  localStorage.removeItem('spotlight-p1-score');
+                  localStorage.removeItem('spotlight-p2-score');
+                }
               }}
             />
           ) : isInitializing ? (
