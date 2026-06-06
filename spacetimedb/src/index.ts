@@ -1694,6 +1694,25 @@ export const update_lobby_message = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: set_game_public
+// ---------------------------------------------------------------------------
+export const set_game_public = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    isPublic: t.bool(),
+  },
+  (ctx, { gameId, isPublic }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'waiting') throw new SenderError('Game is not in waiting state');
+    if (game.createdBy.toHexString() !== ctx.sender.toHexString()) {
+      throw new SenderError('Only the game creator can change game visibility');
+    }
+    ctx.db.Game.id.update({ ...game, isPublic });
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Scheduled reducer: handle_disconnect_timeout
 // ---------------------------------------------------------------------------
 export const handle_disconnect_timeout = spacetimedb.reducer(
@@ -2399,6 +2418,22 @@ export const move_card = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Helper: deleteTokenWithCounters
+// A token can never live in a deck. Any action that would send a token to the
+// deck (topdeck / underdeck / shuffle-into-deck, single or group) deletes it
+// from the game instead — mirroring the move_card drag-to-deck cleanup
+// (TOKEN_REMOVE_ZONES) and the goldfish rule at gameReducer.ts:791/808.
+// Removes the token's counters first, then the CardInstance itself. Callers
+// handle source-pile compaction (hand / land-of-bondage) as needed.
+// ---------------------------------------------------------------------------
+function deleteTokenWithCounters(ctx: any, card: any): void {
+  for (const counter of [...ctx.db.CardCounter.card_counter_card_instance_id.filter(card.id)]) {
+    ctx.db.CardCounter.id.delete(counter.id);
+  }
+  ctx.db.CardInstance.id.delete(card.id);
+}
+
+// ---------------------------------------------------------------------------
 // Reducer: move_cards_batch
 // ---------------------------------------------------------------------------
 export const move_cards_batch = spacetimedb.reducer(
@@ -2794,6 +2829,14 @@ export const move_cards_batch = spacetimedb.reducer(
         ? new Timestamp(ctx.timestamp.microsSinceUnixEpoch + AUTO_REVEAL_HAND_MICROS)
         : undefined;
       const newRevealStartedAt = autoReveal ? ctx.timestamp : undefined;
+
+      // Tokens can't go into a deck — delete instead of inserting it. The
+      // earlier movedCards / hand+LOB compaction bookkeeping already accounted
+      // for this card when its zone changed, so just remove it and skip ahead.
+      if (card.isToken && cardFinalZone === 'deck') {
+        deleteTokenWithCounters(ctx, card);
+        continue;
+      }
 
       clearCountersIfLeavingPlay(ctx, card.id, card.zone, cardFinalZone);
       ctx.db.CardInstance.id.update({
@@ -4281,6 +4324,18 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
 
     const fromZone = card.zone;
 
+    const game0 = ctx.db.Game.id.find(gameId);
+    if (!game0) throw new SenderError('Game not found');
+
+    // Tokens can't be shuffled into a deck — delete the token instead.
+    if (card.isToken) {
+      deleteTokenWithCounters(ctx, card);
+      if (fromZone === 'hand') compactHandIndices(ctx, gameId, card.ownerId);
+      if (fromZone === 'land-of-bondage') compactLobIndices(ctx, gameId, card.ownerId);
+      logAction(ctx, gameId, player.id, 'SHUFFLE_INTO_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, tokenCleanup: true, deckOwnerId: (card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId).toString() }), game0.turnNumber, game0.currentPhase);
+      return;
+    }
+
     // Route into the original owner's deck so a taken opponent card
     // shuffles back into the opponent's deck, not the controller's.
     const deckOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
@@ -5388,6 +5443,15 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
     // topdecks to the opponent's deck, not the acting player's.
     const homeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
 
+    // Tokens can't go onto a deck — delete the token instead.
+    if (card.isToken) {
+      deleteTokenWithCounters(ctx, card);
+      if (fromZone === 'hand') compactHandIndices(ctx, gameId, card.ownerId);
+      if (fromZone === 'land-of-bondage') compactLobIndices(ctx, gameId, card.ownerId);
+      logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, tokenCleanup: true, targetOwnerId: homeOwnerId.toString() }), game.turnNumber, game.currentPhase);
+      return;
+    }
+
     // Shift all existing deck cards' zoneIndex += 1 (in the target deck)
     const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
       (c: any) => c.ownerId === homeOwnerId && c.zone === 'deck'
@@ -5454,6 +5518,15 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
     // Route to the card's original owner's deck so a taken opponent card
     // bottom-decks to the opponent's deck, not the acting player's.
     const homeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+
+    // Tokens can't go onto a deck — delete the token instead.
+    if (card.isToken) {
+      deleteTokenWithCounters(ctx, card);
+      if (fromZone === 'hand') compactHandIndices(ctx, gameId, card.ownerId);
+      if (fromZone === 'land-of-bondage') compactLobIndices(ctx, gameId, card.ownerId);
+      logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, tokenCleanup: true, targetOwnerId: homeOwnerId.toString() }), game.turnNumber, game.currentPhase);
+      return;
+    }
 
     // Find max zoneIndex among target deck's cards
     const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(

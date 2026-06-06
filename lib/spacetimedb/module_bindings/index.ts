@@ -102,6 +102,7 @@ import RollDiceReducer from "./roll_dice_reducer";
 import SendChatReducer from "./send_chat_reducer";
 import SendEmoteReducer from "./send_emote_reducer";
 import SetGamePrivateReducer from "./set_game_private_reducer";
+import SetGamePublicReducer from "./set_game_public_reducer";
 import SetNoteReducer from "./set_note_reducer";
 import SetPhaseReducer from "./set_phase_reducer";
 import SetPlayerOptionReducer from "./set_player_option_reducer";
@@ -432,6 +433,7 @@ const reducersSchema = __reducers(
   __reducerSchema("send_chat", SendChatReducer),
   __reducerSchema("send_emote", SendEmoteReducer),
   __reducerSchema("set_game_private", SetGamePrivateReducer),
+  __reducerSchema("set_game_public", SetGamePublicReducer),
   __reducerSchema("set_note", SetNoteReducer),
   __reducerSchema("set_phase", SetPhaseReducer),
   __reducerSchema("set_player_option", SetPlayerOptionReducer),

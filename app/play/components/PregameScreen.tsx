@@ -61,6 +61,7 @@ interface PregameScreenProps {
   onPractice: () => void;
   onBackToLobby: () => void;
   onUpdateMessage?: (message: string) => void;
+  onTogglePublic?: (isPublic: boolean) => void;
   // True once this client's own deck images are preloaded (or the safety
   // timer has expired). When false, the Ready button is disabled so the
   // server-anchored choose-first countdown can't start while a slow-wifi
@@ -83,6 +84,7 @@ export default function PregameScreen({
   onPractice,
   onBackToLobby,
   onUpdateMessage,
+  onTogglePublic,
   canReady,
 }: PregameScreenProps) {
   const { game, myPlayer, opponentPlayer } = gameState;
@@ -170,6 +172,8 @@ export default function PregameScreen({
                 goldfishDeck={goldfishDeck}
                 onPractice={onPractice}
                 onUpdateMessage={onUpdateMessage}
+                isPublic={game?.isPublic ?? true}
+                onTogglePublic={onTogglePublic}
               />
             ) : phase === 'deck_select' ? (
               // Nothing extra — player cards have the ready button
@@ -513,10 +517,14 @@ function WaitingActions({
   goldfishDeck,
   onPractice,
   onUpdateMessage,
+  isPublic,
+  onTogglePublic,
 }: {
   goldfishDeck: import('@/app/goldfish/types').DeckDataForGoldfish | null;
   onPractice: () => void;
   onUpdateMessage?: (message: string) => void;
+  isPublic?: boolean;
+  onTogglePublic?: (isPublic: boolean) => void;
 }) {
   const [message, setMessage] = useState('');
   const [messageSaved, setMessageSaved] = useState(false);
@@ -578,6 +586,29 @@ function WaitingActions({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Visibility toggle — host can flip between public (listed) and private (invite-only) */}
+      {onTogglePublic && (
+        <div className="mt-3 flex items-center justify-center gap-2.5">
+          <button
+            role="switch"
+            aria-checked={!isPublic}
+            onClick={() => onTogglePublic(!isPublic)}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              isPublic ? 'bg-amber-200/20' : 'bg-primary'
+            }`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                isPublic ? 'translate-x-[3px]' : 'translate-x-[19px]'
+              }`}
+            />
+          </button>
+          <span className="text-[11px] text-amber-200/40">
+            {isPublic ? 'Public — listed in open games' : 'Private — invite only'}
+          </span>
         </div>
       )}
 
