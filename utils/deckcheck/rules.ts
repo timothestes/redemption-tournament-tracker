@@ -16,11 +16,11 @@ export function isHopperLostSoul(card: ResolvedCard): boolean {
   if (!isLostSoul(card)) return false;
   const nameLower = card.name.toLowerCase();
   if (nameLower.includes("hopper")) return true;
-  // Check name for reference text (card names often contain the reference)
-  if (nameLower.includes("ii chronicles 28:13")) return true;
   // Also check the reference field directly
   if (card.reference === "II Chronicles 28:13") return true;
   if (card.reference === "Matthew 18:12") return true;
+  // Check name for reference text (card names often contain the reference)
+  if (nameLower.includes("ii chronicles 28:13")) return true;
   return false;
 }
 
@@ -1325,6 +1325,30 @@ export function checkT2ReserveSize(
 }
 
 /**
+ * Per-card T2 copy limit based on the same 4-tier system used below.
+ * Returns the max copies allowed for a single card, or null when the card is
+ * not subject to a brigade/type tier here (Dominants — handled by
+ * checkDominantUnique; non-SA Lost Souls — handled by the LS count rules;
+ * Colorless / no-brigade cards — uncapped by these tiers).
+ *
+ * Mirrors the tiers in checkT2QuantityLimits exactly so the two stay in sync.
+ */
+function getT2CardCopyLimit(card: ResolvedCard): number | null {
+  if (isDominant(card)) return null;
+  if (isLostSoul(card)) return hasSpecialAbility(card) ? 2 : null;
+
+  const brigades = getBrigadeCount(card);
+  if (brigades >= 3) return isSpecialExceptionCard(card) ? null : 1;
+  if (brigades === 2) return 2;
+  if (brigades === 1) {
+    if (isSiteOrCity(card)) return hasSpecialAbility(card) ? 2 : 4;
+    if (isArtifactFortressCovCurse(card)) return 3;
+    if (isCharacter(card) || isEnhancement(card)) return 4;
+  }
+  return null;
+}
+
+/**
  * Rule: t2-quantity-limits — The 4-tier quantity system for Type 2.
  *
  * Max 1: 3+ brigades (getBrigadeCount >= 3), or Dominant (handled by checkDominantUnique)
@@ -1343,6 +1367,34 @@ export function checkT2QuantityLimits(
   const issues: DeckCheckIssue[] = [];
 
   for (const group of cardGroups) {
+    // Authoritative same-card groups (formed via duplicate_card_groups, so
+    // groupId is set) may contain printings of the same card in DIFFERENT
+    // brigades — e.g. "Daniel, the Treasured" [White, max 4] and
+    // "Daniel, the Apocalyptist" [Green/White, max 2] share group 537.
+    // The per-tier checks below would split those into separate brigade
+    // buckets and miss the combined total, so treat the whole group as a
+    // single card capped at its most restrictive member limit instead.
+    if (group.groupId != null) {
+      const capped = group.cards
+        .map((c) => ({ card: c, limit: getT2CardCopyLimit(c) }))
+        .filter((x): x is { card: ResolvedCard; limit: number } => x.limit != null);
+
+      if (capped.length > 0) {
+        const minLimit = Math.min(...capped.map((x) => x.limit));
+        const totalQty = capped.reduce((sum, x) => sum + x.card.quantity, 0);
+        if (totalQty > minLimit) {
+          const names = [...new Set(capped.map((x) => x.card.name))];
+          issues.push({
+            type: "error",
+            rule: "t2-quantity-same-card-combined",
+            message: `"${group.canonicalName}" — these printings count as the same card, max ${minLimit} copies allowed (most restrictive printing), found ${totalQty}.`,
+            cards: names,
+          });
+        }
+      }
+      continue;
+    }
+
     // Note: Dominant uniqueness (max 1) is handled by checkDominantUnique,
     // which is called separately in validateT2Rules. Don't duplicate it here.
 

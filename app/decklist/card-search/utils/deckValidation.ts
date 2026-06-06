@@ -32,31 +32,39 @@ export interface DeckValidation {
 }
 
 /**
- * Redemption CCG Deck Building Rules Summary:
- * 
+ * LEGACY client-side fallback validator.
+ *
+ * The authoritative deck legality checker is `utils/deckcheck` (run on save and
+ * surfaced via `useDeckCheck`). This module only provides the fast, synchronous
+ * structural checks used before the server result arrives, plus the Paragon
+ * brigade breakdown. When in doubt, trust `utils/deckcheck`.
+ *
+ * Redemption CCG Deck Building Rules Summary (as checked HERE):
+ *
  * 1. Deck Size:
  *    - Type 1: 50-154 cards
  *    - Type 2: 100-252 cards
  *    - Paragon: 40 cards (exact)
- * 
+ *
  * 2. Lost Soul Requirements: Based on Main Deck size ONLY (not including Reserve)
  *    - Every 7 cards in Main Deck requires 1 more Lost Soul
  *    - 50-56 cards = 7 Lost Souls, 57-63 = 8, etc.
  *    - EXCEPTION: "Hopper" Lost Souls (II Chronicles 28:13 variants) do NOT count
  *    - Paragon: NO Lost Souls allowed
- * 
+ *
  * 3. Reserve Limits:
  *    - Type 1: Maximum 10 cards
  *    - Type 2: Maximum 15 cards
  *    - Paragon: Maximum 10 cards
  *    - Dominants and Lost Souls CANNOT be in Reserve
- * 
+ *
  * 4. Dominant Limits:
  *    - Maximum 1 copy of each unique Dominant
  *    - Total Dominants cannot exceed required Lost Souls (based on deck size)
  *    - Example: 50-56 card deck = max 7 Dominants, 57-63 = max 8, etc.
- * 
- * 5. Card Quantity Limits: NOT ENFORCED (per user request)
+ *
+ * 5. Per-card copy limits (brigade-based max copies, same-card grouping, etc.):
+ *    NOT checked here — enforced authoritatively by `utils/deckcheck`.
  */
 
 /**
@@ -441,8 +449,8 @@ export function validateDeck(deck: Deck): DeckValidation {
     });
   }
   
-  // Validation: Card quantity limits - REMOVED per user request
-  // "We will not be enforcing card quality limits at this time"
+  // Per-card copy limits (brigade-based max copies, same-card grouping) are not
+  // checked in this legacy fallback — `utils/deckcheck` enforces them on save.
   
   // Validation: Dominant limits (max 1 per unique Dominant)
   const dominantQuantities = new Map<string, number>();

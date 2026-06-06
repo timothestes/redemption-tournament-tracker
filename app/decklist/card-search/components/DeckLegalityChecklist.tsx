@@ -78,6 +78,7 @@ const T2_RULE_CATEGORIES = [
       "t2-quantity-artifact-fortress",
       "t2-quantity-character-enhancement",
       "t2-quantity-vanilla-site",
+      "t2-quantity-same-card-combined",
       "t1-special-card",
       "t1-character-alias",
     ],

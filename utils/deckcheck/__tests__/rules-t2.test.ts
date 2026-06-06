@@ -1135,6 +1135,97 @@ describe("checkT2QuantityLimits", () => {
       expect(relevant[0].type).toBe("error");
     });
   });
+
+  // ---- Same-card groups with mixed-brigade printings (combined cap) ----
+
+  describe("authoritative same-card groups (duplicate_card_groups)", () => {
+    // Mirrors the real "Daniel" group (id 537): single-brigade and multicolor
+    // printings of the same character intentionally share a groupId, so the
+    // copy limit must treat them as one card capped at the most restrictive
+    // member limit — NOT split each brigade into its own tier bucket.
+    function makeSameCardGroup(
+      canonicalName: string,
+      cards: ResolvedCard[]
+    ): CardGroup {
+      return {
+        canonicalName,
+        groupId: 537,
+        cards,
+        totalQuantity: cards.reduce((sum, c) => sum + c.quantity, 0),
+      };
+    }
+
+    it("errors when single-brigade + multicolor printings exceed the most restrictive cap", () => {
+      // White Daniel (single brigade, max 4) x3 + Green/White Daniel (2 brigades, max 2) x1
+      // = 4 of "the same card", but the most restrictive printing caps at 2.
+      const white = makeCard({
+        name: "Daniel, the Treasured",
+        type: "Hero",
+        brigade: "White",
+        alignment: "Good",
+        quantity: 3,
+      });
+      const multicolor = makeCard({
+        name: "Daniel, the Apocalyptist",
+        type: "Hero",
+        brigade: "Green/White",
+        alignment: "Good",
+        quantity: 1,
+        isReserve: true,
+      });
+      const mainDeck = makeValidMainDeck(100, [white]);
+      const reserve = [multicolor];
+      const groups = [makeSameCardGroup("Daniel", [white, multicolor])];
+      const issues = checkT2QuantityLimits(mainDeck, reserve, groups);
+      const relevant = issues.filter(
+        (i) => i.rule === "t2-quantity-same-card-combined"
+      );
+      expect(relevant).toHaveLength(1);
+      expect(relevant[0].type).toBe("error");
+    });
+
+    it("passes when the combined total stays within the most restrictive cap", () => {
+      // White Daniel x1 + Green/White Daniel x1 = 2 total, cap is 2 (multicolor) → legal.
+      const white = makeCard({
+        name: "Daniel, the Treasured",
+        type: "Hero",
+        brigade: "White",
+        alignment: "Good",
+        quantity: 1,
+      });
+      const multicolor = makeCard({
+        name: "Daniel, the Apocalyptist",
+        type: "Hero",
+        brigade: "Green/White",
+        alignment: "Good",
+        quantity: 1,
+      });
+      const mainDeck = makeValidMainDeck(100, [white, multicolor]);
+      const groups = [makeSameCardGroup("Daniel", [white, multicolor])];
+      const issues = checkT2QuantityLimits(mainDeck, [], groups);
+      const relevant = issues.filter(
+        (i) => i.rule === "t2-quantity-same-card-combined"
+      );
+      expect(relevant).toHaveLength(0);
+    });
+
+    it("passes a homogeneous same-card group within its single-tier cap", () => {
+      // 4 White Daniels, all single brigade, max 4 → legal (combined cap == 4).
+      const white = makeCard({
+        name: "Daniel, the Treasured",
+        type: "Hero",
+        brigade: "White",
+        alignment: "Good",
+        quantity: 4,
+      });
+      const mainDeck = makeValidMainDeck(100, [white]);
+      const groups = [makeSameCardGroup("Daniel", [white])];
+      const issues = checkT2QuantityLimits(mainDeck, [], groups);
+      expect(
+        issues.filter((i) => i.rule?.startsWith("t2-quantity")).length
+      ).toBe(0);
+    });
+  });
 });
 
 // ===========================================================================
