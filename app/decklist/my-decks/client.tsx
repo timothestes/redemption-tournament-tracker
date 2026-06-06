@@ -26,11 +26,14 @@ import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 import DeleteDeckModal from "./DeleteDeckModal";
 import FolderModal from "./FolderModal";
 import UsernameModal from "./UsernameModal";
+import QuickLookModal from "./QuickLookModal";
+import { cardKey, buildTypeRanks } from "./cardTypeSort";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import ShareDeckModal from "../card-search/components/ShareDeckModal";
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
+import { cn } from "@/lib/utils";
 
 // Derive three-state visibility from a deck row (falls back to the is_public mirror).
 function deckVisibility(deck: DeckData): DeckVisibility {
@@ -96,6 +99,30 @@ function formatDateTime(dateString: string): string {
   return `${month}/${day}/${year} ${hours}:${minutes}:${seconds} ${tzAbbr}`;
 }
 
+// Helper: relative "time ago" for quick scanning; absolute stays on hover via formatDateTime.
+function formatRelativeTime(dateString: string): string {
+  const then = new Date(dateString).getTime();
+  const diffSec = Math.round((Date.now() - then) / 1000);
+  if (diffSec < 45) return "just now";
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.round(diffHr / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  const d = new Date(dateString);
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const year = String(d.getFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
+}
+
+type ToastState = {
+  message: string;
+  type: "error" | "success";
+  action?: { label: string; onClick: () => void };
+};
+
 export default function MyDecksClient() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckData[]>([]);
@@ -119,6 +146,30 @@ export default function MyDecksClient() {
   const [usernameModalDeckId, setUsernameModalDeckId] = useState<string | null>(null);
   const [shareDeckId, setShareDeckId] = useState<string | null>(null);
   const [coverPickerDeckId, setCoverPickerDeckId] = useState<string | null>(null);
+  const [quickLookDeckId, setQuickLookDeckId] = useState<string | null>(null);
+
+  // Multi-select + bulk actions
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const bulkMoveRef = useRef<HTMLDivElement>(null);
+
+  // Drag-to-folder: tracks which drop target is hovered ("uncat" or a folder id).
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+
+  // Inline toast/snackbar (replaces native alert; also drives undo-on-delete)
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(
+    message: string,
+    type: "error" | "success" = "error",
+    action?: ToastState["action"],
+  ) {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type, action });
+    toastTimerRef.current = setTimeout(() => setToast(null), action ? 5000 : 4000);
+  }
 
   // Tag filter state
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -149,6 +200,17 @@ export default function MyDecksClient() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [searchScopeOpen]);
+
+  useEffect(() => {
+    if (!bulkMoveOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (bulkMoveRef.current && !bulkMoveRef.current.contains(e.target as Node)) {
+        setBulkMoveOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [bulkMoveOpen]);
 
   useEffect(() => {
     loadGlobalTagsAction().then((res) => {
@@ -188,39 +250,64 @@ export default function MyDecksClient() {
     setLoading(false);
   }
 
-  async function handleDeleteDeck(deckId: string) {
-    const result = await deleteDeckAction(deckId);
-    if (result.success) {
-      setDecks(decks.filter((d) => d.id !== deckId));
-    } else {
-      alert(result.error || "Failed to delete deck");
-    }
+  // Silent refetch (no full-page spinner) used to reconcile after mutations.
+  async function refreshDecks() {
+    const r = await loadUserDecksAction();
+    if (r.success) setDecks(r.decks);
+  }
+
+  function handleDeleteDeck(deckId: string) {
+    const removed = decks.find((d) => d.id === deckId);
+    if (!removed) return;
+    // Deferred-commit delete: remove optimistically, only call the server after
+    // the undo window elapses. Undo cancels the timer and restores the row.
+    setDecks((prev) => prev.filter((d) => d.id !== deckId));
+    let undone = false;
+    const commitTimer = setTimeout(async () => {
+      const result = await deleteDeckAction(deckId);
+      if (!result.success) {
+        setDecks((prev) => [removed, ...prev]);
+        showToast(result.error || "Failed to delete deck");
+      }
+    }, 5000);
+    showToast(`Deleted "${removed.name}"`, "success", {
+      label: "Undo",
+      onClick: () => {
+        if (undone) return;
+        undone = true;
+        clearTimeout(commitTimer);
+        setDecks((prev) => [removed, ...prev]);
+        setToast(null);
+      },
+    });
   }
 
   async function handleDuplicateDeck(deckId: string) {
     const result = await duplicateDeckAction(deckId);
     if (result.success) {
-      await loadData(); // Reload to show the new deck
+      await refreshDecks();
+      showToast("Deck duplicated", "success");
     } else {
-      alert(result.error || "Failed to duplicate deck");
+      showToast(result.error || "Failed to duplicate deck");
     }
   }
 
   async function handleCreateFolder(name: string) {
     const result = await createFolderAction(name);
-    if (result.success) {
-      await loadData();
+    if (result.success && result.folder) {
+      setFolders((prev) => [...prev, result.folder!]);
     } else {
-      alert(result.error || "Failed to create folder");
+      showToast(result.error || "Failed to create folder");
     }
   }
 
   async function handleRenameFolder(folderId: string, newName: string) {
+    setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, name: newName } : f)));
     const result = await renameFolderAction(folderId, newName);
-    if (result.success) {
-      await loadData();
-    } else {
-      alert(result.error || "Failed to rename folder");
+    if (!result.success) {
+      const r = await loadUserFoldersAction();
+      if (r.success) setFolders(r.folders);
+      showToast(result.error || "Failed to rename folder");
     }
   }
 
@@ -232,17 +319,98 @@ export default function MyDecksClient() {
         setSelectedFolder(null); // Go back to "My Decks"
       }
     } else {
-      alert(result.error || "Failed to delete folder");
+      showToast(result.error || "Failed to delete folder");
     }
   }
 
   async function handleMoveDeck(deckId: string, folderId: string | null) {
+    setDecks((prev) => prev.map((d) => (d.id === deckId ? { ...d, folder_id: folderId } : d)));
     const result = await moveDeckToFolderAction(deckId, folderId);
-    if (result.success) {
-      await loadData();
-    } else {
-      alert(result.error || "Failed to move deck");
+    if (!result.success) {
+      await refreshDecks();
+      showToast(result.error || "Failed to move deck");
     }
+  }
+
+  // ── Multi-select / bulk actions ────────────────────────────────────────────
+  function toggleSelect(deckId: string) {
+    setSelectedIds((prev) =>
+      prev.includes(deckId) ? prev.filter((id) => id !== deckId) : [...prev, deckId]
+    );
+  }
+
+  function exitSelection() {
+    setSelectionMode(false);
+    setSelectedIds([]);
+    setBulkMoveOpen(false);
+  }
+
+  async function handleBulkMove(folderId: string | null) {
+    const ids = selectedIds.slice();
+    if (ids.length === 0) return;
+    setBulkMoveOpen(false);
+    setDecks((prev) => prev.map((d) => (ids.includes(d.id!) ? { ...d, folder_id: folderId } : d)));
+    exitSelection();
+    const results = await Promise.all(ids.map((id) => moveDeckToFolderAction(id, folderId)));
+    if (results.some((r) => !r.success)) {
+      await refreshDecks();
+      showToast("Some decks couldn't be moved");
+    } else {
+      showToast(`Moved ${ids.length} deck${ids.length > 1 ? "s" : ""}`, "success");
+    }
+  }
+
+  function handleBulkDelete() {
+    const ids = selectedIds.slice();
+    if (ids.length === 0) return;
+    const removed = decks.filter((d) => ids.includes(d.id!));
+    setDecks((prev) => prev.filter((d) => !ids.includes(d.id!)));
+    exitSelection();
+    // Deferred-commit: only hit the server after the undo window elapses.
+    let undone = false;
+    const commitTimer = setTimeout(async () => {
+      const results = await Promise.all(ids.map((id) => deleteDeckAction(id)));
+      const failed = removed.filter((_, i) => !results[i].success);
+      if (failed.length > 0) {
+        setDecks((prev) => [...failed, ...prev]);
+        showToast(`${failed.length} deck${failed.length > 1 ? "s" : ""} couldn't be deleted`);
+      }
+    }, 5000);
+    showToast(`Deleted ${ids.length} deck${ids.length > 1 ? "s" : ""}`, "success", {
+      label: "Undo",
+      onClick: () => {
+        if (undone) return;
+        undone = true;
+        clearTimeout(commitTimer);
+        setDecks((prev) => [...removed, ...prev]);
+        setToast(null);
+      },
+    });
+  }
+
+  // Move a deck via drag-and-drop onto a folder (desktop). No-op if already there.
+  function handleDropDeckOnFolder(deckId: string, folderId: string | null) {
+    const deck = decks.find((d) => d.id === deckId);
+    if (!deck || (deck.folder_id ?? null) === folderId) return;
+    handleMoveDeck(deckId, folderId);
+  }
+
+  // Drop-target props for a folder destination (highlight + drop = move).
+  function deckDropHandlers(key: string, folderId: string | null) {
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (dragOverKey !== key) setDragOverKey(key);
+      },
+      onDragLeave: () => setDragOverKey((k) => (k === key ? null : k)),
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault();
+        setDragOverKey(null);
+        const id = e.dataTransfer.getData("text/plain");
+        if (id) handleDropDeckOnFolder(id, folderId);
+      },
+    };
   }
 
   async function handleSetVisibility(deckId: string, visibility: DeckVisibility) {
@@ -256,7 +424,7 @@ export default function MyDecksClient() {
     } else if ((result as any).needsUsername) {
       setUsernameModalDeckId(deckId);
     } else {
-      alert(result.error || "Failed to update deck visibility");
+      showToast(result.error || "Failed to update deck visibility");
     }
   }
 
@@ -270,7 +438,7 @@ export default function MyDecksClient() {
           d.id === deckId ? { ...d, visibility: "public", is_public: true } : d
         ));
       } else {
-        alert(result.error || "Failed to update deck visibility");
+        showToast(result.error || "Failed to update deck visibility");
       }
     }
   }
@@ -303,7 +471,7 @@ export default function MyDecksClient() {
       };
       return { deck, isLegal: cloudDeck.is_legal ?? null };
     }
-    alert(result.error || "Failed to load deck");
+    showToast(result.error || "Failed to load deck");
     return null;
   }
 
@@ -396,10 +564,27 @@ export default function MyDecksClient() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading your decks...</p>
+      <div className="w-full max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-8">
+        <div className="flex gap-6">
+          <div className="hidden lg:block w-64 flex-shrink-0">
+            <div className="h-64 rounded-lg border border-border bg-card animate-pulse" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="h-9 w-40 rounded bg-muted animate-pulse mb-6" />
+            <div className="h-10 rounded-lg bg-muted animate-pulse mb-3" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rounded-lg border border-border bg-card overflow-hidden">
+                  <div className="h-12 bg-muted animate-pulse" />
+                  <div className="p-4 space-y-3">
+                    <div className="h-5 w-2/3 rounded bg-muted animate-pulse" />
+                    <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
+                    <div className="h-9 rounded bg-muted animate-pulse mt-4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -413,7 +598,7 @@ export default function MyDecksClient() {
           <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
           <button
             onClick={loadData}
-            className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-800"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
             Try Again
           </button>
@@ -430,11 +615,12 @@ export default function MyDecksClient() {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
           <button
             onClick={() => setSelectedFolder(null)}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              selectedFolder === null
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-foreground hover:bg-muted/80"
-            }`}
+            {...deckDropHandlers("uncat", null)}
+            className={cn(
+              "flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+              selectedFolder === null ? "bg-primary text-primary-foreground" : "bg-muted text-foreground hover:bg-muted/80",
+              dragOverKey === "uncat" && "ring-2 ring-primary",
+            )}
           >
             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -448,11 +634,12 @@ export default function MyDecksClient() {
             <button
               key={folder.id}
               onClick={() => setSelectedFolder(folder.id!)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                selectedFolder === folder.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-foreground hover:bg-muted/80"
-              }`}
+              {...deckDropHandlers(folder.id!, folder.id!)}
+              className={cn(
+                "flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                selectedFolder === folder.id ? "bg-primary text-primary-foreground" : "bg-muted text-foreground hover:bg-muted/80",
+                dragOverKey === folder.id && "ring-2 ring-primary",
+              )}
             >
               <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -492,11 +679,12 @@ export default function MyDecksClient() {
             {/* My Decks (Uncategorized) */}
             <div
               onClick={() => setSelectedFolder(null)}
-              className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 cursor-pointer ${
-                selectedFolder === null
-                  ? "bg-primary/10 text-primary"
-                  : "hover:bg-muted"
-              }`}
+              {...deckDropHandlers("uncat", null)}
+              className={cn(
+                "w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 cursor-pointer",
+                selectedFolder === null ? "bg-primary/10 text-primary" : "hover:bg-muted",
+                dragOverKey === "uncat" && "ring-2 ring-primary bg-primary/10",
+              )}
             >
               <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -518,6 +706,7 @@ export default function MyDecksClient() {
                   onSelect={() => setSelectedFolder(folder.id!)}
                   onRename={() => setFolderModal({ mode: "rename", folderId: folder.id!, initialName: folder.name })}
                   onDelete={() => setFolderToDelete({ id: folder.id!, name: folder.name })}
+                  onDropDeck={(deckId) => handleDropDeckOnFolder(deckId, folder.id!)}
                 />
               ))}
             </div>
@@ -562,7 +751,7 @@ export default function MyDecksClient() {
               placeholder={searchAllFolders ? "Search all folders..." : `Search ${selectedFolderName.toLowerCase()}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-28 py-2 text-sm border border-border rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              className="w-full pl-9 pr-28 py-2 text-sm border border-border rounded-lg bg-card focus-visible:outline-none focus:border-foreground/30"
             />
             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
               {searchQuery && (
@@ -674,7 +863,7 @@ export default function MyDecksClient() {
                           placeholder="Filter tags…"
                           value={tagFilterInput}
                           onChange={(e) => setTagFilterInput(e.target.value)}
-                          className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-ring"
+                          className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus-visible:outline-none focus:border-foreground/30"
                         />
                       </div>
                       <div className="max-h-64 overflow-y-auto">
@@ -722,6 +911,17 @@ export default function MyDecksClient() {
             </div>
 
             <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+              <button
+                onClick={() => { if (selectionMode) exitSelection(); else setSelectionMode(true); }}
+                className={`px-2 md:px-3 py-1.5 rounded-lg border text-xs md:text-sm font-medium transition-colors ${
+                  selectionMode
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-card text-foreground hover:bg-muted"
+                }`}
+                title={selectionMode ? "Exit selection" : "Select decks"}
+              >
+                {selectionMode ? "Done" : "Select"}
+              </button>
               <button
                 onClick={() => setViewMode("grid")}
                 className={`p-1.5 md:p-2 rounded ${
@@ -779,6 +979,73 @@ export default function MyDecksClient() {
             </div>
           )}
 
+          {/* Bulk action bar (selection mode) */}
+          {selectionMode && (
+            <div className="sticky top-2 z-30 mb-3 flex items-center gap-2 md:gap-3 rounded-lg border border-primary/40 bg-card/95 backdrop-blur px-3 py-2 shadow-sm">
+              <span className="text-sm font-medium flex-shrink-0">
+                {selectedIds.length} selected
+              </span>
+              <button
+                onClick={() => {
+                  const visibleIds = sortedDecks.map((d) => d.id!);
+                  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+                  setSelectedIds(allSelected ? [] : visibleIds);
+                }}
+                className="text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+              >
+                {sortedDecks.length > 0 && sortedDecks.every((d) => selectedIds.includes(d.id!)) ? "Clear" : "Select all"}
+              </button>
+
+              <div className="flex-1" />
+
+              <div className="relative" ref={bulkMoveRef}>
+                <button
+                  onClick={() => setBulkMoveOpen((o) => !o)}
+                  disabled={selectedIds.length === 0}
+                  className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-md border border-border bg-card text-xs md:text-sm font-medium hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Move to
+                  <svg className={`w-3.5 h-3.5 transition-transform ${bulkMoveOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {bulkMoveOpen && selectedIds.length > 0 && (
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-card rounded-md shadow-lg border border-border z-40 max-h-60 overflow-y-auto">
+                    <button
+                      onClick={() => handleBulkMove(null)}
+                      className="w-full text-left px-4 py-2 hover:bg-muted first:rounded-t-md text-sm"
+                    >
+                      My Decks
+                    </button>
+                    {folders.map((folder) => (
+                      <button
+                        key={folder.id}
+                        onClick={() => handleBulkMove(folder.id!)}
+                        className="w-full text-left px-4 py-2 hover:bg-muted last:rounded-b-md text-sm truncate"
+                      >
+                        {folder.name}
+                      </button>
+                    ))}
+                    {folders.length === 0 && (
+                      <div className="px-4 py-2 text-sm text-muted-foreground">No folders</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleBulkDelete}
+                disabled={selectedIds.length === 0}
+                className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-md text-xs md:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            </div>
+          )}
+
           {/* Decks Display */}
           {filteredDecks.length === 0 ? (
             <div className="text-center py-16">
@@ -811,7 +1078,7 @@ export default function MyDecksClient() {
               </p>
               <button
                 onClick={handleNewDeck}
-                className="mt-6 px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800 font-medium transition-colors"
+                className="mt-6 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium transition-colors"
               >
                 Create A Deck
               </button>
@@ -823,6 +1090,9 @@ export default function MyDecksClient() {
                   key={deck.id}
                   deck={deck}
                   folders={folders}
+                  selectionMode={selectionMode}
+                  selected={selectedIds.includes(deck.id!)}
+                  onToggleSelect={() => toggleSelect(deck.id!)}
                   onEdit={handleEditDeck}
                   onDelete={(id, name) => setDeckToDelete({ id, name })}
                   onDuplicate={handleDuplicateDeck}
@@ -832,6 +1102,7 @@ export default function MyDecksClient() {
                   onDownload={handleDownload}
                   onShare={(id) => setShareDeckId(id)}
                   onEditCover={(id) => setCoverPickerDeckId(id)}
+                  onQuickLook={(id) => setQuickLookDeckId(id)}
                 />
               ))}
             </div>
@@ -842,6 +1113,9 @@ export default function MyDecksClient() {
                   key={deck.id}
                   deck={deck}
                   folders={folders}
+                  selectionMode={selectionMode}
+                  selected={selectedIds.includes(deck.id!)}
+                  onToggleSelect={() => toggleSelect(deck.id!)}
                   onEdit={handleEditDeck}
                   onDelete={(id, name) => setDeckToDelete({ id, name })}
                   onDuplicate={handleDuplicateDeck}
@@ -850,6 +1124,7 @@ export default function MyDecksClient() {
                   onGenerateImage={handleGenerateImage}
                   onDownload={handleDownload}
                   onShare={(id) => setShareDeckId(id)}
+                  onQuickLook={(id) => setQuickLookDeckId(id)}
                 />
               ))}
             </div>
@@ -948,6 +1223,51 @@ export default function MyDecksClient() {
           />
         ) : null;
       })()}
+
+      {/* Quick look modal */}
+      {quickLookDeckId && (() => {
+        const qlDeck = decks.find((d) => d.id === quickLookDeckId);
+        return qlDeck ? (
+          <QuickLookModal
+            deckId={quickLookDeckId}
+            deckName={qlDeck.name}
+            onClose={() => setQuickLookDeckId(null)}
+            onOpenEditor={(id) => { setQuickLookDeckId(null); handleEditDeck(id); }}
+          />
+        ) : null;
+      })()}
+
+      {/* Inline toast / snackbar */}
+      {toast && (
+        <div
+          className={cn(
+            "fixed bottom-4 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 z-[60]",
+            "max-w-[calc(100vw-2rem)] md:max-w-sm bg-card border border-border text-foreground shadow-lg rounded-lg px-4 py-3 flex items-center gap-3",
+            toast.type === "error" && "border-l-2 border-l-red-500",
+          )}
+        >
+          <span className="text-sm flex-1 min-w-0">{toast.message}</span>
+          {toast.action && (
+            <button
+              onClick={() => {
+                toast.action!.onClick();
+              }}
+              className="flex-shrink-0 min-h-[40px] px-3 -my-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              {toast.action.label}
+            </button>
+          )}
+          <button
+            onClick={() => setToast(null)}
+            aria-label="Dismiss"
+            className="flex-shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -960,6 +1280,7 @@ function FolderItem({
   onSelect,
   onRename,
   onDelete,
+  onDropDeck,
 }: {
   folder: FolderData;
   isSelected: boolean;
@@ -967,18 +1288,28 @@ function FolderItem({
   onSelect: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onDropDeck: (deckId: string) => void;
 }) {
   const [showMenu, setShowMenu] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   return (
     <div className="relative">
       <div
         onClick={onSelect}
-        className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer ${
-          isSelected
-            ? "bg-primary/10 text-primary"
-            : "hover:bg-muted"
-        }`}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (!isDragOver) setIsDragOver(true); }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragOver(false);
+          const id = e.dataTransfer.getData("text/plain");
+          if (id) onDropDeck(id);
+        }}
+        className={cn(
+          "w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer",
+          isSelected ? "bg-primary/10 text-primary" : "hover:bg-muted",
+          isDragOver && "ring-2 ring-primary bg-primary/10",
+        )}
       >
         <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -1040,6 +1371,9 @@ function getCardImageUrl(cardName: string | null | undefined): string | null {
 function DeckCard({
   deck,
   folders,
+  selectionMode,
+  selected,
+  onToggleSelect,
   onEdit,
   onDelete,
   onDuplicate,
@@ -1049,9 +1383,13 @@ function DeckCard({
   onDownload,
   onShare,
   onEditCover,
+  onQuickLook,
 }: {
   deck: DeckData;
   folders: FolderData[];
+  selectionMode: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
   onEdit: (id: string) => void;
   onDelete: (id: string, name: string) => void;
   onDuplicate: (id: string) => void;
@@ -1061,27 +1399,57 @@ function DeckCard({
   onDownload: (deckId: string) => void;
   onShare: (deckId: string) => void;
   onEditCover: (deckId: string) => void;
+  onQuickLook: (deckId: string) => void;
 }) {
-  const updatedDate = formatDateTime(deck.updated_at!);
+  const updatedRelative = formatRelativeTime(deck.updated_at!);
+  const updatedAbsolute = formatDateTime(deck.updated_at!);
+  const openCard = () => (selectionMode ? onToggleSelect() : onEdit(deck.id!));
 
   return (
-    <div className="bg-gradient-to-br from-card to-muted/40 rounded-lg border border-border hover:shadow-lg transition-shadow flex flex-col jayden-gradient-bg">
+    <div
+      draggable={!selectionMode}
+      onDragStart={(e) => {
+        if (selectionMode) { e.preventDefault(); return; }
+        e.dataTransfer.setData("text/plain", deck.id!);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onClick={selectionMode ? onToggleSelect : undefined}
+      className={cn(
+        "group relative bg-gradient-to-br from-card to-muted/40 rounded-lg border hover:shadow-lg transition-shadow flex flex-col jayden-gradient-bg",
+        selectionMode && "cursor-pointer select-none",
+        selected ? "border-primary ring-2 ring-primary" : "border-border",
+      )}
+    >
+      {/* Selection checkbox (selection mode) */}
+      {selectionMode && (
+        <span
+          className={cn(
+            "absolute top-2 left-2 z-10 w-6 h-6 rounded-md border-2 flex items-center justify-center shadow",
+            selected ? "bg-primary border-primary text-primary-foreground" : "bg-card/90 border-border text-transparent",
+          )}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </span>
+      )}
       {/* Image Header */}
       {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
-        <div className="h-32 overflow-hidden rounded-t-lg cursor-pointer" onClick={() => onEdit(deck.id!)}>
+        <div className="h-32 overflow-hidden rounded-t-lg cursor-pointer" onClick={openCard}>
           <Image
             src={`/paragons/Paragon ${deck.paragon}.png`}
             alt={deck.paragon}
             width={400}
             height={560}
+            draggable={false}
             className="w-full h-full object-cover object-top"
           />
         </div>
       ) : (getCardImageUrl(deck.preview_card_1) || getCardImageUrl(deck.preview_card_2)) ? (
-        <div className="relative h-32 overflow-hidden rounded-t-lg flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={() => onEdit(deck.id!)}>
-          {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" className="h-full object-contain rounded shadow-md" />}
-          {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" className="h-full object-contain rounded shadow-md" />}
-          <button
+        <div className="relative h-32 overflow-hidden rounded-t-lg flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={openCard}>
+          {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" draggable={false} className="h-full object-contain rounded shadow-md" />}
+          {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" draggable={false} className="h-full object-contain rounded shadow-md" />}
+          {!selectionMode && <button
             onClick={(e) => { e.stopPropagation(); onEditCover(deck.id!); }}
             className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/30 hover:bg-black/50 text-white/60 hover:text-white transition-colors"
             title="Change cover cards"
@@ -1089,13 +1457,16 @@ function DeckCard({
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-          </button>
+          </button>}
         </div>
       ) : formatDeckType(deck.format) !== "Paragon" ? (
-        <div className="h-12 rounded-t-lg bg-muted flex items-center justify-center">
+        <div
+          className="h-8 group-hover:h-12 rounded-t-lg bg-muted/40 group-hover:bg-muted flex items-center justify-center transition-all"
+          onClick={selectionMode ? onToggleSelect : undefined}
+        >
           <button
-            onClick={() => onEditCover(deck.id!)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => { if (!selectionMode) onEditCover(deck.id!); }}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground/60 group-hover:text-muted-foreground hover:!text-foreground transition-colors"
             title="Set cover cards"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1114,18 +1485,21 @@ function DeckCard({
               {visibilityBadge(deckVisibility(deck)).label}
             </span>
           </div>
-          <DropdownMenu
-            folders={folders}
-            currentFolderId={deck.folder_id}
-            onEdit={() => onEdit(deck.id!)}
-            onDelete={() => onDelete(deck.id!, deck.name)}
-            onDuplicate={() => onDuplicate(deck.id!)}
-            onMove={(folderId) => onMove(deck.id!, folderId)}
-            onGeneratePDF={() => onGeneratePDF(deck.id!)}
-            onGenerateImage={() => onGenerateImage(deck.id!)}
-            onDownload={() => onDownload(deck.id!)}
-            onShare={() => onShare(deck.id!)}
-          />
+          {!selectionMode && (
+            <DropdownMenu
+              folders={folders}
+              currentFolderId={deck.folder_id}
+              onQuickLook={() => onQuickLook(deck.id!)}
+              onEdit={() => onEdit(deck.id!)}
+              onDelete={() => onDelete(deck.id!, deck.name)}
+              onDuplicate={() => onDuplicate(deck.id!)}
+              onMove={(folderId) => onMove(deck.id!, folderId)}
+              onGeneratePDF={() => onGeneratePDF(deck.id!)}
+              onGenerateImage={() => onGenerateImage(deck.id!)}
+              onDownload={() => onDownload(deck.id!)}
+              onShare={() => onShare(deck.id!)}
+            />
+          )}
         </div>
 
         <div className="flex items-center justify-between text-sm">
@@ -1147,9 +1521,9 @@ function DeckCard({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1 mt-2 mb-3">
-          {deck.tags && deck.tags.length > 0 ? (
-            deck.tags.slice(0, 6).map((tag) => (
+        {deck.tags && deck.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2 mb-3">
+            {deck.tags.slice(0, 6).map((tag) => (
               <span
                 key={tag.id}
                 className="px-2 py-0.5 rounded-full text-xs font-medium"
@@ -1157,20 +1531,18 @@ function DeckCard({
               >
                 {tag.name}
               </span>
-            ))
-          ) : (
-            <span className="text-xs text-muted-foreground italic">No tags yet...</span>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="mt-auto pt-3 border-t border-border">
-          <p className="text-xs text-muted-foreground">
-            Updated {updatedDate}
+          <p className="text-xs text-muted-foreground" title={updatedAbsolute}>
+            Updated {updatedRelative}
           </p>
         </div>
       </div>
 
-      <div className="border-t border-border px-4 py-3 flex gap-2">
+      <div className={cn("border-t border-border px-4 py-3 flex gap-2", selectionMode && "pointer-events-none opacity-40")}>
         <button
           onClick={() => onEdit(deck.id!)}
           className="flex-1 px-4 py-2 bg-muted text-foreground rounded-md hover:bg-muted/80 font-medium transition-colors"
@@ -1187,6 +1559,9 @@ function DeckCard({
 function DeckListItem({
   deck,
   folders,
+  selectionMode,
+  selected,
+  onToggleSelect,
   onEdit,
   onDelete,
   onDuplicate,
@@ -1195,9 +1570,13 @@ function DeckListItem({
   onGenerateImage,
   onDownload,
   onShare,
+  onQuickLook,
 }: {
   deck: DeckData;
   folders: FolderData[];
+  selectionMode: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
   onEdit: (id: string) => void;
   onDelete: (id: string, name: string) => void;
   onDuplicate: (id: string) => void;
@@ -1206,12 +1585,39 @@ function DeckListItem({
   onGenerateImage: (deckId: string) => void;
   onDownload: (deckId: string) => void;
   onShare: (deckId: string) => void;
+  onQuickLook: (deckId: string) => void;
 }) {
-  const updatedDate = formatDateTime(deck.updated_at!);
+  const updatedRelative = formatRelativeTime(deck.updated_at!);
+  const updatedAbsolute = formatDateTime(deck.updated_at!);
 
   return (
-    <div className="bg-card rounded-lg border border-border hover:bg-muted transition-colors">
+    <div
+      draggable={!selectionMode}
+      onDragStart={(e) => {
+        if (selectionMode) { e.preventDefault(); return; }
+        e.dataTransfer.setData("text/plain", deck.id!);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onClick={selectionMode ? onToggleSelect : undefined}
+      className={cn(
+        "bg-card rounded-lg border transition-colors",
+        selectionMode ? "cursor-pointer select-none" : "hover:bg-muted",
+        selected ? "border-primary ring-2 ring-primary" : "border-border",
+      )}
+    >
       <div className="flex items-center gap-2 md:gap-4 p-3 md:p-4">
+        {selectionMode && (
+          <span
+            className={cn(
+              "flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center",
+              selected ? "bg-primary border-primary text-primary-foreground" : "bg-card border-border text-transparent",
+            )}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </span>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 md:gap-3">
             <span className={getDeckTypeBadgeClasses(deck.format)}>
@@ -1258,29 +1664,32 @@ function DeckListItem({
               min ${deck.budget_price.toFixed(2)}
             </span>
           )}
-          <span className="text-xs">Updated {updatedDate}</span>
+          <span className="text-xs" title={updatedAbsolute}>Updated {updatedRelative}</span>
         </div>
 
-        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
-          <button
-            onClick={() => onEdit(deck.id!)}
-            className="px-2 md:px-4 py-1.5 md:py-2 bg-green-700 text-white rounded-md hover:bg-green-800 text-xs md:text-sm font-medium transition-colors"
-          >
-            Edit
-          </button>
-          <DropdownMenu
-            folders={folders}
-            currentFolderId={deck.folder_id}
-            onEdit={() => onEdit(deck.id!)}
-            onDelete={() => onDelete(deck.id!, deck.name)}
-            onDuplicate={() => onDuplicate(deck.id!)}
-            onMove={(folderId) => onMove(deck.id!, folderId)}
-            onGeneratePDF={() => onGeneratePDF(deck.id!)}
-            onGenerateImage={() => onGenerateImage(deck.id!)}
-            onDownload={() => onDownload(deck.id!)}
-            onShare={() => onShare(deck.id!)}
-          />
-        </div>
+        {!selectionMode && (
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+            <button
+              onClick={() => onEdit(deck.id!)}
+              className="px-2 md:px-4 py-1.5 md:py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-xs md:text-sm font-medium transition-colors"
+            >
+              Edit
+            </button>
+            <DropdownMenu
+              folders={folders}
+              currentFolderId={deck.folder_id}
+              onQuickLook={() => onQuickLook(deck.id!)}
+              onEdit={() => onEdit(deck.id!)}
+              onDelete={() => onDelete(deck.id!, deck.name)}
+              onDuplicate={() => onDuplicate(deck.id!)}
+              onMove={(folderId) => onMove(deck.id!, folderId)}
+              onGeneratePDF={() => onGeneratePDF(deck.id!)}
+              onGenerateImage={() => onGenerateImage(deck.id!)}
+              onDownload={() => onDownload(deck.id!)}
+              onShare={() => onShare(deck.id!)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1290,6 +1699,7 @@ function DeckListItem({
 function DropdownMenu({
   folders,
   currentFolderId,
+  onQuickLook,
   onEdit,
   onDelete,
   onDuplicate,
@@ -1301,6 +1711,7 @@ function DropdownMenu({
 }: {
   folders: FolderData[];
   currentFolderId?: string | null;
+  onQuickLook: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -1394,14 +1805,27 @@ function DropdownMenu({
           <div
             ref={menuRef}
             style={menuStyle}
-            className="w-52 bg-card rounded-md shadow-lg border border-border"
+            className="w-52 bg-card rounded-md shadow-lg border border-border max-h-[calc(100vh-2rem)] overflow-y-auto"
           >
+            <button
+              onClick={() => {
+                onQuickLook();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-muted first:rounded-t-md flex items-center gap-2"
+            >
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Quick look
+            </button>
             <button
               onClick={() => {
                 onEdit();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-muted first:rounded-t-md flex items-center gap-2"
+              className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
             >
               <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1561,6 +1985,7 @@ function CoverPickerModal({
   onSaved: (deckId: string, card1: string | null, card2: string | null) => void;
 }) {
   const [cards, setCards] = useState<DeckCardData[]>([]);
+  const [rankByKey, setRankByKey] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [previewCard1, setPreviewCard1] = useState<string | null>(initialCard1);
   const [previewCard2, setPreviewCard2] = useState<string | null>(initialCard2);
@@ -1569,12 +1994,20 @@ function CoverPickerModal({
   const [coverSearch, setCoverSearch] = useState("");
 
   useEffect(() => {
-    loadDeckByIdAction(deckId).then((result) => {
+    let active = true;
+    loadDeckByIdAction(deckId).then(async (result) => {
+      if (!active) return;
       if (result.success && result.deck) {
-        setCards((result.deck as any).cards?.filter((c: DeckCardData) => c.zone === 'main') || []);
+        const mainCards = ((result.deck as any).cards?.filter((c: DeckCardData) => c.zone === 'main') || []) as DeckCardData[];
+        setCards(mainCards);
+        setLoading(false);
+        const ranks = await buildTypeRanks(mainCards);
+        if (active) setRankByKey(ranks);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
+    return () => { active = false; };
   }, [deckId]);
 
   useEffect(() => {
@@ -1588,7 +2021,11 @@ function CoverPickerModal({
   const filteredCards = coverSearch.trim()
     ? cards.filter(c => c.card_name.toLowerCase().includes(coverSearch.trim().toLowerCase()))
     : cards;
-  const sortedCards = [...filteredCards].sort((a, b) => a.card_name.localeCompare(b.card_name));
+  // Sort by card type (grouping same types together), then alphabetically — consistent with quick look.
+  const sortedCards = [...filteredCards].sort((a, b) =>
+    (rankByKey[cardKey(a)] ?? 99) - (rankByKey[cardKey(b)] ?? 99) ||
+    a.card_name.localeCompare(b.card_name)
+  );
 
   async function handleSelect(imgFile: string) {
     const c1 = activeSlot === 1 ? imgFile : previewCard1;
@@ -1631,7 +2068,7 @@ function CoverPickerModal({
                   onClick={() => setActiveSlot(slot)}
                   className={`relative w-16 sm:w-24 aspect-[2.5/3.5] rounded-lg overflow-hidden border-2 transition-all ${
                     isActive
-                      ? "border-primary ring-2 ring-ring"
+                      ? "border-primary"
                       : "border-border hover:border-foreground/50"
                   } bg-muted`}
                 >
@@ -1665,7 +2102,7 @@ function CoverPickerModal({
               placeholder="Search cards..."
               value={coverSearch}
               onChange={(e) => setCoverSearch(e.target.value)}
-              className="w-full pl-8 pr-8 py-1.5 text-sm border border-border rounded-lg bg-card focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full pl-8 pr-8 py-1.5 text-sm border border-border rounded-lg bg-card focus-visible:outline-none focus:border-foreground/30"
             />
             {coverSearch && (
               <button onClick={() => setCoverSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">

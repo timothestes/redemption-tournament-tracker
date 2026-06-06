@@ -20,7 +20,19 @@ export const meta = {
 //   lenses:      [{key,prompt}]? — override the 3 default ideation lenses (optional)
 //   implement:   boolean  — actually implement (default true). false = stop at spec.
 // }
-const A = args || {}
+// `args` may arrive as a parsed object OR as a JSON string (some harnesses pass
+// the Workflow `args` input verbatim as a string). Normalize both, with a clear
+// error if a non-empty string isn't valid JSON.
+let A = {}
+if (args && typeof args === 'object') {
+  A = args
+} else if (typeof args === 'string' && args.trim()) {
+  try {
+    A = JSON.parse(args)
+  } catch {
+    throw new Error('improve-area-pipeline: args was a string but not valid JSON: ' + args.slice(0, 120))
+  }
+}
 const AREA = A.area || 'this area of the app'
 const CONTEXT = A.context
 if (!CONTEXT) throw new Error('improve-area-pipeline requires args.context (the context brief)')
