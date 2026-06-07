@@ -1140,9 +1140,9 @@ describe("checkT2QuantityLimits", () => {
 
   describe("authoritative same-card groups (duplicate_card_groups)", () => {
     // Mirrors the real "Daniel" group (id 537): single-brigade and multicolor
-    // printings of the same character intentionally share a groupId, so the
-    // copy limit must treat them as one card capped at the most restrictive
-    // member limit — NOT split each brigade into its own tier bucket.
+    // printings of the same character intentionally share a groupId. They share
+    // ONE copy pool sized to the most PERMISSIVE printing (single-brigade = 4),
+    // while each printing still respects its own brigade limit (multicolor ≤ 2).
     function makeSameCardGroup(
       canonicalName: string,
       cards: ResolvedCard[]
@@ -1155,9 +1155,40 @@ describe("checkT2QuantityLimits", () => {
       };
     }
 
-    it("errors when single-brigade + multicolor printings exceed the most restrictive cap", () => {
-      // White Daniel (single brigade, max 4) x3 + Green/White Daniel (2 brigades, max 2) x1
-      // = 4 of "the same card", but the most restrictive printing caps at 2.
+    it("errors when the pooled total exceeds the most permissive cap (4)", () => {
+      // Real deck: 4 mono White Daniel + 1 Green/White Daniel = 5 of "the same
+      // card". Each printing is individually legal (mono 4 ≤ 4, multi 1 ≤ 2),
+      // but the shared pool of 4 is exceeded.
+      const white = makeCard({
+        name: "Daniel, the Treasured",
+        type: "Hero",
+        brigade: "White",
+        alignment: "Good",
+        quantity: 4,
+      });
+      const multicolor = makeCard({
+        name: "Daniel, the Apocalyptist",
+        type: "Hero",
+        brigade: "Green/White",
+        alignment: "Good",
+        quantity: 1,
+        isReserve: true,
+      });
+      const mainDeck = makeValidMainDeck(100, [white]);
+      const reserve = [multicolor];
+      const groups = [makeSameCardGroup("Daniel", [white, multicolor])];
+      const issues = checkT2QuantityLimits(mainDeck, reserve, groups);
+      const relevant = issues.filter(
+        (i) => i.rule === "t2-quantity-same-card-combined"
+      );
+      expect(relevant).toHaveLength(1);
+      expect(relevant[0].type).toBe("error");
+      expect(relevant[0].message).toContain("max 4");
+      expect(relevant[0].message).toContain("found 5");
+    });
+
+    it("passes 3 mono + 1 multicolor (4 total, exactly the pooled cap)", () => {
+      // The user's canonical legal example.
       const white = makeCard({
         name: "Daniel, the Treasured",
         type: "Hero",
@@ -1177,15 +1208,14 @@ describe("checkT2QuantityLimits", () => {
       const reserve = [multicolor];
       const groups = [makeSameCardGroup("Daniel", [white, multicolor])];
       const issues = checkT2QuantityLimits(mainDeck, reserve, groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-same-card-combined"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
+      expect(
+        issues.filter((i) => i.rule?.startsWith("t2-quantity")).length
+      ).toBe(0);
     });
 
-    it("passes when the combined total stays within the most restrictive cap", () => {
-      // White Daniel x1 + Green/White Daniel x1 = 2 total, cap is 2 (multicolor) → legal.
+    it("still caps a printing by its own brigade limit even within the pool", () => {
+      // 1 mono + 3 multicolor = 4 total (within the pool of 4), but a 2-brigade
+      // printing may never exceed 2 copies → per-tier 2-brigade error.
       const white = makeCard({
         name: "Daniel, the Treasured",
         type: "Hero",
@@ -1198,19 +1228,18 @@ describe("checkT2QuantityLimits", () => {
         type: "Hero",
         brigade: "Green/White",
         alignment: "Good",
-        quantity: 1,
+        quantity: 3,
       });
       const mainDeck = makeValidMainDeck(100, [white, multicolor]);
       const groups = [makeSameCardGroup("Daniel", [white, multicolor])];
       const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-same-card-combined"
-      );
-      expect(relevant).toHaveLength(0);
+      expect(
+        issues.filter((i) => i.rule === "t2-quantity-2-brigade")
+      ).toHaveLength(1);
     });
 
     it("passes a homogeneous same-card group within its single-tier cap", () => {
-      // 4 White Daniels, all single brigade, max 4 → legal (combined cap == 4).
+      // 4 White Daniels, all single brigade, max 4 → legal.
       const white = makeCard({
         name: "Daniel, the Treasured",
         type: "Hero",

@@ -1367,33 +1367,7 @@ export function checkT2QuantityLimits(
   const issues: DeckCheckIssue[] = [];
 
   for (const group of cardGroups) {
-    // Authoritative same-card groups (formed via duplicate_card_groups, so
-    // groupId is set) may contain printings of the same card in DIFFERENT
-    // brigades — e.g. "Daniel, the Treasured" [White, max 4] and
-    // "Daniel, the Apocalyptist" [Green/White, max 2] share group 537.
-    // The per-tier checks below would split those into separate brigade
-    // buckets and miss the combined total, so treat the whole group as a
-    // single card capped at its most restrictive member limit instead.
-    if (group.groupId != null) {
-      const capped = group.cards
-        .map((c) => ({ card: c, limit: getT2CardCopyLimit(c) }))
-        .filter((x): x is { card: ResolvedCard; limit: number } => x.limit != null);
-
-      if (capped.length > 0) {
-        const minLimit = Math.min(...capped.map((x) => x.limit));
-        const totalQty = capped.reduce((sum, x) => sum + x.card.quantity, 0);
-        if (totalQty > minLimit) {
-          const names = [...new Set(capped.map((x) => x.card.name))];
-          issues.push({
-            type: "error",
-            rule: "t2-quantity-same-card-combined",
-            message: `"${group.canonicalName}" — these printings count as the same card, max ${minLimit} copies allowed (most restrictive printing), found ${totalQty}.`,
-            cards: names,
-          });
-        }
-      }
-      continue;
-    }
+    const issueCountBeforeGroup = issues.length;
 
     // Note: Dominant uniqueness (max 1) is handled by checkDominantUnique,
     // which is called separately in validateT2Rules. Don't duplicate it here.
@@ -1530,6 +1504,36 @@ export function checkT2QuantityLimits(
           message: `"${group.canonicalName}" (non-SA Site/City, single-brigade) — max 4 copies allowed, found ${totalQty}.`,
           cards: [group.canonicalName],
         });
+      }
+    }
+
+    // --- Combined pool cap for authoritative same-card groups ---
+    // Cards in a duplicate_card_groups group (groupId set) are the same card,
+    // even across brigade printings — e.g. "Daniel, the Treasured" [White] and
+    // "Daniel, the Apocalyptist" [Green/White] share group 537. They share ONE
+    // copy pool sized to the most PERMISSIVE printing (single-brigade = 4), so
+    // 3 mono + 1 multicolor (4 total) is legal but a 5th copy is not. The
+    // per-tier checks above still cap each printing by its own brigade limit
+    // (so the multicolor copies can't exceed 2). Only flag the pool here when
+    // every printing is individually legal but the shared pool is exceeded —
+    // otherwise a per-tier error above already covers this group.
+    if (group.groupId != null && issues.length === issueCountBeforeGroup) {
+      const capped = group.cards
+        .map((c) => ({ card: c, limit: getT2CardCopyLimit(c) }))
+        .filter((x): x is { card: ResolvedCard; limit: number } => x.limit != null);
+
+      if (capped.length > 0) {
+        const poolLimit = Math.max(...capped.map((x) => x.limit));
+        const totalQty = capped.reduce((sum, x) => sum + x.card.quantity, 0);
+        if (totalQty > poolLimit) {
+          const names = [...new Set(capped.map((x) => x.card.name))];
+          issues.push({
+            type: "error",
+            rule: "t2-quantity-same-card-combined",
+            message: `"${group.canonicalName}" — these printings count as the same card, max ${poolLimit} copies total, found ${totalQty}.`,
+            cards: names,
+          });
+        }
       }
     }
   }
