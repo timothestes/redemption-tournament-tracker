@@ -452,6 +452,7 @@ export default function CardSearchClient() {
     newDeck,
     loadDeck,
     loadDeckFromCloud,
+    replaceHalf,
     saveDeckToCloud,
     getCardQuantity,
     getDeckStats,
@@ -1551,6 +1552,23 @@ export default function CardSearchClient() {
     }
   }
 
+  // Replace good/evil half with cards from another deck
+  async function handleReplaceHalf(alignment: "good" | "evil", sourceDeckId: string) {
+    const result = await replaceHalf(alignment, sourceDeckId);
+    if (result.success) {
+      setNotification({
+        message: `Replaced ${alignment} half: removed ${result.removed}, added ${result.added} from "${result.sourceName}".`,
+        type: "success",
+      });
+    } else {
+      setNotification({
+        message: result.error || "Failed to replace deck half",
+        type: "error",
+      });
+    }
+    setTimeout(() => setNotification(null), 3000);
+  }
+
   return (
     <>
       {/* Modal - Rendered outside main container to avoid z-index issues */}
@@ -2641,6 +2659,8 @@ export default function CardSearchClient() {
             }}
             onNewDeck={handleNewDeck}
             onLoadDeck={loadDeckFromCloud}
+            onReplaceGood={(sourceDeckId) => handleReplaceHalf("good", sourceDeckId)}
+            onReplaceEvil={(sourceDeckId) => handleReplaceHalf("evil", sourceDeckId)}
             defaultTab={activeDeckTab}
             onActiveTabChange={setActiveDeckTab}
             onViewCard={(card, fromReserve) => {
@@ -2734,6 +2754,8 @@ export default function CardSearchClient() {
               onDuplicate={() => {}}
               onNewDeck={handleNewDeck}
               onLoadDeck={loadDeckFromCloud}
+              onReplaceGood={(sourceDeckId) => handleReplaceHalf("good", sourceDeckId)}
+              onReplaceEvil={(sourceDeckId) => handleReplaceHalf("evil", sourceDeckId)}
               defaultTab={activeDeckTab}
               onActiveTabChange={setActiveDeckTab}
               onViewCard={(card, fromReserve) => {
