@@ -450,8 +450,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             prevOwnerId: String(card.ownerId),
             posX: card.posX,
             posY: card.posY,
-            expectedZone: toZone,
-            expectedOwnerId: targetOwnerId ?? String(card.ownerId),
           };
           undoStack.push({
             description: `Moved ${card.cardName || 'card'} to ${toZone}`,
@@ -479,8 +477,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               prevOwnerId: String(card.ownerId),
               posX: card.posX,
               posY: card.posY,
-              expectedZone: toZone,
-              expectedOwnerId: targetOwnerId ?? String(card.ownerId),
             },
           }];
         });
@@ -506,7 +502,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Push an undo entry for an opponent-card move. Captures the card's current
   // zone/position/owner BEFORE the forward action runs, so undo can restore it
   // even after the search request is closed.
-  const recordOpponentCardUndo = useCallback((cardId: string | bigint, toZone: string, expectedOwnerId?: string) => {
+  const recordOpponentCardUndo = useCallback((cardId: string | bigint, toZone: string) => {
     if (!undoStack) return;
     const idStr = String(cardId);
     const card = findCardForUndo(idStr);
@@ -519,10 +515,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       prevOwnerId,
       posX: card.posX ?? '',
       posY: card.posY ?? '',
-      expectedZone: toZone,
-      // Post-move owner: a "take" routes ownership to the acting player; an
-      // in-place opponent move leaves the original owner.
-      expectedOwnerId: expectedOwnerId ?? prevOwnerId,
     };
     undoStack.push({
       description: `Moved ${card.cardName || 'card'} back to ${card.zone}`,
@@ -1232,8 +1224,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             prevOwnerId: ownerId,
             posX: card.posX,
             posY: card.posY,
-            expectedZone: toZone,
-            expectedOwnerId: ownerId,
           };
           undoStack.push({
             description: `Moved ${card.cardName || 'card'} to ${toZone}`,
@@ -1262,8 +1252,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 prevOwnerId: ownerId,
                 posX: card.posX,
                 posY: card.posY,
-                expectedZone: toZone,
-                expectedOwnerId: ownerId,
               },
             }];
           });
@@ -1370,7 +1358,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           const captured: Captured = {
             cardId, fromZone: card.zone, prevOwnerId: ownerId,
             posX: card.posX, posY: card.posY,
-            expectedZone: 'deck', expectedOwnerId: ownerId,
           };
           undoStack.push({
             description: `Shuffled ${card.cardName || 'card'} into deck`,
@@ -1393,7 +1380,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           const captured: Captured = {
             cardId, fromZone: card.zone, prevOwnerId: ownerId,
             posX: card.posX, posY: card.posY,
-            expectedZone: 'deck', expectedOwnerId: ownerId,
           };
           undoStack.push({
             description: `Moved ${card.cardName || 'card'} to top of deck`,
@@ -1416,11 +1402,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           const captured: Captured = {
             cardId, fromZone, prevOwnerId: ownerId,
             posX: card.posX, posY: card.posY,
-            expectedZone: 'deck', expectedOwnerId: ownerId,
           };
           const reverseAction = fromZone === 'deck'
             ? () => {
-                if (!reverseIsSafe(captured, lookupForUndo(cardId))) return false;
+                if (!reverseIsSafe(lookupForUndo(cardId))) return false;
                 gameState.moveCardToTopOfDeck(BigInt(cardId));
                 return true;
               }
@@ -1564,10 +1549,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 // land-of-bondage under the same owner (i.e. still where
                 // play_all_lost_souls left them). Refuse entirely if none are.
                 const safe = reverseEntries.filter(e =>
-                  reverseIsSafe(
-                    { expectedZone: 'land-of-bondage', expectedOwnerId: e.ownerId },
-                    lookupForUndo(String(e.id)),
-                  ),
+                  reverseIsSafe(lookupForUndo(String(e.id))),
                 );
                 if (safe.length === 0) return false;
                 // Group by (ownerId, zone) so each affected deck gets exactly
@@ -1686,7 +1668,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const captured: Captured = {
               cardId: id, fromZone: card.zone, prevOwnerId: ownerId,
               posX: card.posX, posY: card.posY,
-              expectedZone: 'deck', expectedOwnerId: ownerId,
             };
             undoStack.push({
               description: `Moved ${card.cardName || 'card'} to top of deck`,
@@ -1705,11 +1686,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const captured: Captured = {
               cardId: id, fromZone, prevOwnerId: ownerId,
               posX: card.posX, posY: card.posY,
-              expectedZone: 'deck', expectedOwnerId: ownerId,
             };
             const reverseAction = fromZone === 'deck'
               ? () => {
-                  if (!reverseIsSafe(captured, lookupForUndo(id))) return false;
+                  if (!reverseIsSafe(lookupForUndo(id))) return false;
                   gameState.moveCardToTopOfDeck(BigInt(id));
                   return true;
                 }
@@ -1731,7 +1711,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const captured: Captured = {
               cardId: id, fromZone: card.zone, prevOwnerId: ownerId,
               posX: card.posX, posY: card.posY,
-              expectedZone: 'deck', expectedOwnerId: ownerId,
             };
             undoStack.push({
               description: `Shuffled ${card.cardName || 'card'} into deck`,
@@ -1768,7 +1747,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   any = true;
                 }
                 for (const o of originals) {
-                  if (!reverseIsSafe({ expectedZone: 'deck', expectedOwnerId: o.ownerId }, lookupForUndo(o.id))) continue;
+                  if (!reverseIsSafe(lookupForUndo(o.id))) continue;
                   gameState.moveCard(BigInt(o.id), o.zone, undefined, o.posX, o.posY, o.ownerId);
                   any = true;
                 }
@@ -2341,7 +2320,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               ? (gameState.opponentPlayer ? String(gameState.opponentPlayer.id) : '')
               : (gameState.myPlayer ? String(gameState.myPlayer.id) : ''))
             : (gameState.myPlayer ? String(gameState.myPlayer.id) : '');
-          recordOpponentCardUndo(id, String(toZone), newOwnerId);
+          recordOpponentCardUndo(id, String(toZone));
           moveOpponentCard(
             BigInt(approvedSearchRequest.id),
             BigInt(id),
@@ -2388,7 +2367,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 : (gameState.myPlayer ? String(gameState.myPlayer.id) : '');
               for (const id of ids) {
                 const p = positions[id];
-                recordOpponentCardUndo(id, String(toZone), newOwnerId);
+                recordOpponentCardUndo(id, String(toZone));
                 if (!p) {
                   moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone), undefined, undefined, newOwnerId);
                   continue;

@@ -131,6 +131,7 @@ export default function MyDecksClient() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"updated" | "created" | "name">("updated");
+  const [deckTypeFilter, setDeckTypeFilter] = useState<"all" | "T1" | "T2" | "Paragon">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchAllFolders, setSearchAllFolders] = useState(true);
   const [searchScopeOpen, setSearchScopeOpen] = useState(false);
@@ -544,8 +545,18 @@ export default function MyDecksClient() {
     ? searchedDecks
     : searchedDecks.filter(d => d.tags && d.tags.some(t => selectedTagIds.includes(t.id)));
 
+  // Apply deck type filter (client-side)
+  const typeFilteredDecks = deckTypeFilter === "all"
+    ? filteredDecks
+    : filteredDecks.filter(d => formatDeckType(d.format) === deckTypeFilter);
+
+  // Deck types present among the loaded decks (drives which pills render)
+  const availableDeckTypes = (["T1", "T2", "Paragon"] as const).filter(
+    type => decks.some(d => formatDeckType(d.format) === type)
+  );
+
   // Sort decks
-  const sortedDecks = [...filteredDecks].sort((a, b) => {
+  const sortedDecks = [...typeFilteredDecks].sort((a, b) => {
     switch (sortBy) {
       case "name":
         return a.name.localeCompare(b.name);
@@ -728,7 +739,8 @@ export default function MyDecksClient() {
             <div className="min-w-0">
               <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2 truncate">{selectedFolderName}</h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                {filteredDecks.length} {filteredDecks.length === 1 ? "deck" : "decks"}
+                {typeFilteredDecks.length} {typeFilteredDecks.length === 1 ? "deck" : "decks"}
+                {deckTypeFilter !== "all" && ` · ${deckTypeFilter}`}
                 {selectedTagIds.length > 0 && ` · ${selectedTagIds.length} tag${selectedTagIds.length > 1 ? "s" : ""} selected`}
               </p>
             </div>
@@ -828,6 +840,28 @@ export default function MyDecksClient() {
                 <option value="created">Date Created</option>
                 <option value="name">Name</option>
               </select>
+
+              {/* Deck type filter pills */}
+              {availableDeckTypes.length > 0 && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {(["all", ...availableDeckTypes] as const).map((type) => {
+                    const active = deckTypeFilter === type;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => setDeckTypeFilter(type)}
+                        className={`px-2 md:px-3 py-1.5 border rounded-lg text-xs md:text-sm transition-colors ${
+                          active
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-card text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {type === "all" ? "All" : type}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Tags dropdown */}
               {globalTags.length > 0 && (
@@ -1047,7 +1081,7 @@ export default function MyDecksClient() {
           )}
 
           {/* Decks Display */}
-          {filteredDecks.length === 0 ? (
+          {typeFilteredDecks.length === 0 ? (
             <div className="text-center py-16">
               <svg
                 className="mx-auto h-24 w-24 text-muted-foreground"

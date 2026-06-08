@@ -14,6 +14,7 @@ const path = require('path');
 
 const txtPath = path.join(__dirname, 'data/carddata.txt');
 const outputPath = path.join(__dirname, '../lib/cards/generated/cardData.ts');
+const jsonPath = path.join(__dirname, '../lib/cards/generated/cardData.json');
 
 const raw = fs.readFileSync(txtPath, 'utf-8');
 const lines = raw.split('\n');
@@ -56,27 +57,11 @@ if (cards.length < 5000) {
   process.exit(1);
 }
 
-// Build the four lookup maps (last-wins on collision, matching legacy deckcheck behavior)
-const byKey = new Map();
-const byNameSet = new Map();
-const byName = new Map();
-const byNameLower = new Map();
-
-for (const card of cards) {
-  byKey.set(`${card.name}|${card.set}|${card.imgFile}`, card);
-  byNameSet.set(`${card.name}|${card.set}`, card);
-  byName.set(card.name, card);
-  byNameLower.set(card.name.toLowerCase(), card);
-}
-
-// Diff summary against previous generated module, if present
+// Diff summary against previous generated data, if present
 function loadPreviousCards() {
-  if (!fs.existsSync(outputPath)) return null;
-  const prev = fs.readFileSync(outputPath, 'utf-8');
-  const match = prev.match(/export const CARDS: readonly CardData\[\] = (\[[\s\S]*?\n\]);\n/);
-  if (!match) return null;
+  if (!fs.existsSync(jsonPath)) return null;
   try {
-    return JSON.parse(match[1]);
+    return JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
   } catch {
     return null;
   }
@@ -109,12 +94,10 @@ if (previous) {
   console.log(`🔄 ${modified} cards modified`);
 }
 
-// Serialize
-const cardsJson = JSON.stringify(cards, null, 2);
-const byKeyJson = JSON.stringify(Array.from(byKey.entries()), null, 2);
-const byNameSetJson = JSON.stringify(Array.from(byNameSet.entries()), null, 2);
-const byNameJson = JSON.stringify(Array.from(byName.entries()), null, 2);
-const byNameLowerJson = JSON.stringify(Array.from(byNameLower.entries()), null, 2);
+// The card array lives in a .json file so TypeScript never has to type-check a
+// multi-megabyte inline literal (which OOMs the build). The lookup maps are
+// rebuilt at runtime from CARDS in lib/cards/lookup.ts — no need to serialize them.
+fs.writeFileSync(jsonPath, JSON.stringify(cards, null, 2));
 
 const tsContent = `/**
  * Redemption CCG card data.
@@ -124,7 +107,12 @@ const tsContent = `/**
  * To regenerate this file, run: make update-cards
  *
  * DO NOT EDIT BY HAND.
+ *
+ * The card data itself lives in ./cardData.json; this module only types it.
+ * Keeping the array out of the .ts source avoids type-checking a giant literal.
  */
+
+import cardData from './cardData.json';
 
 export interface CardData {
   name: string;
@@ -144,16 +132,13 @@ export interface CardData {
   legality: string;
 }
 
-export const CARDS: readonly CardData[] = ${cardsJson};
-
-export const CARD_BY_KEY: ReadonlyMap<string, CardData> = new Map(${byKeyJson});
-
-export const CARD_BY_NAME_SET: ReadonlyMap<string, CardData> = new Map(${byNameSetJson});
-
-export const CARD_BY_NAME: ReadonlyMap<string, CardData> = new Map(${byNameJson});
-
-export const CARD_BY_NAME_LOWER: ReadonlyMap<string, CardData> = new Map(${byNameLowerJson});
+export const CARDS: readonly CardData[] = cardData as readonly CardData[];
 `;
 
 fs.writeFileSync(outputPath, tsContent);
-console.log(`✅ Generated ${path.relative(process.cwd(), outputPath)} with ${cards.length} cards`);
+console.log(
+  `✅ Generated ${path.relative(process.cwd(), jsonPath)} + ${path.relative(
+    process.cwd(),
+    outputPath
+  )} with ${cards.length} cards`
+);
