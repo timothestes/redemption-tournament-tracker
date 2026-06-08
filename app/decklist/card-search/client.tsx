@@ -2618,8 +2618,9 @@ export default function CardSearchClient() {
               }}
             />
           ) : isInitializing ? (
-            <div className="flex-1 flex items-center justify-center bg-background">
-              <div className="text-muted-foreground text-sm">Loading deck...</div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
+              <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
+              <div className="text-muted-foreground text-sm">Loading deck…</div>
             </div>
           ) : (
           <DeckBuilderPanel
@@ -2717,8 +2718,9 @@ export default function CardSearchClient() {
       {isMobileDeckDrawerOpen && (
         <div className="md:hidden fixed inset-x-0 top-[64px] bottom-[3.5rem] z-40 bg-background flex flex-col overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {isInitializing ? (
-            <div className="flex-1 flex items-center justify-center p-8">
-              <div className="text-muted-foreground text-sm">Loading deck...</div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
+              <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
+              <div className="text-muted-foreground text-sm">Loading deck…</div>
             </div>
           ) : (
             <DeckBuilderPanel

@@ -93,9 +93,13 @@ export function useDeckState(
         if (storedDeck.cards.length > 0 || storedDeck.name !== "Untitled Deck" || storedDeck.id) {
           setDeck(storedDeck);
         }
+        // This path owns initialization; the cloud-load and new-deck effects own
+        // theirs. Flipping isInitializing here when a deckId is present would
+        // prematurely hide the "Loading deck..." indicator while the cloud fetch
+        // is still in flight, leaving a blank "Untitled Deck" panel on screen.
+        setIsInitializing(false);
       }
       hasLoadedFromStorage.current = true;
-      setIsInitializing(false);
     }, 0);
     
     return () => clearTimeout(timer);
