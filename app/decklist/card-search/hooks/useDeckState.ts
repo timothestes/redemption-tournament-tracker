@@ -3,6 +3,7 @@ import { Card, sanitizeImgFile } from "../utils";
 import { Deck, DeckCard, DeckStats, DeckZone, DeckVisibility } from "../types/deck";
 import { saveDeckAction, loadDeckByIdAction, DeckCardData } from "../../actions";
 import { CARD_BY_FULL_KEY } from "../data/cardIndex";
+import { buildReplacedHalf, type ReplaceAlignment } from "../utils/replaceHalf";
 
 const STORAGE_KEY = "redemption-deck-builder-current-deck";
 
@@ -161,47 +162,7 @@ export function useDeckState(
           visibility: isOwner ? (cloudDeck.visibility ?? "private") : "private",
           previewCard1: cloudDeck.preview_card_1 ?? null,
           previewCard2: cloudDeck.preview_card_2 ?? null,
-          cards: cloudDeck.cards.map((dbCard: any) => {
-            // Reconstruct the lookup key
-            const key = `${dbCard.card_name}|${dbCard.card_set}|${sanitizeImgFile(dbCard.card_img_file)}`;
-            const fullCard = CARD_BY_FULL_KEY.get(key);
-            
-            if (fullCard) {
-              // Use full card data from database
-              return {
-                card: fullCard,
-                quantity: dbCard.quantity,
-                zone: dbCard.zone as DeckZone,
-              };
-            } else {
-              // Fallback: create minimal card object if not found
-              console.warn(`Card not found in database: ${dbCard.card_name} (${dbCard.card_set})`);
-              return {
-                card: {
-                  dataLine: "",
-                  name: dbCard.card_name,
-                  set: dbCard.card_set,
-                  imgFile: sanitizeImgFile(dbCard.card_img_file),
-                  officialSet: "",
-                  type: "Unknown",
-                  brigade: "",
-                  strength: "",
-                  toughness: "",
-                  class: "",
-                  identifier: "",
-                  specialAbility: "",
-                  rarity: "",
-                  reference: "",
-                  alignment: "",
-                  legality: "",
-                  testament: "",
-                  isGospel: false,
-                } as Card,
-                quantity: dbCard.quantity,
-                zone: dbCard.zone as DeckZone,
-              };
-            }
-          }),
+          cards: cloudDeck.cards.map(dbCardToDeckCard),
           createdAt: new Date(cloudDeck.created_at),
           updatedAt: new Date(cloudDeck.updated_at),
         };
@@ -659,6 +620,49 @@ export function useDeckState(
   }, [deck.cards]);
 
   /**
+   * Replace the current deck's good (or evil) half with the matching half of another
+   * saved deck (in memory only — the user saves manually). Returns counts for a toast,
+   * or an error string. Makes no change when the source has no matching-alignment cards.
+   */
+  const replaceHalf = useCallback(
+    async (
+      alignment: ReplaceAlignment,
+      sourceDeckId: string
+    ): Promise<{
+      success: boolean;
+      removed?: number;
+      added?: number;
+      sourceName?: string;
+      error?: string;
+    }> => {
+      try {
+        const result = await loadDeckByIdAction(sourceDeckId);
+        if (!result.success || !result.deck) {
+          return { success: false, error: result.error || "Failed to load source deck" };
+        }
+
+        const sourceName = result.deck.name;
+        const sourceCards = result.deck.cards.map(dbCardToDeckCard);
+        const { cards, removed, added } = buildReplacedHalf(deck.cards, sourceCards, alignment);
+
+        if (added === 0) {
+          return {
+            success: false,
+            error: `"${sourceName}" has no ${alignment}-aligned cards.`,
+          };
+        }
+
+        setDeck({ ...deck, cards, updatedAt: new Date() });
+        return { success: true, removed, added, sourceName };
+      } catch (error) {
+        console.error("Error replacing deck half:", error);
+        return { success: false, error: "Failed to replace deck half" };
+      }
+    },
+    [deck]
+  );
+
+  /**
    * Clear the unsaved changes flag (useful when discarding changes)
    */
   const clearUnsavedChanges = useCallback(() => {
@@ -684,10 +688,55 @@ export function useDeckState(
     newDeck,
     loadDeck,
     loadDeckFromCloud,
+    replaceHalf,
     saveDeckToCloud,
     getCardQuantity,
     getDeckStats,
     clearUnsavedChanges,
+  };
+}
+
+/**
+ * Reconstruct a full in-memory DeckCard from a database card row, using the card
+ * catalog lookup so alignment and other fields are populated. Falls back to a
+ * minimal card object if the card is not found in the catalog.
+ */
+function dbCardToDeckCard(dbCard: any): DeckCard {
+  const key = `${dbCard.card_name}|${dbCard.card_set}|${sanitizeImgFile(dbCard.card_img_file)}`;
+  const fullCard = CARD_BY_FULL_KEY.get(key);
+
+  if (fullCard) {
+    return {
+      card: fullCard,
+      quantity: dbCard.quantity,
+      zone: dbCard.zone as DeckZone,
+    };
+  }
+
+  console.warn(`Card not found in database: ${dbCard.card_name} (${dbCard.card_set})`);
+  return {
+    card: {
+      dataLine: "",
+      name: dbCard.card_name,
+      set: dbCard.card_set,
+      imgFile: sanitizeImgFile(dbCard.card_img_file),
+      officialSet: "",
+      type: "Unknown",
+      brigade: "",
+      strength: "",
+      toughness: "",
+      class: "",
+      identifier: "",
+      specialAbility: "",
+      rarity: "",
+      reference: "",
+      alignment: "",
+      legality: "",
+      testament: "",
+      isGospel: false,
+    } as Card,
+    quantity: dbCard.quantity,
+    zone: dbCard.zone as DeckZone,
   };
 }
 
