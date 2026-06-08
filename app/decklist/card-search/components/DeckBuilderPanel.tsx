@@ -3483,6 +3483,7 @@ export default function DeckBuilderPanel({
         <LoadDeckModal
           title="Replace Good"
           subtitle="Choose a deck to copy its good cards from"
+          matchFormat={deck.format}
           onLoadDeck={(sourceDeckId) => onReplaceGood(sourceDeckId)}
           onClose={() => setShowReplaceGoodModal(false)}
         />
@@ -3492,6 +3493,7 @@ export default function DeckBuilderPanel({
         <LoadDeckModal
           title="Replace Evil"
           subtitle="Choose a deck to copy its evil cards from"
+          matchFormat={deck.format}
           onLoadDeck={(sourceDeckId) => onReplaceEvil(sourceDeckId)}
           onClose={() => setShowReplaceEvilModal(false)}
         />

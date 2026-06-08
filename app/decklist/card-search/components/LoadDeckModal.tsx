@@ -37,6 +37,8 @@ interface LoadDeckModalProps {
   title?: string;
   /** Sub-heading text (defaults to "Select a deck to load into the builder"). */
   subtitle?: string;
+  /** When set, only decks of the same normalized type (T1/T2/Paragon) are shown. */
+  matchFormat?: string;
 }
 
 export default function LoadDeckModal({
@@ -44,6 +46,7 @@ export default function LoadDeckModal({
   onClose,
   title = "Load Deck",
   subtitle = "Select a deck to load into the builder",
+  matchFormat,
 }: LoadDeckModalProps) {
   const [decks, setDecks] = useState<DeckData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +79,8 @@ export default function LoadDeckModal({
   }, []);
 
   const filteredDecks = decks.filter(deck =>
-    deck.name.toLowerCase().includes(searchQuery.toLowerCase())
+    deck.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (!matchFormat || formatDeckType(deck.format) === formatDeckType(matchFormat))
   );
 
   const handleDeckClick = (deckId: string) => {
@@ -145,7 +149,11 @@ export default function LoadDeckModal({
             <div className="text-center py-8 text-red-500">{error}</div>
           ) : filteredDecks.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {searchQuery ? "No decks match your search" : "No saved decks found"}
+              {searchQuery
+                ? "No decks match your search"
+                : matchFormat
+                  ? `No ${formatDeckType(matchFormat)} decks found`
+                  : "No saved decks found"}
             </div>
           ) : (
             <div className="space-y-2">
