@@ -422,7 +422,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     switch (r.status) {
       case 'applied': showGameToast(`Undo: ${r.description}`); break;
       case 'empty':   showGameToast('Nothing to undo'); break;
-      case 'refused': showGameToast("Can't undo — the board changed"); break;
+      case 'refused': showGameToast("Nothing left to undo on the board"); break;
       case 'threw':
         console.warn('Undo threw', r.error);
         showGameToast("Couldn't undo — the action can't be reversed");

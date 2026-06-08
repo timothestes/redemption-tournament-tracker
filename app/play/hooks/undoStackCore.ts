@@ -39,28 +39,31 @@ export function pushEntry(
 }
 
 /**
- * Peek the top entry, run its reverse inside try/catch, and ALWAYS consume it
- * on any non-empty outcome (applied | refused | threw). Consuming on failure
- * prevents Ctrl+Z from retrying the same stale reverse forever — the user
- * falls through to the previous entry instead.
+ * Walk the stack from the top and apply the first entry whose reverse succeeds,
+ * removing only that entry. An entry that returns false (its card is gone) is
+ * passed over and LEFT IN PLACE — so a single dead entry can't jam Ctrl+Z, and
+ * still-valid history below it is never silently discarded. If nothing in the
+ * stack can be applied, the stack is left untouched and the result is `refused`.
+ * A reverse that throws is treated as an unrecoverable failure of that specific
+ * entry: it is consumed and reported as `threw`.
  */
 export function undoEntry(stack: UndoEntry[]): { next: UndoEntry[]; result: UndoResult } {
   if (stack.length === 0) {
     return { next: stack, result: { status: 'empty' } };
   }
-  const entry = stack[stack.length - 1];
-  const next = stack.slice(0, -1);
-  try {
-    const applied = entry.reverseAction();
-    return {
-      next,
-      result: applied
-        ? { status: 'applied', description: entry.description }
-        : { status: 'refused', description: entry.description },
-    };
-  } catch (error) {
-    return { next, result: { status: 'threw', description: entry.description, error } };
+  const without = (i: number) => [...stack.slice(0, i), ...stack.slice(i + 1)];
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
+    try {
+      if (entry.reverseAction()) {
+        return { next: without(i), result: { status: 'applied', description: entry.description } };
+      }
+      // returned false (card gone) — leave it and keep scanning downward
+    } catch (error) {
+      return { next: without(i), result: { status: 'threw', description: entry.description, error } };
+    }
   }
+  return { next: stack, result: { status: 'refused', description: stack[stack.length - 1].description } };
 }
 
 /**
@@ -79,20 +82,19 @@ export interface Captured {
   cardId: string;
   fromZone: string;     // restore target (pre-forward)
   prevOwnerId: string;  // restore target owner (pre-forward)
-  posX?: string;        // courtesy restore, not guarded
-  posY?: string;        // courtesy restore, not guarded
-  expectedZone: string;    // == forward toZone — guard compares live zone to THIS
-  expectedOwnerId: string; // == owner the card has AFTER the forward move
+  posX?: string;        // courtesy restore
+  posY?: string;        // courtesy restore
 }
 
-/** reverseIsSafe: the card still exists AND is still where the forward move left it. */
+/**
+ * Best-effort guard: refuse only if the card no longer exists. Zone/owner are
+ * NOT compared — undo means "put it back," and the SpacetimeDB reducer is the
+ * authority on whether the reverse move is actually legal.
+ */
 export function reverseIsSafe(
-  captured: Pick<Captured, 'expectedZone' | 'expectedOwnerId'>,
   current: { zone: string; ownerId: string } | undefined,
 ): boolean {
-  if (!current) return false;                       // deleted token → refuse
-  return current.zone === captured.expectedZone
-      && current.ownerId === captured.expectedOwnerId;
+  return !!current;
 }
 
 type LiveLookup = (id: string) => { zone: string; ownerId: string } | undefined;
@@ -106,7 +108,7 @@ export function makeReverseAction(args: {
 }): () => boolean {
   return () => {
     const current = args.lookup(args.captured.cardId);
-    if (!reverseIsSafe(args.captured, current)) return false; // refuse, dispatch nothing
+    if (!reverseIsSafe(current)) return false; // card gone → refuse, dispatch nothing
     args.move(
       args.captured.cardId, args.captured.fromZone,
       args.captured.posX, args.captured.posY, args.captured.prevOwnerId,
@@ -129,7 +131,7 @@ export function makeBatchReverseAction(args: {
     let any = false;
     for (const captured of args.items) {
       const current = args.lookup(captured.cardId);
-      if (!reverseIsSafe(captured, current)) continue;
+      if (!reverseIsSafe(current)) continue;
       args.move(captured.cardId, captured.fromZone, captured.posX, captured.posY, captured.prevOwnerId);
       any = true;
     }

@@ -452,6 +452,7 @@ export default function CardSearchClient() {
     newDeck,
     loadDeck,
     loadDeckFromCloud,
+    replaceHalf,
     saveDeckToCloud,
     getCardQuantity,
     getDeckStats,
@@ -1551,6 +1552,23 @@ export default function CardSearchClient() {
     }
   }
 
+  // Replace good/evil half with cards from another deck
+  async function handleReplaceHalf(alignment: "good" | "evil", sourceDeckId: string) {
+    const result = await replaceHalf(alignment, sourceDeckId);
+    if (result.success) {
+      setNotification({
+        message: `Replaced ${alignment} half: removed ${result.removed}, added ${result.added} from "${result.sourceName}".`,
+        type: "success",
+      });
+    } else {
+      setNotification({
+        message: result.error || "Failed to replace deck half",
+        type: "error",
+      });
+    }
+    setTimeout(() => setNotification(null), 3000);
+  }
+
   return (
     <>
       {/* Modal - Rendered outside main container to avoid z-index issues */}
@@ -2600,8 +2618,9 @@ export default function CardSearchClient() {
               }}
             />
           ) : isInitializing ? (
-            <div className="flex-1 flex items-center justify-center bg-background">
-              <div className="text-muted-foreground text-sm">Loading deck...</div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
+              <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
+              <div className="text-muted-foreground text-sm">Loading deck…</div>
             </div>
           ) : (
           <DeckBuilderPanel
@@ -2641,6 +2660,8 @@ export default function CardSearchClient() {
             }}
             onNewDeck={handleNewDeck}
             onLoadDeck={loadDeckFromCloud}
+            onReplaceGood={(sourceDeckId) => handleReplaceHalf("good", sourceDeckId)}
+            onReplaceEvil={(sourceDeckId) => handleReplaceHalf("evil", sourceDeckId)}
             defaultTab={activeDeckTab}
             onActiveTabChange={setActiveDeckTab}
             onViewCard={(card, fromReserve) => {
@@ -2697,8 +2718,9 @@ export default function CardSearchClient() {
       {isMobileDeckDrawerOpen && (
         <div className="md:hidden fixed inset-x-0 top-[64px] bottom-[3.5rem] z-40 bg-background flex flex-col overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {isInitializing ? (
-            <div className="flex-1 flex items-center justify-center p-8">
-              <div className="text-muted-foreground text-sm">Loading deck...</div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
+              <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
+              <div className="text-muted-foreground text-sm">Loading deck…</div>
             </div>
           ) : (
             <DeckBuilderPanel
@@ -2734,6 +2756,8 @@ export default function CardSearchClient() {
               onDuplicate={() => {}}
               onNewDeck={handleNewDeck}
               onLoadDeck={loadDeckFromCloud}
+              onReplaceGood={(sourceDeckId) => handleReplaceHalf("good", sourceDeckId)}
+              onReplaceEvil={(sourceDeckId) => handleReplaceHalf("evil", sourceDeckId)}
               defaultTab={activeDeckTab}
               onActiveTabChange={setActiveDeckTab}
               onViewCard={(card, fromReserve) => {

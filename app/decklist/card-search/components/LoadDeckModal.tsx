@@ -33,9 +33,21 @@ function getDeckTypeBadgeClasses(format?: string): string {
 interface LoadDeckModalProps {
   onLoadDeck: (deckId: string) => void;
   onClose: () => void;
+  /** Heading text (defaults to "Load Deck"). */
+  title?: string;
+  /** Sub-heading text (defaults to "Select a deck to load into the builder"). */
+  subtitle?: string;
+  /** When set, only decks of the same normalized type (T1/T2/Paragon) are shown. */
+  matchFormat?: string;
 }
 
-export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProps) {
+export default function LoadDeckModal({
+  onLoadDeck,
+  onClose,
+  title = "Load Deck",
+  subtitle = "Select a deck to load into the builder",
+  matchFormat,
+}: LoadDeckModalProps) {
   const [decks, setDecks] = useState<DeckData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +79,8 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
   }, []);
 
   const filteredDecks = decks.filter(deck =>
-    deck.name.toLowerCase().includes(searchQuery.toLowerCase())
+    deck.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (!matchFormat || formatDeckType(deck.format) === formatDeckType(matchFormat))
   );
 
   const handleDeckClick = (deckId: string) => {
@@ -99,10 +112,10 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-foreground">
-                  Load Deck
+                  {title}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Select a deck to load into the builder
+                  {subtitle}
                 </p>
               </div>
             </div>
@@ -136,7 +149,11 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
             <div className="text-center py-8 text-red-500">{error}</div>
           ) : filteredDecks.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {searchQuery ? "No decks match your search" : "No saved decks found"}
+              {searchQuery
+                ? "No decks match your search"
+                : matchFormat
+                  ? `No ${formatDeckType(matchFormat)} decks found`
+                  : "No saved decks found"}
             </div>
           ) : (
             <div className="space-y-2">
