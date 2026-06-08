@@ -33,9 +33,18 @@ function getDeckTypeBadgeClasses(format?: string): string {
 interface LoadDeckModalProps {
   onLoadDeck: (deckId: string) => void;
   onClose: () => void;
+  /** Heading text (defaults to "Load Deck"). */
+  title?: string;
+  /** Sub-heading text (defaults to "Select a deck to load into the builder"). */
+  subtitle?: string;
 }
 
-export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProps) {
+export default function LoadDeckModal({
+  onLoadDeck,
+  onClose,
+  title = "Load Deck",
+  subtitle = "Select a deck to load into the builder",
+}: LoadDeckModalProps) {
   const [decks, setDecks] = useState<DeckData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,10 +108,10 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-foreground">
-                  Load Deck
+                  {title}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Select a deck to load into the builder
+                  {subtitle}
                 </p>
               </div>
             </div>
