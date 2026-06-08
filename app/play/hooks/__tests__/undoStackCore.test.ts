@@ -50,14 +50,21 @@ describe('undoEntry', () => {
     expect(next.map(e => e.description)).toEqual(['a']);
   });
 
-  it('reverseAction returning false → refused, still shrinks by one (consume)', () => {
-    const stack = [entry('a'), entry('b', () => false)];
+  it('top entry returning false (card gone) → falls through to next applicable, dead entry stays', () => {
+    const stack = [entry('a', () => true), entry('dead', () => false)];
     const { next, result } = undoEntry(stack);
-    expect(result).toEqual({ status: 'refused', description: 'b' });
-    expect(next.map(e => e.description)).toEqual(['a']);
+    expect(result).toEqual({ status: 'applied', description: 'a' });
+    expect(next.map(e => e.description)).toEqual(['dead']); // dead entry left in place
   });
 
-  it('reverseAction throwing → threw with error, still shrinks by one (consume)', () => {
+  it('all entries dead → refused, stack untouched', () => {
+    const stack = [entry('a', () => false), entry('b', () => false)];
+    const { next, result } = undoEntry(stack);
+    expect(result).toEqual({ status: 'refused', description: 'b' });
+    expect(next).toBe(stack); // nothing removed
+  });
+
+  it('reverseAction throwing → threw with error, consumes that entry', () => {
     const boom = new Error('boom');
     const stack = [entry('a'), entry('b', () => { throw boom; })];
     const { next, result } = undoEntry(stack);
@@ -95,19 +102,12 @@ describe('shouldClearUndoStack', () => {
 });
 
 describe('reverseIsSafe', () => {
-  const captured = { expectedZone: 'territory', expectedOwnerId: '7' };
-
-  it('true when zone + owner both match', () => {
-    expect(reverseIsSafe(captured, { zone: 'territory', ownerId: '7' })).toBe(true);
-  });
-  it('false on zone change', () => {
-    expect(reverseIsSafe(captured, { zone: 'discard', ownerId: '7' })).toBe(false);
-  });
-  it('false on owner change', () => {
-    expect(reverseIsSafe(captured, { zone: 'territory', ownerId: '9' })).toBe(false);
+  it('true when the card exists, regardless of zone/owner', () => {
+    expect(reverseIsSafe({ zone: 'territory', ownerId: '7' })).toBe(true);
+    expect(reverseIsSafe({ zone: 'discard', ownerId: '9' })).toBe(true);
   });
   it('false when the card no longer exists (deleted token)', () => {
-    expect(reverseIsSafe(captured, undefined)).toBe(false);
+    expect(reverseIsSafe(undefined)).toBe(false);
   });
 });
 
@@ -117,23 +117,10 @@ const cap = (over: Partial<Captured> = {}): Captured => ({
   prevOwnerId: '1',
   posX: '0.1',
   posY: '0.2',
-  expectedZone: 'territory',
-  expectedOwnerId: '1',
   ...over,
 });
 
 describe('makeReverseAction', () => {
-  it('does NOT call move and returns false when unsafe', () => {
-    const move = vi.fn();
-    const reverse = makeReverseAction({
-      captured: cap(),
-      lookup: () => ({ zone: 'discard', ownerId: '1' }), // moved away
-      move,
-    });
-    expect(reverse()).toBe(false);
-    expect(move).not.toHaveBeenCalled();
-  });
-
   it('does NOT call move and returns false when the card is gone', () => {
     const move = vi.fn();
     const reverse = makeReverseAction({ captured: cap(), lookup: () => undefined, move });
@@ -141,11 +128,11 @@ describe('makeReverseAction', () => {
     expect(move).not.toHaveBeenCalled();
   });
 
-  it('calls move once with fromZone/prevOwnerId and returns true when safe', () => {
+  it('puts the card back even if it has since moved elsewhere (best-effort)', () => {
     const move = vi.fn();
     const reverse = makeReverseAction({
       captured: cap(),
-      lookup: () => ({ zone: 'territory', ownerId: '1' }),
+      lookup: () => ({ zone: 'discard', ownerId: '9' }), // moved + taken since
       move,
     });
     expect(reverse()).toBe(true);
@@ -155,23 +142,20 @@ describe('makeReverseAction', () => {
 });
 
 describe('makeBatchReverseAction', () => {
-  it('returns true iff at least one card is safe, dispatching only safe ones', () => {
+  it('restores every still-existing card, skipping only the gone ones', () => {
     const move = vi.fn();
-    const items = [
-      cap({ cardId: 'safe', expectedZone: 'territory', fromZone: 'hand' }),
-      cap({ cardId: 'stale', expectedZone: 'territory', fromZone: 'hand' }),
-    ];
+    const items = [cap({ cardId: 'live' }), cap({ cardId: 'gone' })];
     const reverse = makeBatchReverseAction({
       items,
-      lookup: (id) => (id === 'safe' ? { zone: 'territory', ownerId: '1' } : { zone: 'discard', ownerId: '1' }),
+      lookup: (id) => (id === 'live' ? { zone: 'discard', ownerId: '1' } : undefined),
       move,
     });
     expect(reverse()).toBe(true);
     expect(move).toHaveBeenCalledTimes(1);
-    expect(move).toHaveBeenCalledWith('safe', 'hand', '0.1', '0.2', '1');
+    expect(move).toHaveBeenCalledWith('live', 'hand', '0.1', '0.2', '1');
   });
 
-  it('returns false and dispatches nothing when no card is safe', () => {
+  it('returns false and dispatches nothing when every card is gone', () => {
     const move = vi.fn();
     const reverse = makeBatchReverseAction({
       items: [cap({ cardId: 'a' }), cap({ cardId: 'b' })],
