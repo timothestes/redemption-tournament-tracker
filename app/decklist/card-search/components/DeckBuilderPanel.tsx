@@ -142,6 +142,10 @@ interface DeckBuilderPanelProps {
   onDuplicate?: () => void;
   /** Callback to load a deck from cloud by ID */
   onLoadDeck?: (deckId: string) => void;
+  /** Replace the current deck's good half with another deck's good half (T2 only). */
+  onReplaceGood?: (sourceDeckId: string) => void;
+  /** Replace the current deck's evil half with another deck's evil half (T2 only). */
+  onReplaceEvil?: (sourceDeckId: string) => void;
   /** Callback to create a new blank deck */
   onNewDeck?: (name?: string, folderId?: string | null, skipConfirmation?: boolean) => void;
   /** Callback when active tab changes */
@@ -197,6 +201,8 @@ export default function DeckBuilderPanel({
   onDelete,
   onDuplicate,
   onLoadDeck,
+  onReplaceGood,
+  onReplaceEvil,
   onNewDeck,
   onActiveTabChange,
   onViewCard,
@@ -220,6 +226,8 @@ export default function DeckBuilderPanel({
   const [showGenerateImageModal, setShowGenerateImageModal] = useState(false);
   const [showDeleteDeckModal, setShowDeleteDeckModal] = useState(false);
   const [showLoadDeckModal, setShowLoadDeckModal] = useState(false);
+  const [showReplaceGoodModal, setShowReplaceGoodModal] = useState(false);
+  const [showReplaceEvilModal, setShowReplaceEvilModal] = useState(false);
   const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
   const [buyModalMode, setBuyModalMode] = useState<"exact" | "budget">("exact");
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
@@ -1227,6 +1235,28 @@ export default function DeckBuilderPanel({
                       Load Deck
                     </button>
                   )}
+                  {onReplaceGood && isAuthenticated && deck.format?.toLowerCase().includes("type 2") && (
+                    <button
+                      onClick={() => { setShowReplaceGoodModal(true); setShowMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                    >
+                      <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Replace Good…
+                    </button>
+                  )}
+                  {onReplaceEvil && isAuthenticated && deck.format?.toLowerCase().includes("type 2") && (
+                    <button
+                      onClick={() => { setShowReplaceEvilModal(true); setShowMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                    >
+                      <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Replace Evil…
+                    </button>
+                  )}
                   {isAuthenticated && deck.id && (
                     <button
                       onClick={() => { setShowShareModal(true); setShowMenu(false); }}
@@ -1717,7 +1747,29 @@ export default function DeckBuilderPanel({
                   Load Deck
                 </button>
               )}
-              
+              {onReplaceGood && isAuthenticated && deck.format?.toLowerCase().includes("type 2") && (
+                <button
+                  onClick={() => { setShowReplaceGoodModal(true); setShowMenu(false); }}
+                  className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                >
+                  <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Replace Good…
+                </button>
+              )}
+              {onReplaceEvil && isAuthenticated && deck.format?.toLowerCase().includes("type 2") && (
+                <button
+                  onClick={() => { setShowReplaceEvilModal(true); setShowMenu(false); }}
+                  className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                >
+                  <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Replace Evil…
+                </button>
+              )}
+
               {/* Sharing Section */}
               {isAuthenticated && deck.id && (
                 <button
@@ -3424,6 +3476,24 @@ export default function DeckBuilderPanel({
         <LoadDeckModal
           onLoadDeck={onLoadDeck}
           onClose={() => setShowLoadDeckModal(false)}
+        />
+      )}
+
+      {showReplaceGoodModal && onReplaceGood && (
+        <LoadDeckModal
+          title="Replace Good"
+          subtitle="Choose a deck to copy its good cards from"
+          onLoadDeck={(sourceDeckId) => onReplaceGood(sourceDeckId)}
+          onClose={() => setShowReplaceGoodModal(false)}
+        />
+      )}
+
+      {showReplaceEvilModal && onReplaceEvil && (
+        <LoadDeckModal
+          title="Replace Evil"
+          subtitle="Choose a deck to copy its evil cards from"
+          onLoadDeck={(sourceDeckId) => onReplaceEvil(sourceDeckId)}
+          onClose={() => setShowReplaceEvilModal(false)}
         />
       )}
 
