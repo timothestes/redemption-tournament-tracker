@@ -1,5 +1,7 @@
 'use client';
 
+import { useToastKeyboardNav, toastFocusShadow } from './toastKeyboardNav';
+
 interface ConsentDialogProps {
   requesterName: string;
   zoneName: string;
@@ -11,6 +13,17 @@ interface ConsentDialogProps {
 }
 
 export function ConsentDialog({ requesterName, zoneName, requestType = 'search', actionDescription, onAllow, onDeny }: ConsentDialogProps) {
+  // Allow is the affirmative default (Enter); Escape denies. ←/→ move between
+  // the two and the focused option is highlighted.
+  const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
+    count: 2,
+    defaultIndex: 0, // Allow / Grant
+    onSelect: idx => (idx === 0 ? onAllow() : onDeny()),
+    onCancel: onDeny,
+  });
+  const allowFocused = focusedIndex === 0;
+  const denyFocused = focusedIndex === 1;
+
   return (
     <div
       style={{
@@ -48,35 +61,37 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button
             onClick={onAllow}
+            onMouseEnter={() => setFocusedIndex(0)}
             style={{
               padding: '9px 18px',
-              background: '#2d5a27',
+              background: allowFocused ? '#3a7332' : '#2d5a27',
               border: '1px solid #4a8a42',
               borderRadius: 6,
               color: '#c4e8bf',
               fontSize: 14,
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               cursor: 'pointer',
+              boxShadow: allowFocused ? toastFocusShadow('#6fbf63', 'rgba(74,138,66,0.55)') : 'none',
+              transition: 'background 0.14s, box-shadow 0.14s',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
           >
             {requestType === 'priority' ? 'Grant' : 'Allow'}
           </button>
           <button
             onClick={onDeny}
+            onMouseEnter={() => setFocusedIndex(1)}
             style={{
               padding: '9px 18px',
-              background: '#5a2727',
+              background: denyFocused ? '#733232' : '#5a2727',
               border: '1px solid #8a4242',
               borderRadius: 6,
               color: '#e8bfbf',
               fontSize: 14,
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               cursor: 'pointer',
+              boxShadow: denyFocused ? toastFocusShadow('#c46a6a', 'rgba(138,66,66,0.55)') : 'none',
+              transition: 'background 0.14s, box-shadow 0.14s',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#733232'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#5a2727'; }}
           >
             Deny
           </button>

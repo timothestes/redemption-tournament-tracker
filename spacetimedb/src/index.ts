@@ -2993,6 +2993,38 @@ function setCardOutlineImpl(
 // Validates, computes target zone + zoneIndex, then inserts token CardInstance
 // rows. SpacetimeDB rolls back the whole reducer if any insert throws.
 // ---------------------------------------------------------------------------
+// Compute a run of staggered positions cascading down-right from a base point,
+// skipping any slot that overlaps an already-occupied position. Each placed
+// slot becomes occupied so returned slots never collide with each other. This
+// gives visual feedback when tokens are spawned in a row — a second spawn lands
+// on free slots instead of stacking exactly on the first batch.
+function staggerSlots(
+  occupied: Array<{ x: number; y: number }>,
+  baseX: number,
+  baseY: number,
+  staggerX: number,
+  staggerY: number,
+  count: number,
+): Array<{ x: number; y: number }> {
+  const threshold = Math.hypot(staggerX, staggerY) * 0.5;
+  const taken = [...occupied];
+  const slots: Array<{ x: number; y: number }> = [];
+  let step = 1;
+  for (let i = 0; i < count; i++) {
+    let x = baseX + step * staggerX;
+    let y = baseY + step * staggerY;
+    while (taken.some(p => Math.hypot(p.x - x, p.y - y) < threshold)) {
+      step += 1;
+      x = baseX + step * staggerX;
+      y = baseY + step * staggerY;
+    }
+    slots.push({ x, y });
+    taken.push({ x, y });
+    step += 1;
+  }
+  return slots;
+}
+
 function spawnTokenImpl(
   ctx: any,
   source: any, // CardInstance row
@@ -3012,10 +3044,16 @@ function spawnTokenImpl(
   const targetZone = ability.defaultZone ?? 'territory';
 
   // Compute starting zoneIndex based on existing cards for (targetZone, ownerId).
+  // In the same pass, collect occupied territory positions so spawned tokens
+  // can cascade past them instead of stacking invisibly on a previous batch.
   let maxIdx = -1n;
+  const occupied: Array<{ x: number; y: number }> = [];
   for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
-    if (c.ownerId === source.ownerId && c.zone === targetZone && c.zoneIndex > maxIdx) {
-      maxIdx = c.zoneIndex;
+    if (c.ownerId === source.ownerId && c.zone === targetZone) {
+      if (c.zoneIndex > maxIdx) maxIdx = c.zoneIndex;
+      const x = c.posX ? Number(c.posX) : NaN;
+      const y = c.posY ? Number(c.posY) : NaN;
+      if (Number.isFinite(x) && Number.isFinite(y)) occupied.push({ x, y });
     }
   }
 
@@ -3032,13 +3070,17 @@ function spawnTokenImpl(
   const sourcePosY = source.posY ? Number(source.posY) : NaN;
   const baseX = sourceInTerritory && Number.isFinite(sourcePosX) ? sourcePosX : 0.3;
   const baseY = sourceInTerritory && Number.isFinite(sourcePosY) ? sourcePosY : 0.4;
+  const slots =
+    targetZone === 'territory'
+      ? staggerSlots(occupied, baseX, baseY, STAGGER_X, STAGGER_Y, count)
+      : [];
 
   // Phase 3 — all-or-nothing inserts. SpacetimeDB rolls back the whole
   // reducer if any insert throws.
   for (let i = 0; i < count; i++) {
     maxIdx += 1n;
-    const posX = targetZone === 'territory' ? String(baseX + (i + 1) * STAGGER_X) : '';
-    const posY = targetZone === 'territory' ? String(baseY + (i + 1) * STAGGER_Y) : '';
+    const posX = targetZone === 'territory' ? String(slots[i].x) : '';
+    const posY = targetZone === 'territory' ? String(slots[i].y) : '';
     ctx.db.CardInstance.insert({
       id: 0n,
       gameId,
@@ -4967,6 +5009,69 @@ export const three_nails_reset_execute = spacetimedb.reducer(
         finalGame.turnNumber, finalGame.currentPhase,
       );
     }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: discard_reserve_characters_execute
+// Authorised via an approved ZoneSearchRequest (action='discard_reserve_characters').
+// Darius' Decree "discard all characters from a Reserve" targeting the
+// OPPONENT's reserve requires opponent consent. Dispatched by the requester
+// after the opponent approves. Reuses discardCharactersFromReserveImpl with
+// target='opponent'. Self-reserve activations skip this and fire immediately
+// through execute_card_ability.
+// ---------------------------------------------------------------------------
+export const discard_reserve_characters_execute = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+  },
+  (ctx, { gameId, requestId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Search request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.requesterId !== player.id) throw new SenderError('Not your search request');
+    if (req.status !== 'approved') throw new SenderError('Search request not approved');
+    if (req.action !== 'discard_reserve_characters') throw new SenderError('Wrong action type');
+
+    // Parse sourceInstanceId from actionParams.
+    let sourceInstanceId: bigint;
+    try {
+      const params = JSON.parse(req.actionParams);
+      sourceInstanceId = BigInt(params.sourceInstanceId);
+    } catch {
+      throw new SenderError('Invalid actionParams');
+    }
+
+    // Verify the source (Darius' Decree) is still in play and owned by the
+    // requester. No-op if it moved/was negated mid-flight; leave request
+    // cleanup to complete_zone_search (client responsibility).
+    const source = ctx.db.CardInstance.id.find(sourceInstanceId);
+    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
+    if (
+      !source ||
+      source.gameId !== gameId ||
+      source.ownerId !== player.id ||
+      !ABILITY_SOURCE_ZONES.includes(source.zone)
+    ) {
+      logAction(
+        ctx, gameId, player.id, 'DISCARD_CHARACTERS_FROM_RESERVE_CANCELLED',
+        JSON.stringify({ reason: 'source_card_unavailable' }),
+        game.turnNumber, game.currentPhase,
+      );
+      return;
+    }
+
+    discardCharactersFromReserveImpl(
+      ctx, source, { type: 'discard_characters_from_reserve', target: 'opponent' }, player, gameId,
+    );
+    // Leave request cleanup to complete_zone_search (client responsibility).
   }
 );
 

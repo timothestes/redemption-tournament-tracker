@@ -3008,6 +3008,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               onStartMultiDrag: modalStartMultiDrag,
               didDragRef: modalDidDragRef,
             }]}
+            isDragActive={modalDrag.isDragging}
             onConfirm={(ids) => {
               dispatch(gameActionCreators.resurrectHeroes(ids));
               setResurrectReq(null);

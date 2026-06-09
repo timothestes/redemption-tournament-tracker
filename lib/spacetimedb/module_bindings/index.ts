@@ -44,6 +44,7 @@ import CompleteZoneSearchReducer from "./complete_zone_search_reducer";
 import CreateGameReducer from "./create_game_reducer";
 import DenyZoneSearchReducer from "./deny_zone_search_reducer";
 import DetachCardReducer from "./detach_card_reducer";
+import DiscardReserveCharactersExecuteReducer from "./discard_reserve_characters_execute_reducer";
 import DrawCardReducer from "./draw_card_reducer";
 import DrawMultipleReducer from "./draw_multiple_reducer";
 import EndTurnReducer from "./end_turn_reducer";
@@ -376,6 +377,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_game", CreateGameReducer),
   __reducerSchema("deny_zone_search", DenyZoneSearchReducer),
   __reducerSchema("detach_card", DetachCardReducer),
+  __reducerSchema("discard_reserve_characters_execute", DiscardReserveCharactersExecuteReducer),
   __reducerSchema("draw_card", DrawCardReducer),
   __reducerSchema("draw_multiple", DrawMultipleReducer),
   __reducerSchema("end_turn", EndTurnReducer),

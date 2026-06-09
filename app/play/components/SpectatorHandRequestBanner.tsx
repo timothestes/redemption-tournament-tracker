@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTable, useSpacetimeDB } from 'spacetimedb/react';
 import { tables } from '@/lib/spacetimedb/module_bindings';
-import { useToastKeyboardNav } from '@/app/shared/components/toastKeyboardNav';
+import { useToastKeyboardNav, toastFocusShadow } from '@/app/shared/components/toastKeyboardNav';
 
 interface SpectatorHandRequestBannerProps {
   gameId: bigint | null;
@@ -204,6 +204,7 @@ function SpectatorRequestBanner({
             textTransform: 'uppercase',
             cursor: 'pointer',
             whiteSpace: 'nowrap',
+            boxShadow: dismissFocused ? toastFocusShadow('rgba(196, 149, 90, 0.5)', 'rgba(196, 149, 90, 0.22)') : 'none',
             transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
           }}
         >
@@ -225,7 +226,7 @@ function SpectatorRequestBanner({
             textTransform: 'uppercase',
             cursor: 'pointer',
             whiteSpace: 'nowrap',
-            boxShadow: shareFocused ? '0 0 14px rgba(196, 149, 90, 0.35)' : 'none',
+            boxShadow: shareFocused ? toastFocusShadow('rgba(196, 149, 90, 0.85)', 'rgba(196, 149, 90, 0.4)') : 'none',
             transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
           }}
         >

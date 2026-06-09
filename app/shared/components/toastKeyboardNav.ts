@@ -13,6 +13,15 @@ import { useEffect, useRef, useState } from 'react';
 // and overlapping toasts from double-firing.
 // ---------------------------------------------------------------------------
 
+/**
+ * Box-shadow for the currently-focused toast option. A thin ring in the
+ * button's OWN accent color plus a soft glow — a deliberate "selected"
+ * indicator, distinct from the jarring global focus ring on form controls.
+ */
+export function toastFocusShadow(ring: string, glow: string): string {
+  return `0 0 0 2px ${ring}, 0 0 16px ${glow}`;
+}
+
 export interface ToastNavEntry {
   /** Higher wins. Card-choice prompts / modals sit above plain banners. */
   priority: number;

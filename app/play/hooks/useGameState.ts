@@ -99,6 +99,7 @@ export interface GameState {
   randomOpponentHandToZone: (requestId: bigint, count: number, toZone: string, deckPosition: string) => void;
   opponentShuffleAndDraw: (requestId: bigint, shuffleCount: number, drawCount: number) => void;
   threeNailsResetExecute: (requestId: bigint) => void;
+  discardReserveCharactersExecute: (requestId: bigint) => void;
   meekCard: (cardInstanceId: bigint) => void;
   unmeekCard: (cardInstanceId: bigint) => void;
   flipCard: (cardInstanceId: bigint) => void;
@@ -486,6 +487,13 @@ export function useGameState(gameId: bigint): GameState {
   const threeNailsResetExecute = useCallback(
     (requestId: bigint) => {
       conn?.reducers.threeNailsResetExecute({ gameId, requestId });
+    },
+    [conn, gameId],
+  );
+
+  const discardReserveCharactersExecute = useCallback(
+    (requestId: bigint) => {
+      conn?.reducers.discardReserveCharactersExecute({ gameId, requestId });
     },
     [conn, gameId],
   );
@@ -923,6 +931,7 @@ export function useGameState(gameId: bigint): GameState {
     randomOpponentHandToZone,
     opponentShuffleAndDraw,
     threeNailsResetExecute,
+    discardReserveCharactersExecute,
     reloadDeck,
     meekCard,
     unmeekCard,
@@ -1222,6 +1231,7 @@ export function useSpectatorGameState(gameId: bigint | null) {
     randomOpponentHandToZone: useCallback((_requestId: bigint, _count: number, _toZone: string, _deckPosition: string) => {}, []),
     opponentShuffleAndDraw: useCallback((_requestId: bigint, _shuffleCount: number, _drawCount: number) => {}, []),
     threeNailsResetExecute: noopBigint,
+    discardReserveCharactersExecute: noopBigint,
     meekCard: noopBigint,
     unmeekCard: noopBigint,
     flipCard: noopBigint,

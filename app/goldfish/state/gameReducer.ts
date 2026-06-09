@@ -43,6 +43,41 @@ function cloneZones(zones: GameState['zones']): GameState['zones'] {
   return cloned;
 }
 
+/**
+ * Compute a run of staggered positions that cascade down-right from a base
+ * point, skipping any slot that overlaps an already-occupied position. Each
+ * placed slot is itself treated as occupied so the returned slots never
+ * collide with each other. This is what gives visual feedback when tokens are
+ * spawned in a row: a second spawn lands on free slots instead of stacking
+ * exactly on the first batch.
+ */
+function staggerSlots(
+  occupied: Array<{ x: number; y: number }>,
+  baseX: number,
+  baseY: number,
+  staggerX: number,
+  staggerY: number,
+  count: number,
+): Array<{ x: number; y: number }> {
+  const threshold = Math.hypot(staggerX, staggerY) * 0.5;
+  const taken = [...occupied];
+  const slots: Array<{ x: number; y: number }> = [];
+  let step = 1;
+  for (let i = 0; i < count; i++) {
+    let x = baseX + step * staggerX;
+    let y = baseY + step * staggerY;
+    while (taken.some(p => Math.hypot(p.x - x, p.y - y) < threshold)) {
+      step += 1;
+      x = baseX + step * staggerX;
+      y = baseY + step * staggerY;
+    }
+    slots.push({ x, y });
+    taken.push({ x, y });
+    step += 1;
+  }
+  return slots;
+}
+
 function spawnTokenInState(
   state: GameState,
   source: GameCard,
@@ -88,6 +123,18 @@ function spawnTokenInState(
   const baseX = sourceInTerritory && Number.isFinite(sourcePosX) ? sourcePosX : 200;
   const baseY = sourceInTerritory && Number.isFinite(sourcePosY) ? sourcePosY : 200;
 
+  // Existing same-owner cards already in the target zone. Cascading past these
+  // means a second spawn-in-a-row lands on fresh slots instead of stacking
+  // invisibly on the first batch (the visual feedback this is meant to give).
+  const occupied: Array<{ x: number; y: number }> =
+    targetZone === 'territory'
+      ? state.zones[targetZone]
+          .filter(c => c.ownerId === source.ownerId)
+          .map(c => ({ x: Number(c.posX), y: Number(c.posY) }))
+          .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+      : [];
+  const slots = staggerSlots(occupied, baseX, baseY, STAGGER_X, STAGGER_Y, count);
+
   // Phase 2 — build all new cards in memory. No state mutation yet.
   const newCards: GameCard[] = Array.from({ length: count }, (_, i) => ({
     instanceId: crypto.randomUUID(),
@@ -109,8 +156,8 @@ function spawnTokenInState(
     zone: targetZone,
     ownerId: source.ownerId,
     notes: '',
-    posX: targetZone === 'territory' ? baseX + (i + 1) * STAGGER_X : undefined,
-    posY: targetZone === 'territory' ? baseY + (i + 1) * STAGGER_Y : undefined,
+    posX: targetZone === 'territory' ? slots[i].x : undefined,
+    posY: targetZone === 'territory' ? slots[i].y : undefined,
   }));
 
   // Phase 3 — commit in a single shallow clone.

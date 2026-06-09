@@ -78,6 +78,22 @@ describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
     expect(tokens[0].instanceId).not.toEqual('source-1');
   });
 
+  it('spawning in a row cascades onto fresh slots instead of stacking', () => {
+    const source = makeCard({ zone: 'territory', cardName: 'Two Possessed (GoC)', posX: 200, posY: 200 });
+    const state = makeState([source]);
+
+    // First spawn (2 tokens), then a second spawn from the same source.
+    const after1 = gameReducer(state, act('source-1', 0));
+    const after2 = gameReducer(after1, act('source-1', 0));
+
+    const tokens = after2.zones.territory.filter(c => c.isToken);
+    expect(tokens).toHaveLength(4);
+
+    // Every token occupies a distinct position — no two tokens share a slot.
+    const positions = tokens.map(t => `${t.posX},${t.posY}`);
+    expect(new Set(positions).size).toBe(4);
+  });
+
   it('single-count ability spawns exactly one token', () => {
     const source = makeCard({ cardName: 'The Proselytizers (GoC)' });
     const state = makeState([source]);

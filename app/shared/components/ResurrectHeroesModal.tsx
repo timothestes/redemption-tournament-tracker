@@ -21,6 +21,10 @@ interface ResurrectHeroesModalProps {
   pages: ResurrectHeroesPage[];
   onConfirm: (selectedInstanceIds: string[]) => void;
   onCancel: () => void;
+  /** True while a card from this modal is being dragged onto the canvas.
+   *  Mirrors ZoneBrowseModal — the modal fades + goes pointer-through during
+   *  the drag and (unless "Leave open") closes when it ends. */
+  isDragActive?: boolean;
 }
 
 /**
@@ -30,30 +34,39 @@ interface ResurrectHeroesModalProps {
  * confirm the selected Heroes return to their own owner's Territory. Cards can
  * also be dragged out onto the canvas (when the page supplies drag handlers).
  */
-export function ResurrectHeroesModal({ pages, onConfirm, onCancel }: ResurrectHeroesModalProps) {
+export function ResurrectHeroesModal({ pages, onConfirm, onCancel, isDragActive }: ResurrectHeroesModalProps) {
   const [activeTab, setActiveTab] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const pointerDownCardRef = useRef<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Esc closes. A pointerdown that STARTS outside the modal content also closes
-  // — using pointerdown (not a backdrop overlay) so dragging a card onto the
-  // canvas behind the modal still works: that gesture starts inside on a card.
+  // Refs so the drag-end effect only re-runs on the isDragActive transition,
+  // not when these callbacks/flags change identity between renders.
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
+  const leaveOpenRef = useRef(leaveOpen);
+  leaveOpenRef.current = leaveOpen;
+
+  // Close once a drag completes (isDragActive true → false), unless "Leave
+  // open" is checked — matching the zone-browse modals. Also reset the shared
+  // didDrag refs so a later outside-click isn't mistaken for a drag.
+  const prevDragActive = useRef(false);
+  useEffect(() => {
+    if (prevDragActive.current && !isDragActive) {
+      pages.forEach((p) => { if (p.didDragRef) p.didDragRef.current = false; });
+      if (!leaveOpenRef.current) onCancelRef.current();
+    }
+    prevDragActive.current = !!isDragActive;
+  }, [isDragActive, pages]);
+
+  // Esc closes.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
     };
-    const onPointerDown = (e: PointerEvent) => {
-      if (contentRef.current && !contentRef.current.contains(e.target as Node)) {
-        onCancel();
-      }
-    };
     window.addEventListener('keydown', onKey);
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.removeEventListener('pointerdown', onPointerDown);
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [onCancel]);
 
   // Every Hero id currently present across all pages (drag-out can remove some).
@@ -115,13 +128,18 @@ export function ResurrectHeroesModal({ pages, onConfirm, onCancel }: ResurrectHe
 
   return (
     <div
+      // Full-area backdrop. Catches outside clicks directly (robust against
+      // canvas event handling). Goes pointer-through while dragging so the drop
+      // reaches the board below.
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
       style={{
         position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
+        inset: 0,
         zIndex: 900,
-        pointerEvents: 'auto',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: isDragActive ? 'none' : 'auto',
       }}
     >
       <div
@@ -136,6 +154,11 @@ export function ResurrectHeroesModal({ pages, onConfirm, onCancel }: ResurrectHe
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
+          // While dragging a card out, fade and go pointer-through so the board
+          // (and the drop target) is visible — matches ZoneBrowseModal.
+          opacity: isDragActive ? 0.15 : 1,
+          pointerEvents: isDragActive ? 'none' : 'auto',
+          transition: 'opacity 0.2s ease',
         }}
         onContextMenu={(e) => e.preventDefault()}
       >
@@ -291,16 +314,58 @@ export function ResurrectHeroesModal({ pages, onConfirm, onCancel }: ResurrectHe
         </div>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
-          <button
-            onClick={() => onConfirm(allHeroIds)}
-            disabled={allHeroIds.length === 0}
-            title="Resurrect every Hero from all discard piles"
-            style={btnStyle('secondary', allHeroIds.length === 0)}
-            onMouseEnter={(e) => { if (allHeroIds.length > 0) e.currentTarget.style.background = 'var(--gf-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            Resurrect All{allHeroIds.length > 0 ? ` (${allHeroIds.length})` : ''}
-          </button>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <button
+              onClick={() => onConfirm(allHeroIds)}
+              disabled={allHeroIds.length === 0}
+              title="Resurrect every Hero from all discard piles"
+              style={btnStyle('secondary', allHeroIds.length === 0)}
+              onMouseEnter={(e) => { if (allHeroIds.length > 0) e.currentTarget.style.background = 'var(--gf-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              Resurrect All{allHeroIds.length > 0 ? ` (${allHeroIds.length})` : ''}
+            </button>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                color: 'var(--gf-text-dim)',
+                fontSize: 11,
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+              title="Keep this picker open after dragging a Hero out"
+            >
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 3,
+                  border: leaveOpen ? '1.5px solid var(--gf-accent)' : '1.5px solid var(--gf-border)',
+                  background: leaveOpen ? 'var(--gf-hover-strong)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+              >
+                {leaveOpen && (
+                  <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5L4.5 7.5L8 3" stroke="var(--gf-text-bright)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </span>
+              <input
+                type="checkbox"
+                checked={leaveOpen}
+                onChange={(e) => setLeaveOpen(e.target.checked)}
+                className="sr-only"
+              />
+              Leave open
+            </label>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={onCancel}

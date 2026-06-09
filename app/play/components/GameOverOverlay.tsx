@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useToastKeyboardNav } from '@/app/shared/components/toastKeyboardNav';
+import { useToastKeyboardNav, toastFocusShadow } from '@/app/shared/components/toastKeyboardNav';
 import { DeckPickerModal } from './DeckPickerModal';
 import type { DeckOption } from './DeckPickerCard';
 import { loadDeckForGame } from '../actions';
@@ -360,6 +360,7 @@ function OpponentLeftModal({
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               cursor: 'pointer',
+              boxShadow: lobbyFocused ? toastFocusShadow('rgba(196, 149, 90, 0.5)', 'rgba(196, 149, 90, 0.22)') : 'none',
               transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
             }}
           >
@@ -381,7 +382,7 @@ function OpponentLeftModal({
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               cursor: 'pointer',
-              boxShadow: dismissFocused ? '0 0 14px rgba(196, 149, 90, 0.35)' : 'none',
+              boxShadow: dismissFocused ? toastFocusShadow('rgba(196, 149, 90, 0.85)', 'rgba(196, 149, 90, 0.4)') : 'none',
               transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
             }}
           >
@@ -459,7 +460,7 @@ function RematchRequestBanner({
           textTransform: 'uppercase',
           cursor: 'pointer',
           whiteSpace: 'nowrap',
-          boxShadow: acceptFocused ? '0 0 14px rgba(196, 149, 90, 0.35)' : 'none',
+          boxShadow: acceptFocused ? toastFocusShadow('rgba(196, 149, 90, 0.85)', 'rgba(196, 149, 90, 0.4)') : 'none',
           transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
         }}
       >
@@ -481,6 +482,7 @@ function RematchRequestBanner({
           textTransform: 'uppercase',
           cursor: 'pointer',
           whiteSpace: 'nowrap',
+          boxShadow: declineFocused ? toastFocusShadow('rgba(196, 149, 90, 0.5)', 'rgba(196, 149, 90, 0.22)') : 'none',
           transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
         }}
       >

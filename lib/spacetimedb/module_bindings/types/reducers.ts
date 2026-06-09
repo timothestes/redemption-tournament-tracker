@@ -16,6 +16,7 @@ import CompleteZoneSearchReducer from "../complete_zone_search_reducer";
 import CreateGameReducer from "../create_game_reducer";
 import DenyZoneSearchReducer from "../deny_zone_search_reducer";
 import DetachCardReducer from "../detach_card_reducer";
+import DiscardReserveCharactersExecuteReducer from "../discard_reserve_characters_execute_reducer";
 import DrawCardReducer from "../draw_card_reducer";
 import DrawMultipleReducer from "../draw_multiple_reducer";
 import EndTurnReducer from "../end_turn_reducer";
@@ -104,6 +105,7 @@ export type CompleteZoneSearchParams = __Infer<typeof CompleteZoneSearchReducer>
 export type CreateGameParams = __Infer<typeof CreateGameReducer>;
 export type DenyZoneSearchParams = __Infer<typeof DenyZoneSearchReducer>;
 export type DetachCardParams = __Infer<typeof DetachCardReducer>;
+export type DiscardReserveCharactersExecuteParams = __Infer<typeof DiscardReserveCharactersExecuteReducer>;
 export type DrawCardParams = __Infer<typeof DrawCardReducer>;
 export type DrawMultipleParams = __Infer<typeof DrawMultipleReducer>;
 export type EndTurnParams = __Infer<typeof EndTurnReducer>;

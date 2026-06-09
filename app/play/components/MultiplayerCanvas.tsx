@@ -39,6 +39,7 @@ import { OpponentZoneContextMenu } from '@/app/shared/components/OpponentZoneCon
 import { HandContextMenu } from '@/app/shared/components/HandContextMenu';
 import { ReserveContextMenu } from '@/app/shared/components/ReserveContextMenu';
 import { ConsentDialog } from '@/app/shared/components/ConsentDialog';
+import { BoardRequestBanner } from '@/app/shared/components/BoardRequestBanner';
 import { OpponentBrowseModal } from '@/app/shared/components/OpponentBrowseModal';
 import { showGameToast } from '@/app/shared/components/GameToast';
 import { TargetCardOverlay } from '@/app/shared/components/TargetCardOverlay';
@@ -163,6 +164,7 @@ function describeOpponentAction(action: string, paramsJson: string): string {
     case 'random_hand_to_deck_top': return `send ${count} random card${plural} from your hand to the top of your deck`;
     case 'random_hand_to_deck_bottom': return `send ${count} random card${plural} from your hand to the bottom of your deck`;
     case 'random_hand_to_deck_shuffle': return `shuffle ${count} random card${plural} from your hand into your deck`;
+    case 'discard_reserve_characters': return 'discard all characters from your reserve';
     default: return 'perform an action on your deck';
   }
 }
@@ -201,6 +203,7 @@ function describeRequesterAction(action: string, paramsJson: string): string {
     case 'random_hand_to_deck_top': return `send ${count} random from opponent's hand to top of deck`;
     case 'random_hand_to_deck_bottom': return `send ${count} random from opponent's hand to bottom of deck`;
     case 'random_hand_to_deck_shuffle': return `shuffle ${count} random from opponent's hand into deck`;
+    case 'discard_reserve_characters': return "discard all characters from opponent's reserve";
     default: return 'action';
   }
 }
@@ -1616,15 +1619,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         return;
       }
       if (ability?.type === 'discard_characters_from_reserve') {
-        // Discarding characters from a reserve pulls them out of that zone, so
-        // the Turn 1 reserve restriction applies. Gate on whichever player owns
-        // the targeted reserve being on their first turn, and make them confirm
-        // through the same reminder dialog used for dragging cards out manually.
-        const target = ability.target;
-        const ownerFirstTurn = target === 'self' ? isMyFirstTurn : isOpponentFirstTurn;
+        if (ability.target === 'opponent') {
+          // Touches the opponent's cards — route through the opponent-consent
+          // flow. On approval, the approvedSearchRequest effect dispatches
+          // discard_reserve_characters_execute. The opponent can decline (e.g.
+          // when it's their first turn and the reserve should stay locked).
+          requestOpponentAction(
+            'discard_reserve_characters',
+            JSON.stringify({ sourceInstanceId: sourceInstanceId.toString() }),
+          );
+          return;
+        }
+        // Self-reserve: fires immediately. Discarding out of your own reserve on
+        // your first turn still triggers the Turn 1 reminder dialog.
         const execute = () => gameState.executeCardAbility(sourceInstanceId, abilityIndex);
-        if (ownerFirstTurn && hasOpponent) {
-          const whose = target === 'self' ? 'your' : "your opponent's";
+        if (isMyFirstTurn && hasOpponent) {
           setPendingReserveMove({
             kind: 'single',
             execute,
@@ -1632,7 +1641,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               <>
                 Characters typically cannot leave the reserve on{' '}
                 <strong style={{ color: 'var(--gf-text-bright, #e8d5a3)' }}>Turn 1</strong>.
-                {' '}Discard all characters from {whose} reserve anyway?
+                {' '}Discard all characters from your reserve anyway?
               </>
             ),
             confirmLabel: 'Discard Anyway',
@@ -2587,6 +2596,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         // sourceInstanceId is encoded in actionParams and re-parsed server-side
         // by three_nails_reset_execute; the client only needs to fire the reducer.
         gameState.threeNailsResetExecute(reqIdBig);
+        complete();
+        break;
+      case 'discard_reserve_characters':
+        // Darius' Decree on the opponent's reserve. sourceInstanceId is encoded
+        // in actionParams and re-parsed server-side by
+        // discard_reserve_characters_execute.
+        gameState.discardReserveCharactersExecute(reqIdBig);
         complete();
         break;
       default:
@@ -6728,250 +6744,63 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       {/* Three Nails (GoC) reset approval — floating in center of board */}
       {incomingSearchRequest && incomingSearchRequest.action === 'three_nails_reset' && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 300,
-            pointerEvents: 'auto',
-          }}
-        >
-          <div
-            style={{
-              background: 'rgba(14, 10, 6, 0.95)',
-              border: '1px solid rgba(196, 149, 90, 0.35)',
-              borderRadius: 10,
-              padding: '16px 24px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 12,
-              boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-              maxWidth: 460,
-            }}
-          >
-            <div style={{
-              fontSize: 14,
-              color: '#e8d5a3',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              letterSpacing: '0.06em',
-              textAlign: 'center',
-              lineHeight: 1.5,
-            }}>
+        <BoardRequestBanner
+          maxWidth={460}
+          message={
+            <>
               <strong style={{ color: '#c4955a' }}>
                 {gameState.opponentPlayer?.displayName ?? 'Opponent'}
               </strong>{' '}
               is activating <strong style={{ color: '#c4955a' }}>Three Nails (GoC)</strong> — shuffles all hands, territories, and lands of bondage; each player draws 8.
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => {
-                  approveZoneSearch(BigInt(incomingSearchRequest.id));
-                  showGameToast('Three Nails reset approved');
-                }}
-                style={{
-                  padding: '9px 20px',
-                  background: '#2d5a27',
-                  border: '1px solid #4a8a42',
-                  borderRadius: 6,
-                  color: '#c4e8bf',
-                  fontSize: 14,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  letterSpacing: '0.06em',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
-              >
-                Approve
-              </button>
-              <button
-                onClick={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
-                style={{
-                  padding: '9px 20px',
-                  background: '#5a2727',
-                  border: '1px solid #8a4242',
-                  borderRadius: 6,
-                  color: '#e8bfbf',
-                  fontSize: 14,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  letterSpacing: '0.06em',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#733232'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#5a2727'; }}
-              >
-                Deny
-              </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          affirmLabel="Approve"
+          onAffirm={() => {
+            approveZoneSearch(BigInt(incomingSearchRequest.id));
+            showGameToast('Three Nails reset approved');
+          }}
+          onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+        />
       )}
 
       {/* Priority request — floating in center of board between territories */}
       {incomingSearchRequest && incomingSearchRequest.zone === 'action-priority' && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 300,
-            pointerEvents: 'auto',
-          }}
-        >
-          <div
-            style={{
-              background: 'rgba(14, 10, 6, 0.95)',
-              border: '1px solid rgba(196, 149, 90, 0.35)',
-              borderRadius: 10,
-              padding: '16px 24px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 12,
-              boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-            }}
-          >
-            <div style={{
-              fontSize: 15,
-              color: '#e8d5a3',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              letterSpacing: '0.06em',
-              textAlign: 'center',
-            }}>
+        <BoardRequestBanner
+          message={
+            <>
               <strong style={{ color: '#c4955a' }}>
                 {gameState.opponentPlayer?.displayName ?? 'Opponent'}
               </strong>{' '}
               requests action priority
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => {
-                  approveZoneSearch(BigInt(incomingSearchRequest.id));
-                  showGameToast('Action priority granted');
-                }}
-                style={{
-                  padding: '9px 20px',
-                  background: '#2d5a27',
-                  border: '1px solid #4a8a42',
-                  borderRadius: 6,
-                  color: '#c4e8bf',
-                  fontSize: 14,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  letterSpacing: '0.06em',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
-              >
-                Grant
-              </button>
-              <button
-                onClick={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
-                style={{
-                  padding: '9px 20px',
-                  background: '#5a2727',
-                  border: '1px solid #8a4242',
-                  borderRadius: 6,
-                  color: '#e8bfbf',
-                  fontSize: 14,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  letterSpacing: '0.06em',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#733232'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#5a2727'; }}
-              >
-                Deny
-              </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          affirmLabel="Grant"
+          onAffirm={() => {
+            approveZoneSearch(BigInt(incomingSearchRequest.id));
+            showGameToast('Action priority granted');
+          }}
+          onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+        />
       )}
 
       {/* Initiative request — floating in center of board between territories */}
       {incomingSearchRequest && incomingSearchRequest.zone === 'initiative' && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 300,
-            pointerEvents: 'auto',
-          }}
-        >
-          <div
-            style={{
-              background: 'rgba(14, 10, 6, 0.95)',
-              border: '1px solid rgba(196, 149, 90, 0.35)',
-              borderRadius: 10,
-              padding: '16px 24px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 12,
-              boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-            }}
-          >
-            <div style={{
-              fontSize: 15,
-              color: '#e8d5a3',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              letterSpacing: '0.06em',
-              textAlign: 'center',
-            }}>
+        <BoardRequestBanner
+          message={
+            <>
               <strong style={{ color: '#c4955a' }}>
                 {gameState.opponentPlayer?.displayName ?? 'Opponent'}
               </strong>{' '}
               requests initiative
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => {
-                  approveZoneSearch(BigInt(incomingSearchRequest.id));
-                  showGameToast('Initiative granted');
-                }}
-                style={{
-                  padding: '9px 20px',
-                  background: '#2d5a27',
-                  border: '1px solid #4a8a42',
-                  borderRadius: 6,
-                  color: '#c4e8bf',
-                  fontSize: 14,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  letterSpacing: '0.06em',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
-              >
-                Grant
-              </button>
-              <button
-                onClick={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
-                style={{
-                  padding: '9px 20px',
-                  background: '#5a2727',
-                  border: '1px solid #8a4242',
-                  borderRadius: 6,
-                  color: '#e8bfbf',
-                  fontSize: 14,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  letterSpacing: '0.06em',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#733232'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#5a2727'; }}
-              >
-                Deny
-              </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          affirmLabel="Grant"
+          onAffirm={() => {
+            approveZoneSearch(BigInt(incomingSearchRequest.id));
+            showGameToast('Initiative granted');
+          }}
+          onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+        />
       )}
 
       {/* Search/reveal/action requests — floating top-center banner */}
@@ -7699,6 +7528,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         return (
           <ResurrectHeroesModal
             pages={pages}
+            isDragActive={modalDrag.isDragging || opponentModalDrag.isDragging}
             onConfirm={(ids) => {
               gameState.resurrectHeroes(resurrectReq.sourceInstanceId, resurrectReq.abilityIndex, ids);
               setResurrectReq(null);

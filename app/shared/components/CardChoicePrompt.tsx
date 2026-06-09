@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
-import { useToastKeyboardNav } from './toastKeyboardNav';
+import { useToastKeyboardNav, toastFocusShadow } from './toastKeyboardNav';
 
 export interface CardChoiceButton {
   label: string;
@@ -265,7 +265,7 @@ function PromptCard({
                 fontSize: 14,
                 letterSpacing: '0.04em',
                 cursor: 'pointer',
-                boxShadow: isFocused ? `0 0 16px ${glow}` : 'none',
+                boxShadow: isFocused ? toastFocusShadow(stroke, glow) : 'none',
                 transition: 'background 0.14s, transform 0.08s, box-shadow 0.14s',
               }}
               onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
