@@ -65,6 +65,16 @@ const MANUAL_MAPPINGS: Record<string, string> = {
   "Isaiah, Prince of Prophets": "Isaiah, Prince of Prophets",
 };
 
+// --- Extra members for printings released after the ORDIR PDF ---
+// The ORDIR v7 PDF can't list cards printed after it was published, so these
+// new printings of existing duplicate groups never come through the parse.
+// Keyed by the group's canonical name → exact carddata names to add.
+// Re-applied on every sync because the ordir groups are cleared and rebuilt
+// each run (a direct DB insert into an ordir group would be wiped).
+const EXTRA_MEMBERS: Record<string, string[]> = {
+  Ruth: ["Ruth, the Retainer [2026 - National]"],
+};
+
 // --- Step 1: Extract duplicate section from ORDIR PDF ---
 
 function extractDuplicateSection(): string {
@@ -573,6 +583,27 @@ async function syncToSupabase(
         );
       } else {
         memberCount++;
+      }
+    }
+
+    // Add any post-PDF printings registered for this group (see EXTRA_MEMBERS)
+    const extras = EXTRA_MEMBERS[group.canonicalName];
+    if (extras) {
+      for (const cardName of extras) {
+        const { error: extraError } = await supabase
+          .from("duplicate_card_group_members")
+          .insert({ group_id: groupId, card_name: cardName, ordir_sets: "", matched: true });
+
+        if (extraError) {
+          if (extraError.code === "23505") continue;
+          console.error(
+            `  Error inserting extra member "${cardName}" in group "${group.canonicalName}":`,
+            extraError.message
+          );
+        } else {
+          memberCount++;
+          console.log(`  + Added extra member "${cardName}" to "${group.canonicalName}"`);
+        }
       }
     }
   }
