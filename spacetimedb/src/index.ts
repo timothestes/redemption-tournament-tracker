@@ -11,6 +11,8 @@ import {
   IMITATE_SOUL_IMAGES,
   IMITATE_ORIGINAL_IMG,
   isNewTestamentLostSoul,
+  isCharacterCard,
+  isHeroCard,
   simplifyLostSoulName,
   type CardAbility,
 } from './cardAbilities';
@@ -2221,9 +2223,21 @@ export const move_card = spacetimedb.reducer(
     const isExplicitHandDrop =
       toZone === 'hand' && !!targetOwnerId;
 
+    // Graveyard-style piles (discard / reserve / banish) always belong to the
+    // card's true owner — you can't send a card you gave or lent to the
+    // opponent into *their* pile. An explicit drop on a specific seat's pile is
+    // honored only when that seat is the card's true owner (returning a captured
+    // card, or discarding the opponent's own deck card); otherwise the card
+    // returns home. The "taking from an opponent's hidden zone" case is
+    // preserved through homeOwnerId.
+    const GRAVEYARD_PILE_ZONES = ['discard', 'reserve', 'banish'];
     let newOwnerId: bigint;
     if (isExplicitLobDrop || isExplicitHandDrop) {
       newOwnerId = BigInt(targetOwnerId);
+    } else if (GRAVEYARD_PILE_ZONES.includes(toZone)) {
+      newOwnerId = (targetOwnerId && BigInt(targetOwnerId) === trueHomeOwnerId)
+        ? trueHomeOwnerId
+        : homeOwnerId;
     } else if (HOME_ZONES.includes(toZone)) {
       const droppedOnOwnZone = !targetOwnerId || BigInt(targetOwnerId) === player.id;
       newOwnerId = droppedOnOwnZone ? homeOwnerId : BigInt(targetOwnerId);
@@ -2610,9 +2624,11 @@ export const move_cards_batch = spacetimedb.reducer(
         HIDDEN_HOME_ZONES.includes(card.zone) && card.ownerId !== player.id;
       const homeOwnerId = isTakingFromOpponentHiddenZone ? player.id : trueHomeOwnerId;
 
-      // Lost souls sent to discard or reserve go to land-of-bondage instead
+      // Lost souls sent to discard or reserve go to land-of-bondage instead.
+      // Tokens are exempt — a token Lost Soul dragged to a removal zone is
+      // deleted below, never redirected (mirrors move_card's token-first rule).
       const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
-      if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
+      if (isLostSoul && !card.isToken && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
         // Lost Souls always go to the deck owner's LoB — see move_card.
         const lobOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
         const lobIndex = BigInt(
@@ -2694,9 +2710,17 @@ export const move_cards_batch = spacetimedb.reducer(
         toZone === 'land-of-bondage' && newOwnerId !== null;
       const isExplicitHandDrop =
         toZone === 'hand' && newOwnerId !== null;
+      // Graveyard-style piles (discard / reserve / banish) always return to the
+      // card's true owner — mirror of the move_card rule. An explicit drop on a
+      // seat's pile only wins when that seat is the card's true owner.
+      const GRAVEYARD_PILE_ZONES = ['discard', 'reserve', 'banish'];
       let cardOwnerId: bigint;
       if (isExplicitLobDrop || isExplicitHandDrop) {
         cardOwnerId = newOwnerId!;
+      } else if (GRAVEYARD_PILE_ZONES.includes(toZone)) {
+        cardOwnerId = (newOwnerId !== null && newOwnerId === trueHomeOwnerId)
+          ? trueHomeOwnerId
+          : homeOwnerId;
       } else if (HOME_ZONES.includes(toZone)) {
         const droppedOnOwnZone = newOwnerId === null || newOwnerId === player.id;
         cardOwnerId = droppedOnOwnZone ? homeOwnerId : newOwnerId;
@@ -2830,10 +2854,13 @@ export const move_cards_batch = spacetimedb.reducer(
         : undefined;
       const newRevealStartedAt = autoReveal ? ctx.timestamp : undefined;
 
-      // Tokens can't go into a deck — delete instead of inserting it. The
-      // earlier movedCards / hand+LOB compaction bookkeeping already accounted
-      // for this card when its zone changed, so just remove it and skip ahead.
-      if (card.isToken && cardFinalZone === 'deck') {
+      // Tokens dropped into a non-play zone (deck/hand/discard/reserve/banish) —
+      // including via a group drag — are deleted, not moved. Mirrors the single
+      // move_card rule (TOKEN_REMOVE_ZONES). The earlier movedCards / hand+LOB
+      // compaction bookkeeping already accounted for this card when its zone
+      // changed, so just remove it and skip ahead.
+      const TOKEN_REMOVE_ZONES = ['reserve', 'banish', 'discard', 'hand', 'deck'];
+      if (card.isToken && TOKEN_REMOVE_ZONES.includes(cardFinalZone)) {
         deleteTokenWithCounters(ctx, card);
         continue;
       }
@@ -3531,6 +3558,72 @@ function playAllLostSoulsImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: discardCharactersFromReserveImpl
+// Called by execute_card_ability when ability.type === 'discard_characters_from_reserve'.
+// Discards every character (Hero / Evil Character) from the chosen player's
+// Reserve. ability.target picks whose Reserve: 'self' = activating player,
+// 'opponent' = the other player. Empty Reserve is a harmless no-op.
+// ---------------------------------------------------------------------------
+function discardCharactersFromReserveImpl(
+  ctx: any,
+  source: any,
+  ability: Extract<CardAbility, { type: 'discard_characters_from_reserve' }>,
+  player: any,
+  gameId: bigint,
+) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+
+  // Resolve whose Reserve to clear.
+  let targetPlayerId = player.id;
+  if (ability.target === 'opponent') {
+    const opponent = [...ctx.db.Player.player_game_id.filter(gameId)].find(
+      (p: any) => p.id !== player.id,
+    );
+    if (!opponent) throw new SenderError('Opponent not found');
+    targetPlayerId = opponent.id;
+  }
+
+  const ownerCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)]
+    .filter((c: any) => c.ownerId === targetPlayerId);
+  const toDiscard = ownerCards.filter(
+    (c: any) => c.zone === 'reserve' && isCharacterCard({ cardType: c.cardType }),
+  );
+  if (toDiscard.length === 0) return;
+
+  // Append to the bottom of the target owner's discard pile.
+  let nextDiscardIdx = 0n;
+  for (const c of ownerCards) {
+    if (c.zone === 'discard' && c.zoneIndex >= nextDiscardIdx) {
+      nextDiscardIdx = c.zoneIndex + 1n;
+    }
+  }
+
+  for (const c of toDiscard) {
+    ctx.db.CardInstance.id.update({
+      ...c,
+      zone: 'discard',
+      zoneIndex: nextDiscardIdx,
+      posX: '',
+      posY: '',
+      isFlipped: false,
+    });
+    nextDiscardIdx += 1n;
+  }
+
+  logAction(
+    ctx, gameId, player.id, 'DISCARD_CHARACTERS_FROM_RESERVE',
+    JSON.stringify({
+      sourceCardName: source.cardName,
+      sourceCardImgFile: source.cardImgFile,
+      target: ability.target,
+      count: toDiscard.length,
+    }),
+    game.turnNumber, game.currentPhase,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Reducer: execute_card_ability
 //
 // Server-authoritative dispatch for per-card custom abilities defined in the
@@ -3622,6 +3715,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('three_nails_reset is dispatched by the client, not this reducer');
       case 'imitate_lost_soul':
         throw new SenderError('imitate_lost_soul is dispatched directly by the client');
+      case 'resurrect_heroes':
+        throw new SenderError('resurrect_heroes is dispatched via the resurrect_heroes reducer');
       case 'reserve_opponent_deck':
         throw new SenderError('reserve_opponent_deck is dispatched by the client, not this reducer');
       case 'reserve_top_of_deck':
@@ -3632,6 +3727,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('draw_bottom_of_deck_choose is dispatched via execute_card_ability_with_count');
       case 'underdeck_top_of_deck':
         return underdeckTopOfDeckImpl(ctx, source, ability, player, gameId);
+      case 'discard_characters_from_reserve':
+        return discardCharactersFromReserveImpl(ctx, source, ability, player, gameId);
       case 'set_card_outline':
         return setCardOutlineImpl(ctx, source, ability, player, gameId);
       case 'play_all_lost_souls':
@@ -3688,6 +3785,114 @@ export const execute_card_ability_with_count = spacetimedb.reducer(
       player,
       gameId,
     );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: resurrect_heroes
+//
+// Interactive ability (Emptying the Tombs / Redemption [National]). The client
+// gathers the player's selection of Heroes across every player's discard pile
+// and sends their instance ids as a JSON array. Each selected Hero returns to
+// its OWN owner's Territory — ownerId never changes. Selections are re-validated
+// server-side (must be in this game, in 'discard', and a Hero); invalid ids are
+// skipped rather than aborting the whole batch.
+// ---------------------------------------------------------------------------
+export const resurrect_heroes = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    abilityIndex: t.u64(),
+    selectedIdsJson: t.string(),
+  },
+  (ctx, { gameId, cardInstanceId, abilityIndex, selectedIdsJson }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const source = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!source) throw new SenderError('Card not found');
+    if (source.gameId !== gameId) throw new SenderError('Card not in this game');
+    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+
+    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
+    if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
+      throw new SenderError('Source card must be in play');
+    }
+
+    const ability = getEffectiveAbilities(source)[Number(abilityIndex)];
+    if (!ability) throw new SenderError('No such ability');
+    if (ability.type !== 'resurrect_heroes') {
+      throw new SenderError('Ability is not resurrect_heroes');
+    }
+
+    let selectedIds: string[];
+    try {
+      selectedIds = JSON.parse(selectedIdsJson);
+    } catch {
+      throw new SenderError('Invalid selection');
+    }
+    if (!Array.isArray(selectedIds) || selectedIds.length === 0) return;
+
+    // Next Territory zoneIndex per owner — resurrected Heroes land sequentially
+    // in their own owner's Territory.
+    const maxIdxByOwner = new Map<bigint, bigint>();
+    for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+      if (c.zone === 'territory') {
+        const cur = maxIdxByOwner.get(c.ownerId);
+        if (cur === undefined || c.zoneIndex > cur) maxIdxByOwner.set(c.ownerId, c.zoneIndex);
+      }
+    }
+
+    // Normalized 0–1 coordinates (client scales to pixels). Stagger per owner.
+    const STAGGER_X = 0.05;
+    const STAGGER_Y = 0.03;
+    const BASE_X = 0.3;
+    const BASE_Y = 0.4;
+    const placedByOwner = new Map<bigint, number>();
+
+    let resurrectedCount = 0;
+    const byOwner: Record<string, number> = {};
+    for (const idStr of selectedIds) {
+      let id: bigint;
+      try { id = BigInt(idStr); } catch { continue; }
+      const card = ctx.db.CardInstance.id.find(id);
+      if (!card) continue;
+      if (card.gameId !== gameId) continue;
+      if (card.zone !== 'discard') continue;
+      if (!isHeroCard({ cardType: card.cardType })) continue;
+
+      const owner = card.ownerId;
+      const nextIdx = (maxIdxByOwner.get(owner) ?? -1n) + 1n;
+      maxIdxByOwner.set(owner, nextIdx);
+      const placed = placedByOwner.get(owner) ?? 0;
+      placedByOwner.set(owner, placed + 1);
+
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: 'territory',
+        zoneIndex: nextIdx,
+        posX: String(BASE_X + (placed + 1) * STAGGER_X),
+        posY: String(BASE_Y + (placed + 1) * STAGGER_Y),
+      });
+      resurrectedCount++;
+      byOwner[owner.toString()] = (byOwner[owner.toString()] ?? 0) + 1;
+    }
+
+    if (resurrectedCount === 0) return;
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (game) {
+      logAction(
+        ctx, gameId, player.id, 'RESURRECT_HEROES',
+        JSON.stringify({
+          sourceInstanceId: source.id.toString(),
+          sourceCardName: source.cardName,
+          sourceCardImgFile: source.cardImgFile,
+          count: resurrectedCount,
+          byOwner,
+        }),
+        game.turnNumber, game.currentPhase,
+      );
+    }
   },
 );
 
@@ -4973,12 +5178,24 @@ export const flip_card = spacetimedb.reducer(
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
-    ctx.db.CardInstance.id.update({ ...card, isFlipped: !card.isFlipped });
+    const newFlipped = !card.isFlipped;
+    // Flipping a card face-down turns it into a generic face-down card: drop any
+    // player-added text and clear all counters. Flipping back face-up just
+    // reveals the card — nothing to restore.
+    if (newFlipped) {
+      for (const counter of [...ctx.db.CardCounter.card_counter_card_instance_id.filter(cardInstanceId)]) {
+        ctx.db.CardCounter.id.delete(counter.id);
+      }
+    }
+    ctx.db.CardInstance.id.update({
+      ...card,
+      isFlipped: newFlipped,
+      notes: newFlipped ? '' : card.notes,
+    });
 
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
-    const newFlipped = !card.isFlipped;
     const flipPayload: Record<string, string | boolean> = { cardInstanceId: cardInstanceId.toString(), isFlipped: newFlipped };
     if (!newFlipped) {
       // Flipping face-up — include card identity

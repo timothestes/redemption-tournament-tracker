@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useToastKeyboardNav } from '@/app/shared/components/toastKeyboardNav';
 import { DeckPickerModal } from './DeckPickerModal';
 import type { DeckOption } from './DeckPickerCard';
 import { loadDeckForGame } from '../actions';
@@ -140,93 +141,14 @@ export default function GameOverOverlay({
     <>
       {/* Opponent left/resigned — blocking modal */}
       {isOpponentLeft && !modalDismissed && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
-            zIndex: 900,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(6, 4, 2, 0.7)',
-            backdropFilter: 'blur(3px)',
-          }}
-        >
-          <div style={{
-            background: 'rgba(14, 10, 6, 0.97)',
-            border: `1px solid ${isOpponentResigned ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
-            borderRadius: 10,
-            padding: '32px 36px',
-            textAlign: 'center',
-            maxWidth: 340,
-            width: '100%',
-            boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-          }}>
-            <p style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: isOpponentResigned ? 'rgba(196, 149, 90, 0.7)' : 'rgba(196, 149, 90, 0.5)',
-            }}>{isOpponentResigned ? 'Victory' : 'Game Over'}</p>
-            <h2 style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 18,
-              fontWeight: 700,
-              color: '#e8d5a3',
-              marginTop: 8,
-              textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-            }}>{isOpponentResigned ? `${oppName} Conceded` : label}</h2>
-            <p style={{
-              marginTop: 8,
-              fontFamily: 'Georgia, serif',
-              fontSize: 13,
-              color: 'rgba(196, 149, 90, 0.5)',
-            }}>{isOpponentResigned ? 'Your opponent has surrendered the game.' : 'The game has ended.'}</p>
-
-            <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
-              <button
-                onClick={onReturnToLobby}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  borderRadius: 4,
-                  border: '1px solid rgba(107, 78, 39, 0.3)',
-                  background: 'transparent',
-                  color: 'rgba(196, 149, 90, 0.6)',
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                }}
-              >
-                Back to Lobby
-              </button>
-              <button
-                onClick={() => setModalDismissed(true)}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  borderRadius: 4,
-                  border: '1px solid rgba(196, 149, 90, 0.45)',
-                  background: 'rgba(196, 149, 90, 0.15)',
-                  color: '#e8d5a3',
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                }}
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
+        <OpponentLeftModal
+          isOpponentResigned={isOpponentResigned}
+          oppName={oppName}
+          label={label}
+          isLoupeVisible={isLoupeVisible}
+          onReturnToLobby={onReturnToLobby}
+          onDismiss={() => setModalDismissed(true)}
+        />
       )}
 
       {/* Temporary toast — auto-dismisses (for self-resign / generic end) */}
@@ -269,72 +191,15 @@ export default function GameOverOverlay({
 
       {/* Rematch request banner from opponent */}
       {showRematchBanner && (
-        <div style={{
-          position: 'absolute',
-          bottom: 70,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 800,
-          background: 'rgba(14, 10, 6, 0.95)',
-          border: '1px solid rgba(196, 149, 90, 0.4)',
-          borderRadius: 8,
-          padding: '12px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
-        }}>
-          <p style={{
-            fontFamily: 'Georgia, serif',
-            fontSize: 14,
-            color: '#e8d5a3',
-            whiteSpace: 'nowrap',
-          }}>
-            {oppName} wants to play again
-          </p>
-          <button
-            onClick={() => {
-              setPickerMode('respond');
-              setPickerOpen(true);
-            }}
-            disabled={isLoading}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 4,
-              border: '1px solid rgba(196, 149, 90, 0.45)',
-              background: 'rgba(196, 149, 90, 0.15)',
-              color: '#e8d5a3',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Accept
-          </button>
-          <button
-            onClick={() => gameState.respondRematch(false, '', '', '', '')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 4,
-              border: '1px solid rgba(107, 78, 39, 0.3)',
-              background: 'transparent',
-              color: 'rgba(196, 149, 90, 0.5)',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Decline
-          </button>
-        </div>
+        <RematchRequestBanner
+          oppName={oppName}
+          isLoading={isLoading}
+          onAccept={() => {
+            setPickerMode('respond');
+            setPickerOpen(true);
+          }}
+          onDecline={() => gameState.respondRematch(false, '', '', '', '')}
+        />
       )}
 
       {/* Waiting/result status toast */}
@@ -393,6 +258,235 @@ export default function GameOverOverlay({
         }
       `}</style>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Interactive sub-surfaces (extracted so the keyboard-nav hook is active only
+// while the surface is on screen).
+// ---------------------------------------------------------------------------
+
+/**
+ * Blocking modal shown when the opponent resigns/disconnects. Dismiss is the
+ * affirmative default (Enter); Escape also dismisses. Highest priority so it
+ * wins the keyboard over any lingering banner.
+ */
+function OpponentLeftModal({
+  isOpponentResigned,
+  oppName,
+  label,
+  isLoupeVisible,
+  onReturnToLobby,
+  onDismiss,
+}: {
+  isOpponentResigned: boolean;
+  oppName: string;
+  label: string;
+  isLoupeVisible: boolean;
+  onReturnToLobby: () => void;
+  onDismiss: () => void;
+}) {
+  const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
+    count: 2,
+    defaultIndex: 1, // Dismiss
+    priority: 2,
+    onSelect: idx => (idx === 0 ? onReturnToLobby() : onDismiss()),
+    onCancel: onDismiss,
+  });
+
+  const lobbyFocused = focusedIndex === 0;
+  const dismissFocused = focusedIndex === 1;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
+        zIndex: 900,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(6, 4, 2, 0.7)',
+        backdropFilter: 'blur(3px)',
+      }}
+    >
+      <div style={{
+        background: 'rgba(14, 10, 6, 0.97)',
+        border: `1px solid ${isOpponentResigned ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
+        borderRadius: 10,
+        padding: '32px 36px',
+        textAlign: 'center',
+        maxWidth: 340,
+        width: '100%',
+        boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+      }}>
+        <p style={{
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: isOpponentResigned ? 'rgba(196, 149, 90, 0.7)' : 'rgba(196, 149, 90, 0.5)',
+        }}>{isOpponentResigned ? 'Victory' : 'Game Over'}</p>
+        <h2 style={{
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 18,
+          fontWeight: 700,
+          color: '#e8d5a3',
+          marginTop: 8,
+          textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+        }}>{isOpponentResigned ? `${oppName} Conceded` : label}</h2>
+        <p style={{
+          marginTop: 8,
+          fontFamily: 'Georgia, serif',
+          fontSize: 13,
+          color: 'rgba(196, 149, 90, 0.5)',
+        }}>{isOpponentResigned ? 'Your opponent has surrendered the game.' : 'The game has ended.'}</p>
+
+        <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+          <button
+            onClick={onReturnToLobby}
+            onMouseEnter={() => setFocusedIndex(0)}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              borderRadius: 4,
+              border: `1px solid ${lobbyFocused ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
+              background: lobbyFocused ? 'rgba(196, 149, 90, 0.12)' : 'transparent',
+              color: lobbyFocused ? 'rgba(196, 149, 90, 0.95)' : 'rgba(196, 149, 90, 0.6)',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
+            }}
+          >
+            Back to Lobby
+          </button>
+          <button
+            onClick={onDismiss}
+            onMouseEnter={() => setFocusedIndex(1)}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              borderRadius: 4,
+              border: '1px solid rgba(196, 149, 90, 0.45)',
+              background: dismissFocused ? 'rgba(196, 149, 90, 0.30)' : 'rgba(196, 149, 90, 0.15)',
+              color: '#e8d5a3',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              boxShadow: dismissFocused ? '0 0 14px rgba(196, 149, 90, 0.35)' : 'none',
+              transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Opponent's rematch request. Accept is the affirmative default (Enter);
+ * Escape declines.
+ */
+function RematchRequestBanner({
+  oppName,
+  isLoading,
+  onAccept,
+  onDecline,
+}: {
+  oppName: string;
+  isLoading: boolean;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
+    count: 2,
+    defaultIndex: 0, // Accept
+    onSelect: idx => (idx === 0 ? onAccept() : onDecline()),
+    onCancel: onDecline,
+  });
+
+  const acceptFocused = focusedIndex === 0;
+  const declineFocused = focusedIndex === 1;
+
+  return (
+    <div style={{
+      position: 'absolute',
+      bottom: 70,
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 800,
+      background: 'rgba(14, 10, 6, 0.95)',
+      border: '1px solid rgba(196, 149, 90, 0.4)',
+      borderRadius: 8,
+      padding: '12px 20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 16,
+      boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+    }}>
+      <p style={{
+        fontFamily: 'Georgia, serif',
+        fontSize: 14,
+        color: '#e8d5a3',
+        whiteSpace: 'nowrap',
+      }}>
+        {oppName} wants to play again
+      </p>
+      <button
+        onClick={onAccept}
+        onMouseEnter={() => setFocusedIndex(0)}
+        disabled={isLoading}
+        style={{
+          padding: '8px 16px',
+          borderRadius: 4,
+          border: '1px solid rgba(196, 149, 90, 0.45)',
+          background: acceptFocused ? 'rgba(196, 149, 90, 0.30)' : 'rgba(196, 149, 90, 0.15)',
+          color: '#e8d5a3',
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          boxShadow: acceptFocused ? '0 0 14px rgba(196, 149, 90, 0.35)' : 'none',
+          transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
+        }}
+      >
+        Accept
+      </button>
+      <button
+        onClick={onDecline}
+        onMouseEnter={() => setFocusedIndex(1)}
+        style={{
+          padding: '8px 16px',
+          borderRadius: 4,
+          border: `1px solid ${declineFocused ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
+          background: declineFocused ? 'rgba(196, 149, 90, 0.12)' : 'transparent',
+          color: declineFocused ? 'rgba(196, 149, 90, 0.85)' : 'rgba(196, 149, 90, 0.5)',
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
+        }}
+      >
+        Decline
+      </button>
+    </div>
   );
 }
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useToastKeyboardNav } from './toastKeyboardNav';
 
 export interface CardChoiceButton {
   label: string;
@@ -74,17 +75,8 @@ export function CardChoicePromptContainer() {
     };
   }, []);
 
-  // Escape closes the most recent prompt without applying an effect.
-  useEffect(() => {
-    if (prompts.length === 0) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      setPrompts(prev => prev.slice(0, -1));
-    };
-    document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
-  }, [prompts.length]);
+  // Escape closes the most recent prompt without applying an effect — handled
+  // per-prompt by the keyboard-nav hook in PromptCard (topmost prompt only).
 
   // Mousedown outside the prompt closes the most recent prompt without effect.
   useEffect(() => {
@@ -117,142 +109,173 @@ export function CardChoicePromptContainer() {
       }}
     >
       <AnimatePresence>
-        {prompts.map(prompt => (
-          <motion.div
+        {prompts.map((prompt, i) => (
+          <PromptCard
             key={prompt.id}
-            ref={(el: HTMLDivElement | null) => {
+            prompt={prompt}
+            isTop={i === prompts.length - 1}
+            registerEl={(el) => {
               if (el) promptElsRef.current.set(prompt.id, el);
               else promptElsRef.current.delete(prompt.id);
             }}
-            drag
-            dragMomentum={false}
-            dragElastic={0}
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            whileDrag={{ cursor: 'grabbing' }}
-            style={{
-              position: 'relative',
-              background: 'rgba(20, 20, 20, 0.92)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: 10,
-              padding: '18px 22px 20px',
-              color: 'var(--gf-text-bright)',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              boxShadow: '0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'stretch',
-              gap: 14,
-              minWidth: 320,
-              maxWidth: 420,
-              pointerEvents: 'auto',
-              cursor: 'grab',
-              userSelect: 'none',
-            }}
-          >
-            {/* Dismiss — top-right corner, generous hit target */}
-            <button
-              aria-label="Dismiss"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => dismissCardChoicePrompt(prompt.key)}
-              style={{
-                position: 'absolute',
-                top: 6,
-                right: 6,
-                width: 32,
-                height: 32,
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: 'rgba(255, 255, 255, 0.7)',
-                cursor: 'pointer',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 6,
-                transition: 'color 0.12s, background 0.12s, border-color 0.12s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = 'rgba(255, 255, 255, 1)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
-              }}
-            >
-              <X size={16} strokeWidth={2.25} />
-            </button>
-
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <div
-                style={{
-                  fontSize: 10,
-                  letterSpacing: '0.16em',
-                  textTransform: 'uppercase',
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
-                }}
-              >
-                Choose
-              </div>
-              <div
-                style={{
-                  fontSize: 18,
-                  textAlign: 'center',
-                  letterSpacing: '0.02em',
-                  lineHeight: 1.2,
-                }}
-              >
-                {cleanCardName(prompt.message)}
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${prompt.choices.length}, 1fr)`, gap: 10 }}>
-              {prompt.choices.map((choice, idx) => {
-                const { stroke, glow } = COLOR_HEX[choice.color];
-                return (
-                  <button
-                    key={idx}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={choice.onClick}
-                    style={{
-                      background: glow,
-                      border: `1.5px solid ${stroke}`,
-                      borderRadius: 8,
-                      padding: '10px 16px',
-                      color: stroke,
-                      fontFamily: 'var(--font-cinzel), Georgia, serif',
-                      fontSize: 14,
-                      letterSpacing: '0.04em',
-                      cursor: 'pointer',
-                      transition: 'background 0.14s, transform 0.08s, box-shadow 0.14s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = `${stroke}33`;
-                      e.currentTarget.style.boxShadow = `0 0 16px ${glow}`;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = glow;
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                    onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-                    onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                  >
-                    {choice.label}
-                  </button>
-                );
-              })}
-            </div>
-          </motion.div>
+          />
         ))}
       </AnimatePresence>
     </div>
+  );
+}
+
+// First green ("good") choice, else the first choice — the affirmative default
+// that Enter confirms.
+function defaultChoiceIndex(choices: CardChoiceButton[]): number {
+  const good = choices.findIndex(c => c.color === 'good');
+  return good >= 0 ? good : 0;
+}
+
+function PromptCard({
+  prompt,
+  isTop,
+  registerEl,
+}: {
+  prompt: PromptItem;
+  isTop: boolean;
+  registerEl: (el: HTMLDivElement | null) => void;
+}) {
+  // Only the topmost prompt responds to the keyboard. Enter confirms the
+  // focused choice; Escape dismisses the prompt without applying any effect.
+  const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
+    count: prompt.choices.length,
+    defaultIndex: defaultChoiceIndex(prompt.choices),
+    enabled: isTop,
+    priority: 1,
+    onSelect: idx => prompt.choices[idx]?.onClick(),
+    onCancel: () => dismissCardChoicePrompt(prompt.key),
+  });
+
+  return (
+    <motion.div
+      ref={registerEl}
+      drag
+      dragMomentum={false}
+      dragElastic={0}
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+      whileDrag={{ cursor: 'grabbing' }}
+      style={{
+        position: 'relative',
+        background: 'rgba(20, 20, 20, 0.92)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: 10,
+        padding: '18px 22px 20px',
+        color: 'var(--gf-text-bright)',
+        fontFamily: 'var(--font-cinzel), Georgia, serif',
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        gap: 14,
+        minWidth: 320,
+        maxWidth: 420,
+        pointerEvents: 'auto',
+        cursor: 'grab',
+        userSelect: 'none',
+      }}
+    >
+      {/* Dismiss — top-right corner, generous hit target */}
+      <button
+        aria-label="Dismiss"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => dismissCardChoicePrompt(prompt.key)}
+        style={{
+          position: 'absolute',
+          top: 6,
+          right: 6,
+          width: 32,
+          height: 32,
+          background: 'rgba(255, 255, 255, 0.06)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          color: 'rgba(255, 255, 255, 0.7)',
+          cursor: 'pointer',
+          padding: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 6,
+          transition: 'color 0.12s, background 0.12s, border-color 0.12s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'rgba(255, 255, 255, 1)';
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)';
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+        }}
+      >
+        <X size={16} strokeWidth={2.25} />
+      </button>
+
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'rgba(255, 255, 255, 0.5)',
+            fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+          }}
+        >
+          Choose
+        </div>
+        <div
+          style={{
+            fontSize: 18,
+            textAlign: 'center',
+            letterSpacing: '0.02em',
+            lineHeight: 1.2,
+          }}
+        >
+          {cleanCardName(prompt.message)}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${prompt.choices.length}, 1fr)`, gap: 10 }}>
+        {prompt.choices.map((choice, idx) => {
+          const { stroke, glow } = COLOR_HEX[choice.color];
+          const isFocused = idx === focusedIndex;
+          return (
+            <button
+              key={idx}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={choice.onClick}
+              onMouseEnter={() => setFocusedIndex(idx)}
+              style={{
+                background: isFocused ? `${stroke}33` : glow,
+                border: `1.5px solid ${stroke}`,
+                borderRadius: 8,
+                padding: '10px 16px',
+                color: stroke,
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 14,
+                letterSpacing: '0.04em',
+                cursor: 'pointer',
+                boxShadow: isFocused ? `0 0 16px ${glow}` : 'none',
+                transition: 'background 0.14s, transform 0.08s, box-shadow 0.14s',
+              }}
+              onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+              onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+            >
+              {choice.label}
+            </button>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }

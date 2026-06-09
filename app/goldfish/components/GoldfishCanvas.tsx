@@ -48,7 +48,8 @@ import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePro
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
-import { getEffectiveAbilities, isLostSoulCard } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isLostSoulCard, isHeroCard } from '@/lib/cards/cardAbilities';
+import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
 import { Link2Off } from 'lucide-react';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
@@ -141,6 +142,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // eligible card click.
   const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
   const [countPrompt, setCountPrompt] = useState<CountPromptRequest | null>(null);
+  const [resurrectReq, setResurrectReq] = useState<{ sourceInstanceId: string; abilityIndex: number } | null>(null);
 
   // Adapter: bridge goldfish game context to shared GameActions interface
   const goldfishActions: GameActions = useMemo(() => ({
@@ -217,6 +219,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       dispatch(gameActionCreators.executeCardAbilityWithCount(cardId, abilityIndex, count));
     },
     beginCountPrompt: (req) => setCountPrompt(req),
+    beginResurrectPrompt: (sourceInstanceId, abilityIndex) => setResurrectReq({ sourceInstanceId, abilityIndex }),
   }), [moveCard, moveCardsBatch, flipCard, revealCardInHand, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones, dispatch]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components
@@ -2991,6 +2994,28 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           }}
         />
       )}
+
+      {resurrectReq && (() => {
+        // Goldfish is single-seat — only player1 has a discard pile of Heroes.
+        const heroes = state.zones.discard.filter(c => c.ownerId === 'player1' && isHeroCard(c));
+        return (
+          <ResurrectHeroesModal
+            pages={[{
+              ownerId: 'player1',
+              playerName: 'You',
+              heroes,
+              onStartDrag: modalStartDrag,
+              onStartMultiDrag: modalStartMultiDrag,
+              didDragRef: modalDidDragRef,
+            }]}
+            onConfirm={(ids) => {
+              dispatch(gameActionCreators.resurrectHeroes(ids));
+              setResurrectReq(null);
+            }}
+            onCancel={() => setResurrectReq(null)}
+          />
+        );
+      })()}
     </>
   );
 }

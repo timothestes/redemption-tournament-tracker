@@ -128,6 +128,10 @@ export const actions = {
     return createAction('EXECUTE_CARD_ABILITY_WITH_COUNT', { cardInstanceId, abilityIndex, quantity: count });
   },
 
+  resurrectHeroes(cardInstanceIds: string[]): GameAction {
+    return createAction('RESURRECT_HEROES', { cardInstanceIds });
+  },
+
   imitateLostSoul(sourceInstanceId: string, targetInstanceId: string): GameAction {
     return createAction('IMITATE_LOST_SOUL', {
       cardInstanceId: sourceInstanceId,

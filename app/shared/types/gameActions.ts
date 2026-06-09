@@ -89,4 +89,13 @@ export interface GameActions {
   imitateLostSoul?(sourceInstanceId: string, targetInstanceId: string): void;
   stopImitatingLostSoul?(sourceInstanceId: string): void;
   beginTargeting?(req: TargetingRequest): void;
+
+  // Resurrect Heroes ability (optional — implemented by both goldfish and
+  // multiplayer). The CardContextMenu calls beginResurrectPrompt for the
+  // `resurrect_heroes` variant; the canvas builds the per-player discard
+  // pages from its own state, shows ResurrectHeroesModal, and on confirm
+  // invokes resurrectHeroes with the chosen card instance ids. Each selected
+  // Hero returns to its own owner's Territory (ownerId unchanged).
+  beginResurrectPrompt?(sourceInstanceId: string, abilityIndex: number): void;
+  resurrectHeroes?(sourceInstanceId: string, abilityIndex: number, selectedInstanceIds: string[]): void;
 }

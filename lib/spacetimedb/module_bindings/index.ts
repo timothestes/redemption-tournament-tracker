@@ -96,6 +96,7 @@ import ResignGameReducer from "./resign_game_reducer";
 import RespondRematchReducer from "./respond_rematch_reducer";
 import RespondToPauseReducer from "./respond_to_pause_reducer";
 import RespondToResumeReducer from "./respond_to_resume_reducer";
+import ResurrectHeroesReducer from "./resurrect_heroes_reducer";
 import RevealCardInHandReducer from "./reveal_card_in_hand_reducer";
 import RevealCardsReducer from "./reveal_cards_reducer";
 import RollDiceReducer from "./roll_dice_reducer";
@@ -427,6 +428,7 @@ const reducersSchema = __reducers(
   __reducerSchema("respond_rematch", RespondRematchReducer),
   __reducerSchema("respond_to_pause", RespondToPauseReducer),
   __reducerSchema("respond_to_resume", RespondToResumeReducer),
+  __reducerSchema("resurrect_heroes", ResurrectHeroesReducer),
   __reducerSchema("reveal_card_in_hand", RevealCardInHandReducer),
   __reducerSchema("reveal_cards", RevealCardsReducer),
   __reducerSchema("roll_dice", RollDiceReducer),

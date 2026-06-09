@@ -435,3 +435,67 @@ describe('getEffectiveAbilities — Imitate inherits the imitated soul abilities
     expect(abilities[0]?.type).toBe('imitate_lost_soul');
   });
 });
+
+describe('RESURRECT_HEROES', () => {
+  function resurrect(cardInstanceIds: string[]): GameAction {
+    return {
+      id: 'r',
+      type: 'RESURRECT_HEROES',
+      playerId: 'player1',
+      timestamp: 0,
+      payload: { cardInstanceIds },
+    };
+  }
+
+  it('moves selected Heroes from discard into territory, owner preserved', () => {
+    const hero1 = makeCard({ instanceId: 'h1', cardName: 'Aaron (Di)', type: 'Hero', zone: 'discard' });
+    const hero2 = makeCard({ instanceId: 'h2', cardName: 'David (Roots)', type: 'Hero', zone: 'discard' });
+    const state = makeState([hero1, hero2]);
+
+    const next = gameReducer(state, resurrect(['h1', 'h2']));
+
+    expect(next.zones.discard).toHaveLength(0);
+    expect(next.zones.territory).toHaveLength(2);
+    expect(next.zones.territory.every(c => c.ownerId === 'player1')).toBe(true);
+    expect(next.zones.territory.every(c => typeof c.posX === 'number')).toBe(true);
+  });
+
+  it('accepts dual-alignment "contains Hero" types', () => {
+    const dual = makeCard({ instanceId: 'd1', cardName: 'Dual', type: 'Hero/Evil Character', zone: 'discard' });
+    const state = makeState([dual]);
+
+    const next = gameReducer(state, resurrect(['d1']));
+
+    expect(next.zones.discard).toHaveLength(0);
+    expect(next.zones.territory).toHaveLength(1);
+  });
+
+  it('ignores non-Hero ids in the discard pile', () => {
+    const hero = makeCard({ instanceId: 'h1', cardName: 'Aaron (Di)', type: 'Hero', zone: 'discard' });
+    const evil = makeCard({ instanceId: 'e1', cardName: 'Evil One', type: 'Evil Character', zone: 'discard' });
+    const state = makeState([hero, evil]);
+
+    const next = gameReducer(state, resurrect(['h1', 'e1']));
+
+    expect(next.zones.territory).toHaveLength(1);
+    expect(next.zones.territory[0].instanceId).toBe('h1');
+    // The non-Hero stays in discard.
+    expect(next.zones.discard.map(c => c.instanceId)).toEqual(['e1']);
+  });
+
+  it('is a no-op (same state reference) when nothing valid is selected', () => {
+    const evil = makeCard({ instanceId: 'e1', cardName: 'Evil One', type: 'Evil Character', zone: 'discard' });
+    const state = makeState([evil]);
+
+    expect(gameReducer(state, resurrect(['e1']))).toBe(state);
+    expect(gameReducer(state, resurrect([]))).toBe(state);
+  });
+
+  it('does not resurrect Heroes that are not in the discard pile', () => {
+    const heroInPlay = makeCard({ instanceId: 'h1', cardName: 'Aaron (Di)', type: 'Hero', zone: 'territory' });
+    const state = makeState([heroInPlay]);
+
+    // h1 is in territory, not discard — selecting it should change nothing.
+    expect(gameReducer(state, resurrect(['h1']))).toBe(state);
+  });
+});

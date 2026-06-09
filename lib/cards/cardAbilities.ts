@@ -32,11 +32,13 @@ export type CardAbility = AbilityBase & (
   | { type: 'draw_bottom_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck_choose' }
   | { type: 'underdeck_top_of_deck'; count: number }
+  | { type: 'discard_characters_from_reserve'; target: 'self' | 'opponent' }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
   | { type: 'play_all_lost_souls' }
   | { type: 'three_nails_reset' }
   | { type: 'imitate_lost_soul' }
   | { type: 'draw_and_topdeck_self' }
+  | { type: 'resurrect_heroes' }
   | { type: 'custom'; reducerName: string; label: string }
 );
 
@@ -141,6 +143,15 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Harvest Time (GoC)':                                  [{ type: 'play_all_lost_souls' }],
   'Harvest Time [Fundraiser]':                           [{ type: 'play_all_lost_souls' }],
   'Three Nails (GoC)':                                   [{ type: 'three_nails_reset' }],
+  // "You may discard this card to discard all characters from a Reserve."
+  // Surfaced as two menu items so the activating player picks which Reserve;
+  // no in-menu target picker needed.
+  "Darius' Decree [T2C]":                                [{ type: 'discard_characters_from_reserve', target: 'self' }, { type: 'discard_characters_from_reserve', target: 'opponent' }],
+  "Darius' Decree [T2C AB]":                             [{ type: 'discard_characters_from_reserve', target: 'self' }, { type: 'discard_characters_from_reserve', target: 'opponent' }],
+  // "Resurrect any number of Heroes from each player." Opens a per-player
+  // discard picker; selected Heroes return to their own owner's Territory.
+  'Emptying the Tombs (GoC)':                            [{ type: 'resurrect_heroes' }],
+  'Redemption [2025 - National]':                        [{ type: 'resurrect_heroes' }],
 };
 
 /**
@@ -297,6 +308,30 @@ export function isLostSoulCard(card: { type?: string; cardType?: string }): bool
 }
 
 /**
+ * True when a card is a "character" in Redemption terms — a Hero or an Evil
+ * Character (including their token variants and dual-type combos like
+ * "Hero/Evil Character"). Handles both the goldfish `type` field and the
+ * multiplayer `cardType` field. Duplicated in spacetimedb/src/cardAbilities.ts.
+ */
+export function isCharacterCard(card: { type?: string; cardType?: string }): boolean {
+  const t = (card.type ?? card.cardType ?? '').toLowerCase();
+  if (!t) return false;
+  return t.includes('hero') || t.includes('evil character');
+}
+
+/**
+ * True when a card's type contains "Hero" — the valid-target rule for the
+ * resurrect_heroes ability. "Contains" rather than exact match so dual-
+ * alignment / compound-type Heroes (e.g. "Hero/Evil Character") qualify.
+ * Handles both the goldfish `type` field and the multiplayer `cardType`
+ * field. Duplicated in spacetimedb/src/cardAbilities.ts.
+ */
+export function isHeroCard(card: { type?: string; cardType?: string }): boolean {
+  const t = (card.type ?? card.cardType ?? '').toLowerCase();
+  return t.includes('hero');
+}
+
+/**
  * Extracts a short label from a Lost Soul cardName for the imitation overlay.
  * Priority: quoted name → first parenthetical → cardName with "Lost Soul " prefix stripped.
  */
@@ -373,6 +408,10 @@ export function abilityLabel(a: CardAbility): string {
       return a.count === 1
         ? 'Underdeck top card of deck'
         : `Underdeck top ${a.count} cards of deck`;
+    case 'discard_characters_from_reserve':
+      return a.target === 'self'
+        ? 'Discard all characters from your Reserve'
+        : "Discard all characters from opponent's Reserve";
     case 'set_card_outline':
       return a.label;
     case 'play_all_lost_souls':
@@ -383,6 +422,8 @@ export function abilityLabel(a: CardAbility): string {
       return 'Imitate...';
     case 'draw_and_topdeck_self':
       return 'Draw 1 and topdeck this Lost Soul';
+    case 'resurrect_heroes':
+      return 'Resurrect Heroes…';
     case 'custom':
       return a.label;
   }

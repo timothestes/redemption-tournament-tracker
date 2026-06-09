@@ -44,6 +44,8 @@ import { showGameToast } from '@/app/shared/components/GameToast';
 import { TargetCardOverlay } from '@/app/shared/components/TargetCardOverlay';
 import type { GameActions, TargetingRequest, CountPromptRequest } from '@/app/shared/types/gameActions';
 import { CountPromptDialog } from '@/app/shared/components/CountPromptDialog';
+import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
+import { isHeroCard } from '@/lib/cards/cardAbilities';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
@@ -956,6 +958,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Cleared by Esc, the banner's Cancel button, or any eligible card click.
   const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
   const [countPrompt, setCountPrompt] = useState<CountPromptRequest | null>(null);
+  const [resurrectReq, setResurrectReq] = useState<{ sourceInstanceId: string; abilityIndex: number } | null>(null);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notePopover, setNotePopover] = useState<{
     cardId: string;
@@ -1069,9 +1072,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // used by the opponent-reserve flow to defer completing the ZoneSearchRequest
   // until the user has decided — otherwise the request is deleted by the modal's
   // auto-close-on-drag-end before `execute` runs and the server rejects the move.
+  // message/confirmLabel let callers (e.g. the Darius' Decree reserve-discard
+  // ability) reuse this dialog with their own reminder wording. Both default to
+  // the reserve-drag copy when omitted.
   type PendingReserveMove =
-    | { kind: 'single'; execute: () => void; afterDismiss?: () => void }
-    | { kind: 'batch'; execute: () => void; afterDismiss?: () => void };
+    | { kind: 'single'; execute: () => void; afterDismiss?: () => void; message?: React.ReactNode; confirmLabel?: string }
+    | { kind: 'batch'; execute: () => void; afterDismiss?: () => void; message?: React.ReactNode; confirmLabel?: string };
   const [pendingReserveMove, setPendingReserveMove] = useState<PendingReserveMove | null>(null);
 
   // When set, the opponent browse modal's onClose should NOT immediately call
@@ -1609,6 +1615,33 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
         return;
       }
+      if (ability?.type === 'discard_characters_from_reserve') {
+        // Discarding characters from a reserve pulls them out of that zone, so
+        // the Turn 1 reserve restriction applies. Gate on whichever player owns
+        // the targeted reserve being on their first turn, and make them confirm
+        // through the same reminder dialog used for dragging cards out manually.
+        const target = ability.target;
+        const ownerFirstTurn = target === 'self' ? isMyFirstTurn : isOpponentFirstTurn;
+        const execute = () => gameState.executeCardAbility(sourceInstanceId, abilityIndex);
+        if (ownerFirstTurn && hasOpponent) {
+          const whose = target === 'self' ? 'your' : "your opponent's";
+          setPendingReserveMove({
+            kind: 'single',
+            execute,
+            message: (
+              <>
+                Characters typically cannot leave the reserve on{' '}
+                <strong style={{ color: 'var(--gf-text-bright, #e8d5a3)' }}>Turn 1</strong>.
+                {' '}Discard all characters from {whose} reserve anyway?
+              </>
+            ),
+            confirmLabel: 'Discard Anyway',
+          });
+          return;
+        }
+        execute();
+        return;
+      }
       gameState.executeCardAbility(sourceInstanceId, abilityIndex);
     },
     randomHandToZone: (count, toZone, deckPosition) =>
@@ -1637,7 +1670,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       gameState.executeCardAbilityWithCount(sourceInstanceId, abilityIndex, count);
     },
     beginCountPrompt: (req) => setCountPrompt(req),
-  }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts]);
+    beginResurrectPrompt: (sourceInstanceId, abilityIndex) => setResurrectReq({ sourceInstanceId, abilityIndex }),
+  }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts, isMyFirstTurn, isOpponentFirstTurn, hasOpponent]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({
@@ -7469,7 +7503,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               lineHeight: 1.5,
               marginBottom: 18,
             }}>
-              Cards typically cannot leave the reserve on <strong style={{ color: 'var(--gf-text-bright, #e8d5a3)' }}>Turn 1</strong>. Move anyway?
+              {pendingReserveMove.message ?? (
+                <>Cards typically cannot leave the reserve on <strong style={{ color: 'var(--gf-text-bright, #e8d5a3)' }}>Turn 1</strong>. Move anyway?</>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button
@@ -7488,7 +7524,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
               >
-                Move Anyway
+                {pendingReserveMove.confirmLabel ?? 'Move Anyway'}
               </button>
               <button
                 onClick={() => dismissPendingReserveMove(pendingReserveMove, false)}
@@ -7634,6 +7670,43 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           }}
         />
       )}
+
+      {resurrectReq && (() => {
+        const myZones = modalGameValue.zones as Record<string, GameCard[]>;
+        const oppZones = opponentModalGameValue.zones as Record<string, GameCard[]>;
+        // The source card is always one the local player controls ('player1'),
+        // so list their discard page first. Each page carries the drag handlers
+        // for its owner — your own zones via modalStartDrag, the opponent's via
+        // opponentModalStartDrag (same infra the zone-browse modals use).
+        const pages = [
+          {
+            ownerId: 'player1',
+            playerName: gameState.myPlayer?.displayName || 'You',
+            heroes: (myZones['discard'] ?? []).filter(isHeroCard),
+            onStartDrag: modalStartDrag,
+            onStartMultiDrag: modalStartMultiDrag,
+            didDragRef: modalDidDragRef,
+          },
+          {
+            ownerId: 'player2',
+            playerName: gameState.opponentPlayer?.displayName || 'Opponent',
+            heroes: (oppZones['discard'] ?? []).filter(isHeroCard),
+            onStartDrag: opponentModalStartDrag,
+            onStartMultiDrag: opponentModalStartMultiDrag,
+            didDragRef: opponentModalDidDragRef,
+          },
+        ];
+        return (
+          <ResurrectHeroesModal
+            pages={pages}
+            onConfirm={(ids) => {
+              gameState.resurrectHeroes(resurrectReq.sourceInstanceId, resurrectReq.abilityIndex, ids);
+              setResurrectReq(null);
+            }}
+            onCancel={() => setResurrectReq(null)}
+          />
+        );
+      })()}
 
       {soulCinematic && (
         <LostSoulCinematic

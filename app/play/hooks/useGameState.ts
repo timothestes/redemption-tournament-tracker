@@ -124,6 +124,7 @@ export interface GameState {
   executeCardAbilityWithCount: (sourceInstanceId: string, abilityIndex: number, count: number) => void;
   imitateLostSoul: (sourceInstanceId: string, targetInstanceId: string) => void;
   stopImitatingLostSoul: (sourceInstanceId: string) => void;
+  resurrectHeroes: (sourceInstanceId: string, abilityIndex: number, selectedInstanceIds: string[]) => void;
   surrenderLostSoul: (cardInstanceId: bigint) => void;
   rescueLostSoul: (cardInstanceId: bigint) => void;
   resignGame: () => void;
@@ -691,6 +692,18 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const resurrectHeroes = useCallback(
+    (sourceInstanceId: string, abilityIndex: number, selectedInstanceIds: string[]) => {
+      conn?.reducers.resurrectHeroes({
+        gameId,
+        cardInstanceId: BigInt(sourceInstanceId),
+        abilityIndex: BigInt(abilityIndex),
+        selectedIdsJson: JSON.stringify(selectedInstanceIds),
+      });
+    },
+    [conn, gameId],
+  );
+
   const stopImitatingLostSoul = useCallback(
     (sourceInstanceId: string) => {
       conn?.reducers.stopImitatingLostSoul({
@@ -938,6 +951,7 @@ export function useGameState(gameId: bigint): GameState {
     executeCardAbilityWithCount,
     imitateLostSoul,
     stopImitatingLostSoul,
+    resurrectHeroes,
     surrenderLostSoul,
     rescueLostSoul,
     resignGame,
@@ -1235,6 +1249,7 @@ export function useSpectatorGameState(gameId: bigint | null) {
     executeCardAbility: useCallback((_sourceInstanceId: string, _abilityIndex: number) => {}, []),
     executeCardAbilityWithCount: useCallback((_sourceInstanceId: string, _abilityIndex: number, _count: number) => {}, []),
     imitateLostSoul: useCallback((_sourceInstanceId: string, _targetInstanceId: string) => {}, []),
+    resurrectHeroes: useCallback((_sourceInstanceId: string, _abilityIndex: number, _selectedInstanceIds: string[]) => {}, []),
     stopImitatingLostSoul: noopString,
     surrenderLostSoul: noopBigint,
     rescueLostSoul: noopBigint,

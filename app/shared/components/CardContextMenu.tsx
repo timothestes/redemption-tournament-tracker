@@ -308,6 +308,10 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
                       },
                       onCancel: () => {},
                     });
+                  } else if (ability.type === 'resurrect_heroes') {
+                    // The canvas builds the per-player discard pages from its
+                    // own state and shows ResurrectHeroesModal.
+                    actions.beginResurrectPrompt?.(card.instanceId, index);
                   } else {
                     actions.executeCardAbility?.(card.instanceId, index);
                   }

@@ -13,12 +13,15 @@ import {
   CARD_ABILITIES as libCardAbilities,
   simplifyLostSoulName,
   isNewTestamentLostSoul,
+  isCharacterCard,
+  isHeroCard,
   getEffectiveAbilities,
 } from '../cardAbilities';
 import {
   IMITATE_SOUL_IMAGES as serverImitateImages,
   IMITATE_ORIGINAL_IMG,
   isNewTestamentLostSoul as serverIsNewTestamentLostSoul,
+  isHeroCard as serverIsHeroCard,
 } from '@/spacetimedb/src/cardAbilities';
 
 describe('CARD_ABILITIES registry', () => {
@@ -132,6 +135,82 @@ describe('abilityLabel', () => {
   it('formats discard_opponent_deck for random position', () => {
     expect(abilityLabel({ type: 'discard_opponent_deck', position: 'random', count: 4 }))
       .toBe("Discard 4 random cards of opponent's deck");
+  });
+
+  it('formats discard_characters_from_reserve for self', () => {
+    expect(abilityLabel({ type: 'discard_characters_from_reserve', target: 'self' }))
+      .toBe('Discard all characters from your Reserve');
+  });
+
+  it('formats discard_characters_from_reserve for opponent', () => {
+    expect(abilityLabel({ type: 'discard_characters_from_reserve', target: 'opponent' }))
+      .toBe("Discard all characters from opponent's Reserve");
+  });
+});
+
+describe('isCharacterCard', () => {
+  it('recognizes Heroes and Evil Characters (incl. combos and tokens)', () => {
+    expect(isCharacterCard({ type: 'Hero' })).toBe(true);
+    expect(isCharacterCard({ type: 'Evil Character' })).toBe(true);
+    expect(isCharacterCard({ type: 'Hero/Evil Character' })).toBe(true);
+    expect(isCharacterCard({ cardType: 'Hero Token' })).toBe(true);
+    expect(isCharacterCard({ cardType: 'Evil Character Token' })).toBe(true);
+  });
+
+  it('rejects non-characters and empty input', () => {
+    expect(isCharacterCard({ type: 'Artifact' })).toBe(false);
+    expect(isCharacterCard({ type: 'Lost Soul' })).toBe(false);
+    expect(isCharacterCard({ type: 'Evil Enhancement' })).toBe(false);
+    expect(isCharacterCard({ type: '' })).toBe(false);
+    expect(isCharacterCard({})).toBe(false);
+  });
+});
+
+describe('isHeroCard', () => {
+  it('matches any type containing "hero" (incl. dual-alignment / tokens)', () => {
+    expect(isHeroCard({ type: 'Hero' })).toBe(true);
+    expect(isHeroCard({ type: 'Hero/Evil Character' })).toBe(true);
+    expect(isHeroCard({ cardType: 'Hero Token' })).toBe(true);
+    expect(isHeroCard({ cardType: 'Evil Character/Hero' })).toBe(true);
+  });
+
+  it('rejects non-Heroes and empty input', () => {
+    expect(isHeroCard({ type: 'Evil Character' })).toBe(false);
+    expect(isHeroCard({ type: 'Lost Soul' })).toBe(false);
+    expect(isHeroCard({ type: 'Good Enhancement' })).toBe(false);
+    expect(isHeroCard({ type: '' })).toBe(false);
+    expect(isHeroCard({})).toBe(false);
+  });
+
+  it('lib and spacetimedb copies behave identically', () => {
+    const samples = [
+      { type: 'Hero' }, { type: 'Hero/Evil Character' }, { cardType: 'Hero Token' },
+      { type: 'Evil Character' }, { type: 'Lost Soul' }, { type: '' }, {},
+    ];
+    for (const s of samples) {
+      expect(serverIsHeroCard(s)).toBe(isHeroCard(s));
+    }
+  });
+});
+
+describe('resurrect_heroes registration', () => {
+  it('both cards are registered with the resurrect_heroes ability', () => {
+    expect(libCardAbilities['Emptying the Tombs (GoC)']).toEqual([{ type: 'resurrect_heroes' }]);
+    expect(libCardAbilities['Redemption [2025 - National]']).toEqual([{ type: 'resurrect_heroes' }]);
+  });
+
+  it('labels the ability', () => {
+    expect(abilityLabel({ type: 'resurrect_heroes' })).toBe('Resurrect Heroes…');
+  });
+});
+
+describe("Darius' Decree [T2C]", () => {
+  it('is registered with self + opponent Reserve discard abilities', () => {
+    const abilities = libCardAbilities["Darius' Decree [T2C]"];
+    expect(abilities).toEqual([
+      { type: 'discard_characters_from_reserve', target: 'self' },
+      { type: 'discard_characters_from_reserve', target: 'opponent' },
+    ]);
   });
 });
 

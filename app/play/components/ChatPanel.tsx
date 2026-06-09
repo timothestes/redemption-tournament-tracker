@@ -429,6 +429,45 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       );
     } catch { /* fall through */ }
   }
+  if (actionType === 'RESURRECT_HEROES' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = Number(data.count ?? 0);
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const noun = count === 1 ? 'Hero' : 'Heroes';
+      return (
+        <>
+          resurrected {count} {noun}
+          {sourceName ? (
+            <>
+              {' '}via <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'DISCARD_CHARACTERS_FROM_RESERVE' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = Number(data.count ?? 0);
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const whose = data.target === 'opponent' ? "opponent's" : 'their own';
+      const noun = count === 1 ? 'character' : 'characters';
+      return (
+        <>
+          discarded {count} {noun} from {whose} Reserve
+          {sourceName ? (
+            <>
+              {' '}via <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
   if (actionType === 'PLAY_ALL_LOST_SOULS' && payload) {
     try {
       const data = JSON.parse(payload);

@@ -1,5 +1,7 @@
 'use client';
 
+import { useToastKeyboardNav } from '@/app/shared/components/toastKeyboardNav';
+
 interface PauseConsentToastProps {
   /** Game row from SpacetimeDB. */
   game: any;
@@ -44,6 +46,33 @@ export default function PauseConsentToast({
   const onDecline = () =>
     requestType === 'pause' ? onRespondToPause(false) : onRespondToResume(false);
 
+  return <PauseConsentBody message={message} onAccept={onAccept} onDecline={onDecline} />;
+}
+
+/**
+ * Rendered only while a request is pending so the keyboard-nav hook (which
+ * registers a global listener) is active only when the toast is visible.
+ * Accept is the affirmative default (Enter); Escape declines.
+ */
+function PauseConsentBody({
+  message,
+  onAccept,
+  onDecline,
+}: {
+  message: string;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
+    count: 2,
+    defaultIndex: 0, // Accept
+    onSelect: idx => (idx === 0 ? onAccept() : onDecline()),
+    onCancel: onDecline,
+  });
+
+  const acceptFocused = focusedIndex === 0;
+  const declineFocused = focusedIndex === 1;
+
   return (
     <div
       style={{
@@ -75,11 +104,12 @@ export default function PauseConsentToast({
       </p>
       <button
         onClick={onAccept}
+        onMouseEnter={() => setFocusedIndex(0)}
         style={{
           padding: '8px 16px',
           borderRadius: 4,
           border: '1px solid rgba(196, 149, 90, 0.45)',
-          background: 'rgba(196, 149, 90, 0.15)',
+          background: acceptFocused ? 'rgba(196, 149, 90, 0.30)' : 'rgba(196, 149, 90, 0.15)',
           color: '#e8d5a3',
           fontFamily: 'var(--font-cinzel), Georgia, serif',
           fontSize: 12,
@@ -88,18 +118,21 @@ export default function PauseConsentToast({
           textTransform: 'uppercase',
           cursor: 'pointer',
           whiteSpace: 'nowrap',
+          boxShadow: acceptFocused ? '0 0 14px rgba(196, 149, 90, 0.35)' : 'none',
+          transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
         }}
       >
         Accept
       </button>
       <button
         onClick={onDecline}
+        onMouseEnter={() => setFocusedIndex(1)}
         style={{
           padding: '8px 16px',
           borderRadius: 4,
-          border: '1px solid rgba(107, 78, 39, 0.3)',
-          background: 'transparent',
-          color: 'rgba(196, 149, 90, 0.5)',
+          border: `1px solid ${declineFocused ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
+          background: declineFocused ? 'rgba(196, 149, 90, 0.12)' : 'transparent',
+          color: declineFocused ? 'rgba(196, 149, 90, 0.85)' : 'rgba(196, 149, 90, 0.5)',
           fontFamily: 'var(--font-cinzel), Georgia, serif',
           fontSize: 12,
           fontWeight: 700,
@@ -107,6 +140,7 @@ export default function PauseConsentToast({
           textTransform: 'uppercase',
           cursor: 'pointer',
           whiteSpace: 'nowrap',
+          transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
         }}
       >
         Decline

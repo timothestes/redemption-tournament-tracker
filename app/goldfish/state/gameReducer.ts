@@ -14,6 +14,8 @@ import {
   resolveTokenCard,
   IMITATE_SOUL_IMAGES,
   isNewTestamentLostSoul,
+  isCharacterCard,
+  isHeroCard,
 } from '@/lib/cards/cardAbilities';
 import { findCard } from '@/lib/cards/lookup';
 
@@ -114,6 +116,42 @@ function spawnTokenInState(
   // Phase 3 — commit in a single shallow clone.
   const zones = cloneZones(state.zones);
   zones[targetZone] = [...zones[targetZone], ...newCards];
+  return { ...state, zones, history };
+}
+
+/**
+ * Resurrect Heroes: move the selected Heroes from the discard pile into
+ * Territory. Each Hero stays owned by its current owner (goldfish is single-
+ * seat, so this is player1's own discard). Atomic — returns the original
+ * state reference when nothing valid is selected.
+ */
+function resurrectHeroesInState(
+  state: GameState,
+  selectedInstanceIds: string[],
+  history: GameState[],
+): GameState {
+  // Phase 1 — validate. Only Heroes currently in the discard pile qualify.
+  const idSet = new Set(selectedInstanceIds);
+  const toResurrect = state.zones.discard.filter(c => idSet.has(c.instanceId) && isHeroCard(c));
+  if (toResurrect.length === 0) return state;
+
+  // Phase 2 — build. Stagger the resurrected Heroes into Territory.
+  const STAGGER_X = 55;
+  const STAGGER_Y = 15;
+  const baseX = 200;
+  const baseY = 200;
+  const movedIds = new Set(toResurrect.map(c => c.instanceId));
+  const resurrected: GameCard[] = toResurrect.map((c, i) => ({
+    ...c,
+    zone: 'territory' as ZoneId,
+    posX: baseX + (i + 1) * STAGGER_X,
+    posY: baseY + (i + 1) * STAGGER_Y,
+  }));
+
+  // Phase 3 — commit.
+  const zones = cloneZones(state.zones);
+  zones.discard = zones.discard.filter(c => !movedIds.has(c.instanceId));
+  zones.territory = [...zones.territory, ...resurrected];
   return { ...state, zones, history };
 }
 
@@ -349,6 +387,41 @@ function playAllLostSoulsInState(
     revealUntil: undefined,
   }));
   zones['land-of-bondage'] = [...zones['land-of-bondage'], ...moved];
+
+  return { ...state, zones, history };
+}
+
+function discardCharactersFromReserveInState(
+  state: GameState,
+  source: GameCard,
+  ability: Extract<CardAbility, { type: 'discard_characters_from_reserve' }>,
+  history: GameState[],
+): GameState {
+  // Goldfish is single-seat (player1). 'self' clears the source owner's
+  // Reserve; 'opponent' targets any other owner, which normally has no cards
+  // in goldfish — a harmless no-op there.
+  const targetIsSelf = ability.target === 'self';
+  const discarding = state.zones.reserve.filter(c =>
+    (targetIsSelf ? c.ownerId === source.ownerId : c.ownerId !== source.ownerId)
+    && isCharacterCard(c),
+  );
+  if (discarding.length === 0) return state;
+
+  const discardingIds = new Set(discarding.map(c => c.instanceId));
+  const zones = cloneZones(state.zones);
+  zones.reserve = zones.reserve.filter(c => !discardingIds.has(c.instanceId));
+  const moved: GameCard[] = discarding.map(c => ({
+    ...c,
+    zone: 'discard',
+    isFlipped: false,
+    isMeek: false,
+    posX: undefined,
+    posY: undefined,
+    counters: [],
+    outlineColor: undefined,
+    notes: '',
+  }));
+  zones.discard = [...zones.discard, ...moved];
 
   return { ...state, zones, history };
 }
@@ -890,6 +963,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         const card = zones[zoneId].find(c => c.instanceId === cardInstanceId);
         if (card) {
           card.isFlipped = !card.isFlipped;
+          // Flipping face-down makes it a generic face-down card: drop any
+          // player-added text and clear all counters.
+          if (card.isFlipped) {
+            card.counters = [];
+            card.notes = '';
+          }
           return { ...state, zones, history };
         }
       }
@@ -980,6 +1059,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         const result = findAndRemoveCard(zones, instanceId);
         if (!result) continue;
         const finalZone = finalZoneById.get(instanceId) ?? toZone;
+        // Tokens group-dragged into a non-play zone are removed entirely —
+        // mirror of the single MOVE_CARD rule. findAndRemoveCard already pulled
+        // it out of its source zone, so skipping the re-add deletes it.
+        const TOKEN_REMOVE_ZONES: ZoneId[] = ['reserve', 'banish', 'discard', 'hand', 'deck'];
+        if (result.card.isToken && TOKEN_REMOVE_ZONES.includes(finalZone)) {
+          continue;
+        }
         if (result.fromZone === 'deck' && finalZone !== 'deck') {
           result.card.isFlipped = false;
         }
@@ -1300,6 +1386,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return state;
         case 'underdeck_top_of_deck':
           return underdeckTopOfDeckInState(state, source, ability, history);
+        case 'discard_characters_from_reserve':
+          return discardCharactersFromReserveInState(state, source, ability, history);
         case 'set_card_outline':
           return setCardOutlineInState(state, source, ability, history);
         case 'play_all_lost_souls':
@@ -1316,6 +1404,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return state;
         case 'draw_and_topdeck_self':
           return drawAndTopdeckSelfInState(state, source, history);
+        case 'resurrect_heroes':
+          // Interactive picker — dispatched via the dedicated RESURRECT_HEROES
+          // action which carries the selected card ids. No-op here.
+          return state;
         default: {
           const _exhaustive: never = ability;
           return state;
@@ -1348,6 +1440,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         { type: 'draw_bottom_of_deck', count: quantity },
         history,
       );
+    }
+
+    case 'RESURRECT_HEROES': {
+      const { cardInstanceIds } = action.payload;
+      if (!Array.isArray(cardInstanceIds) || cardInstanceIds.length === 0) return state;
+      return resurrectHeroesInState(state, cardInstanceIds, history);
     }
 
     case 'IMITATE_LOST_SOUL': {
