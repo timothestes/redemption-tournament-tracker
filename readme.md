@@ -117,7 +117,6 @@ AoD calculations
 
 
 ## short term
-add aod button
 Fallow audit: https://github.com/fallow-rs/fallow
 Pre-bake duplicate card groups at build time (static JSON) instead of fetching from Supabase at runtime — eliminates cold-start connection pressure on deckcheck
 

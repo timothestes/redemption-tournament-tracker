@@ -11,6 +11,8 @@ import {
   HiViewList,
   HiChevronLeft,
   HiChevronRight,
+  HiClipboardCopy,
+  HiCheck,
 } from "react-icons/hi";
 import { TournamentListing } from "./actions";
 
@@ -151,6 +153,21 @@ function ListingCard({
 }) {
   const daysUntil = getDaysUntil(listing.start_date);
   const isImminent = daysUntil >= 0 && daysUntil <= 3;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyAddress = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const text = [listing.venue_name, listing.venue_address]
+      .filter(Boolean)
+      .join(", ");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable; silently ignore.
+    }
+  };
 
   return (
     <div
@@ -222,7 +239,7 @@ function ListingCard({
             {(listing.venue_name || listing.venue_address) && (
               <div className="flex items-start gap-2">
                 <HiLocationMarker className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div>
+                <div className="min-w-0">
                   {listing.venue_name && (
                     <div className="font-medium text-foreground">
                       {listing.venue_name}
@@ -234,6 +251,18 @@ function ListingCard({
                     </div>
                   )}
                 </div>
+                <button
+                  onClick={handleCopyAddress}
+                  title={copied ? "Copied!" : "Copy address"}
+                  aria-label={copied ? "Address copied" : "Copy address"}
+                  className="flex-shrink-0 p-1 -m-1 text-muted-foreground/70 hover:text-foreground transition-colors"
+                >
+                  {copied ? (
+                    <HiCheck className="w-4 h-4 text-primary" />
+                  ) : (
+                    <HiClipboardCopy className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             )}
 
