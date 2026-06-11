@@ -177,19 +177,40 @@ export default function CollectionClient() {
           <button
             onClick={() => downloadCollectionCsv(ownedEntries)}
             disabled={ownedEntries.length === 0}
-            className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50"
+            className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Export CSV
           </button>
-          <button
-            onClick={() => setShowClearConfirm(true)}
-            disabled={ownedEntries.length === 0}
-            className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted text-red-600 dark:text-red-400 disabled:opacity-50"
-          >
-            Clear
-          </button>
+          {ownedEntries.length > 0 && (
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="px-2 py-1.5 text-sm text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
+
+      {/* First-run banner — the page is a catalog browser until cards are owned */}
+      {!isLoading && quantities.size === 0 && (
+        <div className="mb-4 rounded-lg border border-border bg-muted/40 p-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex-1 min-w-[240px]">
+            <p className="text-sm font-semibold">Start tracking your collection</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Browse all {ALL_CARDS.length.toLocaleString()} Redemption cards below and tap{" "}
+              <span className="font-medium text-foreground">+ Add</span> as you sort your
+              binder — or bring in an existing spreadsheet.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowImport(true)}
+            className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+          >
+            Import CSV
+          </button>
+        </div>
+      )}
 
       {/* Set completion panel */}
       {showSetStats && (
@@ -226,7 +247,7 @@ export default function CollectionClient() {
         <select
           value={setFilter}
           onChange={(e) => setSetFilter(e.target.value)}
-          className="rounded-lg border border-border bg-background px-2 py-2 text-sm"
+          className="w-36 rounded-lg border border-border bg-background px-2 py-2 text-sm"
         >
           <option value="">All sets</option>
           {SET_OPTIONS.map((s) => (
@@ -236,7 +257,7 @@ export default function CollectionClient() {
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
-          className="rounded-lg border border-border bg-background px-2 py-2 text-sm"
+          className="w-36 rounded-lg border border-border bg-background px-2 py-2 text-sm"
         >
           <option value="">All types</option>
           {TYPE_OPTIONS.map((t) => (
@@ -246,7 +267,7 @@ export default function CollectionClient() {
         <select
           value={brigadeFilter}
           onChange={(e) => setBrigadeFilter(e.target.value)}
-          className="rounded-lg border border-border bg-background px-2 py-2 text-sm"
+          className="w-36 rounded-lg border border-border bg-background px-2 py-2 text-sm"
         >
           <option value="">All brigades</option>
           <optgroup label="Good">
@@ -263,7 +284,7 @@ export default function CollectionClient() {
         <select
           value={alignmentFilter}
           onChange={(e) => setAlignmentFilter(e.target.value)}
-          className="rounded-lg border border-border bg-background px-2 py-2 text-sm"
+          className="w-36 rounded-lg border border-border bg-background px-2 py-2 text-sm"
         >
           <option value="">All alignments</option>
           {ALIGNMENT_OPTIONS.map((a) => (
@@ -273,36 +294,44 @@ export default function CollectionClient() {
         <select
           value={rarityFilter}
           onChange={(e) => setRarityFilter(e.target.value)}
-          className="rounded-lg border border-border bg-background px-2 py-2 text-sm"
+          className="w-36 rounded-lg border border-border bg-background px-2 py-2 text-sm"
         >
           <option value="">All rarities</option>
           {RARITY_OPTIONS.map((r) => (
             <option key={r} value={r}>{r}</option>
           ))}
         </select>
-        <label className="flex items-center gap-1.5 text-sm px-2 py-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={ownedOnly}
-            onChange={(e) => setOwnedOnly(e.target.checked)}
-          />
+        <button
+          onClick={() => setOwnedOnly((v) => !v)}
+          aria-pressed={ownedOnly}
+          className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
+            ownedOnly
+              ? "bg-foreground text-background border-foreground"
+              : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
+        >
           Owned only
-        </label>
-        <label className="flex items-center gap-1.5 text-sm px-2 py-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={showPrices}
-            onChange={(e) => toggleShowPrices(e.target.checked)}
-          />
+        </button>
+        <button
+          onClick={() => toggleShowPrices(!showPrices)}
+          aria-pressed={showPrices}
+          className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
+            showPrices
+              ? "bg-foreground text-background border-foreground"
+              : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
+        >
           Show prices
-        </label>
+        </button>
       </div>
 
       {/* Result count */}
       <p className="text-xs text-muted-foreground mb-3">
         {isLoading
           ? "Loading your collection…"
-          : `${filteredCards.length.toLocaleString()} card${filteredCards.length === 1 ? "" : "s"}`}
+          : filteredCards.length === ALL_CARDS.length
+            ? `${filteredCards.length.toLocaleString()} cards`
+            : `${filteredCards.length.toLocaleString()} of ${ALL_CARDS.length.toLocaleString()} cards`}
       </p>
 
       {/* Empty states */}
@@ -360,7 +389,7 @@ export default function CollectionClient() {
               {qty === 0 ? (
                 <button
                   onClick={() => setQuantity(card, 1)}
-                  className="w-full py-1.5 text-sm font-medium border border-border rounded-md hover:bg-muted"
+                  className="w-full py-1.5 text-sm text-muted-foreground rounded-md border border-transparent hover:border-border hover:bg-muted hover:text-foreground transition-colors"
                 >
                   + Add
                 </button>
