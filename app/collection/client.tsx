@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ALL_CARDS, CARD_BY_FULL_KEY } from "../decklist/card-search/data/cardIndex";
 import { categorizeRarity, type Card } from "../decklist/card-search/utils";
 import { GOOD_BRIGADES, EVIL_BRIGADES } from "../decklist/card-search/constants";
@@ -19,9 +19,32 @@ const SET_OPTIONS: string[] = Array.from(
   new Set(ALL_CARDS.map((c) => c.officialSet).filter(Boolean))
 ).sort();
 
-const TYPE_OPTIONS: string[] = Array.from(
-  new Set(ALL_CARDS.map((c) => c.type).filter(Boolean))
-).sort();
+// Collapsed type filter. Each bucket's `match` is tested as a substring of the
+// card's raw type, so a bucket also catches compound/token variants
+// (e.g. "Hero" catches "Hero/GE" and "Hero Token"). "Other" catches anything in
+// none of the buckets (Covenant, City, Territory, …).
+const OTHER_TYPE = "__other__";
+const TYPE_BUCKETS: { label: string; match: string }[] = [
+  { label: "Lost Soul", match: "Lost Soul" },
+  { label: "Hero", match: "Hero" },
+  { label: "Good Enhancement", match: "GE" },
+  { label: "Artifact", match: "Artifact" },
+  { label: "Dominant", match: "Dominant" },
+  { label: "Covenant", match: "Covenant" },
+  { label: "Evil Character", match: "Evil Character" },
+  { label: "Evil Enhancement", match: "EE" },
+  { label: "Curse", match: "Curse" },
+  { label: "Fortress", match: "Fortress" },
+  { label: "Site", match: "Site" },
+];
+
+function matchesTypeFilter(cardType: string, filter: string): boolean {
+  if (!filter) return true;
+  if (filter === OTHER_TYPE) {
+    return !TYPE_BUCKETS.some((b) => cardType.includes(b.match));
+  }
+  return cardType.includes(filter);
+}
 
 export default function CollectionClient() {
   const {
@@ -44,6 +67,7 @@ export default function CollectionClient() {
   const [ownedOnly, setOwnedOnly] = useState(false);
   const [showPrices, setShowPrices] = useShowPrices();
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [modalCard, setModalCard] = useState<Card | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -56,7 +80,7 @@ export default function CollectionClient() {
     return ALL_CARDS.filter((card) => {
       if (ownedOnly && !quantities.has(cardFullKey(card))) return false;
       if (setFilter && card.officialSet !== setFilter) return false;
-      if (typeFilter && card.type !== typeFilter) return false;
+      if (!matchesTypeFilter(card.type, typeFilter)) return false;
       if (alignmentFilter && card.alignment !== alignmentFilter) return false;
       if (brigadeFilter && !card.brigade.split("/").includes(brigadeFilter)) return false;
       if (rarityFilter && categorizeRarity(card.rarity, card.officialSet) !== rarityFilter)
@@ -127,6 +151,22 @@ export default function CollectionClient() {
   }, [quantities]);
 
   const visibleCards = filteredCards.slice(0, visibleCount);
+
+  // Infinite scroll: load the next batch when the sentinel scrolls into view
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || visibleCount >= filteredCards.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, filteredCards.length));
+        }
+      },
+      { rootMargin: "600px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [visibleCount, filteredCards.length]);
 
   return (
     <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
@@ -252,9 +292,10 @@ export default function CollectionClient() {
           className="w-36 rounded-lg border border-border bg-background px-2 py-2 text-sm"
         >
           <option value="">All types</option>
-          {TYPE_OPTIONS.map((t) => (
-            <option key={t} value={t}>{t}</option>
+          {TYPE_BUCKETS.map((b) => (
+            <option key={b.match} value={b.match}>{b.label}</option>
           ))}
+          <option value={OTHER_TYPE}>Other</option>
         </select>
         <select
           value={brigadeFilter}
@@ -416,15 +457,10 @@ export default function CollectionClient() {
         })}
       </div>
 
-      {/* Load more */}
+      {/* Infinite scroll: sentinel auto-loads the next batch as it nears the viewport */}
       {visibleCount < filteredCards.length && (
-        <div className="text-center mt-6">
-          <button
-            onClick={() => setVisibleCount((c) => c + BATCH_SIZE)}
-            className="px-6 py-2 border border-border rounded-lg hover:bg-muted text-sm font-medium"
-          >
-            Show more ({(filteredCards.length - visibleCount).toLocaleString()} remaining)
-          </button>
+        <div ref={sentinelRef} className="py-6 text-center text-xs text-muted-foreground">
+          Loading more… ({(filteredCards.length - visibleCount).toLocaleString()} remaining)
         </div>
       )}
 
@@ -496,7 +532,8 @@ export default function CollectionClient() {
             <h2 className="text-lg font-semibold mb-2">Clear collection?</h2>
             <p className="text-sm text-muted-foreground mb-4">
               This removes all {stats.uniqueOwned.toLocaleString()} cards from your
-              collection. Consider exporting a CSV first — this cannot be undone.
+              collection and cannot be undone. We&apos;ll download a backup CSV first so
+              you can re-import it later.
             </p>
             <div className="flex gap-2 justify-end">
               <button
@@ -507,12 +544,14 @@ export default function CollectionClient() {
               </button>
               <button
                 onClick={async () => {
+                  // Force a backup download before the destructive clear
+                  downloadCollectionCsv(ownedEntries);
                   await clearCollection();
                   setShowClearConfirm(false);
                 }}
                 className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700"
               >
-                Clear everything
+                Download backup &amp; clear
               </button>
             </div>
           </div>
