@@ -149,16 +149,9 @@ export default function CollectionClient() {
         {collectionValue && (
           <span
             className="text-sm font-medium text-green-600 dark:text-green-400 inline-flex items-center gap-1 cursor-help"
-            title={
-              `Estimated cost to buy these cards at Your Turn Games retail prices — ` +
-              `not a resale value. What a shop or trade would give you is typically much lower.` +
-              (collectionValue.unpriced > 0
-                ? ` ${collectionValue.unpriced.toLocaleString()} cop${collectionValue.unpriced === 1 ? "y has" : "ies have"} no YTG price and aren't counted.`
-                : "")
-            }
+            title="Estimated cost to buy these cards at Your Turn Games retail prices — not a resale value."
           >
             ≈ ${collectionValue.total.toFixed(2)} to buy at YTG
-            {collectionValue.unpriced > 0 && "*"}
             <svg className="w-3.5 h-3.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
             </svg>
