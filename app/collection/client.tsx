@@ -46,17 +46,18 @@ function matchesFormat(card: Card, mode: FormatMode): boolean {
 // (e.g. "Hero" catches "Hero/GE" and "Hero Token"). "Other" catches anything in
 // none of the buckets (Covenant, City, Territory, …).
 const OTHER_TYPE = "__other__";
+// Sorted alphabetically by label; "Other" is appended separately in the dropdown.
 const TYPE_BUCKETS: { label: string; match: string }[] = [
-  { label: "Lost Soul", match: "Lost Soul" },
-  { label: "Hero", match: "Hero" },
-  { label: "Good Enhancement", match: "GE" },
   { label: "Artifact", match: "Artifact" },
-  { label: "Dominant", match: "Dominant" },
   { label: "Covenant", match: "Covenant" },
+  { label: "Curse", match: "Curse" },
+  { label: "Dominant", match: "Dominant" },
   { label: "Evil Character", match: "Evil Character" },
   { label: "Evil Enhancement", match: "EE" },
-  { label: "Curse", match: "Curse" },
   { label: "Fortress", match: "Fortress" },
+  { label: "Good Enhancement", match: "GE" },
+  { label: "Hero", match: "Hero" },
+  { label: "Lost Soul", match: "Lost Soul" },
   { label: "Site", match: "Site" },
 ];
 
@@ -253,6 +254,27 @@ export default function CollectionClient() {
             </svg>
           </span>
         )}
+        {/* Sponsor: card prices come from YTG. Always visible since infinite
+            scroll means the page footer is never reached. */}
+        <a
+          href="https://www.yourturngames.biz"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Card prices from Your Turn Games"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground opacity-80 hover:opacity-100 transition-opacity"
+        >
+          <span className="hidden sm:inline">Prices by</span>
+          <img
+            src="/sponsors/ytg-light.png"
+            alt="Your Turn Games"
+            className="h-5 w-auto object-contain block [.dark_&]:hidden [.jayden_&]:hidden"
+          />
+          <img
+            src="/sponsors/ytg-dark.png"
+            alt="Your Turn Games"
+            className="h-5 w-auto object-contain hidden [.dark_&]:block [.jayden_&]:block"
+          />
+        </a>
         <span className="text-xs text-muted-foreground min-w-[80px]">
           {isSaving ? "Saving…" : syncError ? (
             <span className="text-red-600 dark:text-red-400">{syncError}</span>
