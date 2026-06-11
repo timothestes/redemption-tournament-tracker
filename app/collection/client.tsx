@@ -5,6 +5,7 @@ import { ALL_CARDS, CARD_BY_FULL_KEY } from "../decklist/card-search/data/cardIn
 import { categorizeRarity, type Card } from "../decklist/card-search/utils";
 import { GOOD_BRIGADES, EVIL_BRIGADES } from "../decklist/card-search/constants";
 import CardImage from "../decklist/card-search/components/CardImage";
+import { useCardPrices } from "../decklist/card-search/hooks/useCardPrices";
 import { useCollectionState, cardFullKey } from "./hooks/useCollectionState";
 import { downloadCollectionCsv } from "./utils/collectionCsv";
 import ImportCsvModal from "./components/ImportCsvModal";
@@ -40,11 +41,21 @@ export default function CollectionClient() {
   const [alignmentFilter, setAlignmentFilter] = useState("");
   const [rarityFilter, setRarityFilter] = useState("");
   const [ownedOnly, setOwnedOnly] = useState(false);
+  const [showPrices, setShowPrices] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("collection-show-prices") === "1"
+  );
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [modalCard, setModalCard] = useState<Card | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showSetStats, setShowSetStats] = useState(false);
+
+  const { getPrice } = useCardPrices();
+
+  const toggleShowPrices = (checked: boolean) => {
+    setShowPrices(checked);
+    localStorage.setItem("collection-show-prices", checked ? "1" : "0");
+  };
 
   const filteredCards = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -78,6 +89,18 @@ export default function CollectionClient() {
     for (const qty of quantities.values()) totalCopies += qty;
     return { uniqueOwned: quantities.size, totalCopies };
   }, [quantities]);
+
+  const collectionValue = useMemo(() => {
+    if (!showPrices) return null;
+    let total = 0;
+    let unpriced = 0;
+    for (const [key, qty] of quantities) {
+      const info = getPrice(key);
+      if (info) total += info.price * qty;
+      else unpriced += qty;
+    }
+    return { total, unpriced };
+  }, [showPrices, quantities, getPrice]);
 
   const setCompletion = useMemo(() => {
     const totals = new Map<string, number>();
@@ -120,6 +143,19 @@ export default function CollectionClient() {
           {stats.uniqueOwned.toLocaleString()} unique ·{" "}
           {stats.totalCopies.toLocaleString()} total cards
         </span>
+        {collectionValue && (
+          <span
+            className="text-sm font-medium text-green-600 dark:text-green-400"
+            title={
+              collectionValue.unpriced > 0
+                ? `${collectionValue.unpriced.toLocaleString()} cop${collectionValue.unpriced === 1 ? "y" : "ies"} have no YTG price and aren't counted`
+                : undefined
+            }
+          >
+            ≈ ${collectionValue.total.toFixed(2)} YTG value
+            {collectionValue.unpriced > 0 && "*"}
+          </span>
+        )}
         <span className="text-xs text-muted-foreground min-w-[80px]">
           {isSaving ? "Saving…" : syncError ? (
             <span className="text-red-600 dark:text-red-400">{syncError}</span>
@@ -252,6 +288,14 @@ export default function CollectionClient() {
           />
           Owned only
         </label>
+        <label className="flex items-center gap-1.5 text-sm px-2 py-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showPrices}
+            onChange={(e) => toggleShowPrices(e.target.checked)}
+          />
+          Show prices
+        </label>
       </div>
 
       {/* Result count */}
@@ -299,9 +343,19 @@ export default function CollectionClient() {
                 <p className="text-xs font-medium truncate" title={card.name}>
                   {card.name}
                 </p>
-                <p className="text-[10px] text-muted-foreground truncate">
-                  {card.officialSet || card.set}
-                </p>
+                <div className="flex items-baseline justify-between gap-1">
+                  <p className="text-[10px] text-muted-foreground truncate">
+                    {card.officialSet || card.set}
+                  </p>
+                  {showPrices && (
+                    <span className="text-[10px] tabular-nums shrink-0 text-green-600 dark:text-green-400">
+                      {(() => {
+                        const info = getPrice(cardFullKey(card));
+                        return info ? `$${info.price.toFixed(2)}` : "—";
+                      })()}
+                    </span>
+                  )}
+                </div>
               </div>
               {qty === 0 ? (
                 <button
@@ -369,6 +423,12 @@ export default function CollectionClient() {
                 <p className="text-sm font-medium truncate">{modalCard.name}</p>
                 <p className="text-xs text-muted-foreground truncate">
                   {modalCard.officialSet || modalCard.set}
+                  {showPrices && (() => {
+                    const info = getPrice(cardFullKey(modalCard));
+                    return info ? (
+                      <span className="text-green-600 dark:text-green-400"> · ${info.price.toFixed(2)}</span>
+                    ) : null;
+                  })()}
                 </p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
