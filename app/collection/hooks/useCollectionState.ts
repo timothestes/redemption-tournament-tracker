@@ -35,28 +35,62 @@ export function useCollectionState({ enabled = true }: { enabled?: boolean } = {
 
   const reload = useCallback(async () => {
     setIsLoading(true);
-    const result = await loadCollectionAction();
-    if (result.success) {
-      const map = new Map<string, number>();
-      for (const row of result.cards) {
-        map.set(`${row.card_name}|${row.card_set}|${row.card_img_file}`, row.quantity);
+    try {
+      const result = await loadCollectionAction();
+      if (result.success) {
+        const map = new Map<string, number>();
+        for (const row of result.cards) {
+          map.set(`${row.card_name}|${row.card_set}|${row.card_img_file}`, row.quantity);
+        }
+        setQuantities(map);
+        setIsAvailable(true);
+        setSyncError(null);
+      } else {
+        setSyncError(result.error || "Failed to load collection");
       }
-      setQuantities(map);
-      setIsAvailable(true);
-      setSyncError(null);
-    } else {
-      setSyncError(result.error || "Failed to load collection");
+    } catch {
+      // Aborted (e.g. by a concurrent client navigation) or network error.
+      // The watchdog effect below will retry while still enabled.
+      setSyncError("Failed to load collection");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
+  // Load on enable, then keep retrying until the collection is actually
+  // available. In the deck builder, the first load races with the deck's
+  // router.replace navigation, which can abort the server action; a single
+  // attempt would leave the collection permanently unavailable. Retry a
+  // bounded number of times until isAvailable flips true.
   useEffect(() => {
-    if (enabled) reload();
+    if (!enabled || isAvailable) return;
+    let attempts = 0;
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      attempts++;
+      reload();
+    };
+    run();
+    const interval = setInterval(() => {
+      if (cancelled || isAvailable || attempts >= 5) {
+        clearInterval(interval);
+        return;
+      }
+      run();
+    }, 1200);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [enabled, isAvailable, reload]);
+
+  useEffect(() => {
     const timers = timersRef.current;
     return () => {
       for (const timer of timers.values()) clearTimeout(timer);
     };
-  }, [enabled, reload]);
+  }, []);
 
   const persistCard = useCallback(async (key: string) => {
     const pending = latestQtyRef.current.get(key);
