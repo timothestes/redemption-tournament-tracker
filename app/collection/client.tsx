@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ALL_CARDS, CARD_BY_FULL_KEY } from "../decklist/card-search/data/cardIndex";
 import { categorizeRarity, type Card } from "../decklist/card-search/utils";
 import { GOOD_BRIGADES, EVIL_BRIGADES } from "../decklist/card-search/constants";
@@ -41,9 +41,12 @@ export default function CollectionClient() {
   const [alignmentFilter, setAlignmentFilter] = useState("");
   const [rarityFilter, setRarityFilter] = useState("");
   const [ownedOnly, setOwnedOnly] = useState(false);
-  const [showPrices, setShowPrices] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem("collection-show-prices") === "1"
-  );
+  // Read the persisted preference after mount — reading localStorage during
+  // render makes server and client HTML disagree (hydration error)
+  const [showPrices, setShowPrices] = useState(false);
+  useEffect(() => {
+    if (localStorage.getItem("collection-show-prices") === "1") setShowPrices(true);
+  }, []);
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [modalCard, setModalCard] = useState<Card | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -223,7 +226,7 @@ export default function CollectionClient() {
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {owned}/{total}
                 </span>
-                <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden shrink-0">
+                <div className="w-20 h-1.5 rounded-full bg-foreground/10 overflow-hidden shrink-0">
                   <div
                     className="h-full bg-primary"
                     style={{ width: `${Math.round((owned / total) * 100)}%` }}

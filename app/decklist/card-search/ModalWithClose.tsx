@@ -503,6 +503,8 @@ export default function ModalWithClose({
   activeDeckTab = "main", // Default to main if not provided
   legalityFilter = null,
   allCards,
+  collectionQuantities = null,
+  onAdjustCollection = null,
 }: {
   modalCard: Card | null;
   setModalCard: (card: Card | null) => void;
@@ -517,6 +519,10 @@ export default function ModalWithClose({
   legalityFilter?: string | null;
   /** Full unfiltered card list for legality checking of duplicates */
   allCards?: Card[];
+  /** Owned quantities keyed by `name|set|imgFile`. null = collection unavailable (signed out). */
+  collectionQuantities?: ReadonlyMap<string, number> | null;
+  /** Adjust the user's collection by delta copies of a card. */
+  onAdjustCollection?: ((card: Card, delta: number) => void) | null;
 }) {
   const { getImageUrl } = useCardImageUrl();
   const { getPrice, getProductUrl } = useCardPrices();
@@ -1492,6 +1498,40 @@ export default function ModalWithClose({
                         )}
                       </>
                     )}
+                    {/* Collection actions — stay open so multiple copies can be added in a row */}
+                    {collectionQuantities && onAdjustCollection && (() => {
+                      const ownedQty = collectionQuantities.get(`${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`) || 0;
+                      return (
+                        <>
+                          <div className="border-t border-border my-1"></div>
+                          <button
+                            onClick={() => onAdjustCollection(modalCard, 1)}
+                            className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-sky-700 dark:text-sky-300"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add to Collection
+                            {ownedQty > 0 && (
+                              <span className="ml-auto bg-sky-500/15 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded text-xs font-bold">
+                                ×{ownedQty}
+                              </span>
+                            )}
+                          </button>
+                          {ownedQty > 0 && (
+                            <button
+                              onClick={() => onAdjustCollection(modalCard, -1)}
+                              className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-red-600 dark:text-red-400"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                              </svg>
+                              Remove from Collection
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

@@ -145,6 +145,12 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
     setLoading(true);
     setError(null);
     setShowUnavailable(false);
+    // Everything excluded (e.g. user owns the whole deck) — nothing to ask YTG for
+    if (cardsToBuy.length === 0) {
+      setResult({ cartUrl: null, matched: [], unmatched: [], matchedTotal: 0, unmatchedTotal: 0 });
+      setLoading(false);
+      return;
+    }
     try {
       const cards = cardsToBuy.map(c => ({
         card_key: c.card_key,
@@ -559,7 +565,9 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
               </a>
             ) : (
               <div className="text-center py-2 text-sm text-muted-foreground">
-                {hasExclusions ? "No cards selected" : "No cards currently in stock on YTG"}
+                {ownedExclusion && ownedExclusion.kept.length === 0
+                  ? "You already own every card in this deck — nothing to buy!"
+                  : hasExclusions ? "No cards selected" : "No cards currently in stock on YTG"}
               </div>
             )}
           </div>

@@ -18,6 +18,7 @@ import { ALL_CARDS } from "./data/cardIndex";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
+import { useCollectionState } from "../../collection/hooks/useCollectionState";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, downloadDeckAsFileBySet, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
@@ -482,6 +483,14 @@ export default function CardSearchClient() {
   const { result: deckCheckResult, isChecking: isDeckChecking, setResult: setDeckCheckResult } = useDeckCheck(deck, !ignoreLegalityChecks);
 
   const { getPrice } = useCardPrices();
+
+  // User's card collection — loaded only when signed in. Drives the owned
+  // badges on search tiles and the collection actions in the card modal.
+  const {
+    quantities: collectionQuantities,
+    isAvailable: collectionAvailable,
+    adjustQuantity: adjustCollectionQuantity,
+  } = useCollectionState({ enabled: !!user });
 
   // Refs for input fields to enable auto-focus
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -1601,6 +1610,8 @@ export default function CardSearchClient() {
           activeDeckTab={activeDeckTab}
           legalityFilter={legalityMode}
           allCards={cards}
+          collectionQuantities={collectionAvailable ? collectionQuantities : null}
+          onAdjustCollection={collectionAvailable ? adjustCollectionQuantity : null}
         />
       )}
       
@@ -2245,6 +2256,9 @@ export default function CardSearchClient() {
               const quantityInDeck = getCardQuantity(c.name, c.set, 'main');
               const quantityInReserve = getCardQuantity(c.name, c.set, 'reserve');
               const quantityInMaybeboard = getCardQuantity(c.name, c.set, 'maybeboard');
+              const quantityInCollection = collectionAvailable
+                ? collectionQuantities.get(c.dataLine) || 0
+                : 0;
               const isMenuOpen = openSearchMenuCard === c.dataLine;
               return (
                 <div
@@ -2457,6 +2471,16 @@ export default function CardSearchClient() {
                     </div>
                     )}
 
+
+                    {/* Owned-in-collection badge — top left, sky so it never reads as a deck zone */}
+                    {!isSpotlight && quantityInCollection > 0 && (
+                      <div
+                        title={`${quantityInCollection} in your collection`}
+                        className="absolute top-1 left-1 pointer-events-none bg-sky-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20"
+                      >
+                        ×{quantityInCollection}
+                      </div>
+                    )}
 
                     {/* Quantity Badge - Bottom Right, Always Visible. Color-coded so a glance tells you where the card already lives:
                         emerald = in main deck, amber = in reserve, violet = on the maybeboard. */}

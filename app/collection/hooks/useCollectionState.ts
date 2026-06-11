@@ -20,10 +20,14 @@ const PERSIST_DEBOUNCE_MS = 600;
  * Client state for the user's collection: a Map of fullKey -> quantity with
  * optimistic updates and per-card debounced persistence. The full collection
  * is loaded once (server action paginates past the 1000-row limit).
+ *
+ * Pass `enabled: false` to skip loading (e.g. signed-out users in the deck
+ * builder); `isAvailable` is true once a load has succeeded.
  */
-export function useCollectionState() {
+export function useCollectionState({ enabled = true }: { enabled?: boolean } = {}) {
   const [quantities, setQuantities] = useState<Map<string, number>>(new Map());
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
+  const [isAvailable, setIsAvailable] = useState(false);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [syncError, setSyncError] = useState<string | null>(null);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -38,6 +42,7 @@ export function useCollectionState() {
         map.set(`${row.card_name}|${row.card_set}|${row.card_img_file}`, row.quantity);
       }
       setQuantities(map);
+      setIsAvailable(true);
       setSyncError(null);
     } else {
       setSyncError(result.error || "Failed to load collection");
@@ -46,12 +51,12 @@ export function useCollectionState() {
   }, []);
 
   useEffect(() => {
-    reload();
+    if (enabled) reload();
     const timers = timersRef.current;
     return () => {
       for (const timer of timers.values()) clearTimeout(timer);
     };
-  }, [reload]);
+  }, [enabled, reload]);
 
   const persistCard = useCallback(async (key: string) => {
     const pending = latestQtyRef.current.get(key);
@@ -136,6 +141,7 @@ export function useCollectionState() {
   return {
     quantities,
     isLoading,
+    isAvailable,
     isSaving: pendingSaves > 0,
     syncError,
     setQuantity,
