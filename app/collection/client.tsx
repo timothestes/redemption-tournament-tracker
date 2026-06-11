@@ -15,6 +15,12 @@ const BATCH_SIZE = 60;
 const RARITY_OPTIONS = ["Common", "Rare", "Ultra Rare", "Promo"];
 const ALIGNMENT_OPTIONS = ["Good", "Evil", "Neutral"];
 
+// Sets that aren't real collectible cards — excluded from the collection tracker.
+// (Scoped here, not in the global catalog, since the deck builder references
+// these for token generation.)
+const EXCLUDED_OFFICIAL_SETS = new Set(["Prophecies of Christ Token"]);
+const COLLECTION_CARDS = ALL_CARDS.filter((c) => !EXCLUDED_OFFICIAL_SETS.has(c.officialSet));
+
 // Tournament format filter, mirrored from the deck builder's legality logic.
 type FormatMode = "Rotation" | "Classic" | "Scrolls" | "Banned" | "Paragon";
 const FORMAT_OPTIONS: FormatMode[] = ["Rotation", "Classic", "Scrolls", "Banned", "Paragon"];
@@ -141,7 +147,7 @@ export default function CollectionClient() {
 
   const filteredCards = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return ALL_CARDS.filter((card) => {
+    return COLLECTION_CARDS.filter((card) => {
       if (ownedOnly && !quantities.has(cardFullKey(card))) return false;
       if (!matchesFormat(card, formatMode)) return false;
       if (!matchesTypeFilter(card.type, typeFilter)) return false;
@@ -189,7 +195,7 @@ export default function CollectionClient() {
   const setCompletion = useMemo(() => {
     const totals = new Map<string, number>();
     const owned = new Map<string, number>();
-    for (const card of ALL_CARDS) {
+    for (const card of COLLECTION_CARDS) {
       if (!card.officialSet) continue;
       totals.set(card.officialSet, (totals.get(card.officialSet) || 0) + 1);
       if (quantities.has(cardFullKey(card))) {
@@ -340,7 +346,7 @@ export default function CollectionClient() {
           <div className="flex-1 min-w-[240px]">
             <p className="text-sm font-semibold">Start tracking your collection</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Browse all {ALL_CARDS.length.toLocaleString()} Redemption cards below and tap{" "}
+              Browse all {COLLECTION_CARDS.length.toLocaleString()} Redemption cards below and tap{" "}
               <span className="font-medium text-foreground">+ Add</span> as you sort your
               binder — or bring in an existing spreadsheet.
             </p>
@@ -473,9 +479,9 @@ export default function CollectionClient() {
       <p className="text-xs text-muted-foreground mb-3">
         {isLoading
           ? "Loading your collection…"
-          : filteredCards.length === ALL_CARDS.length
+          : filteredCards.length === COLLECTION_CARDS.length
             ? `${filteredCards.length.toLocaleString()} cards`
-            : `${filteredCards.length.toLocaleString()} of ${ALL_CARDS.length.toLocaleString()} cards`}
+            : `${filteredCards.length.toLocaleString()} of ${COLLECTION_CARDS.length.toLocaleString()} cards`}
       </p>
 
       {/* Empty states */}
@@ -624,7 +630,7 @@ export default function CollectionClient() {
       {/* Import modal */}
       {showImport && (
         <ImportCsvModal
-          allCards={ALL_CARDS}
+          allCards={COLLECTION_CARDS}
           onClose={() => setShowImport(false)}
           onImport={importRows}
           currentCount={ownedEntries.length}
