@@ -15,6 +15,7 @@ import ModalWithClose from "../card-search/ModalWithClose";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 import { sanitizeImgFile, getCardImageUrl as getImageUrl } from '../../shared/utils/cardImageUrl';
 import { useCardPrices } from "../card-search/hooks/useCardPrices";
+import { useCollectionState } from "../../collection/hooks/useCollectionState";
 import BuyDeckModal from "../card-search/components/BuyDeckModal";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
@@ -140,6 +141,12 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [copyResult, setCopyResult] = useState<{ success: boolean; message: string } | null>(null);
   const [cardDatabase, setCardDatabase] = useState<Map<string, Card> | null>(null);
   const [modalCard, setModalCard] = useState<Card | null>(null);
+  // Logged-in users can manage their collection from the card modal here too
+  const {
+    quantities: collectionQuantities,
+    isAvailable: collectionAvailable,
+    adjustQuantity: adjustCollectionQuantity,
+  } = useCollectionState({ enabled: isLoggedIn });
   const [viewMode, setViewMode] = useState<"normal" | "stacked">("normal");
   const [groupBy, setGroupBy] = useState<"type" | "alignment" | "none">("type");
   const [showParagonModal, setShowParagonModal] = useState(false);
@@ -477,6 +484,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           getCardQuantity={null}
           legalityFilter={null}
           allCards={allCardsForNav}
+          collectionQuantities={collectionAvailable ? collectionQuantities : null}
+          onAdjustCollection={collectionAvailable ? adjustCollectionQuantity : null}
+          collectionSignedOut={!isLoggedIn}
         />
       )}
 
