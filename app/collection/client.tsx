@@ -126,7 +126,7 @@ export default function CollectionClient() {
     setBrigadeFilter("");
     setAlignmentFilter("");
     setRarityFilter("");
-    setOwnedOnly(false);
+    setOwnershipFilter("all");
   };
 
   // "/" resets all filters to default and focuses search — matches the deck builder.
@@ -490,18 +490,18 @@ export default function CollectionClient() {
       </p>
 
       {/* Empty states */}
-      {!isLoading && ownershipFilter === “owned” && filteredCards.length === 0 && (
-        <div className=”text-center py-16 text-muted-foreground”>
-          <p className=”mb-2 font-medium”>No owned cards match these filters.</p>
-          <p className=”text-sm”>
-            Turn off “Owned only” to browse all cards and tap <span className=”font-semibold”>Add</span> to
+      {!isLoading && ownershipFilter === "owned" && filteredCards.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground">
+          <p className="mb-2 font-medium">No owned cards match these filters.</p>
+          <p className="text-sm">
+            Turn off "Owned only" to browse all cards and tap <span className="font-semibold">Add</span> to
             start tracking your collection.
           </p>
         </div>
       )}
-      {!isLoading && ownershipFilter === “unowned” && filteredCards.length === 0 && (
-        <div className=”text-center py-16 text-muted-foreground”>
-          <p className=”mb-2 font-medium”>You own everything matching these filters.</p>
+      {!isLoading && ownershipFilter === "unowned" && filteredCards.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground">
+          <p className="mb-2 font-medium">You own everything matching these filters.</p>
         </div>
       )}
 
