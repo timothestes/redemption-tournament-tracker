@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ALL_CARDS, CARD_BY_FULL_KEY } from "../decklist/card-search/data/cardIndex";
 import { categorizeRarity, type Card } from "../decklist/card-search/utils";
 import { GOOD_BRIGADES, EVIL_BRIGADES } from "../decklist/card-search/constants";
@@ -9,6 +9,7 @@ import { useCardPrices } from "../decklist/card-search/hooks/useCardPrices";
 import { useCollectionState, cardFullKey } from "./hooks/useCollectionState";
 import { downloadCollectionCsv } from "./utils/collectionCsv";
 import ImportCsvModal from "./components/ImportCsvModal";
+import { useShowPrices } from "../../hooks/useShowPrices";
 
 const BATCH_SIZE = 60;
 const RARITY_OPTIONS = ["Common", "Rare", "Ultra Rare", "Promo"];
@@ -41,12 +42,7 @@ export default function CollectionClient() {
   const [alignmentFilter, setAlignmentFilter] = useState("");
   const [rarityFilter, setRarityFilter] = useState("");
   const [ownedOnly, setOwnedOnly] = useState(false);
-  // Read the persisted preference after mount — reading localStorage during
-  // render makes server and client HTML disagree (hydration error)
-  const [showPrices, setShowPrices] = useState(false);
-  useEffect(() => {
-    if (localStorage.getItem("collection-show-prices") === "1") setShowPrices(true);
-  }, []);
+  const [showPrices, setShowPrices] = useShowPrices();
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [modalCard, setModalCard] = useState<Card | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -54,11 +50,6 @@ export default function CollectionClient() {
   const [showSetStats, setShowSetStats] = useState(false);
 
   const { getPrice } = useCardPrices();
-
-  const toggleShowPrices = (checked: boolean) => {
-    setShowPrices(checked);
-    localStorage.setItem("collection-show-prices", checked ? "1" : "0");
-  };
 
   const filteredCards = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -314,7 +305,7 @@ export default function CollectionClient() {
           Owned only
         </button>
         <button
-          onClick={() => toggleShowPrices(!showPrices)}
+          onClick={() => setShowPrices(!showPrices)}
           aria-pressed={showPrices}
           className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
             showPrices
