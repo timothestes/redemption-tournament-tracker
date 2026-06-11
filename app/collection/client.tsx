@@ -15,9 +15,31 @@ const BATCH_SIZE = 60;
 const RARITY_OPTIONS = ["Common", "Rare", "Ultra Rare", "Promo"];
 const ALIGNMENT_OPTIONS = ["Good", "Evil", "Neutral"];
 
-const SET_OPTIONS: string[] = Array.from(
-  new Set(ALL_CARDS.map((c) => c.officialSet).filter(Boolean))
-).sort();
+// Tournament format filter, mirrored from the deck builder's legality logic.
+type FormatMode = "Rotation" | "Classic" | "Scrolls" | "Banned" | "Paragon";
+const FORMAT_OPTIONS: FormatMode[] = ["Rotation", "Classic", "Scrolls", "Banned", "Paragon"];
+const DEFAULT_FORMAT: FormatMode = "Rotation";
+
+const PARAGON_EXCLUDED_SETS = new Set([
+  "10th Anniversary", "1st Edition", "1st Edition Unlimited", "2nd Edition",
+  "2nd Edition Revised", "3rd Edition", "Angel Wars", "Apostles", "Cloud of Witnesses",
+  "Cloud of Witnesses (Alternate Border)", "Disciples", "Early Church", "Faith of Our Fathers",
+  "Fall of Man", "Fundraiser", "Gospel of Christ", "Gospel of Christ Token", "Kings",
+  "Lineage of Christ", "Main", "Main Unlimited", "Patriarchs", "Persecuted Church", "Priests",
+  "Promo", "Promo Token", "Prophecies of Christ", "Prophecies of Christ Token", "Prophets",
+  "Revelation of John", "Revelation of John (Alternate Border)", "Rock of Ages",
+  "Thesaurus ex Preteritus", "Warriors", "Women",
+]);
+
+function matchesFormat(card: Card, mode: FormatMode): boolean {
+  if (mode === "Classic") return true;
+  if (mode === "Scrolls") return card.legality !== "Rotation" && card.legality !== "Banned";
+  if (mode === "Paragon") {
+    if (card.type.toLowerCase().includes("lost soul")) return false;
+    return !PARAGON_EXCLUDED_SETS.has(card.officialSet);
+  }
+  return card.legality === mode; // Rotation or Banned
+}
 
 // Collapsed type filter. Each bucket's `match` is tested as a substring of the
 // card's raw type, so a bucket also catches compound/token variants
@@ -59,7 +81,7 @@ export default function CollectionClient() {
   } = useCollectionState();
 
   const [search, setSearch] = useState("");
-  const [setFilter, setSetFilter] = useState("");
+  const [formatMode, setFormatMode] = useState<FormatMode>(DEFAULT_FORMAT);
   const [typeFilter, setTypeFilter] = useState("");
   const [brigadeFilter, setBrigadeFilter] = useState("");
   const [alignmentFilter, setAlignmentFilter] = useState("");
@@ -68,6 +90,7 @@ export default function CollectionClient() {
   const [showPrices, setShowPrices] = useShowPrices();
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [modalCard, setModalCard] = useState<Card | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -89,27 +112,55 @@ export default function CollectionClient() {
 
   const { getPrice } = useCardPrices();
 
+  const resetFilters = () => {
+    setSearch("");
+    setFormatMode(DEFAULT_FORMAT);
+    setTypeFilter("");
+    setBrigadeFilter("");
+    setAlignmentFilter("");
+    setRarityFilter("");
+    setOwnedOnly(false);
+  };
+
+  // "/" resets all filters to default and focuses search — matches the deck builder.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isTyping =
+        target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey && !isTyping && !modalCard && !showImport) {
+        e.preventDefault();
+        resetFilters();
+        searchRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [modalCard, showImport]);
+
   const filteredCards = useMemo(() => {
     const q = search.trim().toLowerCase();
     return ALL_CARDS.filter((card) => {
       if (ownedOnly && !quantities.has(cardFullKey(card))) return false;
-      if (setFilter && card.officialSet !== setFilter) return false;
+      if (!matchesFormat(card, formatMode)) return false;
       if (!matchesTypeFilter(card.type, typeFilter)) return false;
       if (alignmentFilter && card.alignment !== alignmentFilter) return false;
       if (brigadeFilter && !card.brigade.split("/").includes(brigadeFilter)) return false;
       if (rarityFilter && categorizeRarity(card.rarity, card.officialSet) !== rarityFilter)
         return false;
       if (q) {
+        // Search matches name, set, ability, and identifier — folds the old
+        // (unwieldy) set dropdown into the search bar.
         const haystack =
-          `${card.name} ${card.specialAbility} ${card.identifier}`.toLowerCase();
+          `${card.name} ${card.set} ${card.officialSet} ${card.specialAbility} ${card.identifier}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     }).sort((a, b) => a.name.localeCompare(b.name) || a.set.localeCompare(b.set));
-  }, [search, setFilter, typeFilter, brigadeFilter, alignmentFilter, rarityFilter, ownedOnly, quantities]);
+  }, [search, formatMode, typeFilter, brigadeFilter, alignmentFilter, rarityFilter, ownedOnly, quantities]);
 
   // Reset pagination whenever the filter result changes identity
-  const filterKey = `${search}|${setFilter}|${typeFilter}|${brigadeFilter}|${alignmentFilter}|${rarityFilter}|${ownedOnly}`;
+  const filterKey = `${search}|${formatMode}|${typeFilter}|${brigadeFilter}|${alignmentFilter}|${rarityFilter}|${ownedOnly}`;
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
   if (filterKey !== lastFilterKey) {
     setLastFilterKey(filterKey);
@@ -307,20 +358,21 @@ export default function CollectionClient() {
       {/* Search + filters */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <input
+          ref={searchRef}
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, ability, identifier…"
+          placeholder="Search name, set, ability…  ( / to reset )"
           className="flex-1 min-w-[200px] rounded-lg border border-border bg-background px-3 py-2 text-sm"
         />
         <select
-          value={setFilter}
-          onChange={(e) => setSetFilter(e.target.value)}
-          className="w-36 rounded-lg border border-border bg-background px-2 py-2 text-sm"
+          value={formatMode}
+          onChange={(e) => setFormatMode(e.target.value as FormatMode)}
+          title="Tournament format"
+          className="w-32 rounded-lg border border-border bg-background px-2 py-2 text-sm"
         >
-          <option value="">All sets</option>
-          {SET_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s}</option>
+          {FORMAT_OPTIONS.map((f) => (
+            <option key={f} value={f}>{f}</option>
           ))}
         </select>
         <select
