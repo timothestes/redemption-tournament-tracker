@@ -837,8 +837,8 @@ export default function ModalWithClose({
                   </span>
                 )}
                 {ownedQty > 0 && (
-                  <span title={`${ownedQty} in your collection`} className="bg-sky-500 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                    ×{ownedQty}
+                  <span title={`${ownedQty} in your collection`} className="bg-zinc-700 text-zinc-100 ring-1 ring-white/20 px-1.5 py-0.5 rounded text-xs font-bold">
+                    ×{ownedQty} C
                   </span>
                 )}
               </div>
@@ -1122,24 +1122,24 @@ export default function ModalWithClose({
                 {hasCollection && (() => {
                   const ownedQty = collectionQuantities!.get(`${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`) || 0;
                   return (
-                    <div className="flex items-center h-9 rounded-lg border border-sky-500/30 bg-sky-500/10 overflow-hidden">
+                    <div className="flex items-center h-9 rounded-lg border border-border bg-muted/50 overflow-hidden">
                       <button
                         onClick={() => onAdjustCollection!(modalCard, -1)}
                         disabled={ownedQty === 0}
-                        className="h-full w-8 flex items-center justify-center text-sky-700 dark:text-sky-300 active:bg-sky-500/20 disabled:opacity-30 font-bold"
+                        className="h-full w-8 flex items-center justify-center text-foreground active:bg-muted disabled:opacity-30 font-bold"
                         aria-label="Remove one from collection"
                       >
                         −
                       </button>
-                      <span className="flex items-center gap-1 px-0.5 text-xs font-bold text-sky-700 dark:text-sky-300" title={`${ownedQty} in your collection`}>
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <span className="flex items-center gap-1 px-0.5 text-xs font-bold text-foreground" title={`${ownedQty} in your collection`}>
+                        <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                         </svg>
                         {ownedQty}
                       </span>
                       <button
                         onClick={() => onAdjustCollection!(modalCard, 1)}
-                        className="h-full w-8 flex items-center justify-center text-sky-700 dark:text-sky-300 active:bg-sky-500/20 font-bold"
+                        className="h-full w-8 flex items-center justify-center text-foreground active:bg-muted font-bold"
                         aria-label="Add one to collection"
                       >
                         +
@@ -1333,7 +1333,7 @@ export default function ModalWithClose({
                 return (
                   <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                      <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                       </svg>
                       In Collection
@@ -1347,7 +1347,7 @@ export default function ModalWithClose({
                       >
                         −
                       </button>
-                      <span className={`w-8 text-center text-sm font-bold tabular-nums ${ownedQty > 0 ? 'text-sky-600 dark:text-sky-400' : 'text-muted-foreground'}`}>
+                      <span className={`w-8 text-center text-sm font-bold tabular-nums ${ownedQty > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
                         {ownedQty}
                       </span>
                       <button

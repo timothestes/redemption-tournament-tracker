@@ -2473,19 +2473,9 @@ export default function CardSearchClient() {
                     )}
 
 
-                    {/* Owned-in-collection badge — top left, sky so it never reads as a deck zone */}
-                    {!isSpotlight && quantityInCollection > 0 && (
-                      <div
-                        title={`${quantityInCollection} in your collection`}
-                        className="absolute top-1 left-1 pointer-events-none bg-sky-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20"
-                      >
-                        ×{quantityInCollection}
-                      </div>
-                    )}
-
                     {/* Quantity Badge - Bottom Right, Always Visible. Color-coded so a glance tells you where the card already lives:
-                        emerald = in main deck, amber = in reserve, violet = on the maybeboard. */}
-                    {!isSpotlight && (quantityInDeck > 0 || quantityInReserve > 0 || quantityInMaybeboard > 0) && (
+                        emerald = in main deck, amber = in reserve, violet = on the maybeboard, neutral C = in your collection. */}
+                    {!isSpotlight && (quantityInDeck > 0 || quantityInReserve > 0 || quantityInMaybeboard > 0 || quantityInCollection > 0) && (
                       <div className="absolute bottom-1 right-1 flex flex-col items-end gap-0.5">
                         {quantityInDeck > 0 && (
                           <div key={`m${quantityInDeck}`} title={`${quantityInDeck} in main deck`} className="animate-qty-pop bg-emerald-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20">
@@ -2500,6 +2490,11 @@ export default function CardSearchClient() {
                         {quantityInMaybeboard > 0 && (
                           <div key={`mb${quantityInMaybeboard}`} title={`${quantityInMaybeboard} on maybeboard`} className="animate-qty-pop bg-violet-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20">
                             ×{quantityInMaybeboard} M
+                          </div>
+                        )}
+                        {quantityInCollection > 0 && (
+                          <div key={`c${quantityInCollection}`} title={`${quantityInCollection} in your collection`} className="animate-qty-pop bg-zinc-800/80 backdrop-blur-sm text-zinc-100 px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-white/20">
+                            ×{quantityInCollection} C
                           </div>
                         )}
                       </div>
