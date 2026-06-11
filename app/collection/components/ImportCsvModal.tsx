@@ -11,15 +11,26 @@ interface ImportCsvModalProps {
     rows: { card: Card; quantity: number }[],
     mode: "merge" | "replace"
   ) => Promise<{ success: boolean; error?: string; imported?: number }>;
+  /** Number of cards currently owned — drives the Replace guard. */
+  currentCount: number;
+  /** Download a backup of the current collection (called before a Replace wipe). */
+  onBackup: () => void;
 }
 
-export default function ImportCsvModal({ allCards, onClose, onImport }: ImportCsvModalProps) {
+const CONFIRM_WORD = "REPLACE";
+
+export default function ImportCsvModal({ allCards, onClose, onImport, currentCount, onBackup }: ImportCsvModalProps) {
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<CsvImportResult | null>(null);
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [done, setDone] = useState<number | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+
+  // A Replace that would wipe existing cards needs the type-to-confirm guard
+  const replaceGuarded = mode === "replace" && currentCount > 0;
+  const confirmOk = confirmText.trim().toUpperCase() === CONFIRM_WORD;
 
   const handleFile = async (file: File) => {
     const content = await file.text();
@@ -33,6 +44,10 @@ export default function ImportCsvModal({ allCards, onClose, onImport }: ImportCs
 
   const handleImport = async () => {
     if (!parsed || parsed.rows.length === 0) return;
+    if (replaceGuarded) {
+      if (!confirmOk) return;
+      onBackup(); // download a backup right before the wipe
+    }
     setIsImporting(true);
     setImportError(null);
     const result = await onImport(parsed.rows, mode);
@@ -174,20 +189,53 @@ export default function ImportCsvModal({ allCards, onClose, onImport }: ImportCs
               </label>
             </fieldset>
 
+            {/* Replace guard: only when there's an existing collection to lose */}
+            {replaceGuarded && (
+              <div className="rounded-lg border border-red-500/40 bg-red-500/5 p-3 space-y-2">
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  This deletes all{" "}
+                  <span className="font-semibold">{currentCount.toLocaleString()}</span> card
+                  {currentCount === 1 ? "" : "s"} you currently own and imports{" "}
+                  <span className="font-semibold">{parsed?.rows.length ?? 0}</span> from this
+                  file. We&apos;ll download a backup first, but to be safe, type{" "}
+                  <code className="font-semibold">{CONFIRM_WORD}</code> to confirm.
+                </p>
+                <input
+                  type="text"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  placeholder={`Type ${CONFIRM_WORD}`}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  autoComplete="off"
+                />
+              </div>
+            )}
+
             {importError && (
               <p className="text-sm text-red-600 dark:text-red-400">{importError}</p>
             )}
 
             <button
               onClick={handleImport}
-              disabled={!parsed || parsed.rows.length === 0 || isImporting}
-              className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50"
+              disabled={
+                !parsed ||
+                parsed.rows.length === 0 ||
+                isImporting ||
+                (replaceGuarded && !confirmOk)
+              }
+              className={`w-full px-4 py-2 rounded-lg font-medium disabled:opacity-50 ${
+                replaceGuarded
+                  ? "bg-red-600 text-white hover:bg-red-700"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
+              }`}
             >
               {isImporting
                 ? "Importing…"
-                : mode === "replace"
-                  ? "Replace collection"
-                  : "Import cards"}
+                : replaceGuarded
+                  ? "Download backup & replace"
+                  : mode === "replace"
+                    ? "Replace collection"
+                    : "Import cards"}
             </button>
           </div>
         )}

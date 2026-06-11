@@ -516,6 +516,8 @@ export default function CollectionClient() {
           allCards={ALL_CARDS}
           onClose={() => setShowImport(false)}
           onImport={importRows}
+          currentCount={ownedEntries.length}
+          onBackup={() => downloadCollectionTxt(ownedEntries)}
         />
       )}
 
