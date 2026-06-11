@@ -18,6 +18,7 @@ import { ALL_CARDS } from "./data/cardIndex";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
+import { useCollectionState } from "../../collection/hooks/useCollectionState";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, downloadDeckAsFileBySet, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
@@ -482,6 +483,14 @@ export default function CardSearchClient() {
   const { result: deckCheckResult, isChecking: isDeckChecking, setResult: setDeckCheckResult } = useDeckCheck(deck, !ignoreLegalityChecks);
 
   const { getPrice } = useCardPrices();
+
+  // User's card collection — loaded only when signed in. Drives the owned
+  // badges on search tiles and the collection actions in the card modal.
+  const {
+    quantities: collectionQuantities,
+    isAvailable: collectionAvailable,
+    adjustQuantity: adjustCollectionQuantity,
+  } = useCollectionState({ enabled: !!user });
 
   // Refs for input fields to enable auto-focus
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -1601,6 +1610,9 @@ export default function CardSearchClient() {
           activeDeckTab={activeDeckTab}
           legalityFilter={legalityMode}
           allCards={cards}
+          collectionQuantities={collectionAvailable ? collectionQuantities : null}
+          onAdjustCollection={collectionAvailable ? adjustCollectionQuantity : null}
+          collectionSignedOut={!user}
         />
       )}
       
@@ -2245,6 +2257,9 @@ export default function CardSearchClient() {
               const quantityInDeck = getCardQuantity(c.name, c.set, 'main');
               const quantityInReserve = getCardQuantity(c.name, c.set, 'reserve');
               const quantityInMaybeboard = getCardQuantity(c.name, c.set, 'maybeboard');
+              const quantityInCollection = collectionAvailable
+                ? collectionQuantities.get(c.dataLine) || 0
+                : 0;
               const isMenuOpen = openSearchMenuCard === c.dataLine;
               return (
                 <div
@@ -2459,8 +2474,8 @@ export default function CardSearchClient() {
 
 
                     {/* Quantity Badge - Bottom Right, Always Visible. Color-coded so a glance tells you where the card already lives:
-                        emerald = in main deck, amber = in reserve, violet = on the maybeboard. */}
-                    {!isSpotlight && (quantityInDeck > 0 || quantityInReserve > 0 || quantityInMaybeboard > 0) && (
+                        emerald = in main deck, amber = in reserve, violet = on the maybeboard, neutral C = in your collection. */}
+                    {!isSpotlight && (quantityInDeck > 0 || quantityInReserve > 0 || quantityInMaybeboard > 0 || quantityInCollection > 0) && (
                       <div className="absolute bottom-1 right-1 flex flex-col items-end gap-0.5">
                         {quantityInDeck > 0 && (
                           <div key={`m${quantityInDeck}`} title={`${quantityInDeck} in main deck`} className="animate-qty-pop bg-emerald-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20">
@@ -2475,6 +2490,11 @@ export default function CardSearchClient() {
                         {quantityInMaybeboard > 0 && (
                           <div key={`mb${quantityInMaybeboard}`} title={`${quantityInMaybeboard} on maybeboard`} className="animate-qty-pop bg-violet-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20">
                             ×{quantityInMaybeboard} M
+                          </div>
+                        )}
+                        {quantityInCollection > 0 && (
+                          <div key={`c${quantityInCollection}`} title={`${quantityInCollection} in your collection`} className="animate-qty-pop bg-zinc-800/80 backdrop-blur-sm text-zinc-100 px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-white/20">
+                            ×{quantityInCollection} C
                           </div>
                         )}
                       </div>

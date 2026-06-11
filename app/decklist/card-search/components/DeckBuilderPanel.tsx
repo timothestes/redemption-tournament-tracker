@@ -18,6 +18,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { Deck, DeckZone } from "../types/deck";
+import { useShowPrices } from "../../../../hooks/useShowPrices";
 import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
 import FullDeckView from "./FullDeckView";
@@ -505,14 +506,8 @@ export default function DeckBuilderPanel({
 
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
-  const [showPrices, setShowPricesRaw] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('deck-show-prices') === 'true';
-  });
-  const setShowPrices = (val: boolean) => {
-    setShowPricesRaw(val);
-    localStorage.setItem('deck-show-prices', String(val));
-  };
+  // Shared app-wide preference (synced with the collection page)
+  const [showPrices, setShowPrices] = useShowPrices();
 
   // Swipe-to-dismiss for mobile bottom sheet
   const sheetTouchRef = useRef<{ startY: number; currentY: number } | null>(null);

@@ -503,6 +503,9 @@ export default function ModalWithClose({
   activeDeckTab = "main", // Default to main if not provided
   legalityFilter = null,
   allCards,
+  collectionQuantities = null,
+  onAdjustCollection = null,
+  collectionSignedOut = false,
 }: {
   modalCard: Card | null;
   setModalCard: (card: Card | null) => void;
@@ -517,6 +520,12 @@ export default function ModalWithClose({
   legalityFilter?: string | null;
   /** Full unfiltered card list for legality checking of duplicates */
   allCards?: Card[];
+  /** Owned quantities keyed by `name|set|imgFile`. null = collection unavailable (signed out). */
+  collectionQuantities?: ReadonlyMap<string, number> | null;
+  /** Adjust the user's collection by delta copies of a card. */
+  onAdjustCollection?: ((card: Card, delta: number) => void) | null;
+  /** True when there is definitely no signed-in user — shows a sign-in hint instead of the stepper. */
+  collectionSignedOut?: boolean;
 }) {
   const { getImageUrl } = useCardImageUrl();
   const { getPrice, getProductUrl } = useCardPrices();
@@ -777,7 +786,8 @@ export default function ModalWithClose({
   // Mobile footer needs row 2 when: has rulings, is admin, minus buttons showing, or has duplicates
   const hasMinusButtons = quantityInDeck > 0 || quantityInReserve > 0;
   const hasDuplicates = duplicateSiblings && duplicateSiblings.length > 0;
-  const needsFooterRow2 = ((rulings.length > 0 || canManageRulings) && !addRulingMode) || hasMinusButtons || hasDuplicates;
+  const hasCollection = !!(collectionQuantities && onAdjustCollection);
+  const needsFooterRow2 = ((rulings.length > 0 || canManageRulings) && !addRulingMode) || hasMinusButtons || hasDuplicates || hasCollection;
 
   return (
     <div
@@ -810,20 +820,30 @@ export default function ModalWithClose({
             </div>
           </div>
           {/* Quantity badges */}
-          {onAddCard && (quantityInDeck > 0 || quantityInReserve > 0) && (
-            <div className="flex items-center gap-1 mr-2 flex-shrink-0">
-              {quantityInDeck > 0 && (
-                <span className="bg-primary text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                  ×{quantityInDeck}
-                </span>
-              )}
-              {quantityInReserve > 0 && (
-                <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                  ×{quantityInReserve} R
-                </span>
-              )}
-            </div>
-          )}
+          {(() => {
+            const ownedQty = collectionQuantities?.get(`${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`) || 0;
+            const showDeckBadges = onAddCard && (quantityInDeck > 0 || quantityInReserve > 0);
+            if (!showDeckBadges && ownedQty === 0) return null;
+            return (
+              <div className="flex items-center gap-1 mr-2 flex-shrink-0">
+                {onAddCard && quantityInDeck > 0 && (
+                  <span className="bg-primary text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                    ×{quantityInDeck}
+                  </span>
+                )}
+                {onAddCard && quantityInReserve > 0 && (
+                  <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                    ×{quantityInReserve} R
+                  </span>
+                )}
+                {ownedQty > 0 && (
+                  <span title={`${ownedQty} in your collection`} className="bg-zinc-700 text-zinc-100 ring-1 ring-white/20 px-1.5 py-0.5 rounded text-xs font-bold">
+                    ×{ownedQty} C
+                  </span>
+                )}
+              </div>
+            );
+          })()}
           <button
             className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-muted-foreground active:bg-muted"
             aria-label="Close modal"
@@ -1098,6 +1118,35 @@ export default function ModalWithClose({
           {needsFooterRow2 && (
             <div className="flex items-center justify-between mt-1.5">
               <div className="flex items-center gap-2">
+                {/* Collection stepper — compact sky pill */}
+                {hasCollection && (() => {
+                  const ownedQty = collectionQuantities!.get(`${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`) || 0;
+                  return (
+                    <div className="flex items-center h-9 rounded-lg border border-border bg-muted/50 overflow-hidden">
+                      <button
+                        onClick={() => onAdjustCollection!(modalCard, -1)}
+                        disabled={ownedQty === 0}
+                        className="h-full w-8 flex items-center justify-center text-foreground active:bg-muted disabled:opacity-30 font-bold"
+                        aria-label="Remove one from collection"
+                      >
+                        −
+                      </button>
+                      <span className="flex items-center gap-1 px-0.5 text-xs font-bold text-foreground" title={`${ownedQty} in your collection`}>
+                        <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                        </svg>
+                        {ownedQty}
+                      </span>
+                      <button
+                        onClick={() => onAdjustCollection!(modalCard, 1)}
+                        className="h-full w-8 flex items-center justify-center text-foreground active:bg-muted font-bold"
+                        aria-label="Add one to collection"
+                      >
+                        +
+                      </button>
+                    </div>
+                  );
+                })()}
                 {/* Rulings button */}
                 {rulings.length > 0 && (
                   <button
@@ -1264,6 +1313,54 @@ export default function ModalWithClose({
                   <Attribute key={key} label={prettifyFieldName(key)} value={value as string} />
                 ))}
               </div>
+              {/* Collection — signed out: quiet hint so the feature is discoverable */}
+              {collectionSignedOut && (
+                <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                    </svg>
+                    In Collection
+                  </p>
+                  <a href="/sign-in" className="text-xs text-muted-foreground hover:text-foreground underline">
+                    Sign in to track your cards
+                  </a>
+                </div>
+              )}
+              {/* Collection — owned count + inline stepper */}
+              {collectionQuantities && onAdjustCollection && (() => {
+                const ownedQty = collectionQuantities.get(`${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`) || 0;
+                return (
+                  <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                      </svg>
+                      In Collection
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => onAdjustCollection(modalCard, -1)}
+                        disabled={ownedQty === 0}
+                        className="w-8 h-8 rounded-md border border-border text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                        aria-label="Remove one from collection"
+                      >
+                        −
+                      </button>
+                      <span className={`w-8 text-center text-sm font-bold tabular-nums ${ownedQty > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        {ownedQty}
+                      </span>
+                      <button
+                        onClick={() => onAdjustCollection(modalCard, 1)}
+                        className="w-8 h-8 rounded-md border border-border text-foreground hover:bg-muted flex items-center justify-center"
+                        aria-label="Add one to collection"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
               {/* Desktop Duplicate Cards (Also Known As) */}
               {duplicateSiblings && duplicateSiblings.length > 0 && (
                 <DuplicateCards
