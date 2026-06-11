@@ -122,7 +122,6 @@ Pre-bake duplicate card groups at build time (static JSON) instead of fetching f
 
 ## long term
 add deck versioning
-Collection Tracker
 add wishlist
 misc tournament tracker improvements
 - Joining a tournament via QR code
