@@ -141,6 +141,7 @@ const TopNav: React.FC = () => {
   const deckLinks: NavLink[] = [
     { href: "/decklist/community", label: "Community Decks", icon: HiGlobeAlt, isNew: true },
     { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled, authRequired: true },
+    { href: "/collection", label: "My Collection", icon: HiCollection, authRequired: true, isNew: true },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
   ];
 

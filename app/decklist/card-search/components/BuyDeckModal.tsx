@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { getOwnedQuantitiesAction } from "../../../collection/actions";
 import type { DeckZone } from "../types/deck";
 
 /** Generic card item that both Deck and PublicDeck formats can provide */
@@ -57,6 +58,28 @@ interface BuyDeckModalProps {
   initialMode?: BuyMode;
 }
 
+/**
+ * Subtract collection-owned quantities from the cards to buy. Owned counts are
+ * keyed by `name|set` (summed across printings) and allocated across deck
+ * entries in order, so two alt-art entries share the same owned pool.
+ */
+function applyOwnedExclusion(cards: BuyDeckCard[], owned: Record<string, number>) {
+  const remaining = { ...owned };
+  const kept: BuyDeckCard[] = [];
+  let skipped = 0;
+  for (const c of cards) {
+    const [name, set] = c.card_key.split("|");
+    const key = `${name}|${set}`;
+    const used = Math.min(remaining[key] || 0, c.quantity);
+    if (used > 0) {
+      remaining[key] -= used;
+      skipped += used;
+    }
+    if (c.quantity - used > 0) kept.push({ ...c, quantity: c.quantity - used });
+  }
+  return { kept, skipped };
+}
+
 export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: BuyDeckModalProps) {
   const { isAdmin } = useIsAdmin();
   const [scope, setScope] = useState<BuyScope>("all");
@@ -68,6 +91,10 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
   const [showUnavailable, setShowUnavailable] = useState(!isMobile);
   const [showEdit, setShowEdit] = useState(!isMobile);
   const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
+  const [excludeOwned, setExcludeOwned] = useState(false);
+  const [owned, setOwned] = useState<Record<string, number> | null>(null);
+  const [ownedLoading, setOwnedLoading] = useState(false);
+  const [ownedUnavailable, setOwnedUnavailable] = useState(false);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -110,12 +137,16 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
 
   const scopedCards = scope === "main" ? mainCards : scope === "reserve" ? reserveCards : buyableCards;
 
+  // Collection exclusion — applied both to the cart request and the summary line
+  const ownedExclusion = excludeOwned && owned ? applyOwnedExclusion(scopedCards, owned) : null;
+  const cardsToBuy = ownedExclusion ? ownedExclusion.kept : scopedCards;
+
   const fetchCart = useCallback(async () => {
     setLoading(true);
     setError(null);
     setShowUnavailable(false);
     try {
-      const cards = scopedCards.map(c => ({
+      const cards = cardsToBuy.map(c => ({
         card_key: c.card_key,
         card_name: c.card_name,
         quantity: c.quantity,
@@ -135,7 +166,7 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
     } finally {
       setLoading(false);
     }
-  }, [scopedCards, mode]);
+  }, [cardsToBuy, mode]);
 
   // Fetch on first render
   React.useEffect(() => {
@@ -168,6 +199,27 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
       fetchCart();
     }
   }, [mode]);
+
+  const handleExcludeOwnedChange = async (checked: boolean) => {
+    setExcludeOwned(checked);
+    setResult(null);
+    setExcludedKeys(new Set());
+    setShowEdit(false);
+    if (checked && owned === null && !ownedLoading) {
+      setOwnedLoading(true);
+      const res = await getOwnedQuantitiesAction();
+      setOwned(res.owned);
+      setOwnedUnavailable(!res.success || Object.keys(res.owned).length === 0);
+      setOwnedLoading(false);
+    }
+  };
+
+  // Re-fetch when the exclusion changes; wait until owned quantities are loaded
+  React.useEffect(() => {
+    if (!result && !loading && !(excludeOwned && owned === null)) {
+      fetchCart();
+    }
+  }, [excludeOwned, owned]);
 
   // Derived: selected cards (matched minus excluded)
   const selectedMatched = result?.matched.filter(m => !excludedKeys.has(m.card_key)) ?? [];
@@ -254,6 +306,31 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
               </button>
             ))}
           </div>
+
+          {/* Skip cards already in the user's collection */}
+          <label className="flex items-center gap-2 mt-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={excludeOwned}
+              onChange={(e) => handleExcludeOwnedChange(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-border text-green-600 flex-shrink-0 focus:outline-none focus:ring-0"
+            />
+            <span className="text-xs text-muted-foreground">
+              Don&apos;t buy cards I already own
+              {ownedLoading && " (checking your collection…)"}
+            </span>
+          </label>
+          {excludeOwned && !ownedLoading && ownedUnavailable && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              No collection found — sign in and track your cards on the{" "}
+              <a href="/collection" className="underline">My Collection</a> page to use this.
+            </p>
+          )}
+          {ownedExclusion && ownedExclusion.skipped > 0 && (
+            <p className="mt-1 text-[11px] text-green-600 dark:text-green-400">
+              Skipping {ownedExclusion.skipped} cop{ownedExclusion.skipped === 1 ? "y" : "ies"} you already own
+            </p>
+          )}
         </div>
 
         {/* Body — scrollable */}
