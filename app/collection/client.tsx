@@ -7,7 +7,7 @@ import { GOOD_BRIGADES, EVIL_BRIGADES } from "../decklist/card-search/constants"
 import CardImage from "../decklist/card-search/components/CardImage";
 import { useCardPrices } from "../decklist/card-search/hooks/useCardPrices";
 import { useCollectionState, cardFullKey } from "./hooks/useCollectionState";
-import { downloadCollectionCsv } from "./utils/collectionCsv";
+import { downloadCollectionTxt } from "./utils/collectionCsv";
 import ImportCsvModal from "./components/ImportCsvModal";
 import { useShowPrices } from "../../hooks/useShowPrices";
 
@@ -204,14 +204,14 @@ export default function CollectionClient() {
             onClick={() => setShowImport(true)}
             className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted"
           >
-            Import CSV
+            Import
           </button>
           <button
-            onClick={() => downloadCollectionCsv(ownedEntries)}
+            onClick={() => downloadCollectionTxt(ownedEntries)}
             disabled={ownedEntries.length === 0}
             className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Export CSV
+            Export
           </button>
           {ownedEntries.length > 0 && (
             <button
@@ -532,7 +532,7 @@ export default function CollectionClient() {
             <h2 className="text-lg font-semibold mb-2">Clear collection?</h2>
             <p className="text-sm text-muted-foreground mb-4">
               This removes all {stats.uniqueOwned.toLocaleString()} cards from your
-              collection and cannot be undone. We&apos;ll download a backup CSV first so
+              collection and cannot be undone. We&apos;ll download a backup file first so
               you can re-import it later.
             </p>
             <div className="flex gap-2 justify-end">
@@ -545,7 +545,7 @@ export default function CollectionClient() {
               <button
                 onClick={async () => {
                   // Force a backup download before the destructive clear
-                  downloadCollectionCsv(ownedEntries);
+                  downloadCollectionTxt(ownedEntries);
                   await clearCollection();
                   setShowClearConfirm(false);
                 }}

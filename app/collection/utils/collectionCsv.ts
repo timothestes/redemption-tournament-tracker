@@ -1,4 +1,5 @@
 import type { Card } from "../../decklist/card-search/utils";
+import { parseDeckText } from "../../decklist/card-search/utils/deckImportExport";
 
 export interface CollectionCsvRow {
   card: Card;
@@ -14,13 +15,6 @@ export interface CsvImportResult {
 /** Normalize apostrophe variants so smart quotes match standard ones. */
 function normalizeCardName(name: string): string {
   return name.replace(/[‘’‛′]/g, "'");
-}
-
-function csvEscape(value: string): string {
-  if (/[",\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
 }
 
 /** RFC-4180 style parser: handles quoted fields, escaped quotes, commas and newlines in fields. */
@@ -73,12 +67,35 @@ function findColumn(headers: string[], candidates: string[]): number {
 }
 
 /**
+ * Parse a collection import file, auto-detecting the format:
+ *  - Tab-separated → the deck builder's .txt format (shared interchange). Main
+ *    and Reserve cards both count as owned; the Tokens/maybeboard section is
+ *    ignored. This lets any deck .txt be imported straight into a collection.
+ *  - Otherwise → legacy comma CSV (still accepted for older exports).
+ */
+export function parseCollectionFile(text: string, allCards: Card[]): CsvImportResult {
+  if (text.includes("\t")) {
+    const result = parseDeckText(text, allCards);
+    const map = new Map<string, CollectionCsvRow>();
+    for (const dc of result.deck?.cards ?? []) {
+      if (dc.zone === "maybeboard") continue; // tokens / scratchpad aren't owned cards
+      const key = `${dc.card.name}|${dc.card.set}|${dc.card.imgFile}`;
+      const existing = map.get(key);
+      if (existing) existing.quantity += dc.quantity;
+      else map.set(key, { card: dc.card, quantity: dc.quantity });
+    }
+    return { rows: Array.from(map.values()), errors: result.errors, warnings: result.warnings };
+  }
+  return parseCollectionCsv(text, allCards);
+}
+
+/**
  * Parse a collection CSV. Expects a header row; columns are matched by name
  * (Quantity/Name required, Set/ImgFile optional). Card resolution order:
  * name+set+imgFile → name+set → name+officialSet → name only (warns when
  * several printings match).
  */
-export function parseCollectionCsv(text: string, allCards: Card[]): CsvImportResult {
+function parseCollectionCsv(text: string, allCards: Card[]): CsvImportResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const rows: CollectionCsvRow[] = [];
@@ -167,30 +184,32 @@ export function parseCollectionCsv(text: string, allCards: Card[]): CsvImportRes
   return { rows, errors, warnings };
 }
 
-/** Generate a collection CSV: Quantity,Name,Set,ImgFile — sorted by name then set. */
-export function generateCollectionCsv(
+/**
+ * Generate a collection .txt in the deck builder's tab-separated format:
+ * `Quantity\tName\tSet\tImgFile`, sorted by name then set. No header row, so
+ * the file imports directly into the deck builder (and back into a collection).
+ */
+export function generateCollectionTxt(
   entries: { card: Card; quantity: number }[]
 ): string {
   const sorted = [...entries].sort(
     (a, b) =>
       a.card.name.localeCompare(b.card.name) || a.card.set.localeCompare(b.card.set)
   );
-  const lines = ["Quantity,Name,Set,ImgFile"];
-  for (const { card, quantity } of sorted) {
-    lines.push(
-      [String(quantity), csvEscape(card.name), csvEscape(card.set), csvEscape(card.imgFile)].join(",")
-    );
-  }
-  return lines.join("\n");
+  return sorted
+    .map(({ card, quantity }) =>
+      [quantity, normalizeCardName(card.name), card.set, card.imgFile].join("\t")
+    )
+    .join("\n");
 }
 
-export function downloadCollectionCsv(entries: { card: Card; quantity: number }[]) {
-  const csv = generateCollectionCsv(entries);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+export function downloadCollectionTxt(entries: { card: Card; quantity: number }[]) {
+  const txt = generateCollectionTxt(entries);
+  const blob = new Blob([txt], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "redemption-collection.csv";
+  a.download = "redemption-collection.txt";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

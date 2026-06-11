@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import type { Card } from "../../decklist/card-search/utils";
-import { parseCollectionCsv, type CsvImportResult } from "../utils/collectionCsv";
+import { parseCollectionFile, type CsvImportResult } from "../utils/collectionCsv";
 
 interface ImportCsvModalProps {
   allCards: Card[];
@@ -24,11 +24,11 @@ export default function ImportCsvModal({ allCards, onClose, onImport }: ImportCs
   const handleFile = async (file: File) => {
     const content = await file.text();
     setText(content);
-    setParsed(parseCollectionCsv(content, allCards));
+    setParsed(parseCollectionFile(content, allCards));
   };
 
   const handleParse = () => {
-    setParsed(parseCollectionCsv(text, allCards));
+    setParsed(parseCollectionFile(text, allCards));
   };
 
   const handleImport = async () => {
@@ -54,7 +54,7 @@ export default function ImportCsvModal({ allCards, onClose, onImport }: ImportCs
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Import collection from CSV</h2>
+          <h2 className="text-lg font-semibold">Import collection</h2>
           <button
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground p-1"
@@ -80,16 +80,16 @@ export default function ImportCsvModal({ allCards, onClose, onImport }: ImportCs
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Needs a header row with at least <code>Quantity</code> and{" "}
-              <code>Name</code> columns. <code>Set</code> and <code>ImgFile</code>{" "}
-              columns improve matching for cards with multiple printings.
+              Drop in a deck builder <code>.txt</code> export (the cards become owned
+              copies), or a spreadsheet CSV with <code>Quantity</code> and{" "}
+              <code>Name</code> columns. The format is detected automatically.
             </p>
 
             <label className="block">
-              <span className="text-sm font-medium">Choose a .csv file</span>
+              <span className="text-sm font-medium">Choose a file</span>
               <input
                 type="file"
-                accept=".csv,text/csv,text/plain"
+                accept=".txt,.csv,text/csv,text/plain"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleFile(file);
@@ -99,13 +99,13 @@ export default function ImportCsvModal({ allCards, onClose, onImport }: ImportCs
             </label>
 
             <div>
-              <span className="text-sm font-medium">…or paste CSV text</span>
+              <span className="text-sm font-medium">…or paste a deck list / CSV</span>
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onBlur={handleParse}
                 rows={5}
-                placeholder={"Quantity,Name,Set\n3,Abraham,PoC\n1,Moses,Pa"}
+                placeholder={"3\tAbraham\tPoC\n1\tMoses\tPa"}
                 className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm font-mono"
               />
               <button
