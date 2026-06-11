@@ -505,6 +505,7 @@ export default function ModalWithClose({
   allCards,
   collectionQuantities = null,
   onAdjustCollection = null,
+  collectionSignedOut = false,
 }: {
   modalCard: Card | null;
   setModalCard: (card: Card | null) => void;
@@ -523,6 +524,8 @@ export default function ModalWithClose({
   collectionQuantities?: ReadonlyMap<string, number> | null;
   /** Adjust the user's collection by delta copies of a card. */
   onAdjustCollection?: ((card: Card, delta: number) => void) | null;
+  /** True when there is definitely no signed-in user — shows a sign-in hint instead of the stepper. */
+  collectionSignedOut?: boolean;
 }) {
   const { getImageUrl } = useCardImageUrl();
   const { getPrice, getProductUrl } = useCardPrices();
@@ -1310,6 +1313,20 @@ export default function ModalWithClose({
                   <Attribute key={key} label={prettifyFieldName(key)} value={value as string} />
                 ))}
               </div>
+              {/* Collection — signed out: quiet hint so the feature is discoverable */}
+              {collectionSignedOut && (
+                <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                    </svg>
+                    In Collection
+                  </p>
+                  <a href="/sign-in" className="text-xs text-muted-foreground hover:text-foreground underline">
+                    Sign in to track your cards
+                  </a>
+                </div>
+              )}
               {/* Collection — owned count + inline stepper */}
               {collectionQuantities && onAdjustCollection && (() => {
                 const ownedQty = collectionQuantities.get(`${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`) || 0;

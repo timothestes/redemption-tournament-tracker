@@ -1612,6 +1612,7 @@ export default function CardSearchClient() {
           allCards={cards}
           collectionQuantities={collectionAvailable ? collectionQuantities : null}
           onAdjustCollection={collectionAvailable ? adjustCollectionQuantity : null}
+          collectionSignedOut={!user}
         />
       )}
       
