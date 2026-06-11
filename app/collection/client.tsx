@@ -93,7 +93,7 @@ export default function CollectionClient() {
   const [brigadeFilter, setBrigadeFilter] = useState("");
   const [alignmentFilter, setAlignmentFilter] = useState("");
   const [rarityFilter, setRarityFilter] = useState("");
-  const [ownedOnly, setOwnedOnly] = useState(false);
+  const [ownershipFilter, setOwnershipFilter] = useState<"all" | "owned" | "unowned">("all");
   const [showPrices, setShowPrices] = useShowPrices();
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -148,7 +148,8 @@ export default function CollectionClient() {
   const filteredCards = useMemo(() => {
     const q = search.trim().toLowerCase();
     return COLLECTION_CARDS.filter((card) => {
-      if (ownedOnly && !quantities.has(cardFullKey(card))) return false;
+      if (ownershipFilter === "owned" && !quantities.has(cardFullKey(card))) return false;
+      if (ownershipFilter === "unowned" && quantities.has(cardFullKey(card))) return false;
       if (!matchesFormat(card, formatMode)) return false;
       if (!matchesTypeFilter(card.type, typeFilter)) return false;
       if (alignmentFilter && card.alignment !== alignmentFilter) return false;
@@ -164,10 +165,10 @@ export default function CollectionClient() {
       }
       return true;
     }).sort((a, b) => a.name.localeCompare(b.name) || a.set.localeCompare(b.set));
-  }, [search, formatMode, typeFilter, brigadeFilter, alignmentFilter, rarityFilter, ownedOnly, quantities]);
+  }, [search, formatMode, typeFilter, brigadeFilter, alignmentFilter, rarityFilter, ownershipFilter, quantities]);
 
   // Reset pagination whenever the filter result changes identity
-  const filterKey = `${search}|${formatMode}|${typeFilter}|${brigadeFilter}|${alignmentFilter}|${rarityFilter}|${ownedOnly}`;
+  const filterKey = `${search}|${formatMode}|${typeFilter}|${brigadeFilter}|${alignmentFilter}|${rarityFilter}|${ownershipFilter}`;
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
   if (filterKey !== lastFilterKey) {
     setLastFilterKey(filterKey);
@@ -452,15 +453,19 @@ export default function CollectionClient() {
           ))}
         </select>
         <button
-          onClick={() => setOwnedOnly((v) => !v)}
-          aria-pressed={ownedOnly}
+          onClick={() => setOwnershipFilter((v) => v === "owned" ? "all" : "owned")}
+          onContextMenu={(e) => { e.preventDefault(); setOwnershipFilter((v) => v === "unowned" ? "all" : "unowned"); }}
+          aria-pressed={ownershipFilter !== "all"}
+          title="Left-click: owned only · Right-click: not yet owned"
           className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
-            ownedOnly
+            ownershipFilter === "owned"
               ? "bg-foreground text-background border-foreground"
+              : ownershipFilter === "unowned"
+              ? "bg-amber-500 text-white border-amber-500"
               : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >
-          Owned only
+          {ownershipFilter === "unowned" ? "Not owned" : "Owned only"}
         </button>
         <button
           onClick={() => setShowPrices(!showPrices)}
@@ -485,13 +490,18 @@ export default function CollectionClient() {
       </p>
 
       {/* Empty states */}
-      {!isLoading && ownedOnly && filteredCards.length === 0 && (
-        <div className="text-center py-16 text-muted-foreground">
-          <p className="mb-2 font-medium">No owned cards match these filters.</p>
-          <p className="text-sm">
-            Turn off “Owned only” to browse all cards and tap <span className="font-semibold">Add</span> to
+      {!isLoading && ownershipFilter === “owned” && filteredCards.length === 0 && (
+        <div className=”text-center py-16 text-muted-foreground”>
+          <p className=”mb-2 font-medium”>No owned cards match these filters.</p>
+          <p className=”text-sm”>
+            Turn off “Owned only” to browse all cards and tap <span className=”font-semibold”>Add</span> to
             start tracking your collection.
           </p>
+        </div>
+      )}
+      {!isLoading && ownershipFilter === “unowned” && filteredCards.length === 0 && (
+        <div className=”text-center py-16 text-muted-foreground”>
+          <p className=”mb-2 font-medium”>You own everything matching these filters.</p>
         </div>
       )}
 
@@ -513,7 +523,7 @@ export default function CollectionClient() {
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw"
                 />
                 {qty > 0 && (
-                  <span className="absolute top-1 right-1 min-w-[1.5rem] text-center px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow">
+                  <span className="absolute bottom-1 right-1 bg-emerald-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20">
                     ×{qty}
                   </span>
                 )}
