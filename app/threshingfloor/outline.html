@@ -872,7 +872,6 @@
               <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="fetchDeckInfo()">Fetch</button>
             </div>
             <div id="dotw-fetch-status" style="font-size:9px; color:var(--placeholder); font-style:italic; margin-top:2px;"></div>
-            <textarea class="field-textarea" id="dotw-paste" placeholder="If Fetch is blocked: open the deck link, view-source (or save page), copy all, and paste it here -- then click Fetch again." style="display:none; min-height:50px; margin-top:4px;"></textarea>
           </div>
           <div class="field">
             <label class="field-label">Deck Name</label>
@@ -1876,80 +1875,27 @@
   function fetchDeckInfo() {
     var url = document.getElementById('dotw-link').value.trim();
     var status = document.getElementById('dotw-fetch-status');
-    var pasteBox = document.getElementById('dotw-paste');
-
-    if (!url) {
-      status.textContent = 'Enter a deck link first.';
-      return;
-    }
-
-    var pasted = pasteBox.value.trim();
-    if (pasted) {
-      var ok = parseDeckHtml(pasted, url);
-      status.textContent = ok ? 'Filled in from pasted source.' : 'Could not find deck info in pasted text.';
-      return;
-    }
-
+    if (!url) { status.textContent = 'Enter a deck link first.'; return; }
+    var m = url.match(/decklist\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/);
+    if (!m) { status.textContent = 'Could not find a deck id in that link.'; return; }
     status.textContent = 'Fetching...';
-    fetch(url)
+    fetch('/threshingfloor/api/data?kind=deck&id=' + m[1])
       .then(function(res) {
+        if (res.status === 404) { status.textContent = 'Deck not found (must be public or unlisted).'; return null; }
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.text();
+        return res.json();
       })
-      .then(function(html) {
-        var ok = parseDeckHtml(html, url);
-        status.textContent = ok ? 'Filled in from deck page.' : 'Fetched page but could not find deck info.';
+      .then(function(deck) {
+        if (!deck) return;
+        if (deck.name) document.getElementById('dotw-name').value = deck.name;
+        if (deck.creator) document.getElementById('dotw-creator').value = deck.creator;
+        if (deck.format) document.getElementById('dotw-format').value = deck.format;
+        status.textContent = 'Filled in from deck (' + (deck.card_count || 0) + ' cards). Set color manually.';
       })
-      .catch(function(err) {
-        status.textContent = 'Could not fetch directly (browser blocked it). Paste the page source below and click Fetch again.';
-        pasteBox.style.display = 'block';
-      });
+      .catch(function() { status.textContent = 'Could not fetch deck info.'; });
   }
 
-  function parseDeckHtml(html, url) {
-    var found = false;
-
-    // Deck name: og:title or <title> or first <h1>
-    var nameMatch = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
-                 || html.match(/<title>([^<|]+)/i)
-                 || html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-    if (nameMatch) {
-      var name = nameMatch[1].replace(/&amp;/g,'&').trim();
-      if (name) { document.getElementById('dotw-name').value = name; found = true; }
-    }
-
-    // Format: T1 / T2 (look for standalone T1 or T2 near the top)
-    var fmtMatch = html.match(/>\s*(T1|T2)\s*</);
-    if (fmtMatch) {
-      document.getElementById('dotw-format').value = fmtMatch[1];
-      found = true;
-    }
-
-    // Creator: "by [Username]" pattern
-    var creatorMatch = html.match(/\bby\s*\[?([A-Za-z0-9_\-\. ]{2,30})\]?\(/)
-                    || html.match(/username=([A-Za-z0-9_\-\.]+)/i)
-                    || html.match(/\bby\s+([A-Za-z0-9_\-\. ]{2,30})/);
-    if (creatorMatch) {
-      document.getElementById('dotw-creator').value = creatorMatch[1].trim();
-      found = true;
-    }
-
-    // Color: look for known color words
-    var colorWords = ['White','Red','Green','Blue','Purple','Black','Gold','Brown','Gray','Clergy','Multi'];
-    for (var i = 0; i < colorWords.length; i++) {
-      var re = new RegExp('>\\s*' + colorWords[i] + '\\s*<');
-      if (re.test(html)) {
-        document.getElementById('dotw-color').value = colorWords[i];
-        rebuildColorOptions(colorWords[i]);
-        found = true;
-        break;
-      }
-    }
-
-    return found;
-  }
-
-  // ---- Upcoming Tournaments: fetch from redemptionccg.app/tournaments ----
+  // ---- Upcoming Tournaments: fetch from /threshingfloor/api/data?kind=tournaments ----
   window.upcomingListings = [];
 
   var MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1963,35 +1909,18 @@
 
   // ---- Shared helper: fetch and parse /tournaments listings JSON ----
   function fetchTournamentListings(onSuccess, onError) {
-    fetch('https://redemptionccg.app/tournaments')
+    fetch('/threshingfloor/api/data?kind=tournaments')
       .then(function(res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.text();
+        return res.json();
       })
-      .then(function(html) {
-        var match = html.match(/"listings":(\[.*?\])\}\]/);
-        if (!match) {
-          match = html.match(/"listings":(\[[\s\S]*?\])\}\]\s*\}/);
-        }
-        if (!match) {
-          onError('Could not find tournament listings in the page.');
-          return;
-        }
-        var listings;
-        try {
-          listings = JSON.parse(match[1]);
-        } catch (e) {
-          onError('Could not parse tournament data.');
-          return;
-        }
-        onSuccess(listings);
-      })
-      .catch(function(err) {
-        onError('Could not fetch (browser blocked the request, or not yet hosted on redemptionccg.app).');
+      .then(onSuccess)
+      .catch(function() {
+        onError('Could not fetch tournament listings.');
       });
   }
 
-  // ---- Spoilers: fetch from redemptionccg.app/spoilers ----
+  // ---- Spoilers: fetch from /threshingfloor/api/data?kind=spoilers ----
   window.spoilerListings = [];
 
   function fetchRecentSpoilers() {
@@ -2000,29 +1929,12 @@
     var addBtn = document.getElementById('spoiler-add-btn');
 
     status.textContent = 'Fetching...';
-    fetch('https://redemptionccg.app/spoilers')
+    fetch('/threshingfloor/api/data?kind=spoilers')
       .then(function(res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.text();
+        return res.json();
       })
-      .then(function(html) {
-        var match = html.match(/"initialSpoilers":(\[.*?\])\}\]/);
-        if (!match) {
-          match = html.match(/"initialSpoilers":(\[[\s\S]*?\])\}\]\s*\}/);
-        }
-        if (!match) {
-          status.textContent = 'Could not find spoiler listings in the page.';
-          return;
-        }
-
-        var listings;
-        try {
-          listings = JSON.parse(match[1]);
-        } catch (e) {
-          status.textContent = 'Could not parse spoiler data.';
-          return;
-        }
-
+      .then(function(listings) {
         var now = new Date();
         var cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - 21);
@@ -2074,7 +1986,7 @@
         }
       })
       .catch(function(err) {
-        status.textContent = 'Could not fetch (browser blocked the request, or not yet hosted on redemptionccg.app).';
+        status.textContent = 'Could not fetch spoilers.';
       });
   }
 
@@ -2420,7 +2332,7 @@
 
     fetchTournamentListings(function(listings) {
       var national = listings.find(function(item) {
-        return item.tournament_type === 'National';
+        return /national/i.test(item.tournament_type || '');
       });
 
       if (!national) {
