@@ -2928,10 +2928,11 @@
               var col = document.getElementById('collectors-card-col');
               col.innerHTML =
                 '<div class="collectors-card-img-wrap">' +
-                  '<img id="collectors-card-img" src="' + data['collectors-card-img'] + '" alt="Card reference">' +
+                  '<img id="collectors-card-img" alt="Card reference">' +
                   '<button type="button" class="collectors-card-remove" title="Remove" onclick="removeCollectorsCard()">&times;</button>' +
                 '</div>' +
                 '<input class="collectors-card-caption-input" id="collectors-card-caption" placeholder="Card name / note" autocomplete="off">';
+              document.getElementById('collectors-card-img').src = data['collectors-card-img'];
               if (data['collectors-card-caption']) document.getElementById('collectors-card-caption').value = data['collectors-card-caption'];
             }
             syncCollectorsBullets();
@@ -2981,7 +2982,12 @@
     fetch('/threshingfloor/api/drafts')
       .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
       .then(function(list) {
-        if (!list.length) { status.textContent = 'No drafts saved yet.'; return; }
+        if (!list.length) {
+          var stale = document.getElementById('draft-picker-row');
+          if (stale) stale.remove();
+          status.textContent = 'No drafts saved yet.';
+          return;
+        }
         showDraftPicker(list);
         status.textContent = 'Select a draft to load.';
       })
