@@ -1265,6 +1265,7 @@ export interface LoadPublicDecksParams {
   search?: string;
   username?: string;
   tagIds?: string[];
+  cardNames?: string[];
   tournamentOnly?: boolean;
   excludeFullSize?: boolean;
 }
@@ -1280,6 +1281,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       search,
       username,
       tagIds,
+      cardNames,
       tournamentOnly,
       excludeFullSize,
     } = params;
@@ -1314,6 +1316,30 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
+    // If card filtering is requested, resolve the matching deck IDs first.
+    // AND logic: a deck must contain every selected card (names come from
+    // autocomplete, so exact match). One query per card keeps each result
+    // set small and well under row limits.
+    let cardFilteredDeckIds: string[] | null = null;
+    if (cardNames && cardNames.length > 0) {
+      const perCardResults = await Promise.all(
+        cardNames.map((name) =>
+          supabase.from("deck_cards").select("deck_id").eq("card_name", name)
+        )
+      );
+      let intersected: Set<string> | null = null;
+      for (const { data: rows } of perCardResults) {
+        const ids = new Set((rows || []).map((r: any) => r.deck_id as string));
+        intersected = intersected
+          ? new Set([...intersected].filter((id) => ids.has(id)))
+          : ids;
+      }
+      cardFilteredDeckIds = [...(intersected || [])];
+      if (cardFilteredDeckIds.length === 0) {
+        return { success: true, decks: [], totalCount: 0 };
+      }
+    }
+
     let query = supabase
       .from("decks")
       .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, user_id, created_at, updated_at, is_legal", { count: "exact" })
@@ -1321,6 +1347,10 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
 
     if (tagFilteredDeckIds) {
       query = query.in("id", tagFilteredDeckIds);
+    }
+
+    if (cardFilteredDeckIds) {
+      query = query.in("id", cardFilteredDeckIds);
     }
 
     if (tournamentDeckIds) {
@@ -1533,6 +1563,34 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
   } catch (error) {
     console.error("Error in loadPublicDecksAction:", error);
     return { success: false, error: "An unexpected error occurred", decks: [], totalCount: 0 };
+  }
+}
+
+/**
+ * Autocomplete card names for the community card filter.
+ * Searches deck_cards of public decks (enforced by RLS).
+ */
+export async function loadCardSuggestionsAction(search: string) {
+  try {
+    const term = (search || "").trim().replace(/[%_]/g, "");
+    if (term.length < 2) {
+      return { success: true, suggestions: [] as string[] };
+    }
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("deck_cards")
+      .select("card_name")
+      .ilike("card_name", `%${term}%`)
+      .limit(500);
+    if (error) {
+      console.error("Error loading card suggestions:", error);
+      return { success: false, suggestions: [] as string[] };
+    }
+    const unique = [...new Set((data || []).map((r: any) => r.card_name as string))].sort();
+    return { success: true, suggestions: unique.slice(0, 15) };
+  } catch (error) {
+    console.error("Error in loadCardSuggestionsAction:", error);
+    return { success: false, suggestions: [] as string[] };
   }
 }
 

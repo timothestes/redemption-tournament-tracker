@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { loadPublicDecksAction, loadGlobalTagsAction, copyPublicDeckAction, loadPublicDeckAction, LoadPublicDecksParams } from "../actions";
+import { loadPublicDecksAction, loadGlobalTagsAction, loadCardSuggestionsAction, copyPublicDeckAction, loadPublicDeckAction, LoadPublicDecksParams } from "../actions";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
@@ -124,32 +124,69 @@ function TrophyIcon({ place, className }: { place: number; className?: string })
 
 const PAGE_SIZE = 24;
 
+function getPageNumbers(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "…")[] = [1];
+  if (current > 3) pages.push("…");
+  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) {
+    pages.push(p);
+  }
+  if (current < total - 2) pages.push("…");
+  pages.push(total);
+  return pages;
+}
+
 interface Props {
   initialDecks: PublicDeck[];
   initialCount: number;
   currentUserId?: string;
+  showTournamentFilter?: boolean;
 }
 
-export default function CommunityClient({ initialDecks, initialCount, currentUserId }: Props) {
+export default function CommunityClient({ initialDecks, initialCount, currentUserId, showTournamentFilter }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialUsername = searchParams.get("username") || "";
+  // Any filter in the URL means the server-provided page-1 data is wrong and a fetch is needed
+  const hasInitialFilters = !!(
+    initialUsername ||
+    searchParams.get("q") ||
+    searchParams.get("format") ||
+    searchParams.get("sort") ||
+    searchParams.get("page") ||
+    searchParams.get("tags") ||
+    searchParams.getAll("card").length > 0 ||
+    searchParams.get("tournament") ||
+    searchParams.get("hide100")
+  );
 
-  const [decks, setDecks] = useState<PublicDeck[]>(initialUsername ? [] : initialDecks);
-  const [loading, setLoading] = useState(!!initialUsername);
-  const [totalCount, setTotalCount] = useState(initialUsername ? 0 : initialCount);
-  const [page, setPage] = useState(1);
-  const [sort, setSort] = useState<"newest" | "most_viewed" | "name">("newest");
-  const [format, setFormat] = useState<string>("");
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const [decks, setDecks] = useState<PublicDeck[]>(hasInitialFilters ? [] : initialDecks);
+  const [loading, setLoading] = useState(hasInitialFilters);
+  const [totalCount, setTotalCount] = useState(hasInitialFilters ? 0 : initialCount);
+  const [page, setPage] = useState(() => Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1));
+  const [sort, setSort] = useState<"newest" | "most_viewed" | "name">(() => {
+    const s = searchParams.get("sort");
+    return s === "most_viewed" || s === "name" ? s : "newest";
+  });
+  const [format, setFormat] = useState<string>(searchParams.get("format") || "");
+  const [search, setSearch] = useState(searchParams.get("q") || "");
+  const [searchInput, setSearchInput] = useState(searchParams.get("q") || "");
   const [usernameFilter, setUsernameFilter] = useState(initialUsername);
-  const [excludeFullSize, setExcludeFullSize] = useState(false);
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [excludeFullSize, setExcludeFullSize] = useState(searchParams.get("hide100") === "1");
+  const [tournamentOnly, setTournamentOnly] = useState(searchParams.get("tournament") === "1");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(() => {
+    const t = searchParams.get("tags");
+    return t ? t.split(",").filter(Boolean) : [];
+  });
   const [globalTags, setGlobalTags] = useState<DeckTag[]>([]);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const [tagFilterInput, setTagFilterInput] = useState("");
   const tagDropdownRef = useRef<HTMLDivElement>(null);
+  const [cardFilters, setCardFilters] = useState<string[]>(() => searchParams.getAll("card"));
+  const [cardDropdownOpen, setCardDropdownOpen] = useState(false);
+  const [cardSearchInput, setCardSearchInput] = useState("");
+  const [cardSuggestions, setCardSuggestions] = useState<string[]>([]);
+  const cardDropdownRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
 
   useEffect(() => {
@@ -164,12 +201,32 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
     return () => document.removeEventListener("mousedown", handleClick);
   }, [tagDropdownOpen]);
 
-  // Sync usernameFilter state with URL param on client-side navigation
   useEffect(() => {
-    const urlUsername = searchParams.get("username") || "";
-    setUsernameFilter(urlUsername);
-    setPage(1);
-  }, [searchParams]);
+    if (!cardDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (cardDropdownRef.current && !cardDropdownRef.current.contains(e.target as Node)) {
+        setCardDropdownOpen(false);
+        setCardSearchInput("");
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [cardDropdownOpen]);
+
+  // Debounced card-name autocomplete
+  useEffect(() => {
+    const term = cardSearchInput.trim();
+    if (term.length < 2) {
+      setCardSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      loadCardSuggestionsAction(term).then((res) => {
+        if (res.success) setCardSuggestions(res.suggestions);
+      });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [cardSearchInput]);
 
   // Load global tags for the filter row
   useEffect(() => {
@@ -185,6 +242,13 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
     setPage(1);
   }
 
+  function toggleCardFilter(cardName: string) {
+    setCardFilters((prev) =>
+      prev.includes(cardName) ? prev.filter((n) => n !== cardName) : [...prev, cardName]
+    );
+    setPage(1);
+  }
+
   const loadDecks = useCallback(async () => {
     setLoading(true);
     const params: LoadPublicDecksParams = {
@@ -195,6 +259,8 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       search: search || undefined,
       username: usernameFilter || undefined,
       tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+      cardNames: cardFilters.length > 0 ? cardFilters : undefined,
+      tournamentOnly: tournamentOnly || undefined,
       excludeFullSize: excludeFullSize || undefined,
     };
     const result = await loadPublicDecksAction(params);
@@ -203,16 +269,35 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       setTotalCount(result.totalCount);
     }
     setLoading(false);
-  }, [page, sort, format, search, usernameFilter, selectedTagIds, excludeFullSize]);
+  }, [page, sort, format, search, usernameFilter, selectedTagIds, cardFilters, tournamentOnly, excludeFullSize]);
 
   useEffect(() => {
-    // Skip the initial fetch if we already have server-provided data (no username filter)
+    // Skip the initial fetch if we already have server-provided data (no URL filters)
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      if (!initialUsername) return;
+      if (!hasInitialFilters) return;
     }
     loadDecks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDecks]);
+
+  // Keep filter/sort/page state in the URL for deep links and refresh
+  useEffect(() => {
+    const qs = new URLSearchParams();
+    if (search) qs.set("q", search);
+    if (format) qs.set("format", format);
+    if (sort !== "newest") qs.set("sort", sort);
+    if (selectedTagIds.length > 0) qs.set("tags", selectedTagIds.join(","));
+    for (const name of cardFilters) qs.append("card", name);
+    if (tournamentOnly) qs.set("tournament", "1");
+    if (excludeFullSize) qs.set("hide100", "1");
+    if (usernameFilter) qs.set("username", usernameFilter);
+    if (page > 1) qs.set("page", String(page));
+    const next = qs.toString();
+    if (next !== searchParams.toString()) {
+      router.replace(next ? `/decklist/community?${next}` : "/decklist/community", { scroll: false });
+    }
+  }, [search, format, sort, selectedTagIds, cardFilters, tournamentOnly, excludeFullSize, usernameFilter, page, router, searchParams]);
 
   // Reset to page 1 when filters change
   function handleSortChange(newSort: typeof sort) {
@@ -239,7 +324,17 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
   function handleClearUsername() {
     setUsernameFilter("");
     setPage(1);
-    router.replace("/decklist/community");
+  }
+
+  function handleUsernameClick(username: string) {
+    setUsernameFilter(username);
+    goToPage(1);
+  }
+
+  function goToPage(n: number) {
+    setPage(n);
+    // Instant jump: smooth scrolling gets canceled by the re-render/URL replace that follows
+    window.scrollTo({ top: 0 });
   }
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
@@ -264,7 +359,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             placeholder="Search decks, players, or tournaments..."
-            className="flex-1 min-w-0 px-3 py-2 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="flex-1 min-w-0 px-3 py-2 border border-border rounded-lg bg-card text-sm focus:outline-none focus:border-primary/50 transition-colors"
           />
           <button
             onClick={handleSearch}
@@ -322,6 +417,23 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             Hide 100-Card
           </button>
 
+          {/* Tournament-only toggle — hidden until any tournament has published decklists */}
+          {showTournamentFilter && (
+          <button
+            onClick={() => { setTournamentOnly((v) => !v); setPage(1); }}
+            className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
+              tournamentOnly
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-card text-foreground hover:bg-muted"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4h10v5a5 5 0 01-10 0V4zM7 6H5a2 2 0 00-2 2c0 1.105.895 2 2 2h2M17 6h2a2 2 0 012 2c0 1.105-.895 2-2 2h-2M12 14v4M8 21h8" />
+            </svg>
+            Tournament
+          </button>
+          )}
+
           {/* Tags dropdown */}
           {globalTags.length > 0 && (
             <div className="relative" ref={tagDropdownRef}>
@@ -357,7 +469,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
                     placeholder="Filter tags…"
                     value={tagFilterInput}
                     onChange={(e) => setTagFilterInput(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-primary/50 transition-colors"
                   />
                 </div>
 
@@ -406,13 +518,107 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             )}
           </div>
         )}
+
+          {/* Cards dropdown */}
+          <div className="relative" ref={cardDropdownRef}>
+            <button
+              onClick={() => { setCardDropdownOpen((o) => !o); setCardSearchInput(""); }}
+              className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
+                cardFilters.length > 0
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card text-foreground hover:bg-muted"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4h9a2 2 0 012 2v12a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2zM6 8H5a2 2 0 00-2 2v9a2 2 0 002 2h8" />
+              </svg>
+              Cards
+              {cardFilters.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground">
+                  {cardFilters.length}
+                </span>
+              )}
+              <svg className={`w-3.5 h-3.5 transition-transform ${cardDropdownOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {cardDropdownOpen && (
+              <div className="absolute z-50 top-full mt-1.5 left-0 w-72 max-w-[calc(100vw-2rem)] bg-background border border-border rounded-xl shadow-xl">
+                {/* Search input */}
+                <div className="px-3 pt-3 pb-2 border-b border-border">
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Search card names…"
+                    value={cardSearchInput}
+                    onChange={(e) => setCardSearchInput(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-primary/50 transition-colors"
+                  />
+                </div>
+
+                {/* Suggestions */}
+                <div className="max-h-64 overflow-y-auto">
+                  {cardSearchInput.trim().length < 2 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">Type at least 2 characters</p>
+                  ) : cardSuggestions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">No matches</p>
+                  ) : (
+                    cardSuggestions.map((name) => {
+                      const active = cardFilters.includes(name);
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => toggleCardFilter(name)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted transition-colors text-left"
+                        >
+                          <span className="w-4 flex-shrink-0 flex items-center justify-center">
+                            {active && (
+                              <svg className="w-3.5 h-3.5 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </span>
+                          <span className="text-sm text-foreground">{name}</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer: clear all */}
+                {cardFilters.length > 0 && (
+                  <div className="border-t border-border">
+                    <button
+                      onClick={() => { setCardFilters([]); setPage(1); }}
+                      className="w-full px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-left"
+                    >
+                      Clear all cards
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>{/* end Row 2 */}
       </div>{/* end Controls */}
 
-      {/* Active tag pills banner */}
-      {selectedTagIds.length > 0 && (
+      {/* Active filter pills banner */}
+      {(selectedTagIds.length > 0 || cardFilters.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <span className="text-xs text-muted-foreground">Filtered by:</span>
+          {cardFilters.map((name) => (
+            <button
+              key={name}
+              onClick={() => toggleCardFilter(name)}
+              className="flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium border border-primary/30 bg-primary/10 text-primary"
+            >
+              {name}
+              <svg className="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          ))}
           {selectedTagIds.map((id) => {
             const tag = globalTags.find((t) => t.id === id);
             if (!tag) return null;
@@ -449,17 +655,19 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       )}
 
       {/* Results count */}
-      {!loading && (
-        <p className="text-sm text-muted-foreground mb-4">
+      {!(loading && decks.length === 0) && (
+        <p className={`text-sm text-muted-foreground mb-4 transition-opacity ${loading ? "opacity-50" : ""}`}>
           {totalCount} {totalCount === 1 ? "deck" : "decks"} found
           {search && ` for "${search}"`}
           {format && ` in ${format}`}
           {selectedTagIds.length > 0 && ` · ${selectedTagIds.length} tag${selectedTagIds.length > 1 ? "s" : ""} selected`}
+          {cardFilters.length > 0 && ` · ${cardFilters.length} card${cardFilters.length > 1 ? "s" : ""} selected`}
+          {tournamentOnly && " · tournament decks"}
         </p>
       )}
 
-      {/* Loading */}
-      {loading ? (
+      {/* Loading (first load only — otherwise the stale grid stays visible, dimmed) */}
+      {loading && decks.length === 0 ? (
         <div className="flex items-center justify-center min-h-[300px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-foreground mx-auto"></div>
@@ -473,7 +681,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
           </svg>
           <h3 className="text-lg font-medium mb-2">No public decks found</h3>
           <p className="text-muted-foreground">
-            {search || format
+            {search || format || selectedTagIds.length > 0 || cardFilters.length > 0 || tournamentOnly || usernameFilter
               ? "Try adjusting your search or filters."
               : "Be the first to share a deck! Go to My Decks and make one public."}
           </p>
@@ -481,28 +689,50 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       ) : (
         <>
           {/* Deck grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {decks.map((deck) => (
-              <DeckCard key={deck.id} deck={deck} currentUserId={currentUserId} />
-            ))}
+          <div className="relative">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 transition-opacity ${loading ? "opacity-50 pointer-events-none" : ""}`}>
+              {decks.map((deck) => (
+                <DeckCard key={deck.id} deck={deck} currentUserId={currentUserId} onUsernameClick={handleUsernameClick} />
+              ))}
+            </div>
+            {loading && (
+              <div className="absolute inset-0 flex items-start justify-center pt-24">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-foreground"></div>
+              </div>
+            )}
           </div>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-8">
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-8">
               <button
-                onClick={() => setPage(Math.max(1, page - 1))}
-                disabled={page === 1}
+                onClick={() => goToPage(Math.max(1, page - 1))}
+                disabled={page === 1 || loading}
                 className="px-3 py-2 border border-border rounded-lg text-sm disabled:opacity-40 hover:bg-muted transition-colors"
               >
                 Previous
               </button>
-              <span className="text-sm text-muted-foreground px-4">
-                Page {page} of {totalPages}
-              </span>
+              {getPageNumbers(page, totalPages).map((p, i) =>
+                p === "…" ? (
+                  <span key={`ellipsis-${i}`} className="px-1 text-sm text-muted-foreground">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => goToPage(p)}
+                    disabled={loading}
+                    className={`min-w-[2.5rem] px-3 py-2 rounded-lg text-sm transition-colors disabled:opacity-40 ${
+                      p === page
+                        ? "bg-primary text-primary-foreground"
+                        : "border border-border hover:bg-muted"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
               <button
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
-                disabled={page === totalPages}
+                onClick={() => goToPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages || loading}
                 className="px-3 py-2 border border-border rounded-lg text-sm disabled:opacity-40 hover:bg-muted transition-colors"
               >
                 Next
@@ -519,7 +749,7 @@ function getPreviewImages(deck: PublicDeck): [string | null, string | null] {
   return [getCardImageUrl(deck.preview_card_1), getCardImageUrl(deck.preview_card_2)];
 }
 
-function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: string }) {
+function DeckCard({ deck, currentUserId, onUsernameClick }: { deck: PublicDeck; currentUserId?: string; onUsernameClick: (username: string) => void }) {
   const router = useRouter();
   const [img1, img2] = getPreviewImages(deck);
   const hasPreview = img1 || img2;
@@ -679,7 +909,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    router.push(`/decklist/community?username=${encodeURIComponent(deck.username!)}`);
+                    onUsernameClick(deck.username!);
                   }}
                   className="text-muted-foreground underline hover:text-foreground cursor-pointer"
                 >
