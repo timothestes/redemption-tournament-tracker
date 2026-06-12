@@ -37,6 +37,12 @@ CREATE TABLE public.threshing_floor_drafts (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Keep updated_at current on every write (function exists since migration 001)
+CREATE TRIGGER update_threshing_floor_drafts_updated_at
+  BEFORE UPDATE ON public.threshing_floor_drafts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
 -- 3) RLS — every operation requires the threshing_floor permission.
 -- Uses the SECURITY DEFINER helper from migration 010; do NOT use an inline
 -- subquery against admin_users (circular-RLS failure documented in 009).
