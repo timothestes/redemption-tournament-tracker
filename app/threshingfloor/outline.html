@@ -101,6 +101,26 @@
   .btn-red:hover { background: #e02020; }
   .save-status { font-size: 10px; color: var(--teal-mid); margin-left: auto; font-style: italic; }
 
+  .tf-confirm-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000;
+    background: rgba(2,30,28,0.6);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .tf-confirm-box {
+    background: var(--teal-dark);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-top: 3px solid var(--teal);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+    max-width: 400px; width: 100%;
+    padding: 18px 20px 14px;
+  }
+  .tf-confirm-message {
+    font-size: 13px; font-weight: 500; color: var(--white);
+    line-height: 1.5; margin-bottom: 16px;
+  }
+  .tf-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
   .toggle-row {
     background: var(--teal-deep);
     padding: 8px 24px;
@@ -2806,6 +2826,49 @@
 
   window.loadedDraftUpdatedAt = null;
 
+  // Styled replacement for window.confirm(); resolves true/false.
+  function showConfirm(message, opts) {
+    opts = opts || {};
+    return new Promise(function(resolve) {
+      var overlay = document.createElement('div');
+      overlay.className = 'tf-confirm-overlay';
+      var box = document.createElement('div');
+      box.className = 'tf-confirm-box';
+      var msg = document.createElement('div');
+      msg.className = 'tf-confirm-message';
+      msg.textContent = message;
+      var actions = document.createElement('div');
+      actions.className = 'tf-confirm-actions';
+      var cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn btn-ghost';
+      cancelBtn.textContent = opts.cancelText || 'Cancel';
+      var okBtn = document.createElement('button');
+      okBtn.type = 'button';
+      okBtn.className = 'btn ' + (opts.danger ? 'btn-red' : 'btn-teal');
+      okBtn.textContent = opts.confirmText || 'Confirm';
+      function close(result) {
+        overlay.remove();
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') close(false);
+      }
+      cancelBtn.addEventListener('click', function() { close(false); });
+      okBtn.addEventListener('click', function() { close(true); });
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) close(false); });
+      document.addEventListener('keydown', onKey);
+      actions.appendChild(cancelBtn);
+      actions.appendChild(okBtn);
+      box.appendChild(msg);
+      box.appendChild(actions);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      okBtn.focus();
+    });
+  }
+
   function draftEpisodeKey() {
     var v = document.getElementById('ep-num').value.trim();
     return v || 'draft';
@@ -2828,12 +2891,14 @@
       body: json
     }).then(function(res) {
       if (res.status === 409) {
-        if (confirm('This draft was changed by someone else since you loaded it. Overwrite their version?')) {
-          window.loadedDraftUpdatedAt = null;
-          saveData();
-        } else {
-          status.textContent = 'Save canceled.';
-        }
+        showConfirm('This draft was changed by someone else since you loaded it. Overwrite their version?', { confirmText: 'Overwrite', danger: true }).then(function(ok) {
+          if (ok) {
+            window.loadedDraftUpdatedAt = null;
+            saveData();
+          } else {
+            status.textContent = 'Save canceled.';
+          }
+        });
         return null;
       }
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -3037,15 +3102,17 @@
   }
 
   function deleteDraft(ep) {
-    if (!confirm('Delete the saved draft for Ep ' + ep + '? This cannot be undone.')) return;
-    var status = document.getElementById('save-status');
-    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep), { method: 'DELETE' })
-      .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
-      .then(function() {
-        status.textContent = 'Deleted Ep ' + ep + '.';
-        loadData();
-      })
-      .catch(function() { status.textContent = 'Could not delete that draft.'; });
+    showConfirm('Delete the saved draft for Ep ' + ep + '? This cannot be undone.', { confirmText: 'Delete', danger: true }).then(function(ok) {
+      if (!ok) return;
+      var status = document.getElementById('save-status');
+      fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep), { method: 'DELETE' })
+        .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .then(function() {
+          status.textContent = 'Deleted Ep ' + ep + '.';
+          loadData();
+        })
+        .catch(function() { status.textContent = 'Could not delete that draft.'; });
+    });
   }
 
   // ---- Section reordering (session-only) ----
@@ -3138,22 +3205,24 @@
   }
 
   function clearAll() {
-    if (!confirm('Clear all fields and reset toggles to default?')) return;
-    resetForm();
-    var defaults = {
-      'tog-news': true, 'tog-tournaments': true, 'tog-rankings': true,
-      'tog-dotw': true, 'tog-mailbag': true,
-      'tog-rtn': false, 'tog-spoilers': false, 'tog-collectors': false,
-      'tog-meta': false, 'tog-agur': false, 'tog-potm': false, 'tog-guest': false
-    };
-    Object.keys(defaults).forEach(function(id) {
-      var el = document.getElementById(id);
-      if (el) {
-        el.checked = defaults[id];
-        if (el.onchange) el.onchange.call(el, { target: el });
-      }
+    showConfirm('Clear all fields and reset toggles to default?', { confirmText: 'Clear All', danger: true }).then(function(ok) {
+      if (!ok) return;
+      resetForm();
+      var defaults = {
+        'tog-news': true, 'tog-tournaments': true, 'tog-rankings': true,
+        'tog-dotw': true, 'tog-mailbag': true,
+        'tog-rtn': false, 'tog-spoilers': false, 'tog-collectors': false,
+        'tog-meta': false, 'tog-agur': false, 'tog-potm': false, 'tog-guest': false
+      };
+      Object.keys(defaults).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+          el.checked = defaults[id];
+          if (el.onchange) el.onchange.call(el, { target: el });
+        }
+      });
+      document.getElementById('save-status').textContent = 'Cleared.';
     });
-    document.getElementById('save-status').textContent = 'Cleared.';
   }
 
   document.querySelectorAll('.toggle-item input[type=checkbox]').forEach(function(cb) {
