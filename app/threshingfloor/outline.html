@@ -748,6 +748,7 @@
     <span class="toolbar-label">Actions</span>
     <button class="btn btn-teal" onclick="saveData()">Save Draft</button>
     <button class="btn btn-ghost" onclick="loadData()">Load Draft</button>
+    <button class="btn btn-ghost" onclick="downloadJson()">Download JSON</button>
     <button class="btn btn-ghost" onclick="window.print()">Print / Export PDF</button>
     <button class="btn btn-red" onclick="clearAll()">Clear All</button>
     <span class="save-status" id="save-status">No draft saved yet</span>
@@ -2884,28 +2885,62 @@
     return data;
   }
 
-  function saveData() {
-    var epNum = document.getElementById('ep-num').value || 'draft';
-    var data  = collectData();
-    var json  = JSON.stringify(data, null, 2);
-    var blob  = new Blob([json], { type: 'application/json' });
-    var a     = document.createElement('a');
-    a.href      = URL.createObjectURL(blob);
-    a.download  = 'TF_Outline_Ep' + epNum + '.json';
-    a.click();
-    document.getElementById('save-status').textContent = 'Saved: TF_Outline_Ep' + epNum + '.json';
+  window.loadedDraftUpdatedAt = null;
+
+  function draftEpisodeKey() {
+    var v = document.getElementById('ep-num').value.trim();
+    return v || 'draft';
   }
 
-  function loadData() {
-    var input = document.createElement('input');
-    input.type  = 'file';
-    input.accept = '.json';
-    input.onchange = function(e) {
-      var file   = e.target.files[0];
-      var reader = new FileReader();
-      reader.onload = function(ev) {
-        try {
-          var data = JSON.parse(ev.target.result);
+  function saveData() {
+    var ep = draftEpisodeKey();
+    var status = document.getElementById('save-status');
+    var payload = { data: collectData() };
+    if (window.loadedDraftUpdatedAt) payload.lastSeenUpdatedAt = window.loadedDraftUpdatedAt;
+    var json = JSON.stringify(payload);
+    if (json.length > 4 * 1024 * 1024) {
+      status.textContent = 'Draft too large to save (over 4 MB) -- remove some images.';
+      return;
+    }
+    status.textContent = 'Saving...';
+    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: json
+    }).then(function(res) {
+      if (res.status === 409) {
+        if (confirm('This draft was changed by someone else since you loaded it. Overwrite their version?')) {
+          window.loadedDraftUpdatedAt = null;
+          saveData();
+        } else {
+          status.textContent = 'Save canceled.';
+        }
+        return null;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function(row) {
+      if (!row) return;
+      window.loadedDraftUpdatedAt = row.updated_at;
+      status.textContent = 'Saved Ep ' + ep + ' at ' + new Date().toLocaleTimeString();
+    }).catch(function() {
+      status.textContent = 'Save failed -- check connection and try again.';
+    });
+  }
+
+  function downloadJson() {
+    var epNum = draftEpisodeKey();
+    var json = JSON.stringify(collectData(), null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'TF_Outline_Ep' + epNum + '.json';
+    a.click();
+  }
+
+  function applyDraft(data) {
+    resetForm();
+    try {
 
           Object.keys(data).forEach(function(id) {
             var el = document.getElementById(id);
@@ -3015,16 +3050,87 @@
               });
             }
           }, 50);
+    } catch(err) {
+      document.getElementById('save-status').textContent = 'Could not apply that draft.';
+      console.error(err);
+    }
+  }
 
-          document.getElementById('save-status').textContent = 'Loaded: ' + file.name;
-        } catch(err) {
-          alert('Could not load file. Make sure it is a valid outline JSON.');
-          console.error(err);
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
+  function loadData() {
+    var status = document.getElementById('save-status');
+    status.textContent = 'Loading drafts...';
+    fetch('/threshingfloor/api/drafts')
+      .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+      .then(function(list) {
+        if (!list.length) { status.textContent = 'No drafts saved yet.'; return; }
+        showDraftPicker(list);
+        status.textContent = 'Select a draft to load.';
+      })
+      .catch(function() { status.textContent = 'Could not load drafts.'; });
+  }
+
+  function showDraftPicker(list) {
+    var existing = document.getElementById('draft-picker-row');
+    if (existing) existing.remove();
+    var row = document.createElement('div');
+    row.id = 'draft-picker-row';
+    row.style.cssText = 'display:flex; gap:6px; align-items:center; width:100%; margin-top:6px;';
+    var picker = document.createElement('select');
+    picker.className = 'field-input';
+    picker.style.flex = '1';
+    list.forEach(function(d) {
+      var opt = document.createElement('option');
+      opt.value = d.episode_number;
+      opt.textContent = 'Ep ' + d.episode_number + ' -- saved ' + new Date(d.updated_at).toLocaleString();
+      picker.appendChild(opt);
+    });
+    var loadBtn = document.createElement('button');
+    loadBtn.type = 'button';
+    loadBtn.className = 'btn btn-teal';
+    loadBtn.textContent = 'Load';
+    loadBtn.addEventListener('click', function() { loadDraft(picker.value); });
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn-red';
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', function() { deleteDraft(picker.value); });
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'btn btn-ghost';
+    closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', function() { row.remove(); });
+    row.appendChild(picker);
+    row.appendChild(loadBtn);
+    row.appendChild(delBtn);
+    row.appendChild(closeBtn);
+    document.querySelector('.toolbar').appendChild(row);
+  }
+
+  function loadDraft(ep) {
+    var status = document.getElementById('save-status');
+    status.textContent = 'Loading Ep ' + ep + '...';
+    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep))
+      .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+      .then(function(row) {
+        applyDraft(row.data);
+        window.loadedDraftUpdatedAt = row.updated_at;
+        status.textContent = 'Loaded Ep ' + row.episode_number + '.';
+        var pickerRow = document.getElementById('draft-picker-row');
+        if (pickerRow) pickerRow.remove();
+      })
+      .catch(function() { status.textContent = 'Could not load that draft.'; });
+  }
+
+  function deleteDraft(ep) {
+    if (!confirm('Delete the saved draft for Ep ' + ep + '? This cannot be undone.')) return;
+    var status = document.getElementById('save-status');
+    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep), { method: 'DELETE' })
+      .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+      .then(function() {
+        status.textContent = 'Deleted Ep ' + ep + '.';
+        loadData();
+      })
+      .catch(function() { status.textContent = 'Could not delete that draft.'; });
   }
 
   // ---- Section reordering (session-only) ----
@@ -3087,13 +3193,20 @@
     }
   } catch (e) {}
 
-  function clearAll() {
-    if (!confirm('Clear all fields and reset toggles to default?')) return;
+  function resetForm() {
     document.querySelectorAll('input[type=text], input[type=date], textarea').forEach(function(el) { el.value = ''; });
     removeExtraNotesField();
+    removeCountdownField();
     removeCollectorsCard();
     syncCollectorsBullets();
     document.getElementById('agur-card-grid').innerHTML = '';
+    document.getElementById('agur-empty-state').style.display = '';
+    document.getElementById('rtn-deadlines-list').innerHTML = '';
+    document.getElementById('rtn-deadlines-field').style.display = 'none';
+    window.rtnDeadlineCount = 0;
+    document.getElementById('rtn-events-list').innerHTML = '';
+    document.getElementById('rtn-events-field').style.display = 'none';
+    window.rtnEventCount = 0;
     mailbagBody.innerHTML = '';
     window.mailbagCount = 0;
     addMailbagItem();
@@ -3102,7 +3215,16 @@
     window.newsCount = 0;
     addNewsItem();
     newsBody.appendChild(createNewsAddRow());
-    document.getElementById('agur-empty-state').style.display = '';
+    window.previousRankings = null;
+    window.previousMetaRankings = null;
+    updateAllRankDeltas();
+    updateAllMetaRankDeltas();
+    window.loadedDraftUpdatedAt = null;
+  }
+
+  function clearAll() {
+    if (!confirm('Clear all fields and reset toggles to default?')) return;
+    resetForm();
     var defaults = {
       'tog-news': true, 'tog-tournaments': true, 'tog-rankings': true,
       'tog-dotw': true, 'tog-mailbag': true,
