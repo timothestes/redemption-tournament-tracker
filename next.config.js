@@ -23,7 +23,7 @@ const nextConfig = {
     unoptimized: false,
   },
   outputFileTracingIncludes: {
-    '/threshingfloor': ['./app/threshingfloor/outline.html'],
+    '/threshingfloor/outline': ['./app/threshingfloor/outline.html'],
   },
 };
 
