@@ -22,6 +22,9 @@ const nextConfig = {
     // Allow unoptimized images for API routes
     unoptimized: false,
   },
+  outputFileTracingIncludes: {
+    '/threshingfloor': ['./app/threshingfloor/outline.html'],
+  },
 };
 
 module.exports = nextConfig;
