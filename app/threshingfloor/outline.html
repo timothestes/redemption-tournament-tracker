@@ -1,0 +1,3233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Threshing Floor - Episode Outline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&family=Anton&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --teal:       #0aada6;
+    --teal-dark:  #044e4a;
+    --teal-deep:  #022e2b;
+    --teal-light: #d6f5f3;
+    --teal-mid:   #7dd4d0;
+    --white:      #ffffff;
+    --gray-light: #eef4f4;
+    --gray:       #8a9e9d;
+    --red:        #cc1c1c;
+    --text:       #1a2a29;
+    --placeholder:#7aa8a6;
+  }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: #0d1f1e;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+
+  .page-header {
+    background:
+      linear-gradient(135deg, rgba(2,46,43,0.75) 0%, rgba(4,78,74,0.7) 60%, rgba(10,110,105,0.65) 100%),
+      url('/threshingfloor/header.jpg') center center / cover no-repeat;
+    border-radius: 10px 10px 0 0;
+    padding: 18px 24px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 3px solid var(--teal);
+  }
+  .header-left { flex: 1; }
+  .podcast-name {
+    font-family: 'Anton', 'Barlow Condensed', sans-serif;
+    font-weight: 400;
+    font-size: 30px;
+    color: var(--white);
+    letter-spacing: 1px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .podcast-sub {
+    font-size: 11px;
+    color: var(--teal-mid);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+  .header-meta { display: flex; gap: 10px; align-items: center; }
+  .meta-field { display: flex; flex-direction: column; gap: 2px; }
+  .meta-label {
+    font-size: 9px; font-weight: 600; color: var(--teal-mid);
+    letter-spacing: 2px; text-transform: uppercase;
+  }
+  .meta-input {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px; color: var(--white);
+    font-family: 'Barlow', sans-serif; font-size: 12px; font-weight: 600;
+    padding: 4px 8px; width: 110px; outline: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .meta-input.narrow { width: 70px; }
+  .meta-input:focus { border-color: var(--teal); background: rgba(255,255,255,0.15); }
+  .meta-input::placeholder { color: rgba(255,255,255,0.35); }
+  .meta-value-print { display: none; }
+
+  .toolbar {
+    background: var(--teal-dark);
+    padding: 8px 24px;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    position: relative;
+  }
+  .toolbar-label { font-size: 10px; color: var(--teal-mid); letter-spacing: 2px; text-transform: uppercase; margin-right: 4px; }
+  .btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    border: none; border-radius: 4px; cursor: pointer;
+    padding: 5px 14px; transition: all 0.15s;
+  }
+  .btn-teal  { background: var(--teal); color: #fff; }
+  .btn-teal:hover  { background: #08c4bc; }
+  .btn-ghost { background: transparent; color: var(--teal-mid); border: 1px solid var(--teal-mid); }
+  .btn-ghost:hover { background: rgba(10,173,166,0.15); }
+  .btn-red   { background: var(--red); color: #fff; }
+  .btn-red:hover { background: #e02020; }
+  .save-status { font-size: 10px; color: var(--teal-mid); margin-left: auto; font-style: italic; }
+
+  .tf-confirm-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000;
+    background: rgba(2,30,28,0.6);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .tf-confirm-box {
+    background: var(--teal-dark);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-top: 3px solid var(--teal);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+    max-width: 400px; width: 100%;
+    padding: 18px 20px 14px;
+  }
+  .tf-confirm-message {
+    font-size: 13px; font-weight: 500; color: var(--white);
+    line-height: 1.5; margin-bottom: 16px;
+  }
+  .tf-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+  .toggle-row {
+    background: var(--teal-deep);
+    padding: 8px 24px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    border-bottom: 1px solid rgba(10,173,166,0.3);
+  }
+  .toggle-row-label {
+    font-size: 9px; font-weight: 600; color: var(--teal-mid);
+    letter-spacing: 2px; text-transform: uppercase; margin-right: 2px;
+    flex-basis: 100%;
+  }
+  .toggle-item { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .toggle-item input[type=checkbox] { display: none; }
+  .toggle-switch {
+    width: 28px; height: 15px; background: rgba(255,255,255,0.15);
+    border-radius: 8px; position: relative; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle-switch::after {
+    content: ''; position: absolute; left: 2px; top: 2px;
+    width: 11px; height: 11px; background: rgba(255,255,255,0.4);
+    border-radius: 50%; transition: left 0.2s, background 0.2s;
+  }
+  .toggle-item input:checked ~ .toggle-switch { background: var(--teal); }
+  .toggle-item input:checked ~ .toggle-switch::after { left: 15px; background: white; }
+  .toggle-item-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    color: rgba(255,255,255,0.5); transition: color 0.2s; user-select: none;
+  }
+  .toggle-item input:checked ~ .toggle-switch ~ .toggle-item-label { color: rgba(255,255,255,0.95); }
+
+  .canvas {
+    background: var(--white);
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .canvas.page2 { border-radius: 10px; margin-top: 16px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; }
+  .grid-1 { display: grid; grid-template-columns: 1fr; }
+
+  .section {
+    border-right: 1px solid var(--teal-light);
+    border-bottom: 1px solid var(--teal-light);
+  }
+  .grid-2 > .section:nth-child(2n) { border-right: none; }
+  .grid-1 > .section { border-right: none; }
+
+  .section.hidden { display: none; }
+
+  .sec-header {
+    background: var(--teal);
+    padding: 6px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .sec-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--white);
+  }
+  .sec-order-controls { display: flex; gap: 2px; }
+  .sec-order-btn {
+    width: 18px; height: 18px; border: none; border-radius: 3px;
+    background: rgba(255,255,255,0.18); color: var(--white);
+    font-size: 11px; line-height: 1; cursor: pointer; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .sec-order-btn:hover { background: rgba(255,255,255,0.35); }
+  .sec-order-btn:disabled { opacity: 0.3; cursor: default; }
+  .sec-order-btn:disabled:hover { background: rgba(255,255,255,0.18); }
+  .sec-body { padding: 8px 10px; background: var(--white); }
+
+  .field { margin-bottom: 6px; }
+  .field-label {
+    font-size: 9px; font-weight: 600; color: var(--teal-dark);
+    letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 2px; display: block;
+  }
+  .field-input, .field-textarea {
+    width: 100%; border: none; border-bottom: 1.5px solid var(--teal-light);
+    background: transparent; font-family: 'Barlow', sans-serif; font-size: 11px;
+    color: var(--text); padding: 2px 0; outline: none; resize: none;
+    transition: border-color 0.2s;
+  }
+  .field-input:focus, .field-textarea:focus { border-color: var(--teal); }
+  .field-input::placeholder, .field-textarea::placeholder { color: var(--placeholder); font-style: italic; }
+  .field-textarea { min-height: 38px; line-height: 1.5; }
+  .field-textarea.tall { min-height: 60px; }
+  .field-textarea.xtall { min-height: 100px; }
+
+  .tourn-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 8px; }
+  .tourn-block { background: var(--gray-light); border-radius: 4px; padding: 6px 28px 6px 8px; }
+  .tourn-name-input {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--teal-dark);
+    border: none; border-bottom: 1.5px solid var(--teal-mid); background: transparent;
+    width: 100%; padding: 2px 0; outline: none; margin-bottom: 4px;
+  }
+  .tourn-name-input::placeholder { color: var(--placeholder); font-style: italic; text-transform: none; letter-spacing: normal; }
+
+  .tourn-remove-btn {
+    position: absolute; top: 6px; right: 6px; width: 18px; height: 18px;
+    border: none; background: var(--gray-light); color: var(--gray);
+    border-radius: 50%; font-size: 12px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+    transition: background 0.15s, color 0.15s; z-index: 1;
+  }
+  .tourn-remove-btn:hover { background: var(--red); color: #fff; }
+
+  .results-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .results-grid th {
+    font-size: 8px; font-weight: 700; color: var(--gray); letter-spacing: 1.5px;
+    text-transform: uppercase; text-align: left; padding: 0 6px 4px;
+    border-bottom: 1.5px solid var(--teal); white-space: nowrap;
+  }
+  .results-grid td { padding: 3px 6px; border-bottom: 1px solid #fff; vertical-align: middle; }
+  .results-grid td.rank-cell {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 11px;
+    color: var(--teal); width: 30px; text-align: center;
+  }
+  .results-grid th:first-child, .results-grid td.rank-cell { width: 22px; }
+  .placement-cell-wrap { display: flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; }
+  .placement-pair { display: flex; gap: 6px; flex: 1; min-width: 0; }
+  .placement-pair .placement-cell-wrap { flex: 1; }
+  .placement-input {
+    flex: 1; min-width: 0; width: 0; border: none; border-bottom: 1px solid var(--teal-light);
+    background: transparent; font-family: 'Barlow', sans-serif; font-size: 11px;
+    color: var(--text); padding: 2px 0; outline: none;
+  }
+  .placement-input:focus { border-color: var(--teal); }
+  .placement-input::placeholder { color: var(--placeholder); font-style: italic; }
+  .placement-clear {
+    width: 12px; height: 12px; flex-shrink: 0; border: none; background: var(--gray-light);
+    color: var(--gray); border-radius: 50%; font-size: 8px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .placement-clear:hover { background: var(--red); color: #fff; }
+
+  .rtn-row { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .rtn-row input.field-input { margin-bottom: 0; }
+  .rtn-deadline-label { flex: 2; }
+  .rtn-deadline-date { flex: 1; }
+  .rtn-event-name { flex: 1.4; }
+  .rtn-event-host { flex: 1.2; }
+  .rtn-event-desc { flex: 2; }
+  .rtn-row-remove {
+    width: 16px; height: 16px; flex-shrink: 0; border: none; background: var(--gray-light);
+    color: var(--gray); border-radius: 50%; font-size: 10px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .rtn-row-remove:hover { background: var(--red); color: #fff; }
+
+  /* Road to Nationals: countdown hero */
+  .countdown-hero {
+    display: flex; align-items: center; gap: 14px;
+    background: linear-gradient(135deg, var(--teal-dark) 0%, var(--teal) 100%);
+    border-radius: 6px; padding: 10px 14px; margin-bottom: 10px; color: #fff; position: relative;
+  }
+  .countdown-number { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 32px; line-height: 1; }
+  .countdown-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.85; }
+  .countdown-date { margin-left: auto; text-align: right; font-size: 10px; opacity: 0.9; line-height: 1.6; }
+  .countdown-date input {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px; color: #fff; font-size: 11px; padding: 3px 6px; font-family: 'Barlow', sans-serif;
+  }
+  .countdown-date input::-webkit-calendar-picker-indicator { filter: invert(1); }
+  .countdown-remove {
+    position: absolute; top: 6px; right: 6px; width: 16px; height: 16px;
+    border: none; background: rgba(255,255,255,0.2); color: #fff; border-radius: 50%;
+    font-size: 10px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .countdown-remove:hover { background: var(--red); }
+
+  /* Road to Nationals: deadline pills */
+  .deadline-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .deadline-pill {
+    display: flex; align-items: center; gap: 6px; background: var(--gray-light);
+    border-radius: 20px; padding: 4px 6px 4px 12px; font-size: 11px;
+  }
+  .deadline-pill input.dp-label {
+    border: none; background: transparent; font-weight: 600; font-size: 11px;
+    width: 130px; color: var(--text); outline: none;
+  }
+  .deadline-pill input.dp-label::placeholder { color: var(--placeholder); font-style: italic; font-weight: 400; }
+  .deadline-pill input.dp-date {
+    border: none; background: #fff; border-radius: 12px; font-size: 10px;
+    padding: 2px 6px; color: var(--teal-dark); outline: none;
+  }
+  .deadline-pill .rtn-row-remove { flex-shrink: 0; }
+
+  /* Road to Nationals: event cards */
+  .event-cards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .event-card {
+    flex: 1 1 300px; min-width: 260px;
+    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 6px;
+    border-left: 3px solid var(--teal); position: relative;
+  }
+  .event-card .rtn-row-remove { position: absolute; top: 6px; right: 6px; }
+  .event-card input.ec-name {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
+    letter-spacing: 0.5px; text-transform: uppercase; color: var(--teal-dark);
+    border: none; background: transparent; width: 85%; margin-bottom: 2px; outline: none;
+  }
+  .event-card input.ec-name::placeholder { text-transform: none; font-style: italic; color: var(--placeholder); letter-spacing: normal; font-weight: 400; }
+  .event-card input.ec-host {
+    font-size: 10px; color: var(--gray); border: none; background: transparent;
+    font-style: italic; width: 100%; margin-bottom: 4px; outline: none;
+  }
+  .event-card input.ec-host::placeholder { color: var(--placeholder); }
+  .event-card input.ec-desc {
+    font-size: 11px; border: none; background: transparent; width: 100%;
+    border-top: 1px solid #fff; padding-top: 4px; outline: none; color: var(--text);
+  }
+  .event-card input.ec-desc::placeholder { color: var(--placeholder); font-style: italic; }
+
+  /* Spoilers: card grid */
+  .spoiler-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 4px 0 10px; }
+  .spoiler-card { position: relative; }
+  .spoiler-card-img-wrap {
+    position: relative; aspect-ratio: 5 / 7; width: 100%; border-radius: 6px;
+    overflow: hidden; background: var(--gray-light);
+  }
+  .spoiler-card-img-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  .spoiler-card-remove {
+    position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border: none;
+    background: rgba(0,0,0,0.5); color: #fff; border-radius: 50%; font-size: 11px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2;
+  }
+  .spoiler-card-remove:hover { background: var(--red); }
+  .spoiler-card-caption-input {
+    width: 100%; font-size: 10px; font-weight: 600; color: var(--text); margin-top: 4px;
+    text-align: center; border: none; background: transparent; outline: none;
+    font-family: 'Barlow', sans-serif; padding: 1px;
+  }
+  .spoiler-card-caption-input::placeholder { color: var(--placeholder); font-style: italic; font-weight: 400; }
+  .spoiler-card-set-input {
+    width: 100%; font-size: 8px; color: var(--gray); text-align: center; border: none;
+    background: transparent; outline: none; font-family: 'Barlow', sans-serif; padding: 1px;
+  }
+  .spoiler-card-set-input::placeholder { color: var(--placeholder); font-style: italic; }
+  .spoiler-card-caption-input:hover, .spoiler-card-caption-input:focus,
+  .spoiler-card-set-input:hover, .spoiler-card-set-input:focus {
+    background: var(--gray-light); border-radius: 3px;
+  }
+  .spoiler-card-note {
+    width: 100%; border: none; border-top: 1px solid var(--teal-light); background: transparent;
+    font-size: 10px; color: var(--text); padding: 3px 0 0; margin-top: 3px; outline: none;
+    font-family: 'Barlow', sans-serif; resize: vertical; min-height: 42px;
+  }
+  .spoiler-card-note::placeholder { color: var(--placeholder); font-style: italic; }
+  .spoiler-card-note-print { display: none; }
+  .spoiler-card-addnote-btn {
+    display: block; width: 100%; margin-top: 3px; font-size: 9px; color: var(--teal);
+    background: none; border: 1px dashed var(--teal-mid); border-radius: 4px; padding: 2px 0;
+    cursor: pointer; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 0.5px;
+  }
+  .spoiler-card-addnote-btn:hover { background: var(--teal-light); }
+
+  /* Agur the Creator: fan-art card grid (mirrors spoiler cards minus set/badge) */
+  .agur-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 4px 0 10px; }
+  .agur-card { position: relative; }
+  .agur-card-img-wrap {
+    position: relative; aspect-ratio: 5 / 7; width: 100%; border-radius: 6px;
+    overflow: hidden; background: var(--gray-light); cursor: pointer;
+  }
+  .agur-card-img-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  .agur-card-remove {
+    position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border: none;
+    background: rgba(0,0,0,0.5); color: #fff; border-radius: 50%; font-size: 11px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2;
+  }
+  .agur-card-remove:hover { background: var(--red); }
+  .agur-card-caption-input {
+    width: 100%; font-size: 10px; font-weight: 600; color: var(--text); margin-top: 4px;
+    text-align: center; border: none; background: transparent; outline: none;
+    font-family: 'Barlow', sans-serif; padding: 1px;
+  }
+  .agur-card-caption-input::placeholder { color: var(--placeholder); font-style: italic; font-weight: 400; }
+  .agur-card-caption-input:hover, .agur-card-caption-input:focus { background: var(--gray-light); border-radius: 3px; }
+  .agur-card-note {
+    width: 100%; border: none; border-top: 1px solid var(--teal-light); background: transparent;
+    font-size: 10px; color: var(--text); padding: 3px 0 0; margin-top: 3px; outline: none;
+    font-family: 'Barlow', sans-serif; resize: vertical; min-height: 42px;
+  }
+  .agur-card-note::placeholder { color: var(--placeholder); font-style: italic; }
+  .agur-card-note-print { display: none; }
+  .agur-card-addnote-btn {
+    display: block; width: 100%; margin-top: 3px; font-size: 9px; color: var(--teal);
+    background: none; border: 1px dashed var(--teal-mid); border-radius: 4px; padding: 2px 0;
+    cursor: pointer; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 0.5px;
+  }
+  .agur-card-addnote-btn:hover { background: var(--teal-light); }
+
+  /* Collector's Corner */
+  .collectors-topic-input {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px;
+    letter-spacing: 1px; color: var(--teal-dark); border: none;
+    border-bottom: 1.5px solid var(--teal-light); background: transparent;
+    width: 100%; padding: 3px 0; outline: none; margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+  .collectors-topic-input:focus { border-color: var(--teal); }
+  .collectors-topic-input::placeholder { color: var(--placeholder); font-style: italic; font-weight: 400; letter-spacing: normal; }
+
+  .collectors-layout { display: flex; gap: 14px; align-items: flex-start; }
+  .collectors-notes-col { flex: 1; min-width: 0; }
+  .collectors-card-col { width: 130px; flex-shrink: 0; }
+
+  .bullet-wrap { position: relative; }
+  .bullet-textarea {
+    width: 100%; border: none; border-bottom: 1.5px solid var(--teal-light);
+    background: transparent; font-family: 'Barlow', sans-serif; font-size: 11px;
+    color: var(--text); padding: 2px 0 2px 16px; outline: none; resize: vertical;
+    min-height: 100px; line-height: 1.7;
+    background-image: repeating-linear-gradient(transparent, transparent calc(1.7em - 1px), var(--teal-light) calc(1.7em - 1px), var(--teal-light) calc(1.7em));
+    transition: border-color 0.2s;
+  }
+  .bullet-textarea:focus { border-color: var(--teal); }
+  .bullet-textarea::placeholder { color: var(--placeholder); font-style: italic; }
+  .bullet-marks {
+    position: absolute; top: 2px; left: 0; line-height: 1.7; font-size: 11px;
+    color: var(--teal); pointer-events: none; font-weight: 700;
+  }
+  .bullet-marks span { display: block; height: 1.7em; }
+  .bullet-textarea.short { min-height: 60px; }
+
+  .collectors-card-placeholder {
+    aspect-ratio: 5 / 7; width: 100%; border-radius: 6px; background: var(--gray-light);
+    border: 2px dashed var(--teal-mid); display: flex; align-items: center; justify-content: center;
+    text-align: center; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  }
+  .collectors-card-placeholder:hover { background: var(--teal-light); border-color: var(--teal); }
+  .collectors-card-placeholder-text {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 10px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--teal); padding: 8px;
+  }
+  .collectors-card-img-wrap {
+    position: relative; aspect-ratio: 5 / 7; width: 100%; border-radius: 6px;
+    overflow: hidden; background: var(--gray-light);
+  }
+  .collectors-card-img-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  .collectors-card-remove {
+    position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border: none;
+    background: rgba(0,0,0,0.5); color: #fff; border-radius: 50%; font-size: 11px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2;
+  }
+  .collectors-card-remove:hover { background: var(--red); }
+  .collectors-card-caption-input {
+    width: 100%; font-size: 10px; font-weight: 600; color: var(--text); margin-top: 4px;
+    text-align: center; border: none; background: transparent; outline: none;
+    font-family: 'Barlow', sans-serif; padding: 1px;
+  }
+  .collectors-card-caption-input::placeholder { color: var(--placeholder); font-style: italic; font-weight: 400; }
+  .collectors-card-caption-input:hover, .collectors-card-caption-input:focus { background: var(--gray-light); border-radius: 3px; }
+
+  .bullet-notes-print { display: none; }
+
+  /* ===== Dark Mode (additive overrides; affects screen and print/PDF) ===== */
+
+  body.dark-mode {
+    --white: #1c2e2d;
+    --gray-light: #2a4442;
+    --gray: #93aead;
+    --text: #eef7f6;
+    --teal-light: #345a58;
+    --placeholder: #7fa19f;
+    background: #081615;
+  }
+  body.dark-mode .canvas { box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+
+  body.dark-mode .podcast-name { color: #ffffff; text-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+  body.dark-mode .page-header {
+    background:
+      linear-gradient(135deg, rgba(2,20,19,0.82) 0%, rgba(3,40,38,0.8) 60%, rgba(6,60,57,0.75) 100%),
+      url('/threshingfloor/header.jpg') center center / cover no-repeat;
+  }
+
+  body.dark-mode .field-input, body.dark-mode .field-textarea, body.dark-mode .bullet-textarea,
+  body.dark-mode .collectors-topic-input, body.dark-mode .tourn-name-input,
+  body.dark-mode .rank-input, body.dark-mode .placement-input, body.dark-mode .deadline-pill input.dp-label,
+  body.dark-mode .event-card input, body.dark-mode .agur-card-caption-input,
+  body.dark-mode .collectors-card-caption-input, body.dark-mode input[type=text],
+  body.dark-mode input[type=date], body.dark-mode select.field-input {
+    color: var(--text);
+  }
+
+  body.dark-mode .meta-input { color: #eef7f6; }
+  body.dark-mode .meta-input::placeholder { color: rgba(255,255,255,0.45); }
+
+  body.dark-mode .field-input::placeholder, body.dark-mode .field-textarea::placeholder,
+  body.dark-mode .bullet-textarea::placeholder, body.dark-mode .collectors-topic-input::placeholder,
+  body.dark-mode .rank-input::placeholder, body.dark-mode .placement-input::placeholder,
+  body.dark-mode .tourn-name-input::placeholder, body.dark-mode .agur-card-caption-input::placeholder,
+  body.dark-mode .collectors-card-caption-input::placeholder {
+    color: var(--placeholder);
+  }
+
+  body.dark-mode .tourn-block, body.dark-mode .event-card, body.dark-mode .deadline-pill,
+  body.dark-mode .collectors-card-placeholder, body.dark-mode .agur-card-img-wrap,
+  body.dark-mode .collectors-card-img-wrap, body.dark-mode .spoiler-card-img-wrap {
+    background: var(--gray-light);
+  }
+
+  body.dark-mode .results-grid th { color: var(--gray); }
+  body.dark-mode .rank-delta.same { background: var(--gray-light); color: var(--gray); }
+
+  body.dark-mode .field-label { color: var(--teal-mid) !important; }
+  body.dark-mode .tourn-name-input { color: var(--teal-mid); }
+
+  body.dark-mode input[type=date]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+  body.dark-mode #news-body label { color: var(--gray) !important; }
+
+  body.dark-mode .collectors-card-placeholder { border-color: var(--teal-mid); }
+  body.dark-mode .collectors-card-placeholder-text { color: var(--teal-mid); }
+
+  body.dark-mode .toggle-item-label { color: rgba(255,255,255,0.55); }
+  body.dark-mode .toggle-item input:checked ~ .toggle-switch ~ .toggle-item-label { color: rgba(255,255,255,0.95); }
+
+  body.dark-mode .save-status,
+  body.dark-mode [id$="-status"],
+  body.dark-mode [id$="-fetch-status"] {
+    color: var(--placeholder);
+  }
+
+  body.dark-mode .deadline-pill input.dp-date { background: var(--gray-light); color: var(--text); }
+
+  body.dark-mode .spoiler-modal-content { background: var(--white); color: var(--text); }
+  body.dark-mode .spoiler-modal-caption { color: var(--teal-mid); }
+
+  body.dark-mode .btn-ghost { color: var(--teal-mid); border-color: var(--teal-mid); }
+
+  @media print {
+    .bullet-textarea, .bullet-marks, .collectors-card-placeholder, .collectors-card-remove { display: none !important; }
+    .collectors-card-caption-input { border: none !important; background: transparent !important; pointer-events: none; }
+    .bullet-notes-print {
+      display: block; font-size: 11px; color: var(--text); line-height: 1.6; padding-left: 16px;
+    }
+    .bullet-notes-print li { margin-bottom: 3px; }
+    .bullet-notes-print:empty { display: none; }
+    .field:has(> .bullet-notes-print:empty) { display: none !important; }
+
+    /* Header meta fields: show as clean text, not input boxes */
+    .meta-input { display: none !important; }
+    .meta-value-print { display: inline; color: #ffffff; font-family: 'Barlow', sans-serif; font-size: 12px; font-weight: 700; }
+    .meta-field:has(.meta-value-print:empty) { display: none !important; }
+    .meta-field { display: inline-block !important; width: auto !important; margin-right: 14px; }
+    .meta-field .meta-label { display: block; }
+  }
+
+  /* Spoilers: enlarge modal */
+  .spoiler-card-img-wrap { cursor: pointer; }
+  .spoiler-modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(2,46,43,0.75);
+    z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+  }
+  .spoiler-modal-overlay.open { display: flex; }
+  .spoiler-modal-content {
+    background: #fff; border-radius: 8px; padding: 16px; max-width: 360px; width: 100%;
+    max-height: 90vh; overflow-y: auto; position: relative; text-align: center;
+  }
+  .spoiler-modal-content img { width: 100%; border-radius: 6px; object-fit: contain; }
+  .spoiler-modal-close {
+    position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border: none;
+    background: var(--gray-light); color: var(--text); border-radius: 50%; font-size: 16px;
+    line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .spoiler-modal-close:hover { background: var(--red); color: #fff; }
+  .spoiler-modal-caption {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 16px;
+    color: var(--teal-dark); margin-top: 10px;
+  }
+  .spoiler-modal-set { font-size: 11px; color: var(--gray); margin-top: 2px; }
+  .spoiler-modal-note {
+    font-size: 12px; color: var(--text); margin-top: 8px; padding-top: 8px;
+    border-top: 1px solid var(--gray-light); text-align: left;
+  }
+  .spoiler-modal-note:empty { display: none; }
+  .spoiler-modal-note ul { margin: 0; padding-left: 18px; }
+  .spoiler-modal-note li { margin-bottom: 4px; line-height: 1.4; }
+
+  /* Spoilers: per-card set hero strip */
+  .spoiler-card-badge {
+    width: 100%; box-sizing: border-box;
+    color: #fff; font-family: 'Barlow Condensed', sans-serif; font-weight: 800;
+    font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; text-align: center;
+    border-radius: 4px; padding: 3px 4px; line-height: 1.2; margin-bottom: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .spoiler-card-badge:empty { padding: 0; }
+  .spoiler-modal-badge { font-size: 18px; padding: 10px 8px; margin-bottom: 10px; }
+  .spoiler-modal-badge:empty { display: none; margin-bottom: 0; }
+
+  .rankings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+  .rank-item { display: flex; align-items: center; gap: 5px; padding: 2px 0; border-bottom: 1px solid var(--teal-light); }
+  .rank-num { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 900; color: var(--teal); width: 18px; flex-shrink: 0; }
+  .rank-input { flex: 1; border: none; background: transparent; font-family: 'Barlow', sans-serif; font-size: 11px; color: var(--text); outline: none; padding: 1px 0; }
+  .rank-input::placeholder { color: var(--placeholder); font-style: italic; }
+  .rank-delta {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 10px; font-weight: 700;
+    min-width: 28px; text-align: center; border-radius: 3px; padding: 1px 4px; flex-shrink: 0;
+  }
+  .rank-delta.up   { background: #d6f5e0; color: #0a8a3a; }
+  .rank-delta.down { background: #fde0e0; color: var(--red); }
+  .rank-delta.same { background: var(--gray-light); color: var(--gray); }
+  .rank-delta.new  { background: var(--teal-light); color: var(--teal-dark); }
+  .rank-delta.empty { visibility: hidden; }
+  .rank-clear {
+    width: 14px; height: 14px; flex-shrink: 0; border: none; background: var(--gray-light);
+    color: var(--gray); border-radius: 50%; font-size: 9px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .rank-clear:hover { background: var(--red); color: #fff; }
+
+  .repeat-item { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--teal-light); }
+  .repeat-item:last-child { border-bottom: none; margin-bottom: 0; }
+
+  #news-body { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+  #news-body .repeat-item {
+    flex: 1 1 260px; min-width: 220px; border: none; border-radius: 6px;
+    background: var(--gray-light); padding: 8px 10px; margin-bottom: 0;
+  }
+  #news-add-row { flex-basis: 100%; }
+
+  .section-divider {
+    height: 3px;
+    background: linear-gradient(to right, var(--teal-dark), var(--teal), var(--teal-dark));
+  }
+
+  .page2-banner {
+    background: linear-gradient(135deg, var(--teal-deep) 0%, var(--teal-dark) 60%, #0a6e69 100%);
+    border-radius: 10px 10px 0 0;
+    padding: 10px 24px;
+    border-bottom: 3px solid var(--teal);
+  }
+  .page2-banner-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--white);
+  }
+  .page2-banner-sub { font-size: 10px; color: var(--teal-mid); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+  .page-footer {
+    background: var(--teal-deep);
+    color: var(--teal-mid);
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+    text-align: center; padding: 7px; border-radius: 0 0 10px 10px;
+  }
+
+  #page2-wrapper { display: none; }
+  #page2-wrapper.active { display: block; }
+
+  @media print {
+    @page { margin: 0.4in; }
+    body { background: white; padding: 0; }
+    .toolbar, .toggle-row { display: none; }
+    .sec-order-controls { display: none !important; }
+    .page-header { border-radius: 0; }
+    .canvas { box-shadow: none; border-radius: 0; }
+    .canvas.page2 { margin-top: 0; page-break-before: always; }
+    .page2-banner { border-radius: 0; }
+
+    /* Keep each section together on one page; if it doesn't fit, push the whole thing to the next page */
+    .movable-section, .grid-1, .grid-2 {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      break-before: avoid;
+      page-break-before: avoid;
+    }
+    .sec-header {
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    #tourn-add-row, .tourn-remove-btn, .placement-clear, .rank-clear { display: none; }
+    .rank-delta.empty { display: none; }
+    #prev-rankings-field { display: none; }
+    #prev-meta-rankings-field { display: none; }
+    #tournaments-section button, #tournaments-section select, #upcoming-fetch-status { display: none; }
+    .rtn-row-remove, .countdown-remove { display: none; }
+    #rtn-section .btn { display: none; }
+    #rtn-carryforward-status { display: none; }
+    #rtn-nats-fetch-status { display: none; }
+    #spoiler-fetch-status, #spoilers-section button, #spoilers-section select, #spoilers-section label.btn { display: none; }
+    .spoiler-card-remove, .spoiler-card-addnote-btn { display: none; }
+    .spoiler-card-note { display: none; }
+    .spoiler-card-note-print {
+      display: block; font-size: 10px; color: var(--text); margin: 3px 0 0;
+      padding-top: 3px; border-top: 1px solid var(--teal-light); padding-left: 14px;
+    }
+    .spoiler-card-note-print li { margin-bottom: 2px; line-height: 1.3; }
+    .spoiler-card-note-print:empty { display: none; border-top: none; }
+    #spoiler-empty-state { display: none; }
+    .spoiler-card-caption-input, .spoiler-card-set-input { border: none !important; background: transparent !important; pointer-events: none; }
+    .spoiler-modal-overlay { display: none !important; }
+    #agur-modal-overlay { display: none !important; }
+    #mailbag-add-row, #mailbag-body .tourn-remove-btn { display: none; }
+    #news-add-row, #news-body .tourn-remove-btn { display: none; }
+    #news-body label:has(input[type=checkbox]) { display: none !important; }
+    #agur-section button, #agur-section label.btn { display: none; }
+    .agur-card-remove, .agur-card-addnote-btn { display: none; }
+    .agur-card-note { display: none; }
+    .agur-card-note-print {
+      display: block; font-size: 10px; color: var(--text); margin: 3px 0 0;
+      padding-top: 3px; border-top: 1px solid var(--teal-light); padding-left: 14px;
+    }
+    .agur-card-note-print li { margin-bottom: 2px; line-height: 1.3; }
+    .agur-card-note-print:empty { display: none; border-top: none; }
+    #agur-empty-state { display: none; }
+    .agur-card-caption-input { border: none !important; background: transparent !important; pointer-events: none; }
+    .rtn-row { border-bottom: 1px solid var(--teal-light); padding-bottom: 2px; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<div style="max-width: 1000px; margin: 0 auto;">
+
+  <div class="page-header">
+    <div class="header-left">
+      <div class="podcast-name">The Threshing Floor</div>
+      <div class="podcast-sub">Episode Outline &nbsp;&middot;&nbsp; Hendrix &amp; Agur the Wise</div>
+    </div>
+    <div class="header-meta">
+      <div class="meta-field">
+        <span class="meta-label">Episode #</span>
+        <input class="meta-input narrow" id="ep-num" type="text" placeholder="e.g. 100" autocomplete="off">
+        <span class="meta-value-print" id="ep-num-print"></span>
+      </div>
+      <div class="meta-field">
+        <span class="meta-label">Recording Date</span>
+        <input class="meta-input" id="ep-date" type="date">
+        <span class="meta-value-print" id="ep-date-print"></span>
+      </div>
+      <div class="meta-field">
+        <span class="meta-label">Est. Runtime</span>
+        <input class="meta-input narrow" id="ep-runtime" type="text" placeholder="90 min" autocomplete="off">
+        <span class="meta-value-print" id="ep-runtime-print"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <span class="toolbar-label">Actions</span>
+    <button class="btn btn-teal" onclick="saveData()">Save Draft</button>
+    <button class="btn btn-ghost" onclick="loadData()">Load Draft</button>
+    <button class="btn btn-ghost" onclick="window.print()">Print / Export PDF</button>
+    <button class="btn btn-red" onclick="clearAll()">Clear All</button>
+    <span class="save-status" id="save-status">No draft saved yet</span>
+    <button class="btn btn-ghost" id="dark-mode-toggle" onclick="toggleDarkMode()" style="margin-left:8px;">&#127769; Dark Mode</button>
+  </div>
+
+  <div class="toggle-row">
+    <span class="toggle-row-label">Segments for This Episode</span>
+    <label class="toggle-item"><input type="checkbox" id="tog-news" onchange="updateSection('news-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Recent News</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-tournaments" onchange="updateSection('tournaments-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Tournaments</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-rankings" onchange="updateSection('rankings-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Power Rankings</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-dotw" onchange="updateSection('dotw-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Deck of the Week</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-mailbag" onchange="updateSection('mailbag-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Community Mailbag</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-rtn" checked onchange="updateSection('rtn-section', this); if(this.checked) fetchNationalsInfo();"><span class="toggle-switch"></span><span class="toggle-item-label">Road to Nationals</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-spoilers" onchange="updateSection('spoilers-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Spoilers</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-collectors" onchange="updateSection('collectors-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Collector's Corner</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-meta" onchange="updateSection('meta-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Meta Forecast</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-agur" onchange="updateSection('agur-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Agur the Creator</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-potm" onchange="updateSection('potm-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Player of the Month</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-guest" onchange="toggleGuestPage(this)"><span class="toggle-switch"></span><span class="toggle-item-label">Guest Interview</span></label>
+  </div>
+
+  <div class="canvas">
+
+    <div class="grid-1">
+      <div class="section">
+        <div class="sec-header"><span class="sec-title">Opening Conversations</span></div>
+        <div class="sec-body">
+          <div class="field">
+            <label class="field-label">Sponsor Shoutout</label>
+            <input class="field-input" id="sponsor" placeholder="Your Turn Games - yourturngames.biz" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="field-label bullet-field-label">Opening Topic / Notes</label>
+            <div class="bullet-wrap">
+              <div class="bullet-marks" id="opening-notes-marks"><span>&#8226;</span></div>
+              <textarea class="bullet-textarea" id="opening-notes" placeholder="Conversation starter, personal updates, milestone notes... (one per line)"></textarea>
+            </div>
+            <ul class="bullet-notes-print" id="opening-notes-print"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="movable-section" data-sid="news">
+    <div class="grid-1">
+      <div class="section" id="news-section">
+        <div class="sec-header">
+          <span class="sec-title">Recent News</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('news',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('news',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body" id="news-body"></div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="movable-section" data-sid="tournaments">
+    <div class="grid-1">
+      <div class="section" id="tournaments-section">
+        <div class="sec-header">
+          <span class="sec-title">Tournaments</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('tournaments',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('tournaments',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body">
+          <label class="field-label">Recent Results</label>
+          <div class="tourn-grid" id="tourn-grid"></div>
+          <label class="field-label">Upcoming Tournaments</label>
+          <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
+            <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="fetchUpcomingTournaments()">Fetch Upcoming (Next 21 Days)</button>
+            <select class="field-input" id="upcoming-picker" style="display:none; flex:1;"></select>
+            <button class="btn btn-teal" type="button" id="upcoming-add-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="addUpcomingPick()">Add</button>
+          </div>
+          <div id="upcoming-fetch-status" style="font-size:9px; color:var(--placeholder); font-style:italic; margin-bottom:4px;"></div>
+          <textarea class="field-textarea tall" id="upcoming" placeholder="Tournament name - Date - Location (one per line)"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="movable-section" data-sid="rankings-dotw">
+    <div class="grid-2">
+      <div class="section" id="rankings-section">
+        <div class="sec-header">
+          <span class="sec-title">Power Rankings</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('rankings-dotw',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('rankings-dotw',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body">
+          <div class="field" id="prev-rankings-field" style="margin-bottom:8px;">
+            <label class="field-label">Previous Episode's Rankings (for movement +/-)</label>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="loadPreviousRankings()">Load Previous Draft</button>
+              <span id="prev-rankings-status" style="font-size:9px; color:var(--placeholder); font-style:italic;">No previous rankings loaded</span>
+            </div>
+          </div>
+          <div class="rankings-grid" id="rankings-grid"></div>
+        </div>
+      </div>
+
+      <div class="section" id="dotw-section">
+        <div class="sec-header"><span class="sec-title">Deck of the Week</span></div>
+        <div class="sec-body">
+          <div class="field">
+            <label class="field-label">Deck Profile Link</label>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input class="field-input" id="dotw-link" placeholder="https://redemptionccg.app/decklist/..." autocomplete="off" style="flex:1;">
+              <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="fetchDeckInfo()">Fetch</button>
+            </div>
+            <div id="dotw-fetch-status" style="font-size:9px; color:var(--placeholder); font-style:italic; margin-top:2px;"></div>
+          </div>
+          <div class="field">
+            <label class="field-label">Deck Name</label>
+            <input class="field-input" id="dotw-name" placeholder="e.g. 1-Turn Combo Win" autocomplete="off">
+          </div>
+          <div class="field" style="display:flex; gap:8px;">
+            <div style="flex:1;">
+              <label class="field-label">Creator</label>
+              <input class="field-input" id="dotw-creator" placeholder="Name / handle" autocomplete="off">
+            </div>
+            <div style="flex:1;">
+              <label class="field-label">Format</label>
+              <select class="field-input" id="dotw-format">
+                <option value="">--</option>
+                <option value="T1">T1</option>
+                <option value="T2">T2</option>
+                <option value="Both">Both</option>
+              </select>
+            </div>
+            <div style="flex:1;">
+              <label class="field-label">Color / Alignment</label>
+              <input class="field-input" id="dotw-color" list="dotw-color-options" placeholder="e.g. White, Gold, Multi" autocomplete="off">
+              <datalist id="dotw-color-options"></datalist>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Key Cards &amp; Strategy</label>
+            <textarea class="field-textarea xtall" id="dotw-notes" placeholder="Key cards and their roles, strategy overview, talking points..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="movable-section" data-sid="rtn">
+    <div class="grid-1">
+      <div class="section" id="rtn-section">
+        <div class="sec-header">
+          <span class="sec-title">Road to Nationals</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('rtn',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('rtn',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body">
+          <div id="rtn-nats-fetch-status" style="font-size:9px; color:var(--placeholder); font-style:italic; margin-bottom:6px;"></div>
+          <div class="countdown-hero" id="rtn-countdown-field" style="display:none;">
+            <div>
+              <div class="countdown-number" id="rtn-countdown-number">--</div>
+              <div class="countdown-label" id="rtn-countdown-label">Days to Nationals</div>
+            </div>
+            <div class="countdown-date">
+              Nationals Date<br>
+              <input type="date" id="rtn-nats-date">
+            </div>
+            <button type="button" class="countdown-remove" title="Remove" onclick="removeCountdownField()">&times;</button>
+          </div>
+
+          <div class="field" id="rtn-deadlines-field" style="display:none;">
+            <label class="field-label">Key Deadlines</label>
+            <div class="deadline-pills" id="rtn-deadlines-list"></div>
+          </div>
+
+          <div class="field" id="rtn-events-field" style="display:none; margin-top:6px;">
+            <label class="field-label">Side Events</label>
+            <div class="event-cards" id="rtn-events-list"></div>
+          </div>
+
+          <div class="field" id="rtn-extra-notes-field" style="display:none; margin-top:8px; position:relative;">
+            <label class="field-label bullet-field-label">Venue / Other Notes</label>
+            <div class="bullet-wrap">
+              <div class="bullet-marks" id="rtn-extra-notes-marks"><span>&#8226;</span></div>
+              <textarea class="bullet-textarea" id="rtn-extra-notes" placeholder="Venue logistics, parking, hotel info, special arrangements... (one per line)"></textarea>
+            </div>
+            <ul class="bullet-notes-print" id="rtn-extra-notes-print"></ul>
+            <button type="button" class="countdown-remove" title="Remove" onclick="removeExtraNotesField()" style="position:absolute; top:0; right:0;">&times;</button>
+          </div>
+
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+            <button class="btn btn-ghost" type="button" id="rtn-add-countdown-btn" style="padding:3px 10px; font-size:10px;" onclick="showCountdownField()">+ Add Nationals Countdown</button>
+            <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="addDeadlineRow()">+ Add Deadline</button>
+            <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="addSideEventRow()">+ Add Side Event</button>
+            <button class="btn btn-ghost" type="button" id="rtn-add-extra-notes-btn" style="padding:3px 10px; font-size:10px;" onclick="showExtraNotesField()">+ Add Venue / Other Notes</button>
+            <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="carryForwardRtn()">&#8635; Carry Forward from Previous Draft</button>
+            <span id="rtn-carryforward-status" style="font-size:9px; color:var(--placeholder); font-style:italic;"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="movable-section" data-sid="spoilers">
+    <div class="grid-1">
+      <div class="section" id="spoilers-section">
+        <div class="sec-header">
+          <span class="sec-title">Spoilers</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('spoilers',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('spoilers',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body">
+          <div class="field">
+            <label class="field-label">Cards to Feature</label>
+            <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px; flex-wrap:wrap;">
+              <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="fetchRecentSpoilers()">Fetch Recent Spoilers (Last 21 Days)</button>
+              <select class="field-input" id="spoiler-picker" style="display:none; flex:1;"></select>
+              <button class="btn btn-teal" type="button" id="spoiler-add-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="addSpoilerPick()">Add</button>
+              <label class="btn btn-ghost" style="padding:3px 10px; font-size:10px; white-space:nowrap; cursor:pointer; margin-bottom:0;">
+                + Upload Card Image
+                <input type="file" id="spoiler-manual-file" accept="image/*" style="display:none;" onchange="addManualSpoilerCard()">
+              </label>
+            </div>
+            <div id="spoiler-fetch-status" style="font-size:9px; color:var(--placeholder); font-style:italic; margin-bottom:4px;"></div>
+
+            <div class="spoiler-card-grid" id="spoiler-card-grid"></div>
+            <div id="spoiler-empty-state" style="font-size:10px; color:var(--placeholder); font-style:italic; padding:6px 0;">No cards added yet -- fetch recent spoilers or add one manually.</div>
+          </div>
+
+          <div id="spoiler-modal-overlay" class="spoiler-modal-overlay" onclick="closeSpoilerModal(event)">
+            <div class="spoiler-modal-content">
+              <button type="button" class="spoiler-modal-close" onclick="closeSpoilerModal(event)">&times;</button>
+              <div class="spoiler-card-badge spoiler-modal-badge" id="spoiler-modal-badge"></div>
+              <img id="spoiler-modal-img" src="" alt="">
+              <div class="spoiler-modal-caption" id="spoiler-modal-caption"></div>
+              <div class="spoiler-modal-set" id="spoiler-modal-set"></div>
+              <div class="spoiler-modal-note" id="spoiler-modal-note"></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Discussion Notes</label>
+            <textarea class="field-textarea" id="spoiler-notes" placeholder="Talking points, comparisons, community reaction..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="movable-section" data-sid="collectors">
+    <div class="grid-1">
+      <div class="section" id="collectors-section">
+        <div class="sec-header">
+          <span class="sec-title">Collector's Corner</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('collectors',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('collectors',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body">
+          <input class="collectors-topic-input" id="collectors-topic" placeholder="Segment topic -- e.g. Foil price trends, grading talk, rare finds..." autocomplete="off">
+
+          <div class="collectors-layout">
+            <div class="collectors-notes-col">
+              <div class="bullet-wrap">
+                <div class="bullet-marks" id="collectors-bullet-marks"><span>&#8226;</span></div>
+                <textarea class="bullet-textarea" id="collectors-notes" placeholder="Talking points -- price trends, demand shifts, reprints, grading, rumors... (one per line)"></textarea>
+              </div>
+              <ul class="bullet-notes-print" id="collectors-notes-print"></ul>
+            </div>
+            <div class="collectors-card-col" id="collectors-card-col">
+              <div class="collectors-card-placeholder" id="collectors-card-placeholder" onclick="document.getElementById('collectors-card-file').click()">
+                <span class="collectors-card-placeholder-text">+ Reference a Card</span>
+              </div>
+              <input type="file" id="collectors-card-file" accept="image/*" style="display:none;" onchange="addCollectorsCard(this)">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="movable-section" data-sid="meta">
+    <div class="grid-1">
+      <div class="section" id="meta-section">
+        <div class="sec-header">
+          <span class="sec-title">Meta Forecast</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('meta',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('meta',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body">
+          <div class="field" id="prev-meta-rankings-field" style="margin-bottom:8px;">
+            <label class="field-label">Previous Episode's Deck Rankings (for movement +/-)</label>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="loadPreviousMetaRankings()">Load Previous Draft</button>
+              <span id="prev-meta-rankings-status" style="font-size:9px; color:var(--placeholder); font-style:italic;">No previous rankings loaded</span>
+            </div>
+          </div>
+          <div class="rankings-grid" id="meta-rankings-grid"></div>
+          <div class="field" style="margin-top:8px;">
+            <label class="field-label">Discussion Notes</label>
+            <textarea class="field-textarea tall" id="meta-notes" placeholder="Predictions on upcoming meta shifts, archetypes to watch, rotation impact, etc."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="movable-section" data-sid="agur">
+    <div class="grid-1">
+      <div class="section" id="agur-section">
+        <div class="sec-header">
+          <span class="sec-title">Agur the Creator</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('agur',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('agur',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body">
+          <div class="field">
+            <label class="field-label">Fan Card Designs</label>
+            <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px; flex-wrap:wrap;">
+              <label class="btn btn-ghost" style="padding:3px 10px; font-size:10px; white-space:nowrap; cursor:pointer; margin-bottom:0;">
+                + Upload Card Image
+                <input type="file" id="agur-manual-file" accept="image/*" style="display:none;" onchange="addAgurCard()">
+              </label>
+            </div>
+            <div class="agur-card-grid" id="agur-card-grid"></div>
+            <div id="agur-empty-state" style="font-size:10px; color:var(--placeholder); font-style:italic; padding:6px 0;">No designs added yet -- upload a fan card image to get started.</div>
+          </div>
+
+          <div id="agur-modal-overlay" class="spoiler-modal-overlay" onclick="closeAgurModal(event)">
+            <div class="spoiler-modal-content">
+              <button type="button" class="spoiler-modal-close" onclick="closeAgurModal(event)">&times;</button>
+              <img id="agur-modal-img" src="" alt="">
+              <div class="spoiler-modal-caption" id="agur-modal-caption"></div>
+              <div class="spoiler-modal-note" id="agur-modal-note"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Discussion Notes</label>
+            <textarea class="field-textarea tall" id="agur-notes" placeholder="Custom card design, homebrew content, creative projects..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="movable-section" data-sid="potm">
+    <div class="grid-1">
+      <div class="section" id="potm-section">
+        <div class="sec-header">
+          <span class="sec-title">Player of the Month</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('potm',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('potm',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body">
+          <div class="field">
+            <label class="field-label">Player Name</label>
+            <input class="field-input" id="potm-name" list="rank-player-options" placeholder="Name / handle -- select existing or type new" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="field-label">Highlight / Reason</label>
+            <textarea class="field-textarea" id="potm-notes" placeholder="Recent achievements, community contributions, notable plays..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="movable-section" data-sid="mailbag">
+    <div class="grid-1">
+      <div class="section" id="mailbag-section">
+        <div class="sec-header">
+          <span class="sec-title">Community Mailbag</span>
+          <span class="sec-order-controls">
+            <button class="sec-order-btn" type="button" onclick="moveSection('mailbag',-1)" title="Move up">&#9650;</button>
+            <button class="sec-order-btn" type="button" onclick="moveSection('mailbag',1)" title="Move down">&#9660;</button>
+          </span>
+        </div>
+        <div class="sec-body" id="mailbag-body"></div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    </div>
+
+    <div class="section-divider" id="closing-divider-p1"></div>
+
+    <div class="grid-1" id="closing-wrapper-p1">
+      <div class="section">
+        <div class="sec-header"><span class="sec-title">Closing</span></div>
+        <div class="sec-body" id="closing-body-p1"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="page-footer" id="footer-p1">
+    The Threshing Floor Podcast &nbsp;&middot;&nbsp; thethreshingfloorpodcast.com &nbsp;&middot;&nbsp; Sponsored by Your Turn Games - yourturngames.biz
+  </div>
+
+  <div id="page2-wrapper">
+    <div class="canvas page2">
+      <div class="page2-banner">
+        <div class="page2-banner-title">Guest Interview</div>
+        <div class="page2-banner-sub">Page 2 &nbsp;&middot;&nbsp; The Threshing Floor</div>
+      </div>
+
+      <div class="grid-1">
+        <div class="section">
+          <div class="sec-header"><span class="sec-title">Guest Background</span></div>
+          <div class="sec-body">
+            <div class="field">
+              <label class="field-label">Guest Name</label>
+              <input class="field-input" id="guest-name" placeholder="Full name / handle" autocomplete="off">
+            </div>
+            <div class="field">
+              <label class="field-label">Background / Intro</label>
+              <textarea class="field-textarea tall" id="guest-bio" placeholder="How they got into Redemption, community role, accomplishments..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="grid-1">
+        <div class="section">
+          <div class="sec-header"><span class="sec-title">Interview Questions &amp; Topics</span></div>
+          <div class="sec-body" id="guest-questions-body"></div>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="grid-1">
+        <div class="section">
+          <div class="sec-header"><span class="sec-title">Resources &amp; Wrap-up</span></div>
+          <div class="sec-body">
+            <div class="field">
+              <label class="field-label">Resources to Mention</label>
+              <textarea class="field-textarea" id="guest-links" placeholder="Links, social handles, decks, projects the guest wants to plug..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="grid-1" id="closing-wrapper-p2">
+        <div class="section">
+          <div class="sec-header"><span class="sec-title">Closing</span></div>
+          <div class="sec-body" id="closing-body-p2"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="page-footer">
+      The Threshing Floor Podcast &nbsp;&middot;&nbsp; thethreshingfloorpodcast.com &nbsp;&middot;&nbsp; Sponsored by Your Turn Games - yourturngames.biz
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ---- Power Rankings: player datalist + delta tracking ----
+  window.previousRankings = null; // { "PlayerName": rankNumber, ... }
+
+  var rankingsGrid = document.getElementById('rankings-grid');
+  rankingsGrid.insertAdjacentHTML('beforebegin', '<datalist id="rank-player-options"></datalist>');
+  var rankPlayerDatalist = document.getElementById('rank-player-options');
+  window.knownPlayers = [];
+
+  function rebuildPlayerOptions(extra) {
+    var all = window.knownPlayers.slice();
+    if (extra && all.indexOf(extra) === -1) all.push(extra);
+    rankPlayerDatalist.innerHTML = '';
+    all.forEach(function(p) {
+      var opt = document.createElement('option');
+      opt.value = p;
+      rankPlayerDatalist.appendChild(opt);
+    });
+  }
+
+  // Header meta: plain-text mirrors for print/view display
+  function syncEpDatePrint() {
+    var input = document.getElementById('ep-date');
+    var out = document.getElementById('ep-date-print');
+    if (!input.value) { out.textContent = ''; return; }
+    var parts = input.value.split('-'); // YYYY-MM-DD
+    var d = new Date(parseInt(parts[0],10), parseInt(parts[1],10) - 1, parseInt(parts[2],10));
+    out.textContent = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+  document.getElementById('ep-date').addEventListener('input', syncEpDatePrint);
+
+  function syncEpNumPrint() {
+    document.getElementById('ep-num-print').textContent = document.getElementById('ep-num').value.trim();
+  }
+  document.getElementById('ep-num').addEventListener('input', syncEpNumPrint);
+
+  function syncEpRuntimePrint() {
+    document.getElementById('ep-runtime-print').textContent = document.getElementById('ep-runtime').value.trim();
+  }
+  document.getElementById('ep-runtime').addEventListener('input', syncEpRuntimePrint);
+
+  var potmNameInput = document.getElementById('potm-name');
+  potmNameInput.addEventListener('change', function() {
+    var v = this.value.trim();
+    if (v && window.knownPlayers.indexOf(v) === -1) {
+      window.knownPlayers.push(v);
+      rebuildPlayerOptions();
+    }
+  });
+
+  for (var i = 1; i <= 10; i++) {
+    rankingsGrid.insertAdjacentHTML('beforeend',
+      '<div class="rank-item"><span class="rank-num">' + i + '</span>' +
+      '<input class="rank-input" id="rank-' + i + '" list="rank-player-options" placeholder="Player name" autocomplete="off">' +
+      '<button type="button" class="rank-clear" title="Clear" onclick="clearRankField(' + i + ')">&times;</button>' +
+      '<span class="rank-delta empty" id="rank-delta-' + i + '"></span></div>');
+  }
+
+  // Update delta badge for a given row based on a previous-rankings map
+  function updateRankDeltaGeneric(prefix, rowNum, prevMap) {
+    var input = document.getElementById(prefix + '-' + rowNum);
+    var badge = document.getElementById(prefix + '-delta-' + rowNum);
+    var name = input.value.trim();
+
+    if (!name || !prevMap) {
+      badge.className = 'rank-delta empty';
+      badge.textContent = '';
+      return;
+    }
+
+    var prevRank = prevMap[name];
+    if (prevRank === undefined) {
+      badge.className = 'rank-delta new';
+      badge.textContent = 'NEW';
+      return;
+    }
+
+    var diff = prevRank - rowNum; // positive = moved up
+    if (diff > 0) {
+      badge.className = 'rank-delta up';
+      badge.textContent = '+' + diff;
+    } else if (diff < 0) {
+      badge.className = 'rank-delta down';
+      badge.textContent = String(diff);
+    } else {
+      badge.className = 'rank-delta same';
+      badge.textContent = '-';
+    }
+  }
+
+  function updateRankDelta(rowNum) {
+    updateRankDeltaGeneric('rank', rowNum, window.previousRankings);
+  }
+
+  function updateAllRankDeltas() {
+    for (var r = 1; r <= 10; r++) updateRankDelta(r);
+  }
+
+  function clearRankField(rowNum) {
+    var input = document.getElementById('rank-' + rowNum);
+    input.value = '';
+    input.focus();
+    updateRankDelta(rowNum);
+  }
+
+  // ---- Meta Forecast: community deck archetype rankings ----
+  window.previousMetaRankings = null; // { "Archetype Name": rankNumber, ... }
+  window.knownArchetypes = [];
+
+  var metaRankingsGrid = document.getElementById('meta-rankings-grid');
+  metaRankingsGrid.insertAdjacentHTML('beforebegin', '<datalist id="meta-archetype-options"></datalist>');
+  var metaArchetypeDatalist = document.getElementById('meta-archetype-options');
+
+  function rebuildArchetypeOptions(extra) {
+    var all = window.knownArchetypes.slice();
+    if (extra && all.indexOf(extra) === -1) all.push(extra);
+    metaArchetypeDatalist.innerHTML = '';
+    all.forEach(function(a) {
+      var opt = document.createElement('option');
+      opt.value = a;
+      metaArchetypeDatalist.appendChild(opt);
+    });
+  }
+
+  for (var mi = 1; mi <= 10; mi++) {
+    metaRankingsGrid.insertAdjacentHTML('beforeend',
+      '<div class="rank-item"><span class="rank-num">' + mi + '</span>' +
+      '<input class="rank-input" id="meta-rank-' + mi + '" list="meta-archetype-options" placeholder="Deck archetype" autocomplete="off">' +
+      '<button type="button" class="rank-clear" title="Clear" onclick="clearMetaRankField(' + mi + ')">&times;</button>' +
+      '<span class="rank-delta empty" id="meta-rank-delta-' + mi + '"></span></div>');
+  }
+
+  function updateMetaRankDelta(rowNum) {
+    updateRankDeltaGeneric('meta-rank', rowNum, window.previousMetaRankings);
+  }
+
+  function updateAllMetaRankDeltas() {
+    for (var r = 1; r <= 10; r++) updateMetaRankDelta(r);
+  }
+
+  function clearMetaRankField(rowNum) {
+    var input = document.getElementById('meta-rank-' + rowNum);
+    input.value = '';
+    input.focus();
+    updateMetaRankDelta(rowNum);
+  }
+
+  for (var mj = 1; mj <= 10; mj++) {
+    (function(rowNum) {
+      var input = document.getElementById('meta-rank-' + rowNum);
+      input.addEventListener('input', function() { updateMetaRankDelta(rowNum); });
+      input.addEventListener('change', function() {
+        var v = this.value.trim();
+        if (v && window.knownArchetypes.indexOf(v) === -1) {
+          window.knownArchetypes.push(v);
+          rebuildArchetypeOptions();
+        }
+      });
+    })(mj);
+  }
+
+  function loadPreviousMetaRankings() {
+    var status = document.getElementById('prev-meta-rankings-status');
+    var ep = document.getElementById('ep-num').value.trim();
+    if (!/^\d+(\.\d+)?$/.test(ep)) {
+      status.textContent = 'Enter a numeric episode number first.';
+      return;
+    }
+    status.textContent = 'Loading...';
+    fetch('/threshingfloor/api/drafts?before=' + encodeURIComponent(ep))
+      .then(function(res) {
+        if (res.status === 404) { status.textContent = 'No earlier episode draft found.'; return null; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        if (!row) return;
+        var data = row.data || {};
+        var prev = {};
+        var count = 0;
+        for (var r = 1; r <= 10; r++) {
+          var name = data['meta-rank-' + r];
+          if (name && name.trim()) {
+            prev[name.trim()] = r;
+            count++;
+            if (window.knownArchetypes.indexOf(name.trim()) === -1) window.knownArchetypes.push(name.trim());
+            document.getElementById('meta-rank-' + r).value = name.trim();
+          }
+        }
+        window.previousMetaRankings = prev;
+        rebuildArchetypeOptions();
+        updateAllMetaRankDeltas();
+        status.textContent = count > 0
+          ? ('Loaded ' + count + ' archetype(s) from Ep ' + row.episode_number + ' -- fields pre-filled, use x to clear and reorder')
+          : 'No meta rankings found in that draft.';
+      })
+      .catch(function() { status.textContent = 'Could not load the previous draft.'; });
+  }
+
+
+  // ---- Tournaments: name dropdown + placement fields ----
+  var tournNameDatalist = document.createElement('datalist');
+  tournNameDatalist.id = 'tourn-name-options';
+  document.body.appendChild(tournNameDatalist);
+  window.knownTournaments = [];
+
+  function rebuildTournNameOptions() {
+    tournNameDatalist.innerHTML = '';
+    window.knownTournaments.forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t;
+      tournNameDatalist.appendChild(opt);
+    });
+  }
+
+  // categories: [key, label, ranksCount, fieldsPerRank]
+  var placementCats = [
+    ['t1',  'T1 2-Player', 3, 1],
+    ['t2',  'T2 2-Player', 3, 1],
+    ['bo',  'Booster',     3, 1],
+    ['se',  'Sealed',      3, 1],
+    ['tm',  'Teams',       3, 2]
+  ];
+  var rankLabels = ['1st', '2nd', '3rd'];
+
+  var tournGrid = document.getElementById('tourn-grid');
+  window.tournBlockCount = 0;
+
+  function buildTournamentBlock() {
+    window.tournBlockCount++;
+    var b = window.tournBlockCount;
+
+    var block = document.createElement('div');
+    block.className = 'tourn-block';
+    block.id = 'tourn-block-' + b;
+    block.style.position = 'relative';
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'tourn-remove-btn';
+    removeBtn.title = 'Remove this tournament';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function() {
+      block.remove();
+    });
+    block.appendChild(removeBtn);
+
+    var nameInput = document.createElement('input');
+    nameInput.className = 'tourn-name-input';
+    nameInput.id = 't' + b + '-name';
+    nameInput.placeholder = 'Tournament Name';
+    nameInput.autocomplete = 'off';
+    nameInput.setAttribute('list', 'tourn-name-options');
+    nameInput.addEventListener('change', function() {
+      var v = this.value.trim();
+      if (v && window.knownTournaments.indexOf(v) === -1) {
+        window.knownTournaments.push(v);
+        rebuildTournNameOptions();
+      }
+    });
+    block.appendChild(nameInput);
+
+    var table = document.createElement('table');
+    table.className = 'results-grid';
+
+    // Header row
+    var thead = document.createElement('tr');
+    thead.appendChild(document.createElement('th')); // blank corner for rank column
+    placementCats.forEach(function(cat) {
+      var th = document.createElement('th');
+      th.textContent = cat[1];
+      if (cat[3] > 1) th.style.width = '34%';
+      thead.appendChild(th);
+    });
+    table.appendChild(thead);
+
+    function makeFieldCell(fieldId, placeholderText) {
+      var td = document.createElement('td');
+      var wrap = document.createElement('div');
+      wrap.className = 'placement-cell-wrap';
+
+      var inp = document.createElement('input');
+      inp.className = 'placement-input';
+      inp.id = fieldId;
+      inp.placeholder = placeholderText;
+      inp.autocomplete = 'off';
+      inp.setAttribute('list', 'rank-player-options');
+      inp.addEventListener('change', function() {
+        var v = this.value.trim();
+        if (v && window.knownPlayers.indexOf(v) === -1) {
+          window.knownPlayers.push(v);
+          rebuildPlayerOptions();
+        }
+      });
+      wrap.appendChild(inp);
+
+      var clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'placement-clear';
+      clearBtn.title = 'Clear';
+      clearBtn.innerHTML = '&times;';
+      clearBtn.addEventListener('click', function() {
+        inp.value = '';
+        inp.focus();
+      });
+      wrap.appendChild(clearBtn);
+
+      td.appendChild(wrap);
+      return td;
+    }
+
+    for (var r = 1; r <= 3; r++) {
+      var tr = document.createElement('tr');
+
+      var rankTd = document.createElement('td');
+      rankTd.className = 'rank-cell';
+      rankTd.textContent = rankLabels[r - 1];
+      tr.appendChild(rankTd);
+
+      placementCats.forEach(function(cat) {
+        var catKey = cat[0], ranks = cat[2], fieldsPerRank = cat[3];
+
+        if (fieldsPerRank === 1) {
+          var fieldId = 't' + b + '-' + catKey + '-' + r;
+          tr.appendChild(makeFieldCell(fieldId, 'Player name'));
+        } else {
+          var td = document.createElement('td');
+          var pairWrap = document.createElement('div');
+          pairWrap.className = 'placement-pair';
+          for (var f = 1; f <= fieldsPerRank; f++) {
+            var fieldId2 = 't' + b + '-' + catKey + '-' + r + '-' + f;
+            var cell = makeFieldCell(fieldId2, 'Player ' + f);
+            pairWrap.appendChild(cell.firstChild);
+          }
+          td.appendChild(pairWrap);
+          tr.appendChild(td);
+        }
+      });
+
+      table.appendChild(tr);
+    }
+
+    block.appendChild(table);
+    return block;
+  }
+
+  function addTournamentBlock() {
+    var block = buildTournamentBlock();
+    tournGrid.insertBefore(block, document.getElementById('tourn-add-row'));
+  }
+
+  // "Add tournament" row
+  var addRow = document.createElement('div');
+  addRow.id = 'tourn-add-row';
+  addRow.style.textAlign = 'center';
+  var addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'btn btn-ghost';
+  addBtn.textContent = '+ Add Tournament';
+  addBtn.addEventListener('click', addTournamentBlock);
+  addRow.appendChild(addBtn);
+
+  // Start with one block
+  tournGrid.appendChild(buildTournamentBlock());
+  tournGrid.appendChild(addRow);
+
+
+  // Wire up input listeners + add to known players on change
+  for (var i = 1; i <= 10; i++) {
+    (function(rowNum) {
+      var input = document.getElementById('rank-' + rowNum);
+      input.addEventListener('input', function() { updateRankDelta(rowNum); });
+      input.addEventListener('change', function() {
+        var v = this.value.trim();
+        if (v && window.knownPlayers.indexOf(v) === -1) {
+          window.knownPlayers.push(v);
+          rebuildPlayerOptions();
+        }
+      });
+    })(i);
+  }
+
+  // Load a previous draft JSON purely to extract last episode's rankings as a baseline
+  function loadPreviousRankings() {
+    var status = document.getElementById('prev-rankings-status');
+    var ep = document.getElementById('ep-num').value.trim();
+    if (!/^\d+(\.\d+)?$/.test(ep)) {
+      status.textContent = 'Enter a numeric episode number first.';
+      return;
+    }
+    status.textContent = 'Loading...';
+    fetch('/threshingfloor/api/drafts?before=' + encodeURIComponent(ep))
+      .then(function(res) {
+        if (res.status === 404) { status.textContent = 'No earlier episode draft found.'; return null; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        if (!row) return;
+        var data = row.data || {};
+        var prev = {};
+        var count = 0;
+        for (var r = 1; r <= 10; r++) {
+          var name = data['rank-' + r];
+          if (name && name.trim()) {
+            prev[name.trim()] = r;
+            count++;
+            if (window.knownPlayers.indexOf(name.trim()) === -1) window.knownPlayers.push(name.trim());
+            document.getElementById('rank-' + r).value = name.trim();
+          }
+        }
+        window.previousRankings = prev;
+        rebuildPlayerOptions();
+        updateAllRankDeltas();
+        status.textContent = count > 0
+          ? ('Loaded ' + count + ' player(s) from Ep ' + row.episode_number + ' -- fields pre-filled, use x to clear and reorder')
+          : 'No rankings found in that draft.';
+      })
+      .catch(function() { status.textContent = 'Could not load the previous draft.'; });
+  }
+
+  // ---- Recent News: repeating topic + notes items ----
+  var newsBody = document.getElementById('news-body');
+  window.newsCount = 0;
+  window.knownNewsTopics = [];
+
+  newsBody.insertAdjacentHTML('beforebegin', '<datalist id="news-topic-options"></datalist>');
+  var newsTopicDatalist = document.getElementById('news-topic-options');
+
+  function rebuildNewsTopicOptions() {
+    newsTopicDatalist.innerHTML = '';
+    window.knownNewsTopics.forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t;
+      newsTopicDatalist.appendChild(opt);
+    });
+  }
+
+  function createNewsAddRow() {
+    var addRow = document.createElement('div');
+    addRow.id = 'news-add-row';
+    addRow.style.textAlign = 'center';
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn btn-ghost';
+    addBtn.style.marginTop = '6px';
+    addBtn.textContent = '+ Add Topic';
+    addBtn.addEventListener('click', addNewsItem);
+    addRow.appendChild(addBtn);
+    return addRow;
+  }
+
+  function addNewsItem() {
+    window.newsCount++;
+    var n = window.newsCount;
+
+    var item = document.createElement('div');
+    item.className = 'repeat-item';
+    item.id = 'news-item-' + n;
+    item.style.position = 'relative';
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'tourn-remove-btn';
+    removeBtn.title = 'Remove this topic';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function() {
+      item.remove();
+    });
+    item.appendChild(removeBtn);
+
+    item.insertAdjacentHTML('beforeend',
+      '<div class="field">' +
+        '<label class="field-label">Topic</label>' +
+        '<div style="display:flex; gap:6px; align-items:center; padding-right:26px;">' +
+          '<input class="field-input" id="news-topic-' + n + '" list="news-topic-options" placeholder="Topic name -- e.g. Redemption with Jayden, or a one-off headline" autocomplete="off" style="flex:1;">' +
+          '<label style="display:flex; align-items:center; gap:4px; font-size:10px; color:var(--gray); white-space:nowrap; cursor:pointer;">' +
+            '<input type="checkbox" id="news-save-topic-' + n + '" style="margin:0;">Save as recurring' +
+          '</label>' +
+        '</div>' +
+      '</div>' +
+      '<div class="field" id="news-notes-field-' + n + '">' +
+        '<label class="field-label bullet-field-label">Notes</label>' +
+        '<div class="bullet-wrap">' +
+          '<div class="bullet-marks" id="news-notes-marks-' + n + '"><span>&#8226;</span></div>' +
+          '<textarea class="bullet-textarea short" id="news-notes-' + n + '" placeholder="Talking points -- details, links, context... (one per line)"></textarea>' +
+        '</div>' +
+        '<ul class="bullet-notes-print" id="news-notes-print-' + n + '"></ul>' +
+      '</div>');
+
+    var addRow = document.getElementById('news-add-row');
+    if (addRow) {
+      newsBody.insertBefore(item, addRow);
+    } else {
+      newsBody.appendChild(item);
+    }
+
+    var topicInput = document.getElementById('news-topic-' + n);
+    var saveCheckbox = document.getElementById('news-save-topic-' + n);
+    saveCheckbox.addEventListener('change', function() {
+      var v = topicInput.value.trim();
+      if (this.checked && v && window.knownNewsTopics.indexOf(v) === -1) {
+        window.knownNewsTopics.push(v);
+        rebuildNewsTopicOptions();
+      }
+    });
+    topicInput.addEventListener('change', function() {
+      if (saveCheckbox.checked) {
+        var v = this.value.trim();
+        if (v && window.knownNewsTopics.indexOf(v) === -1) {
+          window.knownNewsTopics.push(v);
+          rebuildNewsTopicOptions();
+        }
+      }
+    });
+
+    var notesField = document.getElementById('news-notes-' + n);
+    notesField.addEventListener('input', function() {
+      syncBulletField('news-notes-' + n, 'news-notes-marks-' + n, 'news-notes-print-' + n);
+    });
+    syncBulletField('news-notes-' + n, 'news-notes-marks-' + n, 'news-notes-print-' + n);
+  }
+
+  // Start with one topic
+  addNewsItem();
+  newsBody.appendChild(createNewsAddRow());
+
+  var mailbagBody = document.getElementById('mailbag-body');
+  window.mailbagCount = 0;
+
+  function addMailbagItem() {
+    window.mailbagCount++;
+    var m = window.mailbagCount;
+
+    var item = document.createElement('div');
+    item.className = 'repeat-item';
+    item.id = 'mb-item-' + m;
+    item.style.position = 'relative';
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'tourn-remove-btn';
+    removeBtn.title = 'Remove this question';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function() {
+      item.remove();
+    });
+    item.appendChild(removeBtn);
+
+    item.insertAdjacentHTML('beforeend',
+      '<div class="field"><label class="field-label">Submitted by</label>' +
+      '<input class="field-input" id="mb-by-' + m + '" placeholder="Name / handle" autocomplete="off"></div>' +
+      '<div class="field"><label class="field-label">Question</label>' +
+      '<textarea class="field-textarea" id="mb-q-' + m + '" placeholder="Full question text..."></textarea></div>' +
+      '<div class="field" id="mb-notes-field-' + m + '"><label class="field-label bullet-field-label">Talking Points</label>' +
+      '<div class="bullet-wrap">' +
+        '<div class="bullet-marks" id="mb-notes-marks-' + m + '"><span>&#8226;</span></div>' +
+        '<textarea class="bullet-textarea short" id="mb-notes-' + m + '" placeholder="Answer points -- key talking points for this question (one per line)"></textarea>' +
+      '</div>' +
+      '<ul class="bullet-notes-print" id="mb-notes-print-' + m + '"></ul>' +
+      '</div>');
+
+    var addRow = document.getElementById('mailbag-add-row');
+    if (addRow) {
+      mailbagBody.insertBefore(item, addRow);
+    } else {
+      mailbagBody.appendChild(item);
+    }
+
+    var notesField = document.getElementById('mb-notes-' + m);
+    notesField.addEventListener('input', function() {
+      syncBulletField('mb-notes-' + m, 'mb-notes-marks-' + m, 'mb-notes-print-' + m);
+    });
+    syncBulletField('mb-notes-' + m, 'mb-notes-marks-' + m, 'mb-notes-print-' + m);
+  }
+
+  function createMailbagAddRow() {
+    var addRow = document.createElement('div');
+    addRow.id = 'mailbag-add-row';
+    addRow.style.textAlign = 'center';
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn btn-ghost';
+    addBtn.style.marginTop = '6px';
+    addBtn.textContent = '+ Add Question';
+    addBtn.addEventListener('click', addMailbagItem);
+    addRow.appendChild(addBtn);
+    return addRow;
+  }
+
+  // Start with one question
+  addMailbagItem();
+  mailbagBody.appendChild(createMailbagAddRow());
+
+  var guestQBody = document.getElementById('guest-questions-body');
+  for (var g = 1; g <= 8; g++) {
+    guestQBody.insertAdjacentHTML('beforeend',
+      '<div class="field"><label class="field-label">Question / Topic ' + g + '</label>' +
+      '<textarea class="field-textarea" id="guest-q' + g + '" placeholder="Interview question or discussion topic..."></textarea></div>');
+  }
+
+  // ---- Deck of the Week: color dropdown ----
+  var defaultColors = ['White','Red','Green','Blue','Purple','Black','Gold','Brown','Gray','Clergy','Multi'];
+  var colorDatalist = document.getElementById('dotw-color-options');
+  function rebuildColorOptions(extra) {
+    var all = defaultColors.slice();
+    (window.customColors || []).forEach(function(c){ if (all.indexOf(c) === -1) all.push(c); });
+    if (extra && all.indexOf(extra) === -1) all.push(extra);
+    colorDatalist.innerHTML = '';
+    all.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c;
+      colorDatalist.appendChild(opt);
+    });
+  }
+  window.customColors = [];
+  rebuildColorOptions();
+  document.getElementById('dotw-color').addEventListener('change', function() {
+    var v = this.value.trim();
+    if (v && defaultColors.indexOf(v) === -1 && window.customColors.indexOf(v) === -1) {
+      window.customColors.push(v);
+      rebuildColorOptions();
+    }
+  });
+
+  // ---- Deck of the Week: fetch/parse deck link ----
+  function fetchDeckInfo() {
+    var url = document.getElementById('dotw-link').value.trim();
+    var status = document.getElementById('dotw-fetch-status');
+    if (!url) { status.textContent = 'Enter a deck link first.'; return; }
+    var m = url.match(/decklist\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/);
+    if (!m) { status.textContent = 'Could not find a deck id in that link.'; return; }
+    status.textContent = 'Fetching...';
+    fetch('/threshingfloor/api/data?kind=deck&id=' + m[1])
+      .then(function(res) {
+        if (res.status === 404) { status.textContent = 'Deck not found (must be public or unlisted).'; return null; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(deck) {
+        if (!deck) return;
+        if (deck.name) document.getElementById('dotw-name').value = deck.name;
+        if (deck.creator) document.getElementById('dotw-creator').value = deck.creator;
+        if (deck.format) document.getElementById('dotw-format').value = deck.format;
+        status.textContent = 'Filled in from deck (' + (deck.card_count || 0) + ' cards). Set color manually.';
+      })
+      .catch(function() { status.textContent = 'Could not fetch deck info.'; });
+  }
+
+  // ---- Upcoming Tournaments: fetch from /threshingfloor/api/data?kind=tournaments ----
+  window.upcomingListings = [];
+
+  var MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function formatDateShort(dateStr) {
+    // dateStr like "2026-06-27"
+    var parts = dateStr.split('-');
+    var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10), d = parseInt(parts[2], 10);
+    return MONTH_ABBR[m - 1] + ' ' + d;
+  }
+
+  // ---- Shared helper: fetch and parse /tournaments listings JSON ----
+  function fetchTournamentListings(onSuccess, onError) {
+    fetch('/threshingfloor/api/data?kind=tournaments')
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(onSuccess)
+      .catch(function() {
+        onError('Could not fetch tournament listings.');
+      });
+  }
+
+  // ---- Spoilers: fetch from /threshingfloor/api/data?kind=spoilers ----
+  window.spoilerListings = [];
+
+  function fetchRecentSpoilers() {
+    var status = document.getElementById('spoiler-fetch-status');
+    var picker = document.getElementById('spoiler-picker');
+    var addBtn = document.getElementById('spoiler-add-btn');
+
+    status.textContent = 'Fetching...';
+    fetch('/threshingfloor/api/data?kind=spoilers')
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(listings) {
+        var now = new Date();
+        var cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 21);
+
+        var filtered = listings.filter(function(item) {
+          var d = new Date(item.spoil_date + 'T00:00:00');
+          return d >= cutoff && d <= now;
+        });
+
+        if (filtered.length === 0) {
+          status.textContent = 'No spoilers found in the last 21 days.';
+          picker.style.display = 'none';
+          addBtn.style.display = 'none';
+          return;
+        }
+
+        window.spoilerListings = filtered;
+        picker.innerHTML = '';
+        filtered.forEach(function(item, idx) {
+          var opt = document.createElement('option');
+          opt.value = idx;
+          var label = item.card_name;
+          if (item.set_name) {
+            label += ' (' + item.set_name;
+            if (item.set_number) label += ' #' + item.set_number;
+            label += ')';
+          }
+          label += ' - ' + formatDateShort(item.spoil_date);
+          opt.textContent = label;
+          picker.appendChild(opt);
+        });
+
+        picker.style.display = '';
+        addBtn.style.display = '';
+        status.textContent = 'Found ' + filtered.length + ' spoiler(s) in the last 21 days. Select one and click Add.';
+
+        // Auto-fill Set/Promo with the most common set name among recent spoilers, if empty
+        var setField = document.getElementById('spoiler-set');
+        if (!setField.value) {
+          var counts = {};
+          filtered.forEach(function(item) {
+            if (item.set_name) counts[item.set_name] = (counts[item.set_name] || 0) + 1;
+          });
+          var topSet = null, topCount = 0;
+          Object.keys(counts).forEach(function(name) {
+            if (counts[name] > topCount) { topCount = counts[name]; topSet = name; }
+          });
+          if (topSet) setField.value = topSet;
+        }
+      })
+      .catch(function(err) {
+        status.textContent = 'Could not fetch spoilers.';
+      });
+  }
+
+  window.spoilerCardCount = 0;
+  function addSpoilerPick() {
+    var picker = document.getElementById('spoiler-picker');
+    var idx = parseInt(picker.value, 10);
+    var item = window.spoilerListings[idx];
+    if (!item) return;
+    addSpoilerCard(item.card_name, item.set_name, item.set_number, item.image_url);
+  }
+
+  // Palette of distinct gradient pairs for set badges
+  window.spoilerSetPalette = [
+    ['#0aada6', '#044e4a'], // teal (brand)
+    ['#cc6b1c', '#7a3e0d'], // burnt orange
+    ['#6b4ccc', '#3a2a73'], // purple
+    ['#c0392b', '#6e1f17'], // brick red
+    ['#2c8a4f', '#155228'], // forest green
+    ['#b8860b', '#5e4506'], // gold/amber
+    ['#3a6ea5', '#1d3a57'], // steel blue
+    ['#9b2c5e', '#54173a']  // magenta/wine
+  ];
+
+  function colorForSetName(setName) {
+    if (!setName) return null;
+    var hash = 0;
+    for (var i = 0; i < setName.length; i++) {
+      hash = ((hash << 5) - hash + setName.charCodeAt(i)) | 0;
+    }
+    var idx = Math.abs(hash) % window.spoilerSetPalette.length;
+    return window.spoilerSetPalette[idx];
+  }
+
+  function applyBadgeColor(badge, setName) {
+    var pair = colorForSetName(setName);
+    if (!pair) {
+      badge.style.background = '';
+      return;
+    }
+    badge.style.background = 'linear-gradient(135deg, ' + pair[0] + ' 0%, ' + pair[1] + ' 100%)';
+  }
+
+  function addSpoilerCard(cardName, setName, setNumber, imageUrl) {
+    window.spoilerCardCount++;
+    var n = window.spoilerCardCount;
+
+    var card = document.createElement('div');
+    card.className = 'spoiler-card';
+    card.id = 'spoiler-card-' + n;
+
+    var badge = document.createElement('div');
+    badge.className = 'spoiler-card-badge';
+    badge.id = 'spoiler-badge-' + n;
+    badge.textContent = setName ? (setName + (setNumber ? (' #' + setNumber) : '')) : '';
+    applyBadgeColor(badge, setName);
+    card.appendChild(badge);
+
+    var imgWrap = document.createElement('div');
+    imgWrap.className = 'spoiler-card-img-wrap';
+
+    var img = document.createElement('img');
+    img.src = imageUrl || '';
+    img.alt = cardName || 'Card image';
+    imgWrap.appendChild(img);
+    imgWrap.addEventListener('click', function() {
+      openSpoilerModal(n);
+    });
+
+    card.dataset.cardName = cardName || '';
+    card.dataset.setName = setName || '';
+    card.dataset.setNumber = setNumber || '';
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'spoiler-card-remove';
+    removeBtn.title = 'Remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function() {
+      card.remove();
+      if (document.getElementById('spoiler-card-grid').children.length === 0) {
+        document.getElementById('spoiler-empty-state').style.display = '';
+      }
+    });
+    imgWrap.appendChild(removeBtn);
+
+    card.appendChild(imgWrap);
+
+    var caption = document.createElement('input');
+    caption.className = 'spoiler-card-caption-input';
+    caption.value = cardName || '';
+    caption.placeholder = 'Card name';
+    caption.addEventListener('input', function() {
+      card.dataset.cardName = caption.value;
+    });
+    card.appendChild(caption);
+
+    var setLine = document.createElement('input');
+    setLine.className = 'spoiler-card-set-input';
+    setLine.value = setName ? (setName + (setNumber ? (' #' + setNumber) : '')) : '';
+    setLine.placeholder = 'Set #';
+    setLine.addEventListener('input', function() {
+      var parts = setLine.value.split('#');
+      card.dataset.setName = parts[0].trim();
+      card.dataset.setNumber = parts[1] ? parts[1].trim() : '';
+      badge.textContent = setLine.value.trim();
+      applyBadgeColor(badge, parts[0].trim());
+    });
+    card.appendChild(setLine);
+
+
+    var addNoteBtn = document.createElement('button');
+    addNoteBtn.type = 'button';
+    addNoteBtn.className = 'spoiler-card-addnote-btn';
+    addNoteBtn.textContent = '+ Add Note';
+    addNoteBtn.addEventListener('click', function() {
+      var note = document.createElement('textarea');
+      note.className = 'spoiler-card-note';
+      note.id = 'spoiler-note-' + n;
+      note.placeholder = 'Talking point...';
+      note.rows = 2;
+
+      var printList = document.createElement('ul');
+      printList.className = 'spoiler-card-note-print';
+      printList.id = 'spoiler-note-print-' + n;
+
+      function syncPrintList() {
+        printList.innerHTML = '';
+        note.value.split('\n').forEach(function(line) {
+          line = line.trim();
+          if (!line) return;
+          var li = document.createElement('li');
+          li.textContent = line;
+          printList.appendChild(li);
+        });
+      }
+      note.addEventListener('input', syncPrintList);
+
+      card.insertBefore(note, addNoteBtn);
+      card.insertBefore(printList, addNoteBtn);
+      addNoteBtn.remove();
+      note.focus();
+    });
+    card.appendChild(addNoteBtn);
+
+    document.getElementById('spoiler-card-grid').appendChild(card);
+    document.getElementById('spoiler-empty-state').style.display = 'none';
+  }
+
+  function openSpoilerModal(n) {
+    var card = document.getElementById('spoiler-card-' + n);
+    if (!card) return;
+    var img = card.querySelector('.spoiler-card-img-wrap img');
+    var noteEl = document.getElementById('spoiler-note-' + n);
+
+    document.getElementById('spoiler-modal-img').src = img.src;
+    document.getElementById('spoiler-modal-img').alt = card.dataset.cardName || '';
+    document.getElementById('spoiler-modal-caption').textContent = card.dataset.cardName || '';
+
+    var setLine = card.dataset.setName || '';
+    if (setLine && card.dataset.setNumber) setLine += ' #' + card.dataset.setNumber;
+    document.getElementById('spoiler-modal-set').textContent = setLine;
+
+    var modalBadge = document.getElementById('spoiler-modal-badge');
+    modalBadge.textContent = setLine;
+    applyBadgeColor(modalBadge, card.dataset.setName);
+
+    var modalNote = document.getElementById('spoiler-modal-note');
+    modalNote.innerHTML = '';
+    if (noteEl && noteEl.value.trim()) {
+      var ul = document.createElement('ul');
+      noteEl.value.split('\n').forEach(function(line) {
+        line = line.trim();
+        if (!line) return;
+        var li = document.createElement('li');
+        li.textContent = line;
+        ul.appendChild(li);
+      });
+      modalNote.appendChild(ul);
+    }
+
+    document.getElementById('spoiler-modal-overlay').classList.add('open');
+  }
+
+  function closeSpoilerModal(event) {
+    if (event && event.target.closest('.spoiler-modal-content') && !event.target.classList.contains('spoiler-modal-close')) {
+      return;
+    }
+    document.getElementById('spoiler-modal-overlay').classList.remove('open');
+  }
+
+  function openAgurModal(n) {
+    var card = document.getElementById('agur-card-' + n);
+    if (!card) return;
+    var img = card.querySelector('.agur-card-img-wrap img');
+    var caption = card.querySelector('.agur-card-caption-input');
+    var noteEl = document.getElementById('agur-note-' + n);
+
+    document.getElementById('agur-modal-img').src = img.src;
+    document.getElementById('agur-modal-img').alt = (caption && caption.value) || '';
+    document.getElementById('agur-modal-caption').textContent = (caption && caption.value) || '';
+
+    var modalNote = document.getElementById('agur-modal-note');
+    modalNote.innerHTML = '';
+    if (noteEl && noteEl.value.trim()) {
+      var ul = document.createElement('ul');
+      noteEl.value.split('\n').forEach(function(line) {
+        line = line.trim();
+        if (!line) return;
+        var li = document.createElement('li');
+        li.textContent = line;
+        ul.appendChild(li);
+      });
+      modalNote.appendChild(ul);
+    }
+
+    document.getElementById('agur-modal-overlay').classList.add('open');
+  }
+
+  function closeAgurModal(event) {
+    if (event && event.target.closest('.spoiler-modal-content') && !event.target.classList.contains('spoiler-modal-close')) {
+      return;
+    }
+    document.getElementById('agur-modal-overlay').classList.remove('open');
+  }
+
+
+  function addAgurCard() {
+    var fileField = document.getElementById('agur-manual-file');
+    if (!fileField.files || !fileField.files[0]) return;
+
+    var file = fileField.files[0];
+    var baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      buildAgurCard(baseName, e.target.result);
+      fileField.value = '';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  window.agurCardCount = window.agurCardCount || 0;
+
+  function buildAgurCard(cardName, imageUrl) {
+    window.agurCardCount++;
+    var n = window.agurCardCount;
+
+    var card = document.createElement('div');
+    card.className = 'agur-card';
+    card.id = 'agur-card-' + n;
+
+    var imgWrap = document.createElement('div');
+    imgWrap.className = 'agur-card-img-wrap';
+
+    var img = document.createElement('img');
+    img.src = imageUrl || '';
+    img.alt = cardName || 'Fan card design';
+    imgWrap.appendChild(img);
+    imgWrap.addEventListener('click', function() {
+      openAgurModal(n);
+    });
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'agur-card-remove';
+    removeBtn.title = 'Remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      card.remove();
+      if (document.getElementById('agur-card-grid').children.length === 0) {
+        document.getElementById('agur-empty-state').style.display = '';
+      }
+    });
+    imgWrap.appendChild(removeBtn);
+
+    card.appendChild(imgWrap);
+
+    var caption = document.createElement('input');
+    caption.className = 'agur-card-caption-input';
+    caption.value = cardName || '';
+    caption.placeholder = 'Design name';
+    card.appendChild(caption);
+
+    var addNoteBtn = document.createElement('button');
+    addNoteBtn.type = 'button';
+    addNoteBtn.className = 'agur-card-addnote-btn';
+    addNoteBtn.textContent = '+ Add Note';
+    addNoteBtn.addEventListener('click', function() {
+      var note = document.createElement('textarea');
+      note.className = 'agur-card-note';
+      note.id = 'agur-note-' + n;
+      note.placeholder = 'Talking point...';
+      note.rows = 2;
+
+      var printList = document.createElement('ul');
+      printList.className = 'agur-card-note-print';
+      printList.id = 'agur-note-print-' + n;
+
+      function syncPrintList() {
+        printList.innerHTML = '';
+        note.value.split('\n').forEach(function(line) {
+          line = line.trim();
+          if (!line) return;
+          var li = document.createElement('li');
+          li.textContent = line;
+          printList.appendChild(li);
+        });
+      }
+      note.addEventListener('input', syncPrintList);
+
+      card.insertBefore(note, addNoteBtn);
+      card.insertBefore(printList, addNoteBtn);
+      addNoteBtn.remove();
+      note.focus();
+    });
+    card.appendChild(addNoteBtn);
+
+    document.getElementById('agur-card-grid').appendChild(card);
+    document.getElementById('agur-empty-state').style.display = 'none';
+  }
+
+  function addManualSpoilerCard() {
+    var fileField = document.getElementById('spoiler-manual-file');
+    if (!fileField.files || !fileField.files[0]) return;
+
+    var file = fileField.files[0];
+    var baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      addSpoilerCard(baseName, '', '', e.target.result);
+      fileField.value = '';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ---- Road to Nationals: auto-fetch the National tournament entry ----
+  function fetchNationalsInfo() {
+    var status = document.getElementById('rtn-nats-fetch-status');
+    status.textContent = 'Checking for Nationals info...';
+
+    fetchTournamentListings(function(listings) {
+      var national = listings.find(function(item) {
+        return /national/i.test(item.tournament_type || '');
+      });
+
+      if (!national) {
+        status.textContent = "No National event found yet -- check back once next year's dates are announced.";
+        return;
+      }
+
+      // Only auto-fill if the date isn't already set, to avoid clobbering manual edits
+      var dateField = document.getElementById('rtn-nats-date');
+      if (!dateField.value) {
+        showCountdownField();
+        dateField.value = national.start_date;
+        updateNatsCountdown();
+      }
+
+      var loc = national.city + ', ' + national.state;
+      var dateLabel = formatDateShort(national.start_date);
+      if (national.end_date && national.end_date !== national.start_date) {
+        dateLabel += '-' + formatDateShort(national.end_date).split(' ')[1];
+      }
+      status.textContent = 'Nationals: ' + dateLabel + ' - ' + loc +
+        (national.venue_name ? ' (' + national.venue_name + ')' : '');
+    }, function(errMsg) {
+      status.textContent = errMsg;
+    });
+  }
+
+  function fetchUpcomingTournaments() {
+    var status = document.getElementById('upcoming-fetch-status');
+    var picker = document.getElementById('upcoming-picker');
+    var addBtn = document.getElementById('upcoming-add-btn');
+
+    status.textContent = 'Fetching...';
+    fetchTournamentListings(function(listings) {
+        var now = new Date();
+        var cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() + 21);
+
+        var filtered = listings.filter(function(item) {
+          var d = new Date(item.start_date + 'T00:00:00');
+          return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && d <= cutoff;
+        });
+
+        if (filtered.length === 0) {
+          status.textContent = 'No tournaments found in the next 21 days.';
+          picker.style.display = 'none';
+          addBtn.style.display = 'none';
+          return;
+        }
+
+        window.upcomingListings = filtered;
+        picker.innerHTML = '';
+        filtered.forEach(function(item, idx) {
+          var opt = document.createElement('option');
+          var dateLabel = formatDateShort(item.start_date);
+          if (item.end_date && item.end_date !== item.start_date) {
+            dateLabel += '-' + formatDateShort(item.end_date).split(' ')[1];
+          }
+          opt.value = idx;
+          opt.textContent = dateLabel + ' - ' + item.city + ', ' + item.state + ' - ' + item.tournament_type;
+          picker.appendChild(opt);
+        });
+
+        picker.style.display = '';
+        addBtn.style.display = '';
+        status.textContent = 'Found ' + filtered.length + ' tournament(s) in the next 21 days. Select one and click Add.';
+      }, function(errMsg) {
+        status.textContent = errMsg;
+      });
+  }
+
+  function addUpcomingPick() {
+    var picker = document.getElementById('upcoming-picker');
+    var idx = parseInt(picker.value, 10);
+    var item = window.upcomingListings[idx];
+    if (!item) return;
+
+    var dateLabel = formatDateShort(item.start_date);
+    if (item.end_date && item.end_date !== item.start_date) {
+      dateLabel += '-' + formatDateShort(item.end_date).split(' ')[1];
+    }
+
+    var line = dateLabel + ' - ' + item.city + ', ' + item.state + ' - ' + item.tournament_type;
+    if (item.host_name) line += ' - Hosted by ' + item.host_name;
+
+    var ta = document.getElementById('upcoming');
+    ta.value = ta.value ? (ta.value.replace(/\n+$/, '') + '\n' + line) : line;
+  }
+
+  // ---- Road to Nationals: countdown ----
+  function updateNatsCountdown() {
+    var dateVal = document.getElementById('rtn-nats-date').value;
+    var numOut = document.getElementById('rtn-countdown-number');
+    var labelOut = document.getElementById('rtn-countdown-label');
+    if (!dateVal) { numOut.textContent = '--'; labelOut.textContent = 'Days to Nationals'; return; }
+    var target = new Date(dateVal + 'T00:00:00');
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+    if (diffDays > 0) {
+      numOut.textContent = diffDays;
+      labelOut.textContent = 'Day' + (diffDays === 1 ? '' : 's') + ' to Nationals';
+    } else if (diffDays === 0) {
+      numOut.textContent = '0';
+      labelOut.textContent = "It's Today!";
+    } else {
+      numOut.textContent = Math.abs(diffDays);
+      labelOut.textContent = 'Day' + (Math.abs(diffDays) === 1 ? '' : 's') + ' Since Nationals';
+    }
+  }
+  document.getElementById('rtn-nats-date').addEventListener('change', updateNatsCountdown);
+
+  function showCountdownField() {
+    document.getElementById('rtn-countdown-field').style.display = 'flex';
+    document.getElementById('rtn-add-countdown-btn').style.display = 'none';
+  }
+  function removeCountdownField() {
+    document.getElementById('rtn-countdown-field').style.display = 'none';
+    document.getElementById('rtn-add-countdown-btn').style.display = '';
+    document.getElementById('rtn-nats-date').value = '';
+    document.getElementById('rtn-countdown-number').textContent = '--';
+    document.getElementById('rtn-countdown-label').textContent = 'Days to Nationals';
+  }
+
+  function showExtraNotesField() {
+    document.getElementById('rtn-extra-notes-field').style.display = 'block';
+    document.getElementById('rtn-add-extra-notes-btn').style.display = 'none';
+    syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+  }
+  function removeExtraNotesField() {
+    document.getElementById('rtn-extra-notes-field').style.display = 'none';
+    document.getElementById('rtn-add-extra-notes-btn').style.display = '';
+    document.getElementById('rtn-extra-notes').value = '';
+    syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+  }
+  document.getElementById('rtn-extra-notes').addEventListener('input', function() {
+    syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+  });
+
+
+  // ---- Road to Nationals: Key Deadlines (add/remove rows) ----
+  window.rtnDeadlineCount = 0;
+  function addDeadlineRow() {
+    document.getElementById('rtn-deadlines-field').style.display = '';
+    window.rtnDeadlineCount++;
+    var n = window.rtnDeadlineCount;
+    var row = document.createElement('div');
+    row.className = 'deadline-pill';
+    row.id = 'rtn-deadline-row-' + n;
+
+    var labelInput = document.createElement('input');
+    labelInput.className = 'dp-label';
+    labelInput.id = 'rtn-deadline-label-' + n;
+    labelInput.placeholder = 'e.g. Nametag deadline';
+    labelInput.autocomplete = 'off';
+
+    var dateInput = document.createElement('input');
+    dateInput.className = 'dp-date';
+    dateInput.id = 'rtn-deadline-date-' + n;
+    dateInput.type = 'date';
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'rtn-row-remove';
+    removeBtn.title = 'Remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function() {
+      row.remove();
+      if (document.getElementById('rtn-deadlines-list').children.length === 0) {
+        document.getElementById('rtn-deadlines-field').style.display = 'none';
+      }
+    });
+
+    row.appendChild(labelInput);
+    row.appendChild(dateInput);
+    row.appendChild(removeBtn);
+    document.getElementById('rtn-deadlines-list').appendChild(row);
+  }
+
+  // ---- Road to Nationals: Side Events (add/remove rows) ----
+  window.rtnEventCount = 0;
+  window.knownSideEvents = [];
+  var sideEventDatalist = document.createElement('datalist');
+  sideEventDatalist.id = 'side-event-options';
+  document.body.appendChild(sideEventDatalist);
+
+  function rebuildSideEventOptions() {
+    sideEventDatalist.innerHTML = '';
+    window.knownSideEvents.forEach(function(e) {
+      var opt = document.createElement('option');
+      opt.value = e;
+      sideEventDatalist.appendChild(opt);
+    });
+  }
+
+  function addSideEventRow() {
+    document.getElementById('rtn-events-field').style.display = '';
+    window.rtnEventCount++;
+    var n = window.rtnEventCount;
+    var row = document.createElement('div');
+    row.className = 'event-card';
+    row.id = 'rtn-event-row-' + n;
+
+    var nameInput = document.createElement('input');
+    nameInput.className = 'ec-name';
+    nameInput.id = 'rtn-event-name-' + n;
+    nameInput.placeholder = 'Event Name';
+    nameInput.autocomplete = 'off';
+    nameInput.setAttribute('list', 'side-event-options');
+    nameInput.addEventListener('change', function() {
+      var v = this.value.trim();
+      if (v && window.knownSideEvents.indexOf(v) === -1) {
+        window.knownSideEvents.push(v);
+        rebuildSideEventOptions();
+      }
+    });
+
+    var hostInput = document.createElement('input');
+    hostInput.className = 'ec-host';
+    hostInput.id = 'rtn-event-host-' + n;
+    hostInput.placeholder = 'Hosted by...';
+    hostInput.autocomplete = 'off';
+    hostInput.setAttribute('list', 'rank-player-options');
+    hostInput.addEventListener('change', function() {
+      var v = this.value.trim();
+      if (v && window.knownPlayers.indexOf(v) === -1) {
+        window.knownPlayers.push(v);
+        rebuildPlayerOptions();
+      }
+    });
+
+    var descInput = document.createElement('input');
+    descInput.className = 'ec-desc';
+    descInput.id = 'rtn-event-desc-' + n;
+    descInput.placeholder = 'Short description';
+    descInput.autocomplete = 'off';
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'rtn-row-remove';
+    removeBtn.title = 'Remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function() {
+      row.remove();
+      if (document.getElementById('rtn-events-list').children.length === 0) {
+        document.getElementById('rtn-events-field').style.display = 'none';
+      }
+    });
+
+    row.appendChild(nameInput);
+    row.appendChild(hostInput);
+    row.appendChild(descInput);
+    row.appendChild(removeBtn);
+    document.getElementById('rtn-events-list').appendChild(row);
+  }
+
+  // ---- Carry Forward: Side Events + Deadline labels from a previous draft ----
+  function carryForwardRtn() {
+    var status = document.getElementById('rtn-carryforward-status');
+    var ep = document.getElementById('ep-num').value.trim();
+    if (!/^\d+(\.\d+)?$/.test(ep)) {
+      status.textContent = 'Enter a numeric episode number first.';
+      return;
+    }
+    status.textContent = 'Loading...';
+    fetch('/threshingfloor/api/drafts?before=' + encodeURIComponent(ep))
+      .then(function(res) {
+        if (res.status === 404) { status.textContent = 'No earlier episode draft found.'; return null; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        if (!row) return;
+        var data = row.data || {};
+        var eventsAdded = 0, deadlinesAdded = 0;
+
+        // Side events: carry forward name, host, AND description (these recur as-is)
+        for (var i = 1; i <= 20; i++) {
+          var name = data['rtn-event-name-' + i];
+          if (name && name.trim()) {
+            addSideEventRow();
+            var n = window.rtnEventCount;
+            document.getElementById('rtn-event-name-' + n).value = name.trim();
+            if (data['rtn-event-host-' + i]) document.getElementById('rtn-event-host-' + n).value = data['rtn-event-host-' + i];
+            if (data['rtn-event-desc-' + i]) document.getElementById('rtn-event-desc-' + n).value = data['rtn-event-desc-' + i];
+            eventsAdded++;
+          }
+        }
+
+        // Deadlines: carry forward label only, leave date blank for re-entry
+        for (var j = 1; j <= 20; j++) {
+          var label = data['rtn-deadline-label-' + j];
+          if (label && label.trim()) {
+            addDeadlineRow();
+            var m = window.rtnDeadlineCount;
+            document.getElementById('rtn-deadline-label-' + m).value = label.trim();
+            deadlinesAdded++;
+          }
+        }
+
+        if (eventsAdded === 0 && deadlinesAdded === 0) {
+          status.textContent = 'Nothing found to carry forward in that draft.';
+        } else {
+          status.textContent = 'Carried forward ' + eventsAdded + ' side event(s) and ' + deadlinesAdded + ' deadline label(s) -- update dates/details as needed.';
+        }
+      })
+      .catch(function() { status.textContent = 'Could not load the previous draft.'; });
+  }
+
+  var closingTemplate =
+    '<div class="field"><label class="field-label">Sponsor Sign-off</label>' +
+    '<input class="field-input" id="close-sponsor" placeholder="Your Turn Games - yourturngames.biz" autocomplete="off"></div>' +
+    '<div class="field"><label class="field-label bullet-field-label">Reminders to Listeners</label>' +
+    '<div class="bullet-wrap">' +
+      '<div class="bullet-marks" id="close-reminders-marks"><span>&#8226;</span></div>' +
+      '<textarea class="bullet-textarea" id="close-reminders" placeholder="Subscribe / leave a review, Discord / socials, next episode teaser... (one per line)"></textarea>' +
+    '</div>' +
+    '<ul class="bullet-notes-print" id="close-reminders-print"></ul></div>';
+
+  document.getElementById('closing-body-p1').innerHTML = closingTemplate;
+
+  function syncBulletField(textareaId, marksId, printListId) {
+    var ta = document.getElementById(textareaId);
+    var marks = document.getElementById(marksId);
+    var printList = document.getElementById(printListId);
+    if (!ta || !marks || !printList) return;
+
+    var lines = ta.value.split('\n');
+    var lineCount = Math.max(lines.length, 1);
+    var marksHtml = '';
+    for (var i = 0; i < lineCount; i++) marksHtml += '<span>&#8226;</span>';
+    marks.innerHTML = marksHtml;
+
+    printList.innerHTML = '';
+    lines.forEach(function(line) {
+      line = line.trim();
+      if (!line) return;
+      var li = document.createElement('li');
+      li.textContent = line;
+      printList.appendChild(li);
+    });
+  }
+
+  function syncCollectorsBullets() {
+    syncBulletField('collectors-notes', 'collectors-bullet-marks', 'collectors-notes-print');
+  }
+  document.getElementById('collectors-notes').addEventListener('input', syncCollectorsBullets);
+  syncCollectorsBullets();
+
+  // Opening Topic / Notes (bulleted)
+  document.getElementById('opening-notes').addEventListener('input', function() {
+    syncBulletField('opening-notes', 'opening-notes-marks', 'opening-notes-print');
+  });
+  syncBulletField('opening-notes', 'opening-notes-marks', 'opening-notes-print');
+
+  // Closing: Reminders to Listeners (bulleted)
+  document.getElementById('close-reminders').addEventListener('input', function() {
+    syncBulletField('close-reminders', 'close-reminders-marks', 'close-reminders-print');
+  });
+  syncBulletField('close-reminders', 'close-reminders-marks', 'close-reminders-print');
+
+
+  function addCollectorsCard(input) {
+    var file = input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var col = document.getElementById('collectors-card-col');
+      col.innerHTML =
+        '<div class="collectors-card-img-wrap">' +
+          '<img id="collectors-card-img" src="' + ev.target.result + '" alt="Card reference">' +
+          '<button type="button" class="collectors-card-remove" title="Remove" onclick="removeCollectorsCard()">&times;</button>' +
+        '</div>' +
+        '<input class="collectors-card-caption-input" id="collectors-card-caption" placeholder="Card name / note" autocomplete="off">';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeCollectorsCard() {
+    var col = document.getElementById('collectors-card-col');
+    col.innerHTML =
+      '<div class="collectors-card-placeholder" id="collectors-card-placeholder" onclick="document.getElementById(\'collectors-card-file\').click()">' +
+        '<span class="collectors-card-placeholder-text">+ Reference a Card</span>' +
+      '</div>' +
+      '<input type="file" id="collectors-card-file" accept="image/*" style="display:none;" onchange="addCollectorsCard(this)">';
+  }
+
+  function updateSection(sectionId, checkbox) {
+
+    var section = document.getElementById(sectionId);
+    var wrapper = section.closest('.grid-1, .grid-2');
+
+    if (checkbox.checked) {
+      section.classList.remove('hidden');
+    } else {
+      section.classList.add('hidden');
+    }
+
+    if (wrapper.classList.contains('grid-1')) {
+      wrapper.style.display = checkbox.checked ? '' : 'none';
+      var next = wrapper.nextElementSibling;
+      if (next && next.classList.contains('section-divider')) {
+        next.style.display = checkbox.checked ? '' : 'none';
+      }
+    }
+
+    if (typeof updateSectionOrderControls === 'function') updateSectionOrderControls();
+  }
+
+  function toggleGuestPage(checkbox) {
+    var page2 = document.getElementById('page2-wrapper');
+    var closingP1 = document.getElementById('closing-wrapper-p1');
+    var closingDividerP1 = document.getElementById('closing-divider-p1');
+    var closingBodyP1 = document.getElementById('closing-body-p1');
+    var closingBodyP2 = document.getElementById('closing-body-p2');
+
+    var currentValues = {};
+    ['close-sponsor','close-reminders'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) currentValues[id] = el.value;
+    });
+
+    if (checkbox.checked) {
+      page2.classList.add('active');
+      closingP1.style.display = 'none';
+      closingDividerP1.style.display = 'none';
+      closingBodyP2.innerHTML = closingTemplate;
+    } else {
+      page2.classList.remove('active');
+      closingP1.style.display = '';
+      closingDividerP1.style.display = '';
+      closingBodyP1.innerHTML = closingTemplate;
+    }
+
+    Object.keys(currentValues).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.value = currentValues[id];
+    });
+
+    document.getElementById('close-reminders').addEventListener('input', function() {
+      syncBulletField('close-reminders', 'close-reminders-marks', 'close-reminders-print');
+    });
+    syncBulletField('close-reminders', 'close-reminders-marks', 'close-reminders-print');
+  }
+
+  function collectData() {
+    var data = {};
+    document.querySelectorAll('input[id], textarea[id]').forEach(function(el) {
+      if (el.type === 'checkbox') {
+        data[el.id] = el.checked;
+      } else {
+        data[el.id] = el.value;
+      }
+    });
+    var collImg = document.getElementById('collectors-card-img');
+    if (collImg) data['collectors-card-img'] = collImg.src;
+
+    data['agur-cards'] = [...document.querySelectorAll('.agur-card')].map(function(card) {
+      var img = card.querySelector('img');
+      var caption = card.querySelector('.agur-card-caption-input');
+      var note = card.querySelector('.agur-card-note');
+      return {
+        img: img ? img.src : '',
+        caption: caption ? caption.value : '',
+        note: note ? note.value : ''
+      };
+    });
+
+    return data;
+  }
+
+  window.loadedDraftUpdatedAt = null;
+
+  // Styled replacement for window.confirm(); resolves true/false.
+  function showConfirm(message, opts) {
+    opts = opts || {};
+    return new Promise(function(resolve) {
+      var overlay = document.createElement('div');
+      overlay.className = 'tf-confirm-overlay';
+      var box = document.createElement('div');
+      box.className = 'tf-confirm-box';
+      var msg = document.createElement('div');
+      msg.className = 'tf-confirm-message';
+      msg.textContent = message;
+      var actions = document.createElement('div');
+      actions.className = 'tf-confirm-actions';
+      var cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn btn-ghost';
+      cancelBtn.textContent = opts.cancelText || 'Cancel';
+      var okBtn = document.createElement('button');
+      okBtn.type = 'button';
+      okBtn.className = 'btn ' + (opts.danger ? 'btn-red' : 'btn-teal');
+      okBtn.textContent = opts.confirmText || 'Confirm';
+      function close(result) {
+        overlay.remove();
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') close(false);
+      }
+      cancelBtn.addEventListener('click', function() { close(false); });
+      okBtn.addEventListener('click', function() { close(true); });
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) close(false); });
+      document.addEventListener('keydown', onKey);
+      actions.appendChild(cancelBtn);
+      actions.appendChild(okBtn);
+      box.appendChild(msg);
+      box.appendChild(actions);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      okBtn.focus();
+    });
+  }
+
+  function draftEpisodeKey() {
+    var v = document.getElementById('ep-num').value.trim();
+    return v || 'draft';
+  }
+
+  function saveData() {
+    var ep = draftEpisodeKey();
+    var status = document.getElementById('save-status');
+    var payload = { data: collectData() };
+    if (window.loadedDraftUpdatedAt) payload.lastSeenUpdatedAt = window.loadedDraftUpdatedAt;
+    var json = JSON.stringify(payload);
+    if (json.length > 4 * 1024 * 1024) {
+      status.textContent = 'Draft too large to save (over 4 MB) -- remove some images.';
+      return;
+    }
+    status.textContent = 'Saving...';
+    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: json
+    }).then(function(res) {
+      if (res.status === 409) {
+        showConfirm('This draft was changed by someone else since you loaded it. Overwrite their version?', { confirmText: 'Overwrite', danger: true }).then(function(ok) {
+          if (ok) {
+            window.loadedDraftUpdatedAt = null;
+            saveData();
+          } else {
+            status.textContent = 'Save canceled.';
+          }
+        });
+        return null;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function(row) {
+      if (!row) return;
+      window.loadedDraftUpdatedAt = row.updated_at;
+      status.textContent = 'Saved Ep ' + ep + ' at ' + new Date().toLocaleTimeString();
+    }).catch(function() {
+      status.textContent = 'Save failed -- check connection and try again.';
+    });
+  }
+
+  function applyDraft(data) {
+    resetForm();
+    try {
+
+          Object.keys(data).forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el && el.type === 'checkbox') {
+              el.checked = data[id];
+              if (el.onchange) el.onchange.call(el, { target: el });
+            }
+          });
+
+          // Pre-build RTN dynamic rows/fields so values have somewhere to land
+          if (data['rtn-nats-date']) {
+            showCountdownField();
+          }
+          if (data['rtn-extra-notes'] && data['rtn-extra-notes'].trim()) {
+            showExtraNotesField();
+          }
+          for (var i = 1; i <= 20; i++) {
+            if (data['rtn-deadline-label-' + i] !== undefined) addDeadlineRow();
+            if (data['rtn-event-name-' + i] !== undefined) addSideEventRow();
+          }
+
+          // Pre-build mailbag items to match saved data
+          var mbKeys = Object.keys(data).filter(function(k) { return /^mb-(by|q|notes)-\d+$/.test(k); });
+          if (mbKeys.length) {
+            document.getElementById('mailbag-add-row').remove();
+            document.getElementById('mb-item-1').remove();
+            window.mailbagCount = 0;
+            var mbMax = 0;
+            mbKeys.forEach(function(k) {
+              var n = parseInt(k.split('-').pop(), 10);
+              if (n > mbMax) mbMax = n;
+            });
+            for (var mb = 1; mb <= mbMax; mb++) addMailbagItem();
+            mailbagBody.appendChild(createMailbagAddRow());
+          }
+
+          // Pre-build news items to match saved data
+          var newsKeys = Object.keys(data).filter(function(k) { return /^news-(topic|notes|save-topic)-\d+$/.test(k); });
+          if (newsKeys.length) {
+            document.getElementById('news-add-row').remove();
+            document.getElementById('news-item-1').remove();
+            window.newsCount = 0;
+            var newsMax = 0;
+            newsKeys.forEach(function(k) {
+              var n = parseInt(k.split('-').pop(), 10);
+              if (n > newsMax) newsMax = n;
+            });
+            for (var nw = 1; nw <= newsMax; nw++) addNewsItem();
+            newsBody.appendChild(createNewsAddRow());
+          }
+
+          // Restore checkbox states for dynamically-rebuilt items
+          Object.keys(data).forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el && el.type === 'checkbox' && /^news-save-topic-\d+$/.test(id)) {
+              el.checked = data[id];
+            }
+          });
+
+          setTimeout(function() {
+            Object.keys(data).forEach(function(id) {
+              var el = document.getElementById(id);
+              if (el && el.type !== 'checkbox' && id !== 'collectors-card-img') el.value = data[id];
+            });
+            if (data['collectors-card-img']) {
+              var col = document.getElementById('collectors-card-col');
+              col.innerHTML =
+                '<div class="collectors-card-img-wrap">' +
+                  '<img id="collectors-card-img" alt="Card reference">' +
+                  '<button type="button" class="collectors-card-remove" title="Remove" onclick="removeCollectorsCard()">&times;</button>' +
+                '</div>' +
+                '<input class="collectors-card-caption-input" id="collectors-card-caption" placeholder="Card name / note" autocomplete="off">';
+              document.getElementById('collectors-card-img').src = data['collectors-card-img'];
+              if (data['collectors-card-caption']) document.getElementById('collectors-card-caption').value = data['collectors-card-caption'];
+            }
+            syncCollectorsBullets();
+            updateNatsCountdown();
+            updateAllMetaRankDeltas();
+            syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+            syncEpDatePrint();
+            syncEpNumPrint();
+            syncEpRuntimePrint();
+            syncBulletField('opening-notes', 'opening-notes-marks', 'opening-notes-print');
+            syncBulletField('close-reminders', 'close-reminders-marks', 'close-reminders-print');
+
+            for (var mbi = 1; mbi <= window.mailbagCount; mbi++) {
+              syncBulletField('mb-notes-' + mbi, 'mb-notes-marks-' + mbi, 'mb-notes-print-' + mbi);
+            }
+
+            for (var nwi = 1; nwi <= window.newsCount; nwi++) {
+              syncBulletField('news-notes-' + nwi, 'news-notes-marks-' + nwi, 'news-notes-print-' + nwi);
+            }
+
+            if (data['agur-cards'] && data['agur-cards'].length) {
+              data['agur-cards'].forEach(function(c) {
+                buildAgurCard(c.caption, c.img);
+                var n = window.agurCardCount;
+                if (c.note) {
+                  var card = document.getElementById('agur-card-' + n);
+                  var addBtn = card.querySelector('.agur-card-addnote-btn');
+                  if (addBtn) addBtn.click();
+                  var noteEl = document.getElementById('agur-note-' + n);
+                  if (noteEl) {
+                    noteEl.value = c.note;
+                    noteEl.dispatchEvent(new Event('input'));
+                  }
+                }
+              });
+            }
+          }, 50);
+    } catch(err) {
+      document.getElementById('save-status').textContent = 'Could not apply that draft.';
+      console.error(err);
+    }
+  }
+
+  function loadData() {
+    var status = document.getElementById('save-status');
+    status.textContent = 'Loading drafts...';
+    fetch('/threshingfloor/api/drafts')
+      .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+      .then(function(list) {
+        if (!list.length) {
+          var stale = document.getElementById('draft-picker-row');
+          if (stale) stale.remove();
+          status.textContent = 'No drafts saved yet.';
+          return;
+        }
+        showDraftPicker(list);
+        status.textContent = 'Select a draft to load.';
+      })
+      .catch(function() { status.textContent = 'Could not load drafts.'; });
+  }
+
+  function showDraftPicker(list) {
+    var existing = document.getElementById('draft-picker-row');
+    if (existing) existing.remove();
+    var row = document.createElement('div');
+    row.id = 'draft-picker-row';
+    row.style.cssText = 'position:absolute; top:calc(100% + 6px); right:24px; z-index:50; display:flex; gap:6px; align-items:center; min-width:380px; background:var(--teal-dark); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:8px 10px; box-shadow:0 6px 16px rgba(0,0,0,0.35);';
+    var picker = document.createElement('select');
+    picker.className = 'field-input';
+    picker.style.flex = '1';
+    list.forEach(function(d) {
+      var opt = document.createElement('option');
+      opt.value = d.episode_number;
+      opt.textContent = 'Ep ' + d.episode_number + ' -- saved ' + new Date(d.updated_at).toLocaleString();
+      picker.appendChild(opt);
+    });
+    var loadBtn = document.createElement('button');
+    loadBtn.type = 'button';
+    loadBtn.className = 'btn btn-teal';
+    loadBtn.textContent = 'Load';
+    loadBtn.addEventListener('click', function() { loadDraft(picker.value); });
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn-red';
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', function() { deleteDraft(picker.value); });
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'btn btn-ghost';
+    closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', function() { row.remove(); });
+    row.appendChild(picker);
+    row.appendChild(loadBtn);
+    row.appendChild(delBtn);
+    row.appendChild(closeBtn);
+    document.querySelector('.toolbar').appendChild(row);
+  }
+
+  function loadDraft(ep) {
+    var status = document.getElementById('save-status');
+    status.textContent = 'Loading Ep ' + ep + '...';
+    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep))
+      .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+      .then(function(row) {
+        applyDraft(row.data);
+        window.loadedDraftUpdatedAt = row.updated_at;
+        status.textContent = 'Loaded Ep ' + row.episode_number + '.';
+        var pickerRow = document.getElementById('draft-picker-row');
+        if (pickerRow) pickerRow.remove();
+      })
+      .catch(function() { status.textContent = 'Could not load that draft.'; });
+  }
+
+  function deleteDraft(ep) {
+    showConfirm('Delete the saved draft for Ep ' + ep + '? This cannot be undone.', { confirmText: 'Delete', danger: true }).then(function(ok) {
+      if (!ok) return;
+      var status = document.getElementById('save-status');
+      fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep), { method: 'DELETE' })
+        .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .then(function() {
+          status.textContent = 'Deleted Ep ' + ep + '.';
+          loadData();
+        })
+        .catch(function() { status.textContent = 'Could not delete that draft.'; });
+    });
+  }
+
+  // ---- Section reordering (session-only) ----
+  function isSectionVisible(el) {
+    if (el.dataset.sid === 'rankings-dotw') {
+      var r = document.getElementById('tog-rankings');
+      var d = document.getElementById('tog-dotw');
+      return (r && r.checked) || (d && d.checked);
+    }
+    var grid = el.querySelector('.grid-1, .grid-2');
+    if (!grid) return true;
+    return getComputedStyle(grid).display !== 'none';
+  }
+
+  function getMovableSections() {
+    return [...document.querySelectorAll('.movable-section')];
+  }
+
+  function getVisibleMovableSections() {
+    return getMovableSections().filter(isSectionVisible);
+  }
+
+  function moveSection(sid, direction) {
+    var visible = getVisibleMovableSections();
+    var el = document.querySelector('.movable-section[data-sid="' + sid + '"]');
+    var idx = visible.indexOf(el);
+    if (idx === -1) return;
+    var targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= visible.length) return;
+    var target = visible[targetIdx];
+    if (direction < 0) {
+      el.parentNode.insertBefore(el, target);
+    } else {
+      el.parentNode.insertBefore(target, el);
+    }
+    updateSectionOrderControls();
+  }
+
+  function updateSectionOrderControls() {
+    var visible = getVisibleMovableSections();
+    getMovableSections().forEach(function(sec) {
+      var upBtn = sec.querySelector('.sec-order-btn[title="Move up"]');
+      var downBtn = sec.querySelector('.sec-order-btn[title="Move down"]');
+      var i = visible.indexOf(sec);
+      if (upBtn) upBtn.disabled = (i <= 0);
+      if (downBtn) downBtn.disabled = (i === -1) || (i === visible.length - 1);
+    });
+  }
+  updateSectionOrderControls();
+
+  function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    try {
+      localStorage.setItem('tf-dark-mode', document.body.classList.contains('dark-mode') ? '1' : '0');
+    } catch (e) {}
+  }
+  try {
+    if (localStorage.getItem('tf-dark-mode') === '1') {
+      document.body.classList.add('dark-mode');
+    }
+  } catch (e) {}
+
+  function resetForm() {
+    document.querySelectorAll('input[type=text], input[type=date], textarea').forEach(function(el) { el.value = ''; });
+    removeExtraNotesField();
+    removeCountdownField();
+    removeCollectorsCard();
+    syncCollectorsBullets();
+    document.getElementById('agur-card-grid').innerHTML = '';
+    document.getElementById('agur-empty-state').style.display = '';
+    document.getElementById('rtn-deadlines-list').innerHTML = '';
+    document.getElementById('rtn-deadlines-field').style.display = 'none';
+    window.rtnDeadlineCount = 0;
+    document.getElementById('rtn-events-list').innerHTML = '';
+    document.getElementById('rtn-events-field').style.display = 'none';
+    window.rtnEventCount = 0;
+    mailbagBody.innerHTML = '';
+    window.mailbagCount = 0;
+    addMailbagItem();
+    mailbagBody.appendChild(createMailbagAddRow());
+    newsBody.innerHTML = '';
+    window.newsCount = 0;
+    addNewsItem();
+    newsBody.appendChild(createNewsAddRow());
+    window.previousRankings = null;
+    window.previousMetaRankings = null;
+    updateAllRankDeltas();
+    updateAllMetaRankDeltas();
+    window.loadedDraftUpdatedAt = null;
+  }
+
+  function clearAll() {
+    showConfirm('Clear all fields and reset toggles to default?', { confirmText: 'Clear All', danger: true }).then(function(ok) {
+      if (!ok) return;
+      resetForm();
+      var defaults = {
+        'tog-news': true, 'tog-tournaments': true, 'tog-rankings': true,
+        'tog-dotw': true, 'tog-mailbag': true,
+        'tog-rtn': false, 'tog-spoilers': false, 'tog-collectors': false,
+        'tog-meta': false, 'tog-agur': false, 'tog-potm': false, 'tog-guest': false
+      };
+      Object.keys(defaults).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+          el.checked = defaults[id];
+          if (el.onchange) el.onchange.call(el, { target: el });
+        }
+      });
+      document.getElementById('save-status').textContent = 'Cleared.';
+    });
+  }
+
+  document.querySelectorAll('.toggle-item input[type=checkbox]').forEach(function(cb) {
+    if (cb.onchange) cb.onchange.call(cb, { target: cb });
+  });
+</script>
+</body>
+</html>
