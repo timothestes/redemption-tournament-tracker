@@ -84,6 +84,7 @@
     padding: 8px 24px;
     display: flex; align-items: center; gap: 10px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
+    position: relative;
   }
   .toolbar-label { font-size: 10px; color: var(--teal-mid); letter-spacing: 2px; text-transform: uppercase; margin-right: 4px; }
   .btn {
@@ -748,7 +749,6 @@
     <span class="toolbar-label">Actions</span>
     <button class="btn btn-teal" onclick="saveData()">Save Draft</button>
     <button class="btn btn-ghost" onclick="loadData()">Load Draft</button>
-    <button class="btn btn-ghost" onclick="downloadJson()">Download JSON</button>
     <button class="btn btn-ghost" onclick="window.print()">Print / Export PDF</button>
     <button class="btn btn-red" onclick="clearAll()">Clear All</button>
     <span class="save-status" id="save-status">No draft saved yet</span>
@@ -2847,16 +2847,6 @@
     });
   }
 
-  function downloadJson() {
-    var epNum = draftEpisodeKey();
-    var json = JSON.stringify(collectData(), null, 2);
-    var blob = new Blob([json], { type: 'application/json' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'TF_Outline_Ep' + epNum + '.json';
-    a.click();
-  }
-
   function applyDraft(data) {
     resetForm();
     try {
@@ -2999,7 +2989,7 @@
     if (existing) existing.remove();
     var row = document.createElement('div');
     row.id = 'draft-picker-row';
-    row.style.cssText = 'display:flex; gap:6px; align-items:center; width:100%; margin-top:6px;';
+    row.style.cssText = 'position:absolute; top:calc(100% + 6px); right:24px; z-index:50; display:flex; gap:6px; align-items:center; min-width:380px; background:var(--teal-dark); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:8px 10px; box-shadow:0 6px 16px rgba(0,0,0,0.35);';
     var picker = document.createElement('select');
     picker.className = 'field-input';
     picker.style.flex = '1';
