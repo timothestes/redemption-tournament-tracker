@@ -1409,38 +1409,41 @@
   }
 
   function loadPreviousMetaRankings() {
-    var input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = function(e) {
-      var file = e.target.files[0];
-      var reader = new FileReader();
-      reader.onload = function(ev) {
-        try {
-          var data = JSON.parse(ev.target.result);
-          var prev = {};
-          var count = 0;
-          for (var r = 1; r <= 10; r++) {
-            var name = data['meta-rank-' + r];
-            if (name && name.trim()) {
-              prev[name.trim()] = r;
-              count++;
-              if (window.knownArchetypes.indexOf(name.trim()) === -1) window.knownArchetypes.push(name.trim());
-              document.getElementById('meta-rank-' + r).value = name.trim();
-            }
+    var status = document.getElementById('prev-meta-rankings-status');
+    var ep = document.getElementById('ep-num').value.trim();
+    if (!/^\d+(\.\d+)?$/.test(ep)) {
+      status.textContent = 'Enter a numeric episode number first.';
+      return;
+    }
+    status.textContent = 'Loading...';
+    fetch('/threshingfloor/api/drafts?before=' + encodeURIComponent(ep))
+      .then(function(res) {
+        if (res.status === 404) { status.textContent = 'No earlier episode draft found.'; return null; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        if (!row) return;
+        var data = row.data || {};
+        var prev = {};
+        var count = 0;
+        for (var r = 1; r <= 10; r++) {
+          var name = data['meta-rank-' + r];
+          if (name && name.trim()) {
+            prev[name.trim()] = r;
+            count++;
+            if (window.knownArchetypes.indexOf(name.trim()) === -1) window.knownArchetypes.push(name.trim());
+            document.getElementById('meta-rank-' + r).value = name.trim();
           }
-          window.previousMetaRankings = prev;
-          rebuildArchetypeOptions();
-          updateAllMetaRankDeltas();
-          document.getElementById('prev-meta-rankings-status').textContent =
-            count > 0 ? ('Loaded ' + count + ' archetype(s) from ' + file.name + ' -- fields pre-filled, use x to clear and reorder') : 'No rankings found in that file.';
-        } catch(err) {
-          document.getElementById('prev-meta-rankings-status').textContent = 'Could not read that file.';
         }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
+        window.previousMetaRankings = prev;
+        rebuildArchetypeOptions();
+        updateAllMetaRankDeltas();
+        status.textContent = count > 0
+          ? ('Loaded ' + count + ' archetype(s) from Ep ' + row.episode_number + ' -- fields pre-filled, use x to clear and reorder')
+          : 'No meta rankings found in that draft.';
+      })
+      .catch(function() { status.textContent = 'Could not load the previous draft.'; });
   }
 
 
@@ -1628,38 +1631,41 @@
 
   // Load a previous draft JSON purely to extract last episode's rankings as a baseline
   function loadPreviousRankings() {
-    var input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = function(e) {
-      var file = e.target.files[0];
-      var reader = new FileReader();
-      reader.onload = function(ev) {
-        try {
-          var data = JSON.parse(ev.target.result);
-          var prev = {};
-          var count = 0;
-          for (var r = 1; r <= 10; r++) {
-            var name = data['rank-' + r];
-            if (name && name.trim()) {
-              prev[name.trim()] = r;
-              count++;
-              if (window.knownPlayers.indexOf(name.trim()) === -1) window.knownPlayers.push(name.trim());
-              document.getElementById('rank-' + r).value = name.trim();
-            }
+    var status = document.getElementById('prev-rankings-status');
+    var ep = document.getElementById('ep-num').value.trim();
+    if (!/^\d+(\.\d+)?$/.test(ep)) {
+      status.textContent = 'Enter a numeric episode number first.';
+      return;
+    }
+    status.textContent = 'Loading...';
+    fetch('/threshingfloor/api/drafts?before=' + encodeURIComponent(ep))
+      .then(function(res) {
+        if (res.status === 404) { status.textContent = 'No earlier episode draft found.'; return null; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        if (!row) return;
+        var data = row.data || {};
+        var prev = {};
+        var count = 0;
+        for (var r = 1; r <= 10; r++) {
+          var name = data['rank-' + r];
+          if (name && name.trim()) {
+            prev[name.trim()] = r;
+            count++;
+            if (window.knownPlayers.indexOf(name.trim()) === -1) window.knownPlayers.push(name.trim());
+            document.getElementById('rank-' + r).value = name.trim();
           }
-          window.previousRankings = prev;
-          rebuildPlayerOptions();
-          updateAllRankDeltas();
-          document.getElementById('prev-rankings-status').textContent =
-            count > 0 ? ('Loaded ' + count + ' player(s) from ' + file.name + ' -- fields pre-filled, use x to clear and reorder') : 'No rankings found in that file.';
-        } catch(err) {
-          document.getElementById('prev-rankings-status').textContent = 'Could not read that file.';
         }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
+        window.previousRankings = prev;
+        rebuildPlayerOptions();
+        updateAllRankDeltas();
+        status.textContent = count > 0
+          ? ('Loaded ' + count + ' player(s) from Ep ' + row.episode_number + ' -- fields pre-filled, use x to clear and reorder')
+          : 'No rankings found in that draft.';
+      })
+      .catch(function() { status.textContent = 'Could not load the previous draft.'; });
   }
 
   // ---- Recent News: repeating topic + notes items ----
@@ -2673,54 +2679,55 @@
 
   // ---- Carry Forward: Side Events + Deadline labels from a previous draft ----
   function carryForwardRtn() {
-    var input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = function(e) {
-      var file = e.target.files[0];
-      var reader = new FileReader();
-      reader.onload = function(ev) {
-        try {
-          var data = JSON.parse(ev.target.result);
-          var eventsAdded = 0, deadlinesAdded = 0;
+    var status = document.getElementById('rtn-carryforward-status');
+    var ep = document.getElementById('ep-num').value.trim();
+    if (!/^\d+(\.\d+)?$/.test(ep)) {
+      status.textContent = 'Enter a numeric episode number first.';
+      return;
+    }
+    status.textContent = 'Loading...';
+    fetch('/threshingfloor/api/drafts?before=' + encodeURIComponent(ep))
+      .then(function(res) {
+        if (res.status === 404) { status.textContent = 'No earlier episode draft found.'; return null; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        if (!row) return;
+        var data = row.data || {};
+        var eventsAdded = 0, deadlinesAdded = 0;
 
-          // Side events: carry forward name, host, AND description (these recur as-is)
-          for (var i = 1; i <= 20; i++) {
-            var name = data['rtn-event-name-' + i];
-            if (name && name.trim()) {
-              addSideEventRow();
-              var n = window.rtnEventCount;
-              document.getElementById('rtn-event-name-' + n).value = name.trim();
-              if (data['rtn-event-host-' + i]) document.getElementById('rtn-event-host-' + n).value = data['rtn-event-host-' + i];
-              if (data['rtn-event-desc-' + i]) document.getElementById('rtn-event-desc-' + n).value = data['rtn-event-desc-' + i];
-              eventsAdded++;
-            }
+        // Side events: carry forward name, host, AND description (these recur as-is)
+        for (var i = 1; i <= 20; i++) {
+          var name = data['rtn-event-name-' + i];
+          if (name && name.trim()) {
+            addSideEventRow();
+            var n = window.rtnEventCount;
+            document.getElementById('rtn-event-name-' + n).value = name.trim();
+            if (data['rtn-event-host-' + i]) document.getElementById('rtn-event-host-' + n).value = data['rtn-event-host-' + i];
+            if (data['rtn-event-desc-' + i]) document.getElementById('rtn-event-desc-' + n).value = data['rtn-event-desc-' + i];
+            eventsAdded++;
           }
-
-          // Deadlines: carry forward label only, leave date blank for re-entry
-          for (var j = 1; j <= 20; j++) {
-            var label = data['rtn-deadline-label-' + j];
-            if (label && label.trim()) {
-              addDeadlineRow();
-              var m = window.rtnDeadlineCount;
-              document.getElementById('rtn-deadline-label-' + m).value = label.trim();
-              deadlinesAdded++;
-            }
-          }
-
-          var status = document.getElementById('rtn-carryforward-status');
-          if (eventsAdded === 0 && deadlinesAdded === 0) {
-            status.textContent = 'Nothing found to carry forward in that file.';
-          } else {
-            status.textContent = 'Carried forward ' + eventsAdded + ' side event(s) and ' + deadlinesAdded + ' deadline label(s) -- update dates/details as needed.';
-          }
-        } catch(err) {
-          document.getElementById('rtn-carryforward-status').textContent = 'Could not read that file.';
         }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
+
+        // Deadlines: carry forward label only, leave date blank for re-entry
+        for (var j = 1; j <= 20; j++) {
+          var label = data['rtn-deadline-label-' + j];
+          if (label && label.trim()) {
+            addDeadlineRow();
+            var m = window.rtnDeadlineCount;
+            document.getElementById('rtn-deadline-label-' + m).value = label.trim();
+            deadlinesAdded++;
+          }
+        }
+
+        if (eventsAdded === 0 && deadlinesAdded === 0) {
+          status.textContent = 'Nothing found to carry forward in that draft.';
+        } else {
+          status.textContent = 'Carried forward ' + eventsAdded + ' side event(s) and ' + deadlinesAdded + ' deadline label(s) -- update dates/details as needed.';
+        }
+      })
+      .catch(function() { status.textContent = 'Could not load the previous draft.'; });
   }
 
   var closingTemplate =
