@@ -819,6 +819,7 @@
     <span class="toolbar-label">Actions</span>
     <button class="btn btn-teal" onclick="saveData()">Save Draft</button>
     <button class="btn btn-ghost" onclick="loadData()">Load Draft</button>
+    <button class="btn btn-ghost" onclick="publishEpisode()">Publish</button>
     <button class="btn btn-ghost" onclick="window.print()">Print / Export PDF</button>
     <button class="btn btn-red" onclick="clearAll()">Clear All</button>
     <span class="save-status" id="save-status">No draft saved yet</span>
@@ -2926,6 +2927,64 @@
     return v || 'draft';
   }
 
+  function showPublishLink(ep, published) {
+    var status = document.getElementById('save-status');
+    if (!published) { status.textContent = 'Not published.'; return; }
+    var url = location.origin + '/threshingfloor/episodes/' + encodeURIComponent(ep);
+    status.innerHTML = '';
+    status.appendChild(document.createTextNode('Published: '));
+    var a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = url;
+    a.style.color = 'var(--teal-mid)';
+    status.appendChild(a);
+    var copy = document.createElement('button');
+    copy.type = 'button'; copy.className = 'btn btn-ghost'; copy.textContent = 'Copy';
+    copy.style.marginLeft = '8px';
+    copy.addEventListener('click', function() {
+      navigator.clipboard.writeText(url).then(function() { copy.textContent = 'Copied'; });
+    });
+    var unpub = document.createElement('button');
+    unpub.type = 'button'; unpub.className = 'btn btn-red'; unpub.textContent = 'Unpublish';
+    unpub.style.marginLeft = '6px';
+    unpub.addEventListener('click', function() { unpublishEpisode(); });
+    status.appendChild(copy);
+    status.appendChild(unpub);
+  }
+
+  function publishEpisode() {
+    var ep = draftEpisodeKey();
+    var status = document.getElementById('save-status');
+    var json = JSON.stringify({ data: collectData() });
+    if (json.length > 4 * 1024 * 1024) {
+      status.textContent = 'Too large to publish (over 4 MB) -- remove some images.';
+      return;
+    }
+    status.textContent = 'Publishing...';
+    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep) + '/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: json
+    }).then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function(row) {
+      window.loadedDraftUpdatedAt = null; // publish also saved; force fresh concurrency token next save
+      showPublishLink(ep, true);
+    }).catch(function() { status.textContent = 'Publish failed -- try again.'; });
+  }
+
+  function unpublishEpisode() {
+    var ep = draftEpisodeKey();
+    var status = document.getElementById('save-status');
+    showConfirm('Take the public page for Ep ' + ep + ' offline?', { confirmText: 'Unpublish', danger: true }).then(function(ok) {
+      if (!ok) return;
+      fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep) + '/publish', { method: 'DELETE' })
+        .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .then(function() { status.textContent = 'Unpublished Ep ' + ep + '.'; })
+        .catch(function() { status.textContent = 'Could not unpublish.'; });
+    });
+  }
+
   function saveData() {
     var ep = draftEpisodeKey();
     var status = document.getElementById('save-status');
@@ -3146,7 +3205,8 @@
       .then(function(row) {
         applyDraft(row.data);
         window.loadedDraftUpdatedAt = row.updated_at;
-        status.textContent = 'Loaded Ep ' + row.episode_number + '.';
+        if (row.published_at) { showPublishLink(row.episode_number, true); }
+        else { status.textContent = 'Loaded Ep ' + row.episode_number + '.'; }
         var pickerRow = document.getElementById('draft-picker-row');
         if (pickerRow) pickerRow.remove();
       })
