@@ -735,6 +735,56 @@
     .rtn-row { border-bottom: 1px solid var(--teal-light); padding-bottom: 2px; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
+
+  /* ---- Live View Mode (public read-only render) ---- */
+  body.view-mode .toolbar,
+  body.view-mode .toggle-row,
+  body.view-mode .sec-order-controls,
+  body.view-mode #tourn-add-row,
+  body.view-mode .tourn-remove-btn,
+  body.view-mode .placement-clear,
+  body.view-mode .rank-clear,
+  body.view-mode #prev-rankings-field,
+  body.view-mode #prev-meta-rankings-field,
+  body.view-mode #tournaments-section button,
+  body.view-mode #tournaments-section select,
+  body.view-mode #upcoming-fetch-status,
+  body.view-mode .rtn-row-remove,
+  body.view-mode .countdown-remove,
+  body.view-mode #rtn-section .btn,
+  body.view-mode #rtn-carryforward-status,
+  body.view-mode #rtn-nats-fetch-status,
+  body.view-mode #spoiler-fetch-status,
+  body.view-mode #spoilers-section button,
+  body.view-mode #spoilers-section select,
+  body.view-mode #spoilers-section label.btn,
+  body.view-mode .spoiler-card-remove,
+  body.view-mode .spoiler-card-addnote-btn,
+  body.view-mode #spoiler-empty-state,
+  body.view-mode #agur-empty-state,
+  body.view-mode .agur-card-remove,
+  body.view-mode .agur-card-addnote-btn,
+  body.view-mode #dotw-fetch-status,
+  body.view-mode #draft-picker-row,
+  body.view-mode [id$="-add-row"],
+  body.view-mode input[type="file"] {
+    display: none !important;
+  }
+  body.view-mode .rank-delta.empty { display: none; }
+  /* Render inputs/textviews as static text */
+  body.view-mode input,
+  body.view-mode textarea,
+  body.view-mode select {
+    border: none !important;
+    background: transparent !important;
+    resize: none;
+    pointer-events: none;
+    box-shadow: none !important;
+  }
+  body.view-mode textarea { overflow: hidden; }
+  /* The enlarge modals stay clickable */
+  body.view-mode .spoiler-card-img-wrap,
+  body.view-mode .agur-card-img-wrap { pointer-events: auto; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -769,6 +819,7 @@
     <span class="toolbar-label">Actions</span>
     <button class="btn btn-teal" onclick="saveData()">Save Draft</button>
     <button class="btn btn-ghost" onclick="loadData()">Load Draft</button>
+    <button class="btn btn-ghost" onclick="publishEpisode()">Publish</button>
     <button class="btn btn-ghost" onclick="window.print()">Print / Export PDF</button>
     <button class="btn btn-red" onclick="clearAll()">Clear All</button>
     <span class="save-status" id="save-status">No draft saved yet</span>
@@ -1929,6 +1980,7 @@
 
   // ---- Shared helper: fetch and parse /tournaments listings JSON ----
   function fetchTournamentListings(onSuccess, onError) {
+    if (window.__TF_VIEW__) return;
     fetch('/threshingfloor/api/data?kind=tournaments')
       .then(function(res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -2347,6 +2399,7 @@
 
   // ---- Road to Nationals: auto-fetch the National tournament entry ----
   function fetchNationalsInfo() {
+    if (window.__TF_VIEW__) return;
     var status = document.getElementById('rtn-nats-fetch-status');
     status.textContent = 'Checking for Nationals info...';
 
@@ -2874,6 +2927,64 @@
     return v || 'draft';
   }
 
+  function showPublishLink(ep, published) {
+    var status = document.getElementById('save-status');
+    if (!published) { status.textContent = 'Not published.'; return; }
+    var url = location.origin + '/threshingfloor/episodes/' + encodeURIComponent(ep);
+    status.innerHTML = '';
+    status.appendChild(document.createTextNode('Published: '));
+    var a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = url;
+    a.style.color = 'var(--teal-mid)';
+    status.appendChild(a);
+    var copy = document.createElement('button');
+    copy.type = 'button'; copy.className = 'btn btn-ghost'; copy.textContent = 'Copy';
+    copy.style.marginLeft = '8px';
+    copy.addEventListener('click', function() {
+      navigator.clipboard.writeText(url).then(function() { copy.textContent = 'Copied'; });
+    });
+    var unpub = document.createElement('button');
+    unpub.type = 'button'; unpub.className = 'btn btn-red'; unpub.textContent = 'Unpublish';
+    unpub.style.marginLeft = '6px';
+    unpub.addEventListener('click', function() { unpublishEpisode(); });
+    status.appendChild(copy);
+    status.appendChild(unpub);
+  }
+
+  function publishEpisode() {
+    var ep = draftEpisodeKey();
+    var status = document.getElementById('save-status');
+    var json = JSON.stringify({ data: collectData() });
+    if (json.length > 4 * 1024 * 1024) {
+      status.textContent = 'Too large to publish (over 4 MB) -- remove some images.';
+      return;
+    }
+    status.textContent = 'Publishing...';
+    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep) + '/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: json
+    }).then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function(row) {
+      window.loadedDraftUpdatedAt = null; // publish also saved; force fresh concurrency token next save
+      showPublishLink(ep, true);
+    }).catch(function() { status.textContent = 'Publish failed -- try again.'; });
+  }
+
+  function unpublishEpisode() {
+    var ep = draftEpisodeKey();
+    var status = document.getElementById('save-status');
+    showConfirm('Take the public page for Ep ' + ep + ' offline?', { confirmText: 'Unpublish', danger: true }).then(function(ok) {
+      if (!ok) return;
+      fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep) + '/publish', { method: 'DELETE' })
+        .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .then(function() { status.textContent = 'Unpublished Ep ' + ep + '.'; })
+        .catch(function() { status.textContent = 'Could not unpublish.'; });
+    });
+  }
+
   function saveData() {
     var ep = draftEpisodeKey();
     var status = document.getElementById('save-status');
@@ -3094,7 +3205,8 @@
       .then(function(row) {
         applyDraft(row.data);
         window.loadedDraftUpdatedAt = row.updated_at;
-        status.textContent = 'Loaded Ep ' + row.episode_number + '.';
+        if (row.published_at) { showPublishLink(row.episode_number, true); }
+        else { status.textContent = 'Loaded Ep ' + row.episode_number + '.'; }
         var pickerRow = document.getElementById('draft-picker-row');
         if (pickerRow) pickerRow.remove();
       })
@@ -3228,6 +3340,16 @@
   document.querySelectorAll('.toggle-item input[type=checkbox]').forEach(function(cb) {
     if (cb.onchange) cb.onchange.call(cb, { target: cb });
   });
+
+  // ---- View mode: render a published snapshot read-only ----
+  if (window.__TF_VIEW__) {
+    document.body.classList.add('view-mode');
+    try {
+      applyDraft(window.__TF_VIEW__.data || {});
+    } catch (e) {
+      // Leave whatever rendered; a partial outline beats a blank page.
+    }
+  }
 </script>
 </body>
 </html>
