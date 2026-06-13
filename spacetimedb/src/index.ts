@@ -3528,6 +3528,64 @@ function drawBottomOfDeckImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: discardBottomOfDeckImpl
+// Gates of Hell: discards the bottom card of the acting player's deck —
+// except Lost Souls, which the printed text plays instead (routed to the
+// owner's land-of-bondage). "Bottom" is the highest zoneIndex, matching
+// drawBottomOfDeckImpl. Empty deck is a harmless no-op.
+// ---------------------------------------------------------------------------
+function discardBottomOfDeckImpl(
+  ctx: any,
+  source: any,
+  player: any,
+  gameId: bigint,
+) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+
+  const playerCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    (c: any) => c.ownerId === player.id
+  );
+  const deckCards = playerCards
+    .filter((c: any) => c.zone === 'deck')
+    .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+  if (deckCards.length === 0) return;
+
+  const card = deckCards[deckCards.length - 1];
+  const isLostSoul = card.cardType === 'LS'
+    || card.cardType === 'Lost Soul'
+    || card.cardName.toLowerCase().includes('lost soul');
+  const destZone = isLostSoul ? 'land-of-bondage' : 'discard';
+
+  let nextIdx = 0n;
+  for (const c of playerCards) {
+    if (c.zone === destZone && c.zoneIndex >= nextIdx) {
+      nextIdx = c.zoneIndex + 1n;
+    }
+  }
+
+  ctx.db.CardInstance.id.update({
+    ...card,
+    zone: destZone,
+    zoneIndex: nextIdx,
+    posX: '',
+    posY: '',
+    isFlipped: false,
+  });
+
+  logAction(
+    ctx, gameId, player.id, 'DISCARD_BOTTOM_OF_DECK',
+    JSON.stringify({
+      sourceCardName: source.cardName,
+      sourceCardImgFile: source.cardImgFile,
+      card: { name: card.cardName, img: card.cardImgFile },
+      toLandOfBondage: isLostSoul,
+    }),
+    game.turnNumber, game.currentPhase,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Helper: playAllLostSoulsImpl
 // For each player in the game, moves every Lost Soul from their soul-deck
 // (if non-empty — Paragon mode) or main deck into that same player's
@@ -3767,6 +3825,8 @@ export const execute_card_ability = spacetimedb.reducer(
         return drawBottomOfDeckImpl(ctx, source, ability, player, gameId);
       case 'draw_bottom_of_deck_choose':
         throw new SenderError('draw_bottom_of_deck_choose is dispatched via execute_card_ability_with_count');
+      case 'discard_bottom_of_deck':
+        return discardBottomOfDeckImpl(ctx, source, player, gameId);
       case 'underdeck_top_of_deck':
         return underdeckTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'discard_characters_from_reserve':

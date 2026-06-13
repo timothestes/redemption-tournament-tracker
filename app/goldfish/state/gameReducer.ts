@@ -407,6 +407,31 @@ function drawBottomOfDeckInState(
   return { ...state, zones, history };
 }
 
+// Gates of Hell: discard the bottom card of deck — except Lost Souls, which
+// the printed text plays instead (routed to the Land of Bondage).
+function discardBottomOfDeckInState(
+  state: GameState,
+  _source: GameCard,
+  history: GameState[],
+): GameState {
+  if (state.zones.deck.length === 0) return state;
+
+  const zones = cloneZones(state.zones);
+  const card = zones.deck[zones.deck.length - 1];
+  zones.deck = zones.deck.slice(0, -1);
+
+  const destZone: ZoneId = isLostSoul(card) ? 'land-of-bondage' : 'discard';
+  zones[destZone] = [...zones[destZone], {
+    ...card,
+    zone: destZone,
+    isFlipped: false,
+    posX: undefined,
+    posY: undefined,
+  }];
+
+  return { ...state, zones, history };
+}
+
 function playAllLostSoulsInState(
   state: GameState,
   source: GameCard,
@@ -1431,6 +1456,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // Client opens a count dialog and dispatches EXECUTE_CARD_ABILITY_WITH_COUNT
           // — this action carries no count, so no-op here.
           return state;
+        case 'discard_bottom_of_deck':
+          return discardBottomOfDeckInState(state, source, history);
         case 'underdeck_top_of_deck':
           return underdeckTopOfDeckInState(state, source, ability, history);
         case 'discard_characters_from_reserve':

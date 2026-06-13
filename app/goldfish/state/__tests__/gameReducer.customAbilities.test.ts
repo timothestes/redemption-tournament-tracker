@@ -515,3 +515,47 @@ describe('RESURRECT_HEROES', () => {
     expect(gameReducer(state, resurrect(['h1']))).toBe(state);
   });
 });
+
+describe('EXECUTE_CARD_ABILITY — discard_bottom_of_deck (The Gates of Hell)', () => {
+  it('discards the bottom card of deck when it is not a Lost Soul', () => {
+    const source = makeCard({ instanceId: 'goh', cardName: 'The Gates of Hell (GoC)', zone: 'territory' });
+    const top = makeCard({ instanceId: 'd1', cardName: 'Top Card', zone: 'deck' });
+    const bottom = makeCard({ instanceId: 'd2', cardName: 'Bottom Card', zone: 'deck', isFlipped: true });
+    const state = makeState([source, top, bottom]);
+
+    const next = gameReducer(state, act('goh', 0));
+
+    expect(next.zones.deck.map(c => c.instanceId)).toEqual(['d1']);
+    expect(next.zones.discard.map(c => c.instanceId)).toEqual(['d2']);
+    expect(next.zones.discard[0].isFlipped).toBe(false);
+    expect(next.zones['land-of-bondage']).toHaveLength(0);
+  });
+
+  it('plays the bottom card into the Land of Bondage when it is a Lost Soul', () => {
+    const source = makeCard({ instanceId: 'goh', cardName: 'The Gates of Hell', zone: 'territory' });
+    const top = makeCard({ instanceId: 'd1', cardName: 'Top Card', zone: 'deck' });
+    const soul = makeCard({ instanceId: 'ls1', cardName: 'Lost Soul Romans 3:23', type: 'Lost Soul', zone: 'deck', isFlipped: true });
+    const state = makeState([source, top, soul]);
+
+    const next = gameReducer(state, act('goh', 0));
+
+    expect(next.zones.deck.map(c => c.instanceId)).toEqual(['d1']);
+    expect(next.zones.discard).toHaveLength(0);
+    expect(next.zones['land-of-bondage'].map(c => c.instanceId)).toEqual(['ls1']);
+    expect(next.zones['land-of-bondage'][0].isFlipped).toBe(false);
+    expect(next.zones['land-of-bondage'][0].zone).toBe('land-of-bondage');
+  });
+
+  it('is a no-op (same state reference) when the deck is empty', () => {
+    const source = makeCard({ instanceId: 'goh', cardName: 'The Gates of Hell [2024 - 2nd Place]', zone: 'territory' });
+    const state = makeState([source]);
+
+    expect(gameReducer(state, act('goh', 0))).toBe(state);
+  });
+
+  it('all three Gates of Hell variants are registered', () => {
+    for (const name of ['The Gates of Hell', 'The Gates of Hell (GoC)', 'The Gates of Hell [2024 - 2nd Place]']) {
+      expect(getEffectiveAbilities({ cardName: name })).toEqual([{ type: 'discard_bottom_of_deck' }]);
+    }
+  });
+});

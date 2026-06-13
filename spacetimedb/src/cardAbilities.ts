@@ -36,6 +36,7 @@ export type CardAbility = AbilityBase & (
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck_choose' }
+  | { type: 'discard_bottom_of_deck' }
   | { type: 'underdeck_top_of_deck'; count: number }
   | { type: 'discard_characters_from_reserve'; target: 'self' | 'opponent' }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
@@ -131,6 +132,11 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Choked Seed (GoC)':                                   [{ type: 'draw_bottom_of_deck_choose' }],
   'Destroying Spirit (GoC)':                             [{ type: 'draw_bottom_of_deck_choose' }],
   'Messenger of Satan (EC)':                             [{ type: 'draw_bottom_of_deck_choose' }],
+  // "Discard the bottom card of deck. If it is … a Lost Soul, play it instead."
+  // Lost Souls route to the Land of Bondage; everything else is discarded.
+  'The Gates of Hell':                                   [{ type: 'discard_bottom_of_deck' }],
+  'The Gates of Hell (GoC)':                             [{ type: 'discard_bottom_of_deck' }],
+  'The Gates of Hell [2024 - 2nd Place]':                [{ type: 'discard_bottom_of_deck' }],
   'Three Woes (RoJ AB)':                                 [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
   'Three Woes (RoJ)':                                    [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
   'Three Woes [Fundraiser]':                             [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
