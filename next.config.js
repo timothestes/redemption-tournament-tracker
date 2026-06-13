@@ -24,6 +24,7 @@ const nextConfig = {
   },
   outputFileTracingIncludes: {
     '/threshingfloor/outline': ['./app/threshingfloor/outline.html'],
+    '/threshingfloor/episodes/[episode]': ['./app/threshingfloor/outline.html'],
   },
 };
 
