@@ -1456,7 +1456,7 @@
           <div class="sec-body">
             <div class="field">
               <label class="field-label">Guest Name</label>
-              <input class="field-input" id="guest-name" placeholder="Full name / handle" autocomplete="off">
+              <input class="field-input" id="guest-name" list="rank-player-options" placeholder="Full name / handle" autocomplete="off">
             </div>
             <div class="field">
               <label class="field-label bullet-field-label">Background / Intro</label>
@@ -1535,6 +1535,106 @@
     });
   }
 
+  // ---- Persistent player-name registry (cross-episode autocomplete) ----
+  // Backed by /threshingfloor/api/store/players (a flat array of name strings).
+  // Seeded on load so the datalist suggests every name ever entered; appended to
+  // (best-effort) after each successful draft save. All failures are non-fatal --
+  // the tool falls back to today's episode-scoped behavior.
+  window.playersRegistryUpdatedAt = null;
+  window.playersRegistrySyncedCount = 0; // names known to already be on the server
+  window.playersRegistryLoaded = false;  // have we confirmed the server's current state?
+  var PLAYERS_STORE_URL = '/threshingfloor/api/store/players';
+
+  function mergePlayerNames(names) {
+    var added = false;
+    (names || []).forEach(function(name) {
+      if (typeof name !== 'string') return;
+      var trimmed = name.trim();
+      if (trimmed && window.knownPlayers.indexOf(trimmed) === -1) {
+        window.knownPlayers.push(trimmed);
+        added = true;
+      }
+    });
+    return added;
+  }
+
+  // Pure read: seed the datalist from the server on tool load.
+  function loadPlayerRegistry() {
+    fetch(PLAYERS_STORE_URL)
+      .then(function(res) {
+        if (res.status === 404) return null; // nothing saved yet
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        window.playersRegistryLoaded = true;
+        window.playersRegistryUpdatedAt = (row && row.updated_at) || null;
+        if (row && Array.isArray(row.data) && mergePlayerNames(row.data)) rebuildPlayerOptions();
+        window.playersRegistrySyncedCount = window.knownPlayers.length;
+      })
+      .catch(function(err) { console.warn('Player registry load failed:', err); });
+  }
+
+  // Overwrite the server array with the local union. Names are append-only, so
+  // this only ever grows the set -- provided we've merged the server's current
+  // state first (loaded), which the caller guarantees.
+  function pushPlayerRegistry(canReconcile) {
+    var local = window.knownPlayers.slice();
+    var payload = { data: local };
+    if (window.playersRegistryUpdatedAt) payload.lastSeenUpdatedAt = window.playersRegistryUpdatedAt;
+
+    fetch(PLAYERS_STORE_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(function(res) {
+        if (res.status === 409) {
+          // Someone else wrote since our last read. Reconcile once (the set is
+          // append-only, so merging always converges).
+          if (canReconcile) reconcileAndPushPlayerRegistry();
+          return null;
+        }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json().then(function(row) {
+          window.playersRegistryUpdatedAt = row.updated_at || null;
+          window.playersRegistrySyncedCount = local.length;
+        });
+      })
+      .catch(function(err) { console.warn('Player registry sync failed:', err); });
+  }
+
+  // Read the latest server state, merge it in, then push the union.
+  function reconcileAndPushPlayerRegistry() {
+    fetch(PLAYERS_STORE_URL)
+      .then(function(res) {
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        window.playersRegistryLoaded = true;
+        window.playersRegistryUpdatedAt = (row && row.updated_at) || null;
+        if (row && Array.isArray(row.data) && mergePlayerNames(row.data)) rebuildPlayerOptions();
+        pushPlayerRegistry(false); // already reconciled -- don't loop on a second 409
+      })
+      .catch(function(err) { console.warn('Player registry sync failed:', err); });
+  }
+
+  // Called after a successful draft save. Best-effort, fire-and-forget: never
+  // blocks or fails the draft save.
+  function syncPlayerRegistry() {
+    if (!window.knownPlayers.length) return;
+    // No confirmed view of the server yet (initial load slow or failed) --
+    // reconcile first so we never blind-overwrite names we haven't seen.
+    if (!window.playersRegistryLoaded) { reconcileAndPushPlayerRegistry(); return; }
+    // Nothing new since the last successful sync -- skip the write.
+    if (window.knownPlayers.length <= window.playersRegistrySyncedCount) return;
+    pushPlayerRegistry(true);
+  }
+
+  loadPlayerRegistry();
+
   // Header meta: plain-text mirrors for print/view display
   function syncEpDatePrint() {
     var input = document.getElementById('ep-date');
@@ -1556,13 +1656,16 @@
   }
   document.getElementById('ep-runtime').addEventListener('input', syncEpRuntimePrint);
 
-  var potmNameInput = document.getElementById('potm-name');
-  potmNameInput.addEventListener('change', function() {
-    var v = this.value.trim();
-    if (v && window.knownPlayers.indexOf(v) === -1) {
-      window.knownPlayers.push(v);
-      rebuildPlayerOptions();
-    }
+  ['potm-name', 'guest-name'].forEach(function(id) {
+    var input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('change', function() {
+      var v = this.value.trim();
+      if (v && window.knownPlayers.indexOf(v) === -1) {
+        window.knownPlayers.push(v);
+        rebuildPlayerOptions();
+      }
+    });
   });
 
   for (var i = 1; i <= 10; i++) {
@@ -3487,6 +3590,7 @@
     }).then(function(row) {
       window.loadedDraftUpdatedAt = null; // publish also saved; force fresh concurrency token next save
       showPublishLink(ep, true);
+      syncPlayerRegistry(); // publish is a save path too -- persist any new player names
     }).catch(function() { status.textContent = 'Publish failed -- try again.'; });
   }
 
@@ -3535,6 +3639,7 @@
       if (!row) return;
       window.loadedDraftUpdatedAt = row.updated_at;
       status.textContent = 'Saved Ep ' + ep + ' at ' + new Date().toLocaleTimeString();
+      syncPlayerRegistry(); // best-effort: persist any new player names cross-episode
     }).catch(function() {
       status.textContent = 'Save failed -- check connection and try again.';
     });
