@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("threshing_floor_drafts")
-    .select("episode_number, updated_at");
+    .select("episode_number, updated_at, published_at");
   if (error) {
     return NextResponse.json({ error: "Failed to load drafts" }, { status: 500 });
   }

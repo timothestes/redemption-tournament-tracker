@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeEpisode } from "../../../episodes";
-import { notFoundResponse, requireThreshingFloor } from "../../auth";
+import { normalizeEpisode } from "../../../../episodes";
+import { notFoundResponse, requireThreshingFloor } from "../../../auth";
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024; // Vercel rejects > 4.5 MB at the edge
 
@@ -17,23 +17,13 @@ async function resolveEpisode(params: Promise<{ episode: string }>): Promise<str
 
 type Ctx = { params: Promise<{ episode: string }> };
 
-export async function GET(_request: NextRequest, { params }: Ctx) {
-  const auth = await requireThreshingFloor();
-  if (!auth) return notFoundResponse();
-  const episode = await resolveEpisode(params);
-  if (!episode) return NextResponse.json({ error: "Invalid episode number" }, { status: 400 });
-
-  const { data, error } = await auth.supabase
-    .from("threshing_floor_drafts")
-    .select("episode_number, data, updated_at, published_at")
-    .eq("episode_number", episode)
-    .maybeSingle();
-  if (error) return NextResponse.json({ error: "Failed to load draft" }, { status: 500 });
-  if (!data) return notFoundResponse();
-  return NextResponse.json(data);
+function publicUrl(episode: string): string {
+  return "/threshingfloor/episodes/" + encodeURIComponent(episode);
 }
 
-export async function PUT(request: NextRequest, { params }: Ctx) {
+// POST = save current data AND freeze it as the public snapshot (one step, so
+// the published copy is exactly what's on screen).
+export async function POST(request: NextRequest, { params }: Ctx) {
   const auth = await requireThreshingFloor();
   if (!auth) return notFoundResponse();
   const episode = await resolveEpisode(params);
@@ -43,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   if (text.length > MAX_BODY_BYTES) {
     return NextResponse.json({ error: "Draft too large (over 4 MB)" }, { status: 413 });
   }
-  let body: { data?: unknown; lastSeenUpdatedAt?: unknown };
+  let body: { data?: unknown };
   try {
     body = JSON.parse(text);
   } catch {
@@ -53,44 +43,29 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "data must be an object" }, { status: 400 });
   }
 
-  const { data: existing, error: existingError } = await auth.supabase
-    .from("threshing_floor_drafts")
-    .select("updated_at")
-    .eq("episode_number", episode)
-    .maybeSingle();
-  if (existingError) {
-    return NextResponse.json({ error: "Failed to check draft" }, { status: 500 });
-  }
-  if (
-    existing &&
-    typeof body.lastSeenUpdatedAt === "string" &&
-    body.lastSeenUpdatedAt !== existing.updated_at
-  ) {
-    return NextResponse.json(
-      { error: "Draft was modified by someone else" },
-      { status: 409 }
-    );
-  }
-
+  const now = new Date().toISOString();
   const { data: saved, error } = await auth.supabase
     .from("threshing_floor_drafts")
     .upsert(
       {
         episode_number: episode,
         data: body.data,
+        published_data: body.data,
+        published_at: now,
         updated_by: auth.user.id,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       },
       { onConflict: "episode_number" }
     )
-    .select("episode_number, updated_at")
+    .select("episode_number, published_at")
     .single();
   if (error || !saved) {
-    return NextResponse.json({ error: "Failed to save draft" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to publish" }, { status: 500 });
   }
-  return NextResponse.json(saved);
+  return NextResponse.json({ ...saved, url: publicUrl(episode) });
 }
 
+// DELETE = unpublish (take the public page down). Leaves the draft intact.
 export async function DELETE(_request: NextRequest, { params }: Ctx) {
   const auth = await requireThreshingFloor();
   if (!auth) return notFoundResponse();
@@ -99,8 +74,8 @@ export async function DELETE(_request: NextRequest, { params }: Ctx) {
 
   const { error } = await auth.supabase
     .from("threshing_floor_drafts")
-    .delete()
+    .update({ published_data: null, published_at: null })
     .eq("episode_number", episode);
-  if (error) return NextResponse.json({ error: "Failed to delete draft" }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Failed to unpublish" }, { status: 500 });
   return NextResponse.json({ success: true });
 }
