@@ -193,6 +193,10 @@
   .sec-order-btn:hover { background: rgba(255,255,255,0.35); }
   .sec-order-btn:disabled { opacity: 0.3; cursor: default; }
   .sec-order-btn:disabled:hover { background: rgba(255,255,255,0.18); }
+  .sec-order-btn.sec-action-btn { width: auto; padding: 0 6px; font-size: 10px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+  .sec-order-controls { gap: 4px; }
+  .sec-order-controls .sec-order-divider { width: 1px; background: rgba(255,255,255,0.25); margin: 0 2px; }
+  .sec-order-arrows { display: flex; gap: 2px; }
   .sec-body { padding: 8px 10px; background: var(--white); }
 
   .field { margin-bottom: 6px; }
@@ -281,13 +285,30 @@
     border-radius: 6px; padding: 10px 14px; margin-bottom: 10px; color: #fff; position: relative;
   }
   .countdown-number { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 32px; line-height: 1; }
+  .countdown-hero.clickable { cursor: pointer; }
+  .countdown-hero.clickable:hover { filter: brightness(1.08); }
   .countdown-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.85; }
+  .countdown-info { flex: 1; min-width: 0; padding: 0 14px; }
+  .countdown-info:empty { display: none; }
+  .countdown-info-loc {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 15px;
+    letter-spacing: 0.5px; text-transform: uppercase; line-height: 1.2;
+  }
+  .countdown-info-venue { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+  .countdown-info-dates { font-size: 10px; opacity: 0.75; margin-top: 2px; letter-spacing: 0.5px; }
   .countdown-date { margin-left: auto; text-align: right; font-size: 10px; opacity: 0.9; line-height: 1.6; }
   .countdown-date input {
     background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
     border-radius: 4px; color: #fff; font-size: 11px; padding: 3px 6px; font-family: 'Barlow', sans-serif;
   }
   .countdown-date input::-webkit-calendar-picker-indicator { filter: invert(1); }
+  .countdown-date-print { display: none; font-size: 11px; font-weight: 600; }
+  @media print {
+    .countdown-date input { display: none !important; }
+    .countdown-date-print { display: block; }
+  }
+  body.view-mode .countdown-date input { display: none !important; }
+  body.view-mode .countdown-date-print { display: block; }
   .countdown-remove {
     position: absolute; top: 6px; right: 6px; width: 16px; height: 16px;
     border: none; background: rgba(255,255,255,0.2); color: #fff; border-radius: 50%;
@@ -336,6 +357,53 @@
     border-top: 1px solid #fff; padding-top: 4px; outline: none; color: var(--text);
   }
   .event-card input.ec-desc::placeholder { color: var(--placeholder); font-style: italic; }
+
+  /* Upcoming Tournaments: pills + detail modal */
+  .tournament-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+  .tournament-pill {
+    display: flex; align-items: center; gap: 8px; background: var(--gray-light);
+    border-radius: 20px; padding: 6px 8px 6px 14px; font-size: 11px; cursor: pointer;
+    border-left: 3px solid var(--teal); transition: background 0.15s;
+  }
+  .tournament-pill:hover { background: var(--teal-light); }
+  .tournament-pill-date {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 11px;
+    color: var(--teal-dark); white-space: nowrap;
+  }
+  .tournament-pill-loc { font-size: 11px; color: var(--text); white-space: nowrap; }
+  .tournament-pill-type {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 9px;
+    letter-spacing: 0.5px; text-transform: uppercase; color: var(--teal-dark);
+    background: var(--teal-light); border-radius: 10px; padding: 2px 8px; white-space: nowrap;
+  }
+  .tournament-pill-remove {
+    width: 16px; height: 16px; flex-shrink: 0; border: none; background: rgba(0,0,0,0.08);
+    color: var(--gray); border-radius: 50%; font-size: 10px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tournament-pill-remove:hover { background: var(--red); color: #fff; }
+
+  .tournament-modal-content { max-width: 420px; text-align: left; }
+  .tournament-modal-badge {
+    display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-weight: 800;
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #fff;
+    background: var(--teal); border-radius: 4px; padding: 4px 10px; margin-bottom: 8px;
+  }
+  .tournament-modal-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 18px;
+    color: var(--teal-dark); margin-bottom: 2px;
+  }
+  .tournament-modal-date { font-size: 12px; color: var(--gray); margin-bottom: 10px; }
+  .tournament-modal-section {
+    font-size: 12px; color: var(--text); padding-top: 8px; margin-top: 8px;
+    border-top: 1px solid var(--gray-light); line-height: 1.5;
+  }
+  .tournament-modal-section:empty { display: none; border-top: none; margin-top: 0; padding-top: 0; }
+  .tournament-modal-section strong { color: var(--teal-dark); }
+  .tournament-modal-formats-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .tournament-modal-formats-table td { padding: 2px 0; font-size: 12px; }
+  .tournament-modal-formats-table td.fee { text-align: right; color: var(--teal-dark); font-weight: 600; white-space: nowrap; }
 
   /* Spoilers: card grid */
   .spoiler-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 4px 0 10px; }
@@ -521,9 +589,13 @@
 
   body.dark-mode .tourn-block, body.dark-mode .event-card, body.dark-mode .deadline-pill,
   body.dark-mode .collectors-card-placeholder, body.dark-mode .agur-card-img-wrap,
-  body.dark-mode .collectors-card-img-wrap, body.dark-mode .spoiler-card-img-wrap {
+  body.dark-mode .collectors-card-img-wrap, body.dark-mode .spoiler-card-img-wrap,
+  body.dark-mode .tournament-pill {
     background: var(--gray-light);
   }
+  body.dark-mode .tournament-pill:hover { background: var(--teal-light); }
+  body.dark-mode .tournament-pill-type { background: var(--teal-dark); color: var(--teal-mid); }
+  body.dark-mode .tournament-modal-formats-table td.fee { color: var(--teal-mid); }
 
   body.dark-mode .results-grid th { color: var(--gray); }
   body.dark-mode .rank-delta.same { background: var(--gray-light); color: var(--gray); }
@@ -570,6 +642,12 @@
     .meta-field:has(.meta-value-print:empty) { display: none !important; }
     .meta-field { display: inline-block !important; width: auto !important; margin-right: 14px; }
     .meta-field .meta-label { display: block; }
+
+    /* Hide empty Discussion Notes (Spoilers, Agur, Meta Forecast, etc.) */
+    .field:has(> textarea.field-textarea:placeholder-shown) { display: none !important; }
+
+    /* Hide empty per-card set/promo line on spoiler cards */
+    .spoiler-card-set-input:placeholder-shown { display: none !important; }
   }
 
   /* Spoilers: enlarge modal */
@@ -602,6 +680,38 @@
   .spoiler-modal-note:empty { display: none; }
   .spoiler-modal-note ul { margin: 0; padding-left: 18px; }
   .spoiler-modal-note li { margin-bottom: 4px; line-height: 1.4; }
+
+  /* Spoilers: side-by-side modal (card image left, talking points right) */
+  .spoiler-modal-content-split {
+    max-width: 640px;
+    display: flex; gap: 18px; align-items: flex-start; text-align: left;
+  }
+  .spoiler-modal-media {
+    flex: 0 0 220px; max-width: 220px; text-align: center;
+  }
+  .spoiler-modal-notes-col {
+    flex: 1; min-width: 0; border-left: 1px solid var(--gray-light); padding-left: 18px;
+    max-height: 70vh; overflow-y: auto;
+  }
+  .spoiler-modal-notes-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 12px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--teal-dark); margin-bottom: 8px;
+  }
+  .spoiler-modal-notes-col .spoiler-modal-note {
+    border-top: none; margin-top: 0; padding-top: 0; font-size: 13px; line-height: 1.6;
+  }
+  .spoiler-modal-notes-col .spoiler-modal-note ul { padding-left: 20px; }
+  .spoiler-modal-notes-col .spoiler-modal-note li { margin-bottom: 6px; }
+  .spoiler-modal-note-empty {
+    font-size: 12px; color: var(--placeholder); font-style: italic; display: none;
+  }
+  .spoiler-modal-note:empty ~ .spoiler-modal-note-empty { display: block; }
+
+  @media (max-width: 520px) {
+    .spoiler-modal-content-split { flex-direction: column; max-width: 360px; }
+    .spoiler-modal-media { flex: 1 1 auto; max-width: none; }
+    .spoiler-modal-notes-col { border-left: none; border-top: 1px solid var(--gray-light); padding-left: 0; padding-top: 12px; max-height: none; }
+  }
 
   /* Spoilers: per-card set hero strip */
   .spoiler-card-badge {
@@ -709,11 +819,12 @@
     .spoiler-card-remove, .spoiler-card-addnote-btn { display: none; }
     .spoiler-card-note { display: none; }
     .spoiler-card-note-print {
-      display: block; font-size: 10px; color: var(--text); margin: 3px 0 0;
-      padding-top: 3px; border-top: 1px solid var(--teal-light); padding-left: 14px;
+      display: block; font-size: 9.5px; color: var(--text); margin: 4px 0 0;
+      padding-top: 4px; border-top: 1px solid var(--teal-light); padding-left: 14px;
+      line-height: 1.35;
     }
-    .spoiler-card-note-print li { margin-bottom: 2px; line-height: 1.3; }
-    .spoiler-card-note-print:empty { display: none; border-top: none; }
+    .spoiler-card-note-print li { margin-bottom: 2px; }
+    .spoiler-card-note-print:empty { display: none; border-top: none; margin-top: 0; padding-top: 0; }
     #spoiler-empty-state { display: none; }
     .spoiler-card-caption-input, .spoiler-card-set-input { border: none !important; background: transparent !important; pointer-events: none; }
     .spoiler-modal-overlay { display: none !important; }
@@ -725,14 +836,19 @@
     .agur-card-remove, .agur-card-addnote-btn { display: none; }
     .agur-card-note { display: none; }
     .agur-card-note-print {
-      display: block; font-size: 10px; color: var(--text); margin: 3px 0 0;
-      padding-top: 3px; border-top: 1px solid var(--teal-light); padding-left: 14px;
+      display: block; font-size: 9.5px; color: var(--text); margin: 4px 0 0;
+      padding-top: 4px; border-top: 1px solid var(--teal-light); padding-left: 14px;
+      line-height: 1.35;
     }
-    .agur-card-note-print li { margin-bottom: 2px; line-height: 1.3; }
-    .agur-card-note-print:empty { display: none; border-top: none; }
+    .agur-card-note-print li { margin-bottom: 2px; }
+    .agur-card-note-print:empty { display: none; border-top: none; margin-top: 0; padding-top: 0; }
     #agur-empty-state { display: none; }
     .agur-card-caption-input { border: none !important; background: transparent !important; pointer-events: none; }
     .rtn-row { border-bottom: 1px solid var(--teal-light); padding-bottom: 2px; }
+    .movable-section[data-content-empty="true"],
+    .movable-section[data-content-empty="true"] + .section-divider {
+      display: none !important;
+    }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 
@@ -760,6 +876,8 @@
   body.view-mode #spoilers-section label.btn,
   body.view-mode .spoiler-card-remove,
   body.view-mode .spoiler-card-addnote-btn,
+  body.view-mode .spoiler-card-note,
+  body.view-mode .spoiler-card-note-print,
   body.view-mode .collectors-card-remove,
   body.view-mode #spoiler-empty-state,
   body.view-mode #agur-empty-state,
@@ -767,11 +885,15 @@
   body.view-mode #agur-section label.btn,
   body.view-mode .agur-card-remove,
   body.view-mode .agur-card-addnote-btn,
+  body.view-mode .agur-card-note,
+  body.view-mode .agur-card-note-print,
   body.view-mode #dotw-fetch-status,
   body.view-mode #dotw-section button,
   body.view-mode #news-body label:has(input[type=checkbox]),
   body.view-mode #draft-picker-row,
   body.view-mode [id$="-add-row"],
+  body.view-mode #upcoming-empty-state,
+  body.view-mode .tournament-pill-remove,
   body.view-mode input[type="file"] {
     display: none !important;
   }
@@ -792,6 +914,10 @@
   /* The enlarge modals stay clickable */
   body.view-mode .spoiler-card-img-wrap,
   body.view-mode .agur-card-img-wrap { pointer-events: auto; cursor: pointer; }
+  body.view-mode .movable-section[data-content-empty="true"],
+  body.view-mode .movable-section[data-content-empty="true"] + .section-divider {
+    display: none !important;
+  }
 </style>
 </head>
 <body>
@@ -837,10 +963,10 @@
     <span class="toggle-row-label">Segments for This Episode</span>
     <label class="toggle-item"><input type="checkbox" id="tog-news" onchange="updateSection('news-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Recent News</span></label>
     <label class="toggle-item"><input type="checkbox" id="tog-tournaments" onchange="updateSection('tournaments-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Tournaments</span></label>
-    <label class="toggle-item"><input type="checkbox" id="tog-rankings" onchange="updateSection('rankings-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Power Rankings</span></label>
-    <label class="toggle-item"><input type="checkbox" id="tog-dotw" onchange="updateSection('dotw-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Deck of the Week</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-rankings" onchange="updateSection('rankings-section', this); placeRankingsDotwArrows();"><span class="toggle-switch"></span><span class="toggle-item-label">Power Rankings</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-dotw" onchange="updateSection('dotw-section', this); placeRankingsDotwArrows();"><span class="toggle-switch"></span><span class="toggle-item-label">Deck of the Week</span></label>
     <label class="toggle-item"><input type="checkbox" id="tog-mailbag" onchange="updateSection('mailbag-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Community Mailbag</span></label>
-    <label class="toggle-item"><input type="checkbox" id="tog-rtn" checked onchange="updateSection('rtn-section', this); if(this.checked) fetchNationalsInfo();"><span class="toggle-switch"></span><span class="toggle-item-label">Road to Nationals</span></label>
+    <label class="toggle-item"><input type="checkbox" id="tog-rtn" onchange="updateSection('rtn-section', this); if(this.checked) fetchNationalsInfo();"><span class="toggle-switch"></span><span class="toggle-item-label">Road to Nationals</span></label>
     <label class="toggle-item"><input type="checkbox" id="tog-spoilers" onchange="updateSection('spoilers-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Spoilers</span></label>
     <label class="toggle-item"><input type="checkbox" id="tog-collectors" onchange="updateSection('collectors-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Collector's Corner</span></label>
     <label class="toggle-item"><input type="checkbox" id="tog-meta" onchange="updateSection('meta-section', this)"><span class="toggle-switch"></span><span class="toggle-item-label">Meta Forecast</span></label>
@@ -910,7 +1036,22 @@
             <button class="btn btn-teal" type="button" id="upcoming-add-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="addUpcomingPick()">Add</button>
           </div>
           <div id="upcoming-fetch-status" style="font-size:9px; color:var(--placeholder); font-style:italic; margin-bottom:4px;"></div>
-          <textarea class="field-textarea tall" id="upcoming" placeholder="Tournament name - Date - Location (one per line)"></textarea>
+          <div class="tournament-pills" id="upcoming-pills"></div>
+          <div id="upcoming-empty-state" style="font-size:10px; color:var(--placeholder); font-style:italic; padding:6px 0;">No upcoming tournaments added yet -- fetch and select from the list above.</div>
+
+          <div id="tournament-modal-overlay" class="spoiler-modal-overlay" onclick="closeTournamentModal(event)">
+            <div class="spoiler-modal-content tournament-modal-content">
+              <button type="button" class="spoiler-modal-close" onclick="closeTournamentModal(event)">&times;</button>
+              <div class="tournament-modal-badge" id="tournament-modal-badge"></div>
+              <div class="tournament-modal-title" id="tournament-modal-title"></div>
+              <div class="tournament-modal-date" id="tournament-modal-date"></div>
+              <div class="tournament-modal-section" id="tournament-modal-venue"></div>
+              <div class="tournament-modal-section" id="tournament-modal-host"></div>
+              <div class="tournament-modal-section" id="tournament-modal-formats"></div>
+              <div class="tournament-modal-section" id="tournament-modal-fees"></div>
+              <div class="tournament-modal-section" id="tournament-modal-description"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -923,9 +1064,11 @@
       <div class="section" id="rankings-section">
         <div class="sec-header">
           <span class="sec-title">Power Rankings</span>
-          <span class="sec-order-controls">
-            <button class="sec-order-btn" type="button" onclick="moveSection('rankings-dotw',-1)" title="Move up">&#9650;</button>
-            <button class="sec-order-btn" type="button" onclick="moveSection('rankings-dotw',1)" title="Move down">&#9660;</button>
+          <span class="sec-order-controls" id="rankings-order-controls">
+            <span class="sec-order-arrows" id="rankings-dotw-arrows">
+              <button class="sec-order-btn" type="button" onclick="moveSection('rankings-dotw',-1)" title="Move up">&#9650;</button>
+              <button class="sec-order-btn" type="button" onclick="moveSection('rankings-dotw',1)" title="Move down">&#9660;</button>
+            </span>
           </span>
         </div>
         <div class="sec-body">
@@ -941,7 +1084,7 @@
       </div>
 
       <div class="section" id="dotw-section">
-        <div class="sec-header"><span class="sec-title">Deck of the Week</span></div>
+        <div class="sec-header"><span class="sec-title">Deck of the Week</span><span class="sec-order-controls" id="dotw-order-controls"></span></div>
         <div class="sec-body">
           <div class="field">
             <label class="field-label">Deck Profile Link</label>
@@ -976,8 +1119,12 @@
             </div>
           </div>
           <div class="field">
-            <label class="field-label">Key Cards &amp; Strategy</label>
-            <textarea class="field-textarea xtall" id="dotw-notes" placeholder="Key cards and their roles, strategy overview, talking points..."></textarea>
+            <label class="field-label bullet-field-label">Key Cards &amp; Strategy</label>
+            <div class="bullet-wrap">
+              <div class="bullet-marks" id="dotw-notes-marks"><span>&#8226;</span></div>
+              <textarea class="bullet-textarea xtall" id="dotw-notes" placeholder="Key cards and their roles, strategy overview, talking points... (one per line)"></textarea>
+            </div>
+            <ul class="bullet-notes-print" id="dotw-notes-print"></ul>
           </div>
         </div>
       </div>
@@ -998,16 +1145,18 @@
         </div>
         <div class="sec-body">
           <div id="rtn-nats-fetch-status" style="font-size:9px; color:var(--placeholder); font-style:italic; margin-bottom:6px;"></div>
-          <div class="countdown-hero" id="rtn-countdown-field" style="display:none;">
+          <div class="countdown-hero" id="rtn-countdown-field" style="display:none;" onclick="openNationalsModal(event)">
             <div>
               <div class="countdown-number" id="rtn-countdown-number">--</div>
               <div class="countdown-label" id="rtn-countdown-label">Days to Nationals</div>
             </div>
+            <div class="countdown-info" id="rtn-countdown-info"></div>
             <div class="countdown-date">
               Nationals Date<br>
-              <input type="date" id="rtn-nats-date">
+              <input type="date" id="rtn-nats-date" onclick="event.stopPropagation()">
+              <span class="countdown-date-print" id="rtn-nats-date-print"></span>
             </div>
-            <button type="button" class="countdown-remove" title="Remove" onclick="removeCountdownField()">&times;</button>
+            <button type="button" class="countdown-remove" title="Remove" onclick="event.stopPropagation(); removeCountdownField()">&times;</button>
           </div>
 
           <div class="field" id="rtn-deadlines-field" style="display:none;">
@@ -1038,6 +1187,7 @@
             <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="carryForwardRtn()">&#8635; Carry Forward from Previous Draft</button>
             <span id="rtn-carryforward-status" style="font-size:9px; color:var(--placeholder); font-style:italic;"></span>
           </div>
+          <div id="rtn-carryforward-picker-row" style="display:none; margin-top:6px; align-items:center; gap:6px;"></div>
         </div>
       </div>
     </div>
@@ -1062,6 +1212,8 @@
               <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="fetchRecentSpoilers()">Fetch Recent Spoilers (Last 21 Days)</button>
               <select class="field-input" id="spoiler-picker" style="display:none; flex:1;"></select>
               <button class="btn btn-teal" type="button" id="spoiler-add-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="addSpoilerPick()">Add</button>
+              <button class="btn btn-teal" type="button" id="spoiler-add-all-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="addAllSpoilerPicks()">Add All</button>
+              <button class="btn btn-ghost" type="button" id="spoiler-sort-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="sortSpoilerCardsBySet()">Sort by Set</button>
               <label class="btn btn-ghost" style="padding:3px 10px; font-size:10px; white-space:nowrap; cursor:pointer; margin-bottom:0;">
                 + Upload Card Image
                 <input type="file" id="spoiler-manual-file" accept="image/*" style="display:none;" onchange="addManualSpoilerCard()">
@@ -1074,19 +1226,29 @@
           </div>
 
           <div id="spoiler-modal-overlay" class="spoiler-modal-overlay" onclick="closeSpoilerModal(event)">
-            <div class="spoiler-modal-content">
+            <div class="spoiler-modal-content spoiler-modal-content-split">
               <button type="button" class="spoiler-modal-close" onclick="closeSpoilerModal(event)">&times;</button>
-              <div class="spoiler-card-badge spoiler-modal-badge" id="spoiler-modal-badge"></div>
-              <img id="spoiler-modal-img" src="" alt="">
-              <div class="spoiler-modal-caption" id="spoiler-modal-caption"></div>
-              <div class="spoiler-modal-set" id="spoiler-modal-set"></div>
-              <div class="spoiler-modal-note" id="spoiler-modal-note"></div>
+              <div class="spoiler-modal-media">
+                <div class="spoiler-card-badge spoiler-modal-badge" id="spoiler-modal-badge"></div>
+                <img id="spoiler-modal-img" src="" alt="">
+                <div class="spoiler-modal-caption" id="spoiler-modal-caption"></div>
+                <div class="spoiler-modal-set" id="spoiler-modal-set"></div>
+              </div>
+              <div class="spoiler-modal-notes-col">
+                <div class="spoiler-modal-notes-label">Talking Points</div>
+                <div class="spoiler-modal-note" id="spoiler-modal-note"></div>
+                <div class="spoiler-modal-note-empty" id="spoiler-modal-note-empty">No notes added for this card.</div>
+              </div>
             </div>
           </div>
 
           <div class="field">
-            <label class="field-label">Discussion Notes</label>
-            <textarea class="field-textarea" id="spoiler-notes" placeholder="Talking points, comparisons, community reaction..."></textarea>
+            <label class="field-label bullet-field-label">Discussion Notes</label>
+            <div class="bullet-wrap">
+              <div class="bullet-marks" id="spoiler-notes-marks"><span>&#8226;</span></div>
+              <textarea class="bullet-textarea" id="spoiler-notes" placeholder="Talking points, comparisons, community reaction... (one per line)"></textarea>
+            </div>
+            <ul class="bullet-notes-print" id="spoiler-notes-print"></ul>
           </div>
         </div>
       </div>
@@ -1150,8 +1312,12 @@
           </div>
           <div class="rankings-grid" id="meta-rankings-grid"></div>
           <div class="field" style="margin-top:8px;">
-            <label class="field-label">Discussion Notes</label>
-            <textarea class="field-textarea tall" id="meta-notes" placeholder="Predictions on upcoming meta shifts, archetypes to watch, rotation impact, etc."></textarea>
+            <label class="field-label bullet-field-label">Discussion Notes</label>
+            <div class="bullet-wrap">
+              <div class="bullet-marks" id="meta-notes-marks"><span>&#8226;</span></div>
+              <textarea class="bullet-textarea tall" id="meta-notes" placeholder="Predictions on upcoming meta shifts, archetypes to watch, rotation impact, etc. (one per line)"></textarea>
+            </div>
+            <ul class="bullet-notes-print" id="meta-notes-print"></ul>
           </div>
         </div>
       </div>
@@ -1184,16 +1350,26 @@
           </div>
 
           <div id="agur-modal-overlay" class="spoiler-modal-overlay" onclick="closeAgurModal(event)">
-            <div class="spoiler-modal-content">
+            <div class="spoiler-modal-content spoiler-modal-content-split">
               <button type="button" class="spoiler-modal-close" onclick="closeAgurModal(event)">&times;</button>
-              <img id="agur-modal-img" src="" alt="">
-              <div class="spoiler-modal-caption" id="agur-modal-caption"></div>
-              <div class="spoiler-modal-note" id="agur-modal-note"></div>
+              <div class="spoiler-modal-media">
+                <img id="agur-modal-img" src="" alt="">
+                <div class="spoiler-modal-caption" id="agur-modal-caption"></div>
+              </div>
+              <div class="spoiler-modal-notes-col">
+                <div class="spoiler-modal-notes-label">Talking Points</div>
+                <div class="spoiler-modal-note" id="agur-modal-note"></div>
+                <div class="spoiler-modal-note-empty" id="agur-modal-note-empty">No notes added for this card.</div>
+              </div>
             </div>
           </div>
           <div class="field">
-            <label class="field-label">Discussion Notes</label>
-            <textarea class="field-textarea tall" id="agur-notes" placeholder="Custom card design, homebrew content, creative projects..."></textarea>
+            <label class="field-label bullet-field-label">Discussion Notes</label>
+            <div class="bullet-wrap">
+              <div class="bullet-marks" id="agur-notes-marks"><span>&#8226;</span></div>
+              <textarea class="bullet-textarea tall" id="agur-notes" placeholder="Custom card design, homebrew content, creative projects... (one per line)"></textarea>
+            </div>
+            <ul class="bullet-notes-print" id="agur-notes-print"></ul>
           </div>
         </div>
       </div>
@@ -1218,8 +1394,12 @@
             <input class="field-input" id="potm-name" list="rank-player-options" placeholder="Name / handle -- select existing or type new" autocomplete="off">
           </div>
           <div class="field">
-            <label class="field-label">Highlight / Reason</label>
-            <textarea class="field-textarea" id="potm-notes" placeholder="Recent achievements, community contributions, notable plays..."></textarea>
+            <label class="field-label bullet-field-label">Highlight / Reason</label>
+            <div class="bullet-wrap">
+              <div class="bullet-marks" id="potm-notes-marks"><span>&#8226;</span></div>
+              <textarea class="bullet-textarea" id="potm-notes" placeholder="Recent achievements, community contributions, notable plays... (one per line)"></textarea>
+            </div>
+            <ul class="bullet-notes-print" id="potm-notes-print"></ul>
           </div>
         </div>
       </div>
@@ -1262,9 +1442,12 @@
 
   <div id="page2-wrapper">
     <div class="canvas page2">
-      <div class="page2-banner">
-        <div class="page2-banner-title">Guest Interview</div>
-        <div class="page2-banner-sub">Page 2 &nbsp;&middot;&nbsp; The Threshing Floor</div>
+      <div class="page2-banner" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div>
+          <div class="page2-banner-title">Guest Interview</div>
+          <div class="page2-banner-sub">Page 2 &nbsp;&middot;&nbsp; The Threshing Floor</div>
+        </div>
+        <span class="sec-order-controls" id="guest-order-controls"></span>
       </div>
 
       <div class="grid-1">
@@ -1276,8 +1459,12 @@
               <input class="field-input" id="guest-name" placeholder="Full name / handle" autocomplete="off">
             </div>
             <div class="field">
-              <label class="field-label">Background / Intro</label>
-              <textarea class="field-textarea tall" id="guest-bio" placeholder="How they got into Redemption, community role, accomplishments..."></textarea>
+              <label class="field-label bullet-field-label">Background / Intro</label>
+              <div class="bullet-wrap">
+                <div class="bullet-marks" id="guest-bio-marks"><span>&#8226;</span></div>
+                <textarea class="bullet-textarea tall" id="guest-bio" placeholder="How they got into Redemption, community role, accomplishments... (one per line)"></textarea>
+              </div>
+              <ul class="bullet-notes-print" id="guest-bio-print"></ul>
             </div>
           </div>
         </div>
@@ -1299,8 +1486,12 @@
           <div class="sec-header"><span class="sec-title">Resources &amp; Wrap-up</span></div>
           <div class="sec-body">
             <div class="field">
-              <label class="field-label">Resources to Mention</label>
-              <textarea class="field-textarea" id="guest-links" placeholder="Links, social handles, decks, projects the guest wants to plug..."></textarea>
+              <label class="field-label bullet-field-label">Resources to Mention</label>
+              <div class="bullet-wrap">
+                <div class="bullet-marks" id="guest-links-marks"><span>&#8226;</span></div>
+                <textarea class="bullet-textarea" id="guest-links" placeholder="Links, social handles, decks, projects the guest wants to plug... (one per line)"></textarea>
+              </div>
+              <ul class="bullet-notes-print" id="guest-links-print"></ul>
             </div>
           </div>
         </div>
@@ -2006,6 +2197,7 @@
     var status = document.getElementById('spoiler-fetch-status');
     var picker = document.getElementById('spoiler-picker');
     var addBtn = document.getElementById('spoiler-add-btn');
+    var addAllBtn = document.getElementById('spoiler-add-all-btn');
 
     status.textContent = 'Fetching...';
     fetch('/threshingfloor/api/data?kind=spoilers')
@@ -2027,6 +2219,7 @@
           status.textContent = 'No spoilers found in the last 21 days.';
           picker.style.display = 'none';
           addBtn.style.display = 'none';
+          addAllBtn.style.display = 'none';
           return;
         }
 
@@ -2048,21 +2241,8 @@
 
         picker.style.display = '';
         addBtn.style.display = '';
-        status.textContent = 'Found ' + filtered.length + ' spoiler(s) in the last 21 days. Select one and click Add.';
-
-        // Auto-fill Set/Promo with the most common set name among recent spoilers, if empty
-        var setField = document.getElementById('spoiler-set');
-        if (!setField.value) {
-          var counts = {};
-          filtered.forEach(function(item) {
-            if (item.set_name) counts[item.set_name] = (counts[item.set_name] || 0) + 1;
-          });
-          var topSet = null, topCount = 0;
-          Object.keys(counts).forEach(function(name) {
-            if (counts[name] > topCount) { topCount = counts[name]; topSet = name; }
-          });
-          if (topSet) setField.value = topSet;
-        }
+        addAllBtn.style.display = '';
+        status.textContent = 'Found ' + filtered.length + ' spoiler(s) in the last 21 days. Select one and click Add, or click Add All.';
       })
       .catch(function(err) {
         status.textContent = 'Could not fetch spoilers.';
@@ -2076,6 +2256,48 @@
     var item = window.spoilerListings[idx];
     if (!item) return;
     addSpoilerCard(item.card_name, item.set_name, item.set_number, item.image_url);
+    updateSpoilerSortBtnVisibility();
+  }
+
+  function addAllSpoilerPicks() {
+    if (!window.spoilerListings || !window.spoilerListings.length) return;
+    var sorted = window.spoilerListings.slice().sort(compareBySetThenNumber);
+    sorted.forEach(function(item) {
+      addSpoilerCard(item.card_name, item.set_name, item.set_number, item.image_url);
+    });
+    updateSpoilerSortBtnVisibility();
+  }
+
+  // Compare two spoiler items (or two .spoiler-card datasets) by set name, then set number, then card name
+  function compareBySetThenNumber(a, b) {
+    var aSet = (a.set_name || a.setName || '').toLowerCase();
+    var bSet = (b.set_name || b.setName || '').toLowerCase();
+    if (aSet !== bSet) return aSet < bSet ? -1 : 1;
+
+    var aNum = parseFloat(a.set_number || a.setNumber);
+    var bNum = parseFloat(b.set_number || b.setNumber);
+    var aHasNum = !isNaN(aNum), bHasNum = !isNaN(bNum);
+    if (aHasNum && bHasNum && aNum !== bNum) return aNum - bNum;
+    if (aHasNum !== bHasNum) return aHasNum ? -1 : 1;
+
+    var aName = (a.card_name || a.cardName || '').toLowerCase();
+    var bName = (b.card_name || b.cardName || '').toLowerCase();
+    if (aName !== bName) return aName < bName ? -1 : 1;
+    return 0;
+  }
+
+  function sortSpoilerCardsBySet() {
+    var grid = document.getElementById('spoiler-card-grid');
+    var cards = [...grid.querySelectorAll('.spoiler-card')];
+    cards.sort(function(a, b) { return compareBySetThenNumber(a.dataset, b.dataset); });
+    cards.forEach(function(card) { grid.appendChild(card); });
+  }
+
+  function updateSpoilerSortBtnVisibility() {
+    var btn = document.getElementById('spoiler-sort-btn');
+    var grid = document.getElementById('spoiler-card-grid');
+    if (!btn || !grid) return;
+    btn.style.display = grid.querySelectorAll('.spoiler-card').length >= 2 ? '' : 'none';
   }
 
   // Palette of distinct gradient pairs for set badges
@@ -2149,6 +2371,7 @@
       if (document.getElementById('spoiler-card-grid').children.length === 0) {
         document.getElementById('spoiler-empty-state').style.display = '';
       }
+      updateSpoilerSortBtnVisibility();
     });
     imgWrap.appendChild(removeBtn);
 
@@ -2293,6 +2516,45 @@
   }
 
 
+  // ---- Shared helper: downscale/compress an uploaded image to keep draft size manageable ----
+  // Resizes so the longest edge is at most maxDimension px, and re-encodes as JPEG at the
+  // given quality. Falls back to the original file's data URL if anything goes wrong
+  // (e.g. SVG or unsupported format that canvas can't draw).
+  function resizeImageFile(file, maxDimension, quality, callback) {
+    maxDimension = maxDimension || 600;
+    quality = quality || 0.8;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var original = e.target.result;
+      var img = new Image();
+      img.onload = function() {
+        var w = img.naturalWidth, h = img.naturalHeight;
+        if (!w || !h) { callback(original); return; }
+
+        var scale = Math.min(1, maxDimension / Math.max(w, h));
+        var targetW = Math.round(w * scale);
+        var targetH = Math.round(h * scale);
+
+        try {
+          var canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          var resized = canvas.toDataURL('image/jpeg', quality);
+          // Only use the resized version if it's actually smaller
+          callback(resized.length < original.length ? resized : original);
+        } catch (err) {
+          callback(original);
+        }
+      };
+      img.onerror = function() { callback(original); };
+      img.src = original;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function addAgurCard() {
     var fileField = document.getElementById('agur-manual-file');
     if (!fileField.files || !fileField.files[0]) return;
@@ -2300,12 +2562,10 @@
     var file = fileField.files[0];
     var baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
 
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      buildAgurCard(baseName, e.target.result);
+    resizeImageFile(file, 600, 0.8, function(dataUrl) {
+      buildAgurCard(baseName, dataUrl);
       fileField.value = '';
-    };
-    reader.readAsDataURL(file);
+    });
   }
 
   window.agurCardCount = window.agurCardCount || 0;
@@ -2396,12 +2656,11 @@
     var file = fileField.files[0];
     var baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
 
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      addSpoilerCard(baseName, '', '', e.target.result);
+    resizeImageFile(file, 600, 0.8, function(dataUrl) {
+      addSpoilerCard(baseName, '', '', dataUrl);
       fileField.value = '';
-    };
-    reader.readAsDataURL(file);
+      updateSpoilerSortBtnVisibility();
+    });
   }
 
   // ---- Road to Nationals: auto-fetch the National tournament entry ----
@@ -2427,6 +2686,9 @@
         dateField.value = national.start_date;
         updateNatsCountdown();
       }
+
+      window.rtnNationalsInfo = national;
+      renderNationalsInfo();
 
       var loc = national.city + ', ' + national.state;
       var dateLabel = formatDateShort(national.start_date);
@@ -2484,31 +2746,171 @@
       });
   }
 
+  // ---- Upcoming Tournaments: pills + detail modal ----
+  window.upcomingPicked = [];
+
+  function dateRangeLabel(item) {
+    var dateLabel = formatDateShort(item.start_date);
+    if (item.end_date && item.end_date !== item.start_date) {
+      dateLabel += '-' + formatDateShort(item.end_date).split(' ')[1];
+    }
+    return dateLabel;
+  }
+
+  function renderUpcomingPills() {
+    var wrap = document.getElementById('upcoming-pills');
+    var empty = document.getElementById('upcoming-empty-state');
+    wrap.innerHTML = '';
+
+    window.upcomingPicked.forEach(function(item, idx) {
+      var pill = document.createElement('div');
+      pill.className = 'tournament-pill';
+      pill.addEventListener('click', function() { openTournamentModal(idx); });
+
+      var dateSpan = document.createElement('span');
+      dateSpan.className = 'tournament-pill-date';
+      dateSpan.textContent = dateRangeLabel(item);
+      pill.appendChild(dateSpan);
+
+      var locSpan = document.createElement('span');
+      locSpan.className = 'tournament-pill-loc';
+      locSpan.textContent = item.city + ', ' + item.state;
+      pill.appendChild(locSpan);
+
+      var typeSpan = document.createElement('span');
+      typeSpan.className = 'tournament-pill-type';
+      typeSpan.textContent = item.tournament_type || '';
+      pill.appendChild(typeSpan);
+
+      var removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'tournament-pill-remove';
+      removeBtn.title = 'Remove';
+      removeBtn.innerHTML = '&times;';
+      removeBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        window.upcomingPicked.splice(idx, 1);
+        renderUpcomingPills();
+      });
+      pill.appendChild(removeBtn);
+
+      wrap.appendChild(pill);
+    });
+
+    empty.style.display = window.upcomingPicked.length ? 'none' : '';
+  }
+
+  function openTournamentModal(idx) {
+    var item = window.upcomingPicked[idx];
+    if (!item) return;
+    openTournamentModalForItem(item);
+  }
+
+  function openTournamentModalForItem(item) {
+    if (!item) return;
+
+    var badge = document.getElementById('tournament-modal-badge');
+    badge.textContent = item.tournament_type || '';
+
+    document.getElementById('tournament-modal-title').textContent = item.city + ', ' + item.state;
+
+    var dateLabel = dateRangeLabel(item);
+    if (item.start_time) dateLabel += ' - ' + item.start_time;
+    document.getElementById('tournament-modal-date').textContent = dateLabel;
+
+    var venueHtml = '';
+    if (item.venue_name) venueHtml += '<strong>Venue:</strong> ' + item.venue_name;
+    if (item.venue_address) venueHtml += (venueHtml ? '<br>' : '') + item.venue_address;
+    document.getElementById('tournament-modal-venue').innerHTML = venueHtml;
+
+    var hostHtml = item.host_name ? '<strong>Host:</strong> ' + item.host_name : '';
+    document.getElementById('tournament-modal-host').innerHTML = hostHtml;
+
+    var formatsHtml = '';
+    if (item.formats && item.formats.length) {
+      formatsHtml = '<strong>Formats</strong><table class="tournament-modal-formats-table">';
+      item.formats.forEach(function(f) {
+        formatsHtml += '<tr><td>' + (f.format || '') + '</td><td class="fee">' + (f.entry_fee || '') + '</td></tr>';
+      });
+      formatsHtml += '</table>';
+    }
+    document.getElementById('tournament-modal-formats').innerHTML = formatsHtml;
+
+    var feesHtml = item.door_fee ? '<strong>Door Fee:</strong> ' + item.door_fee : '';
+    document.getElementById('tournament-modal-fees').innerHTML = feesHtml;
+
+    var descHtml = item.description ? item.description : '';
+    document.getElementById('tournament-modal-description').innerHTML = descHtml;
+
+    document.getElementById('tournament-modal-overlay').classList.add('open');
+  }
+
+  function closeTournamentModal(event) {
+    if (event && event.target.closest('.spoiler-modal-content') && !event.target.classList.contains('spoiler-modal-close')) {
+      return;
+    }
+    document.getElementById('tournament-modal-overlay').classList.remove('open');
+  }
+
   function addUpcomingPick() {
     var picker = document.getElementById('upcoming-picker');
     var idx = parseInt(picker.value, 10);
     var item = window.upcomingListings[idx];
     if (!item) return;
 
-    var dateLabel = formatDateShort(item.start_date);
-    if (item.end_date && item.end_date !== item.start_date) {
-      dateLabel += '-' + formatDateShort(item.end_date).split(' ')[1];
+    // Avoid duplicates (by id)
+    if (window.upcomingPicked.some(function(p) { return p.id === item.id; })) return;
+
+    window.upcomingPicked.push(item);
+    renderUpcomingPills();
+  }
+
+
+  // ---- Road to Nationals: middle info block (location, venue, dates) ----
+  window.rtnNationalsInfo = null;
+
+  function renderNationalsInfo() {
+    var info = document.getElementById('rtn-countdown-info');
+    if (!info) return;
+    var n = window.rtnNationalsInfo;
+    if (!n) { info.innerHTML = ''; return; }
+
+    var dateLabel = formatDateShort(n.start_date);
+    if (n.end_date && n.end_date !== n.start_date) {
+      dateLabel += '-' + formatDateShort(n.end_date).split(' ')[1];
     }
 
-    var line = dateLabel + ' - ' + item.city + ', ' + item.state + ' - ' + item.tournament_type;
-    if (item.host_name) line += ' - Hosted by ' + item.host_name;
+    var html = '<div class="countdown-info-loc">' + (n.city || '') + (n.city && n.state ? ', ' : '') + (n.state || '') + '</div>';
+    if (n.venue_name) html += '<div class="countdown-info-venue">' + n.venue_name + '</div>';
+    html += '<div class="countdown-info-dates">' + dateLabel + '</div>';
 
-    var ta = document.getElementById('upcoming');
-    ta.value = ta.value ? (ta.value.replace(/\n+$/, '') + '\n' + line) : line;
+    info.innerHTML = html;
+
+    var hero = document.getElementById('rtn-countdown-field');
+    if (hero) hero.classList.toggle('clickable', !!n);
   }
+
+  function openNationalsModal(event) {
+    if (!window.rtnNationalsInfo) return;
+    openTournamentModalForItem(window.rtnNationalsInfo);
+  }
+
 
   // ---- Road to Nationals: countdown ----
   function updateNatsCountdown() {
     var dateVal = document.getElementById('rtn-nats-date').value;
     var numOut = document.getElementById('rtn-countdown-number');
     var labelOut = document.getElementById('rtn-countdown-label');
-    if (!dateVal) { numOut.textContent = '--'; labelOut.textContent = 'Days to Nationals'; return; }
+    var printOut = document.getElementById('rtn-nats-date-print');
+    if (!dateVal) {
+      numOut.textContent = '--'; labelOut.textContent = 'Days to Nationals';
+      if (printOut) printOut.textContent = '';
+      return;
+    }
     var target = new Date(dateVal + 'T00:00:00');
+    if (printOut) {
+      printOut.textContent = target.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
     var now = new Date();
     var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     var diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
@@ -2535,6 +2937,10 @@
     document.getElementById('rtn-nats-date').value = '';
     document.getElementById('rtn-countdown-number').textContent = '--';
     document.getElementById('rtn-countdown-label').textContent = 'Days to Nationals';
+    var printOut = document.getElementById('rtn-nats-date-print');
+    if (printOut) printOut.textContent = '';
+    window.rtnNationalsInfo = null;
+    renderNationalsInfo();
   }
 
   function showExtraNotesField() {
@@ -2669,25 +3075,91 @@
     document.getElementById('rtn-events-list').appendChild(row);
   }
 
-  // ---- Carry Forward: Side Events + Deadline labels from a previous draft ----
+  // ---- Carry Forward: Side Events + Deadline labels from a chosen previous draft ----
   function carryForwardRtn() {
     var status = document.getElementById('rtn-carryforward-status');
-    var ep = document.getElementById('ep-num').value.trim();
-    if (!/^\d+(\.\d+)?$/.test(ep)) {
-      status.textContent = 'Enter a numeric episode number first.';
-      return;
-    }
-    status.textContent = 'Loading...';
-    fetch('/threshingfloor/api/drafts?before=' + encodeURIComponent(ep))
+    var pickerRow = document.getElementById('rtn-carryforward-picker-row');
+
+    status.textContent = 'Loading drafts...';
+    fetch('/threshingfloor/api/drafts')
+      .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+      .then(function(list) {
+        var currentEp = document.getElementById('ep-num').value.trim();
+        var filtered = list.filter(function(d) { return String(d.episode_number) !== currentEp; });
+
+        if (!filtered.length) {
+          status.textContent = 'No other saved drafts found to carry forward from.';
+          return;
+        }
+
+        // Most recently updated first
+        filtered.sort(function(a, b) { return new Date(b.updated_at) - new Date(a.updated_at); });
+
+        pickerRow.innerHTML = '';
+        var select = document.createElement('select');
+        select.className = 'field-input';
+        select.id = 'rtn-carryforward-select';
+        select.style.flex = '1';
+        filtered.forEach(function(d) {
+          var opt = document.createElement('option');
+          opt.value = d.episode_number;
+          opt.textContent = 'Ep ' + d.episode_number + ' -- saved ' + new Date(d.updated_at).toLocaleString();
+          select.appendChild(opt);
+        });
+
+        var applyBtn = document.createElement('button');
+        applyBtn.type = 'button';
+        applyBtn.className = 'btn btn-teal';
+        applyBtn.style.cssText = 'padding:3px 10px; font-size:10px;';
+        applyBtn.textContent = 'Carry Forward';
+        applyBtn.addEventListener('click', function() {
+          applyCarryForward(select.value);
+        });
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn btn-ghost';
+        cancelBtn.style.cssText = 'padding:3px 10px; font-size:10px;';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.addEventListener('click', function() {
+          pickerRow.style.display = 'none';
+          pickerRow.innerHTML = '';
+          status.textContent = '';
+        });
+
+        pickerRow.appendChild(select);
+        pickerRow.appendChild(applyBtn);
+        pickerRow.appendChild(cancelBtn);
+        pickerRow.style.display = 'flex';
+        status.textContent = 'Select an episode to carry RTN details forward from.';
+      })
+      .catch(function() { status.textContent = 'Could not load saved drafts.'; });
+  }
+
+  function applyCarryForward(ep) {
+    var status = document.getElementById('rtn-carryforward-status');
+    var pickerRow = document.getElementById('rtn-carryforward-picker-row');
+    status.textContent = 'Loading Ep ' + ep + '...';
+
+    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep))
       .then(function(res) {
-        if (res.status === 404) { status.textContent = 'No earlier episode draft found.'; return null; }
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
       .then(function(row) {
-        if (!row) return;
         var data = row.data || {};
-        var eventsAdded = 0, deadlinesAdded = 0;
+        var eventsAdded = 0, deadlinesAdded = 0, notesAdded = false;
+
+        // Venue / Other Notes: carry forward verbatim if present and not already filled in
+        if (data['rtn-extra-notes'] && data['rtn-extra-notes'].trim()) {
+          var notesField = document.getElementById('rtn-extra-notes');
+          if (!notesField.value.trim()) {
+            showExtraNotesField();
+            notesField.value = data['rtn-extra-notes'];
+            syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+            notesAdded = true;
+          }
+        }
 
         // Side events: carry forward name, host, AND description (these recur as-is)
         for (var i = 1; i <= 20; i++) {
@@ -2713,14 +3185,22 @@
           }
         }
 
-        if (eventsAdded === 0 && deadlinesAdded === 0) {
-          status.textContent = 'Nothing found to carry forward in that draft.';
+        pickerRow.style.display = 'none';
+        pickerRow.innerHTML = '';
+
+        if (eventsAdded === 0 && deadlinesAdded === 0 && !notesAdded) {
+          status.textContent = 'Nothing found to carry forward from Ep ' + ep + '.';
         } else {
-          status.textContent = 'Carried forward ' + eventsAdded + ' side event(s) and ' + deadlinesAdded + ' deadline label(s) -- update dates/details as needed.';
+          var parts = [];
+          if (eventsAdded) parts.push(eventsAdded + ' side event(s)');
+          if (deadlinesAdded) parts.push(deadlinesAdded + ' deadline label(s)');
+          if (notesAdded) parts.push('venue/other notes');
+          status.textContent = 'Carried forward ' + parts.join(', ') + ' from Ep ' + ep + ' -- update dates/details as needed.';
         }
       })
-      .catch(function() { status.textContent = 'Could not load the previous draft.'; });
+      .catch(function() { status.textContent = 'Could not load that draft.'; });
   }
+
 
   var closingTemplate =
     '<div class="field"><label class="field-label">Sponsor Sign-off</label>' +
@@ -2774,21 +3254,30 @@
   });
   syncBulletField('close-reminders', 'close-reminders-marks', 'close-reminders-print');
 
+  // Other bulletized notes fields (Deck of the Week, Spoilers, Meta Forecast,
+  // Agur the Creator, Player of the Month, Guest Background/Resources)
+  ['dotw-notes', 'spoiler-notes', 'meta-notes', 'agur-notes', 'potm-notes', 'guest-bio', 'guest-links'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', function() {
+      syncBulletField(id, id + '-marks', id + '-print');
+    });
+    syncBulletField(id, id + '-marks', id + '-print');
+  });
+
 
   function addCollectorsCard(input) {
     var file = input.files[0];
     if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function(ev) {
+    resizeImageFile(file, 600, 0.8, function(dataUrl) {
       var col = document.getElementById('collectors-card-col');
       col.innerHTML =
         '<div class="collectors-card-img-wrap">' +
-          '<img id="collectors-card-img" src="' + ev.target.result + '" alt="Card reference">' +
+          '<img id="collectors-card-img" src="' + dataUrl + '" alt="Card reference">' +
           '<button type="button" class="collectors-card-remove" title="Remove" onclick="removeCollectorsCard()">&times;</button>' +
         '</div>' +
         '<input class="collectors-card-caption-input" id="collectors-card-caption" placeholder="Card name / note" autocomplete="off">';
-    };
-    reader.readAsDataURL(file);
+    });
   }
 
   function removeCollectorsCard() {
@@ -2898,6 +3387,9 @@
         note: note ? note.value : ''
       };
     });
+
+    data['upcoming-picked'] = window.upcomingPicked;
+    data['rtn-nationals-info'] = window.rtnNationalsInfo;
 
     return data;
   }
@@ -3144,6 +3636,9 @@
             syncEpRuntimePrint();
             syncBulletField('opening-notes', 'opening-notes-marks', 'opening-notes-print');
             syncBulletField('close-reminders', 'close-reminders-marks', 'close-reminders-print');
+            ['dotw-notes', 'spoiler-notes', 'meta-notes', 'agur-notes', 'potm-notes', 'guest-bio', 'guest-links'].forEach(function(bid) {
+              syncBulletField(bid, bid + '-marks', bid + '-print');
+            });
 
             for (var mbi = 1; mbi <= window.mailbagCount; mbi++) {
               syncBulletField('mb-notes-' + mbi, 'mb-notes-marks-' + mbi, 'mb-notes-print-' + mbi);
@@ -3185,6 +3680,17 @@
                   }
                 }
               });
+              updateSpoilerSortBtnVisibility();
+            }
+
+            if (data['upcoming-picked'] && data['upcoming-picked'].length) {
+              window.upcomingPicked = data['upcoming-picked'];
+              renderUpcomingPills();
+            }
+
+            if (data['rtn-nationals-info']) {
+              window.rtnNationalsInfo = data['rtn-nationals-info'];
+              renderNationalsInfo();
             }
 
             if (data['section-order'] && data['section-order'].length) {
@@ -3362,6 +3868,9 @@
     document.getElementById('spoiler-card-grid').innerHTML = '';
     document.getElementById('spoiler-empty-state').style.display = '';
     window.spoilerCardCount = 0;
+    updateSpoilerSortBtnVisibility();
+    window.upcomingPicked = [];
+    renderUpcomingPills();
     [...document.querySelectorAll('.tourn-block')].forEach(function(el) { el.remove(); });
     window.tournBlockCount = 0;
     tournGrid.insertBefore(buildTournamentBlock(), document.getElementById('tourn-add-row'));
@@ -3391,8 +3900,8 @@
       if (!ok) return;
       resetForm();
       var defaults = {
-        'tog-news': true, 'tog-tournaments': true, 'tog-rankings': true,
-        'tog-dotw': true, 'tog-mailbag': true,
+        'tog-news': false, 'tog-tournaments': false, 'tog-rankings': false,
+        'tog-dotw': false, 'tog-mailbag': false,
         'tog-rtn': false, 'tog-spoilers': false, 'tog-collectors': false,
         'tog-meta': false, 'tog-agur': false, 'tog-potm': false, 'tog-guest': false
       };
@@ -3407,6 +3916,298 @@
     });
   }
 
+  // ---- Per-section Reset / Remove controls ----
+  // Maps each section's order-controls container id (or movable-section data-sid)
+  // to: the toggle checkbox id(s) to flip off for "Remove Section", and a reset function.
+  var SECTION_RESET_HANDLERS = {
+    'news': function() {
+      newsBody.innerHTML = '';
+      window.newsCount = 0;
+      addNewsItem();
+      newsBody.appendChild(createNewsAddRow());
+    },
+    'mailbag': function() {
+      mailbagBody.innerHTML = '';
+      window.mailbagCount = 0;
+      addMailbagItem();
+      mailbagBody.appendChild(createMailbagAddRow());
+    },
+    'tournaments': function() {
+      [...document.querySelectorAll('.tourn-block')].forEach(function(el) { el.remove(); });
+      window.tournBlockCount = 0;
+      tournGrid.insertBefore(buildTournamentBlock(), document.getElementById('tourn-add-row'));
+      window.upcomingPicked = [];
+      renderUpcomingPills();
+      var status = document.getElementById('upcoming-fetch-status');
+      if (status) status.textContent = '';
+      var picker = document.getElementById('upcoming-picker');
+      var addBtn = document.getElementById('upcoming-add-btn');
+      if (picker) picker.style.display = 'none';
+      if (addBtn) addBtn.style.display = 'none';
+    },
+    'rankings': function() {
+      for (var r = 1; r <= 10; r++) {
+        var input = document.getElementById('rank-' + r);
+        if (input) input.value = '';
+      }
+      window.previousRankings = null;
+      updateAllRankDeltas();
+      var status = document.getElementById('prev-rankings-status');
+      if (status) status.textContent = 'No previous rankings loaded';
+    },
+    'dotw': function() {
+      ['dotw-link','dotw-name','dotw-creator','dotw-format','dotw-color','dotw-notes'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      var status = document.getElementById('dotw-fetch-status');
+      if (status) status.textContent = '';
+    },
+    'rtn': function() {
+      removeExtraNotesField();
+      removeCountdownField();
+      document.getElementById('rtn-deadlines-list').innerHTML = '';
+      document.getElementById('rtn-deadlines-field').style.display = 'none';
+      window.rtnDeadlineCount = 0;
+      document.getElementById('rtn-events-list').innerHTML = '';
+      document.getElementById('rtn-events-field').style.display = 'none';
+      window.rtnEventCount = 0;
+      var natsStatus = document.getElementById('rtn-nats-fetch-status');
+      if (natsStatus) natsStatus.textContent = '';
+      var cfStatus = document.getElementById('rtn-carryforward-status');
+      if (cfStatus) cfStatus.textContent = '';
+    },
+    'spoilers': function() {
+      document.getElementById('spoiler-card-grid').innerHTML = '';
+      document.getElementById('spoiler-empty-state').style.display = '';
+      window.spoilerCardCount = 0;
+      updateSpoilerSortBtnVisibility();
+      var notes = document.getElementById('spoiler-notes');
+      if (notes) notes.value = '';
+      var status = document.getElementById('spoiler-fetch-status');
+      if (status) status.textContent = '';
+      var picker = document.getElementById('spoiler-picker');
+      var addBtn = document.getElementById('spoiler-add-btn');
+      var addAllBtn = document.getElementById('spoiler-add-all-btn');
+      if (picker) picker.style.display = 'none';
+      if (addBtn) addBtn.style.display = 'none';
+      if (addAllBtn) addAllBtn.style.display = 'none';
+    },
+    'collectors': function() {
+      var topic = document.getElementById('collectors-topic');
+      if (topic) topic.value = '';
+      var notes = document.getElementById('collectors-notes');
+      if (notes) notes.value = '';
+      syncCollectorsBullets();
+      removeCollectorsCard();
+    },
+    'meta': function() {
+      for (var r = 1; r <= 10; r++) {
+        var input = document.getElementById('meta-rank-' + r);
+        if (input) input.value = '';
+      }
+      window.previousMetaRankings = null;
+      updateAllMetaRankDeltas();
+      var status = document.getElementById('prev-meta-rankings-status');
+      if (status) status.textContent = 'No previous rankings loaded';
+      var notes = document.getElementById('meta-notes');
+      if (notes) notes.value = '';
+    },
+    'agur': function() {
+      document.getElementById('agur-card-grid').innerHTML = '';
+      document.getElementById('agur-empty-state').style.display = '';
+      var notes = document.getElementById('agur-notes');
+      if (notes) notes.value = '';
+    },
+    'potm': function() {
+      var name = document.getElementById('potm-name');
+      if (name) name.value = '';
+      var notes = document.getElementById('potm-notes');
+      if (notes) notes.value = '';
+    },
+    'guest': function() {
+      ['guest-name','guest-bio','guest-links'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      for (var g = 1; g <= 8; g++) {
+        var q = document.getElementById('guest-q' + g);
+        if (q) q.value = '';
+      }
+    }
+  };
+
+  // Maps the same keys to the toggle checkbox id(s) that control visibility
+  var SECTION_TOGGLE_IDS = {
+    'news': ['tog-news'],
+    'mailbag': ['tog-mailbag'],
+    'tournaments': ['tog-tournaments'],
+    'rankings': ['tog-rankings'],
+    'dotw': ['tog-dotw'],
+    'rtn': ['tog-rtn'],
+    'spoilers': ['tog-spoilers'],
+    'collectors': ['tog-collectors'],
+    'meta': ['tog-meta'],
+    'agur': ['tog-agur'],
+    'potm': ['tog-potm'],
+    'guest': ['tog-guest']
+  };
+
+  function resetSection(key) {
+    var label = SECTION_LABELS[key] || 'this section';
+    showConfirm('Reset ' + label + '? This will clear everything you\'ve entered in this section.', { confirmText: 'Reset', danger: true }).then(function(ok) {
+      if (!ok) return;
+      var fn = SECTION_RESET_HANDLERS[key];
+      if (fn) fn();
+    });
+  }
+
+  function removeSection(key) {
+    var label = SECTION_LABELS[key] || 'this section';
+    showConfirm('Remove ' + label + ' from this episode? Your content will be cleared. You can toggle it back on later to start fresh.', { confirmText: 'Remove', danger: true }).then(function(ok) {
+      if (!ok) return;
+      var fn = SECTION_RESET_HANDLERS[key];
+      if (fn) fn();
+      (SECTION_TOGGLE_IDS[key] || []).forEach(function(id) {
+        var cb = document.getElementById(id);
+        if (cb && cb.checked) {
+          cb.checked = false;
+          if (cb.onchange) cb.onchange.call(cb, { target: cb });
+        }
+      });
+    });
+  }
+
+  var SECTION_LABELS = {
+    'news': 'Recent News',
+    'mailbag': 'Community Mailbag',
+    'tournaments': 'Tournaments',
+    'rankings': 'Power Rankings',
+    'dotw': 'Deck of the Week',
+    'rtn': 'Road to Nationals',
+    'spoilers': 'Spoilers',
+    'collectors': "Collector's Corner",
+    'meta': 'Meta Forecast',
+    'agur': 'Agur the Creator',
+    'potm': 'Player of the Month',
+    'guest': 'Guest Interview'
+  };
+
+  // Inject Reset/Remove buttons into each section's order-controls
+  var SECTION_CONTROL_TARGETS = {
+    'news': document.querySelector('#news-section .sec-order-controls'),
+    'mailbag': document.querySelector('#mailbag-section .sec-order-controls'),
+    'tournaments': document.querySelector('#tournaments-section .sec-order-controls'),
+    'rankings': document.getElementById('rankings-order-controls'),
+    'dotw': document.getElementById('dotw-order-controls'),
+    'rtn': document.querySelector('#rtn-section .sec-order-controls'),
+    'spoilers': document.querySelector('#spoilers-section .sec-order-controls'),
+    'collectors': document.querySelector('#collectors-section .sec-order-controls'),
+    'meta': document.querySelector('#meta-section .sec-order-controls'),
+    'agur': document.querySelector('#agur-section .sec-order-controls'),
+    'potm': document.querySelector('#potm-section .sec-order-controls'),
+    'guest': document.getElementById('guest-order-controls')
+  };
+
+  Object.keys(SECTION_CONTROL_TARGETS).forEach(function(key) {
+    var target = SECTION_CONTROL_TARGETS[key];
+    if (!target) return;
+
+    var divider = document.createElement('span');
+    divider.className = 'sec-order-divider';
+    target.appendChild(divider);
+
+    var resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'sec-order-btn sec-action-btn';
+    resetBtn.title = 'Reset this section';
+    resetBtn.innerHTML = '&#8635; Reset';
+    resetBtn.addEventListener('click', function() { resetSection(key); });
+    target.appendChild(resetBtn);
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'sec-order-btn sec-action-btn';
+    removeBtn.title = 'Remove this section from the episode';
+    removeBtn.innerHTML = '&times; Remove';
+    removeBtn.addEventListener('click', function() { removeSection(key); });
+    target.appendChild(removeBtn);
+  });
+
+  // ---- Hide orphaned (empty) sections in print/PDF and published view ----
+  function sectionHasContent(sectionEl) {
+    var hasContent = false;
+
+    sectionEl.querySelectorAll('input, textarea, select').forEach(function(el) {
+      if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file') return;
+      if (el.value && el.value.trim()) hasContent = true;
+    });
+
+    if (sectionEl.querySelector('img')) hasContent = true;
+
+    sectionEl.querySelectorAll('.bullet-notes-print, .spoiler-card-note-print, .agur-card-note-print').forEach(function(ul) {
+      if (ul.children.length > 0) hasContent = true;
+    });
+
+    if (sectionEl.querySelector('.tournament-pill')) hasContent = true;
+    if (sectionEl.querySelector('.deadline-pill, .event-card')) hasContent = true;
+    if (sectionEl.querySelector('#rtn-countdown-field') &&
+        sectionEl.querySelector('#rtn-countdown-field').style.display !== 'none') hasContent = true;
+
+    return hasContent;
+  }
+
+  function markEmptySections() {
+    document.querySelectorAll('.movable-section').forEach(function(msec) {
+      var sections = msec.querySelectorAll(':scope > .grid-1 > .section, :scope > .grid-2 > .section, :scope .grid-1 > .section, :scope .grid-2 > .section');
+      if (sections.length === 0) {
+        msec.removeAttribute('data-content-empty');
+        return;
+      }
+      var anyHasContent = false;
+      sections.forEach(function(sec) {
+        if (sectionHasContent(sec)) anyHasContent = true;
+      });
+      if (anyHasContent) {
+        msec.removeAttribute('data-content-empty');
+      } else {
+        msec.setAttribute('data-content-empty', 'true');
+      }
+    });
+  }
+
+  window.addEventListener('beforeprint', markEmptySections);
+
+  // ---- Power Rankings / Deck of the Week: relocate shared move-arrows ----
+  // Both sections share one set of up/down arrows (they move together as 'rankings-dotw').
+  // Keep the arrows on whichever section currently occupies the right-hand column so their
+  // position lines up with every other section's order controls; if only one of the two
+  // is visible, it shifts left and the arrows move with it.
+  function placeRankingsDotwArrows() {
+    var arrows = document.getElementById('rankings-dotw-arrows');
+    var rankingsControls = document.getElementById('rankings-order-controls');
+    var dotwControls = document.getElementById('dotw-order-controls');
+    if (!arrows || !rankingsControls || !dotwControls) return;
+
+    var rankingsOn = document.getElementById('tog-rankings').checked;
+    var dotwOn = document.getElementById('tog-dotw').checked;
+
+    var target;
+    if (dotwOn) {
+      // DotW visible (either alone, or alongside rankings as the right column) -> arrows go here
+      target = dotwControls;
+    } else {
+      // Only rankings visible (or neither) -> arrows stay/return here
+      target = rankingsControls;
+    }
+
+    if (arrows.parentNode !== target) {
+      target.insertBefore(arrows, target.firstChild);
+    } else if (target.firstChild !== arrows) {
+      target.insertBefore(arrows, target.firstChild);
+    }
+  }
+
   document.querySelectorAll('.toggle-item input[type=checkbox]').forEach(function(cb) {
     if (cb.onchange) cb.onchange.call(cb, { target: cb });
   });
@@ -3416,6 +4217,7 @@
     document.body.classList.add('view-mode');
     try {
       applyDraft(window.__TF_VIEW__.data || {});
+      markEmptySections();
     } catch (e) {
       // Leave whatever rendered; a partial outline beats a blank page.
     }
