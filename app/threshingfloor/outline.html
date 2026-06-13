@@ -760,11 +760,16 @@
   body.view-mode #spoilers-section label.btn,
   body.view-mode .spoiler-card-remove,
   body.view-mode .spoiler-card-addnote-btn,
+  body.view-mode .collectors-card-remove,
   body.view-mode #spoiler-empty-state,
   body.view-mode #agur-empty-state,
+  body.view-mode #collectors-card-placeholder,
+  body.view-mode #agur-section label.btn,
   body.view-mode .agur-card-remove,
   body.view-mode .agur-card-addnote-btn,
   body.view-mode #dotw-fetch-status,
+  body.view-mode #dotw-section button,
+  body.view-mode #news-body label:has(input[type=checkbox]),
   body.view-mode #draft-picker-row,
   body.view-mode [id$="-add-row"],
   body.view-mode input[type="file"] {
@@ -782,6 +787,8 @@
     box-shadow: none !important;
   }
   body.view-mode textarea { overflow: hidden; }
+  body.view-mode input::placeholder,
+  body.view-mode textarea::placeholder { color: transparent !important; }
   /* The enlarge modals stay clickable */
   body.view-mode .spoiler-card-img-wrap,
   body.view-mode .agur-card-img-wrap { pointer-events: auto; cursor: pointer; }
@@ -2853,7 +2860,7 @@
 
   function collectData() {
     var data = {};
-    document.querySelectorAll('input[id], textarea[id]').forEach(function(el) {
+    document.querySelectorAll('input[id], textarea[id], select[id]').forEach(function(el) {
       if (el.type === 'checkbox') {
         data[el.id] = el.checked;
       } else {
@@ -2863,6 +2870,11 @@
     var collImg = document.getElementById('collectors-card-img');
     if (collImg) data['collectors-card-img'] = collImg.src;
 
+    data['tourn-block-count'] = window.tournBlockCount;
+    data['section-order'] = [...document.querySelectorAll('.movable-section')].map(function(s){ return s.dataset.sid; });
+    data['previous-rankings'] = window.previousRankings;
+    data['previous-meta-rankings'] = window.previousMetaRankings;
+
     data['agur-cards'] = [...document.querySelectorAll('.agur-card')].map(function(card) {
       var img = card.querySelector('img');
       var caption = card.querySelector('.agur-card-caption-input');
@@ -2870,6 +2882,19 @@
       return {
         img: img ? img.src : '',
         caption: caption ? caption.value : '',
+        note: note ? note.value : ''
+      };
+    });
+
+    data['spoiler-cards'] = [...document.querySelectorAll('.spoiler-card')].map(function(card) {
+      var img = card.querySelector('.spoiler-card-img-wrap img');
+      var caption = card.querySelector('.spoiler-card-caption-input');
+      var note = card.querySelector('.spoiler-card-note');
+      return {
+        img: img ? img.src : '',
+        cardName: caption ? caption.value : (card.dataset.cardName || ''),
+        setName: card.dataset.setName || '',
+        setNumber: card.dataset.setNumber || '',
         note: note ? note.value : ''
       };
     });
@@ -3047,6 +3072,14 @@
             if (data['rtn-event-name-' + i] !== undefined) addSideEventRow();
           }
 
+          // Pre-build additional tournament blocks beyond the first
+          var tournCount = data['tourn-block-count'] || 1;
+          for (var tb = 2; tb <= tournCount; tb++) addTournamentBlock();
+
+          // Restore previous-episode ranking baselines for movement deltas
+          if (data['previous-rankings']) window.previousRankings = data['previous-rankings'];
+          if (data['previous-meta-rankings']) window.previousMetaRankings = data['previous-meta-rankings'];
+
           // Pre-build mailbag items to match saved data
           var mbKeys = Object.keys(data).filter(function(k) { return /^mb-(by|q|notes)-\d+$/.test(k); });
           if (mbKeys.length) {
@@ -3103,6 +3136,7 @@
             }
             syncCollectorsBullets();
             updateNatsCountdown();
+            updateAllRankDeltas();
             updateAllMetaRankDeltas();
             syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
             syncEpDatePrint();
@@ -3134,6 +3168,36 @@
                   }
                 }
               });
+            }
+
+            if (data['spoiler-cards'] && data['spoiler-cards'].length) {
+              data['spoiler-cards'].forEach(function(c) {
+                addSpoilerCard(c.cardName, c.setName, c.setNumber, c.img);
+                var n = window.spoilerCardCount;
+                if (c.note) {
+                  var card = document.getElementById('spoiler-card-' + n);
+                  var addBtn = card.querySelector('.spoiler-card-addnote-btn');
+                  if (addBtn) addBtn.click();
+                  var noteEl = document.getElementById('spoiler-note-' + n);
+                  if (noteEl) {
+                    noteEl.value = c.note;
+                    noteEl.dispatchEvent(new Event('input'));
+                  }
+                }
+              });
+            }
+
+            if (data['section-order'] && data['section-order'].length) {
+              var secs = [...document.querySelectorAll('.movable-section')];
+              if (secs.length) {
+                var secParent = secs[0].parentNode;
+                var secAnchor = secs[secs.length - 1].nextSibling;
+                var bySid = {};
+                secs.forEach(function(s){ bySid[s.dataset.sid] = s; });
+                data['section-order'].forEach(function(sid){
+                  if (bySid[sid]) secParent.insertBefore(bySid[sid], secAnchor);
+                });
+              }
             }
           }, 50);
     } catch(err) {
@@ -3295,6 +3359,12 @@
     syncCollectorsBullets();
     document.getElementById('agur-card-grid').innerHTML = '';
     document.getElementById('agur-empty-state').style.display = '';
+    document.getElementById('spoiler-card-grid').innerHTML = '';
+    document.getElementById('spoiler-empty-state').style.display = '';
+    window.spoilerCardCount = 0;
+    [...document.querySelectorAll('.tourn-block')].forEach(function(el) { el.remove(); });
+    window.tournBlockCount = 0;
+    tournGrid.insertBefore(buildTournamentBlock(), document.getElementById('tourn-add-row'));
     document.getElementById('rtn-deadlines-list').innerHTML = '';
     document.getElementById('rtn-deadlines-field').style.display = 'none';
     window.rtnDeadlineCount = 0;
