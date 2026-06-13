@@ -94,6 +94,9 @@ export default function CollectionClient() {
   const [alignmentFilter, setAlignmentFilter] = useState("");
   const [rarityFilter, setRarityFilter] = useState("");
   const [ownershipFilter, setOwnershipFilter] = useState<"all" | "owned" | "unowned">("all");
+  const [sortBy, setSortBy] = useState<
+    "name" | "set" | "strength" | "toughness" | "type" | "brigade" | "quantity" | "price"
+  >("name");
   const [showPrices, setShowPrices] = useShowPrices();
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -164,11 +167,43 @@ export default function CollectionClient() {
         if (!haystack.includes(q)) return false;
       }
       return true;
-    }).sort((a, b) => a.name.localeCompare(b.name) || a.set.localeCompare(b.set));
-  }, [search, formatMode, typeFilter, brigadeFilter, alignmentFilter, rarityFilter, ownershipFilter, quantities]);
+    }).sort((a, b) => {
+      switch (sortBy) {
+        case "set":
+          return a.officialSet.localeCompare(b.officialSet) || a.name.localeCompare(b.name);
+        case "strength": {
+          const aStr = parseInt(a.strength) || 0;
+          const bStr = parseInt(b.strength) || 0;
+          return bStr - aStr || a.name.localeCompare(b.name);
+        }
+        case "toughness": {
+          const aTgh = parseInt(a.toughness) || 0;
+          const bTgh = parseInt(b.toughness) || 0;
+          return bTgh - aTgh || a.name.localeCompare(b.name);
+        }
+        case "type":
+          return a.type.localeCompare(b.type) || a.name.localeCompare(b.name);
+        case "brigade":
+          return a.brigade.localeCompare(b.brigade) || a.name.localeCompare(b.name);
+        case "quantity": {
+          const aQty = quantities.get(cardFullKey(a)) || 0;
+          const bQty = quantities.get(cardFullKey(b)) || 0;
+          return bQty - aQty || a.name.localeCompare(b.name);
+        }
+        case "price": {
+          const aPrice = getPrice(cardFullKey(a))?.price || 0;
+          const bPrice = getPrice(cardFullKey(b))?.price || 0;
+          return bPrice - aPrice || a.name.localeCompare(b.name);
+        }
+        case "name":
+        default:
+          return a.name.localeCompare(b.name) || a.set.localeCompare(b.set);
+      }
+    });
+  }, [search, formatMode, typeFilter, brigadeFilter, alignmentFilter, rarityFilter, ownershipFilter, sortBy, quantities, getPrice]);
 
   // Reset pagination whenever the filter result changes identity
-  const filterKey = `${search}|${formatMode}|${typeFilter}|${brigadeFilter}|${alignmentFilter}|${rarityFilter}|${ownershipFilter}`;
+  const filterKey = `${search}|${formatMode}|${typeFilter}|${brigadeFilter}|${alignmentFilter}|${rarityFilter}|${ownershipFilter}|${sortBy}`;
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
   if (filterKey !== lastFilterKey) {
     setLastFilterKey(filterKey);
@@ -451,6 +486,21 @@ export default function CollectionClient() {
           {RARITY_OPTIONS.map((r) => (
             <option key={r} value={r}>{r}</option>
           ))}
+        </select>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          title="Sort by"
+          className="w-36 rounded-lg border border-border bg-background px-2 py-2 text-sm"
+        >
+          <option value="name">Sort: Name</option>
+          <option value="set">Sort: Set</option>
+          <option value="brigade">Sort: Brigade</option>
+          <option value="type">Sort: Type</option>
+          <option value="strength">Sort: Strength</option>
+          <option value="toughness">Sort: Toughness</option>
+          <option value="quantity">Sort: Quantity</option>
+          <option value="price">Sort: Price</option>
         </select>
         <button
           onClick={() => setOwnershipFilter((v) => v === "owned" ? "all" : "owned")}
