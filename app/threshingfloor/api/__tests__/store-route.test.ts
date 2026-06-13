@@ -96,14 +96,7 @@ describe("PUT /threshingfloor/api/store/[key]", () => {
     expect(r.status).toBe(400);
   });
 
-  // ---- No-token path: first write uses INSERT ----
-  it("inserts a new array value (tournaments) and returns key + updated_at", async () => {
-    authorized([{ data: { key: "tournaments", updated_at: "t" }, error: null }]);
-    const r = await put("tournaments", { data: ["Regionals", "Nationals"] });
-    expect(r.status).toBe(200);
-    expect((await r.json()).key).toBe("tournaments");
-  });
-
+  // ---- No-token path, append-only key (players): first write uses INSERT ----
   it("inserts a new object value (players) and returns key + updated_at", async () => {
     authorized([{ data: { key: "players", updated_at: "2026-06-13T00:00:00Z" }, error: null }]);
     const r = await put("players", { data: { Hendrix: { format: "T1" } } });
@@ -111,7 +104,7 @@ describe("PUT /threshingfloor/api/store/[key]", () => {
     expect((await r.json()).key).toBe("players");
   });
 
-  it("409s when the row was created concurrently (unique violation, no token)", async () => {
+  it("409s when an append-only row was created concurrently (unique violation, no token)", async () => {
     authorized([{ data: null, error: { code: "23505" } }]);
     const r = await put("players", { data: {} });
     expect(r.status).toBe(409);
@@ -121,6 +114,21 @@ describe("PUT /threshingfloor/api/store/[key]", () => {
     authorized([{ data: null, error: { code: "08006" } }]);
     const r = await put("players", { data: {} });
     expect(r.status).toBe(500);
+  });
+
+  // ---- No-token path, snapshot key (rtn-data, tournaments): overwrite freely ----
+  it("overwrites a snapshot key (rtn-data) with no token -> 200", async () => {
+    authorized([{ data: { key: "rtn-data", updated_at: "t2" }, error: null }]);
+    const r = await put("rtn-data", { data: { "rtn-event-name-1": "Side Event" } });
+    expect(r.status).toBe(200);
+    expect((await r.json()).key).toBe("rtn-data");
+  });
+
+  it("overwrites a snapshot array key (tournaments) with no token -> 200", async () => {
+    authorized([{ data: { key: "tournaments", updated_at: "t" }, error: null }]);
+    const r = await put("tournaments", { data: ["Regionals", "Nationals"] });
+    expect(r.status).toBe(200);
+    expect((await r.json()).key).toBe("tournaments");
   });
 
   // ---- Token path: overwrite with optimistic concurrency ----

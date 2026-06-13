@@ -5,7 +5,14 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024; // Vercel rejects > 4.5 MB at the edge
 
 // Fixed set of shared keys. This is NOT an open-ended keyspace — only these
 // known singletons are allowed so the table stays tidy and predictable.
-const ALLOWED_KEYS = new Set(["players", "tournaments", "side-events"]);
+const ALLOWED_KEYS = new Set(["players", "tournaments", "side-events", "rtn-data"]);
+
+// Append-only keys are sets that only ever grow (e.g. the player registry). For
+// these, a write with no concurrency token must NOT clobber a row created
+// concurrently — it INSERTs and 409s on conflict so the client reconciles.
+// Every other key is a last-write-wins snapshot (e.g. rtn-data = the latest
+// episode's recurring Road-to-Nationals details) and may overwrite freely.
+const APPEND_ONLY_KEYS = new Set(["players"]);
 
 async function resolveKey(params: Promise<{ key: string }>): Promise<string | null> {
   const { key } = await params;
@@ -99,23 +106,39 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     return NextResponse.json(saved);
   }
 
-  // No token: the caller believes the row doesn't exist yet (first write). Use a
-  // plain INSERT so a row created concurrently by another host triggers a unique
-  // violation -> 409 (reconcile) instead of a silent overwrite. This closes the
-  // empty-store clobber window that an unconditional upsert would leave open.
+  // No token. Behavior depends on the key's semantics:
+  if (APPEND_ONLY_KEYS.has(key)) {
+    // Append-only set: the caller believes the row doesn't exist yet (first
+    // write). Use a plain INSERT so a row created concurrently by another host
+    // triggers a unique violation -> 409 (reconcile) instead of a silent
+    // overwrite. This closes the empty-store clobber window an unconditional
+    // upsert would leave open.
+    const { data: saved, error } = await auth.supabase
+      .from("threshing_floor_store")
+      .insert(row)
+      .select("key, updated_at")
+      .single();
+    if (error) {
+      if (error.code === "23505") {
+        // unique_violation: someone created the row since the caller last looked.
+        return NextResponse.json(
+          { error: "Value was modified by someone else" },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ error: "Failed to save value" }, { status: 500 });
+    }
+    return NextResponse.json(saved);
+  }
+
+  // Last-write-wins snapshot: overwrite freely. The latest write is always the
+  // intended state, so a token isn't required.
   const { data: saved, error } = await auth.supabase
     .from("threshing_floor_store")
-    .insert(row)
+    .upsert(row, { onConflict: "key" })
     .select("key, updated_at")
     .single();
-  if (error) {
-    if (error.code === "23505") {
-      // unique_violation: someone created the row since the caller last looked.
-      return NextResponse.json(
-        { error: "Value was modified by someone else" },
-        { status: 409 }
-      );
-    }
+  if (error || !saved) {
     return NextResponse.json({ error: "Failed to save value" }, { status: 500 });
   }
   return NextResponse.json(saved);

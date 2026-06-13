@@ -367,10 +367,10 @@
   }
   .tournament-pill:hover { background: var(--teal-light); }
   .tournament-pill-date {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 11px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 12px;
     color: var(--teal-dark); white-space: nowrap;
   }
-  .tournament-pill-loc { font-size: 11px; color: var(--text); white-space: nowrap; }
+  .tournament-pill-loc { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 12px; color: var(--text); white-space: nowrap; }
   .tournament-pill-type {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 9px;
     letter-spacing: 0.5px; text-transform: uppercase; color: var(--teal-dark);
@@ -401,9 +401,9 @@
   }
   .tournament-modal-section:empty { display: none; border-top: none; margin-top: 0; padding-top: 0; }
   .tournament-modal-section strong { color: var(--teal-dark); }
-  .tournament-modal-formats-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-  .tournament-modal-formats-table td { padding: 2px 0; font-size: 12px; }
-  .tournament-modal-formats-table td.fee { text-align: right; color: var(--teal-dark); font-weight: 600; white-space: nowrap; }
+  .tournament-modal-formats-table { width: auto; border-collapse: collapse; margin-top: 4px; }
+  .tournament-modal-formats-table td { padding: 2px 12px 2px 0; font-size: 12px; }
+  .tournament-modal-formats-table td.fee { text-align: left; color: var(--teal-dark); font-weight: 600; white-space: nowrap; padding-right: 0; }
 
   /* Spoilers: card grid */
   .spoiler-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 4px 0 10px; }
@@ -592,8 +592,11 @@
   body.dark-mode .collectors-card-img-wrap, body.dark-mode .spoiler-card-img-wrap,
   body.dark-mode .tournament-pill {
     background: var(--gray-light);
+    border-left-color: var(--teal);
   }
-  body.dark-mode .tournament-pill:hover { background: var(--teal-light); }
+  body.dark-mode .tournament-pill:hover { background: var(--teal-dark); }
+  body.dark-mode .tournament-pill-date { color: var(--teal-mid); }
+  body.dark-mode .tournament-pill-loc { color: var(--text); }
   body.dark-mode .tournament-pill-type { background: var(--teal-dark); color: var(--teal-mid); }
   body.dark-mode .tournament-modal-formats-table td.fee { color: var(--teal-mid); }
 
@@ -1034,6 +1037,7 @@
             <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="fetchUpcomingTournaments()">Fetch Upcoming (Next 21 Days)</button>
             <select class="field-input" id="upcoming-picker" style="display:none; flex:1;"></select>
             <button class="btn btn-teal" type="button" id="upcoming-add-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="addUpcomingPick()">Add</button>
+            <button class="btn btn-teal" type="button" id="upcoming-add-all-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="addAllUpcomingPicks()">Add All</button>
           </div>
           <div id="upcoming-fetch-status" style="font-size:9px; color:var(--placeholder); font-style:italic; margin-bottom:4px;"></div>
           <div class="tournament-pills" id="upcoming-pills"></div>
@@ -1156,7 +1160,6 @@
               <input type="date" id="rtn-nats-date" onclick="event.stopPropagation()">
               <span class="countdown-date-print" id="rtn-nats-date-print"></span>
             </div>
-            <button type="button" class="countdown-remove" title="Remove" onclick="event.stopPropagation(); removeCountdownField()">&times;</button>
           </div>
 
           <div class="field" id="rtn-deadlines-field" style="display:none;">
@@ -1180,14 +1183,12 @@
           </div>
 
           <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px;">
-            <button class="btn btn-ghost" type="button" id="rtn-add-countdown-btn" style="padding:3px 10px; font-size:10px;" onclick="showCountdownField()">+ Add Nationals Countdown</button>
             <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="addDeadlineRow()">+ Add Deadline</button>
             <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="addSideEventRow()">+ Add Side Event</button>
             <button class="btn btn-ghost" type="button" id="rtn-add-extra-notes-btn" style="padding:3px 10px; font-size:10px;" onclick="showExtraNotesField()">+ Add Venue / Other Notes</button>
-            <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="carryForwardRtn()">&#8635; Carry Forward from Previous Draft</button>
+            <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="carryForwardRtn()">&#8635; Recall Previous RTN Data</button>
             <span id="rtn-carryforward-status" style="font-size:9px; color:var(--placeholder); font-style:italic;"></span>
           </div>
-          <div id="rtn-carryforward-picker-row" style="display:none; margin-top:6px; align-items:center; gap:6px;"></div>
         </div>
       </div>
     </div>
@@ -2784,8 +2785,8 @@
 
       // Only auto-fill if the date isn't already set, to avoid clobbering manual edits
       var dateField = document.getElementById('rtn-nats-date');
+      showCountdownField();
       if (!dateField.value) {
-        showCountdownField();
         dateField.value = national.start_date;
         updateNatsCountdown();
       }
@@ -2793,13 +2794,8 @@
       window.rtnNationalsInfo = national;
       renderNationalsInfo();
 
-      var loc = national.city + ', ' + national.state;
-      var dateLabel = formatDateShort(national.start_date);
-      if (national.end_date && national.end_date !== national.start_date) {
-        dateLabel += '-' + formatDateShort(national.end_date).split(' ')[1];
-      }
-      status.textContent = 'Nationals: ' + dateLabel + ' - ' + loc +
-        (national.venue_name ? ' (' + national.venue_name + ')' : '');
+      // Hero now shows all details — clear the redundant status text
+      status.textContent = '';
     }, function(errMsg) {
       status.textContent = errMsg;
     });
@@ -2809,6 +2805,7 @@
     var status = document.getElementById('upcoming-fetch-status');
     var picker = document.getElementById('upcoming-picker');
     var addBtn = document.getElementById('upcoming-add-btn');
+    var addAllBtn = document.getElementById('upcoming-add-all-btn');
 
     status.textContent = 'Fetching...';
     fetchTournamentListings(function(listings) {
@@ -2825,6 +2822,7 @@
           status.textContent = 'No tournaments found in the next 21 days.';
           picker.style.display = 'none';
           addBtn.style.display = 'none';
+          if (addAllBtn) addAllBtn.style.display = 'none';
           return;
         }
 
@@ -2843,11 +2841,23 @@
 
         picker.style.display = '';
         addBtn.style.display = '';
-        status.textContent = 'Found ' + filtered.length + ' tournament(s) in the next 21 days. Select one and click Add.';
+        if (addAllBtn) addAllBtn.style.display = '';
+        status.textContent = 'Found ' + filtered.length + ' tournament(s) in the next 21 days. Select one and click Add, or click Add All.';
       }, function(errMsg) {
         status.textContent = errMsg;
       });
   }
+
+  function addAllUpcomingPicks() {
+    if (!window.upcomingListings || !window.upcomingListings.length) return;
+    window.upcomingListings.forEach(function(item) {
+      if (!window.upcomingPicked.some(function(p) { return p.id === item.id; })) {
+        window.upcomingPicked.push(item);
+      }
+    });
+    renderUpcomingPills();
+  }
+
 
   // ---- Upcoming Tournaments: pills + detail modal ----
   window.upcomingPicked = [];
@@ -2864,6 +2874,11 @@
     var wrap = document.getElementById('upcoming-pills');
     var empty = document.getElementById('upcoming-empty-state');
     wrap.innerHTML = '';
+
+    // Sort by start_date ascending (soonest first) before rendering
+    window.upcomingPicked.sort(function(a, b) {
+      return new Date(a.start_date) - new Date(b.start_date);
+    });
 
     window.upcomingPicked.forEach(function(item, idx) {
       var pill = document.createElement('div');
@@ -3032,11 +3047,9 @@
 
   function showCountdownField() {
     document.getElementById('rtn-countdown-field').style.display = 'flex';
-    document.getElementById('rtn-add-countdown-btn').style.display = 'none';
   }
   function removeCountdownField() {
     document.getElementById('rtn-countdown-field').style.display = 'none';
-    document.getElementById('rtn-add-countdown-btn').style.display = '';
     document.getElementById('rtn-nats-date').value = '';
     document.getElementById('rtn-countdown-number').textContent = '--';
     document.getElementById('rtn-countdown-label').textContent = 'Days to Nationals';
@@ -3179,81 +3192,78 @@
   }
 
   // ---- Carry Forward: Side Events + Deadline labels from a chosen previous draft ----
-  function carryForwardRtn() {
-    var status = document.getElementById('rtn-carryforward-status');
-    var pickerRow = document.getElementById('rtn-carryforward-picker-row');
+  // ---- RTN persistent store: save/recall recurring section data ----
+  var RTN_STORE_URL = '/threshingfloor/api/store/rtn-data';
 
-    status.textContent = 'Loading drafts...';
-    fetch('/threshingfloor/api/drafts')
-      .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
-      .then(function(list) {
-        var currentEp = document.getElementById('ep-num').value.trim();
-        var filtered = list.filter(function(d) { return String(d.episode_number) !== currentEp; });
+  function collectRtnData() {
+    var data = {};
 
-        if (!filtered.length) {
-          status.textContent = 'No other saved drafts found to carry forward from.';
-          return;
-        }
+    // Extra notes
+    var notesEl = document.getElementById('rtn-extra-notes');
+    if (notesEl) data['rtn-extra-notes'] = notesEl.value;
 
-        // Most recently updated first
-        filtered.sort(function(a, b) { return new Date(b.updated_at) - new Date(a.updated_at); });
+    // Side events
+    for (var i = 1; i <= window.rtnEventCount; i++) {
+      var nameEl = document.getElementById('rtn-event-name-' + i);
+      if (nameEl && nameEl.value.trim()) {
+        data['rtn-event-name-' + i] = nameEl.value;
+        var hostEl = document.getElementById('rtn-event-host-' + i);
+        var descEl = document.getElementById('rtn-event-desc-' + i);
+        if (hostEl) data['rtn-event-host-' + i] = hostEl.value;
+        if (descEl) data['rtn-event-desc-' + i] = descEl.value;
+      }
+    }
 
-        pickerRow.innerHTML = '';
-        var select = document.createElement('select');
-        select.className = 'field-input';
-        select.id = 'rtn-carryforward-select';
-        select.style.flex = '1';
-        filtered.forEach(function(d) {
-          var opt = document.createElement('option');
-          opt.value = d.episode_number;
-          opt.textContent = 'Ep ' + d.episode_number + ' -- saved ' + new Date(d.updated_at).toLocaleString();
-          select.appendChild(opt);
-        });
+    // Deadlines (labels only — dates are episode-specific)
+    for (var j = 1; j <= window.rtnDeadlineCount; j++) {
+      var labelEl = document.getElementById('rtn-deadline-label-' + j);
+      if (labelEl && labelEl.value.trim()) {
+        data['rtn-deadline-label-' + j] = labelEl.value;
+      }
+    }
 
-        var applyBtn = document.createElement('button');
-        applyBtn.type = 'button';
-        applyBtn.className = 'btn btn-teal';
-        applyBtn.style.cssText = 'padding:3px 10px; font-size:10px;';
-        applyBtn.textContent = 'Carry Forward';
-        applyBtn.addEventListener('click', function() {
-          applyCarryForward(select.value);
-        });
-
-        var cancelBtn = document.createElement('button');
-        cancelBtn.type = 'button';
-        cancelBtn.className = 'btn btn-ghost';
-        cancelBtn.style.cssText = 'padding:3px 10px; font-size:10px;';
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.addEventListener('click', function() {
-          pickerRow.style.display = 'none';
-          pickerRow.innerHTML = '';
-          status.textContent = '';
-        });
-
-        pickerRow.appendChild(select);
-        pickerRow.appendChild(applyBtn);
-        pickerRow.appendChild(cancelBtn);
-        pickerRow.style.display = 'flex';
-        status.textContent = 'Select an episode to carry RTN details forward from.';
-      })
-      .catch(function() { status.textContent = 'Could not load saved drafts.'; });
+    return data;
   }
 
-  function applyCarryForward(ep) {
-    var status = document.getElementById('rtn-carryforward-status');
-    var pickerRow = document.getElementById('rtn-carryforward-picker-row');
-    status.textContent = 'Loading Ep ' + ep + '...';
+  function rtnHasContent(data) {
+    if (data['rtn-extra-notes'] && data['rtn-extra-notes'].trim()) return true;
+    for (var key in data) {
+      if (/^rtn-event-name-\d+$/.test(key) && data[key].trim()) return true;
+      if (/^rtn-deadline-label-\d+$/.test(key) && data[key].trim()) return true;
+    }
+    return false;
+  }
 
-    fetch('/threshingfloor/api/drafts/' + encodeURIComponent(ep))
+  function syncRtnStore() {
+    // Only write if RTN is toggled on and has meaningful content
+    var togRtn = document.getElementById('tog-rtn');
+    if (!togRtn || !togRtn.checked) return;
+    var rtnData = collectRtnData();
+    if (!rtnHasContent(rtnData)) return;
+
+    fetch(RTN_STORE_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: rtnData })
+    }).catch(function(err) { console.warn('RTN store sync failed:', err); });
+  }
+
+  function carryForwardRtn() {
+    var status = document.getElementById('rtn-carryforward-status');
+    status.textContent = 'Loading...';
+
+    fetch(RTN_STORE_URL)
       .then(function(res) {
+        if (res.status === 404) { status.textContent = 'No previous RTN data found yet -- save an episode with RTN content first.'; return null; }
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
       .then(function(row) {
+        if (!row) return;
         var data = row.data || {};
         var eventsAdded = 0, deadlinesAdded = 0, notesAdded = false;
 
-        // Venue / Other Notes: carry forward verbatim if present and not already filled in
+        // Venue / Other Notes
         if (data['rtn-extra-notes'] && data['rtn-extra-notes'].trim()) {
           var notesField = document.getElementById('rtn-extra-notes');
           if (!notesField.value.trim()) {
@@ -3264,7 +3274,7 @@
           }
         }
 
-        // Side events: carry forward name, host, AND description (these recur as-is)
+        // Side events
         for (var i = 1; i <= 20; i++) {
           var name = data['rtn-event-name-' + i];
           if (name && name.trim()) {
@@ -3277,7 +3287,7 @@
           }
         }
 
-        // Deadlines: carry forward label only, leave date blank for re-entry
+        // Deadlines (labels only)
         for (var j = 1; j <= 20; j++) {
           var label = data['rtn-deadline-label-' + j];
           if (label && label.trim()) {
@@ -3288,20 +3298,17 @@
           }
         }
 
-        pickerRow.style.display = 'none';
-        pickerRow.innerHTML = '';
-
         if (eventsAdded === 0 && deadlinesAdded === 0 && !notesAdded) {
-          status.textContent = 'Nothing found to carry forward from Ep ' + ep + '.';
+          status.textContent = 'Nothing found to carry forward.';
         } else {
           var parts = [];
           if (eventsAdded) parts.push(eventsAdded + ' side event(s)');
           if (deadlinesAdded) parts.push(deadlinesAdded + ' deadline label(s)');
           if (notesAdded) parts.push('venue/other notes');
-          status.textContent = 'Carried forward ' + parts.join(', ') + ' from Ep ' + ep + ' -- update dates/details as needed.';
+          status.textContent = 'Carried forward ' + parts.join(', ') + ' -- update dates/details as needed.';
         }
       })
-      .catch(function() { status.textContent = 'Could not load that draft.'; });
+      .catch(function() { status.textContent = 'Could not load RTN data.'; });
   }
 
 
@@ -3591,6 +3598,7 @@
       window.loadedDraftUpdatedAt = null; // publish also saved; force fresh concurrency token next save
       showPublishLink(ep, true);
       syncPlayerRegistry(); // publish is a save path too -- persist any new player names
+      syncRtnStore();       // persist RTN recurring data if section has content
     }).catch(function() { status.textContent = 'Publish failed -- try again.'; });
   }
 
@@ -3640,6 +3648,7 @@
       window.loadedDraftUpdatedAt = row.updated_at;
       status.textContent = 'Saved Ep ' + ep + ' at ' + new Date().toLocaleTimeString();
       syncPlayerRegistry(); // best-effort: persist any new player names cross-episode
+      syncRtnStore();       // best-effort: persist RTN recurring data if section has content
     }).catch(function() {
       status.textContent = 'Save failed -- check connection and try again.';
     });
@@ -3810,6 +3819,7 @@
                 });
               }
             }
+            if (window.__TF_VIEW__) markEmptySections();
           }, 50);
     } catch(err) {
       document.getElementById('save-status').textContent = 'Could not apply that draft.';
@@ -4047,8 +4057,10 @@
       if (status) status.textContent = '';
       var picker = document.getElementById('upcoming-picker');
       var addBtn = document.getElementById('upcoming-add-btn');
+      var addAllBtn = document.getElementById('upcoming-add-all-btn');
       if (picker) picker.style.display = 'none';
       if (addBtn) addBtn.style.display = 'none';
+      if (addAllBtn) addAllBtn.style.display = 'none';
     },
     'rankings': function() {
       for (var r = 1; r <= 10; r++) {
@@ -4322,7 +4334,6 @@
     document.body.classList.add('view-mode');
     try {
       applyDraft(window.__TF_VIEW__.data || {});
-      markEmptySections();
     } catch (e) {
       // Leave whatever rendered; a partial outline beats a blank page.
     }
