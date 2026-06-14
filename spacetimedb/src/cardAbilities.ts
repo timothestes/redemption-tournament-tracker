@@ -45,6 +45,13 @@ export type CardAbility = AbilityBase & (
   | { type: 'imitate_lost_soul' }
   | { type: 'draw_and_topdeck_self' }
   | { type: 'resurrect_heroes' }
+  // Draw cards equal to the number of distinct brigades of a given alignment in
+  // the opponent's revealed hand. `alignment: 'total'` counts all brigades
+  // (Matthew); 'good'/'evil' count only that alignment. `limit` caps the draw
+  // when the card prints one (e.g. Ahijah limit 3, Divining Damsel limit 6).
+  // Count is computed client-side from the live reveal snapshot and drawn via
+  // the alignment-agnostic matthew_draw_brigades reducer.
+  | { type: 'draw_brigades'; alignment: 'good' | 'evil' | 'total'; limit?: number }
   | { type: 'custom'; reducerName: string; label: string }
 );
 
@@ -89,7 +96,15 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
   'The Ends of the Earth (RoJ AB)':                      [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
   'The Ends of the Earth (RoJ)':                         [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
-  'Matthew the Publican / Matthew (Levi) (GoC)':         [{ type: 'custom', reducerName: 'matthewDrawBrigades', label: "Draw cards equal to brigades in opponent's hand" }],
+  'Matthew the Publican / Matthew (Levi) (GoC)':         [{ type: 'draw_brigades', alignment: 'total' }],
+  // Reveal opponent's hand: draw X = distinct evil brigades (Ahijah limit 3).
+  'Ahijah, Cloak Tearer':                                [{ type: 'draw_brigades', alignment: 'evil', limit: 3 }],
+  'Hannah':                                              [{ type: 'draw_brigades', alignment: 'evil' }],
+  'Mighty Men':                                          [{ type: 'draw_brigades', alignment: 'evil' }],
+  // Reveal opponent's hand: draw X = distinct good brigades (Damsels limit 6).
+  'The Divining Damsel (Promo)':                         [{ type: 'draw_brigades', alignment: 'good', limit: 6 }],
+  'The Divining Damsel [Fundraiser]':                    [{ type: 'draw_brigades', alignment: 'good', limit: 6 }],
+  'The Lying Prophet':                                   [{ type: 'draw_brigades', alignment: 'good' }],
   'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Contagious Fear (GoC)':                               [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Jairus (GoC)':                                        [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],

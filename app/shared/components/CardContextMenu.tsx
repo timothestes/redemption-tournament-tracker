@@ -266,10 +266,9 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
           {abilities.map((ability, index) => {
             const allowedZones = ability.sourceZones ?? DEFAULT_ABILITY_SOURCE_ZONES;
             const isInAbilityZone = allowedZones.includes(card.zone);
-            // Matthew the Publican reads the opponent's revealed hand —
+            // Brigade-draw abilities read the opponent's revealed hand —
             // disable when the opponent isn't currently revealing.
-            const needsOpponentReveal =
-              ability.type === 'custom' && ability.reducerName === 'matthewDrawBrigades';
+            const needsOpponentReveal = ability.type === 'draw_brigades';
             const opponentRevealMissing = needsOpponentReveal && !opponentHandRevealed;
             const disabled = !isOwnedByLocalPlayer || !isInAbilityZone || opponentRevealMissing;
             const disabledReason = !isOwnedByLocalPlayer

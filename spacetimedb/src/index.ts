@@ -3837,6 +3837,8 @@ export const execute_card_ability = spacetimedb.reducer(
         return playAllLostSoulsImpl(ctx, source, player, gameId);
       case 'draw_and_topdeck_self':
         return drawAndTopdeckSelfImpl(ctx, source, player, gameId);
+      case 'draw_brigades':
+        throw new SenderError('draw_brigades is dispatched via matthew_draw_brigades, not this reducer');
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }

@@ -1466,6 +1466,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return setCardOutlineInState(state, source, ability, history);
         case 'play_all_lost_souls':
           return playAllLostSoulsInState(state, source, history);
+        case 'draw_brigades':
+          // Reads the opponent's revealed hand — meaningless in single-player
+          // goldfish. Dispatched client-side in multiplayer. No-op here.
+          return state;
         case 'custom':
           // Custom abilities are dispatched client-side in multiplayer and
           // never reach the goldfish reducer in v1. No-op defensively.

@@ -1607,15 +1607,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         requestOpponentAction(action, JSON.stringify({ count: ability.count }));
         return;
       }
-      if (ability?.type === 'custom' && ability.reducerName === 'matthewDrawBrigades') {
-        // Matthew the Publican — draw cards equal to distinct brigades in
-        // opponent's revealed hand. Brigade count is computed client-side from
-        // the live snapshot; server validates handRevealed + caps the count.
+      if (ability?.type === 'draw_brigades') {
+        // Draw cards equal to distinct brigades of the given alignment in the
+        // opponent's revealed hand (Matthew = total, Ahijah/Hannah/Mighty Men =
+        // evil, Damsels/Lying Prophet = good). Count is computed client-side
+        // from the live snapshot and capped by the card's printed limit; the
+        // server re-validates handRevealed and caps the count defensively.
         if (!opponentHandRevealed) return;
-        gameState.matthewDrawBrigades(
-          BigInt(sourceInstanceId),
-          BigInt(opponentHandBrigadeCounts.total),
-        );
+        let count = opponentHandBrigadeCounts[ability.alignment];
+        if (ability.limit !== undefined) count = Math.min(count, ability.limit);
+        gameState.matthewDrawBrigades(BigInt(sourceInstanceId), BigInt(count));
         return;
       }
       if (ability?.type === 'discard_characters_from_reserve') {
