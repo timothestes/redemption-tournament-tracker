@@ -84,6 +84,7 @@ Props:
   cards: BuyDeckCard[];                 // full deck (main+reserve+maybeboard); helper filters
   ownedByName: Record<string, number>;
   collectionAvailable: boolean;         // useCollectionState.isAvailable
+  collectionSyncError: string | null;   // useCollectionState.syncError
   onClose: () => void;
   onBuyMissing: (missing: BuyDeckCard[]) => void;  // parent opens BuyDeckModal
 }
@@ -91,10 +92,18 @@ Props:
 
 Behavior / UI:
 - Header summary: **"You own {ownedCount} / {totalCount} — missing {missingCount}"**.
+- Footer note clarifying matching: **"Matching by card name only — any printing you own counts as
+  covered."** (Prevents confusion when a deck lists a printing the user doesn't have but they own a
+  different art/set.)
 - Missing list grouped by zone (Main, then Reserve), each row showing card name and `×N` short.
+  The list body is scrollable (`overflow-y-auto flex-1 min-h-0`, same as `BuyDeckModal`'s body at
+  `BuyDeckModal.tsx:343`) so tall missing lists stay usable on mobile.
 - States:
-  - **Owns everything** (`missing.length === 0`): celebratory empty state, no buy button.
-  - **Collection not yet loaded** (`!collectionAvailable`): brief loading note.
+  - **Owns everything** (`missing.length === 0` with collection available): celebratory empty
+    state, no buy button.
+  - **Collection load failed** (`collectionSyncError` set and `!collectionAvailable`): error note
+    pointing to the My Collection page, rather than a misleading "missing everything".
+  - **Collection not yet loaded** (`!collectionAvailable && !collectionSyncError`): brief loading note.
   - **Missing cards present:** show list + **"Buy missing on YTG"** button.
 - "Buy missing on YTG" handler: `onClose()` then `onBuyMissing(missing)`. The parent opens
   `BuyDeckModal` seeded with the missing cards. **Do not nest** the modals — close first, then open.
@@ -130,7 +139,9 @@ Behavior / UI:
 
 2. **`app/decklist/card-search/components/DeckBuilderPanel.tsx`**
    - Accept collection state via props from the parent (`collectionQuantities: Map<string, number>`,
-     `collectionAvailable: boolean`) — `DeckBuilderPanel` does not load it today.
+     `collectionAvailable: boolean`, `collectionSyncError: string | null`) — `DeckBuilderPanel`
+     does not load it today. Note `DeckBuilderPanel` is rendered from more than one call site in the
+     parent `client.tsx`; thread the props through every render site.
    - Import `CollectionCheckModal`; add `showCollectionCheckModal` + `buyCards` state.
    - Add **"Check my collection"** button next to the existing Buy buttons (~line 958), gated on
      signed-in.
@@ -138,8 +149,8 @@ Behavior / UI:
      `deck.cards.map(...)` `BuyDeckCard[]` and `aggregateOwnedByName(collectionQuantities)`.
 
 3. **`app/decklist/card-search/client.tsx`**
-   - Pass the already-loaded collection state (`quantities`, `isAvailable`) down to
-     `DeckBuilderPanel` as props.
+   - Pass the already-loaded collection state (`quantities`, `isAvailable`, `syncError`) down to
+     `DeckBuilderPanel` as props, at every `DeckBuilderPanel` render site.
 
 4. **`app/decklist/card-search/components/BuyDeckModal.tsx`**
    - No behavior change. (Optionally extract `BuyDeckCard` to a shared location if the modal needs
@@ -151,6 +162,8 @@ Behavior / UI:
 - **Signed in, empty collection:** all main+reserve cards missing; summary reads "You own 0 / N".
 - **Collection still loading:** `collectionAvailable` false → modal shows a brief loading note
   rather than a misleading "missing everything".
+- **Collection load failed:** `syncError` set → modal shows an error note (link to My Collection)
+  rather than treating everything as missing.
 - **Owns the whole deck:** missing list empty → celebratory state, no buy button.
 - **Maybeboard:** never counted in totals or missing.
 - **Multiple printings of one name:** share a single owned pool (name-only matching).
