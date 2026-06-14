@@ -489,6 +489,7 @@ export default function CardSearchClient() {
   const {
     quantities: collectionQuantities,
     isAvailable: collectionAvailable,
+    syncError: collectionSyncError,
     adjustQuantity: adjustCollectionQuantity,
   } = useCollectionState({ enabled: !!user });
 
@@ -2652,6 +2653,9 @@ export default function CardSearchClient() {
             deckCheckResult={deckCheckResult}
             isDeckChecking={isDeckChecking}
             allCards={cards}
+            collectionQuantities={collectionQuantities}
+            collectionAvailable={collectionAvailable}
+            collectionSyncError={collectionSyncError}
             onToggleExpand={() => setShowSearch(prev => !prev)}
             onDeckNameChange={setDeckName}
             onDeckFormatChange={handleDeckFormatChange}
@@ -2753,6 +2757,9 @@ export default function CardSearchClient() {
               deckCheckResult={deckCheckResult}
               isDeckChecking={isDeckChecking}
               allCards={cards}
+              collectionQuantities={collectionQuantities}
+              collectionAvailable={collectionAvailable}
+              collectionSyncError={collectionSyncError}
               onDeckNameChange={setDeckName}
               onDeckFormatChange={handleDeckFormatChange}
               onParagonChange={setDeckParagon}
