@@ -5,7 +5,18 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024; // Vercel rejects > 4.5 MB at the edge
 
 // Fixed set of shared keys. This is NOT an open-ended keyspace — only these
 // known singletons are allowed so the table stays tidy and predictable.
-const ALLOWED_KEYS = new Set(["players", "tournaments", "side-events", "rtn-data"]);
+const ALLOWED_KEYS = new Set([
+  "players",
+  "tournaments",
+  "side-events",
+  "rtn-data",
+  // Outline tool: power/meta ranking snapshots, the saved Z Temple art image,
+  // and per-player profile data for ranking graphics.
+  "power-rankings",
+  "meta-rankings",
+  "ztempleart",
+  "player-profiles",
+]);
 
 // Append-only keys are sets that only ever grow (e.g. the player registry). For
 // these, a write with no concurrency token must NOT clobber a row created
@@ -62,10 +73,17 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  // Accept objects (e.g. players registry) and arrays (e.g. tournament names),
-  // but not primitives or null.
-  if (typeof body.data !== "object" || body.data === null) {
-    return NextResponse.json({ error: "data must be an object or array" }, { status: 400 });
+  // Accept objects (e.g. players registry), arrays (e.g. tournament names), and
+  // strings (e.g. ztempleart = a base64 image data URL). Reject other primitives
+  // and null. The 4 MB cap above bounds large string payloads.
+  if (
+    body.data === null ||
+    (typeof body.data !== "object" && typeof body.data !== "string")
+  ) {
+    return NextResponse.json(
+      { error: "data must be an object, array, or string" },
+      { status: 400 }
+    );
   }
 
   const row = {
