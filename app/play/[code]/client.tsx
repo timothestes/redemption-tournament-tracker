@@ -1366,7 +1366,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 opponentPlayer={gameState.opponentPlayer}
                 gameActions={gameState.gameActions}
                 gameState={gameState}
-                onReturnToLobby={handleReturnToLobby}
                 playAgainTriggered={playAgainTriggered}
                 onPlayAgainHandled={() => setPlayAgainTriggered(false)}
               />
@@ -1492,7 +1491,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               opponentPlayer={gameState.opponentPlayer}
               gameActions={gameState.gameActions}
               gameState={gameState}
-              onReturnToLobby={handleReturnToLobby}
             />
           </div>
         </div>

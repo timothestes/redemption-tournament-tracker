@@ -18,7 +18,6 @@ interface GameOverOverlayProps {
   opponentPlayer: any;
   gameActions: any[];
   gameState: GameState;
-  onReturnToLobby: () => void;
   playAgainTriggered?: boolean;
   onPlayAgainHandled?: () => void;
 }
@@ -59,7 +58,6 @@ export default function GameOverOverlay({
   opponentPlayer,
   gameActions,
   gameState,
-  onReturnToLobby,
   playAgainTriggered,
   onPlayAgainHandled,
 }: GameOverOverlayProps) {
@@ -146,7 +144,11 @@ export default function GameOverOverlay({
           oppName={oppName}
           label={label}
           isLoupeVisible={isLoupeVisible}
-          onReturnToLobby={onReturnToLobby}
+          onPlayAgain={() => {
+            setModalDismissed(true);
+            setPickerMode('request');
+            setPickerOpen(true);
+          }}
           onDismiss={() => setModalDismissed(true)}
         />
       )}
@@ -276,25 +278,25 @@ function OpponentLeftModal({
   oppName,
   label,
   isLoupeVisible,
-  onReturnToLobby,
+  onPlayAgain,
   onDismiss,
 }: {
   isOpponentResigned: boolean;
   oppName: string;
   label: string;
   isLoupeVisible: boolean;
-  onReturnToLobby: () => void;
+  onPlayAgain: () => void;
   onDismiss: () => void;
 }) {
   const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
     count: 2,
     defaultIndex: 1, // Dismiss
     priority: 2,
-    onSelect: idx => (idx === 0 ? onReturnToLobby() : onDismiss()),
+    onSelect: idx => (idx === 0 ? onPlayAgain() : onDismiss()),
     onCancel: onDismiss,
   });
 
-  const lobbyFocused = focusedIndex === 0;
+  const playAgainFocused = focusedIndex === 0;
   const dismissFocused = focusedIndex === 1;
 
   return (
@@ -345,26 +347,26 @@ function OpponentLeftModal({
 
         <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
           <button
-            onClick={onReturnToLobby}
+            onClick={onPlayAgain}
             onMouseEnter={() => setFocusedIndex(0)}
             style={{
               flex: 1,
               padding: '10px 16px',
               borderRadius: 4,
-              border: `1px solid ${lobbyFocused ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
-              background: lobbyFocused ? 'rgba(196, 149, 90, 0.12)' : 'transparent',
-              color: lobbyFocused ? 'rgba(196, 149, 90, 0.95)' : 'rgba(196, 149, 90, 0.6)',
+              border: '1px solid rgba(196, 149, 90, 0.45)',
+              background: playAgainFocused ? 'rgba(196, 149, 90, 0.30)' : 'rgba(196, 149, 90, 0.15)',
+              color: '#e8d5a3',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               cursor: 'pointer',
-              boxShadow: lobbyFocused ? toastFocusShadow('rgba(196, 149, 90, 0.5)', 'rgba(196, 149, 90, 0.22)') : 'none',
+              boxShadow: playAgainFocused ? toastFocusShadow('rgba(196, 149, 90, 0.85)', 'rgba(196, 149, 90, 0.4)') : 'none',
               transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
             }}
           >
-            Back to Lobby
+            Play Again
           </button>
           <button
             onClick={onDismiss}
