@@ -16,7 +16,9 @@ import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 import { sanitizeImgFile, getCardImageUrl as getImageUrl } from '../../shared/utils/cardImageUrl';
 import { useCardPrices } from "../card-search/hooks/useCardPrices";
 import { useCollectionState } from "../../collection/hooks/useCollectionState";
-import BuyDeckModal from "../card-search/components/BuyDeckModal";
+import BuyDeckModal, { type BuyDeckCard } from "../card-search/components/BuyDeckModal";
+import CollectionCheckModal from "../card-search/components/CollectionCheckModal";
+import { aggregateOwnedByName } from "../card-search/utils/collectionCheck";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import { Deck as DeckType } from "../card-search/types/deck";
@@ -145,6 +147,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const {
     quantities: collectionQuantities,
     isAvailable: collectionAvailable,
+    syncError: collectionSyncError,
     adjustQuantity: adjustCollectionQuantity,
   } = useCollectionState({ enabled: isLoggedIn });
   const [viewMode, setViewMode] = useState<"normal" | "stacked">("normal");
@@ -158,6 +161,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [showStats, setShowStats] = useState(false);
   const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
   const [buyModalMode, setBuyModalMode] = useState<"exact" | "budget">("exact");
+  const [showCollectionCheckModal, setShowCollectionCheckModal] = useState(false);
+  // When set, the buy modal opens seeded with just these (missing) cards.
+  const [buyCards, setBuyCards] = useState<BuyDeckCard[] | null>(null);
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -842,6 +848,18 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
             </button>
 
             <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} />
+
+            {isLoggedIn && (
+              <button
+                onClick={() => setShowCollectionCheckModal(true)}
+                className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Check my collection
+              </button>
+            )}
 
             {/* Export dropdown */}
             <div className="relative">
@@ -1682,14 +1700,35 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       {/* Buy Deck Modal */}
       {showBuyDeckModal && (
         <BuyDeckModal
+          cards={buyCards ?? enrichedCards.map(c => ({
+            card_name: c.card_name,
+            card_key: `${c.card_name}|${c.card_set}|${sanitizeImgFile(c.card_img_file || "")}`,
+            quantity: c.quantity,
+            zone: c.zone,
+          }))}
+          onClose={() => { setShowBuyDeckModal(false); setBuyCards(null); }}
+          initialMode={buyModalMode}
+        />
+      )}
+
+      {showCollectionCheckModal && (
+        <CollectionCheckModal
           cards={enrichedCards.map(c => ({
             card_name: c.card_name,
             card_key: `${c.card_name}|${c.card_set}|${sanitizeImgFile(c.card_img_file || "")}`,
             quantity: c.quantity,
             zone: c.zone,
           }))}
-          onClose={() => setShowBuyDeckModal(false)}
-          initialMode={buyModalMode}
+          ownedByName={aggregateOwnedByName(collectionQuantities)}
+          collectionAvailable={collectionAvailable}
+          collectionSyncError={collectionSyncError}
+          onClose={() => setShowCollectionCheckModal(false)}
+          onBuyMissing={(missing) => {
+            setShowCollectionCheckModal(false);
+            setBuyCards(missing);
+            setBuyModalMode("exact");
+            setShowBuyDeckModal(true);
+          }}
         />
       )}
 

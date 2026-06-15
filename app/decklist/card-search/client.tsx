@@ -489,6 +489,7 @@ export default function CardSearchClient() {
   const {
     quantities: collectionQuantities,
     isAvailable: collectionAvailable,
+    syncError: collectionSyncError,
     adjustQuantity: adjustCollectionQuantity,
   } = useCollectionState({ enabled: !!user });
 
@@ -683,7 +684,14 @@ export default function CardSearchClient() {
         setToughnessOp(searchParams.get('toughnessOp') || 'eq');
       }
 
-      setnoAltArt(searchParams.get('showAltArt') !== 'true');
+      // Explicit shared-link intent wins; otherwise fall back to the user's
+      // saved per-device preference, defaulting to "hide AB versions" (true).
+      if (searchParams.get('showAltArt') === 'true') {
+        setnoAltArt(false);
+      } else {
+        const savedNoAltArt = localStorage.getItem('deck-filter-noab');
+        setnoAltArt(savedNoAltArt === null ? true : savedNoAltArt === 'true');
+      }
       setnoFirstPrint(searchParams.get('showFirstPrint') !== 'true');
       setNativityOnly(searchParams.get('nativity') === 'true');
       setNativityNot(searchParams.get('nativityNot') === 'true');
@@ -708,6 +716,14 @@ export default function CardSearchClient() {
       setIsInitialized(true);
     }
   }, [searchParams, isInitialized]);
+
+  // Persist the "No AB Versions" toggle as a per-device default so the user's
+  // choice sticks across visits. Skipped until initialized so we don't clobber
+  // the saved value with the initial render default.
+  useEffect(() => {
+    if (!isInitialized) return;
+    localStorage.setItem('deck-filter-noab', String(noAltArt));
+  }, [noAltArt, isInitialized]);
 
   // Update URL whenever filters change
   useEffect(() => {
@@ -2652,6 +2668,9 @@ export default function CardSearchClient() {
             deckCheckResult={deckCheckResult}
             isDeckChecking={isDeckChecking}
             allCards={cards}
+            collectionQuantities={collectionQuantities}
+            collectionAvailable={collectionAvailable}
+            collectionSyncError={collectionSyncError}
             onToggleExpand={() => setShowSearch(prev => !prev)}
             onDeckNameChange={setDeckName}
             onDeckFormatChange={handleDeckFormatChange}
@@ -2753,6 +2772,9 @@ export default function CardSearchClient() {
               deckCheckResult={deckCheckResult}
               isDeckChecking={isDeckChecking}
               allCards={cards}
+              collectionQuantities={collectionQuantities}
+              collectionAvailable={collectionAvailable}
+              collectionSyncError={collectionSyncError}
               onDeckNameChange={setDeckName}
               onDeckFormatChange={handleDeckFormatChange}
               onParagonChange={setDeckParagon}
