@@ -117,7 +117,29 @@ export default function DeckCardList({
       setPreviewCard(null);
     }
   }, [cards, previewCard]);
-  
+
+  // Safety net: dismiss the hover preview on any interaction that can hide or
+  // unmount the hovered card without dispatching its onMouseLeave (e.g. clicking
+  // a card opens a full-screen modal over the cursor, +/-/move re-renders the
+  // tile, scrolling, or switching tabs). Without this the preview can get stuck
+  // on screen until a page refresh.
+  React.useEffect(() => {
+    if (!previewCard) return;
+    const clear = () => setPreviewCard(null);
+    // pointerdown fires before any modal mounts or the tile unmounts
+    window.addEventListener('pointerdown', clear);
+    // capture: true so inner scroll containers are caught, not just window
+    window.addEventListener('scroll', clear, true);
+    window.addEventListener('blur', clear);
+    document.addEventListener('visibilitychange', clear);
+    return () => {
+      window.removeEventListener('pointerdown', clear);
+      window.removeEventListener('scroll', clear, true);
+      window.removeEventListener('blur', clear);
+      document.removeEventListener('visibilitychange', clear);
+    };
+  }, [previewCard]);
+
   // Helper function to calculate preview position avoiding screen edges
   const calculatePreviewPosition = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
