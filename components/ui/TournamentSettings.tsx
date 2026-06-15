@@ -25,22 +25,37 @@ interface TournamentSettingsProps {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+const EMPTY_INFO: TournamentInfo = {
+  n_rounds: null,
+  current_round: null,
+  round_length: null,
+  max_score: null,
+  bye_points: null,
+  bye_differential: null,
+  starting_table_number: null,
+  sound_notifications: null,
+  has_started: null,
+  has_ended: null,
+};
+
+// Fields the user can edit and that get written on Save.
+const EDITABLE_KEYS = [
+  "n_rounds",
+  "round_length",
+  "max_score",
+  "starting_table_number",
+  "bye_points",
+  "bye_differential",
+  "sound_notifications",
+] as const;
+
 export default function TournamentSettings({
   tournamentId,
   participantCount,
 }: TournamentSettingsProps) {
-  const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
-    n_rounds: null,
-    current_round: null,
-    round_length: null,
-    max_score: null,
-    bye_points: null,
-    bye_differential: null,
-    starting_table_number: null,
-    sound_notifications: null,
-    has_started: null,
-    has_ended: null,
-  });
+  const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>(EMPTY_INFO);
+  // Baseline reflecting what's persisted in the DB, used for dirty tracking.
+  const [savedInfo, setSavedInfo] = useState<TournamentInfo>(EMPTY_INFO);
   const [round1Started, setRound1Started] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +81,7 @@ export default function TournamentSettings({
       }
 
       setTournamentInfo(data);
+      setSavedInfo(data);
 
       const { data: round1 } = await client
         .from("rounds")
@@ -85,27 +101,35 @@ export default function TournamentSettings({
     savedTimer.current = setTimeout(() => setSaveStatus("idle"), 1500);
   }, []);
 
-  const persist = useCallback(
-    async (patch: Partial<TournamentInfo>) => {
-      const previous = tournamentInfo;
-      setTournamentInfo((prev) => ({ ...prev, ...patch }));
-      setSaveStatus("saving");
-      try {
-        const client = createClient();
-        const { error } = await client
-          .from("tournaments")
-          .update(patch)
-          .eq("id", tournamentId);
-        if (error) throw error;
-        flashSaved();
-      } catch (err) {
-        console.error("Error updating tournament:", err);
-        setTournamentInfo(previous);
-        setSaveStatus("error");
-      }
-    },
-    [tournamentId, tournamentInfo, flashSaved],
+  const isDirty = EDITABLE_KEYS.some(
+    (key) => tournamentInfo[key] !== savedInfo[key],
   );
+
+  const handleSave = useCallback(async () => {
+    const patch: Partial<TournamentInfo> = {};
+    for (const key of EDITABLE_KEYS) {
+      if (tournamentInfo[key] !== savedInfo[key]) {
+        patch[key] = tournamentInfo[key] as never;
+      }
+    }
+    if (Object.keys(patch).length === 0) return;
+
+    const snapshot = tournamentInfo;
+    setSaveStatus("saving");
+    try {
+      const client = createClient();
+      const { error } = await client
+        .from("tournaments")
+        .update(patch)
+        .eq("id", tournamentId);
+      if (error) throw error;
+      setSavedInfo(snapshot);
+      flashSaved();
+    } catch (err) {
+      console.error("Error updating tournament:", err);
+      setSaveStatus("error");
+    }
+  }, [tournamentId, tournamentInfo, savedInfo, flashSaved]);
 
   useEffect(() => {
     return () => {
@@ -160,6 +184,9 @@ export default function TournamentSettings({
           )}
           {saveStatus === "error" && (
             <span className="text-destructive">Failed to save</span>
+          )}
+          {saveStatus === "idle" && isDirty && (
+            <span className="text-amber-600 dark:text-amber-500">Unsaved changes</span>
           )}
         </div>
       </div>
@@ -247,11 +274,7 @@ export default function TournamentSettings({
                 }}
                 onBlur={(e) => {
                   const value = Math.max(minRounds, parseInt(e.target.value) || minRounds);
-                  if (value !== tournamentInfo.n_rounds) {
-                    persist({ n_rounds: value });
-                  } else {
-                    setTournamentInfo((prev) => ({ ...prev, n_rounds: value }));
-                  }
+                  setTournamentInfo((prev) => ({ ...prev, n_rounds: value }));
                 }}
                 disabled={editingDisabled}
                 className={inputClasses}
@@ -279,11 +302,7 @@ export default function TournamentSettings({
                 }}
                 onBlur={(e) => {
                   const value = Math.min(120, Math.max(1, parseInt(e.target.value) || 45));
-                  if (value !== tournamentInfo.round_length) {
-                    persist({ round_length: value });
-                  } else {
-                    setTournamentInfo((prev) => ({ ...prev, round_length: value }));
-                  }
+                  setTournamentInfo((prev) => ({ ...prev, round_length: value }));
                 }}
                 disabled={editingDisabled}
                 className={inputClasses}
@@ -299,7 +318,9 @@ export default function TournamentSettings({
               </span>
               <select
                 value={tournamentInfo.max_score ?? 5}
-                onChange={(e) => persist({ max_score: Number(e.target.value) })}
+                onChange={(e) =>
+                  setTournamentInfo((prev) => ({ ...prev, max_score: Number(e.target.value) }))
+                }
                 disabled={maxScoreLocked}
                 className={inputClasses}
               >
@@ -328,11 +349,7 @@ export default function TournamentSettings({
                 }}
                 onBlur={(e) => {
                   const value = Math.max(1, parseInt(e.target.value) || 1);
-                  if (value !== tournamentInfo.starting_table_number) {
-                    persist({ starting_table_number: value });
-                  } else {
-                    setTournamentInfo((prev) => ({ ...prev, starting_table_number: value }));
-                  }
+                  setTournamentInfo((prev) => ({ ...prev, starting_table_number: value }));
                 }}
                 disabled={editingDisabled}
                 className={inputClasses}
@@ -345,7 +362,9 @@ export default function TournamentSettings({
               </span>
               <select
                 value={tournamentInfo.bye_points ?? 3}
-                onChange={(e) => persist({ bye_points: Number(e.target.value) })}
+                onChange={(e) =>
+                  setTournamentInfo((prev) => ({ ...prev, bye_points: Number(e.target.value) }))
+                }
                 disabled={editingDisabled}
                 className={inputClasses}
               >
@@ -362,7 +381,9 @@ export default function TournamentSettings({
               </span>
               <select
                 value={tournamentInfo.bye_differential ?? 0}
-                onChange={(e) => persist({ bye_differential: Number(e.target.value) })}
+                onChange={(e) =>
+                  setTournamentInfo((prev) => ({ ...prev, bye_differential: Number(e.target.value) }))
+                }
                 disabled={editingDisabled}
                 className={inputClasses}
               >
@@ -381,7 +402,10 @@ export default function TournamentSettings({
             <input
               type="checkbox"
               checked={tournamentInfo.sound_notifications ?? false}
-              onChange={(e) => persist({ sound_notifications: e.target.checked })}
+              onChange={(e) =>
+                setTournamentInfo((prev) => ({ ...prev, sound_notifications: e.target.checked }))
+              }
+              disabled={editingDisabled}
               className="mt-0.5 h-4 w-4 rounded border-2 border-border text-primary bg-card focus:outline-none focus:ring-0 flex-shrink-0"
             />
             <div className="min-w-0">
@@ -403,6 +427,27 @@ export default function TournamentSettings({
             <p className="text-xs text-muted-foreground italic">
               Tournament has ended — settings are locked.
             </p>
+          )}
+
+          {!editingDisabled && (
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+              {isDirty && saveStatus !== "saving" && (
+                <span className="text-xs text-muted-foreground">
+                  You have unsaved changes
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!isDirty || saveStatus === "saving"}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saveStatus === "saving" && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
+                {saveStatus === "saving" ? "Saving…" : "Save changes"}
+              </button>
+            </div>
           )}
         </div>
       </div>
