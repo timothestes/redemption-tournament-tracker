@@ -22,6 +22,7 @@ help:
 	@echo "  make dev-windows    - Run dev server (Windows: auto-adds Node.js to PATH)"
 	@echo "  make build          - Build for production"
 	@echo "  make start          - Start production server"
+	@echo "  make stop           - Stop all running dev servers"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make clean          - Remove node_modules and lock files"
@@ -60,6 +61,14 @@ build:
 start:
 	npm run start
 
+# Stop all running Next.js dev servers (and free common dev ports)
+stop:
+	@echo "🛑 Stopping all dev servers..."
+	@pkill -f "next dev" 2>/dev/null || true
+	@pkill -f "next-server" 2>/dev/null || true
+	@lsof -ti:3000,3001,3002 2>/dev/null | xargs kill 2>/dev/null || true
+	@echo "✅ Dev servers stopped"
+
 # Setup the project
 setup: install
 
@@ -95,4 +104,4 @@ update-cards:
 
 cards: update-cards
 
-.PHONY: all install run dev dev-windows build start setup clean fresh update-paragons paragons update-cards cards
+.PHONY: all install run dev dev-windows build start stop setup clean fresh update-paragons paragons update-cards cards
