@@ -46,6 +46,8 @@ import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import ReactMarkdown from "react-markdown";
 import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
+import CollectionCheckModal from "./CollectionCheckModal";
+import { aggregateOwnedByName } from "../utils/collectionCheck";
 import DeckLegalityChecklist from "./DeckLegalityChecklist";
 import type { DeckCheckResult } from "@/utils/deckcheck/types";
 import { useBudgetPricing } from '../hooks/useBudgetPricing';
@@ -169,6 +171,12 @@ interface DeckBuilderPanelProps {
   isDeckChecking?: boolean;
   /** Full card catalog for budget pricing */
   allCards: BudgetCard[];
+  /** User's collection quantities, keyed by `name|set|imgFile`. */
+  collectionQuantities?: Map<string, number>;
+  /** Whether the collection has loaded successfully. */
+  collectionAvailable?: boolean;
+  /** Non-null if the collection failed to load. */
+  collectionSyncError?: string | null;
   /** Callback to enter spotlight mode */
   onSpotlightToggle?: () => void;
   /** Whether legality checks are currently suppressed */
@@ -215,6 +223,9 @@ export default function DeckBuilderPanel({
   deckCheckResult,
   isDeckChecking,
   allCards,
+  collectionQuantities,
+  collectionAvailable = false,
+  collectionSyncError = null,
   onSpotlightToggle,
   ignoreLegalityChecks = false,
   onIgnoreLegalityChecksChange,
@@ -231,6 +242,9 @@ export default function DeckBuilderPanel({
   const [showReplaceEvilModal, setShowReplaceEvilModal] = useState(false);
   const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
   const [buyModalMode, setBuyModalMode] = useState<"exact" | "budget">("exact");
+  const [showCollectionCheckModal, setShowCollectionCheckModal] = useState(false);
+  // When set, the buy modal opens seeded with just these (missing) cards.
+  const [buyCards, setBuyCards] = useState<BuyDeckCard[] | null>(null);
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   // Two triggers (mobile / desktop) live in the header action group; whichever
@@ -1294,6 +1308,17 @@ export default function DeckBuilderPanel({
                     </button>
                   )}
                   {isAuthenticated && (
+                    <button
+                      onClick={() => { setShowCollectionCheckModal(true); setShowMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                    >
+                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Check my collection
+                    </button>
+                  )}
+                  {isAuthenticated && (
                     <>
                       <div className="border-t border-border my-1" />
                       <button
@@ -1814,6 +1839,17 @@ export default function DeckBuilderPanel({
                   <img src="/sponsors/ytg-dark.png" alt="" className="w-4 h-4 object-contain hidden dark:block" />
                   <img src="/sponsors/ytg-light.png" alt="" className="w-4 h-4 object-contain dark:hidden" />
                   Buy on YTG
+                </button>
+              )}
+              {isAuthenticated && (
+                <button
+                  onClick={() => { setShowCollectionCheckModal(true); setShowMenu(false); }}
+                  className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
+                >
+                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Check my collection
                 </button>
               )}
 
@@ -3455,14 +3491,35 @@ export default function DeckBuilderPanel({
       {/* Buy Deck Modal */}
       {showBuyDeckModal && (
         <BuyDeckModal
+          cards={buyCards ?? deck.cards.map(dc => ({
+            card_name: dc.card.name,
+            card_key: `${dc.card.name}|${dc.card.set}|${dc.card.imgFile}`,
+            quantity: dc.quantity,
+            zone: dc.zone,
+          }))}
+          onClose={() => { setShowBuyDeckModal(false); setBuyCards(null); }}
+          initialMode={buyModalMode}
+        />
+      )}
+
+      {showCollectionCheckModal && (
+        <CollectionCheckModal
           cards={deck.cards.map(dc => ({
             card_name: dc.card.name,
             card_key: `${dc.card.name}|${dc.card.set}|${dc.card.imgFile}`,
             quantity: dc.quantity,
             zone: dc.zone,
           }))}
-          onClose={() => setShowBuyDeckModal(false)}
-          initialMode={buyModalMode}
+          ownedByName={aggregateOwnedByName(collectionQuantities ?? new Map())}
+          collectionAvailable={collectionAvailable}
+          collectionSyncError={collectionSyncError}
+          onClose={() => setShowCollectionCheckModal(false)}
+          onBuyMissing={(missing) => {
+            setShowCollectionCheckModal(false);
+            setBuyCards(missing);
+            setBuyModalMode("exact");
+            setShowBuyDeckModal(true);
+          }}
         />
       )}
 
