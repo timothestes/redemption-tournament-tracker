@@ -102,7 +102,7 @@
   .save-status { font-size: 10px; color: var(--teal-mid); margin-left: auto; font-style: italic; }
 
   .tf-confirm-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1200;
     background: rgba(2,30,28,0.6);
     display: flex; align-items: center; justify-content: center; padding: 16px;
   }
@@ -216,18 +216,55 @@
   .field-textarea.tall { min-height: 60px; }
   .field-textarea.xtall { min-height: 100px; }
 
-  .tourn-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 8px; }
-  .tourn-block { background: var(--gray-light); border-radius: 4px; padding: 6px 28px 6px 8px; }
-  .tourn-name-input {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
-    letter-spacing: 1px; text-transform: uppercase; color: var(--teal-dark);
-    border: none; border-bottom: 1.5px solid var(--teal-mid); background: transparent;
-    width: 100%; padding: 2px 0; outline: none; margin-bottom: 4px;
+  .tourn-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .tourn-block {
+    flex: 0 0 auto; width: calc(33.333% - 6px);
+    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 6px;
+    border-left: 3px solid var(--teal-light); position: relative;
+    cursor: default; transition: box-shadow 0.15s;
   }
-  .tourn-name-input::placeholder { color: var(--placeholder); font-style: italic; text-transform: none; letter-spacing: normal; }
+  .tourn-block-has-results { border-left-color: var(--teal) !important; }
+  .tourn-block .tourn-remove-btn { position: absolute; top: 6px; right: 6px; }
+
+  .tourn-name-input {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
+    letter-spacing: 0.5px; text-transform: uppercase; color: var(--teal-dark);
+    border: none; background: transparent; width: 85%; margin-bottom: 2px; outline: none;
+    display: block;
+  }
+  .tourn-name-input::placeholder { text-transform: none; font-style: italic; color: var(--placeholder); letter-spacing: normal; font-weight: 400; }
+  .tourn-host-input {
+    font-size: 10px; color: var(--gray); border: none; background: transparent;
+    font-style: italic; flex: 1; min-width: 0; outline: none;
+  }
+  .tourn-host-input::placeholder { color: var(--placeholder); }
+  .tourn-meta-row {
+    display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px;
+  }
+  .tourn-participants-input {
+    font-size: 10px; color: var(--gray); border: none; background: transparent;
+    width: 56px; flex-shrink: 0; outline: none; text-align: right; font-style: italic;
+  }
+  .tourn-participants-input::placeholder { color: var(--placeholder); font-style: italic; text-align: right; }
+  .tourn-participants-suffix {
+    font-size: 10px; color: var(--gray); flex-shrink: 0; font-style: italic;
+  }
+  .tourn-location-input {
+    font-size: 10px; color: var(--gray); border: none; background: transparent;
+    width: 100%; margin-bottom: 4px; outline: none; display: block;
+  }
+  .tourn-location-input::placeholder { color: var(--placeholder); font-style: italic; }
+  .tourn-results-btn {
+    display: inline-flex; align-items: center; gap: 3px; margin-top: 2px;
+    background: none; border: 1px solid var(--teal-light); border-radius: 3px;
+    padding: 2px 6px; font-size: 10px; color: var(--teal); cursor: pointer;
+    font-family: 'Barlow', sans-serif; transition: background 0.12s;
+  }
+  .tourn-results-btn:hover { background: var(--teal-light); }
+  .tourn-results-btn.has-results { color: var(--teal-dark); font-weight: 700; border-color: var(--teal); }
 
   .tourn-remove-btn {
-    position: absolute; top: 6px; right: 6px; width: 18px; height: 18px;
+    width: 18px; height: 18px;
     border: none; background: var(--gray-light); color: var(--gray);
     border-radius: 50%; font-size: 12px; line-height: 1; cursor: pointer;
     display: flex; align-items: center; justify-content: center; padding: 0;
@@ -235,34 +272,122 @@
   }
   .tourn-remove-btn:hover { background: var(--red); color: #fff; }
 
-  .results-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .results-grid th {
-    font-size: 8px; font-weight: 700; color: var(--gray); letter-spacing: 1.5px;
-    text-transform: uppercase; text-align: left; padding: 0 6px 4px;
-    border-bottom: 1.5px solid var(--teal); white-space: nowrap;
+  /* ===== Tournament Results Editor Modal ===== */
+  #tourn-results-editor-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(2,46,43,0.75);
+    z-index: 1100; align-items: center; justify-content: center; padding: 20px;
   }
-  .results-grid td { padding: 3px 6px; border-bottom: 1px solid #fff; vertical-align: middle; }
-  .results-grid td.rank-cell {
+  #tourn-results-editor-overlay.open { display: flex; }
+  #tourn-results-editor-modal {
+    background: #fff; border-radius: 8px; width: 100%; max-width: 680px;
+    max-height: 90vh; overflow-y: auto; position: relative;
+  }
+  #tre-header {
+    background: var(--teal-dark); border-radius: 8px 8px 0 0;
+    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+  }
+  #tre-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 16px;
+    color: #fff; letter-spacing: 0.5px;
+  }
+  #tre-body { padding: 14px 16px 18px; }
+  .tre-format-block { margin-bottom: 16px; }
+  .tre-format-block:last-child { margin-bottom: 0; }
+  .tre-format-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--teal-dark);
+    border-bottom: 1.5px solid var(--teal-light); padding-bottom: 4px; margin-bottom: 8px;
+  }
+  .tre-rank-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .tre-rank-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 13px;
+    color: var(--teal); width: 36px; flex-shrink: 0; text-align: right;
+  }
+  .tre-rank-label.tied { /* color unchanged when tied */ }
+  .tre-player-input {
+    flex: 1; border: none; border-bottom: 1.5px solid var(--teal-light);
+    background: transparent; font-family: 'Barlow', sans-serif; font-size: 12px;
+    color: var(--text); padding: 3px 0; outline: none;
+  }
+  .tre-player-input:focus { border-color: var(--teal); }
+  .tre-player-input::placeholder { color: var(--placeholder); font-style: italic; }
+  .tre-tie-badge {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 11px;
-    color: var(--teal); width: 30px; text-align: center;
+    color: #fff; background: var(--teal); border-radius: 3px;
+    padding: 1px 5px; flex-shrink: 0;
   }
-  .results-grid th:first-child, .results-grid td.rank-cell { width: 22px; }
-  .placement-cell-wrap { display: flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; }
-  .placement-pair { display: flex; gap: 6px; flex: 1; min-width: 0; }
-  .placement-pair .placement-cell-wrap { flex: 1; }
-  .placement-input {
-    flex: 1; min-width: 0; width: 0; border: none; border-bottom: 1px solid var(--teal-light);
-    background: transparent; font-family: 'Barlow', sans-serif; font-size: 11px;
-    color: var(--text); padding: 2px 0; outline: none;
+  .tre-tie-btn {
+    flex-shrink: 0; border: 1px solid var(--teal-light); background: transparent;
+    color: var(--gray); border-radius: 3px; font-size: 9px; font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; padding: 2px 6px;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
   }
-  .placement-input:focus { border-color: var(--teal); }
-  .placement-input::placeholder { color: var(--placeholder); font-style: italic; }
-  .placement-clear {
-    width: 12px; height: 12px; flex-shrink: 0; border: none; background: var(--gray-light);
-    color: var(--gray); border-radius: 50%; font-size: 8px; line-height: 1; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; padding: 0;
+  .tre-tie-btn:hover { border-color: var(--teal); color: var(--teal); }
+  .tre-tie-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+  #tre-footer {
+    padding: 10px 16px 14px; display: flex; justify-content: flex-end; gap: 8px;
+    border-top: 1px solid var(--gray-light);
   }
-  .placement-clear:hover { background: var(--red); color: #fff; }
+
+  /* ===== Tournament Results Display Modal (published) ===== */
+  #tourn-results-display-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(2,46,43,0.75);
+    z-index: 1100; align-items: center; justify-content: center; padding: 20px;
+  }
+  #tourn-results-display-overlay.open { display: flex; }
+  #tourn-results-display-modal {
+    background: #fff; border-radius: 8px; width: 100%; max-width: 680px;
+    max-height: 90vh; overflow-y: auto; position: relative;
+  }
+  #trd-header {
+    background: var(--teal-dark); border-radius: 8px 8px 0 0;
+    padding: 12px 40px 12px 16px; position: relative;
+  }
+  #trd-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 18px;
+    color: #fff; letter-spacing: 0.5px;
+  }
+  #trd-subtitle {
+    font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 2px;
+  }
+  #trd-body { padding: 14px 16px 20px; }
+  .trd-formats-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px;
+  }
+  .trd-format-block { }
+  .trd-format-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--teal-dark);
+    border-bottom: 1.5px solid var(--teal-light); padding-bottom: 3px; margin-bottom: 6px;
+  }
+  .trd-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+  .trd-rank {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 12px;
+    color: var(--teal); width: 36px; flex-shrink: 0; text-align: right;
+  }
+  .trd-rank.tied { /* color unchanged when tied */ }
+  .trd-player { font-size: 12px; color: var(--text); line-height: 1.3; }
+  .trd-empty-state { font-size: 11px; color: var(--placeholder); font-style: italic; padding: 8px 0; }
+
+  /* dark mode for new modals */
+  body.dark-mode #tourn-results-editor-modal,
+  body.dark-mode #tourn-results-display-modal { background: var(--white); }
+  body.dark-mode .tre-format-label,
+  body.dark-mode .trd-format-label { color: var(--teal-mid); border-bottom-color: rgba(255,255,255,0.1); }
+  body.dark-mode .tre-player-input { color: var(--text); }
+  body.dark-mode .tre-player-input::placeholder { color: var(--placeholder); }
+  body.dark-mode .tre-player-input:focus { border-color: var(--teal-mid); }
+  body.dark-mode .tre-player-input { border-bottom-color: rgba(255,255,255,0.15); }
+  body.dark-mode .tre-format-block { border-bottom-color: rgba(255,255,255,0.08); }
+  body.dark-mode #tre-footer { border-top-color: rgba(255,255,255,0.08); }
+  body.dark-mode .tre-tie-btn { border-color: rgba(255,255,255,0.2); color: var(--gray); }
+  body.dark-mode .tre-tie-btn:hover { border-color: var(--teal-mid); color: var(--teal-mid); }
+  body.dark-mode .tre-tie-btn.active { background: var(--teal-mid); border-color: var(--teal-mid); color: #fff; }
+  body.dark-mode .trd-format-label { color: var(--teal-mid); }
+  body.dark-mode .trd-player { color: var(--text); }
+  body.dark-mode .trd-rank { color: var(--teal-mid); }
+  body.dark-mode .trd-rank.tied { /* color unchanged when tied */ }
+  body.dark-mode .trd-empty-state { color: var(--placeholder); }
 
   .rtn-row { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
   .rtn-row input.field-input { margin-bottom: 0; }
@@ -338,7 +463,7 @@
   /* Road to Nationals: event cards */
   .event-cards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
   .event-card {
-    flex: 1 1 300px; min-width: 260px;
+    flex: 0 0 auto; width: calc(33.333% - 6px);
     background: var(--gray-light); border-radius: 6px; padding: 8px 10px 6px;
     border-left: 3px solid var(--teal); position: relative;
   }
@@ -359,6 +484,57 @@
     border-top: 1px solid #fff; padding-top: 4px; outline: none; color: var(--text);
   }
   .event-card input.ec-desc::placeholder { color: var(--placeholder); font-style: italic; }
+
+  /* Side event: notes button on card */
+  .ec-notes-btn {
+    display: inline-flex; align-items: center; gap: 3px; margin-top: 4px;
+    background: none; border: 1px solid var(--teal-light); border-radius: 3px;
+    padding: 2px 6px; font-size: 10px; color: var(--teal); cursor: pointer;
+    font-family: 'Barlow', sans-serif; transition: background 0.12s;
+  }
+  .ec-notes-btn:hover { background: var(--teal-light); }
+  .ec-notes-btn.has-notes { color: var(--teal-dark); font-weight: 700; border-color: var(--teal); }
+  body.dark-mode .ec-notes-btn { color: var(--teal-mid); border-color: var(--teal-mid); }
+  body.dark-mode .ec-notes-btn:hover { background: rgba(10,173,166,0.12); }
+  body.dark-mode .ec-notes-btn.has-notes { color: var(--teal-mid); border-color: var(--teal-mid); }
+
+  /* Side event detail modal */
+  #se-detail-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(2,46,43,0.75);
+    z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+  }
+  #se-detail-overlay.open { display: flex; }
+  #se-detail-modal {
+    background: #fff; border-radius: 8px; padding: 0; max-width: 420px; width: 100%;
+    max-height: 90vh; overflow-y: auto; overflow-x: hidden; position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  }
+  #se-detail-header {
+    background: var(--teal-dark); padding: 14px 18px 12px; border-radius: 8px 8px 0 0; position: relative;
+  }
+  #se-detail-name {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 20px;
+    letter-spacing: 0.5px; color: #fff; text-transform: uppercase; margin-right: 28px;
+  }
+  #se-detail-host {
+    font-size: 11px; color: rgba(255,255,255,0.75); font-style: italic; margin-top: 2px;
+  }
+  #se-detail-body { padding: 14px 18px 18px; }
+  #se-detail-notes-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
+    color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  #se-detail-notes-list {
+    margin: 0; padding-left: 18px; list-style: disc;
+  }
+  #se-detail-notes-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 3px; word-break: break-word; overflow-wrap: anywhere; }
+  #se-detail-notes-empty { font-size: 12px; color: var(--placeholder); font-style: italic; }
+  body.dark-mode #se-detail-modal { background: var(--white); }
+  body.dark-mode #se-detail-name { color: #fff; }
+  body.dark-mode #se-detail-host { color: rgba(255,255,255,0.7); }
+  body.dark-mode #se-detail-notes-label { color: var(--teal-mid); }
+  body.dark-mode #se-detail-notes-list li { color: var(--text); }
+  body.dark-mode #se-detail-notes-empty { color: var(--placeholder); }
 
   /* Upcoming Tournaments: pills + detail modal */
   .tournament-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
@@ -671,6 +847,16 @@
   }
   #player-registry-save-status { font-size: 9px; color: var(--teal-mid); font-style: italic; margin-left: auto; }
 
+  /* Registry panel is always dark-themed — lock text to literal colors so dark-mode variable flips don't break it */
+  body.dark-mode #player-registry-header h2 { color: #ffffff; }
+  body.dark-mode #player-registry-search { color: #ffffff; }
+  body.dark-mode .player-registry-item { color: rgba(255,255,255,0.75); }
+  body.dark-mode .player-registry-item:hover { color: #ffffff; }
+  body.dark-mode .player-registry-item.selected { color: #ffffff; }
+  body.dark-mode .pr-empty-state { color: rgba(255,255,255,0.35); }
+  body.dark-mode .pr-field-input { color: #ffffff; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
+  body.dark-mode .pr-field-input::placeholder { color: rgba(255,255,255,0.3); }
+
   /* Spoilers: card grid */
   .spoiler-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 4px 0 10px; }
   .spoiler-card { position: relative; }
@@ -810,6 +996,51 @@
   }
   .collectors-card-caption-input::placeholder { color: var(--placeholder); font-style: italic; font-weight: 400; }
   .collectors-card-caption-input:hover, .collectors-card-caption-input:focus { background: var(--gray-light); border-radius: 3px; }
+  .collectors-card-img-wrap img { cursor: zoom-in; }
+
+  /* Collector's Corner card modal */
+  #collectors-card-modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(2,46,43,0.75);
+    z-index: 1100; align-items: center; justify-content: center; padding: 20px;
+  }
+  #collectors-card-modal-overlay.open { display: flex; }
+  #collectors-card-modal-content {
+    background: #fff; border-radius: 8px; padding: 20px;
+    max-width: 700px; width: 100%; max-height: 90vh;
+    position: relative; display: flex; gap: 20px; align-items: flex-start;
+  }
+  #collectors-card-modal-img-col { flex: 0 0 260px; max-width: 260px; text-align: center; }
+  #collectors-card-modal-img-col img { width: 100%; border-radius: 6px; object-fit: contain; }
+  #collectors-card-modal-img-caption {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 15px;
+    color: var(--teal-dark); margin-top: 10px;
+  }
+  #collectors-card-modal-notes-col {
+    flex: 1; min-width: 0; border-left: 1px solid var(--gray-light);
+    padding-left: 18px; max-height: 75vh; overflow-y: auto;
+  }
+  #collectors-card-modal-notes-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 12px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--teal-dark); margin-bottom: 10px;
+  }
+  #collectors-card-modal-topic {
+    font-size: 13px; font-weight: 600; color: var(--teal); margin-bottom: 10px;
+  }
+  #collectors-card-modal-notes-list {
+    list-style: disc; padding-left: 18px; margin: 0;
+  }
+  #collectors-card-modal-notes-list li {
+    font-size: 13px; color: var(--text); line-height: 1.6; margin-bottom: 5px;
+  }
+  #collectors-card-modal-notes-empty {
+    font-size: 12px; color: var(--placeholder); font-style: italic;
+  }
+  body.dark-mode #collectors-card-modal-content { background: var(--white); }
+  body.dark-mode #collectors-card-modal-img-caption { color: var(--teal-mid); }
+  body.dark-mode #collectors-card-modal-notes-label { color: var(--teal-mid); }
+  body.dark-mode #collectors-card-modal-notes-col { border-left-color: rgba(255,255,255,0.1); }
+  body.dark-mode #collectors-card-modal-notes-list li { color: var(--text); }
+  body.dark-mode #collectors-card-modal-notes-empty { color: var(--placeholder); }
 
   .bullet-notes-print { display: none; }
 
@@ -835,6 +1066,7 @@
 
   body.dark-mode .field-input, body.dark-mode .field-textarea, body.dark-mode .bullet-textarea,
   body.dark-mode .collectors-topic-input, body.dark-mode .tourn-name-input,
+  body.dark-mode .tourn-host-input, body.dark-mode .tourn-location-input, body.dark-mode .tourn-participants-input,
   body.dark-mode .rank-input, body.dark-mode .placement-input, body.dark-mode .deadline-pill input.dp-label,
   body.dark-mode .event-card input, body.dark-mode .agur-card-caption-input,
   body.dark-mode .collectors-card-caption-input, body.dark-mode input[type=text],
@@ -860,17 +1092,27 @@
     background: var(--gray-light);
     border-left-color: var(--teal);
   }
+  body.dark-mode .tourn-block-has-results { border-left-color: var(--teal-mid) !important; }
+  body.dark-mode .tourn-name-input { color: var(--teal-mid); }
+  body.dark-mode .tourn-host-input,
+  body.dark-mode .tourn-location-input,
+  body.dark-mode .tourn-participants-input { color: var(--placeholder); }
+  body.dark-mode .tourn-results-btn { color: var(--teal-mid); border-color: var(--teal-mid); }
+  body.dark-mode .tourn-results-btn:hover { background: rgba(10,173,166,0.12); }
+  body.dark-mode .tourn-results-btn.has-results { color: var(--teal-mid); border-color: var(--teal-mid); }
   body.dark-mode .tournament-pill:hover { background: var(--teal-dark); }
   body.dark-mode .tournament-pill-date { color: var(--teal-mid); }
   body.dark-mode .tournament-pill-loc { color: var(--text); }
   body.dark-mode .tournament-pill-type { background: var(--teal-dark); color: var(--teal-mid); }
   body.dark-mode .tournament-modal-formats-table td.fee { color: var(--teal-mid); }
-
-  body.dark-mode .results-grid th { color: var(--gray); }
-  body.dark-mode .rank-delta.same { background: var(--gray-light); color: var(--gray); }
+  body.dark-mode .tournament-modal-content { background: var(--white); color: var(--text); }
+  body.dark-mode .tournament-modal-title { color: var(--teal-mid); }
+  body.dark-mode .tournament-modal-date { color: var(--placeholder); }
+  body.dark-mode .tournament-modal-section { color: var(--text); border-top-color: rgba(255,255,255,0.08); }
+  body.dark-mode .tournament-modal-section strong { color: var(--teal-mid); }
+  body.dark-mode .tournament-modal-formats-table td { color: var(--text); }
 
   body.dark-mode .field-label { color: var(--teal-mid) !important; }
-  body.dark-mode .tourn-name-input { color: var(--teal-mid); }
 
   body.dark-mode input[type=date]::-webkit-calendar-picker-indicator { filter: invert(1); }
 
@@ -893,6 +1135,46 @@
   body.dark-mode .spoiler-modal-content:not(.tournament-modal-content) { background: var(--white); color: var(--text); }
   body.dark-mode .spoiler-modal-caption { color: var(--teal-mid); }
 
+  /* ── Player Profile Modal ─────────────────────────────────────────────── */
+  .player-profile-modal {
+    background: #fff; border-radius: 10px; padding: 20px 22px 18px; max-width: 320px; width: 100%;
+    max-height: 90vh; overflow-y: auto; position: relative; text-align: left;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  }
+  .player-profile-modal-name {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 22px;
+    color: var(--teal-dark); margin: 0 24px 2px 0; line-height: 1.2;
+  }
+  .player-profile-modal-row {
+    display: flex; align-items: baseline; gap: 8px; padding: 7px 0;
+    border-top: 1px solid var(--gray-light); margin-top: 6px;
+  }
+  .player-profile-modal-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
+    color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; width: 80px; flex-shrink: 0;
+  }
+  .player-profile-modal-value {
+    font-size: 13px; color: var(--text); line-height: 1.4;
+  }
+  .player-profile-modal-empty {
+    font-size: 12px; color: var(--placeholder); font-style: italic; margin-top: 10px;
+  }
+  .rank-profile-btn {
+    background: none; border: none; padding: 0 2px; cursor: pointer; color: var(--placeholder);
+    font-size: 13px; line-height: 1; flex-shrink: 0; opacity: 0.6; transition: opacity 0.15s, color 0.15s;
+  }
+  .rank-profile-btn:hover { opacity: 1; color: var(--teal); }
+  body.dark-mode .player-profile-modal { background: var(--white); color: var(--text); }
+  body.dark-mode .player-profile-modal-name { color: var(--teal-mid); }
+  body.dark-mode .player-profile-modal-row { border-top-color: rgba(255,255,255,0.08); }
+  body.dark-mode .player-profile-modal-label { color: var(--teal-mid); }
+  body.dark-mode .player-profile-modal-value { color: var(--text); }
+  body.dark-mode .player-profile-modal-empty { color: var(--placeholder); }
+  body.dark-mode .player-profile-modal .spoiler-modal-close { background: rgba(255,255,255,0.12); color: #ffffff; }
+  body.dark-mode .player-profile-modal .spoiler-modal-close:hover { background: var(--red); color: #fff; }
+  .player-profile-modal .spoiler-modal-close { background: var(--gray-light); color: var(--teal-dark); }
+  .player-profile-modal .spoiler-modal-close:hover { background: var(--red); color: #fff; }
+
   body.dark-mode .btn-ghost { color: var(--teal-mid); border-color: var(--teal-mid); }
 
   @media print {
@@ -911,6 +1193,7 @@
     .meta-field:has(.meta-value-print:empty) { display: none !important; }
     .meta-field { display: inline-block !important; width: auto !important; margin-right: 14px; }
     .meta-field .meta-label { display: block; }
+    .meta-field.ep-num-text-only .meta-label { display: none !important; }
 
     /* Hide empty Discussion Notes (Spoilers, Agur, Meta Forecast, etc.) */
     .field:has(> textarea.field-textarea:placeholder-shown) { display: none !important; }
@@ -1003,10 +1286,10 @@
     font-family: 'Barlow Condensed', sans-serif; font-size: 10px; font-weight: 700;
     min-width: 28px; text-align: center; border-radius: 3px; padding: 1px 4px; flex-shrink: 0;
   }
-  .rank-delta.up   { background: #d6f5e0; color: #0a8a3a; }
-  .rank-delta.down { background: #fde0e0; color: var(--red); }
-  .rank-delta.same { background: var(--gray-light); color: var(--gray); }
-  .rank-delta.new  { background: var(--teal-light); color: var(--teal-dark); }
+  .rank-delta.up   { background: transparent; color: #22c55e; }
+  .rank-delta.down { background: transparent; color: #ef4444; }
+  .rank-delta.same { background: transparent; color: #8a9e9d; }
+  .rank-delta.new  { background: transparent; color: #0aada6; }
   .rank-delta.empty { visibility: hidden; }
   .rank-clear {
     width: 14px; height: 14px; flex-shrink: 0; border: none; background: var(--gray-light);
@@ -1073,11 +1356,12 @@
       break-after: avoid;
       page-break-after: avoid;
     }
-    #tourn-add-row, .tourn-remove-btn, .placement-clear, .rank-clear { display: none; }
+    #tourn-add-row, .tourn-remove-btn, .rank-clear, .rank-profile-btn, .ec-notes-btn, .tourn-results-btn { display: none; }
+    #tourn-results-section:not(:has(.tourn-block)) { display: none; }
     .rank-delta.empty { display: none; }
     #prev-rankings-field { display: none; }
-    #rankings-export-row { display: none; }
-    #meta-export-row { display: none; }
+    #rankings-export-row { display: none !important; }
+    #meta-export-row { display: none !important; }
     #prev-meta-rankings-field { display: none; }
     #tournaments-section button, #tournaments-section select, #upcoming-fetch-status { display: none; }
     .rtn-row-remove, .countdown-remove { display: none; }
@@ -1096,7 +1380,7 @@
     .spoiler-card-note-print:empty { display: none; border-top: none; margin-top: 0; padding-top: 0; }
     #spoiler-empty-state { display: none; }
     .spoiler-card-caption-input, .spoiler-card-set-input { border: none !important; background: transparent !important; pointer-events: none; }
-    .spoiler-modal-overlay { display: none !important; }
+    .spoiler-modal-overlay, #collectors-card-modal-overlay { display: none !important; }
     #agur-modal-overlay { display: none !important; }
     #mailbag-add-row, #mailbag-body .tourn-remove-btn { display: none; }
     #guest-q-add-row, #guest-questions-body .tourn-remove-btn { display: none; }
@@ -1137,8 +1421,8 @@
   body.view-mode .sec-order-controls,
   body.view-mode #tourn-add-row,
   body.view-mode .tourn-remove-btn,
-  body.view-mode .placement-clear,
   body.view-mode .rank-clear,
+  body.view-mode .rank-profile-btn,
   body.view-mode #prev-rankings-field,
   body.view-mode #rankings-export-row,
   body.view-mode #meta-export-row,
@@ -1148,6 +1432,8 @@
   body.view-mode #upcoming-fetch-status,
   body.view-mode .rtn-row-remove,
   body.view-mode .countdown-remove,
+  body.view-mode .ec-notes-btn,
+  body.view-mode .tourn-results-btn,
   body.view-mode #rtn-section .btn,
   body.view-mode #rtn-carryforward-status,
   body.view-mode #rtn-nats-fetch-status,
@@ -1201,15 +1487,110 @@
   body.view-mode .movable-section[data-content-empty="true"] + .section-divider,
   body.view-mode #guest-background-wrapper:has(input:placeholder-shown):has(.bullet-notes-print:empty),
   body.view-mode #guest-questions-wrapper:has(textarea:placeholder-shown):not(:has(textarea:not(:placeholder-shown))),
-  body.view-mode #guest-resources-wrapper:has(textarea.bullet-textarea:placeholder-shown) {
+  body.view-mode #guest-resources-wrapper:has(textarea.bullet-textarea:placeholder-shown),
+  body.view-mode .meta-field:has(.meta-value-print:empty),
+  body.view-mode .field:has(> .bullet-notes-print:empty) {
     display: none !important;
   }
+  body.view-mode .meta-field.ep-num-text-only .meta-label { display: none !important; }
+  /* Tournament results: hide editor modal and results btn in view mode; display modal stays accessible */
+  body.view-mode #tourn-results-editor-overlay { display: none !important; }
+  body.view-mode #tourn-results-section:not(:has(.tourn-block)) { display: none; }
+  body.view-mode .tourn-name-input,
+  body.view-mode .tourn-host-input,
+  body.view-mode .tourn-location-input,
+  body.view-mode .tourn-participants-input { pointer-events: none; }
+  body.view-mode .tourn-host-input:placeholder-shown,
+  body.view-mode .tourn-location-input:placeholder-shown,
+  body.view-mode .tourn-participants-input:placeholder-shown { display: none; }
+  body.view-mode .tourn-block { cursor: pointer; pointer-events: auto; }
+  body.view-mode .tourn-block:hover { box-shadow: 0 2px 8px rgba(4,78,74,0.18); }
 </style>
 </head>
 <body>
 
+<div id="collectors-card-modal-overlay" onclick="closeCollectorsModal(event)">
+  <div id="collectors-card-modal-content">
+    <button type="button" class="spoiler-modal-close" onclick="closeCollectorsModal()">&times;</button>
+    <div id="collectors-card-modal-img-col">
+      <img id="collectors-card-modal-img" src="" alt="Card reference">
+      <div id="collectors-card-modal-img-caption"></div>
+    </div>
+    <div id="collectors-card-modal-notes-col">
+      <div id="collectors-card-modal-notes-label">Discussion Notes</div>
+      <div id="collectors-card-modal-topic"></div>
+      <ul id="collectors-card-modal-notes-list"></ul>
+      <div id="collectors-card-modal-notes-empty">No notes added yet.</div>
+    </div>
+  </div>
+</div>
+
+<div id="tournament-modal-overlay" class="spoiler-modal-overlay" onclick="closeTournamentModal(event)">
+  <div class="spoiler-modal-content tournament-modal-content">
+    <button type="button" class="spoiler-modal-close" onclick="closeTournamentModal(event)">&times;</button>
+    <div class="tournament-modal-badge" id="tournament-modal-badge"></div>
+    <div class="tournament-modal-title" id="tournament-modal-title"></div>
+    <div class="tournament-modal-date" id="tournament-modal-date"></div>
+    <div class="tournament-modal-section" id="tournament-modal-venue"></div>
+    <div class="tournament-modal-section" id="tournament-modal-host"></div>
+    <div class="tournament-modal-section" id="tournament-modal-formats"></div>
+    <div class="tournament-modal-section" id="tournament-modal-fees"></div>
+    <div class="tournament-modal-section" id="tournament-modal-description"></div>
+  </div>
+</div>
+
 <div id="deck-card-enlarge-overlay" onclick="closeDeckCardEnlarge()">
   <img id="deck-card-enlarge-img" src="" alt="">
+</div>
+
+<div id="player-profile-modal-overlay" class="spoiler-modal-overlay" onclick="closePlayerProfileModal(event)">
+  <div class="player-profile-modal">
+    <button type="button" class="spoiler-modal-close" onclick="closePlayerProfileModal(event)">&times;</button>
+    <div class="player-profile-modal-name" id="ppm-handle"></div>
+    <div id="ppm-rows"></div>
+  </div>
+</div>
+
+<div id="se-detail-overlay" onclick="closeSeDetailModal(event)">
+  <div id="se-detail-modal">
+    <div id="se-detail-header">
+      <button type="button" class="spoiler-modal-close" onclick="closeSeDetailModal()">&times;</button>
+      <div id="se-detail-name"></div>
+      <div id="se-detail-host"></div>
+    </div>
+    <div id="se-detail-body">
+      <div id="se-detail-notes-label">Event Notes</div>
+      <ul id="se-detail-notes-list"></ul>
+      <div id="se-detail-notes-empty" style="display:none;">No notes added yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tournament Results Editor Modal (editor only) -->
+<div id="tourn-results-editor-overlay" onclick="closeTournResultsEditor(event)">
+  <div id="tourn-results-editor-modal">
+    <div id="tre-header">
+      <div id="tre-title">Edit Results</div>
+      <button type="button" class="spoiler-modal-close" onclick="closeTournResultsEditor()">&times;</button>
+    </div>
+    <div id="tre-body"></div>
+    <div id="tre-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeTournResultsEditor()">Cancel</button>
+      <button type="button" class="btn btn-teal" onclick="saveTournResults()">Save Results</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tournament Results Display Modal (published view) -->
+<div id="tourn-results-display-overlay" onclick="closeTournResultsDisplay(event)">
+  <div id="tourn-results-display-modal">
+    <div id="trd-header">
+      <button type="button" class="spoiler-modal-close" onclick="closeTournResultsDisplay()">&times;</button>
+      <div id="trd-title"></div>
+      <div id="trd-subtitle">Tournament Results</div>
+    </div>
+    <div id="trd-body"></div>
+  </div>
 </div>
 
 <div id="card-notes-popup-overlay" onclick="closeCardNotesPopup(event)">
@@ -1280,12 +1661,12 @@
         <div class="pr-empty-state" id="player-registry-empty-state">Select a player to view or edit their profile.</div>
         <div id="player-registry-form" style="display:none;">
           <div>
-            <label class="pr-field-label">Handle / Display Name</label>
-            <input class="pr-field-input" id="pr-handle" placeholder="e.g. Hendrix" autocomplete="off">
-          </div>
-          <div>
             <label class="pr-field-label">Real Name</label>
             <input class="pr-field-input" id="pr-realname" placeholder="Optional" autocomplete="off">
+          </div>
+          <div>
+            <label class="pr-field-label">Handle / Display Name</label>
+            <input class="pr-field-input" id="pr-handle" placeholder="e.g. Hendrix" autocomplete="off">
           </div>
           <div>
             <label class="pr-field-label">Region</label>
@@ -1409,8 +1790,10 @@
           </span>
         </div>
         <div class="sec-body">
+          <div id="tourn-results-section">
           <label class="field-label">Recent Results</label>
           <div class="tourn-grid" id="tourn-grid"></div>
+          </div>
           <label class="field-label">Upcoming Tournaments</label>
           <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
             <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="fetchUpcomingTournaments()">Fetch Upcoming (Next 21 Days)</button>
@@ -1422,19 +1805,7 @@
           <div class="tournament-pills" id="upcoming-pills"></div>
           <div id="upcoming-empty-state" style="font-size:10px; color:var(--placeholder); font-style:italic; padding:6px 0;">No upcoming tournaments added yet -- fetch and select from the list above.</div>
 
-          <div id="tournament-modal-overlay" class="spoiler-modal-overlay" onclick="closeTournamentModal(event)">
-            <div class="spoiler-modal-content tournament-modal-content">
-              <button type="button" class="spoiler-modal-close" onclick="closeTournamentModal(event)">&times;</button>
-              <div class="tournament-modal-badge" id="tournament-modal-badge"></div>
-              <div class="tournament-modal-title" id="tournament-modal-title"></div>
-              <div class="tournament-modal-date" id="tournament-modal-date"></div>
-              <div class="tournament-modal-section" id="tournament-modal-venue"></div>
-              <div class="tournament-modal-section" id="tournament-modal-host"></div>
-              <div class="tournament-modal-section" id="tournament-modal-formats"></div>
-              <div class="tournament-modal-section" id="tournament-modal-fees"></div>
-              <div class="tournament-modal-section" id="tournament-modal-description"></div>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>
@@ -1777,7 +2148,10 @@
         <div class="sec-body">
           <div class="field">
             <label class="field-label">Player Name</label>
-            <input class="field-input" id="potm-name" list="rank-player-options" placeholder="Name / handle -- select existing or type new" autocomplete="off">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input class="field-input" id="potm-name" list="rank-player-options" placeholder="Name / handle -- select existing or type new" autocomplete="off" style="flex:1;">
+              <button type="button" class="rank-profile-btn" id="potm-profile-btn" title="View profile" style="display:none;" onclick="openPlayerProfileModal(document.getElementById('potm-name').value.trim())">&#128100;</button>
+            </div>
           </div>
           <div class="field">
             <label class="field-label bullet-field-label">Highlight / Reason</label>
@@ -1824,7 +2198,10 @@
           <div class="sec-body">
             <div class="field">
               <label class="field-label">Guest Name</label>
-              <input class="field-input" id="guest-name" list="rank-player-options" placeholder="Full name / handle" autocomplete="off">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <input class="field-input" id="guest-name" list="rank-player-options" placeholder="Full name / handle" autocomplete="off" style="flex:1;">
+                <button type="button" class="rank-profile-btn" id="guest-profile-btn" title="View profile" style="display:none;" onclick="openPlayerProfileModal(document.getElementById('guest-name').value.trim())">&#128100;</button>
+              </div>
             </div>
             <div class="field">
               <label class="field-label bullet-field-label">Background / Intro</label>
@@ -2016,7 +2393,10 @@
   document.getElementById('ep-date').addEventListener('input', syncEpDatePrint);
 
   function syncEpNumPrint() {
-    document.getElementById('ep-num-print').textContent = document.getElementById('ep-num').value.trim();
+    var val = document.getElementById('ep-num').value.trim();
+    document.getElementById('ep-num-print').textContent = val;
+    var field = document.getElementById('ep-num').closest('.meta-field');
+    if (field) field.classList.toggle('ep-num-text-only', val !== '' && isNaN(val));
   }
   document.getElementById('ep-num').addEventListener('input', syncEpNumPrint);
 
@@ -2028,12 +2408,13 @@
   ['potm-name', 'guest-name'].forEach(function(id) {
     var input = document.getElementById(id);
     if (!input) return;
+    input.addEventListener('input', function() {
+      var btn = document.getElementById(id === 'potm-name' ? 'potm-profile-btn' : 'guest-profile-btn');
+      if (btn) btn.style.display = this.value.trim() ? '' : 'none';
+    });
     input.addEventListener('change', function() {
-      var v = this.value.trim();
-      if (v && window.knownPlayers.indexOf(v) === -1) {
-        window.knownPlayers.push(v);
-        rebuildPlayerOptions();
-      }
+      var btn = document.getElementById(id === 'potm-name' ? 'potm-profile-btn' : 'guest-profile-btn');
+      if (btn) btn.style.display = this.value.trim() ? '' : 'none';
     });
   });
 
@@ -2041,6 +2422,7 @@
     rankingsGrid.insertAdjacentHTML('beforeend',
       '<div class="rank-item"><span class="rank-num">' + i + '</span>' +
       '<input class="rank-input" id="rank-' + i + '" list="rank-player-options" placeholder="Player name" autocomplete="off">' +
+      '<button type="button" class="rank-profile-btn" title="View profile" id="rank-profile-btn-' + i + '" onclick="openPlayerProfileModal(document.getElementById(\'rank-' + i + '\').value.trim())" style="display:none;">&#128100;</button>' +
       '<button type="button" class="rank-clear" title="Clear" onclick="clearRankField(' + i + ')">&times;</button>' +
       '<span class="rank-delta empty" id="rank-delta-' + i + '"></span></div>');
   }
@@ -2195,15 +2577,50 @@
     });
   }
 
-  // categories: [key, label, ranksCount, fieldsPerRank]
-  var placementCats = [
-    ['t1',  'T1 2-Player', 3, 1],
-    ['t2',  'T2 2-Player', 3, 1],
-    ['bo',  'Booster',     3, 1],
-    ['se',  'Sealed',      3, 1],
-    ['tm',  'Teams',       3, 2]
+  // ---- Tournament Results: format definitions ----
+  var tournFormats = [
+    { key: 't1',  label: 'T1 2-Player',   teams: false },
+    { key: 't2',  label: 'T2 2-Player',   teams: false },
+    { key: 'bo',  label: 'Booster',        teams: false },
+    { key: 'se',  label: 'Sealed',         teams: false },
+    { key: 'tm',  label: 'Teams',          teams: true  }
   ];
   var rankLabels = ['1st', '2nd', '3rd'];
+
+  // tournResults[b] = { t1: [{p1:'', p2:'', tie:false}, ...x3], t2: [...], ... }
+  window.tournResults = {};
+
+  function emptyFormatResults() {
+    var fmt = {};
+    tournFormats.forEach(function(f) {
+      fmt[f.key] = rankLabels.map(function() {
+        return { p1: '', p2: '', p3: '', p4: '', tie: false };
+      });
+    });
+    return fmt;
+  }
+
+  function hasAnyResults(b) {
+    var res = window.tournResults[b];
+    if (!res) return false;
+    return tournFormats.some(function(f) {
+      return res[f.key] && res[f.key].some(function(row) {
+        return row.p1.trim() || row.p2.trim() || (row.p3 || '').trim() || (row.p4 || '').trim();
+      });
+    });
+  }
+
+  function syncTournBlockAppearance(b) {
+    var block = document.getElementById('tourn-block-' + b);
+    if (!block) return;
+    var hasRes = hasAnyResults(b);
+    block.classList.toggle('tourn-block-has-results', hasRes);
+    var btn = document.getElementById('t' + b + '-results-btn');
+    if (btn) {
+      btn.classList.toggle('has-results', hasRes);
+      btn.textContent = hasRes ? '📋 Results ●' : '📋 Results';
+    }
+  }
 
   var tournGrid = document.getElementById('tourn-grid');
   window.tournBlockCount = 0;
@@ -2211,19 +2628,27 @@
   function buildTournamentBlock() {
     window.tournBlockCount++;
     var b = window.tournBlockCount;
+    window.tournResults[b] = emptyFormatResults();
 
     var block = document.createElement('div');
     block.className = 'tourn-block';
     block.id = 'tourn-block-' + b;
-    block.style.position = 'relative';
+
+    // In view mode, clicking the whole card opens the display modal
+    block.addEventListener('click', function(e) {
+      if (!document.body.classList.contains('view-mode')) return;
+      openTournResultsDisplay(b);
+    });
 
     var removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'tourn-remove-btn';
     removeBtn.title = 'Remove this tournament';
     removeBtn.innerHTML = '&times;';
-    removeBtn.addEventListener('click', function() {
+    removeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       block.remove();
+      delete window.tournResults[b];
     });
     block.appendChild(removeBtn);
 
@@ -2238,91 +2663,60 @@
       if (v && window.knownTournaments.indexOf(v) === -1) {
         window.knownTournaments.push(v);
         rebuildTournNameOptions();
+        syncTournamentStore();
       }
     });
     block.appendChild(nameInput);
 
-    var table = document.createElement('table');
-    table.className = 'results-grid';
+    var metaRow = document.createElement('div');
+    metaRow.className = 'tourn-meta-row';
 
-    // Header row
-    var thead = document.createElement('tr');
-    thead.appendChild(document.createElement('th')); // blank corner for rank column
-    placementCats.forEach(function(cat) {
-      var th = document.createElement('th');
-      th.textContent = cat[1];
-      if (cat[3] > 1) th.style.width = '34%';
-      thead.appendChild(th);
+    var hostInput = document.createElement('input');
+    hostInput.className = 'tourn-host-input';
+    hostInput.id = 't' + b + '-host';
+    hostInput.placeholder = 'Hosted by...';
+    hostInput.autocomplete = 'off';
+    metaRow.appendChild(hostInput);
+
+    var participantsInput = document.createElement('input');
+    participantsInput.className = 'tourn-participants-input';
+    participantsInput.id = 't' + b + '-participants';
+    participantsInput.placeholder = '# players';
+    participantsInput.autocomplete = 'off';
+    participantsInput.type = 'text';
+    metaRow.appendChild(participantsInput);
+
+    var participantsSuffix = document.createElement('span');
+    participantsSuffix.className = 'tourn-participants-suffix';
+    participantsSuffix.id = 't' + b + '-participants-suffix';
+    participantsSuffix.textContent = 'players';
+    participantsSuffix.style.display = 'none';
+    metaRow.appendChild(participantsSuffix);
+
+    participantsInput.addEventListener('input', function() {
+      participantsSuffix.style.display = participantsInput.value.trim() ? '' : 'none';
     });
-    table.appendChild(thead);
 
-    function makeFieldCell(fieldId, placeholderText) {
-      var td = document.createElement('td');
-      var wrap = document.createElement('div');
-      wrap.className = 'placement-cell-wrap';
+    block.appendChild(metaRow);
 
-      var inp = document.createElement('input');
-      inp.className = 'placement-input';
-      inp.id = fieldId;
-      inp.placeholder = placeholderText;
-      inp.autocomplete = 'off';
-      inp.setAttribute('list', 'rank-player-options');
-      inp.addEventListener('change', function() {
-        var v = this.value.trim();
-        if (v && window.knownPlayers.indexOf(v) === -1) {
-          window.knownPlayers.push(v);
-          rebuildPlayerOptions();
-        }
-      });
-      wrap.appendChild(inp);
+    var locationInput = document.createElement('input');
+    locationInput.className = 'tourn-location-input';
+    locationInput.id = 't' + b + '-location';
+    locationInput.placeholder = 'City, State';
+    locationInput.autocomplete = 'off';
+    block.appendChild(locationInput);
 
-      var clearBtn = document.createElement('button');
-      clearBtn.type = 'button';
-      clearBtn.className = 'placement-clear';
-      clearBtn.title = 'Clear';
-      clearBtn.innerHTML = '&times;';
-      clearBtn.addEventListener('click', function() {
-        inp.value = '';
-        inp.focus();
-      });
-      wrap.appendChild(clearBtn);
+    var resultsBtn = document.createElement('button');
+    resultsBtn.type = 'button';
+    resultsBtn.className = 'tourn-results-btn';
+    resultsBtn.id = 't' + b + '-results-btn';
+    resultsBtn.textContent = '📋 Results';
+    resultsBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      openTournResultsEditor(b);
+    });
+    block.appendChild(resultsBtn);
 
-      td.appendChild(wrap);
-      return td;
-    }
-
-    for (var r = 1; r <= 3; r++) {
-      var tr = document.createElement('tr');
-
-      var rankTd = document.createElement('td');
-      rankTd.className = 'rank-cell';
-      rankTd.textContent = rankLabels[r - 1];
-      tr.appendChild(rankTd);
-
-      placementCats.forEach(function(cat) {
-        var catKey = cat[0], ranks = cat[2], fieldsPerRank = cat[3];
-
-        if (fieldsPerRank === 1) {
-          var fieldId = 't' + b + '-' + catKey + '-' + r;
-          tr.appendChild(makeFieldCell(fieldId, 'Player name'));
-        } else {
-          var td = document.createElement('td');
-          var pairWrap = document.createElement('div');
-          pairWrap.className = 'placement-pair';
-          for (var f = 1; f <= fieldsPerRank; f++) {
-            var fieldId2 = 't' + b + '-' + catKey + '-' + r + '-' + f;
-            var cell = makeFieldCell(fieldId2, 'Player ' + f);
-            pairWrap.appendChild(cell.firstChild);
-          }
-          td.appendChild(pairWrap);
-          tr.appendChild(td);
-        }
-      });
-
-      table.appendChild(tr);
-    }
-
-    block.appendChild(table);
     return block;
   }
 
@@ -2346,14 +2740,354 @@
   tournGrid.appendChild(buildTournamentBlock());
   tournGrid.appendChild(addRow);
 
+  // ---- Tournament Results Editor Modal ----
+  var _treEditingBlock = null;
+  var _treDraftResults = null;
+
+  function openTournResultsEditor(b) {
+    _treEditingBlock = b;
+    _treDraftResults = JSON.parse(JSON.stringify(window.tournResults[b] || emptyFormatResults()));
+
+    var nameEl = document.getElementById('t' + b + '-name');
+    var hostEl = document.getElementById('t' + b + '-host');
+    var locEl  = document.getElementById('t' + b + '-location');
+    var partEl = document.getElementById('t' + b + '-participants');
+    var name = nameEl ? nameEl.value.trim() : '';
+    var host = hostEl ? hostEl.value.trim() : '';
+    var loc  = locEl  ? locEl.value.trim()  : '';
+    var part = partEl ? partEl.value.trim()  : '';
+    var subtitleParts = [host, loc].filter(Boolean);
+    if (part) subtitleParts.push(part + ' players');
+    var subtitle = subtitleParts.join(' — ');
+    document.getElementById('tre-title').textContent = (name || 'Tournament') + (subtitle ? ' · ' + subtitle : '');
+
+    var body = document.getElementById('tre-body');
+    body.innerHTML = '';
+
+    tournFormats.forEach(function(fmt) {
+      var block = document.createElement('div');
+      block.className = 'tre-format-block';
+
+      var lbl = document.createElement('div');
+      lbl.className = 'tre-format-label';
+      lbl.textContent = fmt.label;
+      block.appendChild(lbl);
+
+      rankLabels.forEach(function(rankLabel, ri) {
+        var rowData = _treDraftResults[fmt.key][ri];
+        var row = document.createElement('div');
+        row.className = 'tre-rank-row';
+        row.id = 'tre-row-' + fmt.key + '-' + ri;
+
+        // 3rd place (ri=2) is suppressed if any earlier rank has a tie
+        var anyEarlierTie = ri === 2 && (_treDraftResults[fmt.key][0].tie || _treDraftResults[fmt.key][1].tie);
+        if (anyEarlierTie) {
+          row.style.display = 'none';
+        }
+
+        // Rank label
+        var rl = document.createElement('div');
+        rl.className = 'tre-rank-label' + (rowData.tie ? ' tied' : '');
+        rl.id = 'tre-rl-' + fmt.key + '-' + ri;
+        rl.textContent = rowData.tie ? 'T-' + rankLabel : rankLabel;
+        row.appendChild(rl);
+
+        // Player 1 input
+        var p1 = document.createElement('input');
+        p1.className = 'tre-player-input';
+        p1.id = 'tre-p1-' + fmt.key + '-' + ri;
+        p1.placeholder = fmt.teams ? 'Player 1' : 'Player name';
+        p1.autocomplete = 'off';
+        p1.setAttribute('list', 'rank-player-options');
+        p1.value = rowData.p1 || '';
+        p1.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p1 = p1.value; });
+        p1.addEventListener('change', function() {
+          var v = p1.value.trim();
+          if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
+        });
+        row.appendChild(p1);
+
+        // For Teams: always show p2 field (partner), PLUS a tie toggle
+        if (fmt.teams) {
+          var p2 = document.createElement('input');
+          p2.className = 'tre-player-input';
+          p2.id = 'tre-p2-' + fmt.key + '-' + ri;
+          p2.placeholder = 'Player 2';
+          p2.autocomplete = 'off';
+          p2.setAttribute('list', 'rank-player-options');
+          p2.value = rowData.p2 || '';
+          p2.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p2 = p2.value; });
+          p2.addEventListener('change', function() {
+            var v = p2.value.trim();
+            if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
+          });
+          row.appendChild(p2);
+        }
+
+        // Tie toggle (all formats)
+        var tieBtn = document.createElement('button');
+        tieBtn.type = 'button';
+        tieBtn.className = 'tre-tie-btn' + (rowData.tie ? ' active' : '');
+        tieBtn.id = 'tre-tiebtn-' + fmt.key + '-' + ri;
+        tieBtn.textContent = '= Tie';
+
+        // For non-Teams: tie badge + second player field on same row
+        var tieBadge = null, p2tie = null;
+        if (!fmt.teams) {
+          tieBadge = document.createElement('span');
+          tieBadge.className = 'tre-tie-badge';
+          tieBadge.textContent = '=';
+          tieBadge.id = 'tre-tiebadge-' + fmt.key + '-' + ri;
+          tieBadge.style.display = rowData.tie ? '' : 'none';
+
+          p2tie = document.createElement('input');
+          p2tie.className = 'tre-player-input';
+          p2tie.id = 'tre-p2-' + fmt.key + '-' + ri;
+          p2tie.placeholder = 'Player 2 (tied)';
+          p2tie.autocomplete = 'off';
+          p2tie.setAttribute('list', 'rank-player-options');
+          p2tie.value = rowData.p2 || '';
+          p2tie.style.display = rowData.tie ? '' : 'none';
+          p2tie.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p2 = p2tie.value; });
+          p2tie.addEventListener('change', function() {
+            var v = p2tie.value.trim();
+            if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
+          });
+          row.appendChild(tieBadge);
+          row.appendChild(p2tie);
+        }
+
+        row.appendChild(tieBtn);
+        block.appendChild(row);
+
+        // For Teams: second tied-team row (p3 + p4), shown only when tie is active
+        var tiedTeamRow = null;
+        if (fmt.teams) {
+          tiedTeamRow = document.createElement('div');
+          tiedTeamRow.className = 'tre-rank-row';
+          tiedTeamRow.id = 'tre-tiedrow-' + fmt.key + '-' + ri;
+          tiedTeamRow.style.display = rowData.tie ? '' : 'none';
+
+          var rl2 = document.createElement('div');
+          rl2.className = 'tre-rank-label tied';
+          rl2.textContent = 'T-' + rankLabel;
+          tiedTeamRow.appendChild(rl2);
+
+          var p3 = document.createElement('input');
+          p3.className = 'tre-player-input';
+          p3.id = 'tre-p3-' + fmt.key + '-' + ri;
+          p3.placeholder = 'Player 3';
+          p3.autocomplete = 'off';
+          p3.setAttribute('list', 'rank-player-options');
+          p3.value = rowData.p3 || '';
+          p3.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p3 = p3.value; });
+          p3.addEventListener('change', function() {
+            var v = p3.value.trim();
+            if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
+          });
+          tiedTeamRow.appendChild(p3);
+
+          var p4 = document.createElement('input');
+          p4.className = 'tre-player-input';
+          p4.id = 'tre-p4-' + fmt.key + '-' + ri;
+          p4.placeholder = 'Player 4';
+          p4.autocomplete = 'off';
+          p4.setAttribute('list', 'rank-player-options');
+          p4.value = rowData.p4 || '';
+          p4.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p4 = p4.value; });
+          p4.addEventListener('change', function() {
+            var v = p4.value.trim();
+            if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
+          });
+          tiedTeamRow.appendChild(p4);
+
+          // Invisible spacer to align with tie-btn column above
+          var spacer = document.createElement('div');
+          spacer.style.cssText = 'width:44px;flex-shrink:0;';
+          tiedTeamRow.appendChild(spacer);
+
+          block.appendChild(tiedTeamRow);
+        }
+
+        tieBtn.addEventListener('click', function() {
+          var isTied = !_treDraftResults[fmt.key][ri].tie;
+          _treDraftResults[fmt.key][ri].tie = isTied;
+          tieBtn.classList.toggle('active', isTied);
+          rl.classList.toggle('tied', isTied);
+          rl.textContent = isTied ? 'T-' + rankLabel : rankLabel;
+
+          if (!fmt.teams) {
+            if (tieBadge) tieBadge.style.display = isTied ? '' : 'none';
+            if (p2tie) {
+              p2tie.style.display = isTied ? '' : 'none';
+              if (isTied) { p2tie.focus(); }
+              else { p2tie.value = ''; _treDraftResults[fmt.key][ri].p2 = ''; }
+            }
+          } else {
+            // Teams: show/hide the second tied-team row
+            if (tiedTeamRow) {
+              tiedTeamRow.style.display = isTied ? '' : 'none';
+              if (isTied) {
+                document.getElementById('tre-p3-' + fmt.key + '-' + ri).focus();
+              } else {
+                _treDraftResults[fmt.key][ri].p3 = '';
+                _treDraftResults[fmt.key][ri].p4 = '';
+                document.getElementById('tre-p3-' + fmt.key + '-' + ri).value = '';
+                document.getElementById('tre-p4-' + fmt.key + '-' + ri).value = '';
+              }
+            }
+          }
+
+          // Any tie removes 3rd place — a tie at 1st or 2nd both consume all 3 placing slots
+          var thirdRow = document.getElementById('tre-row-' + fmt.key + '-2');
+          if (thirdRow) {
+            thirdRow.style.display = isTied ? 'none' : '';
+            if (isTied) {
+              _treDraftResults[fmt.key][2] = { p1: '', p2: '', p3: '', p4: '', tie: false };
+              var thirdTiedRow = document.getElementById('tre-tiedrow-' + fmt.key + '-2');
+              if (thirdTiedRow) thirdTiedRow.style.display = 'none';
+            }
+          }
+        });
+
+      });
+
+      body.appendChild(block);
+    });
+
+    document.getElementById('tourn-results-editor-overlay').classList.add('open');
+  }
+
+  function closeTournResultsEditor(e) {
+    if (e && e.target !== document.getElementById('tourn-results-editor-overlay')) return;
+    document.getElementById('tourn-results-editor-overlay').classList.remove('open');
+    _treEditingBlock = null;
+    _treDraftResults = null;
+  }
+
+  function saveTournResults() {
+    if (_treEditingBlock === null || !_treDraftResults) return;
+    window.tournResults[_treEditingBlock] = JSON.parse(JSON.stringify(_treDraftResults));
+    syncTournBlockAppearance(_treEditingBlock);
+    document.getElementById('tourn-results-editor-overlay').classList.remove('open');
+    _treEditingBlock = null;
+    _treDraftResults = null;
+  }
+
+  // ---- Tournament Results Display Modal (published/view) ----
+  function openTournResultsDisplay(b) {
+    var nameEl = document.getElementById('t' + b + '-name');
+    var hostEl = document.getElementById('t' + b + '-host');
+    var locEl  = document.getElementById('t' + b + '-location');
+    var partEl = document.getElementById('t' + b + '-participants');
+    var name = nameEl ? nameEl.value.trim() : '';
+    var host = hostEl ? hostEl.value.trim() : '';
+    var loc  = locEl  ? locEl.value.trim()  : '';
+    var part = partEl ? partEl.value.trim()  : '';
+
+    document.getElementById('trd-title').textContent = name || 'Tournament Results';
+    var subtitleParts = [host, loc].filter(Boolean);
+    if (part) subtitleParts.push(part + ' players');
+    document.getElementById('trd-subtitle').textContent = subtitleParts.length ? subtitleParts.join(' — ') : 'Tournament Results';
+
+    var body = document.getElementById('trd-body');
+    body.innerHTML = '';
+
+    var res = window.tournResults[b] || emptyFormatResults();
+    var grid = document.createElement('div');
+    grid.className = 'trd-formats-grid';
+
+    var anyShown = false;
+    tournFormats.forEach(function(fmt) {
+      var rows = res[fmt.key] || [];
+
+      // Only render format block if at least one entry has data
+      var hasData = rows.some(function(row) { return row.p1.trim() || row.p2.trim(); });
+      if (!hasData) return;
+      anyShown = true;
+
+      var fBlock = document.createElement('div');
+      fBlock.className = 'trd-format-block';
+
+      var lbl = document.createElement('div');
+      lbl.className = 'trd-format-label';
+      lbl.textContent = fmt.label;
+      fBlock.appendChild(lbl);
+
+      rows.forEach(function(row, ri) {
+        var p1 = row.p1.trim(), p2 = row.p2.trim();
+        // Skip entirely empty rows
+        if (!p1 && !p2) return;
+
+        var rankLabel = rankLabels[ri];
+
+        if (row.tie) {
+          // Tied: show as two T-Nth lines.
+          var names = fmt.teams
+            ? [p2 ? p1 + ' / ' + p2 : p1, (row.p3 || '').trim() ? ((row.p3||'').trim() + (((row.p4||'').trim()) ? ' / ' + (row.p4||'').trim() : '')) : null].filter(Boolean)
+            : [p1, p2].filter(Boolean);
+
+          names.forEach(function(playerName) {
+            var trdRow = document.createElement('div');
+            trdRow.className = 'trd-row';
+            var rkEl = document.createElement('div');
+            rkEl.className = 'trd-rank tied';
+            rkEl.textContent = 'T-' + rankLabel;
+            trdRow.appendChild(rkEl);
+            var playerEl = document.createElement('div');
+            playerEl.className = 'trd-player';
+            playerEl.textContent = playerName;
+            trdRow.appendChild(playerEl);
+            fBlock.appendChild(trdRow);
+          });
+        } else {
+          // Normal placing
+          var trdRow = document.createElement('div');
+          trdRow.className = 'trd-row';
+          var rkEl = document.createElement('div');
+          rkEl.className = 'trd-rank';
+          rkEl.textContent = rankLabel;
+          trdRow.appendChild(rkEl);
+          var playerEl = document.createElement('div');
+          playerEl.className = 'trd-player';
+          playerEl.textContent = fmt.teams && p2 ? p1 + ' / ' + p2 : p1;
+          trdRow.appendChild(playerEl);
+          fBlock.appendChild(trdRow);
+        }
+      });
+
+      grid.appendChild(fBlock);
+    });
+
+    if (!anyShown) {
+      var empty = document.createElement('div');
+      empty.className = 'trd-empty-state';
+      empty.textContent = 'No results have been recorded for this tournament.';
+      body.appendChild(empty);
+    } else {
+      body.appendChild(grid);
+    }
+
+    document.getElementById('tourn-results-display-overlay').classList.add('open');
+  }
+
+  function closeTournResultsDisplay(e) {
+    if (e && e.target !== document.getElementById('tourn-results-display-overlay')) return;
+    document.getElementById('tourn-results-display-overlay').classList.remove('open');
+  }
 
   // Wire up input listeners + add to known players on change
   for (var i = 1; i <= 10; i++) {
     (function(rowNum) {
       var input = document.getElementById('rank-' + rowNum);
-      input.addEventListener('input', function() { updateRankDelta(rowNum); });
+      var profileBtn = document.getElementById('rank-profile-btn-' + rowNum);
+      function syncProfileBtn() {
+        if (profileBtn) profileBtn.style.display = input.value.trim() ? '' : 'none';
+      }
+      input.addEventListener('input', function() { updateRankDelta(rowNum); syncProfileBtn(); });
       input.addEventListener('change', function() {
         var v = this.value.trim();
+        syncProfileBtn();
         if (v && window.knownPlayers.indexOf(v) === -1) {
           window.knownPlayers.push(v);
           rebuildPlayerOptions();
@@ -2380,6 +3114,37 @@
       newsTopicDatalist.appendChild(opt);
     });
   }
+
+  var NEWS_TOPICS_STORE_URL = '/threshingfloor/api/store/news-topics';
+  window.knownNewsTopicsSyncedCount = 0;
+
+  function persistNewsTopics() {
+    if (!window.knownNewsTopics.length) return;
+    if (window.knownNewsTopics.length <= window.knownNewsTopicsSyncedCount) return;
+    var count = window.knownNewsTopics.length;
+    fetch(NEWS_TOPICS_STORE_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: window.knownNewsTopics })
+    })
+    .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
+    .then(function() { window.knownNewsTopicsSyncedCount = count; })
+    .catch(function() {});
+  }
+
+  // Load recurring news topics from store on startup
+  fetch(NEWS_TOPICS_STORE_URL)
+    .then(function(res) { if (res.status === 404) return null; if (!res.ok) throw new Error(); return res.json(); })
+    .then(function(row) {
+      if (row && Array.isArray(row.data)) {
+        row.data.forEach(function(t) {
+          if (t && window.knownNewsTopics.indexOf(t) === -1) window.knownNewsTopics.push(t);
+        });
+        rebuildNewsTopicOptions();
+        window.knownNewsTopicsSyncedCount = window.knownNewsTopics.length;
+      }
+    })
+    .catch(function() {});
 
   function createNewsAddRow() {
     var addRow = document.createElement('div');
@@ -2447,6 +3212,7 @@
       if (this.checked && v && window.knownNewsTopics.indexOf(v) === -1) {
         window.knownNewsTopics.push(v);
         rebuildNewsTopicOptions();
+        persistNewsTopics();
       }
     });
     topicInput.addEventListener('change', function() {
@@ -2455,6 +3221,7 @@
         if (v && window.knownNewsTopics.indexOf(v) === -1) {
           window.knownNewsTopics.push(v);
           rebuildNewsTopicOptions();
+          persistNewsTopics();
         }
       }
     });
@@ -3198,8 +3965,12 @@
   function addAllSpoilerPicks() {
     if (!window.spoilerListings || !window.spoilerListings.length) return;
     var sorted = window.spoilerListings.slice().sort(compareBySetThenNumber);
+    var existing = Array.from(document.querySelectorAll('#spoiler-card-grid .spoiler-card')).map(function(c) { return c.dataset.cardName; });
     sorted.forEach(function(item) {
-      addSpoilerCard(item.card_name, item.set_name, item.set_number, item.image_url);
+      if (existing.indexOf(item.card_name) === -1) {
+        addSpoilerCard(item.card_name, item.set_name, item.set_number, item.image_url);
+        existing.push(item.card_name);
+      }
     });
     updateSpoilerSortBtnVisibility();
   }
@@ -3802,6 +4573,76 @@
     document.getElementById('tournament-modal-overlay').classList.remove('open');
   }
 
+  function openPlayerProfileModal(handle) {
+    if (!handle) return;
+    var profile = (window.playerProfiles && window.playerProfiles[handle]) ? window.playerProfiles[handle] : {};
+    document.getElementById('ppm-handle').textContent = handle;
+    var rows = '';
+    var fields = [
+      { label: 'Real Name', value: profile.realName },
+      { label: 'Region',    value: profile.region }
+    ];
+    var hasAny = false;
+    fields.forEach(function(f) {
+      if (f.value) {
+        hasAny = true;
+        rows += '<div class="player-profile-modal-row">' +
+          '<span class="player-profile-modal-label">' + f.label + '</span>' +
+          '<span class="player-profile-modal-value">' + f.value + '</span>' +
+          '</div>';
+      }
+    });
+    if (!hasAny) {
+      rows = '<div class="player-profile-modal-empty">No profile data stored for this player.</div>';
+    }
+    document.getElementById('ppm-rows').innerHTML = rows;
+    document.getElementById('player-profile-modal-overlay').classList.add('open');
+  }
+
+  function closePlayerProfileModal(event) {
+    if (event && event.target.closest('.player-profile-modal') && !event.target.classList.contains('spoiler-modal-close')) {
+      return;
+    }
+    document.getElementById('player-profile-modal-overlay').classList.remove('open');
+  }
+
+  function openSeDetailModal(rowNum) {
+    var nameEl = document.getElementById('rtn-event-name-' + rowNum);
+    var hostEl = document.getElementById('rtn-event-host-' + rowNum);
+    var notesEl = document.getElementById('rtn-event-notes-' + rowNum);
+    var name = nameEl ? nameEl.value.trim() : '';
+    var host = hostEl ? hostEl.value.trim() : '';
+    var notes = notesEl ? notesEl.value.trim() : '';
+    if (!name) return;
+
+    document.getElementById('se-detail-name').textContent = name;
+    document.getElementById('se-detail-host').textContent = host ? 'Hosted by ' + host : '';
+    document.getElementById('se-detail-host').style.display = host ? '' : 'none';
+
+    var list = document.getElementById('se-detail-notes-list');
+    var empty = document.getElementById('se-detail-notes-empty');
+    list.innerHTML = '';
+    if (notes) {
+      notes.split('\n').forEach(function(line) {
+        line = line.trim();
+        if (!line) return;
+        var li = document.createElement('li');
+        li.textContent = line;
+        list.appendChild(li);
+      });
+    }
+    var hasNotes = list.children.length > 0;
+    list.style.display = hasNotes ? '' : 'none';
+    empty.style.display = hasNotes ? 'none' : '';
+
+    document.getElementById('se-detail-overlay').classList.add('open');
+  }
+
+  function closeSeDetailModal(event) {
+    if (event && event.target !== document.getElementById('se-detail-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
+    document.getElementById('se-detail-overlay').classList.remove('open');
+  }
+
   function addUpcomingPick() {
     var picker = document.getElementById('upcoming-picker');
     var idx = parseInt(picker.value, 10);
@@ -3949,20 +4790,6 @@
 
   // ---- Road to Nationals: Side Events (add/remove rows) ----
   window.rtnEventCount = 0;
-  window.knownSideEvents = [];
-  var sideEventDatalist = document.createElement('datalist');
-  sideEventDatalist.id = 'side-event-options';
-  document.body.appendChild(sideEventDatalist);
-
-  function rebuildSideEventOptions() {
-    sideEventDatalist.innerHTML = '';
-    window.knownSideEvents.forEach(function(e) {
-      var opt = document.createElement('option');
-      opt.value = e;
-      sideEventDatalist.appendChild(opt);
-    });
-  }
-
   function addSideEventRow() {
     document.getElementById('rtn-events-field').style.display = '';
     window.rtnEventCount++;
@@ -3970,47 +4797,61 @@
     var row = document.createElement('div');
     row.className = 'event-card';
     row.id = 'rtn-event-row-' + n;
+    row.style.cursor = 'pointer';
+    row.title = 'Click to view details';
+    row.addEventListener('click', function(e) {
+      // Don't open detail modal if clicking a button/input inside the card
+      if (e.target.closest('button, input')) return;
+      openSeDetailModal(n);
+    });
 
     var nameInput = document.createElement('input');
     nameInput.className = 'ec-name';
     nameInput.id = 'rtn-event-name-' + n;
     nameInput.placeholder = 'Event Name';
     nameInput.autocomplete = 'off';
-    nameInput.setAttribute('list', 'side-event-options');
-    nameInput.addEventListener('change', function() {
-      var v = this.value.trim();
-      if (v && window.knownSideEvents.indexOf(v) === -1) {
-        window.knownSideEvents.push(v);
-        rebuildSideEventOptions();
-      }
-    });
+    nameInput.addEventListener('click', function(e) { e.stopPropagation(); });
 
     var hostInput = document.createElement('input');
     hostInput.className = 'ec-host';
     hostInput.id = 'rtn-event-host-' + n;
     hostInput.placeholder = 'Hosted by...';
     hostInput.autocomplete = 'off';
-    hostInput.setAttribute('list', 'rank-player-options');
-    hostInput.addEventListener('change', function() {
-      var v = this.value.trim();
-      if (v && window.knownPlayers.indexOf(v) === -1) {
-        window.knownPlayers.push(v);
-        rebuildPlayerOptions();
-      }
-    });
+    hostInput.addEventListener('click', function(e) { e.stopPropagation(); });
 
-    var descInput = document.createElement('input');
-    descInput.className = 'ec-desc';
-    descInput.id = 'rtn-event-desc-' + n;
-    descInput.placeholder = 'Short description';
-    descInput.autocomplete = 'off';
+    // Hidden textarea for bullet notes (saved to draft)
+    var notesTextarea = document.createElement('textarea');
+    notesTextarea.id = 'rtn-event-notes-' + n;
+    notesTextarea.style.display = 'none';
+    notesTextarea.setAttribute('aria-hidden', 'true');
+
+    // Notes button
+    var notesBtn = document.createElement('button');
+    notesBtn.type = 'button';
+    notesBtn.className = 'ec-notes-btn';
+    notesBtn.id = 'rtn-event-notes-btn-' + n;
+    notesBtn.title = 'Add event notes';
+    notesBtn.textContent = '✏ Notes';
+    notesBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var syncFn = function() {
+        var val = document.getElementById('rtn-event-notes-' + n).value.trim();
+        var btn = document.getElementById('rtn-event-notes-btn-' + n);
+        if (btn) {
+          btn.textContent = val ? '✏ Notes ●' : '✏ Notes';
+          btn.classList.toggle('has-notes', !!val);
+        }
+      };
+      openCardNotesPopup('rtn-event-notes-' + n, nameInput.value.trim() || 'Event Notes', syncFn, notesBtn);
+    });
 
     var removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'rtn-row-remove';
     removeBtn.title = 'Remove';
     removeBtn.innerHTML = '&times;';
-    removeBtn.addEventListener('click', function() {
+    removeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       row.remove();
       if (document.getElementById('rtn-events-list').children.length === 0) {
         document.getElementById('rtn-events-field').style.display = 'none';
@@ -4019,7 +4860,8 @@
 
     row.appendChild(nameInput);
     row.appendChild(hostInput);
-    row.appendChild(descInput);
+    row.appendChild(notesTextarea);
+    row.appendChild(notesBtn);
     row.appendChild(removeBtn);
     document.getElementById('rtn-events-list').appendChild(row);
   }
@@ -4044,6 +4886,8 @@
         var descEl = document.getElementById('rtn-event-desc-' + i);
         if (hostEl) data['rtn-event-host-' + i] = hostEl.value;
         if (descEl) data['rtn-event-desc-' + i] = descEl.value;
+        var notesEl2 = document.getElementById('rtn-event-notes-' + i);
+        if (notesEl2) data['rtn-event-notes-' + i] = notesEl2.value;
       }
     }
 
@@ -4116,6 +4960,14 @@
             document.getElementById('rtn-event-name-' + n).value = name.trim();
             if (data['rtn-event-host-' + i]) document.getElementById('rtn-event-host-' + n).value = data['rtn-event-host-' + i];
             if (data['rtn-event-desc-' + i]) document.getElementById('rtn-event-desc-' + n).value = data['rtn-event-desc-' + i];
+            if (data['rtn-event-notes-' + i]) {
+              var notesEl3 = document.getElementById('rtn-event-notes-' + n);
+              if (notesEl3) {
+                notesEl3.value = data['rtn-event-notes-' + i];
+                var btn3 = document.getElementById('rtn-event-notes-btn-' + n);
+                if (btn3 && notesEl3.value.trim()) { btn3.textContent = '✏ Notes ●'; btn3.classList.add('has-notes'); }
+              }
+            }
             eventsAdded++;
           }
         }
@@ -4220,6 +5072,10 @@
           '<button type="button" class="collectors-card-remove" title="Remove" onclick="removeCollectorsCard()">&times;</button>' +
         '</div>' +
         '<input class="collectors-card-caption-input" id="collectors-card-caption" placeholder="Card name / note" autocomplete="off">';
+      document.querySelector('.collectors-card-img-wrap').addEventListener('click', function(e) {
+        if (e.target.classList.contains('collectors-card-remove')) return;
+        openCollectorsModal();
+      });
     });
   }
 
@@ -4230,6 +5086,42 @@
         '<span class="collectors-card-placeholder-text">+ Reference a Card</span>' +
       '</div>' +
       '<input type="file" id="collectors-card-file" accept="image/*" style="display:none;" onchange="addCollectorsCard(this)">';
+  }
+
+  function openCollectorsModal() {
+    var img = document.getElementById('collectors-card-img');
+    if (!img) return;
+    document.getElementById('collectors-card-modal-img').src = img.src;
+    var caption = (document.getElementById('collectors-card-caption') || {}).value || '';
+    document.getElementById('collectors-card-modal-img-caption').textContent = caption;
+    var topic = (document.getElementById('collectors-topic') || {}).value || '';
+    var topicEl = document.getElementById('collectors-card-modal-topic');
+    topicEl.textContent = topic;
+    topicEl.style.display = topic ? '' : 'none';
+    var notes = (document.getElementById('collectors-notes') || {}).value || '';
+    var list = document.getElementById('collectors-card-modal-notes-list');
+    var empty = document.getElementById('collectors-card-modal-notes-empty');
+    list.innerHTML = '';
+    var lines = notes.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+    if (lines.length) {
+      lines.forEach(function(line) {
+        var li = document.createElement('li');
+        li.textContent = line;
+        list.appendChild(li);
+      });
+      empty.style.display = 'none';
+      list.style.display = '';
+    } else {
+      list.style.display = 'none';
+      empty.style.display = '';
+    }
+    document.getElementById('collectors-card-modal-overlay').classList.add('open');
+  }
+
+  function closeCollectorsModal(e) {
+    if (e && e.target !== document.getElementById('collectors-card-modal-overlay') && e.type !== 'click') return;
+    if (e && e.currentTarget === document.getElementById('collectors-card-modal-overlay') && e.target !== e.currentTarget) return;
+    document.getElementById('collectors-card-modal-overlay').classList.remove('open');
   }
 
   function updateSection(sectionId, checkbox) {
@@ -4316,6 +5208,7 @@
     if (collImg) data['collectors-card-img'] = collImg.src;
 
     data['tourn-block-count'] = window.tournBlockCount;
+    data['tourn-results'] = JSON.parse(JSON.stringify(window.tournResults || {}));
     data['section-order'] = [...document.querySelectorAll('.movable-section')].map(function(s){ return s.dataset.sid; });
     data['previous-rankings'] = window.previousRankings;
     data['previous-meta-rankings'] = window.previousMetaRankings;
@@ -4537,6 +5430,15 @@
           var tournCount = data['tourn-block-count'] || 1;
           for (var tb = 2; tb <= tournCount; tb++) addTournamentBlock();
 
+          // Restore tournament results
+          if (data['tourn-results']) {
+            window.tournResults = data['tourn-results'];
+            for (var trb = 1; trb <= tournCount; trb++) {
+              if (!window.tournResults[trb]) window.tournResults[trb] = emptyFormatResults();
+              syncTournBlockAppearance(trb);
+            }
+          }
+
           // Restore previous-episode ranking baselines for movement deltas
           if (data['previous-rankings']) window.previousRankings = data['previous-rankings'];
           if (data['previous-meta-rankings']) window.previousMetaRankings = data['previous-meta-rankings'];
@@ -4594,11 +5496,44 @@
                 '<input class="collectors-card-caption-input" id="collectors-card-caption" placeholder="Card name / note" autocomplete="off">';
               document.getElementById('collectors-card-img').src = data['collectors-card-img'];
               if (data['collectors-card-caption']) document.getElementById('collectors-card-caption').value = data['collectors-card-caption'];
+              document.querySelector('.collectors-card-img-wrap').addEventListener('click', function(e) {
+                if (e.target.classList.contains('collectors-card-remove')) return;
+                openCollectorsModal();
+              });
             }
             syncCollectorsBullets();
             updateNatsCountdown();
             updateAllRankDeltas();
             updateAllMetaRankDeltas();
+            // Sync rank profile button visibility after draft load
+            for (var rp = 1; rp <= 10; rp++) {
+              var rpInp = document.getElementById('rank-' + rp);
+              var rpBtn = document.getElementById('rank-profile-btn-' + rp);
+              if (rpBtn) rpBtn.style.display = (rpInp && rpInp.value.trim()) ? '' : 'none';
+            }
+            // Sync participants suffix visibility after draft load
+            for (var ps = 1; ps <= tournCount; ps++) {
+              var psInp = document.getElementById('t' + ps + '-participants');
+              var psSfx = document.getElementById('t' + ps + '-participants-suffix');
+              if (psSfx && psInp) psSfx.style.display = psInp.value.trim() ? '' : 'none';
+            }
+            // Sync POTM profile button visibility after draft load
+            var potmBtn = document.getElementById('potm-profile-btn');
+            var potmInp = document.getElementById('potm-name');
+            if (potmBtn && potmInp) potmBtn.style.display = potmInp.value.trim() ? '' : 'none';
+            // Sync guest profile button visibility after draft load
+            var guestBtn = document.getElementById('guest-profile-btn');
+            var guestInp = document.getElementById('guest-name');
+            if (guestBtn && guestInp) guestBtn.style.display = guestInp.value.trim() ? '' : 'none';
+            // Sync side event notes button state after draft load
+            for (var se = 1; se <= window.rtnEventCount; se++) {
+              var seNotes = document.getElementById('rtn-event-notes-' + se);
+              var seBtn = document.getElementById('rtn-event-notes-btn-' + se);
+              if (seBtn && seNotes && seNotes.value.trim()) {
+                seBtn.textContent = '✏ Notes ●';
+                seBtn.classList.add('has-notes');
+              }
+            }
             syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
             syncEpDatePrint();
             syncEpNumPrint();
@@ -5338,14 +6273,6 @@
       ctx.fillStyle = '#0d1f1e';
       ctx.fillRect(0, 0, W, H);
 
-      // ── Header bg image at 12% opacity ───────────────────────────────────
-      if (bgImg) {
-        ctx.save();
-        ctx.globalAlpha = 0.12;
-        ctx.drawImage(bgImg, 0, 0, W, HEADER_H);
-        ctx.restore();
-      }
-
       // ── Header gradient (left→right, matches power rankings) ─────────────
       var hdrGrad = ctx.createLinearGradient(0, 0, W, 0);
       hdrGrad.addColorStop(0,   'rgba(2,46,43,0.92)');
@@ -5353,6 +6280,21 @@
       hdrGrad.addColorStop(1,   'rgba(10,110,105,0.82)');
       ctx.fillStyle = hdrGrad;
       ctx.fillRect(0, 0, W, HEADER_H);
+
+      // ── Header bg image — screen blend over gradient ──────────────────────
+      if (bgImg) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, W, HEADER_H);
+        ctx.clip();
+        ctx.globalAlpha = 0.40;
+        ctx.globalCompositeOperation = 'screen';
+        var scale = W / bgImg.naturalWidth;
+        var bh = bgImg.naturalHeight * scale;
+        var by = (HEADER_H - bh) / 2;
+        ctx.drawImage(bgImg, 0, by, W, bh);
+        ctx.restore();
+      }
 
       // ── Teal separator ────────────────────────────────────────────────────
       ctx.fillStyle = '#0aada6';
@@ -5559,19 +6501,27 @@
       ctx.fillStyle = '#0d1f1e';
       ctx.fillRect(0, 0, W, H);
 
-      if (bgImg) {
-        ctx.save();
-        ctx.globalAlpha = 0.12;
-        ctx.drawImage(bgImg, 0, 0, W, 380);
-        ctx.restore();
-      }
-
       var grad = ctx.createLinearGradient(0, 0, W, 280);
       grad.addColorStop(0, 'rgba(2,46,43,0.92)');
       grad.addColorStop(0.6, 'rgba(4,78,74,0.88)');
       grad.addColorStop(1, 'rgba(10,110,105,0.82)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, 260);
+
+      if (bgImg) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, W, 260);
+        ctx.clip();
+        ctx.globalAlpha = 0.40;
+        ctx.globalCompositeOperation = 'screen';
+        // Cover: scale to fill width, maintain aspect ratio, center vertically
+        var scale = W / bgImg.naturalWidth;
+        var bh = bgImg.naturalHeight * scale;
+        var by = (260 - bh) / 2;
+        ctx.drawImage(bgImg, 0, by, W, bh);
+        ctx.restore();
+      }
 
       ctx.fillStyle = '#0aada6';
       ctx.fillRect(0, 260, W, 5);
@@ -5649,22 +6599,22 @@
       });
 
       ctx.fillStyle = '#022e2b';
-      ctx.fillRect(0, H - 80, W, 80);
+      ctx.fillRect(0, H - 100, W, 100);
       ctx.fillStyle = '#0aada6';
-      ctx.fillRect(0, H - 80, W, 3);
+      ctx.fillRect(0, H - 100, W, 3);
       ctx.fillStyle = 'rgba(125,212,208,0.6)';
       ctx.font = '500 15px "Barlow Condensed", sans-serif';
       ctx.textAlign = 'center';
       ctx.letterSpacing = '2px';
-      ctx.fillText('SPONSORED BY', W / 2, H - 52);
+      ctx.fillText('SPONSORED BY', W / 2, H - 66);
       ctx.letterSpacing = '0px';
       if (ytgImg) {
-        var logoH = 28, logoW = ytgImg.naturalWidth * (logoH / ytgImg.naturalHeight);
-        ctx.drawImage(ytgImg, (W - logoW) / 2, H - 42, logoW, logoH);
+        var logoH = 40, logoW = ytgImg.naturalWidth * (logoH / ytgImg.naturalHeight);
+        ctx.drawImage(ytgImg, (W - logoW) / 2, H - 52, logoW, logoH);
       } else {
         ctx.fillStyle = '#7dd4d0';
-        ctx.font = '700 22px "Barlow Condensed", sans-serif';
-        ctx.fillText('YOUR TURN GAMES  ·  yourturngames.biz', W / 2, H - 22);
+        ctx.font = '700 28px "Barlow Condensed", sans-serif';
+        ctx.fillText('YOUR TURN GAMES  ·  yourturngames.biz', W / 2, H - 26);
       }
 
       var link = document.createElement('a');
@@ -5771,16 +6721,21 @@
     var list = document.getElementById('player-registry-list');
     list.innerHTML = '';
     var players = window.knownPlayers.slice().sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
-    if (filter) players = players.filter(function(p) { return p.toLowerCase().indexOf(filter.toLowerCase()) !== -1; });
+    if (filter) players = players.filter(function(p) {
+      var realName = (window.playerProfiles[p] && window.playerProfiles[p].realName) || '';
+      return p.toLowerCase().indexOf(filter.toLowerCase()) !== -1 || realName.toLowerCase().indexOf(filter.toLowerCase()) !== -1;
+    });
     if (!players.length) {
       list.innerHTML = '<div class="pr-empty-state">No players found.</div>';
       return;
     }
     players.forEach(function(handle) {
+      var realName = (window.playerProfiles[handle] && window.playerProfiles[handle].realName) || '';
+      var displayName = realName || handle;
       var item = document.createElement('div');
       item.className = 'player-registry-item' + (handle === window.selectedPlayerHandle ? ' selected' : '');
-      item.textContent = handle;
-      item.title = handle;
+      item.textContent = displayName;
+      item.title = displayName !== handle ? displayName + ' (' + handle + ')' : handle;
       item.addEventListener('click', function() { selectPlayer(handle); });
       list.appendChild(item);
     });
