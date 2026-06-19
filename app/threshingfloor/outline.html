@@ -116,7 +116,7 @@
     padding: 18px 20px 14px;
   }
   .tf-confirm-message {
-    font-size: 13px; font-weight: 500; color: var(--white);
+    font-size: 13px; font-weight: 500; color: #ffffff;
     line-height: 1.5; margin-bottom: 16px;
   }
   .tf-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -180,12 +180,12 @@
   .sec-title {
     font-family: 'Barlow Condensed', sans-serif;
     font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
-    color: var(--white);
+    color: #fff;
   }
   .sec-order-controls { display: flex; gap: 2px; }
   .sec-order-btn {
     width: 18px; height: 18px; border: none; border-radius: 3px;
-    background: rgba(255,255,255,0.18); color: var(--white);
+    background: rgba(255,255,255,0.18); color: #fff;
     font-size: 11px; line-height: 1; cursor: pointer; padding: 0;
     display: flex; align-items: center; justify-content: center;
     transition: background 0.15s;
@@ -219,10 +219,16 @@
   .tourn-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
   .tourn-block {
     flex: 0 0 auto; width: calc(33.333% - 6px);
-    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 6px;
+    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 6px 22px;
     border-left: 3px solid var(--teal-light); position: relative;
     cursor: default; transition: box-shadow 0.15s;
   }
+  .tourn-block.dragging { opacity: 0.4; }
+  .tourn-block-drag-handle {
+    position: absolute; top: 6px; left: 4px; width: 14px; text-align: center;
+    font-size: 11px; line-height: 1; color: var(--gray); cursor: grab; user-select: none;
+  }
+  .tourn-block-drag-handle:hover { color: var(--teal-dark); }
   .tourn-block-has-results { border-left-color: var(--teal) !important; }
   .tourn-block .tourn-remove-btn { position: absolute; top: 6px; right: 6px; }
 
@@ -329,6 +335,44 @@
     border-top: 1px solid var(--gray-light);
   }
 
+  /* ===== Manual Tournament Form Modal (editor only) ===== */
+  #mtf-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(2,46,43,0.75);
+    z-index: 1100; align-items: center; justify-content: center; padding: 20px;
+  }
+  #mtf-overlay.open { display: flex; }
+  #mtf-modal {
+    background: #fff; border-radius: 8px; width: 100%; max-width: 460px;
+    max-height: 90vh; overflow-y: auto; position: relative;
+  }
+  #mtf-header {
+    background: var(--teal-dark); border-radius: 8px 8px 0 0;
+    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+  }
+  #mtf-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 16px;
+    color: #fff; letter-spacing: 0.5px;
+  }
+  #mtf-body { padding: 14px 16px 18px; }
+  #mtf-body .field-label { margin-top: 10px; }
+  #mtf-body .field-label:first-child { margin-top: 0; }
+  .mtf-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mtf-format-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .mtf-format-row .field-input { margin: 0; }
+  .mtf-format-name { flex: 2; }
+  .mtf-format-fee { flex: 1; }
+  .mtf-format-remove {
+    flex-shrink: 0; border: none; background: var(--gray-light); color: var(--text);
+    border-radius: 50%; width: 22px; height: 22px; font-size: 14px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .mtf-format-remove:hover { background: var(--red); color: #fff; }
+  #mtf-status { font-size: 11px; color: var(--red); margin-top: 8px; min-height: 14px; }
+  #mtf-footer {
+    padding: 10px 16px 14px; display: flex; justify-content: flex-end; gap: 8px;
+    border-top: 1px solid var(--gray-light);
+  }
+
   /* ===== Tournament Results Display Modal (published) ===== */
   #tourn-results-display-overlay {
     display: none; position: fixed; inset: 0; background: rgba(2,46,43,0.75);
@@ -371,7 +415,8 @@
 
   /* dark mode for new modals */
   body.dark-mode #tourn-results-editor-modal,
-  body.dark-mode #tourn-results-display-modal { background: var(--white); }
+  body.dark-mode #tourn-results-display-modal,
+  body.dark-mode #mtf-modal { background: var(--white); }
   body.dark-mode .tre-format-label,
   body.dark-mode .trd-format-label { color: var(--teal-mid); border-bottom-color: rgba(255,255,255,0.1); }
   body.dark-mode .tre-player-input { color: var(--text); }
@@ -388,6 +433,9 @@
   body.dark-mode .trd-rank { color: var(--teal-mid); }
   body.dark-mode .trd-rank.tied { /* color unchanged when tied */ }
   body.dark-mode .trd-empty-state { color: var(--placeholder); }
+  body.dark-mode #mtf-footer { border-top-color: rgba(255,255,255,0.08); }
+  body.dark-mode .mtf-format-remove { background: rgba(255,255,255,0.12); color: var(--text); }
+  body.dark-mode .mtf-format-remove:hover { background: var(--red); color: #fff; }
 
   .rtn-row { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
   .rtn-row input.field-input { margin-bottom: 0; }
@@ -464,9 +512,15 @@
   .event-cards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
   .event-card {
     flex: 0 0 auto; width: calc(33.333% - 6px);
-    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 6px;
+    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 6px 22px;
     border-left: 3px solid var(--teal); position: relative;
   }
+  .event-card.dragging { opacity: 0.4; }
+  .event-card-drag-handle {
+    position: absolute; top: 6px; left: 4px; width: 14px; text-align: center;
+    font-size: 11px; line-height: 1; color: var(--gray); cursor: grab; user-select: none;
+  }
+  .event-card-drag-handle:hover { color: var(--teal-dark); }
   .event-card .rtn-row-remove { position: absolute; top: 6px; right: 6px; }
   .event-card input.ec-name {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
@@ -535,28 +589,68 @@
   body.dark-mode #se-detail-notes-label { color: var(--teal-mid); }
   body.dark-mode #se-detail-notes-list li { color: var(--text); }
   body.dark-mode #se-detail-notes-empty { color: var(--placeholder); }
+  /* #deck-viewer-panel is permanently dark regardless of mode toggle, but the
+     shared .spoiler-modal-close idle-state colors are mode-relative -- without
+     this override the button's circle nearly disappears into the panel in
+     dark mode. Hover-to-red is unaffected (var(--red) isn't mode-relative). */
+  body.dark-mode #deck-viewer-panel .spoiler-modal-close { background: rgba(255,255,255,0.15); color: #fff; }
+
+  #news-detail-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(2,46,43,0.75);
+    z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+  }
+  #news-detail-overlay.open { display: flex; }
+  #news-detail-modal {
+    background: #fff; border-radius: 8px; padding: 0; max-width: 420px; width: 100%;
+    max-height: 90vh; overflow-y: auto; overflow-x: hidden; position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  }
+  #news-detail-header {
+    background: var(--teal-dark); padding: 14px 18px 12px; border-radius: 8px 8px 0 0; position: relative;
+  }
+  #news-detail-topic {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 20px;
+    letter-spacing: 0.5px; color: #fff; text-transform: uppercase; margin-right: 28px;
+  }
+  #news-detail-overview {
+    font-size: 11px; color: rgba(255,255,255,0.75); font-style: italic; margin-top: 2px;
+  }
+  #news-detail-body { padding: 14px 18px 18px; }
+  #news-detail-notes-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
+    color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  #news-detail-notes-list { margin: 0; padding-left: 18px; list-style: disc; }
+  #news-detail-notes-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 3px; word-break: break-word; overflow-wrap: anywhere; }
+  #news-detail-notes-empty { font-size: 12px; color: var(--placeholder); font-style: italic; }
+  body.dark-mode #news-detail-modal { background: var(--white); }
+  body.dark-mode #news-detail-topic { color: #fff; }
+  body.dark-mode #news-detail-overview { color: rgba(255,255,255,0.7); }
+  body.dark-mode #news-detail-notes-label { color: var(--teal-mid); }
+  body.dark-mode #news-detail-notes-list li { color: var(--text); }
+  body.dark-mode #news-detail-notes-empty { color: var(--placeholder); }
 
   /* Upcoming Tournaments: pills + detail modal */
   .tournament-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
   .tournament-pill {
-    display: flex; align-items: center; gap: 8px; background: var(--gray-light);
-    border-radius: 20px; padding: 6px 8px 6px 14px; font-size: 11px; cursor: pointer;
+    display: flex; align-items: center; gap: 9px; background: var(--gray-light);
+    border-radius: 22px; padding: 8px 10px 8px 16px; font-size: 12px; cursor: pointer;
     border-left: 3px solid var(--teal); transition: background 0.15s;
   }
   .tournament-pill:hover { background: var(--teal-light); }
   .tournament-pill-date {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 12px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 13px;
     color: var(--teal-dark); white-space: nowrap;
   }
-  .tournament-pill-loc { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 12px; color: var(--text); white-space: nowrap; }
+  .tournament-pill-loc { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px; color: var(--text); white-space: nowrap; }
   .tournament-pill-type {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 9px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 10px;
     letter-spacing: 0.5px; text-transform: uppercase; color: var(--teal-dark);
-    background: var(--teal-light); border-radius: 10px; padding: 2px 8px; white-space: nowrap;
+    background: var(--teal-light); border-radius: 10px; padding: 3px 9px; white-space: nowrap;
   }
   .tournament-pill-remove {
-    width: 16px; height: 16px; flex-shrink: 0; border: none; background: rgba(0,0,0,0.08);
-    color: var(--gray); border-radius: 50%; font-size: 10px; line-height: 1; cursor: pointer;
+    width: 18px; height: 18px; flex-shrink: 0; border: none; background: rgba(0,0,0,0.08);
+    color: var(--gray); border-radius: 50%; font-size: 11px; line-height: 1; cursor: pointer;
     display: flex; align-items: center; justify-content: center; padding: 0;
     transition: background 0.15s, color 0.15s;
   }
@@ -590,21 +684,21 @@
     border-left: 3px solid var(--teal); border-radius: 6px; padding: 12px;
   }
   .dotw-card-preview {
-    flex: 0 0 80px; display: flex; flex-direction: column; gap: 4px;
+    flex: 0 0 auto; display: flex; flex-direction: row; gap: 4px;
   }
   .dotw-card-preview img {
-    width: 80px; border-radius: 3px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    width: 80px; flex-shrink: 0; border-radius: 3px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     cursor: pointer; transition: transform 0.15s;
   }
   .dotw-card-preview img:hover { transform: scale(1.04); }
   .dotw-card-meta { flex: 1; min-width: 0; }
   .dotw-card-name {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 16px;
-    color: var(--white); margin-bottom: 2px;
+    color: #fff; margin-bottom: 2px;
   }
   .dotw-card-desc { font-size: 10px; color: var(--teal-mid); margin-bottom: 6px; font-style: italic; }
   .dotw-card-creator { font-size: 11px; color: var(--text); margin-bottom: 6px; }
-  .dotw-card-creator strong { color: var(--white); }
+  .dotw-card-creator strong { color: #fff; }
   .dotw-card-creator .dotw-creator-sub { font-size: 10px; color: var(--teal-mid); }
   .dotw-card-badges { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
   .dotw-format-badge {
@@ -629,17 +723,17 @@
     background: var(--teal-deep); border: 1px solid rgba(255,255,255,0.1);
     border-top: 3px solid var(--teal); border-radius: 8px;
     width: 100%; max-width: 1100px; min-height: 60vh;
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: column; position: relative;
     box-shadow: 0 20px 60px rgba(0,0,0,0.6); margin: auto;
   }
   #deck-viewer-header {
-    padding: 14px 18px 12px; border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 14px 44px 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.1);
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }
   #deck-viewer-title-block { flex: 1; min-width: 0; }
   #deck-viewer-name {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 20px;
-    color: var(--white); letter-spacing: 0.5px;
+    color: #fff; letter-spacing: 0.5px;
   }
   #deck-viewer-sub { font-size: 11px; color: var(--teal-mid); margin-top: 2px; }
   #deck-viewer-header-badges { display: flex; gap: 5px; flex-wrap: wrap; }
@@ -680,6 +774,19 @@
     line-height: 1.35;
   }
   .dv-note-bullet { color: var(--teal); flex-shrink: 0; font-size: 10px; }
+
+  #deck-viewer-notes-textarea {
+    width: 100%; min-height: 90px; resize: vertical;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px; color: #fff; font-family: 'Barlow', sans-serif; font-size: 12px;
+    line-height: 1.5; padding: 8px 10px; outline: none; transition: border-color 0.15s;
+  }
+  #deck-viewer-notes-textarea:focus { border-color: var(--teal); }
+  #deck-viewer-notes-textarea::placeholder { color: rgba(255,255,255,0.35); font-style: italic; }
+  #deck-viewer-notes-textarea[readonly] {
+    cursor: default; background: transparent; border-color: transparent;
+    padding-left: 0; padding-right: 0; resize: none;
+  }
 
   /* Stacked view */
   #deck-viewer-stacked-wrap {
@@ -722,7 +829,7 @@
   }
   #dv-side-name {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 13px;
-    color: var(--white); line-height: 1.2;
+    color: #fff; line-height: 1.2;
   }
   #dv-side-meta { font-size: 10px; color: var(--teal-mid); }
 
@@ -1159,17 +1266,26 @@
   .player-profile-modal-empty {
     font-size: 12px; color: var(--placeholder); font-style: italic; margin-top: 10px;
   }
+  #ppm-edit-btn { margin-top: 12px; padding: 3px 10px; font-size: 10px; }
+  #ppm-edit-form .pr-field-label { display: block; margin-top: 10px; }
+  #ppm-edit-form .pr-field-label:first-child { margin-top: 0; }
+  #ppm-edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  #ppm-edit-status { font-size: 11px; color: var(--red); margin-top: 6px; min-height: 14px; text-align: right; }
+  body.view-mode #ppm-edit-btn { display: none !important; }
   .rank-profile-btn {
     background: none; border: none; padding: 0 2px; cursor: pointer; color: var(--placeholder);
     font-size: 13px; line-height: 1; flex-shrink: 0; opacity: 0.6; transition: opacity 0.15s, color 0.15s;
   }
   .rank-profile-btn:hover { opacity: 1; color: var(--teal); }
+  .rank-profile-btn-add { font-weight: 900; font-size: 15px; color: var(--teal); opacity: 0.75; }
+  .rank-profile-btn-add:hover { opacity: 1; color: var(--teal-dark); }
   body.dark-mode .player-profile-modal { background: var(--white); color: var(--text); }
   body.dark-mode .player-profile-modal-name { color: var(--teal-mid); }
   body.dark-mode .player-profile-modal-row { border-top-color: rgba(255,255,255,0.08); }
   body.dark-mode .player-profile-modal-label { color: var(--teal-mid); }
   body.dark-mode .player-profile-modal-value { color: var(--text); }
   body.dark-mode .player-profile-modal-empty { color: var(--placeholder); }
+  body.dark-mode .rank-profile-btn-add { color: var(--teal-mid); }
   body.dark-mode .player-profile-modal .spoiler-modal-close { background: rgba(255,255,255,0.12); color: #ffffff; }
   body.dark-mode .player-profile-modal .spoiler-modal-close:hover { background: var(--red); color: #fff; }
   .player-profile-modal .spoiler-modal-close { background: var(--gray-light); color: var(--teal-dark); }
@@ -1186,6 +1302,10 @@
     .bullet-notes-print li { margin-bottom: 3px; }
     .bullet-notes-print:empty { display: none; }
     .field:has(> .bullet-notes-print:empty) { display: none !important; }
+    /* Recent News: PDF/print shows only the one-line Overview -- full details
+       stay accessible via click-to-view on the published page only, same as
+       RTN Side Events (which never had a print bullet list to begin with). */
+    #news-body .bullet-notes-print { display: none !important; }
 
     /* Header meta fields: show as clean text, not input boxes */
     .meta-input { display: none !important; }
@@ -1307,7 +1427,15 @@
     flex: 1 1 260px; min-width: 220px; border: none; border-radius: 6px;
     background: var(--gray-light); padding: 8px 10px; margin-bottom: 0;
   }
+  #news-body .repeat-item.repeat-item-draggable { padding-left: 22px; }
   #news-add-row { flex-basis: 100%; }
+
+  .repeat-item.dragging { opacity: 0.4; }
+  .repeat-item-drag-handle {
+    position: absolute; top: 8px; left: 4px; width: 14px; text-align: center;
+    font-size: 11px; line-height: 1; color: var(--gray); cursor: grab; user-select: none;
+  }
+  .repeat-item-drag-handle:hover { color: var(--teal-dark); }
 
   .section-divider {
     height: 3px;
@@ -1323,7 +1451,7 @@
   .page2-banner-title {
     font-family: 'Barlow Condensed', sans-serif;
     font-size: 16px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;
-    color: var(--white);
+    color: #fff;
   }
   .page2-banner-sub { font-size: 10px; color: var(--teal-mid); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
 
@@ -1358,13 +1486,20 @@
     }
     #tourn-add-row, .tourn-remove-btn, .rank-clear, .rank-profile-btn, .ec-notes-btn, .tourn-results-btn { display: none; }
     #tourn-results-section:not(:has(.tourn-block)) { display: none; }
+    /* Hide empty tournament card fields (Host/Location/# Players placeholders) in
+       print/PDF -- previously this was only handled for the published view-mode
+       page, so an empty field still showed its placeholder text when printing
+       directly from the editor. */
+    .tourn-host-input:placeholder-shown,
+    .tourn-location-input:placeholder-shown,
+    .tourn-participants-input:placeholder-shown { display: none; }
     .rank-delta.empty { display: none; }
     #prev-rankings-field { display: none; }
     #rankings-export-row { display: none !important; }
     #meta-export-row { display: none !important; }
     #prev-meta-rankings-field { display: none; }
     #tournaments-section button, #tournaments-section select, #upcoming-fetch-status { display: none; }
-    .rtn-row-remove, .countdown-remove { display: none; }
+    .rtn-row-remove, .countdown-remove, .event-card-drag-handle, .tourn-block-drag-handle, .repeat-item-drag-handle { display: none; }
     #rtn-section .btn { display: none; }
     #rtn-carryforward-status { display: none; }
     #rtn-nats-fetch-status { display: none; }
@@ -1382,6 +1517,7 @@
     .spoiler-card-caption-input, .spoiler-card-set-input { border: none !important; background: transparent !important; pointer-events: none; }
     .spoiler-modal-overlay, #collectors-card-modal-overlay { display: none !important; }
     #agur-modal-overlay { display: none !important; }
+    #mtf-overlay { display: none !important; }
     #mailbag-add-row, #mailbag-body .tourn-remove-btn { display: none; }
     #guest-q-add-row, #guest-questions-body .tourn-remove-btn { display: none; }
     #dotw-section button, #dotw-fetch-status { display: none; }
@@ -1431,6 +1567,9 @@
   body.view-mode #tournaments-section select,
   body.view-mode #upcoming-fetch-status,
   body.view-mode .rtn-row-remove,
+  body.view-mode .event-card-drag-handle,
+  body.view-mode .tourn-block-drag-handle,
+  body.view-mode .repeat-item-drag-handle,
   body.view-mode .countdown-remove,
   body.view-mode .ec-notes-btn,
   body.view-mode .tourn-results-btn,
@@ -1455,7 +1594,7 @@
   body.view-mode .agur-card-note,
   body.view-mode .agur-card-note-print,
   body.view-mode #dotw-fetch-status,
-  body.view-mode #dotw-section button:not(.spoiler-modal-close),
+  body.view-mode #dotw-section button:not(.spoiler-modal-close):not(#dotw-view-deck-btn),
   body.view-mode #news-body label:has(input[type=checkbox]),
   body.view-mode #draft-picker-row,
   body.view-mode #player-registry-btn,
@@ -1495,6 +1634,7 @@
   body.view-mode .meta-field.ep-num-text-only .meta-label { display: none !important; }
   /* Tournament results: hide editor modal and results btn in view mode; display modal stays accessible */
   body.view-mode #tourn-results-editor-overlay { display: none !important; }
+  body.view-mode #mtf-overlay { display: none !important; }
   body.view-mode #tourn-results-section:not(:has(.tourn-block)) { display: none; }
   body.view-mode .tourn-name-input,
   body.view-mode .tourn-host-input,
@@ -1539,6 +1679,70 @@
   </div>
 </div>
 
+<!-- Add/Edit Manual Tournament Modal (editor only) -->
+<div id="mtf-overlay" onclick="closeManualTournForm(event)">
+  <div id="mtf-modal">
+    <div id="mtf-header">
+      <div id="mtf-title">Add Manual Tournament</div>
+      <button type="button" class="spoiler-modal-close" onclick="closeManualTournForm()">&times;</button>
+    </div>
+    <div id="mtf-body">
+      <label class="field-label">Tournament Type</label>
+      <input class="field-input" id="mtf-type" placeholder="e.g. Type 1, Constructed" autocomplete="off">
+
+      <div class="mtf-row-2">
+        <div>
+          <label class="field-label">City</label>
+          <input class="field-input" id="mtf-city" placeholder="City" autocomplete="off">
+        </div>
+        <div>
+          <label class="field-label">State</label>
+          <input class="field-input" id="mtf-state" placeholder="State" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="mtf-row-2">
+        <div>
+          <label class="field-label">Start Date</label>
+          <input class="field-input" type="date" id="mtf-start-date">
+        </div>
+        <div>
+          <label class="field-label">End Date</label>
+          <input class="field-input" type="date" id="mtf-end-date">
+        </div>
+      </div>
+
+      <label class="field-label">Start Time</label>
+      <input class="field-input" id="mtf-start-time" placeholder="e.g. 10:00 AM" autocomplete="off">
+
+      <label class="field-label">Venue Name</label>
+      <input class="field-input" id="mtf-venue-name" placeholder="Venue name" autocomplete="off">
+
+      <label class="field-label">Venue Address</label>
+      <input class="field-input" id="mtf-venue-address" placeholder="Street address, city, state" autocomplete="off">
+
+      <label class="field-label">Host Name</label>
+      <input class="field-input" id="mtf-host-name" placeholder="Hosted by..." autocomplete="off">
+
+      <label class="field-label">Door Fee</label>
+      <input class="field-input" id="mtf-door-fee" placeholder="e.g. $5" autocomplete="off">
+
+      <label class="field-label">Formats</label>
+      <div id="mtf-formats-list"></div>
+      <button type="button" class="btn btn-ghost" style="padding:3px 10px; font-size:10px; margin-top:4px;" onclick="addManualFormatRow()">+ Add Format</button>
+
+      <label class="field-label" style="margin-top:10px;">Description</label>
+      <textarea class="field-textarea" id="mtf-description" placeholder="Additional details for attendees..."></textarea>
+
+      <div id="mtf-status"></div>
+    </div>
+    <div id="mtf-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeManualTournForm()">Cancel</button>
+      <button type="button" class="btn btn-teal" onclick="saveManualTournament()">Save Tournament</button>
+    </div>
+  </div>
+</div>
+
 <div id="deck-card-enlarge-overlay" onclick="closeDeckCardEnlarge()">
   <img id="deck-card-enlarge-img" src="" alt="">
 </div>
@@ -1547,7 +1751,31 @@
   <div class="player-profile-modal">
     <button type="button" class="spoiler-modal-close" onclick="closePlayerProfileModal(event)">&times;</button>
     <div class="player-profile-modal-name" id="ppm-handle"></div>
-    <div id="ppm-rows"></div>
+
+    <div id="ppm-view">
+      <div id="ppm-rows"></div>
+      <button type="button" class="btn btn-ghost" id="ppm-edit-btn" onclick="enterPlayerProfileEditMode()">Edit</button>
+    </div>
+
+    <div id="ppm-edit-form" style="display:none;">
+      <div>
+        <label class="pr-field-label">Real Name</label>
+        <input class="pr-field-input" id="ppm-realname" placeholder="Optional" autocomplete="off">
+      </div>
+      <div>
+        <label class="pr-field-label">Region</label>
+        <input class="pr-field-input" id="ppm-region" placeholder="e.g. Southeast, New England..." autocomplete="off">
+      </div>
+      <div>
+        <label class="pr-field-label">Team Affiliation</label>
+        <input class="pr-field-input" id="ppm-team" placeholder="Optional" autocomplete="off">
+      </div>
+      <div id="ppm-edit-actions">
+        <button type="button" class="btn btn-ghost" onclick="cancelPlayerProfileEdit()">Cancel</button>
+        <button type="button" class="btn btn-teal" onclick="savePlayerProfileFromModal()">Save Profile</button>
+      </div>
+      <div id="ppm-edit-status"></div>
+    </div>
   </div>
 </div>
 
@@ -1562,6 +1790,22 @@
       <div id="se-detail-notes-label">Event Notes</div>
       <ul id="se-detail-notes-list"></ul>
       <div id="se-detail-notes-empty" style="display:none;">No notes added yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- News Topic Detail Modal (read-only; works in both editor and published view) -->
+<div id="news-detail-overlay" onclick="closeNewsDetailModal(event)">
+  <div id="news-detail-modal">
+    <div id="news-detail-header">
+      <button type="button" class="spoiler-modal-close" onclick="closeNewsDetailModal()">&times;</button>
+      <div id="news-detail-topic"></div>
+      <div id="news-detail-overview"></div>
+    </div>
+    <div id="news-detail-body">
+      <div id="news-detail-notes-label">Full Details</div>
+      <ul id="news-detail-notes-list"></ul>
+      <div id="news-detail-notes-empty" style="display:none;">No additional details added yet.</div>
     </div>
   </div>
 </div>
@@ -1609,6 +1853,7 @@
 
 <div id="deck-viewer-overlay" onclick="closeDeckViewerOnOverlay(event)">
   <div id="deck-viewer-panel">
+    <button type="button" class="spoiler-modal-close" onclick="closeDeckViewer()">&times;</button>
     <div id="deck-viewer-header">
       <div id="deck-viewer-title-block">
         <div id="deck-viewer-name"></div>
@@ -1619,7 +1864,6 @@
         <button type="button" class="dv-toggle-btn active" id="dv-btn-grid" onclick="setDeckViewerMode('grid')">Grid</button>
         <button type="button" class="dv-toggle-btn" id="dv-btn-stack" onclick="setDeckViewerMode('stack')">Stacked</button>
       </div>
-      <button type="button" class="spoiler-modal-close" onclick="closeDeckViewer()" style="margin-left:auto;">&times;</button>
     </div>
     <div id="deck-viewer-notes-bar" style="display:none;">
       <div id="deck-viewer-notes-toggle" onclick="toggleDeckViewerNotes()" style="display:flex; align-items:center; gap:8px; padding:7px 16px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(0,0,0,0.15);">
@@ -1627,7 +1871,9 @@
         <span id="deck-viewer-notes-count" style="font-size:9px; color:var(--placeholder); font-style:italic;"></span>
         <span id="deck-viewer-notes-chevron" style="margin-left:auto; color:rgba(255,255,255,0.4); font-size:11px; transition:transform 0.2s;">&#8964;</span>
       </div>
-      <div id="deck-viewer-notes-content" style="display:none; padding:10px 16px 12px; display:grid; grid-template-columns:1fr 1fr; gap:2px 24px; background:rgba(0,0,0,0.12); border-bottom:1px solid rgba(255,255,255,0.06);"></div>
+      <div id="deck-viewer-notes-content" style="display:none; padding:10px 16px 12px; background:rgba(0,0,0,0.12); border-bottom:1px solid rgba(255,255,255,0.06);">
+        <textarea id="deck-viewer-notes-textarea" placeholder="Key cards and their roles, strategy overview, talking points... (one per line)"></textarea>
+      </div>
     </div>
     <div id="deck-viewer-body">
       <div id="deck-viewer-content"></div>
@@ -1671,6 +1917,10 @@
           <div>
             <label class="pr-field-label">Region</label>
             <input class="pr-field-input" id="pr-region" placeholder="e.g. Southeast, New England..." autocomplete="off">
+          </div>
+          <div>
+            <label class="pr-field-label">Team Affiliation</label>
+            <input class="pr-field-input" id="pr-team" placeholder="Optional" autocomplete="off">
           </div>
         </div>
       </div>
@@ -1797,6 +2047,7 @@
           <label class="field-label">Upcoming Tournaments</label>
           <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
             <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="fetchUpcomingTournaments()">Fetch Upcoming (Next 21 Days)</button>
+            <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="openManualTournForm()">+ Add Manual</button>
             <select class="field-input" id="upcoming-picker" style="display:none; flex:1;"></select>
             <button class="btn btn-teal" type="button" id="upcoming-add-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="addUpcomingPick()">Add</button>
             <button class="btn btn-teal" type="button" id="upcoming-add-all-btn" style="display:none; padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="addAllUpcomingPicks()">Add All</button>
@@ -1862,7 +2113,7 @@
                 <div class="dotw-card-desc" id="dotw-card-desc"></div>
                 <div class="dotw-card-creator" id="dotw-card-creator"></div>
                 <div class="dotw-card-badges" id="dotw-card-badges"></div>
-                <button class="btn btn-teal" type="button" style="margin-top:8px; padding:4px 12px; font-size:10px;" onclick="openDeckViewer()">&#9776; View Full Deck</button>
+                <button class="btn btn-teal" type="button" id="dotw-view-deck-btn" style="margin-top:8px; padding:4px 12px; font-size:10px;" onclick="openDeckViewer()">&#9776; View Full Deck</button>
               </div>
             </div>
           </div>
@@ -2150,7 +2401,7 @@
             <label class="field-label">Player Name</label>
             <div style="display:flex; align-items:center; gap:6px;">
               <input class="field-input" id="potm-name" list="rank-player-options" placeholder="Name / handle -- select existing or type new" autocomplete="off" style="flex:1;">
-              <button type="button" class="rank-profile-btn" id="potm-profile-btn" title="View profile" style="display:none;" onclick="openPlayerProfileModal(document.getElementById('potm-name').value.trim())">&#128100;</button>
+              <button type="button" class="rank-profile-btn" id="potm-profile-btn" title="View profile" style="display:none;" onclick="handlePlayerProfileBtnClick(document.getElementById('potm-name').value.trim())">&#128100;</button>
             </div>
           </div>
           <div class="field">
@@ -2200,7 +2451,7 @@
               <label class="field-label">Guest Name</label>
               <div style="display:flex; align-items:center; gap:6px;">
                 <input class="field-input" id="guest-name" list="rank-player-options" placeholder="Full name / handle" autocomplete="off" style="flex:1;">
-                <button type="button" class="rank-profile-btn" id="guest-profile-btn" title="View profile" style="display:none;" onclick="openPlayerProfileModal(document.getElementById('guest-name').value.trim())">&#128100;</button>
+                <button type="button" class="rank-profile-btn" id="guest-profile-btn" title="View profile" style="display:none;" onclick="handlePlayerProfileBtnClick(document.getElementById('guest-name').value.trim())">&#128100;</button>
               </div>
             </div>
             <div class="field">
@@ -2270,9 +2521,13 @@
   var rankPlayerDatalist = document.getElementById('rank-player-options');
   window.knownPlayers = [];
 
-  function rebuildPlayerOptions(extra) {
-    var all = window.knownPlayers.slice();
-    if (extra && all.indexOf(extra) === -1) all.push(extra);
+  function rebuildPlayerOptions() {
+    // Suggests only players actually in the registry (have a saved profile),
+    // not every name ever typed anywhere -- free text entry of any name is
+    // still allowed, this only affects what's suggested.
+    var all = Object.keys(window.playerProfiles || {}).sort(function(a, b) {
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
     rankPlayerDatalist.innerHTML = '';
     all.forEach(function(p) {
       var opt = document.createElement('option');
@@ -2410,11 +2665,11 @@
     if (!input) return;
     input.addEventListener('input', function() {
       var btn = document.getElementById(id === 'potm-name' ? 'potm-profile-btn' : 'guest-profile-btn');
-      if (btn) btn.style.display = this.value.trim() ? '' : 'none';
+      syncPlayerProfileBtn(this.value, btn);
     });
     input.addEventListener('change', function() {
       var btn = document.getElementById(id === 'potm-name' ? 'potm-profile-btn' : 'guest-profile-btn');
-      if (btn) btn.style.display = this.value.trim() ? '' : 'none';
+      syncPlayerProfileBtn(this.value, btn);
     });
   });
 
@@ -2422,7 +2677,7 @@
     rankingsGrid.insertAdjacentHTML('beforeend',
       '<div class="rank-item"><span class="rank-num">' + i + '</span>' +
       '<input class="rank-input" id="rank-' + i + '" list="rank-player-options" placeholder="Player name" autocomplete="off">' +
-      '<button type="button" class="rank-profile-btn" title="View profile" id="rank-profile-btn-' + i + '" onclick="openPlayerProfileModal(document.getElementById(\'rank-' + i + '\').value.trim())" style="display:none;">&#128100;</button>' +
+      '<button type="button" class="rank-profile-btn" title="View profile" id="rank-profile-btn-' + i + '" onclick="handlePlayerProfileBtnClick(document.getElementById(\'rank-' + i + '\').value.trim())" style="display:none;">&#128100;</button>' +
       '<button type="button" class="rank-clear" title="Clear" onclick="clearRankField(' + i + ')">&times;</button>' +
       '<span class="rank-delta empty" id="rank-delta-' + i + '"></span></div>');
   }
@@ -2532,50 +2787,7 @@
 
 
 
-  // ---- Tournaments: name dropdown + placement fields ----
-  var TOURNAMENTS_STORE_URL = '/threshingfloor/api/store/tournaments';
-  var tournNameDatalist = document.createElement('datalist');
-  tournNameDatalist.id = 'tourn-name-options';
-  document.body.appendChild(tournNameDatalist);
-  window.knownTournaments = [];
-  window.knownTournamentsSyncedCount = 0;
-
-  // Load known tournament names from store on startup
-  fetch(TOURNAMENTS_STORE_URL)
-    .then(function(res) { if (res.status === 404) return null; if (!res.ok) throw new Error(); return res.json(); })
-    .then(function(row) {
-      if (row && Array.isArray(row.data)) {
-        row.data.forEach(function(t) {
-          if (t && window.knownTournaments.indexOf(t) === -1) window.knownTournaments.push(t);
-        });
-        rebuildTournNameOptions();
-        window.knownTournamentsSyncedCount = window.knownTournaments.length;
-      }
-    })
-    .catch(function() {});
-
-  function syncTournamentStore() {
-    if (!window.knownTournaments.length) return;
-    if (window.knownTournaments.length <= window.knownTournamentsSyncedCount) return;
-    var count = window.knownTournaments.length;
-    fetch(TOURNAMENTS_STORE_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: window.knownTournaments })
-    })
-    .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
-    .then(function() { window.knownTournamentsSyncedCount = count; })
-    .catch(function() {});
-  }
-
-  function rebuildTournNameOptions() {
-    tournNameDatalist.innerHTML = '';
-    window.knownTournaments.forEach(function(t) {
-      var opt = document.createElement('option');
-      opt.value = t;
-      tournNameDatalist.appendChild(opt);
-    });
-  }
+  // ---- Tournaments: placement fields ----
 
   // ---- Tournament Results: format definitions ----
   var tournFormats = [
@@ -2625,20 +2837,46 @@
   var tournGrid = document.getElementById('tourn-grid');
   window.tournBlockCount = 0;
 
-  function buildTournamentBlock() {
-    window.tournBlockCount++;
-    var b = window.tournBlockCount;
+  function buildTournamentBlock(forceId) {
+    var b;
+    if (forceId) {
+      b = forceId;
+      if (b > window.tournBlockCount) window.tournBlockCount = b;
+    } else {
+      window.tournBlockCount++;
+      b = window.tournBlockCount;
+    }
     window.tournResults[b] = emptyFormatResults();
 
     var block = document.createElement('div');
     block.className = 'tourn-block';
     block.id = 'tourn-block-' + b;
+    if (!document.body.classList.contains('view-mode')) block.draggable = true;
 
     // In view mode, clicking the whole card opens the display modal
     block.addEventListener('click', function(e) {
       if (!document.body.classList.contains('view-mode')) return;
       openTournResultsDisplay(b);
     });
+    var tournHandleGrabbed = false;
+    block.addEventListener('dragstart', function(e) {
+      if (document.body.classList.contains('view-mode')) { e.preventDefault(); return; }
+      if (!tournHandleGrabbed) { e.preventDefault(); return; }
+      block.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    block.addEventListener('dragend', function() {
+      block.classList.remove('dragging');
+      tournHandleGrabbed = false;
+    });
+
+    var dragHandle = document.createElement('span');
+    dragHandle.className = 'tourn-block-drag-handle';
+    dragHandle.title = 'Drag to reorder';
+    dragHandle.textContent = '\u22ee\u22ee';
+    dragHandle.addEventListener('mousedown', function() { tournHandleGrabbed = true; });
+    dragHandle.addEventListener('mouseup', function() { tournHandleGrabbed = false; });
+    block.appendChild(dragHandle);
 
     var removeBtn = document.createElement('button');
     removeBtn.type = 'button';
@@ -2657,15 +2895,6 @@
     nameInput.id = 't' + b + '-name';
     nameInput.placeholder = 'Tournament Name';
     nameInput.autocomplete = 'off';
-    nameInput.setAttribute('list', 'tourn-name-options');
-    nameInput.addEventListener('change', function() {
-      var v = this.value.trim();
-      if (v && window.knownTournaments.indexOf(v) === -1) {
-        window.knownTournaments.push(v);
-        rebuildTournNameOptions();
-        syncTournamentStore();
-      }
-    });
     block.appendChild(nameInput);
 
     var metaRow = document.createElement('div');
@@ -2720,8 +2949,8 @@
     return block;
   }
 
-  function addTournamentBlock() {
-    var block = buildTournamentBlock();
+  function addTournamentBlock(forceId) {
+    var block = buildTournamentBlock(forceId);
     tournGrid.insertBefore(block, document.getElementById('tourn-add-row'));
   }
 
@@ -2733,12 +2962,26 @@
   addBtn.type = 'button';
   addBtn.className = 'btn btn-ghost';
   addBtn.textContent = '+ Add Tournament';
-  addBtn.addEventListener('click', addTournamentBlock);
+  addBtn.addEventListener('click', function() { addTournamentBlock(); });
   addRow.appendChild(addBtn);
 
   // Start with one block
   tournGrid.appendChild(buildTournamentBlock());
   tournGrid.appendChild(addRow);
+
+  // Drag-and-drop reordering for Tournament Results cards (editor only -- see
+  // buildTournamentBlock for the draggable/dragstart gating; uses the same
+  // genericDragAfterElement helper as News Topics, defined further below --
+  // safe to reference here since function declarations are hoisted).
+  tournGrid.addEventListener('dragover', function(e) {
+    var dragging = tournGrid.querySelector('.tourn-block.dragging');
+    if (!dragging) return;
+    e.preventDefault();
+    var afterEl = genericDragAfterElement(tournGrid, e.clientY, '.tourn-block');
+    var anchor = document.getElementById('tourn-add-row');
+    if (afterEl == null) tournGrid.insertBefore(dragging, anchor);
+    else tournGrid.insertBefore(dragging, afterEl);
+  });
 
   // ---- Tournament Results Editor Modal ----
   var _treEditingBlock = null;
@@ -2801,10 +3044,6 @@
         p1.setAttribute('list', 'rank-player-options');
         p1.value = rowData.p1 || '';
         p1.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p1 = p1.value; });
-        p1.addEventListener('change', function() {
-          var v = p1.value.trim();
-          if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
-        });
         row.appendChild(p1);
 
         // For Teams: always show p2 field (partner), PLUS a tie toggle
@@ -2817,10 +3056,6 @@
           p2.setAttribute('list', 'rank-player-options');
           p2.value = rowData.p2 || '';
           p2.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p2 = p2.value; });
-          p2.addEventListener('change', function() {
-            var v = p2.value.trim();
-            if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
-          });
           row.appendChild(p2);
         }
 
@@ -2849,10 +3084,6 @@
           p2tie.value = rowData.p2 || '';
           p2tie.style.display = rowData.tie ? '' : 'none';
           p2tie.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p2 = p2tie.value; });
-          p2tie.addEventListener('change', function() {
-            var v = p2tie.value.trim();
-            if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
-          });
           row.appendChild(tieBadge);
           row.appendChild(p2tie);
         }
@@ -2881,10 +3112,6 @@
           p3.setAttribute('list', 'rank-player-options');
           p3.value = rowData.p3 || '';
           p3.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p3 = p3.value; });
-          p3.addEventListener('change', function() {
-            var v = p3.value.trim();
-            if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
-          });
           tiedTeamRow.appendChild(p3);
 
           var p4 = document.createElement('input');
@@ -2895,10 +3122,6 @@
           p4.setAttribute('list', 'rank-player-options');
           p4.value = rowData.p4 || '';
           p4.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p4 = p4.value; });
-          p4.addEventListener('change', function() {
-            var v = p4.value.trim();
-            if (v && window.knownPlayers.indexOf(v) === -1) { window.knownPlayers.push(v); rebuildPlayerOptions(); }
-          });
           tiedTeamRow.appendChild(p4);
 
           // Invisible spacer to align with tie-btn column above
@@ -3082,16 +3305,11 @@
       var input = document.getElementById('rank-' + rowNum);
       var profileBtn = document.getElementById('rank-profile-btn-' + rowNum);
       function syncProfileBtn() {
-        if (profileBtn) profileBtn.style.display = input.value.trim() ? '' : 'none';
+        syncPlayerProfileBtn(input.value, profileBtn);
       }
       input.addEventListener('input', function() { updateRankDelta(rowNum); syncProfileBtn(); });
       input.addEventListener('change', function() {
-        var v = this.value.trim();
         syncProfileBtn();
-        if (v && window.knownPlayers.indexOf(v) === -1) {
-          window.knownPlayers.push(v);
-          rebuildPlayerOptions();
-        }
       });
     })(i);
   }
@@ -3155,29 +3373,66 @@
     addBtn.className = 'btn btn-ghost';
     addBtn.style.marginTop = '6px';
     addBtn.textContent = '+ Add Topic';
-    addBtn.addEventListener('click', addNewsItem);
+    addBtn.addEventListener('click', function() { addNewsItem(); });
     addRow.appendChild(addBtn);
     return addRow;
   }
 
-  function addNewsItem() {
-    window.newsCount++;
-    var n = window.newsCount;
+  function addNewsItem(forceId) {
+    var n;
+    if (forceId) {
+      n = forceId;
+      if (n > window.newsCount) window.newsCount = n;
+    } else {
+      window.newsCount++;
+      n = window.newsCount;
+    }
 
     var item = document.createElement('div');
-    item.className = 'repeat-item';
+    item.className = 'repeat-item repeat-item-draggable';
     item.id = 'news-item-' + n;
     item.style.position = 'relative';
+    if (!document.body.classList.contains('view-mode')) item.draggable = true;
+    var newsHandleGrabbed = false;
+    item.addEventListener('dragstart', function(e) {
+      if (document.body.classList.contains('view-mode')) { e.preventDefault(); return; }
+      if (!newsHandleGrabbed) { e.preventDefault(); return; }
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', function() {
+      item.classList.remove('dragging');
+      newsHandleGrabbed = false;
+    });
+
+    var dragHandle = document.createElement('span');
+    dragHandle.className = 'repeat-item-drag-handle';
+    dragHandle.title = 'Drag to reorder';
+    dragHandle.textContent = '\u22ee\u22ee';
+    dragHandle.addEventListener('mousedown', function() { newsHandleGrabbed = true; });
+    dragHandle.addEventListener('mouseup', function() { newsHandleGrabbed = false; });
+    item.appendChild(dragHandle);
 
     var removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'tourn-remove-btn';
     removeBtn.title = 'Remove this topic';
     removeBtn.innerHTML = '&times;';
-    removeBtn.addEventListener('click', function() {
+    removeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       item.remove();
     });
     item.appendChild(removeBtn);
+
+    // Clicking the card (outside inputs/buttons) opens the read-only detail
+    // view -- same click-to-view pattern as RTN Side Events, works in both
+    // editor and published view.
+    item.style.cursor = 'pointer';
+    item.title = 'Click to view details';
+    item.addEventListener('click', function(e) {
+      if (e.target.closest('button, input, label, .repeat-item-drag-handle')) return;
+      openNewsDetailModal(n);
+    });
 
     item.insertAdjacentHTML('beforeend',
       '<div class="field">' +
@@ -3189,14 +3444,34 @@
           '</label>' +
         '</div>' +
       '</div>' +
-      '<div class="field" id="news-notes-field-' + n + '">' +
+      '<div class="field">' +
+        '<label class="field-label">Overview</label>' +
+        '<input class="field-input" id="news-overview-' + n + '" placeholder="One-line summary of this topic..." autocomplete="off">' +
+      '</div>' +
+      '<div class="field" id="news-notes-field-' + n + '" style="display:none;">' +
         '<label class="field-label bullet-field-label">Notes</label>' +
         '<div class="bullet-wrap">' +
           '<div class="bullet-marks" id="news-notes-marks-' + n + '"><span>&#8226;</span></div>' +
           '<textarea class="bullet-textarea short" id="news-notes-' + n + '" placeholder="Talking points -- details, links, context... (one per line)"></textarea>' +
         '</div>' +
-        '<ul class="bullet-notes-print" id="news-notes-print-' + n + '"></ul>' +
-      '</div>');
+      '</div>' +
+      '<ul class="bullet-notes-print" id="news-notes-print-' + n + '"></ul>');
+
+    var notesBtn = document.createElement('button');
+    notesBtn.type = 'button';
+    notesBtn.className = 'ec-notes-btn';
+    notesBtn.id = 'news-notes-btn-' + n;
+    notesBtn.title = 'Add full details';
+    notesBtn.textContent = '✏ Notes';
+    notesBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var syncFn = function() {
+        syncBulletField('news-notes-' + n, 'news-notes-marks-' + n, 'news-notes-print-' + n);
+      };
+      var topicVal = document.getElementById('news-topic-' + n).value.trim();
+      openCardNotesPopup('news-notes-' + n, topicVal || 'Topic Notes', syncFn, notesBtn);
+    });
+    item.appendChild(notesBtn);
 
     var addRow = document.getElementById('news-add-row');
     if (addRow) {
@@ -3226,10 +3501,9 @@
       }
     });
 
-    var notesField = document.getElementById('news-notes-' + n);
-    notesField.addEventListener('input', function() {
-      syncBulletField('news-notes-' + n, 'news-notes-marks-' + n, 'news-notes-print-' + n);
-    });
+    // Initialize the (now hidden) print-list/marks for this item -- the
+    // textarea itself is only ever written to via the Notes popup above,
+    // which calls syncBulletField again through its own syncFn after saving.
     syncBulletField('news-notes-' + n, 'news-notes-marks-' + n, 'news-notes-print-' + n);
   }
 
@@ -3237,12 +3511,42 @@
   addNewsItem();
   newsBody.appendChild(createNewsAddRow());
 
+  // Drag-and-drop reordering for News Topic items (editor only -- see addNewsItem
+  // for the draggable/dragstart gating; this listener is a no-op in view mode
+  // since no item will ever have the .dragging class there).
+  function genericDragAfterElement(container, y, selector) {
+    var els = [...container.querySelectorAll(selector + ':not(.dragging)')];
+    return els.reduce(function(closest, child) {
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      }
+      return closest;
+    }, { offset: -Infinity, element: null }).element;
+  }
+  newsBody.addEventListener('dragover', function(e) {
+    var dragging = newsBody.querySelector('.repeat-item.dragging');
+    if (!dragging) return;
+    e.preventDefault();
+    var afterEl = genericDragAfterElement(newsBody, e.clientY, '.repeat-item');
+    var anchor = document.getElementById('news-add-row');
+    if (afterEl == null) newsBody.insertBefore(dragging, anchor);
+    else newsBody.insertBefore(dragging, afterEl);
+  });
+
   var mailbagBody = document.getElementById('mailbag-body');
   window.mailbagCount = 0;
 
-  function addMailbagItem() {
-    window.mailbagCount++;
-    var m = window.mailbagCount;
+  function addMailbagItem(forceId) {
+    var m;
+    if (forceId) {
+      m = forceId;
+      if (m > window.mailbagCount) window.mailbagCount = m;
+    } else {
+      window.mailbagCount++;
+      m = window.mailbagCount;
+    }
 
     var item = document.createElement('div');
     item.className = 'repeat-item';
@@ -3295,7 +3599,7 @@
     addBtn.className = 'btn btn-ghost';
     addBtn.style.marginTop = '6px';
     addBtn.textContent = '+ Add Question';
-    addBtn.addEventListener('click', addMailbagItem);
+    addBtn.addEventListener('click', function() { addMailbagItem(); });
     addRow.appendChild(addBtn);
     return addRow;
   }
@@ -3329,12 +3633,13 @@
     item.appendChild(removeBtn);
 
     item.insertAdjacentHTML('beforeend',
-      '<div class="field"><label class="field-label guest-q-label">Question / Topic ' + n + '</label>' +
+      '<div class="field"><label class="field-label guest-q-label">Question / Topic</label>' +
       '<textarea class="field-textarea" id="guest-q-' + n + '" placeholder="Interview question or discussion topic..."></textarea></div>');
 
     var addRow = document.getElementById('guest-q-add-row');
     if (addRow) guestQBody.insertBefore(item, addRow);
     else guestQBody.appendChild(item);
+    updateGuestQLabels(); // keep visible numbering in sync with true position, same as remove already does
   }
 
   function updateGuestQLabels() {
@@ -3731,8 +4036,13 @@
     var content = document.getElementById('deck-viewer-notes-content');
     var chevron = document.getElementById('deck-viewer-notes-chevron');
     var open = content.style.display !== 'none';
-    content.style.display = open ? 'none' : 'grid';
+    content.style.display = open ? 'none' : 'block';
     chevron.style.transform = open ? '' : 'rotate(180deg)';
+  }
+
+  function deckViewerNotesCountText(text) {
+    var lineCount = (text || '').split('\n').map(function(l) { return l.trim(); }).filter(Boolean).length;
+    return lineCount ? (lineCount + ' talking point' + (lineCount !== 1 ? 's' : '')) : 'No notes yet -- click to add';
   }
 
   function populateDeckViewerNotes() {
@@ -3740,21 +4050,60 @@
     var bar = document.getElementById('deck-viewer-notes-bar');
     var content = document.getElementById('deck-viewer-notes-content');
     var countEl = document.getElementById('deck-viewer-notes-count');
-    if (!notesEl || !notesEl.value.trim()) { bar.style.display = 'none'; return; }
-    var lines = notesEl.value.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-    if (!lines.length) { bar.style.display = 'none'; return; }
-    content.innerHTML = '';
-    lines.forEach(function(line) {
-      var item = document.createElement('div');
-      item.className = 'dv-note-item';
-      item.innerHTML = '<span class="dv-note-bullet">•</span><span>' + line + '</span>';
-      content.appendChild(item);
-    });
-    countEl.textContent = lines.length + ' talking point' + (lines.length !== 1 ? 's' : '');
+    var textarea = document.getElementById('deck-viewer-notes-textarea');
+    if (!notesEl) { bar.style.display = 'none'; return; }
+
+    var isViewMode = document.body.classList.contains('view-mode');
+    var hasContent = notesEl.value.trim().length > 0;
+
+    if (isViewMode && !hasContent) {
+      // Nothing to discuss and no editing allowed here -- nothing to show.
+      bar.style.display = 'none';
+      return;
+    }
+
+    textarea.value = notesEl.value;
+    textarea.readOnly = isViewMode;
+
+    countEl.textContent = deckViewerNotesCountText(notesEl.value);
     bar.style.display = '';
-    content.style.display = 'none'; // collapsed by default
-    document.getElementById('deck-viewer-notes-chevron').style.transform = '';
+    // Published view: notes are for discussion while looking at the deck, so
+    // show them expanded immediately (readers can still collapse via the
+    // chevron if they want more room). Editor: collapsed by default if notes
+    // already exist (preserves prior behavior); expanded if empty, so a
+    // first-time note has an obvious way in.
+    var expanded = isViewMode ? hasContent : !hasContent;
+    content.style.display = expanded ? 'block' : 'none';
+    document.getElementById('deck-viewer-notes-chevron').style.transform = expanded ? 'rotate(180deg)' : '';
+
+    // Auto-size to fit all content in read-only mode, now that the textarea
+    // is actually laid out -- readers can't drag-resize it (resize:none),
+    // so it needs to already show everything without scrolling.
+    if (isViewMode && expanded) {
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+    } else {
+      textarea.style.height = '';
+    }
   }
+
+  // One-time wiring (the textarea is static HTML, not rebuilt each time the
+  // viewer opens): keep it in sync with the canonical #dotw-notes field --
+  // the same field shown in the main outline's Deck of the Week section.
+  // Edits made here are written straight back and trigger the same
+  // bullet/print-list sync as typing in #dotw-notes directly.
+  (function() {
+    var dvNotesTextarea = document.getElementById('deck-viewer-notes-textarea');
+    if (!dvNotesTextarea) return;
+    dvNotesTextarea.addEventListener('input', function() {
+      var notesEl = document.getElementById('dotw-notes');
+      if (!notesEl || dvNotesTextarea.readOnly) return;
+      notesEl.value = dvNotesTextarea.value;
+      syncBulletField('dotw-notes', 'dotw-notes-marks', 'dotw-notes-print');
+      var countEl = document.getElementById('deck-viewer-notes-count');
+      if (countEl) countEl.textContent = deckViewerNotesCountText(dvNotesTextarea.value);
+    });
+  })();
 
 
 
@@ -4486,7 +4835,10 @@
     window.upcomingPicked.forEach(function(item, idx) {
       var pill = document.createElement('div');
       pill.className = 'tournament-pill';
-      pill.addEventListener('click', function() { openTournamentModal(idx); });
+      pill.addEventListener('click', function() {
+        if (item.manual) openManualTournForm(idx);
+        else openTournamentModal(idx);
+      });
 
       var dateSpan = document.createElement('span');
       dateSpan.className = 'tournament-pill-date';
@@ -4573,40 +4925,223 @@
     document.getElementById('tournament-modal-overlay').classList.remove('open');
   }
 
-  function openPlayerProfileModal(handle) {
+  // ---- Manual Tournament Entry: add/edit form ----
+  // Manual entries live in the same window.upcomingPicked array as fetched
+  // tournaments, tagged with `manual: true`. They reuse the same field names
+  // as fetched listings so the existing display modal (openTournamentModalForItem)
+  // and persistence (collectData/applyDraft) work unmodified -- any field left
+  // blank here is simply absent in the published detail modal, same as a
+  // fetched listing missing that field.
+  window.manualTournEditIndex = null; // null = adding new; otherwise index into upcomingPicked being edited
+
+  function openManualTournForm(idx) {
+    window.manualTournEditIndex = (typeof idx === 'number') ? idx : null;
+    var item = (window.manualTournEditIndex !== null) ? window.upcomingPicked[window.manualTournEditIndex] : null;
+
+    document.getElementById('mtf-title').textContent = item ? 'Edit Manual Tournament' : 'Add Manual Tournament';
+    document.getElementById('mtf-type').value = item ? (item.tournament_type || '') : '';
+    document.getElementById('mtf-city').value = item ? (item.city || '') : '';
+    document.getElementById('mtf-state').value = item ? (item.state || '') : '';
+    document.getElementById('mtf-start-date').value = item ? (item.start_date || '') : '';
+    document.getElementById('mtf-end-date').value = item ? (item.end_date || '') : '';
+    document.getElementById('mtf-start-time').value = item ? (item.start_time || '') : '';
+    document.getElementById('mtf-venue-name').value = item ? (item.venue_name || '') : '';
+    document.getElementById('mtf-venue-address').value = item ? (item.venue_address || '') : '';
+    document.getElementById('mtf-host-name').value = item ? (item.host_name || '') : '';
+    document.getElementById('mtf-door-fee').value = item ? (item.door_fee || '') : '';
+    document.getElementById('mtf-description').value = item ? (item.description || '') : '';
+    document.getElementById('mtf-status').textContent = '';
+
+    var list = document.getElementById('mtf-formats-list');
+    list.innerHTML = '';
+    if (item && item.formats && item.formats.length) {
+      item.formats.forEach(function(f) { addManualFormatRow(f.format, f.entry_fee); });
+    } else {
+      addManualFormatRow();
+    }
+
+    document.getElementById('mtf-overlay').classList.add('open');
+    document.getElementById('mtf-type').focus();
+  }
+
+  function closeManualTournForm(event) {
+    if (event && event.target !== document.getElementById('mtf-overlay')) return;
+    document.getElementById('mtf-overlay').classList.remove('open');
+    window.manualTournEditIndex = null;
+  }
+
+  function addManualFormatRow(formatVal, feeVal) {
+    var list = document.getElementById('mtf-formats-list');
+    var row = document.createElement('div');
+    row.className = 'mtf-format-row';
+
+    var nameInput = document.createElement('input');
+    nameInput.className = 'field-input mtf-format-name';
+    nameInput.placeholder = 'Format (e.g. Type 1)';
+    nameInput.autocomplete = 'off';
+    if (formatVal) nameInput.value = formatVal;
+
+    var feeInput = document.createElement('input');
+    feeInput.className = 'field-input mtf-format-fee';
+    feeInput.placeholder = 'Entry fee';
+    feeInput.autocomplete = 'off';
+    if (feeVal) feeInput.value = feeVal;
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'mtf-format-remove';
+    removeBtn.title = 'Remove format';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function() { row.remove(); });
+
+    row.appendChild(nameInput);
+    row.appendChild(feeInput);
+    row.appendChild(removeBtn);
+    list.appendChild(row);
+  }
+
+  function saveManualTournament() {
+    var status = document.getElementById('mtf-status');
+    var city = document.getElementById('mtf-city').value.trim();
+    var state = document.getElementById('mtf-state').value.trim();
+    var startDate = document.getElementById('mtf-start-date').value;
+
+    if (!city || !state || !startDate) {
+      status.textContent = 'City, State, and Start Date are required.';
+      return;
+    }
+
+    var formats = [];
+    document.querySelectorAll('#mtf-formats-list .mtf-format-row').forEach(function(row) {
+      var f = row.querySelector('.mtf-format-name').value.trim();
+      var fee = row.querySelector('.mtf-format-fee').value.trim();
+      if (f || fee) formats.push({ format: f, entry_fee: fee });
+    });
+
+    var item = {
+      manual: true,
+      id: 'manual-' + Date.now(),
+      tournament_type: document.getElementById('mtf-type').value.trim(),
+      city: city,
+      state: state,
+      start_date: startDate,
+      end_date: document.getElementById('mtf-end-date').value || '',
+      start_time: document.getElementById('mtf-start-time').value.trim(),
+      venue_name: document.getElementById('mtf-venue-name').value.trim(),
+      venue_address: document.getElementById('mtf-venue-address').value.trim(),
+      host_name: document.getElementById('mtf-host-name').value.trim(),
+      door_fee: document.getElementById('mtf-door-fee').value.trim(),
+      formats: formats,
+      description: document.getElementById('mtf-description').value.trim()
+    };
+
+    if (window.manualTournEditIndex !== null) {
+      item.id = window.upcomingPicked[window.manualTournEditIndex].id; // preserve original id
+      window.upcomingPicked[window.manualTournEditIndex] = item;
+    } else {
+      window.upcomingPicked.push(item);
+    }
+
+    renderUpcomingPills();
+    document.getElementById('mtf-overlay').classList.remove('open');
+    window.manualTournEditIndex = null;
+  }
+
+  // ---- Player Profile popup: view mode + inline edit mode ----
+  // Nothing here ever creates or persists a profile except an explicit Save
+  // click in the edit form below -- opening the popup (view or "+" create)
+  // never writes anything by itself.
+  window.ppmCurrentHandle = null;
+  window.ppmIsNew = false;
+
+  function openPlayerProfileModal(handle, isNew) {
     if (!handle) return;
-    var profile = (window.playerProfiles && window.playerProfiles[handle]) ? window.playerProfiles[handle] : {};
+    window.ppmCurrentHandle = handle;
+    window.ppmIsNew = !!isNew;
     document.getElementById('ppm-handle').textContent = handle;
-    var rowsEl = document.getElementById('ppm-rows');
-    rowsEl.innerHTML = '';
+    if (window.ppmIsNew) {
+      enterPlayerProfileEditMode();
+    } else {
+      renderPlayerProfileView(handle);
+      showPlayerProfileViewState();
+    }
+    document.getElementById('player-profile-modal-overlay').classList.add('open');
+  }
+
+  function renderPlayerProfileView(handle) {
+    var profile = (window.playerProfiles && window.playerProfiles[handle]) ? window.playerProfiles[handle] : {};
+    var rows = '';
     var fields = [
       { label: 'Real Name', value: profile.realName },
-      { label: 'Region',    value: profile.region }
+      { label: 'Region',    value: profile.region },
+      { label: 'Team Affiliation', value: profile.team }
     ];
     var hasAny = false;
     fields.forEach(function(f) {
       if (f.value) {
         hasAny = true;
-        var row = document.createElement('div');
-        row.className = 'player-profile-modal-row';
-        var labelEl = document.createElement('span');
-        labelEl.className = 'player-profile-modal-label';
-        labelEl.textContent = f.label;
-        var valueEl = document.createElement('span');
-        valueEl.className = 'player-profile-modal-value';
-        valueEl.textContent = f.value;
-        row.appendChild(labelEl);
-        row.appendChild(valueEl);
-        rowsEl.appendChild(row);
+        rows += '<div class="player-profile-modal-row">' +
+          '<span class="player-profile-modal-label">' + f.label + '</span>' +
+          '<span class="player-profile-modal-value">' + f.value + '</span>' +
+          '</div>';
       }
     });
     if (!hasAny) {
-      var empty = document.createElement('div');
-      empty.className = 'player-profile-modal-empty';
-      empty.textContent = 'No profile data stored for this player.';
-      rowsEl.appendChild(empty);
+      rows = '<div class="player-profile-modal-empty">No profile data stored for this player.</div>';
     }
-    document.getElementById('player-profile-modal-overlay').classList.add('open');
+    document.getElementById('ppm-rows').innerHTML = rows;
+  }
+
+  function showPlayerProfileViewState() {
+    document.getElementById('ppm-view').style.display = '';
+    document.getElementById('ppm-edit-form').style.display = 'none';
+  }
+
+  function showPlayerProfileEditState() {
+    document.getElementById('ppm-view').style.display = 'none';
+    document.getElementById('ppm-edit-form').style.display = '';
+  }
+
+  function enterPlayerProfileEditMode() {
+    var handle = window.ppmCurrentHandle;
+    var profile = (!window.ppmIsNew && window.playerProfiles && window.playerProfiles[handle]) ? window.playerProfiles[handle] : {};
+    document.getElementById('ppm-realname').value = profile.realName || '';
+    document.getElementById('ppm-region').value = profile.region || '';
+    document.getElementById('ppm-team').value = profile.team || '';
+    document.getElementById('ppm-edit-status').textContent = '';
+    showPlayerProfileEditState();
+  }
+
+  function cancelPlayerProfileEdit() {
+    if (window.ppmIsNew) {
+      // Nothing was ever saved for a brand-new add -- just close.
+      closePlayerProfileModal();
+      return;
+    }
+    renderPlayerProfileView(window.ppmCurrentHandle);
+    showPlayerProfileViewState();
+  }
+
+  function savePlayerProfileFromModal() {
+    var handle = window.ppmCurrentHandle;
+    if (!handle) return;
+    var status = document.getElementById('ppm-edit-status');
+    var profileData = {
+      realName: document.getElementById('ppm-realname').value.trim(),
+      region: document.getElementById('ppm-region').value.trim(),
+      team: document.getElementById('ppm-team').value.trim()
+    };
+    status.textContent = 'Saving...';
+    persistPlayerProfile(handle, profileData, function() {
+      window.ppmIsNew = false;
+      renderPlayerProfileView(handle);
+      showPlayerProfileViewState();
+      if (document.getElementById('player-registry-overlay').classList.contains('open')) {
+        renderPlayerList(document.getElementById('player-registry-search').value);
+      }
+    }, function() {
+      status.textContent = 'Save failed.';
+    });
   }
 
   function closePlayerProfileModal(event) {
@@ -4614,6 +5149,66 @@
       return;
     }
     document.getElementById('player-profile-modal-overlay').classList.remove('open');
+    window.ppmCurrentHandle = null;
+    window.ppmIsNew = false;
+  }
+
+  // Shared save path used by both the inline popup above and the Registry
+  // panel's own form -- registers the handle if new, writes window.playerProfiles,
+  // PUTs to the store, then refreshes every visible +/profile button to reflect
+  // the new state.
+  function persistPlayerProfile(handle, profileData, onSuccess, onError) {
+    if (window.knownPlayers.indexOf(handle) === -1) {
+      window.knownPlayers.push(handle);
+      rebuildPlayerOptions();
+    }
+    window.playerProfiles[handle] = profileData;
+    return fetch(PROFILES_STORE_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: window.playerProfiles })
+    })
+      .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
+      .then(function() {
+        syncAllPlayerProfileButtons();
+        if (onSuccess) onSuccess();
+      })
+      .catch(function() { if (onError) onError(); });
+  }
+
+  // ---- +/profile button state (rank rows, POTM, Guest) ----
+  // Shows "+" (add profile) when the typed name has no saved profile yet,
+  // or the profile icon (view profile) once one exists. Never creates a
+  // profile by itself -- only reflects window.playerProfiles' current state.
+  function syncPlayerProfileBtn(name, btn) {
+    if (!btn) return;
+    name = (name || '').trim();
+    if (!name) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
+    var hasProfile = !!(window.playerProfiles && window.playerProfiles[name]);
+    btn.innerHTML = hasProfile ? '&#128100;' : '+';
+    btn.title = hasProfile ? 'View profile' : 'Add profile';
+    btn.classList.toggle('rank-profile-btn-add', !hasProfile);
+  }
+
+  function handlePlayerProfileBtnClick(name) {
+    name = (name || '').trim();
+    if (!name) return;
+    var hasProfile = !!(window.playerProfiles && window.playerProfiles[name]);
+    openPlayerProfileModal(name, !hasProfile);
+  }
+
+  function syncAllPlayerProfileButtons() {
+    for (var spi = 1; spi <= 10; spi++) {
+      var spInp = document.getElementById('rank-' + spi);
+      var spBtn = document.getElementById('rank-profile-btn-' + spi);
+      if (spInp && spBtn) syncPlayerProfileBtn(spInp.value, spBtn);
+    }
+    ['potm', 'guest'].forEach(function(prefix) {
+      var prInp = document.getElementById(prefix + '-name');
+      var prBtn = document.getElementById(prefix + '-profile-btn');
+      if (prInp && prBtn) syncPlayerProfileBtn(prInp.value, prBtn);
+    });
   }
 
   function openSeDetailModal(rowNum) {
@@ -4651,6 +5246,43 @@
   function closeSeDetailModal(event) {
     if (event && event.target !== document.getElementById('se-detail-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
     document.getElementById('se-detail-overlay').classList.remove('open');
+  }
+
+  function openNewsDetailModal(rowNum) {
+    var topicEl = document.getElementById('news-topic-' + rowNum);
+    var overviewEl = document.getElementById('news-overview-' + rowNum);
+    var notesEl = document.getElementById('news-notes-' + rowNum);
+    var topic = topicEl ? topicEl.value.trim() : '';
+    var overview = overviewEl ? overviewEl.value.trim() : '';
+    var notes = notesEl ? notesEl.value.trim() : '';
+    if (!topic) return;
+
+    document.getElementById('news-detail-topic').textContent = topic;
+    document.getElementById('news-detail-overview').textContent = overview;
+    document.getElementById('news-detail-overview').style.display = overview ? '' : 'none';
+
+    var list = document.getElementById('news-detail-notes-list');
+    var empty = document.getElementById('news-detail-notes-empty');
+    list.innerHTML = '';
+    if (notes) {
+      notes.split('\n').forEach(function(line) {
+        line = line.trim();
+        if (!line) return;
+        var li = document.createElement('li');
+        li.textContent = line;
+        list.appendChild(li);
+      });
+    }
+    var hasNotes = list.children.length > 0;
+    list.style.display = hasNotes ? '' : 'none';
+    empty.style.display = hasNotes ? 'none' : '';
+
+    document.getElementById('news-detail-overlay').classList.add('open');
+  }
+
+  function closeNewsDetailModal(event) {
+    if (event && event.target !== document.getElementById('news-detail-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
+    document.getElementById('news-detail-overlay').classList.remove('open');
   }
 
   function addUpcomingPick() {
@@ -4761,10 +5393,16 @@
 
   // ---- Road to Nationals: Key Deadlines (add/remove rows) ----
   window.rtnDeadlineCount = 0;
-  function addDeadlineRow() {
+  function addDeadlineRow(forceId) {
     document.getElementById('rtn-deadlines-field').style.display = '';
-    window.rtnDeadlineCount++;
-    var n = window.rtnDeadlineCount;
+    var n;
+    if (forceId) {
+      n = forceId;
+      if (n > window.rtnDeadlineCount) window.rtnDeadlineCount = n;
+    } else {
+      window.rtnDeadlineCount++;
+      n = window.rtnDeadlineCount;
+    }
     var row = document.createElement('div');
     row.className = 'deadline-pill';
     row.id = 'rtn-deadline-row-' + n;
@@ -4800,20 +5438,46 @@
 
   // ---- Road to Nationals: Side Events (add/remove rows) ----
   window.rtnEventCount = 0;
-  function addSideEventRow() {
+  function addSideEventRow(forceId) {
     document.getElementById('rtn-events-field').style.display = '';
-    window.rtnEventCount++;
-    var n = window.rtnEventCount;
+    var n;
+    if (forceId) {
+      n = forceId;
+      if (n > window.rtnEventCount) window.rtnEventCount = n;
+    } else {
+      window.rtnEventCount++;
+      n = window.rtnEventCount;
+    }
     var row = document.createElement('div');
     row.className = 'event-card';
     row.id = 'rtn-event-row-' + n;
     row.style.cursor = 'pointer';
     row.title = 'Click to view details';
+    if (!document.body.classList.contains('view-mode')) row.draggable = true;
     row.addEventListener('click', function(e) {
-      // Don't open detail modal if clicking a button/input inside the card
-      if (e.target.closest('button, input')) return;
+      // Don't open detail modal if clicking a button/input/drag handle inside the card
+      if (e.target.closest('button, input, .event-card-drag-handle')) return;
       openSeDetailModal(n);
     });
+    var seHandleGrabbed = false;
+    row.addEventListener('dragstart', function(e) {
+      if (document.body.classList.contains('view-mode')) { e.preventDefault(); return; }
+      if (!seHandleGrabbed) { e.preventDefault(); return; }
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', function() {
+      row.classList.remove('dragging');
+      seHandleGrabbed = false;
+    });
+
+    var dragHandle = document.createElement('span');
+    dragHandle.className = 'event-card-drag-handle';
+    dragHandle.title = 'Drag to reorder';
+    dragHandle.textContent = '\u22ee\u22ee';
+    dragHandle.addEventListener('mousedown', function() { seHandleGrabbed = true; });
+    dragHandle.addEventListener('mouseup', function() { seHandleGrabbed = false; });
+    row.appendChild(dragHandle);
 
     var nameInput = document.createElement('input');
     nameInput.className = 'ec-name';
@@ -4875,6 +5539,30 @@
     row.appendChild(removeBtn);
     document.getElementById('rtn-events-list').appendChild(row);
   }
+
+  // Drag-and-drop reordering for Side Event cards (editor only -- dragstart/draggable
+  // are already gated to non-view-mode above; this listener is a no-op in view mode
+  // since no card will ever have the .dragging class there).
+  function sideEventDragAfterElement(container, y) {
+    var els = [...container.querySelectorAll('.event-card:not(.dragging)')];
+    return els.reduce(function(closest, child) {
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      }
+      return closest;
+    }, { offset: -Infinity, element: null }).element;
+  }
+  document.getElementById('rtn-events-list').addEventListener('dragover', function(e) {
+    var dragging = document.querySelector('.event-card.dragging');
+    if (!dragging) return;
+    e.preventDefault();
+    var list = document.getElementById('rtn-events-list');
+    var afterEl = sideEventDragAfterElement(list, e.clientY);
+    if (afterEl == null) list.appendChild(dragging);
+    else list.insertBefore(dragging, afterEl);
+  });
 
   // ---- Carry Forward: Side Events + Deadline labels from a chosen previous draft ----
   // ---- RTN persistent store: save/recall recurring section data ----
@@ -4969,12 +5657,11 @@
             var n = window.rtnEventCount;
             document.getElementById('rtn-event-name-' + n).value = name.trim();
             if (data['rtn-event-host-' + i]) document.getElementById('rtn-event-host-' + n).value = data['rtn-event-host-' + i];
-            // Legacy drafts stored a short description; migrate it into the notes field.
-            var notesVal = data['rtn-event-notes-' + i] || data['rtn-event-desc-' + i];
-            if (notesVal) {
+            if (data['rtn-event-desc-' + i]) document.getElementById('rtn-event-desc-' + n).value = data['rtn-event-desc-' + i];
+            if (data['rtn-event-notes-' + i]) {
               var notesEl3 = document.getElementById('rtn-event-notes-' + n);
               if (notesEl3) {
-                notesEl3.value = notesVal;
+                notesEl3.value = data['rtn-event-notes-' + i];
                 var btn3 = document.getElementById('rtn-event-notes-btn-' + n);
                 if (btn3 && notesEl3.value.trim()) { btn3.textContent = '✏ Notes ●'; btn3.classList.add('has-notes'); }
               }
@@ -5219,7 +5906,16 @@
     if (collImg) data['collectors-card-img'] = collImg.src;
 
     data['tourn-block-count'] = window.tournBlockCount;
+    data['tourn-block-ids'] = [...document.querySelectorAll('.tourn-block')].map(function(el) {
+      return parseInt(el.id.replace('tourn-block-', ''), 10);
+    });
     data['tourn-results'] = JSON.parse(JSON.stringify(window.tournResults || {}));
+    data['rtn-event-order'] = [...document.querySelectorAll('#rtn-events-list .event-card')].map(function(el) {
+      return parseInt(el.id.replace('rtn-event-row-', ''), 10);
+    });
+    data['news-item-order'] = [...document.querySelectorAll('#news-body .repeat-item')].map(function(el) {
+      return parseInt(el.id.replace('news-item-', ''), 10);
+    });
     data['section-order'] = [...document.querySelectorAll('.movable-section')].map(function(s){ return s.dataset.sid; });
     data['previous-rankings'] = window.previousRankings;
     data['previous-meta-rankings'] = window.previousMetaRankings;
@@ -5354,7 +6050,6 @@
       showPublishLink(ep, true);
       syncPlayerRegistry();
       syncRtnStore();
-      syncTournamentStore();
       syncRankingsStore();
     }).catch(function() { status.textContent = 'Publish failed -- try again.'; });
   }
@@ -5406,7 +6101,6 @@
       status.textContent = 'Saved Ep ' + ep + ' at ' + new Date().toLocaleTimeString();
       syncPlayerRegistry();
       syncRtnStore();
-      syncTournamentStore();
       syncRankingsStore();
     }).catch(function() {
       status.textContent = 'Save failed -- check connection and try again.';
@@ -5432,14 +6126,55 @@
           if (data['rtn-extra-notes'] && data['rtn-extra-notes'].trim()) {
             showExtraNotesField();
           }
+          // Pre-build RTN Deadlines using forceId so each row's id exactly matches its
+          // saved data keys -- same numbering-gap fix as tournament blocks above, since
+          // addDeadlineRow() previously just counted saved keys and rebuilt sequentially,
+          // which silently dropped data and left blank rows if a non-last deadline had
+          // been removed mid-session.
           for (var i = 1; i <= 20; i++) {
-            if (data['rtn-deadline-label-' + i] !== undefined) addDeadlineRow();
-            if (data['rtn-event-name-' + i] !== undefined) addSideEventRow();
+            if (data['rtn-deadline-label-' + i] !== undefined) addDeadlineRow(i);
           }
 
-          // Pre-build additional tournament blocks beyond the first
-          var tournCount = data['tourn-block-count'] || 1;
-          for (var tb = 2; tb <= tournCount; tb++) addTournamentBlock();
+          // Pre-build RTN Side Events the same way, but in the saved drag/drop visual
+          // order (rtn-event-order) when available, falling back to ascending index
+          // order for drafts saved before drag reordering existed.
+          var savedEventOrder = data['rtn-event-order'];
+          if (!savedEventOrder) {
+            savedEventOrder = [];
+            for (var sei = 1; sei <= 20; sei++) {
+              if (data['rtn-event-name-' + sei] !== undefined) savedEventOrder.push(sei);
+            }
+          }
+          savedEventOrder.forEach(function(eid) {
+            if (data['rtn-event-name-' + eid] !== undefined) addSideEventRow(eid);
+          });
+          // Safety net: catch any saved event not covered by the order array above
+          // (e.g. a corrupted/incomplete order list) so data is never silently dropped.
+          for (var sei2 = 1; sei2 <= 20; sei2++) {
+            if (data['rtn-event-name-' + sei2] !== undefined && !document.getElementById('rtn-event-row-' + sei2)) {
+              addSideEventRow(sei2);
+            }
+          }
+
+          // Pre-build tournament blocks to match exactly what was saved, in the
+          // exact saved order (so drag-reordering -- including moving block 1 out
+          // of first position -- persists correctly). Always remove the default
+          // starter block and rebuild every block from savedTournIds; this also
+          // still handles blocks removed mid-session, in any order.
+          var savedTournIds = data['tourn-block-ids'];
+          if (!savedTournIds) {
+            // Legacy drafts saved before tourn-block-ids existed: fall back to
+            // the old contiguous-count assumption.
+            var legacyCount = data['tourn-block-count'] || 1;
+            savedTournIds = [];
+            for (var li = 1; li <= legacyCount; li++) savedTournIds.push(li);
+          }
+          var starterBlock = document.getElementById('tourn-block-1');
+          if (starterBlock) starterBlock.remove();
+          savedTournIds.forEach(function(tid) {
+            addTournamentBlock(tid);
+          });
+          var tournCount = window.tournBlockCount;
 
           // Restore tournament results
           if (data['tourn-results']) {
@@ -5454,33 +6189,56 @@
           if (data['previous-rankings']) window.previousRankings = data['previous-rankings'];
           if (data['previous-meta-rankings']) window.previousMetaRankings = data['previous-meta-rankings'];
 
-          // Pre-build mailbag items to match saved data
-          var mbKeys = Object.keys(data).filter(function(k) { return /^mb-(by|q|notes)-\d+$/.test(k); });
-          if (mbKeys.length) {
+          // Pre-build mailbag items to match saved data, preserving original indices
+          // so rebuilt rows always match their saved keys (same numbering-gap fix
+          // applied to RTN Side Events/Deadlines and tournament blocks).
+          var mbIndices = [];
+          Object.keys(data).forEach(function(k) {
+            var m = k.match(/^mb-(by|q|notes)-(\d+)$/);
+            if (m) {
+              var idx = parseInt(m[2], 10);
+              if (mbIndices.indexOf(idx) === -1) mbIndices.push(idx);
+            }
+          });
+          if (mbIndices.length) {
             document.getElementById('mailbag-add-row').remove();
-            document.getElementById('mb-item-1').remove();
+            var starterMb = document.getElementById('mb-item-1');
+            if (starterMb) starterMb.remove();
             window.mailbagCount = 0;
-            var mbMax = 0;
-            mbKeys.forEach(function(k) {
-              var n = parseInt(k.split('-').pop(), 10);
-              if (n > mbMax) mbMax = n;
-            });
-            for (var mb = 1; mb <= mbMax; mb++) addMailbagItem();
+            mbIndices.sort(function(a, b) { return a - b; });
+            mbIndices.forEach(function(idx) { addMailbagItem(idx); });
             mailbagBody.appendChild(createMailbagAddRow());
           }
 
-          // Pre-build news items to match saved data
-          var newsKeys = Object.keys(data).filter(function(k) { return /^news-(topic|notes|save-topic)-\d+$/.test(k); });
-          if (newsKeys.length) {
+          // Pre-build news items to match saved data, preserving original indices
+          // (forceId) so rebuilt rows always match their saved keys -- same fix as
+          // mailbag/RTN/tournaments above -- and in the saved drag-order
+          // (news-item-order) when available, falling back to ascending index order
+          // for drafts saved before drag reordering existed.
+          var newsIndices = [];
+          Object.keys(data).forEach(function(k) {
+            var m = k.match(/^news-(topic|notes|save-topic|overview)-(\d+)$/);
+            if (m) {
+              var idx = parseInt(m[2], 10);
+              if (newsIndices.indexOf(idx) === -1) newsIndices.push(idx);
+            }
+          });
+          if (newsIndices.length) {
             document.getElementById('news-add-row').remove();
-            document.getElementById('news-item-1').remove();
+            var starterNews = document.getElementById('news-item-1');
+            if (starterNews) starterNews.remove();
             window.newsCount = 0;
-            var newsMax = 0;
-            newsKeys.forEach(function(k) {
-              var n = parseInt(k.split('-').pop(), 10);
-              if (n > newsMax) newsMax = n;
+            var newsOrder = data['news-item-order'];
+            if (!newsOrder) {
+              newsOrder = newsIndices.slice().sort(function(a, b) { return a - b; });
+            }
+            newsOrder.forEach(function(idx) {
+              if (newsIndices.indexOf(idx) !== -1) addNewsItem(idx);
             });
-            for (var nw = 1; nw <= newsMax; nw++) addNewsItem();
+            // Safety net: catch any saved topic not covered by the order array
+            newsIndices.forEach(function(idx) {
+              if (!document.getElementById('news-item-' + idx)) addNewsItem(idx);
+            });
             newsBody.appendChild(createNewsAddRow());
           }
 
@@ -5516,11 +6274,11 @@
             updateNatsCountdown();
             updateAllRankDeltas();
             updateAllMetaRankDeltas();
-            // Sync rank profile button visibility after draft load
+            // Sync rank profile button state after draft load
             for (var rp = 1; rp <= 10; rp++) {
               var rpInp = document.getElementById('rank-' + rp);
               var rpBtn = document.getElementById('rank-profile-btn-' + rp);
-              if (rpBtn) rpBtn.style.display = (rpInp && rpInp.value.trim()) ? '' : 'none';
+              if (rpInp && rpBtn) syncPlayerProfileBtn(rpInp.value, rpBtn);
             }
             // Sync participants suffix visibility after draft load
             for (var ps = 1; ps <= tournCount; ps++) {
@@ -5528,14 +6286,14 @@
               var psSfx = document.getElementById('t' + ps + '-participants-suffix');
               if (psSfx && psInp) psSfx.style.display = psInp.value.trim() ? '' : 'none';
             }
-            // Sync POTM profile button visibility after draft load
+            // Sync POTM profile button state after draft load
             var potmBtn = document.getElementById('potm-profile-btn');
             var potmInp = document.getElementById('potm-name');
-            if (potmBtn && potmInp) potmBtn.style.display = potmInp.value.trim() ? '' : 'none';
-            // Sync guest profile button visibility after draft load
+            if (potmInp && potmBtn) syncPlayerProfileBtn(potmInp.value, potmBtn);
+            // Sync guest profile button state after draft load
             var guestBtn = document.getElementById('guest-profile-btn');
             var guestInp = document.getElementById('guest-name');
-            if (guestBtn && guestInp) guestBtn.style.display = guestInp.value.trim() ? '' : 'none';
+            if (guestInp && guestBtn) syncPlayerProfileBtn(guestInp.value, guestBtn);
             // Sync side event notes button state after draft load
             for (var se = 1; se <= window.rtnEventCount; se++) {
               var seNotes = document.getElementById('rtn-event-notes-' + se);
@@ -6702,13 +7460,19 @@
 
 
   var PROFILES_STORE_URL = '/threshingfloor/api/store/player-profiles';
-  window.playerProfiles = {}; // { handle: { realName, region } }
+  window.playerProfiles = {}; // { handle: { realName, region, team } }
   window.selectedPlayerHandle = null;
 
   // Load profiles from store on startup
   fetch(PROFILES_STORE_URL)
     .then(function(res) { if (res.status === 404) return null; if (!res.ok) throw new Error(); return res.json(); })
-    .then(function(row) { if (row && row.data && typeof row.data === 'object') window.playerProfiles = row.data; })
+    .then(function(row) {
+      if (row && row.data && typeof row.data === 'object') window.playerProfiles = row.data;
+      // Rank/POTM/Guest profile buttons may have already rendered (showing "+")
+      // before this fetch resolved -- re-sync now that real profile data is in.
+      syncAllPlayerProfileButtons();
+      rebuildPlayerOptions();
+    })
     .catch(function() {});
 
   function openPlayerRegistry() {
@@ -6783,6 +7547,7 @@
     document.getElementById('pr-handle').value = handle;
     document.getElementById('pr-realname').value = profile.realName || '';
     document.getElementById('pr-region').value = profile.region || '';
+    document.getElementById('pr-team').value = profile.team || '';
 
     emptyState.style.display = 'none';
     form.style.display = '';
@@ -6813,29 +7578,22 @@
       if (oldIdx !== -1) window.knownPlayers[oldIdx] = handle;
       delete window.playerProfiles[window.selectedPlayerHandle];
       rebuildPlayerOptions();
-    } else if (window.knownPlayers.indexOf(handle) === -1) {
-      window.knownPlayers.push(handle);
-      rebuildPlayerOptions();
     }
 
-    window.playerProfiles[handle] = {
+    var profileData = {
       realName: document.getElementById('pr-realname').value.trim(),
-      region: document.getElementById('pr-region').value.trim()
+      region: document.getElementById('pr-region').value.trim(),
+      team: document.getElementById('pr-team').value.trim()
     };
     window.selectedPlayerHandle = handle;
 
     status.textContent = 'Saving...';
-    fetch(PROFILES_STORE_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: window.playerProfiles })
-    })
-    .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
-    .then(function() {
+    persistPlayerProfile(handle, profileData, function() {
       status.textContent = 'Saved.';
       renderPlayerList(document.getElementById('player-registry-search').value);
-    })
-    .catch(function() { status.textContent = 'Save failed.'; });
+    }, function() {
+      status.textContent = 'Save failed.';
+    });
   }
 
   function deletePlayerProfile() {
@@ -6859,7 +7617,7 @@
         body: JSON.stringify({ data: window.playerProfiles })
       })
       .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
-      .then(function() { status.textContent = 'Removed.'; })
+      .then(function() { status.textContent = 'Removed.'; syncAllPlayerProfileButtons(); })
       .catch(function() { status.textContent = 'Save failed.'; });
     });
   }
