@@ -4577,7 +4577,8 @@
     if (!handle) return;
     var profile = (window.playerProfiles && window.playerProfiles[handle]) ? window.playerProfiles[handle] : {};
     document.getElementById('ppm-handle').textContent = handle;
-    var rows = '';
+    var rowsEl = document.getElementById('ppm-rows');
+    rowsEl.innerHTML = '';
     var fields = [
       { label: 'Real Name', value: profile.realName },
       { label: 'Region',    value: profile.region }
@@ -4586,16 +4587,25 @@
     fields.forEach(function(f) {
       if (f.value) {
         hasAny = true;
-        rows += '<div class="player-profile-modal-row">' +
-          '<span class="player-profile-modal-label">' + f.label + '</span>' +
-          '<span class="player-profile-modal-value">' + f.value + '</span>' +
-          '</div>';
+        var row = document.createElement('div');
+        row.className = 'player-profile-modal-row';
+        var labelEl = document.createElement('span');
+        labelEl.className = 'player-profile-modal-label';
+        labelEl.textContent = f.label;
+        var valueEl = document.createElement('span');
+        valueEl.className = 'player-profile-modal-value';
+        valueEl.textContent = f.value;
+        row.appendChild(labelEl);
+        row.appendChild(valueEl);
+        rowsEl.appendChild(row);
       }
     });
     if (!hasAny) {
-      rows = '<div class="player-profile-modal-empty">No profile data stored for this player.</div>';
+      var empty = document.createElement('div');
+      empty.className = 'player-profile-modal-empty';
+      empty.textContent = 'No profile data stored for this player.';
+      rowsEl.appendChild(empty);
     }
-    document.getElementById('ppm-rows').innerHTML = rows;
     document.getElementById('player-profile-modal-overlay').classList.add('open');
   }
 
@@ -4959,11 +4969,12 @@
             var n = window.rtnEventCount;
             document.getElementById('rtn-event-name-' + n).value = name.trim();
             if (data['rtn-event-host-' + i]) document.getElementById('rtn-event-host-' + n).value = data['rtn-event-host-' + i];
-            if (data['rtn-event-desc-' + i]) document.getElementById('rtn-event-desc-' + n).value = data['rtn-event-desc-' + i];
-            if (data['rtn-event-notes-' + i]) {
+            // Legacy drafts stored a short description; migrate it into the notes field.
+            var notesVal = data['rtn-event-notes-' + i] || data['rtn-event-desc-' + i];
+            if (notesVal) {
               var notesEl3 = document.getElementById('rtn-event-notes-' + n);
               if (notesEl3) {
-                notesEl3.value = data['rtn-event-notes-' + i];
+                notesEl3.value = notesVal;
                 var btn3 = document.getElementById('rtn-event-notes-btn-' + n);
                 if (btn3 && notesEl3.value.trim()) { btn3.textContent = '✏ Notes ●'; btn3.classList.add('has-notes'); }
               }
