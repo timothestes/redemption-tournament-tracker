@@ -1,7 +1,7 @@
 "use server";
 
 import { randomBytes } from "crypto";
-import { requireElder, requireForgeSuperadmin, type ForgeRole } from "@/app/forge/lib/auth";
+import { requireElder, requireForgeSuperadmin, requireForge, type ForgeRole } from "@/app/forge/lib/auth";
 import { hashToken } from "@/app/forge/lib/token";
 import { sendEmail, wrapEmailInTemplate } from "@/utils/email";
 import { createClient } from "@/utils/supabase/server";
@@ -50,6 +50,23 @@ export async function mintInvite(input: {
     await sendEmail({ to: input.email, subject: "Your Forge invite", html: wrapEmailInTemplate(body) });
   }
   return { ok: true, url };
+}
+
+export async function setProfile(input: {
+  displayName: string;
+  avatarUrl?: string | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireForge();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const name = input.displayName.trim();
+  if (!name) return { ok: false, error: "Display name is required" };
+  if (name.length > 60) return { ok: false, error: "Display name too long" };
+  const { error } = await ctx.supabase.rpc("forge_set_profile", {
+    p_display_name: name,
+    p_avatar_url: input.avatarUrl ?? null,
+  });
+  if (error) return { ok: false, error: "Could not save profile" };
+  return { ok: true };
 }
 
 export async function redeemInvite(

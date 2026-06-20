@@ -12,9 +12,10 @@ vi.mock("@/utils/email", () => ({
 vi.mock("@/utils/supabase/server", () => ({ createClient: vi.fn() }));
 
 import { requireElder, requireForgeSuperadmin } from "@/app/forge/lib/auth";
+import { requireForge } from "@/app/forge/lib/auth";
 import { sendEmail } from "@/utils/email";
 import { createClient } from "@/utils/supabase/server";
-import { mintInvite, redeemInvite } from "../members";
+import { mintInvite, redeemInvite, setProfile } from "../members";
 
 function ctx(role: string, rpcImpl?: any) {
   return {
@@ -79,5 +80,26 @@ describe("redeemInvite", () => {
   it("returns {ok:false} when the RPC yields null (no oracle)", async () => {
     (createClient as any).mockResolvedValue({ rpc: vi.fn(async () => ({ data: null, error: null })) });
     expect(await redeemInvite("bad", "I agree")).toEqual({ ok: false });
+  });
+});
+
+describe("setProfile", () => {
+  it("rejects a non-member", async () => {
+    (requireForge as any).mockResolvedValue(null);
+    expect((await setProfile({ displayName: "X" })).ok).toBe(false);
+  });
+  it("rejects an empty display name", async () => {
+    (requireForge as any).mockResolvedValue({ supabase: { rpc: vi.fn() } });
+    expect((await setProfile({ displayName: "   " })).ok).toBe(false);
+  });
+  it("calls forge_set_profile for a member", async () => {
+    const rpc = vi.fn(async () => ({ error: null }));
+    (requireForge as any).mockResolvedValue({ supabase: { rpc } });
+    const r = await setProfile({ displayName: "Tim", avatarUrl: "https://x/y.png" });
+    expect(r.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("forge_set_profile", {
+      p_display_name: "Tim",
+      p_avatar_url: "https://x/y.png",
+    });
   });
 });
