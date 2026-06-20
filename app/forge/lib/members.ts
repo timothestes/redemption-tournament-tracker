@@ -1,6 +1,7 @@
 "use server";
 
 import { randomBytes } from "crypto";
+import { revalidatePath } from "next/cache";
 import { requireElder, requireForgeSuperadmin, requireForge, type ForgeRole } from "@/app/forge/lib/auth";
 import { hashToken } from "@/app/forge/lib/token";
 import { sendEmail, wrapEmailInTemplate } from "@/utils/email";
@@ -67,6 +68,59 @@ export async function setProfile(input: {
   });
   if (error) return { ok: false, error: "Could not save profile" };
   return { ok: true };
+}
+
+export async function addMember(
+  userId: string,
+  role: ForgeRole
+): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { error } = await ctx.supabase.rpc("forge_add_member", { p_user_id: userId, p_role: role });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/forge/admin");
+  return { ok: true };
+}
+
+export async function removeMember(userId: string): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { error } = await ctx.supabase.rpc("forge_remove_member", { p_user_id: userId });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/forge/admin");
+  return { ok: true };
+}
+
+export async function changeRole(
+  userId: string,
+  newRole: ForgeRole
+): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { error } = await ctx.supabase.rpc("forge_change_role", {
+    p_user_id: userId,
+    p_new_role: newRole,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/forge/admin");
+  return { ok: true };
+}
+
+export async function listMembers() {
+  const ctx = await requireElder();
+  if (!ctx) return [];
+  const { data } = await ctx.supabase
+    .from("playtest_members")
+    .select("user_id, role, display_name, created_at")
+    .order("created_at", { ascending: true });
+  return data ?? [];
+}
+
+export async function listInvites() {
+  const ctx = await requireElder();
+  if (!ctx) return [];
+  const { data } = await ctx.supabase.rpc("forge_list_invites");
+  return data ?? [];
 }
 
 export async function redeemInvite(

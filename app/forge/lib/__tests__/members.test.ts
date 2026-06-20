@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/app/forge/lib/auth", () => ({
   requireElder: vi.fn(),
   requireForgeSuperadmin: vi.fn(),
@@ -15,7 +16,7 @@ import { requireElder, requireForgeSuperadmin } from "@/app/forge/lib/auth";
 import { requireForge } from "@/app/forge/lib/auth";
 import { sendEmail } from "@/utils/email";
 import { createClient } from "@/utils/supabase/server";
-import { mintInvite, redeemInvite, setProfile } from "../members";
+import { mintInvite, redeemInvite, setProfile, changeRole, removeMember, addMember } from "../members";
 
 function ctx(role: string, rpcImpl?: any) {
   return {
@@ -80,6 +81,33 @@ describe("redeemInvite", () => {
   it("returns {ok:false} when the RPC yields null (no oracle)", async () => {
     (createClient as any).mockResolvedValue({ rpc: vi.fn(async () => ({ data: null, error: null })) });
     expect(await redeemInvite("bad", "I agree")).toEqual({ ok: false });
+  });
+});
+
+describe("changeRole / removeMember / addMember", () => {
+  it("changeRole rejects non-elder", async () => {
+    (requireElder as any).mockResolvedValue(null);
+    expect((await changeRole("u", "playtester")).ok).toBe(false);
+  });
+  it("changeRole calls forge_change_role for an elder", async () => {
+    const rpc = vi.fn(async () => ({ error: null }));
+    (requireElder as any).mockResolvedValue({ supabase: { rpc } });
+    const r = await changeRole("u9", "playtester");
+    expect(r.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("forge_change_role", { p_user_id: "u9", p_new_role: "playtester" });
+  });
+  it("removeMember surfaces an RPC error", async () => {
+    const rpc = vi.fn(async () => ({ error: { message: "not authorized to remove a elder member" } }));
+    (requireElder as any).mockResolvedValue({ supabase: { rpc } });
+    const r = await removeMember("u9");
+    expect(r.ok).toBe(false);
+  });
+  it("addMember calls forge_add_member", async () => {
+    const rpc = vi.fn(async () => ({ error: null }));
+    (requireElder as any).mockResolvedValue({ supabase: { rpc } });
+    const r = await addMember("u2", "playtester");
+    expect(r.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("forge_add_member", { p_user_id: "u2", p_role: "playtester" });
   });
 });
 
