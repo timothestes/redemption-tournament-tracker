@@ -2536,18 +2536,23 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (deck.length === 0) { showGameToast('Deck is empty'); return; }
             const handSpace = 16 - state.zones.hand.length;
             if (handSpace <= 0) { showGameToast('Hand is full (max 16 cards)'); return; }
-            const n = Math.min(count, deck.length);
-            const cards = deck.slice(-n);
+            // Walk up from the bottom of the deck. With auto-route on, a drawn
+            // Lost Soul goes to Land of Bondage without consuming a draw, so we
+            // keep walking up to pull a replacement from the next bottom card —
+            // same rule as top-of-deck (DRAW_CARD).
+            const autoRoute = state.options.autoRouteLostSouls;
+            const want = Math.min(count, deck.length, handSpace);
             let drawn = 0;
-            cards.forEach(c => {
+            for (let i = deck.length - 1; i >= 0 && drawn < want; i--) {
+              const c = deck[i];
               const isLS = c.type === 'LS' || c.type === 'Lost Soul' || c.type.toLowerCase().includes('lost soul');
-              if (isLS) {
+              if (autoRoute && isLS) {
                 moveCard(c.instanceId, 'land-of-bondage');
-              } else if (drawn < handSpace) {
+              } else {
                 moveCard(c.instanceId, 'hand');
                 drawn++;
               }
-            });
+            }
             if (count > handSpace) {
               showGameToast(`Hand is full — drew ${drawn}`);
             }

@@ -391,18 +391,31 @@ function drawBottomOfDeckInState(
   if (state.zones.deck.length === 0) return state;
 
   const zones = cloneZones(state.zones);
+  const autoRoute = state.options.autoRouteLostSouls;
   const handRoom = Math.max(0, HAND_LIMIT - zones.hand.length);
-  const n = Math.min(ability.count, zones.deck.length, handRoom);
-  if (n === 0) return state;
-  const taken = zones.deck.slice(zones.deck.length - n).map(c => ({
-    ...c,
-    zone: 'hand' as ZoneId,
-    isFlipped: false,
-    posX: undefined,
-    posY: undefined,
-  }));
-  zones.deck = zones.deck.slice(0, zones.deck.length - n);
-  zones.hand = [...zones.hand, ...taken];
+  const want = Math.min(ability.count, zones.deck.length, handRoom);
+  if (want === 0) return state;
+
+  // Walk up from the bottom of the deck. With auto-route on, a drawn Lost Soul
+  // goes to Land of Bondage without consuming a draw, so we keep walking up to
+  // pull a replacement from the next bottom card — same rule as top-of-deck.
+  const toHand: GameCard[] = [];
+  const toLob: GameCard[] = [];
+  const consumed = new Set<string>();
+  for (let i = zones.deck.length - 1; i >= 0 && toHand.length < want; i--) {
+    const c = zones.deck[i];
+    consumed.add(c.instanceId);
+    if (autoRoute && isLostSoul(c)) {
+      toLob.push({ ...c, zone: 'land-of-bondage' as ZoneId, isFlipped: false, posX: undefined, posY: undefined });
+    } else {
+      toHand.push({ ...c, zone: 'hand' as ZoneId, isFlipped: false, posX: undefined, posY: undefined });
+    }
+  }
+  if (toHand.length === 0 && toLob.length === 0) return state;
+
+  zones.deck = zones.deck.filter(c => !consumed.has(c.instanceId));
+  zones.hand = [...zones.hand, ...toHand];
+  zones['land-of-bondage'] = [...zones['land-of-bondage'], ...toLob];
 
   return { ...state, zones, history };
 }

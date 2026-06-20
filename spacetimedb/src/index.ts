@@ -3495,29 +3495,66 @@ function drawBottomOfDeckImpl(
   if (deckCards.length === 0) return;
 
   let handCount = playerCards.filter((c: any) => c.zone === 'hand').length;
-  const handRoom = Math.max(0, HAND_LIMIT - handCount);
-  const n = Math.min(ability.count, deckCards.length, handRoom);
-  if (n === 0) return;
+  let lobCount = playerCards.filter((c: any) => c.zone === 'land-of-bondage').length;
 
-  const bottom = deckCards.slice(deckCards.length - n);
+  // Walk up from the bottom of the deck (highest zoneIndex first). With
+  // autoRouteLostSouls on, a drawn Lost Soul routes to Land of Bondage without
+  // consuming a draw, so we keep walking up to pull a replacement from the next
+  // bottom card — same rule as the top-of-deck draw in drawCardsForPlayer.
   const movedCards: { name: string; img: string }[] = [];
-  for (const card of bottom) {
-    ctx.db.CardInstance.id.update({
-      ...card,
-      zone: 'hand',
-      zoneIndex: BigInt(handCount),
-      posX: '',
-      posY: '',
-      isFlipped: false,
-    });
-    handCount++;
-    movedCards.push({ name: card.cardName, img: card.cardImgFile });
+  let drawn = 0;
+  let target = ability.count;
+  let deckPos = deckCards.length - 1;
+
+  for (let i = 0; i < target; i++) {
+    if (deckPos < 0) break; // deck exhausted
+
+    const card = deckCards[deckPos];
+    const isLostSoul =
+      player.autoRouteLostSouls &&
+      (card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul'));
+
+    // Lost Souls auto-route to LOB and don't take a hand slot, so they keep
+    // flowing even when the hand is full. A non-LS card that would land in a
+    // full hand stops the draw.
+    if (!isLostSoul && handCount >= HAND_LIMIT) break;
+
+    deckPos--;
+
+    if (isLostSoul) {
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: 'land-of-bondage',
+        isFlipped: false,
+        zoneIndex: BigInt(lobCount),
+        posX: '',
+        posY: '',
+      });
+      lobCount++;
+      logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: card.id.toString(), from: 'deck', to: 'land-of-bondage', cardName: card.cardName, cardImgFile: card.cardImgFile, redirected: 'drew' }), game.turnNumber, game.currentPhase);
+      // Draw a replacement from the bottom — extend the loop.
+      target++;
+    } else {
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: 'hand',
+        zoneIndex: BigInt(handCount),
+        posX: '',
+        posY: '',
+        isFlipped: false,
+      });
+      handCount++;
+      drawn++;
+      movedCards.push({ name: card.cardName, img: card.cardImgFile });
+    }
   }
+
+  if (movedCards.length === 0) return;
 
   logAction(
     ctx, gameId, player.id, 'DRAW_BOTTOM_OF_DECK',
     JSON.stringify({
-      count: n,
+      count: drawn,
       requested: ability.count,
       sourceCardName: source.cardName,
       sourceCardImgFile: source.cardImgFile,
