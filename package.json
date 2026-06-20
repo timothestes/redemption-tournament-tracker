@@ -62,7 +62,8 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:security": "FORGE_LEAK_TEST=1 vitest run forge-anon-leak"
   },
   "keywords": [],
   "author": "",
