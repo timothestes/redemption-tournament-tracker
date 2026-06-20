@@ -9,10 +9,12 @@ vi.mock("@/utils/email", () => ({
   sendEmail: vi.fn(async () => ({ success: true })),
   wrapEmailInTemplate: (s: string) => s,
 }));
+vi.mock("@/utils/supabase/server", () => ({ createClient: vi.fn() }));
 
 import { requireElder, requireForgeSuperadmin } from "@/app/forge/lib/auth";
 import { sendEmail } from "@/utils/email";
-import { mintInvite } from "../members";
+import { createClient } from "@/utils/supabase/server";
+import { mintInvite, redeemInvite } from "../members";
 
 function ctx(role: string, rpcImpl?: any) {
   return {
@@ -54,5 +56,28 @@ describe("mintInvite", () => {
     expect(html).toContain(url);
     expect(url).toContain("/invite/");
     expect(url).not.toContain(passedHash);
+  });
+});
+
+describe("redeemInvite", () => {
+  it("returns the role on success, hashes the token, and passes p_nda_agreed=true for 'I agree'", async () => {
+    const rpc = vi.fn(async () => ({ data: "playtester", error: null }));
+    (createClient as any).mockResolvedValue({ rpc });
+    const r = await redeemInvite("raw-token-123", "  I Agree ");
+    expect(r).toEqual({ ok: true, role: "playtester" });
+    expect((rpc as any).mock.calls[0][1].p_token_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect((rpc as any).mock.calls[0][1].p_token_hash).not.toBe("raw-token-123");
+    expect((rpc as any).mock.calls[0][1].p_nda_agreed).toBe(true);
+  });
+  it("passes p_nda_agreed=false when the text is not 'I agree'", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: null }));
+    (createClient as any).mockResolvedValue({ rpc });
+    const r = await redeemInvite("raw-token-123", "nope");
+    expect(r).toEqual({ ok: false });
+    expect((rpc as any).mock.calls[0][1].p_nda_agreed).toBe(false);
+  });
+  it("returns {ok:false} when the RPC yields null (no oracle)", async () => {
+    (createClient as any).mockResolvedValue({ rpc: vi.fn(async () => ({ data: null, error: null })) });
+    expect(await redeemInvite("bad", "I agree")).toEqual({ ok: false });
   });
 });

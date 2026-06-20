@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { requireElder, requireForgeSuperadmin, type ForgeRole } from "@/app/forge/lib/auth";
 import { hashToken } from "@/app/forge/lib/token";
 import { sendEmail, wrapEmailInTemplate } from "@/utils/email";
+import { createClient } from "@/utils/supabase/server";
 
 function siteUrl(): string {
   const base = process.env.VERCEL_PROJECT_PRODUCTION_URL
@@ -49,4 +50,20 @@ export async function mintInvite(input: {
     await sendEmail({ to: input.email, subject: "Your Forge invite", html: wrapEmailInTemplate(body) });
   }
   return { ok: true, url };
+}
+
+export async function redeemInvite(
+  rawToken: string,
+  agreement: string
+): Promise<{ ok: true; role: ForgeRole } | { ok: false }> {
+  const agreed = agreement.trim().toLowerCase() === "i agree";
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("forge_redeem_invite", {
+    p_token_hash: hashToken(rawToken),
+    p_nda_agreed: agreed,
+  });
+  if (error || (data !== "superadmin" && data !== "elder" && data !== "playtester")) {
+    return { ok: false };
+  }
+  return { ok: true, role: data as ForgeRole };
 }
