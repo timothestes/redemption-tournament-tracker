@@ -3835,6 +3835,11 @@
   // ---- Deck of the Week: fetch/parse deck link ----
   var CARD_IMG_BASE = 'https://qrpnuz0u6exnvyt8.public.blob.vercel-storage.com/card-images/';
   var CARD_TYPES_GITHUB_URL = 'https://raw.githubusercontent.com/timothestes/redemption-tournament-tracker/refs/heads/main/lib/cards/generated/cardData.json';
+  // Build a card image URL. card_img_file may or may not already carry a
+  // .jpg/.jpeg extension (mixed in the DB), so strip it before appending one.
+  function cardImgSrc(imgFile) {
+    return CARD_IMG_BASE + ((imgFile || '') + '').replace(/\.jpe?g$/i, '') + '.jpg';
+  }
   window.dotwDeckData = null;
   window.cardTypeLookup = null;
   window.cardTypesLoading = false;
@@ -4002,7 +4007,7 @@
     [deck.preview_card_1, deck.preview_card_2].forEach(function(imgFile) {
       if (!imgFile) return;
       var img = document.createElement('img');
-      img.src = CARD_IMG_BASE + imgFile + '.jpg';
+      img.src = cardImgSrc(imgFile);
       img.alt = imgFile;
       img.addEventListener('click', function() { openDeckCardEnlarge(img.src); });
       previewEl.appendChild(img);
@@ -4107,7 +4112,7 @@
         var cardEl = document.createElement('div');
         cardEl.className = 'deck-viewer-card';
         var img = document.createElement('img');
-        img.src = CARD_IMG_BASE + (card.card_img_file || card.imgFile) + '.jpg';
+        img.src = cardImgSrc(card.card_img_file || card.imgFile);
         img.alt = card.card_name;
         img.loading = 'lazy';
         img.addEventListener('click', function() { openDeckCardEnlarge(img.src); });
@@ -4190,7 +4195,7 @@
         var cardEl = document.createElement('div');
         cardEl.className = 'deck-viewer-card';
         var img = document.createElement('img');
-        img.src = CARD_IMG_BASE + (card.card_img_file || card.imgFile) + '.jpg';
+        img.src = cardImgSrc(card.card_img_file || card.imgFile);
         img.alt = card.card_name;
         img.loading = 'lazy';
         img.addEventListener('click', function() { openDeckCardEnlarge(img.src); });
@@ -4367,7 +4372,7 @@
         cardEl.style.top = (idx * 32) + 'px';
         cardEl.style.zIndex = idx + 1;
         var img = document.createElement('img');
-        img.src = CARD_IMG_BASE + (card.card_img_file || card.imgFile) + '.jpg';
+        img.src = cardImgSrc(card.card_img_file || card.imgFile);
         img.alt = card.card_name;
         img.loading = 'lazy';
         img.addEventListener('mouseover', function() {
