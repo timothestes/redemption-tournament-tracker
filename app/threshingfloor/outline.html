@@ -722,7 +722,7 @@
   #deck-viewer-panel {
     background: var(--teal-deep); border: 1px solid rgba(255,255,255,0.1);
     border-top: 3px solid var(--teal); border-radius: 8px;
-    width: 100%; max-width: 1100px; min-height: 60vh;
+    width: fit-content; max-width: 1300px; min-width: min(900px, 95vw); min-height: 60vh;
     display: flex; flex-direction: column; position: relative;
     box-shadow: 0 20px 60px rgba(0,0,0,0.6); margin: auto;
   }
@@ -794,9 +794,9 @@
   }
   #deck-viewer-columns {
     flex: 1; overflow-x: auto; overflow-y: hidden;
-    display: flex; gap: 8px; padding: 14px 16px; align-items: flex-start;
+    display: flex; gap: 6px; padding: 14px 16px; align-items: flex-start;
   }
-  .dv-stack-col { flex-shrink: 0; width: 110px; }
+  .dv-stack-col { flex-shrink: 0; width: 90px; }
   .dv-stack-col-title {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 9px;
     letter-spacing: 2px; text-transform: uppercase; color: var(--teal-mid);
@@ -806,12 +806,12 @@
     position: relative;
   }
   .dv-stacked-card {
-    position: relative; width: 110px; cursor: pointer;
-    margin-bottom: -72px;
+    position: relative; width: 90px; cursor: pointer;
+    margin-bottom: -94px;
   }
   .dv-stacked-card:last-child { margin-bottom: 0; }
   .dv-stacked-card img {
-    width: 110px; border-radius: 4px;
+    width: 90px; border-radius: 3px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.5);
     transition: transform 0.12s; display: block;
   }
@@ -820,18 +820,18 @@
 
   /* Side preview panel */
   #deck-viewer-side-panel {
-    width: 200px; flex-shrink: 0; border-left: 1px solid rgba(255,255,255,0.1);
-    padding: 14px 12px; display: flex; flex-direction: column; gap: 8px;
+    width: 288px; flex-shrink: 0; border-left: 1px solid rgba(255,255,255,0.1);
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
   }
   #dv-side-img {
-    width: 176px; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+    width: 256px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.7);
     display: block;
   }
   #dv-side-name {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 13px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 15px;
     color: #fff; line-height: 1.2;
   }
-  #dv-side-meta { font-size: 10px; color: var(--teal-mid); }
+  #dv-side-meta { font-size: 11px; color: var(--teal-mid); }
 
   /* Card enlarge overlay */
   #deck-card-enlarge-overlay {
@@ -1979,7 +1979,7 @@
     <div id="deck-viewer-stacked-wrap" style="display:none; flex:1; min-height:500px;">
       <div id="deck-viewer-columns"></div>
       <div id="deck-viewer-side-panel">
-        <div style="color:rgba(255,255,255,0.2); font-size:11px; font-style:italic; text-align:center; padding-top:40px;" id="dv-side-hint">Hover a card to preview</div>
+        <div style="color:rgba(255,255,255,0.2); font-size:11px; font-style:italic; text-align:center; padding-top:160px;" id="dv-side-hint">Hover a card to preview</div>
         <img id="dv-side-img" src="" alt="" style="display:none;">
         <div id="dv-side-name" style="display:none;"></div>
         <div id="dv-side-meta" style="display:none;"></div>
@@ -3844,34 +3844,40 @@
     if (!typeInfo) return 'Other';
     var t = typeInfo.t || '';
     var a = typeInfo.a || '';
-    var c = typeInfo.c || '';
+
     if (t.includes('Lost Soul')) return 'Lost Soul';
-    if (t.includes('Hero')) return 'Hero';
-    if (t.includes('Evil Character')) return 'Evil Character';
-    if (t === 'GE' || (t === 'Enhancement' && a.includes('Good'))) {
-      if (c.includes('Territory')) return 'Territory (GE)';
-      if (c.includes('Warrior')) return 'Warrior (GE)';
-      if (c.includes('Weapon')) return 'Weapon (GE)';
-      return 'Good Enhancement';
-    }
-    if (t === 'EE' || (t === 'Enhancement' && a.includes('Evil'))) return 'Evil Enhancement';
-    if (t === 'Artifact') return 'Artifact';
-    if (t === 'Covenant') return 'Covenant';
-    if (t === 'Curse') return 'Curse';
-    if (t.includes('Dominant') && a.includes('Good')) return 'Good Dominant';
-    if (t.includes('Dominant') && a.includes('Evil')) return 'Evil Dominant';
-    if (t.includes('Dominant')) return 'Dominant';
-    if (t.includes('Fortress') && a.includes('Good')) return 'Good Fortress';
-    if (t.includes('Fortress') && a.includes('Evil')) return 'Evil Fortress';
-    if (t === 'Site' || t.includes('City')) return 'Site / City';
+
+    // Dual alignment: any type with "/" and Neutral alignment → Dual Alignment column
+    if (t.includes('/') && a === 'Neutral') return 'Dual Alignment';
+
+    // Non-neutral cards with "/" in type: sort by first type before the slash
+    var primaryType = t.includes('/') ? t.split('/')[0].trim() : t;
+
+    if (primaryType.includes('Hero')) return 'Hero';
+    if (primaryType.includes('Evil Character')) return 'Evil Character';
+    if (primaryType === 'GE' || (primaryType === 'Enhancement' && a.includes('Good'))) return 'Good Enhancement';
+    if (primaryType === 'EE' || (primaryType === 'Enhancement' && a.includes('Evil'))) return 'Evil Enhancement';
+    // Dominants — good, evil, dual
+    if (primaryType.includes('Dominant') && a === 'Neutral') return 'Dual Alignment Dominant';
+    if (primaryType.includes('Dominant') && a.includes('Good')) return 'Good Dominant';
+    if (primaryType.includes('Dominant') && a.includes('Evil')) return 'Evil Dominant';
+    if (primaryType.includes('Dominant')) return 'Good Dominant';
+    // Covenants / Curses / Artifacts — one column
+    if (primaryType === 'Covenant' || primaryType === 'Curse' || primaryType === 'Artifact') return 'Covenant / Curse / Artifact';
+    // Fortresses + Sites/Cities — one column
+    if (primaryType.includes('Fortress') || primaryType === 'Site' || primaryType.includes('City')) return 'Fortress / Site / City';
     return 'Other';
   }
 
+  // Reserve sort order mirrors main deck column order (no Dominants or Lost Souls in reserve)
+  var RESERVE_GROUP_ORDER = [
+    'Covenant / Curse / Artifact', 'Evil Character', 'Evil Enhancement',
+    'Fortress / Site / City', 'Good Enhancement', 'Hero', 'Dual Alignment', 'Other'
+  ];
+
   var GROUP_ORDER = [
-    'Lost Soul', 'Hero', 'Good Enhancement', 'Territory (GE)', 'Warrior (GE)', 'Weapon (GE)',
-    'Artifact', 'Covenant', 'Good Dominant', 'Good Fortress',
-    'Evil Character', 'Evil Enhancement', 'Evil Dominant', 'Evil Fortress',
-    'Curse', 'Site / City', 'Other'
+    'Covenant / Curse / Artifact', 'Dominant', 'Dual Alignment', 'Evil Character', 'Evil Enhancement',
+    'Fortress / Site / City', 'Good Enhancement', 'Hero', 'Lost Soul'
   ];
 
   function loadCardTypes(callback) {
@@ -3909,39 +3915,82 @@
 
 
 
+  function parseDeckFromPageHtml(html) {
+    // Extract the deck object embedded in Next.js __next_f script blocks
+    try {
+      var matches = html.match(/self\.__next_f\.push\(\[1,"c:(.*?)\\n"\]\)/s);
+      if (!matches) return null;
+      // Unescape the JSON string
+      var raw = matches[1].replace(/\\"/g, '"').replace(/\\n/g, '').replace(/\\\\/g, '\\');
+      // Parse the outer array and extract deck from first element's props
+      var parsed = JSON.parse('[' + raw + ']');
+      if (!parsed || !parsed[0]) return null;
+      var props = parsed[0];
+      // props is ["$","$L17",null,{deck:{...},...}]
+      if (Array.isArray(props) && props[3] && props[3].deck) return props[3].deck;
+    } catch(e) {}
+    return null;
+  }
+
   function fetchDeckInfo() {
     var url = document.getElementById('dotw-link').value.trim();
     var status = document.getElementById('dotw-fetch-status');
     if (!url) { status.textContent = 'Enter a deck link first.'; return; }
     var m = url.match(/decklist\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/);
     if (!m) { status.textContent = 'Could not find a deck id in that link.'; return; }
+    var deckId = m[1];
     status.textContent = 'Fetching...';
-    fetch('/threshingfloor/api/data?kind=deck&id=' + m[1])
-      .then(function(res) {
+
+    // Fire both requests in parallel:
+    // 1) Page HTML — for preview_card_1/2 and card_img_file (not exposed by proxy)
+    // 2) API proxy — for full cards array with card_img_file (Tim's endpoint)
+    var pageUrl = 'https://redemptionccg.app/decklist/' + deckId;
+    var apiUrl = '/threshingfloor/api/data?kind=deck&id=' + deckId;
+
+    Promise.all([
+      // Best-effort: page HTML only supplies cosmetic preview cards, so a
+      // failure here (non-200, network, or cross-origin on a non-prod host)
+      // must not reject the whole load — fall back to null.
+      fetch(pageUrl).then(function(res) {
+        return res.ok ? res.text() : null;
+      }).catch(function() { return null; }),
+      fetch(apiUrl).then(function(res) {
         if (res.status === 404) { status.textContent = 'Deck not found (must be public or unlisted).'; return null; }
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (!res.ok) throw new Error('api HTTP ' + res.status);
         return res.json();
       })
-      .then(function(deck) {
-        if (!deck) return;
-        window.dotwDeckData = deck;
-        // Start loading card types in background so they're ready when viewer opens
-        loadCardTypes(null);
+    ]).then(function(results) {
+      var html = results[0];
+      var apiDeck = results[1];
+      if (!apiDeck) return;
 
-        // Store in hidden fields for save/load compatibility
-        document.getElementById('dotw-name').value = deck.name || '';
-        document.getElementById('dotw-creator').value = deck.username || deck.creator || '';
+      // Parse preview card fields from page HTML
+      var pageDeck = parseDeckFromPageHtml(html);
 
-        // Determine format from tags or format field
-        var formatTag = (deck.tags || []).find(function(t) { return /^T[12]$/i.test(t.name); });
-        var format = deck.format || (formatTag ? formatTag.name : '');
-        document.getElementById('dotw-format').value = format;
+      // Merge: use API deck as base, overlay preview fields from page if available
+      var deck = apiDeck;
+      if (pageDeck) {
+        if (pageDeck.preview_card_1) deck.preview_card_1 = pageDeck.preview_card_1;
+        if (pageDeck.preview_card_2) deck.preview_card_2 = pageDeck.preview_card_2;
+      }
 
-        // Build and show profile card
-        renderDotwProfileCard(deck, format);
-        status.textContent = '';
-      })
-      .catch(function() { status.textContent = 'Could not fetch deck info.'; });
+      window.dotwDeckData = deck;
+      // Start loading card types in background so they're ready when viewer opens
+      loadCardTypes(null);
+
+      // Store in hidden fields for save/load compatibility
+      document.getElementById('dotw-name').value = deck.name || '';
+      document.getElementById('dotw-creator').value = deck.username || deck.creator || '';
+
+      // Determine format from tags or format field
+      var formatTag = (deck.tags || []).find(function(t) { return /^T[12]$/i.test(t.name); });
+      var format = deck.format || (formatTag ? formatTag.name : '');
+      document.getElementById('dotw-format').value = format;
+
+      // Build and show profile card
+      renderDotwProfileCard(deck, format);
+      status.textContent = '';
+    }).catch(function() { status.textContent = 'Could not fetch deck info.'; });
   }
 
   function renderDotwProfileCard(deck, format) {
@@ -4058,7 +4107,7 @@
         var cardEl = document.createElement('div');
         cardEl.className = 'deck-viewer-card';
         var img = document.createElement('img');
-        img.src = CARD_IMG_BASE + card.card_img_file + '.jpg';
+        img.src = CARD_IMG_BASE + (card.card_img_file || card.imgFile) + '.jpg';
         img.alt = card.card_name;
         img.loading = 'lazy';
         img.addEventListener('click', function() { openDeckCardEnlarge(img.src); });
@@ -4081,13 +4130,24 @@
       // Group main deck by card type
       var groups = {};
       mainCards.forEach(function(card) {
-        var imgKey = (card.card_img_file || '').replace(/\.jpe?g$/i, '');
+        var imgKey = ((card.card_img_file || card.imgFile) || '').replace(/\.jpe?g$/i, '');
         var typeInfo = window.cardTypeLookup[imgKey];
         var group = getCardGroup(typeInfo);
         if (!groups[group]) groups[group] = [];
         groups[group].push(card);
       });
+      // Merge Dominant sub-groups into one section, sorted Good → Evil → Dual
+      var dominantCards = (groups['Good Dominant'] || [])
+        .concat(groups['Evil Dominant'] || [])
+        .concat(groups['Dual Alignment Dominant'] || []);
+      // Remove dominant sub-groups from overflow rendering
+      ['Good Dominant','Evil Dominant','Dual Alignment Dominant'].forEach(function(k){ delete groups[k]; });
+      if (dominantCards.length) groups['Dominant'] = dominantCards;
       GROUP_ORDER.forEach(function(g) {
+        if (g === 'Dominant') {
+          if (groups['Dominant'] && groups['Dominant'].length) renderCardGrid(groups['Dominant'], 'Dominant');
+          return;
+        }
         if (groups[g] && groups[g].length) renderCardGrid(groups[g], g);
       });
       // Anything not in GROUP_ORDER
@@ -4099,7 +4159,7 @@
     }
 
     if (reserveCards.length) renderCardGrid(reserveCards, 'Reserve');
-    if (maybeCards.length) renderCardGrid(maybeCards, 'Maybeboard');
+    if (maybeCards.length) renderCardGrid(maybeCards, 'Considering');
 
     document.getElementById('deck-viewer-overlay').classList.add('open');
     populateDeckViewerNotes();
@@ -4130,7 +4190,7 @@
         var cardEl = document.createElement('div');
         cardEl.className = 'deck-viewer-card';
         var img = document.createElement('img');
-        img.src = CARD_IMG_BASE + card.card_img_file + '.jpg';
+        img.src = CARD_IMG_BASE + (card.card_img_file || card.imgFile) + '.jpg';
         img.alt = card.card_name;
         img.loading = 'lazy';
         img.addEventListener('click', function() { openDeckCardEnlarge(img.src); });
@@ -4152,13 +4212,24 @@
     if (window.cardTypeLookup) {
       var groups = {};
       mainCards.forEach(function(card) {
-        var imgKey = (card.card_img_file || '').replace(/\.jpe?g$/i, '');
+        var imgKey = ((card.card_img_file || card.imgFile) || '').replace(/\.jpe?g$/i, '');
         var typeInfo = window.cardTypeLookup[imgKey];
         var group = getCardGroup(typeInfo);
         if (!groups[group]) groups[group] = [];
         groups[group].push(card);
       });
+      // Merge Dominant sub-groups into one section, sorted Good → Evil → Dual
+      var dominantCards = (groups['Good Dominant'] || [])
+        .concat(groups['Evil Dominant'] || [])
+        .concat(groups['Dual Alignment Dominant'] || []);
+      // Remove dominant sub-groups from overflow rendering
+      ['Good Dominant','Evil Dominant','Dual Alignment Dominant'].forEach(function(k){ delete groups[k]; });
+      if (dominantCards.length) groups['Dominant'] = dominantCards;
       GROUP_ORDER.forEach(function(g) {
+        if (g === 'Dominant') {
+          if (groups['Dominant'] && groups['Dominant'].length) renderCardGrid(groups['Dominant'], 'Dominant');
+          return;
+        }
         if (groups[g] && groups[g].length) renderCardGrid(groups[g], g);
       });
       Object.keys(groups).forEach(function(g) {
@@ -4169,7 +4240,7 @@
     }
 
     if (reserveCards.length) renderCardGrid(reserveCards, 'Reserve');
-    if (maybeCards.length) renderCardGrid(maybeCards, 'Maybeboard');
+    if (maybeCards.length) renderCardGrid(maybeCards, 'Considering');
   }
 
   function toggleDeckViewerNotes() {
@@ -4254,7 +4325,7 @@
     document.getElementById('deck-viewer-body').style.display = mode === 'grid' ? '' : 'none';
     document.getElementById('deck-viewer-stacked-wrap').style.display = mode === 'stack' ? 'flex' : 'none';
     if (mode === 'stack' && window.dotwDeckData) {
-      buildDeckStackedView(window.dotwDeckData);
+      loadCardTypes(function() { buildDeckStackedView(window.dotwDeckData); });
     }
   }
 
@@ -4287,16 +4358,16 @@
       var stack = document.createElement('div');
       stack.className = 'dv-stack';
       // Calculate height for the stack container
-      var stackHeight = 154 + (cards.length - 1) * 38; // full card + stagger per extra
+      var stackHeight = 126 + (cards.length - 1) * 32; // full card + stagger per extra
       stack.style.height = stackHeight + 'px';
       cards.forEach(function(card, idx) {
         var cardEl = document.createElement('div');
         cardEl.className = 'dv-stacked-card';
         cardEl.style.position = 'absolute';
-        cardEl.style.top = (idx * 38) + 'px';
+        cardEl.style.top = (idx * 32) + 'px';
         cardEl.style.zIndex = idx + 1;
         var img = document.createElement('img');
-        img.src = CARD_IMG_BASE + card.card_img_file + '.jpg';
+        img.src = CARD_IMG_BASE + (card.card_img_file || card.imgFile) + '.jpg';
         img.alt = card.card_name;
         img.loading = 'lazy';
         img.addEventListener('mouseover', function() {
@@ -4317,24 +4388,54 @@
     if (window.cardTypeLookup) {
       var groups = {};
       mainCards.forEach(function(card) {
-        var imgKey = (card.card_img_file || '').replace(/\.jpe?g$/i, '');
+        var imgKey = ((card.card_img_file || card.imgFile) || '').replace(/\.jpe?g$/i, '');
         var typeInfo = window.cardTypeLookup[imgKey];
         var group = getCardGroup(typeInfo);
         if (!groups[group]) groups[group] = [];
         groups[group].push(card);
       });
+      // Merge Dominant sub-groups into one column, sorted Good → Evil → Dual
+      var dominantCards = (groups['Good Dominant'] || [])
+        .concat(groups['Evil Dominant'] || [])
+        .concat(groups['Dual Alignment Dominant'] || []);
+      // Remove dominant sub-groups from overflow rendering
+      ['Good Dominant','Evil Dominant','Dual Alignment Dominant'].forEach(function(k){ delete groups[k]; });
+      if (dominantCards.length) groups['Dominant'] = dominantCards;
       GROUP_ORDER.forEach(function(g) {
+        if (g === 'Dominant') {
+          if (groups['Dominant'] && groups['Dominant'].length) makeStackCol('Dominant', groups['Dominant']);
+          return;
+        }
         if (groups[g] && groups[g].length) makeStackCol(g, groups[g]);
       });
       Object.keys(groups).forEach(function(g) {
         if (GROUP_ORDER.indexOf(g) === -1 && groups[g].length) makeStackCol(g, groups[g]);
       });
+
+      // Reserve: silently sort by RESERVE_GROUP_ORDER
+      if (reserveCards.length) {
+        var resGroups = {};
+        reserveCards.forEach(function(card) {
+          var imgKey = ((card.card_img_file || card.imgFile) || '').replace(/\.jpe?g$/i, '');
+          var typeInfo = window.cardTypeLookup[imgKey];
+          var group = getCardGroup(typeInfo);
+          if (!resGroups[group]) resGroups[group] = [];
+          resGroups[group].push(card);
+        });
+        var sortedReserve = [];
+        RESERVE_GROUP_ORDER.forEach(function(g) {
+          if (resGroups[g]) sortedReserve = sortedReserve.concat(resGroups[g]);
+        });
+        Object.keys(resGroups).forEach(function(g) {
+          if (RESERVE_GROUP_ORDER.indexOf(g) === -1) sortedReserve = sortedReserve.concat(resGroups[g]);
+        });
+        makeStackCol('Reserve', sortedReserve);
+      }
     } else {
-      makeStackCol('Main Deck', mainCards);
+      if (reserveCards.length) makeStackCol('Reserve', reserveCards);
     }
 
-    if (reserveCards.length) makeStackCol('Reserve', reserveCards);
-    if (maybeCards.length) makeStackCol('Maybeboard', maybeCards);
+    if (maybeCards.length) makeStackCol('Considering', maybeCards);
   }
 
   function closeDeckViewer() {
@@ -7497,6 +7598,25 @@
       .catch(function() { zt.onerror(); });
   }
 
+  // ---- Team wordmark images (transparent-background PNGs) -------------
+  // Key must match the player's "team" field in the Player Registry exactly
+  // (case-sensitive). To add a team: drop a transparent PNG in
+  // public/threshingfloor/teams/ and add an entry below.
+  var TEAM_WORDMARKS = {
+    "Genesis":    "/threshingfloor/teams/genesis.png",
+    "Dragonraid": "/threshingfloor/teams/dragonraid.png"
+  };
+
+  // Preload all team wordmark images so drawImage() is synchronous at render time.
+  var _teamWordmarkImgs = {};
+  (function() {
+    Object.keys(TEAM_WORDMARKS).forEach(function(team) {
+      var img = new Image();
+      img.src = TEAM_WORDMARKS[team];
+      _teamWordmarkImgs[team] = img;
+    });
+  })();
+
   function generateRankingsGraphic() {
     var status = document.getElementById('rankings-graphic-status');
     status.textContent = 'Generating...';
@@ -7588,27 +7708,55 @@
         ctx.roundRect(padX, y, W - padX * 2, rowH - 6, 8);
         ctx.fill();
 
-        ctx.fillStyle = isTop3 ? '#0aada6' : '#7dd4d0';
-        ctx.font = (isTop3 ? '900' : '700') + ' ' + (isTop3 ? '52px' : '44px') + ' "Barlow Condensed", sans-serif';
+        ctx.fillStyle = '#7dd4d0';
+        ctx.font = '700 44px "Barlow Condensed", sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(row.rank, padX + 72, y + 60);
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = '800 ' + (isTop3 ? '38px' : '33px') + ' "Barlow Condensed", sans-serif';
+        ctx.font = '800 33px "Barlow Condensed", sans-serif';
         ctx.textAlign = 'left';
-        // Real name is prominent if available, otherwise fall back to handle
         var displayName = (row.profile.realName || row.name).toUpperCase();
-        var hasSub = row.profile.realName || row.profile.region;
+        // Handle source: explicit profile.handle if set, else the typed name
+        // (the registry key). Only shown as a subtitle when a real name is the
+        // title and the handle differs from it — otherwise it would duplicate
+        // the name already on the primary line.
+        var handle = (row.profile.handle !== undefined ? row.profile.handle : (row.name || '')).trim();
+        var showHandle = row.profile.realName && handle && handle !== row.profile.realName;
+        var hasSub = showHandle || row.profile.region;
         ctx.fillText(displayName, padX + 110, y + (hasSub ? 48 : 58));
 
-        // Subtitle: handle + region
+        // Subtitle: handle (only when it differs from the displayed real name) + region
         var sub = '';
-        if (row.profile.realName) sub = row.name; // show handle when real name is primary
+        if (showHandle) sub = handle;
         if (row.profile.region) sub += (sub ? '  ·  ' : '') + row.profile.region;
         if (sub) {
           ctx.fillStyle = '#7dd4d0';
           ctx.font = '400 20px Barlow, sans-serif';
           ctx.fillText(sub, padX + 110, y + 72);
+        }
+
+        // Team wordmark — uniform size across all rows
+        var teamName = row.profile.team || '';
+        if (teamName) {
+          var wmImg = _teamWordmarkImgs[teamName];
+          var deltaReserve = (row.deltaClass && row.deltaClass !== 'empty') ? 90 : 0;
+          var wmRight = W - padX - 10 - deltaReserve;
+          if (wmImg && wmImg.complete && wmImg.naturalWidth > 0) {
+            var maxH = 30;
+            var maxW = 170;
+            var scale = Math.min(maxH / wmImg.naturalHeight, maxW / wmImg.naturalWidth);
+            var dW = wmImg.naturalWidth * scale;
+            var dH = wmImg.naturalHeight * scale;
+            ctx.globalAlpha = 0.92;
+            ctx.drawImage(wmImg, wmRight - dW, y + (rowH - 6 - dH) / 2, dW, dH);
+            ctx.globalAlpha = 1;
+          } else {
+            ctx.fillStyle = 'rgba(125,212,208,0.7)';
+            ctx.font = '600 17px "Barlow Condensed", sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(teamName.toUpperCase(), wmRight, y + 62);
+          }
         }
 
         if (row.deltaClass && row.deltaClass !== 'empty') {
