@@ -953,6 +953,9 @@
     display: flex; gap: 8px; align-items: center;
   }
   #player-registry-save-status { font-size: 9px; color: var(--teal-mid); font-style: italic; margin-left: auto; }
+  #player-registry-save-status.pr-status-error {
+    color: var(--red); font-style: normal; font-weight: 700; font-size: 11px;
+  }
 
   /* Registry panel is always dark-themed — lock text to literal colors so dark-mode variable flips don't break it */
   body.dark-mode #player-registry-header h2 { color: #ffffff; }
@@ -1291,6 +1294,55 @@
   .player-profile-modal .spoiler-modal-close { background: var(--gray-light); color: var(--teal-dark); }
   .player-profile-modal .spoiler-modal-close:hover { background: var(--red); color: #fff; }
 
+  /* ── Player Picker Modal (search registry / quick-add a player) ────────── */
+  .player-picker-modal {
+    background: #fff; border-radius: 10px; padding: 20px 22px 18px; max-width: 340px; width: 100%;
+    max-height: 85vh; display: flex; flex-direction: column; position: relative; text-align: left;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  }
+  .player-picker-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 19px;
+    color: var(--teal-dark); margin: 0 24px 12px 0; line-height: 1.2;
+  }
+  .pp-search-input {
+    width: 100%; background: var(--gray-light); border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 4px; color: var(--text); font-family: 'Barlow', sans-serif; font-size: 13px;
+    padding: 8px 10px; outline: none; margin-bottom: 8px; transition: border-color 0.2s;
+  }
+  .pp-search-input:focus { border-color: var(--teal); }
+  .pp-search-input::placeholder { color: var(--placeholder); }
+  .pp-list { max-height: 190px; overflow-y: auto; border: 1px solid var(--gray-light); border-radius: 6px; margin-bottom: 12px; }
+  .pp-item {
+    padding: 8px 12px; font-size: 13px; color: var(--text); cursor: pointer;
+    border-bottom: 1px solid var(--gray-light); display: flex; align-items: baseline; gap: 8px;
+    transition: background 0.1s;
+  }
+  .pp-item:last-child { border-bottom: none; }
+  .pp-item:hover { background: var(--teal-light); }
+  .pp-item-sub { font-size: 11px; color: var(--placeholder); }
+  .pp-empty { padding: 16px 12px; font-size: 12px; color: var(--placeholder); font-style: italic; text-align: center; }
+  .pp-divider {
+    text-align: center; font-size: 9px; color: var(--placeholder); text-transform: uppercase;
+    letter-spacing: 1.5px; margin: 2px 0 10px;
+  }
+  #pp-add-fields { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .pp-add-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  #pp-status { font-size: 11px; color: var(--red); min-height: 14px; margin-top: 6px; }
+  .pp-footer-link { font-size: 10px; text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--gray-light); }
+  .pp-footer-link button { color: var(--teal); background: none; border: none; cursor: pointer; font-size: 10px; text-decoration: underline; padding: 0; }
+  .pp-footer-link button:hover { color: var(--teal-dark); }
+  .player-picker-modal .spoiler-modal-close { background: var(--gray-light); color: var(--teal-dark); }
+  .player-picker-modal .spoiler-modal-close:hover { background: var(--red); color: #fff; }
+  body.dark-mode .player-picker-modal { background: var(--white); color: var(--text); }
+  body.dark-mode .player-picker-title { color: var(--teal-mid); }
+  body.dark-mode .pp-search-input { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.15); }
+  body.dark-mode .pp-list { border-color: rgba(255,255,255,0.1); }
+  body.dark-mode .pp-item { color: rgba(255,255,255,0.85); border-bottom-color: rgba(255,255,255,0.08); }
+  body.dark-mode .pp-item:hover { background: rgba(255,255,255,0.08); }
+  body.dark-mode .pp-footer-link { border-top-color: rgba(255,255,255,0.1); }
+  body.dark-mode .player-picker-modal .spoiler-modal-close { background: rgba(255,255,255,0.12); color: #ffffff; }
+  body.dark-mode .player-picker-modal .spoiler-modal-close:hover { background: var(--red); color: #fff; }
+
   body.dark-mode .btn-ghost { color: var(--teal-mid); border-color: var(--teal-mid); }
 
   @media print {
@@ -1329,6 +1381,10 @@
     z-index: 1000; align-items: center; justify-content: center; padding: 20px;
   }
   .spoiler-modal-overlay.open { display: flex; }
+  /* These two can be opened from inside other modals (e.g. the Tournament
+     Results editor, z-index 1100) so they need to sit above everything else
+     in the app, not just the base .spoiler-modal-overlay z-index. */
+  #player-picker-overlay, #player-profile-modal-overlay { z-index: 1500; }
   .spoiler-modal-content {
     background: #fff; border-radius: 8px; padding: 16px; max-width: 360px; width: 100%;
     max-height: 90vh; overflow-y: auto; position: relative; text-align: center;
@@ -1779,6 +1835,48 @@
   </div>
 </div>
 
+<div id="player-picker-overlay" class="spoiler-modal-overlay" onclick="closePlayerPicker(event)">
+  <div class="player-picker-modal">
+    <button type="button" class="spoiler-modal-close" onclick="closePlayerPicker()">&times;</button>
+    <div class="player-picker-title">Select Player</div>
+
+    <input type="text" class="pp-search-input" id="pp-search" placeholder="Search players..." autocomplete="off" oninput="filterPlayerPickerList()">
+    <div class="pp-list" id="pp-list"></div>
+
+    <div class="pp-divider">or add a new player</div>
+
+    <div id="pp-add-fields">
+      <div>
+        <label class="pr-field-label">Player's Name (required)</label>
+        <input class="pr-field-input" id="pp-quick-name" placeholder="e.g. Jordan Smith" autocomplete="off">
+      </div>
+      <div>
+        <label class="pr-field-label">Handle / Display Name</label>
+        <input class="pr-field-input" id="pp-handle" placeholder="Optional" autocomplete="off">
+      </div>
+      <div>
+        <label class="pr-field-label">Region</label>
+        <input class="pr-field-input" id="pp-region" placeholder="e.g. Southeast, New England..." autocomplete="off">
+      </div>
+      <div>
+        <label class="pr-field-label">Team Affiliation</label>
+        <input class="pr-field-input" id="pp-team" placeholder="Optional" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="pp-add-actions">
+      <button type="button" class="btn btn-ghost" style="padding:6px 12px; font-size:11px;" onclick="usePlayerPickerQuickName()">Use Without Saving</button>
+      <button type="button" class="btn btn-teal" style="padding:6px 12px; font-size:11px;" onclick="savePlayerPickerFullProfile()">Save to Registry &amp; Use</button>
+    </div>
+
+    <div id="pp-status"></div>
+
+    <div class="pp-footer-link">
+      <button type="button" onclick="openFullRegistryFromPicker()">Open full Player Registry editor</button>
+    </div>
+  </div>
+</div>
+
 <div id="se-detail-overlay" onclick="closeSeDetailModal(event)">
   <div id="se-detail-modal">
     <div id="se-detail-header">
@@ -1907,12 +2005,12 @@
         <div class="pr-empty-state" id="player-registry-empty-state">Select a player to view or edit their profile.</div>
         <div id="player-registry-form" style="display:none;">
           <div>
-            <label class="pr-field-label">Real Name</label>
-            <input class="pr-field-input" id="pr-realname" placeholder="Optional" autocomplete="off">
+            <label class="pr-field-label">Real Name (required)</label>
+            <input class="pr-field-input" id="pr-realname" placeholder="e.g. Jordan Smith" autocomplete="off">
           </div>
           <div>
             <label class="pr-field-label">Handle / Display Name</label>
-            <input class="pr-field-input" id="pr-handle" placeholder="e.g. Hendrix" autocomplete="off">
+            <input class="pr-field-input" id="pr-handle" placeholder="Optional -- e.g. Hendrix" autocomplete="off">
           </div>
           <div>
             <label class="pr-field-label">Region</label>
@@ -2400,8 +2498,8 @@
           <div class="field">
             <label class="field-label">Player Name</label>
             <div style="display:flex; align-items:center; gap:6px;">
-              <input class="field-input" id="potm-name" list="rank-player-options" placeholder="Name / handle -- select existing or type new" autocomplete="off" style="flex:1;">
-              <button type="button" class="rank-profile-btn" id="potm-profile-btn" title="View profile" style="display:none;" onclick="handlePlayerProfileBtnClick(document.getElementById('potm-name').value.trim())">&#128100;</button>
+              <input class="field-input" id="potm-name" placeholder="Player name" autocomplete="off" style="flex:1;">
+              <button type="button" class="rank-profile-btn" id="potm-profile-btn" title="Add / select player" onclick="handlePlayerProfileBtnClick('potm-name')">+</button>
             </div>
           </div>
           <div class="field">
@@ -2450,8 +2548,8 @@
             <div class="field">
               <label class="field-label">Guest Name</label>
               <div style="display:flex; align-items:center; gap:6px;">
-                <input class="field-input" id="guest-name" list="rank-player-options" placeholder="Full name / handle" autocomplete="off" style="flex:1;">
-                <button type="button" class="rank-profile-btn" id="guest-profile-btn" title="View profile" style="display:none;" onclick="handlePlayerProfileBtnClick(document.getElementById('guest-name').value.trim())">&#128100;</button>
+                <input class="field-input" id="guest-name" placeholder="Full name" autocomplete="off" style="flex:1;">
+                <button type="button" class="rank-profile-btn" id="guest-profile-btn" title="Add / select player" onclick="handlePlayerProfileBtnClick('guest-name')">+</button>
               </div>
             </div>
             <div class="field">
@@ -2524,14 +2622,23 @@
   function rebuildPlayerOptions() {
     // Suggests only players actually in the registry (have a saved profile),
     // not every name ever typed anywhere -- free text entry of any name is
-    // still allowed, this only affects what's suggested.
-    var all = Object.keys(window.playerProfiles || {}).sort(function(a, b) {
-      return a.toLowerCase().localeCompare(b.toLowerCase());
+    // still allowed, this only affects what's suggested. Real name takes
+    // priority over handle as the suggested/filled-in value; players with no
+    // real name on file fall back to showing their handle.
+    var profiles = window.playerProfiles || {};
+    var seen = {};
+    var displayNames = [];
+    Object.keys(profiles).forEach(function(key) {
+      var displayName = (profiles[key] && profiles[key].realName) || key;
+      if (seen[displayName]) return;
+      seen[displayName] = true;
+      displayNames.push(displayName);
     });
+    displayNames.sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
     rankPlayerDatalist.innerHTML = '';
-    all.forEach(function(p) {
+    displayNames.forEach(function(displayName) {
       var opt = document.createElement('option');
-      opt.value = p;
+      opt.value = displayName;
       rankPlayerDatalist.appendChild(opt);
     });
   }
@@ -2676,8 +2783,8 @@
   for (var i = 1; i <= 10; i++) {
     rankingsGrid.insertAdjacentHTML('beforeend',
       '<div class="rank-item"><span class="rank-num">' + i + '</span>' +
-      '<input class="rank-input" id="rank-' + i + '" list="rank-player-options" placeholder="Player name" autocomplete="off">' +
-      '<button type="button" class="rank-profile-btn" title="View profile" id="rank-profile-btn-' + i + '" onclick="handlePlayerProfileBtnClick(document.getElementById(\'rank-' + i + '\').value.trim())" style="display:none;">&#128100;</button>' +
+      '<input class="rank-input" id="rank-' + i + '" placeholder="Player name" autocomplete="off">' +
+      '<button type="button" class="rank-profile-btn" title="Add / select player" id="rank-profile-btn-' + i + '" onclick="handlePlayerProfileBtnClick(\'rank-' + i + '\')">+</button>' +
       '<button type="button" class="rank-clear" title="Clear" onclick="clearRankField(' + i + ')">&times;</button>' +
       '<span class="rank-delta empty" id="rank-delta-' + i + '"></span></div>');
   }
@@ -2987,6 +3094,21 @@
   var _treEditingBlock = null;
   var _treDraftResults = null;
 
+  // Builds a "+/profile" button for a Tournament Results player-name input,
+  // matching the same affordance already used on Power Rankings/POTM/Guest.
+  // suffix must match the input's id with the "tre-" prefix stripped (e.g.
+  // input id "tre-p1-singles-0" -> suffix "p1-singles-0") so
+  // syncAllPlayerProfileButtons() can find the paired input later.
+  function createTrePlayerBtn(inputEl, suffix) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'rank-profile-btn';
+    btn.id = 'tre-profile-btn-' + suffix;
+    btn.addEventListener('click', function() { handlePlayerProfileBtnClick(inputEl.id); });
+    syncPlayerProfileBtn(inputEl.value, btn);
+    return btn;
+  }
+
   function openTournResultsEditor(b) {
     _treEditingBlock = b;
     _treDraftResults = JSON.parse(JSON.stringify(window.tournResults[b] || emptyFormatResults()));
@@ -3041,10 +3163,11 @@
         p1.id = 'tre-p1-' + fmt.key + '-' + ri;
         p1.placeholder = fmt.teams ? 'Player 1' : 'Player name';
         p1.autocomplete = 'off';
-        p1.setAttribute('list', 'rank-player-options');
         p1.value = rowData.p1 || '';
-        p1.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p1 = p1.value; });
         row.appendChild(p1);
+        var p1Btn = createTrePlayerBtn(p1, 'p1-' + fmt.key + '-' + ri);
+        row.appendChild(p1Btn);
+        p1.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p1 = p1.value; syncPlayerProfileBtn(p1.value, p1Btn); });
 
         // For Teams: always show p2 field (partner), PLUS a tie toggle
         if (fmt.teams) {
@@ -3053,10 +3176,11 @@
           p2.id = 'tre-p2-' + fmt.key + '-' + ri;
           p2.placeholder = 'Player 2';
           p2.autocomplete = 'off';
-          p2.setAttribute('list', 'rank-player-options');
           p2.value = rowData.p2 || '';
-          p2.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p2 = p2.value; });
           row.appendChild(p2);
+          var p2Btn = createTrePlayerBtn(p2, 'p2-' + fmt.key + '-' + ri);
+          row.appendChild(p2Btn);
+          p2.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p2 = p2.value; syncPlayerProfileBtn(p2.value, p2Btn); });
         }
 
         // Tie toggle (all formats)
@@ -3067,7 +3191,7 @@
         tieBtn.textContent = '= Tie';
 
         // For non-Teams: tie badge + second player field on same row
-        var tieBadge = null, p2tie = null;
+        var tieBadge = null, p2tie = null, p2tieBtn = null;
         if (!fmt.teams) {
           tieBadge = document.createElement('span');
           tieBadge.className = 'tre-tie-badge';
@@ -3080,12 +3204,14 @@
           p2tie.id = 'tre-p2-' + fmt.key + '-' + ri;
           p2tie.placeholder = 'Player 2 (tied)';
           p2tie.autocomplete = 'off';
-          p2tie.setAttribute('list', 'rank-player-options');
           p2tie.value = rowData.p2 || '';
           p2tie.style.display = rowData.tie ? '' : 'none';
-          p2tie.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p2 = p2tie.value; });
           row.appendChild(tieBadge);
           row.appendChild(p2tie);
+          p2tieBtn = createTrePlayerBtn(p2tie, 'p2-' + fmt.key + '-' + ri);
+          p2tieBtn.style.display = rowData.tie ? '' : 'none';
+          row.appendChild(p2tieBtn);
+          p2tie.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p2 = p2tie.value; syncPlayerProfileBtn(p2tie.value, p2tieBtn); });
         }
 
         row.appendChild(tieBtn);
@@ -3109,20 +3235,22 @@
           p3.id = 'tre-p3-' + fmt.key + '-' + ri;
           p3.placeholder = 'Player 3';
           p3.autocomplete = 'off';
-          p3.setAttribute('list', 'rank-player-options');
           p3.value = rowData.p3 || '';
-          p3.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p3 = p3.value; });
           tiedTeamRow.appendChild(p3);
+          var p3Btn = createTrePlayerBtn(p3, 'p3-' + fmt.key + '-' + ri);
+          tiedTeamRow.appendChild(p3Btn);
+          p3.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p3 = p3.value; syncPlayerProfileBtn(p3.value, p3Btn); });
 
           var p4 = document.createElement('input');
           p4.className = 'tre-player-input';
           p4.id = 'tre-p4-' + fmt.key + '-' + ri;
           p4.placeholder = 'Player 4';
           p4.autocomplete = 'off';
-          p4.setAttribute('list', 'rank-player-options');
           p4.value = rowData.p4 || '';
-          p4.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p4 = p4.value; });
           tiedTeamRow.appendChild(p4);
+          var p4Btn = createTrePlayerBtn(p4, 'p4-' + fmt.key + '-' + ri);
+          tiedTeamRow.appendChild(p4Btn);
+          p4.addEventListener('input', function() { _treDraftResults[fmt.key][ri].p4 = p4.value; syncPlayerProfileBtn(p4.value, p4Btn); });
 
           // Invisible spacer to align with tie-btn column above
           var spacer = document.createElement('div');
@@ -3143,8 +3271,13 @@
             if (tieBadge) tieBadge.style.display = isTied ? '' : 'none';
             if (p2tie) {
               p2tie.style.display = isTied ? '' : 'none';
+              if (p2tieBtn) p2tieBtn.style.display = isTied ? '' : 'none';
               if (isTied) { p2tie.focus(); }
-              else { p2tie.value = ''; _treDraftResults[fmt.key][ri].p2 = ''; }
+              else {
+                p2tie.value = '';
+                _treDraftResults[fmt.key][ri].p2 = '';
+                if (p2tieBtn) syncPlayerProfileBtn('', p2tieBtn);
+              }
             }
           } else {
             // Teams: show/hide the second tied-team row
@@ -3157,18 +3290,24 @@
                 _treDraftResults[fmt.key][ri].p4 = '';
                 document.getElementById('tre-p3-' + fmt.key + '-' + ri).value = '';
                 document.getElementById('tre-p4-' + fmt.key + '-' + ri).value = '';
+                if (p3Btn) syncPlayerProfileBtn('', p3Btn);
+                if (p4Btn) syncPlayerProfileBtn('', p4Btn);
               }
             }
           }
 
-          // Any tie removes 3rd place — a tie at 1st or 2nd both consume all 3 placing slots
-          var thirdRow = document.getElementById('tre-row-' + fmt.key + '-2');
-          if (thirdRow) {
-            thirdRow.style.display = isTied ? 'none' : '';
-            if (isTied) {
-              _treDraftResults[fmt.key][2] = { p1: '', p2: '', p3: '', p4: '', tie: false };
-              var thirdTiedRow = document.getElementById('tre-tiedrow-' + fmt.key + '-2');
-              if (thirdTiedRow) thirdTiedRow.style.display = 'none';
+          // A tie at 1st or 2nd consumes the 3rd place slot (two winners fill both spots).
+          // A tie AT 3rd place does not displace anything — it just allows a second
+          // name in the 3rd place row, so this only applies when ri is 0 or 1.
+          if (ri === 0 || ri === 1) {
+            var thirdRow = document.getElementById('tre-row-' + fmt.key + '-2');
+            if (thirdRow) {
+              thirdRow.style.display = isTied ? 'none' : '';
+              if (isTied) {
+                _treDraftResults[fmt.key][2] = { p1: '', p2: '', p3: '', p4: '', tie: false };
+                var thirdTiedRow = document.getElementById('tre-tiedrow-' + fmt.key + '-2');
+                if (thirdTiedRow) thirdTiedRow.style.display = 'none';
+              }
             }
           }
         });
@@ -3238,7 +3377,7 @@
       fBlock.appendChild(lbl);
 
       rows.forEach(function(row, ri) {
-        var p1 = row.p1.trim(), p2 = row.p2.trim();
+        var p1 = displayPlayerName(row.p1.trim()), p2 = displayPlayerName(row.p2.trim());
         // Skip entirely empty rows
         if (!p1 && !p2) return;
 
@@ -3246,8 +3385,9 @@
 
         if (row.tie) {
           // Tied: show as two T-Nth lines.
+          var p3 = displayPlayerName((row.p3 || '').trim()), p4 = displayPlayerName((row.p4 || '').trim());
           var names = fmt.teams
-            ? [p2 ? p1 + ' / ' + p2 : p1, (row.p3 || '').trim() ? ((row.p3||'').trim() + (((row.p4||'').trim()) ? ' / ' + (row.p4||'').trim() : '')) : null].filter(Boolean)
+            ? [p2 ? p1 + ' / ' + p2 : p1, p3 ? (p3 + (p4 ? ' / ' + p4 : '')) : null].filter(Boolean)
             : [p1, p2].filter(Boolean);
 
           names.forEach(function(playerName) {
@@ -5154,48 +5294,158 @@
   }
 
   // Shared save path used by both the inline popup above and the Registry
-  // panel's own form -- registers the handle if new, writes window.playerProfiles,
-  // PUTs to the store, then refreshes every visible +/profile button to reflect
-  // the new state.
+  // panel's own form -- registers the handle if new, writes window.playerProfiles
+  // into local state, then hands off to pushPlayerProfiles() (defined further
+  // below, next to the rest of the player-profiles store logic) for a
+  // conflict-safe write to the server, then refreshes every visible
+  // +/profile button to reflect the new state.
   function persistPlayerProfile(handle, profileData, onSuccess, onError) {
     if (window.knownPlayers.indexOf(handle) === -1) {
       window.knownPlayers.push(handle);
       rebuildPlayerOptions();
     }
     window.playerProfiles[handle] = profileData;
-    return fetch(PROFILES_STORE_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: window.playerProfiles })
-    })
-      .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
-      .then(function() {
-        syncAllPlayerProfileButtons();
-        if (onSuccess) onSuccess();
-      })
-      .catch(function() { if (onError) onError(); });
+    return pushPlayerProfiles(onSuccess, onError, true);
   }
 
-  // ---- +/profile button state (rank rows, POTM, Guest) ----
-  // Shows "+" (add profile) when the typed name has no saved profile yet,
-  // or the profile icon (view profile) once one exists. Never creates a
-  // profile by itself -- only reflects window.playerProfiles' current state.
+  // ---- Player Picker modal (search registry / quick-add) ----
+  // A single shared modal used by every player-name field (Power Rankings,
+  // POTM, Guest, Tournament Results). Opened via the always-visible "+"
+  // button when a field has no resolvable registry profile. Lets you search
+  // existing players by name, or quick-add a name -- optionally expanding to
+  // save it as a full registry profile (handle/region/team) right there.
+  // Whatever gets chosen is written back into the field that opened it.
+  window.playerPickerTargetId = null;
+
+  function openPlayerPicker(targetInputId, prefill) {
+    window.playerPickerTargetId = targetInputId;
+    document.getElementById('pp-search').value = '';
+    document.getElementById('pp-quick-name').value = prefill || '';
+    document.getElementById('pp-handle').value = '';
+    document.getElementById('pp-region').value = '';
+    document.getElementById('pp-team').value = '';
+    document.getElementById('pp-status').textContent = '';
+    renderPlayerPickerList('');
+    document.getElementById('player-picker-overlay').classList.add('open');
+    document.getElementById('pp-search').focus();
+  }
+
+  function closePlayerPicker(e) {
+    if (e && e.target !== document.getElementById('player-picker-overlay')) return;
+    document.getElementById('player-picker-overlay').classList.remove('open');
+    window.playerPickerTargetId = null;
+  }
+
+  function filterPlayerPickerList() {
+    renderPlayerPickerList(document.getElementById('pp-search').value);
+  }
+
+  function renderPlayerPickerList(filter) {
+    var list = document.getElementById('pp-list');
+    list.innerHTML = '';
+    var profiles = window.playerProfiles || {};
+    var entries = Object.keys(profiles).map(function(key) {
+      var profile = profiles[key] || {};
+      var displayName = profile.realName || key;
+      var handleText = profile.handle !== undefined ? profile.handle : key;
+      return { displayName: displayName, handleText: (handleText && handleText !== displayName) ? handleText : '' };
+    });
+    if (filter && filter.trim()) {
+      var f = filter.trim().toLowerCase();
+      entries = entries.filter(function(en) {
+        return en.displayName.toLowerCase().indexOf(f) !== -1 || en.handleText.toLowerCase().indexOf(f) !== -1;
+      });
+    }
+    entries.sort(function(a, b) { return a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase()); });
+
+    if (!entries.length) {
+      list.innerHTML = '<div class="pp-empty">No matching players. Add one below.</div>';
+      return;
+    }
+    entries.forEach(function(en) {
+      var item = document.createElement('div');
+      item.className = 'pp-item';
+      var nameSpan = document.createElement('span');
+      nameSpan.textContent = en.displayName;
+      item.appendChild(nameSpan);
+      if (en.handleText) {
+        var sub = document.createElement('span');
+        sub.className = 'pp-item-sub';
+        sub.textContent = en.handleText;
+        item.appendChild(sub);
+      }
+      item.addEventListener('click', function() { applyPlayerPickerSelection(en.displayName); });
+      list.appendChild(item);
+    });
+  }
+
+  function usePlayerPickerQuickName() {
+    var name = document.getElementById('pp-quick-name').value.trim();
+    if (!name) { document.getElementById('pp-status').textContent = 'Enter a name first.'; return; }
+    applyPlayerPickerSelection(name);
+  }
+
+  function savePlayerPickerFullProfile() {
+    var status = document.getElementById('pp-status');
+    var realName = document.getElementById('pp-quick-name').value.trim();
+    if (!realName) { status.textContent = 'Enter the player\'s name above first.'; return; }
+    var profileData = {
+      realName: realName,
+      handle: document.getElementById('pp-handle').value.trim(),
+      region: document.getElementById('pp-region').value.trim(),
+      team: document.getElementById('pp-team').value.trim()
+    };
+    status.textContent = 'Saving...';
+    persistPlayerProfile(realName, profileData, function() {
+      applyPlayerPickerSelection(realName);
+    }, function() {
+      status.textContent = 'Save failed -- try again.';
+    });
+  }
+
+  // Writes the chosen name into whichever field opened the picker, firing the
+  // same events a normal keystroke would so every existing listener (draft
+  // tracking, rank deltas, tournament data binding, the +/profile icon) reacts.
+  function applyPlayerPickerSelection(name) {
+    var targetId = window.playerPickerTargetId;
+    closePlayerPicker();
+    if (!targetId) return;
+    var input = document.getElementById(targetId);
+    if (!input) return;
+    input.value = name;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.focus();
+  }
+
+  function openFullRegistryFromPicker() {
+    closePlayerPicker();
+    openPlayerRegistry();
+  }
+
+
   function syncPlayerProfileBtn(name, btn) {
     if (!btn) return;
     name = (name || '').trim();
-    if (!name) { btn.style.display = 'none'; return; }
-    btn.style.display = '';
-    var hasProfile = !!(window.playerProfiles && window.playerProfiles[name]);
+    var hasProfile = !!findPlayerProfile(name);
     btn.innerHTML = hasProfile ? '&#128100;' : '+';
-    btn.title = hasProfile ? 'View profile' : 'Add profile';
+    btn.title = hasProfile ? 'View profile' : 'Add / select player';
     btn.classList.toggle('rank-profile-btn-add', !hasProfile);
   }
 
-  function handlePlayerProfileBtnClick(name) {
-    name = (name || '').trim();
-    if (!name) return;
-    var hasProfile = !!(window.playerProfiles && window.playerProfiles[name]);
-    openPlayerProfileModal(name, !hasProfile);
+  // inputId is the id of the text field this button sits next to -- we read
+  // its current value to decide whether to open the existing profile or the
+  // picker, and (for the picker path) pass the id along so the picker can
+  // write the chosen name straight back into that field.
+  function handlePlayerProfileBtnClick(inputId) {
+    var input = document.getElementById(inputId);
+    var name = input ? input.value.trim() : '';
+    var key = findPlayerKey(name);
+    if (key) {
+      openPlayerProfileModal(key, false);
+    } else {
+      openPlayerPicker(inputId, name);
+    }
   }
 
   function syncAllPlayerProfileButtons() {
@@ -5208,6 +5458,13 @@
       var prInp = document.getElementById(prefix + '-name');
       var prBtn = document.getElementById(prefix + '-profile-btn');
       if (prInp && prBtn) syncPlayerProfileBtn(prInp.value, prBtn);
+    });
+    // Tournament Results editor fields only exist while that modal is open --
+    // sync whichever of tre-p1..p4-profile-btn-* are currently in the DOM.
+    document.querySelectorAll('[id^="tre-profile-btn-"]').forEach(function(btn) {
+      var inputId = btn.id.replace('tre-profile-btn-', 'tre-');
+      var inp = document.getElementById(inputId);
+      if (inp) syncPlayerProfileBtn(inp.value, btn);
     });
   }
 
@@ -7253,7 +7510,7 @@
       var delta = document.getElementById('rank-delta-' + i);
       var name = input ? input.value.trim() : '';
       if (!name) continue;
-      var profile = window.playerProfiles && window.playerProfiles[name] ? window.playerProfiles[name] : {};
+      var profile = findPlayerProfile(name) || {};
       var deltaClass = delta ? delta.className.replace('rank-delta', '').trim() : 'empty';
       var deltaText = delta ? delta.textContent.trim() : '';
       rows.push({ rank: i, name: name, profile: profile, deltaClass: deltaClass, deltaText: deltaText });
@@ -7460,20 +7717,132 @@
 
 
   var PROFILES_STORE_URL = '/threshingfloor/api/store/player-profiles';
-  window.playerProfiles = {}; // { handle: { realName, region, team } }
+  // { registryKey: { realName, handle, region, team } }
+  // registryKey is the real name going forward (real name is now the
+  // required/primary field). Older entries created before this change are
+  // still keyed by their handle -- findPlayerKey()/findPlayerProfile() below
+  // resolve either case so nothing needs to be migrated.
+  window.playerProfiles = {};
   window.selectedPlayerHandle = null;
+  window.playerProfilesUpdatedAt = null; // server's updated_at as of our last read -- used for conflict-safe writes
+  window.playerProfilesLoaded = false;   // have we confirmed the server's current state at least once?
 
-  // Load profiles from store on startup
-  fetch(PROFILES_STORE_URL)
-    .then(function(res) { if (res.status === 404) return null; if (!res.ok) throw new Error(); return res.json(); })
-    .then(function(row) {
-      if (row && row.data && typeof row.data === 'object') window.playerProfiles = row.data;
-      // Rank/POTM/Guest profile buttons may have already rendered (showing "+")
-      // before this fetch resolved -- re-sync now that real profile data is in.
-      syncAllPlayerProfileButtons();
-      rebuildPlayerOptions();
+  // Resolves a typed/selected name (which may be a real name, a handle, or
+  // free text with no registry entry at all) to its registry key. Checks an
+  // exact key match first (covers both new realName-keyed entries and legacy
+  // handle-keyed entries), then falls back to matching any profile's stored
+  // realName case-insensitively (covers selecting a real-name suggestion for
+  // a legacy entry that's still keyed by its handle). Returns null if no
+  // matching registry entry exists.
+  function findPlayerKey(name) {
+    name = (name || '').trim();
+    if (!name) return null;
+    var profiles = window.playerProfiles || {};
+    if (profiles[name]) return name;
+    var lower = name.toLowerCase();
+    for (var key in profiles) {
+      if (profiles[key] && profiles[key].realName && profiles[key].realName.toLowerCase() === lower) return key;
+    }
+    return null;
+  }
+
+  function findPlayerProfile(name) {
+    var key = findPlayerKey(name);
+    return key ? window.playerProfiles[key] : null;
+  }
+
+  // For display purposes: real name if there's a matching registry entry,
+  // otherwise whatever was typed (handle, free text, etc.) unchanged.
+  function displayPlayerName(name) {
+    name = (name || '').trim();
+    if (!name) return name;
+    var profile = findPlayerProfile(name);
+    return (profile && profile.realName) || name;
+  }
+
+  // Pure read: seed window.playerProfiles from the server on tool load.
+  function loadPlayerProfiles() {
+    return fetch(PROFILES_STORE_URL)
+      .then(function(res) {
+        if (res.status === 404) return null; // nothing saved yet
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        window.playerProfilesLoaded = true;
+        window.playerProfilesUpdatedAt = (row && row.updated_at) || null;
+        if (row && row.data && typeof row.data === 'object') window.playerProfiles = row.data;
+        // Rank/POTM/Guest/Tournament Results profile buttons may have already
+        // rendered (showing "+") before this fetch resolved -- re-sync now
+        // that real profile data is in.
+        syncAllPlayerProfileButtons();
+        rebuildPlayerOptions();
+      })
+      .catch(function(err) { console.warn('Player profile registry load failed:', err); });
+  }
+  loadPlayerProfiles();
+
+  // Writes the full window.playerProfiles object to the store, using
+  // optimistic concurrency (lastSeenUpdatedAt) so a save here can never
+  // silently overwrite a change made since we last read the store -- on a
+  // conflict (409) we re-fetch the latest server copy, merge our in-flight
+  // edit back on top, and retry once. This replaces a previous version that
+  // blindly PUT the whole object with no conflict check at all, which could
+  // silently clobber other edits (the likely cause of profile changes
+  // appearing to "disappear").
+  function pushPlayerProfiles(onSuccess, onError, canReconcile) {
+    var payload = { data: window.playerProfiles };
+    if (window.playerProfilesUpdatedAt) payload.lastSeenUpdatedAt = window.playerProfilesUpdatedAt;
+
+    return fetch(PROFILES_STORE_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     })
-    .catch(function() {});
+      .then(function(res) {
+        if (res.status === 409) {
+          if (canReconcile) return reconcileAndPushPlayerProfiles(onSuccess, onError);
+          throw new Error('Save conflict (could not reconcile)');
+        }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json().then(function(row) {
+          window.playerProfilesUpdatedAt = row.updated_at || null;
+          window.playerProfilesLoaded = true;
+          syncAllPlayerProfileButtons();
+          if (onSuccess) onSuccess();
+        });
+      })
+      .catch(function(err) {
+        console.warn('Player profile save failed:', err);
+        if (onError) onError();
+      });
+  }
+
+  // On a 409 (someone/something else saved since our last read): pull the
+  // latest server copy, merge our in-flight local changes back on top (so
+  // the edit actually being saved is never lost), then retry the write once.
+  function reconcileAndPushPlayerProfiles(onSuccess, onError) {
+    return fetch(PROFILES_STORE_URL)
+      .then(function(res) {
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(row) {
+        window.playerProfilesLoaded = true;
+        window.playerProfilesUpdatedAt = (row && row.updated_at) || null;
+        if (row && row.data && typeof row.data === 'object') {
+          // Server's copy as the base, with our pending local changes
+          // (including the edit in flight) layered on top.
+          window.playerProfiles = Object.assign({}, row.data, window.playerProfiles);
+        }
+        return pushPlayerProfiles(onSuccess, onError, false); // already reconciled -- don't loop on a second 409
+      })
+      .catch(function(err) {
+        console.warn('Player profile reconcile failed:', err);
+        if (onError) onError();
+      });
+  }
 
   function openPlayerRegistry() {
     window.selectedPlayerHandle = null;
@@ -7496,22 +7865,29 @@
     var list = document.getElementById('player-registry-list');
     list.innerHTML = '';
     var players = window.knownPlayers.slice().sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
-    if (filter) players = players.filter(function(p) {
-      var realName = (window.playerProfiles[p] && window.playerProfiles[p].realName) || '';
-      return p.toLowerCase().indexOf(filter.toLowerCase()) !== -1 || realName.toLowerCase().indexOf(filter.toLowerCase()) !== -1;
-    });
+    if (filter) {
+      var f = filter.toLowerCase();
+      players = players.filter(function(key) {
+        var profile = window.playerProfiles[key] || {};
+        var handleText = profile.handle !== undefined ? profile.handle : key;
+        return key.toLowerCase().indexOf(f) !== -1 ||
+          (profile.realName || '').toLowerCase().indexOf(f) !== -1 ||
+          (handleText || '').toLowerCase().indexOf(f) !== -1;
+      });
+    }
     if (!players.length) {
       list.innerHTML = '<div class="pr-empty-state">No players found.</div>';
       return;
     }
-    players.forEach(function(handle) {
-      var realName = (window.playerProfiles[handle] && window.playerProfiles[handle].realName) || '';
-      var displayName = realName || handle;
+    players.forEach(function(key) {
+      var profile = window.playerProfiles[key] || {};
+      var displayName = profile.realName || key;
+      var handleText = profile.handle !== undefined ? profile.handle : key;
       var item = document.createElement('div');
-      item.className = 'player-registry-item' + (handle === window.selectedPlayerHandle ? ' selected' : '');
+      item.className = 'player-registry-item' + (key === window.selectedPlayerHandle ? ' selected' : '');
       item.textContent = displayName;
-      item.title = displayName !== handle ? displayName + ' (' + handle + ')' : handle;
-      item.addEventListener('click', function() { selectPlayer(handle); });
+      item.title = (handleText && handleText !== displayName) ? displayName + ' (' + handleText + ')' : displayName;
+      item.addEventListener('click', function() { selectPlayer(key); });
       list.appendChild(item);
     });
   }
@@ -7527,7 +7903,15 @@
     showPlayerForm(handle);
   }
 
-  function showPlayerForm(handle) {
+  // Errors get a visibly different style than routine "Saving.../Saved."
+  // status text so a failed save can't be mistaken for a successful one.
+  function setPlayerRegistryStatus(el, text, isError) {
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('pr-status-error', !!isError);
+  }
+
+  function showPlayerForm(key) {
     var emptyState = document.getElementById('player-registry-empty-state');
     var form = document.getElementById('player-registry-form');
     var saveBtn = document.getElementById('pr-save-btn');
@@ -7535,7 +7919,7 @@
     var status = document.getElementById('player-registry-save-status');
     status.textContent = '';
 
-    if (!handle) {
+    if (!key) {
       emptyState.style.display = '';
       form.style.display = 'none';
       saveBtn.style.display = 'none';
@@ -7543,9 +7927,16 @@
       return;
     }
 
-    var profile = window.playerProfiles[handle] || {};
-    document.getElementById('pr-handle').value = handle;
-    document.getElementById('pr-realname').value = profile.realName || '';
+    var saved = window.playerProfiles[key] || null;
+    var profile = saved || {};
+    // Legacy entries (created back when handle was the required/primary
+    // field) are still keyed by their handle and have no separate
+    // profile.handle of their own -- fall back to the registry key itself
+    // for the handle box in that case. A brand-new, not-yet-saved entry is
+    // keyed by the real name just entered in the "+ New Player" prompt --
+    // prefill the real name box with that.
+    document.getElementById('pr-handle').value = (profile.handle !== undefined) ? profile.handle : (saved ? key : '');
+    document.getElementById('pr-realname').value = profile.realName || (saved ? '' : key);
     document.getElementById('pr-region').value = profile.region || '';
     document.getElementById('pr-team').value = profile.team || '';
 
@@ -7556,43 +7947,48 @@
   }
 
   function addNewPlayer() {
-    var handle = prompt('Enter the player handle/name:');
-    if (!handle || !handle.trim()) return;
-    handle = handle.trim();
-    if (window.knownPlayers.indexOf(handle) === -1) {
-      window.knownPlayers.push(handle);
+    var realName = prompt("Enter the player's real name:");
+    if (!realName || !realName.trim()) return;
+    realName = realName.trim();
+    if (window.knownPlayers.indexOf(realName) === -1) {
+      window.knownPlayers.push(realName);
       rebuildPlayerOptions();
     }
-    selectPlayer(handle);
+    selectPlayer(realName);
     renderPlayerList(document.getElementById('player-registry-search').value);
   }
 
   function savePlayerProfile() {
-    var handle = document.getElementById('pr-handle').value.trim();
+    var realName = document.getElementById('pr-realname').value.trim();
+    var handleVal = document.getElementById('pr-handle').value.trim();
     var status = document.getElementById('player-registry-save-status');
-    if (!handle) { status.textContent = 'Handle required.'; return; }
+    if (!realName) { setPlayerRegistryStatus(status, 'Real name required.', true); return; }
 
-    // If handle changed, update knownPlayers
-    if (window.selectedPlayerHandle && window.selectedPlayerHandle !== handle) {
+    var key = realName; // real name is the primary registry identifier
+
+    // If the key changed (renamed, or a legacy handle-keyed entry just got
+    // its first real name on file), migrate the registry entry to the new key.
+    if (window.selectedPlayerHandle && window.selectedPlayerHandle !== key) {
       var oldIdx = window.knownPlayers.indexOf(window.selectedPlayerHandle);
-      if (oldIdx !== -1) window.knownPlayers[oldIdx] = handle;
+      if (oldIdx !== -1) window.knownPlayers[oldIdx] = key;
       delete window.playerProfiles[window.selectedPlayerHandle];
       rebuildPlayerOptions();
     }
 
     var profileData = {
-      realName: document.getElementById('pr-realname').value.trim(),
+      realName: realName,
+      handle: handleVal,
       region: document.getElementById('pr-region').value.trim(),
       team: document.getElementById('pr-team').value.trim()
     };
-    window.selectedPlayerHandle = handle;
+    window.selectedPlayerHandle = key;
 
-    status.textContent = 'Saving...';
-    persistPlayerProfile(handle, profileData, function() {
-      status.textContent = 'Saved.';
+    setPlayerRegistryStatus(status, 'Saving...', false);
+    persistPlayerProfile(key, profileData, function() {
+      setPlayerRegistryStatus(status, 'Saved.', false);
       renderPlayerList(document.getElementById('player-registry-search').value);
     }, function() {
-      status.textContent = 'Save failed.';
+      setPlayerRegistryStatus(status, 'Save failed -- try again.', true);
     });
   }
 
@@ -7610,15 +8006,12 @@
       renderPlayerList(document.getElementById('player-registry-search').value);
 
       var status = document.getElementById('player-registry-save-status');
-      status.textContent = 'Saving...';
-      fetch(PROFILES_STORE_URL, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: window.playerProfiles })
-      })
-      .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
-      .then(function() { status.textContent = 'Removed.'; syncAllPlayerProfileButtons(); })
-      .catch(function() { status.textContent = 'Save failed.'; });
+      setPlayerRegistryStatus(status, 'Saving...', false);
+      pushPlayerProfiles(function() {
+        setPlayerRegistryStatus(status, 'Removed.', false);
+      }, function() {
+        setPlayerRegistryStatus(status, 'Save failed -- try again.', true);
+      }, true);
     });
   }
 
