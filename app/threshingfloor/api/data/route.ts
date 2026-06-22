@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
       creator: deck.username,
       format,
       card_count: deck.card_count,
+      cards: deck.cards,
     });
   }
 
