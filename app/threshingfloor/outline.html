@@ -3895,12 +3895,16 @@
       .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
       .then(function(cards) {
         var lookup = {};
+        var nameLookup = {};
         cards.forEach(function(c) {
           var img = (c.imgFile || '').replace(/\.jpe?g$/i, '');
           if (!img) return;
           lookup[img] = { t: c.type || '', a: c.alignment || '', c: c.class || '' };
+          // Also index by card name for fallback image resolution
+          if (c.name) nameLookup[c.name] = img;
         });
         window.cardTypeLookup = lookup;
+        window.cardNameLookup = nameLookup;
         window.cardTypesLoading = false;
         window.cardTypesCallbacks.forEach(function(cb) { try { cb(); } catch(e) {} });
         window.cardTypesCallbacks = [];
@@ -3914,6 +3918,15 @@
   }
 
 
+
+  function resolveCardImgFile(card) {
+    // Try explicit fields first, then fall back to name lookup from cardData.json
+    var img = card.card_img_file || card.imgFile;
+    if (!img && card.name && window.cardNameLookup) {
+      img = window.cardNameLookup[card.name];
+    }
+    return (img || '').replace(/\.jpe?g$/i, '');
+  }
 
   function parseDeckFromPageHtml(html) {
     // Extract the deck object embedded in Next.js __next_f script blocks
@@ -4107,7 +4120,7 @@
         var cardEl = document.createElement('div');
         cardEl.className = 'deck-viewer-card';
         var img = document.createElement('img');
-        img.src = CARD_IMG_BASE + (card.card_img_file || card.imgFile) + '.jpg';
+        img.src = CARD_IMG_BASE + resolveCardImgFile(card) + '.jpg';
         img.alt = card.card_name;
         img.loading = 'lazy';
         img.addEventListener('click', function() { openDeckCardEnlarge(img.src); });
@@ -4130,7 +4143,7 @@
       // Group main deck by card type
       var groups = {};
       mainCards.forEach(function(card) {
-        var imgKey = ((card.card_img_file || card.imgFile) || '').replace(/\.jpe?g$/i, '');
+        var imgKey = resolveCardImgFile(card);
         var typeInfo = window.cardTypeLookup[imgKey];
         var group = getCardGroup(typeInfo);
         if (!groups[group]) groups[group] = [];
@@ -4190,7 +4203,7 @@
         var cardEl = document.createElement('div');
         cardEl.className = 'deck-viewer-card';
         var img = document.createElement('img');
-        img.src = CARD_IMG_BASE + (card.card_img_file || card.imgFile) + '.jpg';
+        img.src = CARD_IMG_BASE + resolveCardImgFile(card) + '.jpg';
         img.alt = card.card_name;
         img.loading = 'lazy';
         img.addEventListener('click', function() { openDeckCardEnlarge(img.src); });
@@ -4212,7 +4225,7 @@
     if (window.cardTypeLookup) {
       var groups = {};
       mainCards.forEach(function(card) {
-        var imgKey = ((card.card_img_file || card.imgFile) || '').replace(/\.jpe?g$/i, '');
+        var imgKey = resolveCardImgFile(card);
         var typeInfo = window.cardTypeLookup[imgKey];
         var group = getCardGroup(typeInfo);
         if (!groups[group]) groups[group] = [];
@@ -4367,7 +4380,7 @@
         cardEl.style.top = (idx * 32) + 'px';
         cardEl.style.zIndex = idx + 1;
         var img = document.createElement('img');
-        img.src = CARD_IMG_BASE + (card.card_img_file || card.imgFile) + '.jpg';
+        img.src = CARD_IMG_BASE + resolveCardImgFile(card) + '.jpg';
         img.alt = card.card_name;
         img.loading = 'lazy';
         img.addEventListener('mouseover', function() {
@@ -4388,7 +4401,7 @@
     if (window.cardTypeLookup) {
       var groups = {};
       mainCards.forEach(function(card) {
-        var imgKey = ((card.card_img_file || card.imgFile) || '').replace(/\.jpe?g$/i, '');
+        var imgKey = resolveCardImgFile(card);
         var typeInfo = window.cardTypeLookup[imgKey];
         var group = getCardGroup(typeInfo);
         if (!groups[group]) groups[group] = [];
@@ -4416,7 +4429,7 @@
       if (reserveCards.length) {
         var resGroups = {};
         reserveCards.forEach(function(card) {
-          var imgKey = ((card.card_img_file || card.imgFile) || '').replace(/\.jpe?g$/i, '');
+          var imgKey = resolveCardImgFile(card);
           var typeInfo = window.cardTypeLookup[imgKey];
           var group = getCardGroup(typeInfo);
           if (!resGroups[group]) resGroups[group] = [];
