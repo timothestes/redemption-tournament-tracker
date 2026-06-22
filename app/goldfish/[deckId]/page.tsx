@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { loadPublicDeckAction } from '../../decklist/actions';
 import { findCard } from '@/lib/cards/lookup';
+import { createClient } from '@/utils/supabase/server';
 import GoldfishClient from './client';
 import type { DeckDataForGoldfish } from '../types';
 
@@ -20,6 +21,22 @@ export default async function GoldfishPage({
 
   if (!result.success || !result.deck) {
     notFound();
+  }
+
+  // Logged-in user's profile username — only used to gate the per-user
+  // cycling-token easter egg. Null when signed out.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let username: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single();
+    username = profile?.username ?? null;
   }
 
   const deck = result.deck;
@@ -54,5 +71,5 @@ export default async function GoldfishPage({
     }),
   };
 
-  return <GoldfishClient deck={deckData} />;
+  return <GoldfishClient deck={deckData} username={username} />;
 }

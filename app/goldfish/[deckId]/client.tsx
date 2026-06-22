@@ -20,6 +20,9 @@ const GoldfishCanvas = dynamic(() => import('../components/GoldfishCanvas'), { s
 
 interface GoldfishClientProps {
   deck: DeckDataForGoldfish;
+  /** Logged-in user's profile username — only used to gate the cycling-token
+   *  easter egg. Null when not signed in. */
+  username?: string | null;
 }
 
 function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onLoadDeck: () => void }) {
@@ -121,7 +124,7 @@ function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onL
   );
 }
 
-export default function GoldfishClient({ deck }: GoldfishClientProps) {
+export default function GoldfishClient({ deck, username }: GoldfishClientProps) {
   const router = useRouter();
   const [showDeckPicker, setShowDeckPicker] = useState(false);
   const [pendingDeck, setPendingDeck] = useState<DeckOption | null>(null);
@@ -132,7 +135,7 @@ export default function GoldfishClient({ deck }: GoldfishClientProps) {
 
   return (
     <CardPreviewProvider>
-      <GameProvider deck={deck}>
+      <GameProvider deck={deck} username={username}>
         <GoldfishGameArea deck={deck} onLoadDeck={() => setShowDeckPicker(true)} />
       </GameProvider>
 

@@ -997,6 +997,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           <div className="pt-12">
             <WaitingRoomGoldfish
               deck={goldfishDeck}
+              username={gameParams?.displayName}
               onLoadDeck={() => setShowPracticeDeckPicker(true)}
             />
           </div>

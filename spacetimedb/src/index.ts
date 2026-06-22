@@ -3032,9 +3032,36 @@ function spawnTokenImpl(
   player: any, // Player row
   gameId: bigint,
 ) {
+  // Easter egg: gated users get cycling colored tokens instead of the normal
+  // one. The cycle position is derived from how many of the cycling tokens this
+  // player already has in territory (count-based), so no extra state is stored.
+  // Removing a token before the next spawn can repeat a color — acceptable here.
+  let effectiveTokenName = ability.tokenName;
+  const cyclingNames = ability.cyclingTokenNames ?? [];
+  const me = (player.displayName ?? '').toLowerCase();
+  if (cyclingNames.length > 0 && (ability.cyclingAllowedUsers ?? []).includes(me)) {
+    const cyclingDisplayNames = new Set<string>();
+    for (const n of cyclingNames) {
+      const d = findTokenCard(n);
+      if (d) cyclingDisplayNames.add(d.name);
+    }
+    let inPlay = 0;
+    for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+      if (
+        c.ownerId === source.ownerId &&
+        c.zone === 'territory' &&
+        c.isToken &&
+        cyclingDisplayNames.has(c.cardName)
+      ) {
+        inPlay++;
+      }
+    }
+    effectiveTokenName = cyclingNames[inPlay % cyclingNames.length];
+  }
+
   // Phase 1 — validate token exists in card data.
-  const tokenData = findTokenCard(ability.tokenName);
-  if (!tokenData) throw new SenderError(`Unknown token '${ability.tokenName}'`);
+  const tokenData = findTokenCard(effectiveTokenName);
+  if (!tokenData) throw new SenderError(`Unknown token '${effectiveTokenName}'`);
 
   const count = ability.count ?? 1;
   if (count < 1) throw new SenderError('Invalid count');

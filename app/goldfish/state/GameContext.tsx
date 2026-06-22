@@ -47,11 +47,14 @@ interface GameProviderProps {
   children: ReactNode;
   deck: DeckDataForGoldfish;
   optionsOverrides?: Partial<GoldfishOptions>;
+  /** Logged-in user's profile username — only used to gate the cycling-token
+   *  easter egg. Null/undefined when not signed in. */
+  username?: string | null;
 }
 
-export function GameProvider({ children, deck, optionsOverrides }: GameProviderProps) {
+export function GameProvider({ children, deck, optionsOverrides, username }: GameProviderProps) {
   const initialState = useMemo(
-    () => buildInitialGameState(deck, optionsOverrides),
+    () => buildInitialGameState(deck, optionsOverrides, username),
     // Only compute once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -101,7 +104,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
 
   const newGame = useCallback(() => {
     clearGameToasts();
-    const freshState = buildInitialGameState(deck, optionsOverrides);
+    const freshState = buildInitialGameState(deck, optionsOverrides, username);
     baseDispatch({
       id: crypto.randomUUID(),
       type: 'RESET_GAME',
@@ -109,7 +112,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       timestamp: Date.now(),
       payload: { value: JSON.stringify(freshState) },
     });
-  }, [deck, optionsOverrides]);
+  }, [deck, optionsOverrides, username]);
 
   const advancePhase = useCallback(() => dispatch(actions.advancePhase()), [dispatch]);
   const regressPhase = useCallback(() => dispatch(actions.regressPhase()), [dispatch]);

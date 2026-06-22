@@ -19,7 +19,13 @@ export const DEFAULT_ABILITY_SOURCE_ZONES: ReadonlyArray<ZoneId> = [
 ];
 
 export type CardAbility = AbilityBase & (
-  | { type: 'spawn_token'; tokenName: string; count?: number; defaultZone?: ZoneId }
+  // `cyclingTokenNames` + `cyclingAllowedUsers` are an opt-in easter egg: when
+  // both are set and the activating player's display name (lowercased) is in
+  // cyclingAllowedUsers, the spawn cycles through cyclingTokenNames instead of
+  // spawning `tokenName` (count-based: 0→first, 1→second, …). Everyone else
+  // gets the normal `tokenName`. The cycle index is derived from how many of
+  // those tokens the player already has in play, so no extra state is stored.
+  | { type: 'spawn_token'; tokenName: string; count?: number; defaultZone?: ZoneId; cyclingTokenNames?: string[]; cyclingAllowedUsers?: string[] }
   | { type: 'shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'all_players_shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
@@ -63,7 +69,7 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'The Proselytizers (GoC)':                             [{ type: 'spawn_token', tokenName: 'Proselyte Token' }],
   'The Church of Christ (GoC)':                          [{ type: 'spawn_token', tokenName: 'Follower Token' }],
   'Angel of the Harvest (GoC)':                          [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
-  'The Heavenly Host (GoC)':                             [{ type: 'spawn_token', tokenName: 'Heavenly Host Token' }],
+  'The Heavenly Host (GoC)':                             [{ type: 'spawn_token', tokenName: 'Heavenly Host Token', cyclingTokenNames: ['Heavenly Host Token (Blue)', 'Heavenly Host Token (Purple)', 'Heavenly Host Token (Silver)'], cyclingAllowedUsers: ['jaychambers', 'baboonytim'] }],
   'Kingdom of the Divine':                               [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
   'Kingdom of the Divine [T2C AB]':                      [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
   'Lost Soul "Harvest" [John 4:35]':                     [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
@@ -233,6 +239,60 @@ export const SPECIAL_TOKEN_CARDS: Record<string, CardData> = {
     rarity: 'Token',
     reference: '',
     alignment: 'Neutral',
+    legality: '',
+  },
+  // Special cycling Heavenly Host tokens — an easter egg for the gated users on
+  // 'The Heavenly Host (GoC)'. Metadata mirrors the standard Heavenly Host
+  // Token; only the art differs (blue/purple/silver).
+  'Heavenly Host Token (Blue)': {
+    name: 'Heavenly Host Token (Blue)',
+    set: 'GoC',
+    imgFile: '/gameplay/heavenly_host_token_blue.webp',
+    officialSet: '',
+    type: 'Hero Token',
+    brigade: 'Silver',
+    strength: '1',
+    toughness: '9',
+    class: '',
+    identifier: 'Generic, Nativity, Angel',
+    specialAbility: '',
+    rarity: 'Token',
+    reference: 'Luke 2:13',
+    alignment: 'Good',
+    legality: '',
+  },
+  'Heavenly Host Token (Purple)': {
+    name: 'Heavenly Host Token (Purple)',
+    set: 'GoC',
+    imgFile: '/gameplay/heavenly_host_token_purple.webp',
+    officialSet: '',
+    type: 'Hero Token',
+    brigade: 'Silver',
+    strength: '1',
+    toughness: '9',
+    class: '',
+    identifier: 'Generic, Nativity, Angel',
+    specialAbility: '',
+    rarity: 'Token',
+    reference: 'Luke 2:13',
+    alignment: 'Good',
+    legality: '',
+  },
+  'Heavenly Host Token (Silver)': {
+    name: 'Heavenly Host Token (Silver)',
+    set: 'GoC',
+    imgFile: '/gameplay/heavenly_host_token_silver.webp',
+    officialSet: '',
+    type: 'Hero Token',
+    brigade: 'Silver',
+    strength: '1',
+    toughness: '9',
+    class: '',
+    identifier: 'Generic, Nativity, Angel',
+    specialAbility: '',
+    rarity: 'Token',
+    reference: 'Luke 2:13',
+    alignment: 'Good',
     legality: '',
   },
 };

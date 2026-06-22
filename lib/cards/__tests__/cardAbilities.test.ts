@@ -74,6 +74,27 @@ describe('CARD_ABILITIES registry', () => {
     }
     expect(bad).toEqual([]);
   });
+
+  it('every spawn_token.cyclingTokenNames entry resolves (lib) and has server metadata', async () => {
+    // The cycling easter-egg tokens aren't covered by the primary tokenName
+    // checks above — verify each cycling name resolves via resolveTokenCard
+    // (lib) and exists in TOKEN_CARD_DATA (server) so spawning can't fail.
+    const { TOKEN_CARD_DATA } = await import('@/spacetimedb/src/cardAbilities');
+    const badLib: string[] = [];
+    const badServer: string[] = [];
+    for (const abilities of Object.values(CARD_ABILITIES)) {
+      for (const a of abilities) {
+        if (a.type === 'spawn_token' && a.cyclingTokenNames) {
+          for (const name of a.cyclingTokenNames) {
+            if (!resolveTokenCard(name)) badLib.push(name);
+            if (!TOKEN_CARD_DATA[name]) badServer.push(name);
+          }
+        }
+      }
+    }
+    expect(badLib, 'unresolved cycling tokens (lib)').toEqual([]);
+    expect(badServer, 'cycling tokens missing TOKEN_CARD_DATA (server)').toEqual([]);
+  });
 });
 
 describe('abilityLabel', () => {

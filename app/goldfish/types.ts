@@ -55,4 +55,7 @@ export interface GameState {
   options: GoldfishOptions;
   isSpreadHand: boolean;
   drawnThisTurn: boolean;
+  /** Logged-in user's profile username (null when not signed in). Used only to
+   *  gate the per-user cycling-token easter egg; everything else ignores it. */
+  currentUsername?: string | null;
 }

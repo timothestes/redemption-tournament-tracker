@@ -84,13 +84,32 @@ function spawnTokenInState(
   ability: Extract<CardAbility, { type: 'spawn_token' }>,
   history: GameState[],
 ): GameState {
+  // Easter egg: gated users get cycling colored tokens instead of the normal
+  // one. The cycle position is derived from how many of the cycling tokens the
+  // player already has in territory (count-based) — no extra state stored.
+  // Removing a token before the next spawn can repeat a color; acceptable here.
+  let effectiveTokenName = ability.tokenName;
+  const cyclingNames = ability.cyclingTokenNames ?? [];
+  const me = (state.currentUsername ?? '').toLowerCase();
+  if (cyclingNames.length > 0 && me !== '' && (ability.cyclingAllowedUsers ?? []).includes(me)) {
+    const cyclingDisplayNames = new Set<string>();
+    for (const n of cyclingNames) {
+      const d = resolveTokenCard(n);
+      if (d) cyclingDisplayNames.add(d.name);
+    }
+    const inPlay = state.zones.territory.filter(
+      c => c.ownerId === source.ownerId && c.isToken && cyclingDisplayNames.has(c.cardName),
+    ).length;
+    effectiveTokenName = cyclingNames[inPlay % cyclingNames.length];
+  }
+
   // Phase 1 — validate. Any failure returns state unchanged.
   // resolveTokenCard checks SPECIAL_TOKEN_CARDS first (handcrafted lost-soul
   // tokens under public/gameplay/) then falls back to findCard() for tokens
   // that exist in the generated CARDS dataset.
-  const tokenData = resolveTokenCard(ability.tokenName);
+  const tokenData = resolveTokenCard(effectiveTokenName);
   if (!tokenData) {
-    console.warn('[cardAbilities] unknown token', ability.tokenName);
+    console.warn('[cardAbilities] unknown token', effectiveTokenName);
     return state;
   }
   const count = ability.count ?? 1;

@@ -162,7 +162,8 @@ function buildSoulDeckZones(): { soulDeck: GameCard[]; lob: GameCard[] } {
 
 export function buildInitialGameState(
   deck: DeckDataForGoldfish,
-  optionsOverrides?: Partial<GoldfishOptions>
+  optionsOverrides?: Partial<GoldfishOptions>,
+  currentUsername?: string | null
 ): GameState {
   const format = parseFormat(deck.format);
   const options: GoldfishOptions = {
@@ -211,5 +212,6 @@ export function buildInitialGameState(
     options,
     isSpreadHand: false,
     drawnThisTurn: true,
+    currentUsername: currentUsername ?? null,
   };
 }

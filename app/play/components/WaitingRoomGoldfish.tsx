@@ -20,6 +20,9 @@ export const BANNER_HEIGHT = 48;
 interface WaitingRoomGoldfishProps {
   deck: DeckDataForGoldfish;
   onLoadDeck?: () => void;
+  /** Local player's display name (profiles.username-derived) — only used to
+   *  gate the per-user cycling-token easter egg in goldfish. */
+  username?: string | null;
 }
 
 function GoldfishArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onLoadDeck?: () => void }) {
@@ -103,12 +106,12 @@ function GoldfishArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onLoadD
   );
 }
 
-export default function WaitingRoomGoldfish({ deck, onLoadDeck }: WaitingRoomGoldfishProps) {
+export default function WaitingRoomGoldfish({ deck, onLoadDeck, username }: WaitingRoomGoldfishProps) {
   return (
     <CardPreviewProvider>
       {/* Key on deck.id so swapping the deck remounts GameProvider with a fresh
           initial state — its useMemo is keyed to mount only. */}
-      <GameProvider key={deck.id} deck={deck}>
+      <GameProvider key={deck.id} deck={deck} username={username}>
         <GoldfishArea deck={deck} onLoadDeck={onLoadDeck} />
       </GameProvider>
     </CardPreviewProvider>
