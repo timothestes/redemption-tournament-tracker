@@ -46,10 +46,10 @@ describe("GET /threshingfloor/api/data?kind=deck", () => {
     expect(r.status).toBe(404);
   });
 
-  it("returns the cards array alongside the metadata", async () => {
+  it("reshapes cards to the field names the deck viewer reads (incl. card_img_file)", async () => {
     const cards = [
-      { name: "Abishai (Ki)", set: "Ki", quantity: 1, zone: "main" },
-      { name: "The Second Coming", set: "Wo", quantity: 1, zone: "reserve" },
+      { name: "Abishai (Ki)", set: "Ki", card_img_file: "abishai_ki", quantity: 1, zone: "main" },
+      { name: "The Second Coming", set: "Wo", card_img_file: "the_second_coming", quantity: 1, zone: "reserve" },
     ];
     (cache.loadPublicDeckDetail as any).mockResolvedValue({
       name: "My Deck",
@@ -63,6 +63,9 @@ describe("GET /threshingfloor/api/data?kind=deck", () => {
     expect(r.status).toBe(200);
     const body = await r.json();
     expect(body).toMatchObject({ name: "My Deck", creator: "John", format: "T2", card_count: 2 });
-    expect(body.cards).toEqual(cards);
+    expect(body.cards).toEqual([
+      { card_name: "Abishai (Ki)", card_set: "Ki", card_img_file: "abishai_ki", quantity: 1, zone: "main" },
+      { card_name: "The Second Coming", card_set: "Wo", card_img_file: "the_second_coming", quantity: 1, zone: "reserve" },
+    ]);
   });
 });

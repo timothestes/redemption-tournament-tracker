@@ -55,7 +55,7 @@ export type ListPayload = {
 };
 
 export type DetailPayload = DeckPayload & {
-  cards: { name: string; set: string | null; quantity: number; zone: string }[];
+  cards: { name: string; set: string | null; card_img_file: string | null; quantity: number; zone: string }[];
 };
 
 export type ParseResult<T> =
@@ -253,7 +253,7 @@ async function loadDetailFresh(id: string): Promise<DetailPayload | null> {
 
   const { data: cards, error: cardsErr } = await supabase
     .from("deck_cards")
-    .select("card_name, card_set, quantity, zone")
+    .select("card_name, card_set, card_img_file, quantity, zone")
     .eq("deck_id", id);
   if (cardsErr) throw cardsErr;
 
@@ -270,9 +270,10 @@ async function loadDetailFresh(id: string): Promise<DetailPayload | null> {
   const payload = rowToPayload(row, username);
   return {
     ...payload,
-    cards: (cards ?? []).map((c: { card_name: string; card_set: string | null; quantity: number; zone: string }) => ({
+    cards: (cards ?? []).map((c: { card_name: string; card_set: string | null; card_img_file: string | null; quantity: number; zone: string }) => ({
       name: c.card_name,
       set: c.card_set ?? null,
+      card_img_file: c.card_img_file ?? null,
       quantity: c.quantity,
       zone: c.zone ?? "main",
     })),

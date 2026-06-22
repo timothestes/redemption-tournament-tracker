@@ -35,7 +35,14 @@ export async function GET(request: NextRequest) {
       creator: deck.username,
       format,
       card_count: deck.card_count,
-      cards: deck.cards,
+      // Reshape to the field names the deck viewer (outline.html) reads.
+      cards: deck.cards.map((c) => ({
+        card_name: c.name,
+        card_set: c.set,
+        card_img_file: c.card_img_file,
+        quantity: c.quantity,
+        zone: c.zone,
+      })),
     });
   }
 
