@@ -44,7 +44,7 @@ export async function uploadArt(
     p_original_key: key,
   });
   if (error) return { ok: false, error: "Could not save art" };
-  revalidatePath("/forge/art");
+  revalidatePath("/forge/ideas");
   return { ok: true };
 }
 
@@ -59,7 +59,7 @@ export async function setPlaceholder(
     p_is_placeholder: isPlaceholder,
   });
   if (error) return { ok: false, error: "Could not update placeholder" };
-  revalidatePath("/forge/art");
+  revalidatePath("/forge/ideas");
   return { ok: true };
 }
 
