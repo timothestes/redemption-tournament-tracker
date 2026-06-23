@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
 import { validateArtFile, uploadForgeArt } from "@/app/forge/lib/art";
+import type { DesignCard } from "@/app/forge/lib/designCard";
 
 export type ForgeCardRow = {
   id: string;
@@ -19,7 +20,7 @@ export async function createCard(
   if (!ctx) return { ok: false, error: "Not authorized" };
   const { data, error } = await ctx.supabase.rpc("forge_create_card", { p_title: title });
   if (error || typeof data !== "string") return { ok: false, error: "Could not create card" };
-  revalidatePath("/forge/art");
+  revalidatePath("/forge/ideas");
   return { ok: true, id: data };
 }
 
@@ -60,6 +61,69 @@ export async function setPlaceholder(
   if (error) return { ok: false, error: "Could not update placeholder" };
   revalidatePath("/forge/art");
   return { ok: true };
+}
+
+export type ForgeCardFull = {
+  id: string;
+  title: string | null;
+  snapshot: DesignCard;
+  hasArt: boolean;
+  isPlaceholder: boolean;
+  status: string;
+  updatedAt: string;
+};
+
+function toFull(row: any): ForgeCardFull {
+  return {
+    id: row.id,
+    title: row.title,
+    snapshot: (row.working_snapshot ?? {}) as DesignCard,
+    hasArt: !!row.working_art_key,
+    isPlaceholder: !!row.working_art_is_placeholder,
+    status: row.status,
+    updatedAt: row.updated_at,
+  };
+}
+
+const CARD_COLS = "id, title, working_snapshot, working_art_key, working_art_is_placeholder, status, updated_at";
+
+export async function saveCard(
+  cardId: string,
+  snapshot: DesignCard
+): Promise<{ ok: boolean; error?: string; updatedAt?: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { data, error } = await ctx.supabase.rpc("forge_save_card", {
+    p_card_id: cardId,
+    p_snapshot: snapshot,
+  });
+  if (error) return { ok: false, error: "Could not save card" };
+  revalidatePath(`/forge/ideas/${cardId}`);
+  return { ok: true, updatedAt: typeof data === "string" ? data : undefined };
+}
+
+export async function getCard(cardId: string): Promise<ForgeCardFull | null> {
+  const ctx = await requireForge();
+  if (!ctx) return null;
+  const { data } = await ctx.supabase
+    .from("forge_cards")
+    .select(CARD_COLS)
+    .eq("id", cardId)
+    .maybeSingle();
+  return data ? toFull(data) : null;
+}
+
+// Caller's OWN cards only (single-author Phase 1a). Full snapshot is the caller's
+// own data — used to render grid thumbnails.
+export async function listForgeCards(): Promise<ForgeCardFull[]> {
+  const ctx = await requireForge();
+  if (!ctx) return [];
+  const { data } = await ctx.supabase
+    .from("forge_cards")
+    .select(CARD_COLS)
+    .eq("owner_id", ctx.user.id)
+    .order("updated_at", { ascending: false });
+  return (data ?? []).map(toFull);
 }
 
 export async function listMyForgeCards(): Promise<ForgeCardRow[]> {
