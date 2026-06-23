@@ -34,7 +34,7 @@ export async function uploadForgeArt(file: File): Promise<string> {
 }
 
 /** Server-side read of a private art blob by its stored key. */
-export function readForgeArt(key: string): Promise<GetBlobResult> {
+export function readForgeArt(key: string): Promise<GetBlobResult | null> {
   return get(key, { access: "private", token: process.env.BLOB_READ_WRITE_TOKEN! });
 }
 

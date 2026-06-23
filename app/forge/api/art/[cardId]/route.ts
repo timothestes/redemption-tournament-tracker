@@ -1,11 +1,10 @@
-import { type NextRequest } from "next/server";
 import { requireForge, notFoundResponse } from "@/app/forge/lib/auth";
 import { readForgeArt } from "@/app/forge/lib/art";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  req: NextRequest,
+  req: Request,
   { params }: { params: Promise<{ cardId: string }> }
 ): Promise<Response> {
   const ctx = await requireForge();
@@ -23,13 +22,21 @@ export async function GET(
 
   if (!card?.working_art_key) return notFoundResponse();
 
-  const result = await readForgeArt(card.working_art_key);
-  if (result.statusCode !== 200) return notFoundResponse();
+  let result;
+  try {
+    result = await readForgeArt(card.working_art_key);
+  } catch {
+    return notFoundResponse();
+  }
+  if (!result || result.statusCode !== 200) return notFoundResponse();
 
-  const download = req.nextUrl.searchParams.get("download") === "1";
+  const download = new URL(req.url).searchParams.get("download") === "1";
   if (download) {
-    // Best-effort audit; never block the download on a logging failure.
-    await ctx.supabase.rpc("forge_log_art_download", { p_card_id: cardId });
+    try {
+      await ctx.supabase.rpc("forge_log_art_download", { p_card_id: cardId });
+    } catch {
+      // best-effort audit; never block the download on a logging failure
+    }
   }
 
   const headers = new Headers({
@@ -37,7 +44,7 @@ export async function GET(
     "Cache-Control": "private, no-store",
   });
   if (download) {
-    headers.set("Content-Disposition", `attachment; filename="card-${cardId}"`);
+    headers.set("Content-Disposition", `attachment; filename="card-${encodeURIComponent(cardId)}"`);
   }
   return new Response(result.stream, { headers });
 }
