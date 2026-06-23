@@ -13,7 +13,7 @@ const ENABLED = process.env.FORGE_LEAK_TEST === "1" && !!URL && !!ANON;
 
 // Every table that holds Forge secret data. EXTEND THIS as new Forge tables are
 // added in later plans. The anon (public) role must see ZERO rows in each.
-const FORGE_TABLES = ["playtest_members", "forge_invites", "forge_audit"];
+const FORGE_TABLES = ["playtest_members", "forge_invites", "forge_audit", "forge_cards"];
 
 describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
   const anon = createClient(URL!, ANON!);
@@ -46,6 +46,10 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_change_role", { p_user_id: "00000000-0000-0000-0000-000000000000", p_new_role: "playtester" }],
     ["forge_set_profile", { p_display_name: "x", p_avatar_url: null }],
     ["forge_list_invites", {}],
+    ["forge_create_card", { p_title: "x" }],
+    ["forge_set_working_art", { p_card_id: "00000000-0000-0000-0000-000000000000", p_key: "x", p_original_key: "x" }],
+    ["forge_set_art_placeholder", { p_card_id: "00000000-0000-0000-0000-000000000000", p_is_placeholder: true }],
+    ["forge_log_art_download", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
   ];
 
   for (const [fn, args] of FORGE_RPCS) {
