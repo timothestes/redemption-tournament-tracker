@@ -80,7 +80,7 @@ export default function AdminConsole({
             />
           </label>
           <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" disabled={pending}>
-            Mint invite
+            Send invite
           </button>
         </form>
         {inviteUrl && (
