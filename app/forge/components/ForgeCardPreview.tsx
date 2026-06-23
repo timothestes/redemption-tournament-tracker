@@ -36,7 +36,7 @@ export default function ForgeCardPreview({
   return (
     <div
       className={className}
-      style={{ position: "relative", aspectRatio: "750 / 1050", width: "100%", fontFamily: "ForgeBody, system-ui, sans-serif" }}
+      style={{ position: "relative", aspectRatio: "750 / 1050", width: "100%", containerType: "inline-size", fontFamily: "ForgeBody, system-ui, sans-serif" }}
     >
       {/* 1. white base */}
       <Img src="/forge/frames/Elements/White Border.png" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
@@ -46,41 +46,49 @@ export default function ForgeCardPreview({
       ) : (
         <div style={{ ...abs(G.wash), zIndex: 1, background: fallbackColor, borderRadius: "5%" }} />
       )}
-      {/* 3. art */}
-      {artUrl && <Img src={artUrl} style={{ ...abs(G.art), zIndex: 2, objectFit: "cover" }} />}
-      {/* 4. art frame */}
-      <Img src="/forge/frames/Elements/Art Box.png" style={{ ...abs(G.art), zIndex: 3, width: G.art.width, height: G.art.height }} />
-      {/* 5. stat box (stat-bearing types) */}
+      {/* 3. art window — uploaded art clipped to the window, or a clean empty slot.
+            (The kit's "Art Box" element is a checkerboard placeholder, not a frame,
+            so we draw the window border in CSS instead.) */}
+      <div style={{ ...abs(G.art), zIndex: 2, borderRadius: "2.5%", overflow: "hidden", border: "1.5px solid rgba(0,0,0,0.5)", background: "rgba(0,0,0,0.18)" }}>
+        {artUrl ? (
+          <Img src={artUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.45)", fontSize: "3.4cqw" }}>
+            No art
+          </div>
+        )}
+      </div>
+      {/* 5. stat box (stat-bearing types) — solid brigade color (kit has no single Color element) */}
       {isStatBearing(types) && (
-        <div style={{ ...abs(G.statBox), zIndex: 4, background: statBox ? undefined : fallbackColor, borderRadius: "10%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>
+        <div style={{ ...abs(G.statBox), zIndex: 4, background: statBox ? undefined : fallbackColor, borderRadius: "10%", border: "1px solid rgba(255,255,255,0.35)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>
           {statBox && <Img src={statBox} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />}
-          <span style={{ position: "relative", fontSize: "clamp(10px, 4vw, 28px)" }}>
+          <span style={{ position: "relative", fontSize: "7cqw", lineHeight: 1, textShadow: "0 1px 2px rgba(0,0,0,.7)" }}>
             {card.strength ?? 0}/{card.toughness ?? 0}
           </span>
-          {icon && <Img src={icon} style={{ position: "relative", height: "40%", marginTop: "2%" }} />}
+          {icon && <Img src={icon} style={{ position: "relative", height: "42%", marginTop: "3%", objectFit: "contain" }} />}
         </div>
       )}
       {/* 6. title */}
-      <div style={{ ...abs(G.title), zIndex: 5, display: "flex", alignItems: "center", justifyContent: "flex-end", color: "#fff", fontFamily: "ForgeTitle, ForgeBody, sans-serif", fontSize: "clamp(12px, 5vw, 34px)", textShadow: "0 1px 2px rgba(0,0,0,.6)" }}>
+      <div style={{ ...abs(G.title), zIndex: 5, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#fff", fontFamily: "ForgeTitle, ForgeBody, sans-serif", fontSize: "6.5cqw", lineHeight: 1.02, textShadow: "0 1px 2px rgba(0,0,0,.7)", overflow: "hidden" }}>
         {card.name || "Card Title"}
       </div>
-      {/* 8. ability */}
-      <div style={{ ...abs(G.ability), zIndex: 5, overflow: "hidden", color: "#111", fontWeight: 700, textAlign: "center", fontSize: "clamp(8px, 2.6vw, 16px)", lineHeight: 1.15, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {/* 7. ability — light panel so dark text stays readable on any wash */}
+      <div style={{ ...abs(G.ability), zIndex: 5, overflow: "hidden", boxSizing: "border-box", background: "rgba(245,241,233,0.96)", borderRadius: "2.5%", padding: "1.4cqw 3cqw", color: "#111", fontWeight: 700, textAlign: "center", fontSize: "4cqw", lineHeight: 1.15, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {card.specialAbility || ""}
       </div>
-      {/* scripture + reference */}
-      <div style={{ ...abs(G.scripture), zIndex: 5, overflow: "hidden", color: "#eee", fontStyle: "italic", fontSize: "clamp(7px, 2.2vw, 13px)", lineHeight: 1.15 }}>
-        {card.flavorText || ""}
-        <div style={{ textAlign: "right", fontStyle: "normal", fontWeight: 700 }}>{card.reference || ""}</div>
+      {/* 8. scripture + reference — dark panel, light italic text */}
+      <div style={{ ...abs(G.scripture), zIndex: 5, overflow: "hidden", boxSizing: "border-box", background: "rgba(0,0,0,0.82)", borderRadius: "2.5%", padding: "1.4cqw 3cqw", color: "#e8e8e8", fontStyle: "italic", fontSize: "3.2cqw", lineHeight: 1.15, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <span style={{ overflow: "hidden" }}>{card.flavorText || ""}</span>
+        <span style={{ textAlign: "right", fontStyle: "normal", fontWeight: 700 }}>{card.reference || ""}</span>
       </div>
-      {/* footer */}
-      <div style={{ ...abs(G.footer), zIndex: 5, display: "flex", justifyContent: "space-between", alignItems: "flex-end", color: "#fff", fontSize: "clamp(6px, 1.6vw, 10px)", opacity: 0.85 }}>
+      {/* 9. footer */}
+      <div style={{ ...abs(G.footer), zIndex: 5, display: "flex", justifyContent: "space-between", alignItems: "flex-end", color: "#fff", fontSize: "2.3cqw", opacity: 0.85 }}>
         <span>{card.artistCredit ? `Illus. ${card.artistCredit}` : "Illus. Artist Unknown"}</span>
         <span>© Cactus Game Design, Inc.</span>
       </div>
       {/* approximate badge */}
       {approximate && (
-        <div style={{ position: "absolute", left: "50%", bottom: "1%", transform: "translateX(-50%)", zIndex: 6, background: "rgba(0,0,0,.7)", color: "#fff", fontSize: "9px", padding: "1px 6px", borderRadius: "4px" }}>
+        <div style={{ position: "absolute", left: "50%", bottom: "1%", transform: "translateX(-50%)", zIndex: 6, background: "rgba(0,0,0,.7)", color: "#fff", fontSize: "2.6cqw", padding: "1px 6px", borderRadius: "4px" }}>
           preview approximate
         </div>
       )}
