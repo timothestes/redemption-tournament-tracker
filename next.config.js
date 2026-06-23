@@ -1,5 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    // Server Actions cap request bodies at 1MB by default; Forge card art is
+    // validated up to 15MB (validateArtFile / MAX_ART_BYTES), so raise the limit
+    // to match (+ multipart overhead). Note: on Vercel, very large uploads may
+    // still hit the platform request-body limit — switch art upload to a
+    // client-direct-to-Blob flow if that becomes a problem in production.
+    serverActions: {
+      bodySizeLimit: '16mb',
+    },
+  },
   webpack: (config) => {
     config.externals = [...(config.externals || []), { canvas: 'canvas' }];
     return config;
