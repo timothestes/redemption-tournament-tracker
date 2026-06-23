@@ -65,7 +65,7 @@ export default function ArtPanel({ cards }: { cards: ForgeCardRow[] }) {
           <li key={card.id} className="rounded-lg border p-4">
             <div className="flex items-start gap-4">
               <div className="relative h-40 w-28 shrink-0 overflow-hidden rounded-md border bg-muted">
-                {card.working_art_key ? (
+                {card.hasArt ? (
                   // Plain <img> ONLY — next/image is banned under app/forge (see guardrail test).
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -103,7 +103,7 @@ export default function ArtPanel({ cards }: { cards: ForgeCardRow[] }) {
                   <button onClick={() => onTogglePlaceholder(card)} className="text-emerald-600 hover:underline">
                     {card.working_art_is_placeholder ? "Unmark placeholder" : "Mark placeholder"}
                   </button>
-                  {card.working_art_key && (
+                  {card.hasArt && (
                     <a href={`/forge/api/art/${card.id}?download=1`} className="text-emerald-600 hover:underline">
                       Download original
                     </a>

@@ -7,7 +7,7 @@ import { validateArtFile, uploadForgeArt } from "@/app/forge/lib/art";
 export type ForgeCardRow = {
   id: string;
   title: string | null;
-  working_art_key: string | null;
+  hasArt: boolean;
   working_art_is_placeholder: boolean;
   updated_at: string;
 };
@@ -70,5 +70,11 @@ export async function listMyForgeCards(): Promise<ForgeCardRow[]> {
     .select("id, title, working_art_key, working_art_is_placeholder, updated_at")
     .eq("owner_id", ctx.user.id)
     .order("updated_at", { ascending: false });
-  return (data ?? []) as ForgeCardRow[];
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    hasArt: !!row.working_art_key,
+    working_art_is_placeholder: row.working_art_is_placeholder,
+    updated_at: row.updated_at,
+  })) as ForgeCardRow[];
 }
