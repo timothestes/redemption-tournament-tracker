@@ -107,6 +107,5 @@ public/forge/frames/Evil Characters/
 public/forge/frames/Sites/
 public/forge/frames/Covenants/
 public/forge/frames/Curses/
-# Forge: never commit raw kit PNGs (we ship .webp) or proprietary fonts
+# Forge: never commit raw kit PNGs (we ship .webp)
 public/forge/frames/Elements/**/*.png
-public/forge/fonts/*.ttf
