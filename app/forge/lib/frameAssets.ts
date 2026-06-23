@@ -1,5 +1,4 @@
 import type { Brigade, CardType, DesignCard } from "./designCard";
-import { isStatBearing } from "./designCard";
 
 const BASE = "/forge/frames/Elements";
 const ICONS = "/forge/frames/Icons";
@@ -50,14 +49,11 @@ export function washPath(card: DesignCard): string | null {
   return AVAILABLE_WASH.has(s1) ? `${BASE}/Background=${s1}.webp` : null;
 }
 
-export function statBoxPath(card: DesignCard): string | null {
-  if (!isStatBearing(card.cardType ?? [])) return null;
-  const brigades = card.brigades ?? [];
-  const s1 = brigades[0] ? BRIGADE_SLUG[brigades[0]] : null;
-  if (!s1 || !AVAILABLE_WASH.has(s1)) return null; // solid fallback handled by component
-  // Stat-box color element: capitalized brigade name in the kit (e.g. Color=Gold).
-  const cap = s1.charAt(0).toUpperCase() + s1.slice(1);
-  return `${BASE}/Color=${cap}.webp`;
+export function statBoxPath(_card: DesignCard): string | null {
+  // The kit ships no single-brigade stat-box color element (only dual-combo
+  // Color=<A>/<B> dirs). Single-brigade stat boxes render as solid BRIGADE_HEX
+  // in the component. Returning null triggers that fallback.
+  return null;
 }
 
 // Type icon shown in the stat box / corner. Tuned visually against references.

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireForge } from "./lib/auth";
+import "./forge-fonts.css";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

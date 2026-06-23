@@ -22,7 +22,9 @@ describe("washPath", () => {
 
 describe("statBoxPath / iconPath", () => {
   it("stat-bearing types get a stat box; non-stat types do not", () => {
-    expect(statBoxPath({ cardType: ["Hero"], brigades: ["Blue"] })).not.toBeNull();
+    // Kit ships no single-brigade Color=<X>.webp — statBoxPath always returns null;
+    // the component renders a solid BRIGADE_HEX fallback instead.
+    expect(statBoxPath({ cardType: ["Hero"], brigades: ["Blue"] })).toBeNull();
     expect(statBoxPath({ cardType: ["LostSoul"] })).toBeNull();
   });
   it("maps the type icon", () => {
