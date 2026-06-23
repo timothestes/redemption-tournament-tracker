@@ -50,6 +50,8 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_set_working_art", { p_card_id: "00000000-0000-0000-0000-000000000000", p_key: "x", p_original_key: "x" }],
     ["forge_set_art_placeholder", { p_card_id: "00000000-0000-0000-0000-000000000000", p_is_placeholder: true }],
     ["forge_log_art_download", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["is_forge_superadmin", {}],
+    ["forge_save_card", { p_card_id: "00000000-0000-0000-0000-000000000000", p_snapshot: {} }],
   ];
 
   for (const [fn, args] of FORGE_RPCS) {
@@ -58,4 +60,34 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
       expect(error, `anon was able to execute ${fn} — a definer grant leaked`).not.toBeNull();
     });
   }
+
+  // Member-vs-member isolation: a signed-in member must NOT see another member's
+  // private idea. Opt-in (needs a test member + service role to seed a foreign card).
+  const MEMBER_EMAIL = process.env.FORGE_TEST_MEMBER_EMAIL;
+  const MEMBER_PW = process.env.FORGE_TEST_MEMBER_PASSWORD;
+  const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const OTHER_OWNER = process.env.FORGE_TEST_OTHER_OWNER_ID; // an auth.users id != the test member
+  const ISO_ENABLED = !!(MEMBER_EMAIL && MEMBER_PW && SERVICE && OTHER_OWNER);
+
+  describe.runIf(ISO_ENABLED)("member cannot read another member's card", () => {
+    it("a signed-in member sees zero rows for a foreign-owned card", async () => {
+      const svc = createClient(URL!, SERVICE!);
+      const ins = await svc
+        .from("forge_cards")
+        .insert({ owner_id: OTHER_OWNER!, working_snapshot: { name: "SECRET IDEA" } })
+        .select("id")
+        .single();
+      expect(ins.error, ins.error?.message).toBeNull();
+      const foreignId = ins.data!.id as string;
+      try {
+        const member = createClient(URL!, ANON!);
+        const auth = await member.auth.signInWithPassword({ email: MEMBER_EMAIL!, password: MEMBER_PW! });
+        expect(auth.error, auth.error?.message).toBeNull();
+        const { data } = await member.from("forge_cards").select("*").eq("id", foreignId);
+        expect((data ?? []).length, "member leaked a foreign-owned card").toBe(0);
+      } finally {
+        await svc.from("forge_cards").delete().eq("id", foreignId);
+      }
+    });
+  });
 });
