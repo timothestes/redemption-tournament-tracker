@@ -39,7 +39,7 @@ export default function ForgeCardPreview({
       style={{ position: "relative", aspectRatio: "750 / 1050", width: "100%", containerType: "inline-size", fontFamily: "ForgeBody, system-ui, sans-serif" }}
     >
       {/* 1. white base */}
-      <Img src="/forge/frames/Elements/White Border.png" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
+      <Img src="/forge/frames/Elements/White Border.webp" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
       {/* 2. brigade wash (image) or solid-color fallback */}
       {wash ? (
         <Img src={wash} style={{ ...abs(G.wash), zIndex: 1, objectFit: "cover", borderRadius: "5%" }} />

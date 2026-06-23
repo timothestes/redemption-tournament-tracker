@@ -12,9 +12,11 @@ export default function StudioEditor({ card }: { card: ForgeCardFull }) {
   const [fullMode, setFullMode] = useState<boolean>(!!card.snapshot?.cardType?.length);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstRender = useRef(true);
 
-  // Debounced autosave — always persists whatever is typed (never blocks).
+  // Debounced autosave — fires only after the user edits (skips mount).
   useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       setSaved("saving");

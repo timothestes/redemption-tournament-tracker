@@ -5,14 +5,6 @@ import { requireForge, requireElder } from "@/app/forge/lib/auth";
 import { validateArtFile, uploadForgeArt } from "@/app/forge/lib/art";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 
-export type ForgeCardRow = {
-  id: string;
-  title: string | null;
-  hasArt: boolean;
-  working_art_is_placeholder: boolean;
-  updated_at: string;
-};
-
 export async function createCard(
   title: string
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -124,21 +116,4 @@ export async function listForgeCards(): Promise<ForgeCardFull[]> {
     .eq("owner_id", ctx.user.id)
     .order("updated_at", { ascending: false });
   return (data ?? []).map(toFull);
-}
-
-export async function listMyForgeCards(): Promise<ForgeCardRow[]> {
-  const ctx = await requireForge();
-  if (!ctx) return [];
-  const { data } = await ctx.supabase
-    .from("forge_cards")
-    .select("id, title, working_art_key, working_art_is_placeholder, updated_at")
-    .eq("owner_id", ctx.user.id)
-    .order("updated_at", { ascending: false });
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    title: row.title,
-    hasArt: !!row.working_art_key,
-    working_art_is_placeholder: row.working_art_is_placeholder,
-    updated_at: row.updated_at,
-  })) as ForgeCardRow[];
 }
