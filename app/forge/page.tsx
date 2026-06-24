@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 export default async function ForgeDeskPage() {
   const ctx = await requireForge();
   if (!ctx) notFound();
-  const isElder = ctx.role === "elder" || ctx.role === "superadmin";
   return (
     <main className="mx-auto max-w-3xl p-6">
       <h1 className="text-2xl" style={{ fontFamily: "Cinzel, serif" }}>The Forge</h1>
