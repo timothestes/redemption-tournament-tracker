@@ -406,7 +406,11 @@ begin
   if v_card.status not in ('draft','playtesting','approved') then
     raise exception 'card cannot be archived from its current state';
   end if;
-  update public.forge_cards set status = 'archived', updated_at = now() where id = p_card_id;
+  update public.card_versions set status = 'superseded'
+   where card_id = p_card_id and status <> 'superseded';
+  update public.forge_cards
+     set status = 'archived', published_version_id = null, approved_version_id = null, updated_at = now()
+   where id = p_card_id;
 end; $$;
 
 create or replace function public.forge_unarchive_card(p_card_id uuid)
