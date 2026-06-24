@@ -1,21 +1,26 @@
 // Server-only helpers for Forge private card art.
-// DO NOT import this module into a "use client" component — it uses a
-// server-only token and a PRIVATE-access Vercel Blob store. Art is uploaded with
+// DO NOT import this module into a "use client" component — it uses
+// server-only credentials and a PRIVATE-access Vercel Blob store. Art is uploaded with
 // access:'private' under unguessable UUID keys and read back server-side; the
 // browser only ever sees the /forge/api/art proxy URL.
 //
 // IMPORTANT: `access: 'private'` requires a store CONFIGURED for private access.
-// Set FORGE_BLOB_READ_WRITE_TOKEN to a dedicated private store's token (keeps
-// Forge art isolated from the app's public card-image store). If unset, falls
-// back to BLOB_READ_WRITE_TOKEN — which then must itself have private access
-// enabled, or `put`/`get` will fail with "Cannot use private access on a public store".
+// Art lives in a dedicated private store (FORGE_BLOB_STORE_ID), isolated from the
+// app's public card-image store. See `forgeAuth` below for how requests authenticate.
 import { randomUUID } from "crypto";
 import { put, get, del, type GetBlobResult } from "@vercel/blob";
 
-/** Token for the private Forge blob store (dedicated if set, else the default store). */
-function forgeBlobToken(): string {
-  return (process.env.FORGE_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN)!;
-}
+/**
+ * Auth for the PRIVATE Forge store. Production uses Vercel OIDC (no static secret):
+ * the SDK reads VERCEL_OIDC_TOKEN automatically and pairs it with the store id. Local
+ * dev sets FORGE_BLOB_READ_WRITE_TOKEN (OIDC isn't enabled for the dev environment),
+ * which the SDK prefers when present — so prod stays on OIDC as long as that var is
+ * left unset there.
+ */
+const forgeAuth: { token: string } | { storeId: string } =
+  process.env.FORGE_BLOB_READ_WRITE_TOKEN
+    ? { token: process.env.FORGE_BLOB_READ_WRITE_TOKEN }
+    : { storeId: process.env.FORGE_BLOB_STORE_ID! };
 
 const ART_PREFIX = "forge-art/";
 export const ALLOWED_ART_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -38,7 +43,7 @@ export async function uploadForgeArt(file: File): Promise<string> {
   const blob = await put(key, file, {
     access: "private",
     addRandomSuffix: false,
-    token: forgeBlobToken(),
+    ...forgeAuth,
     contentType: file.type,
   });
   return blob.pathname;
@@ -46,13 +51,13 @@ export async function uploadForgeArt(file: File): Promise<string> {
 
 /** Server-side read of a private art blob by its stored key. */
 export function readForgeArt(key: string): Promise<GetBlobResult | null> {
-  return get(key, { access: "private", token: forgeBlobToken() });
+  return get(key, { access: "private", ...forgeAuth });
 }
 
 /** Best-effort delete of a private art blob (used when art is replaced). Non-fatal on failure. */
 export async function deleteForgeArt(key: string): Promise<void> {
   try {
-    await del(key, { token: forgeBlobToken() });
+    await del(key, { ...forgeAuth });
   } catch {
     // A dangling private+UUID blob is invisible and harmless; don't fail the request.
   }

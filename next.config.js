@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // @vercel/blob 2.4.x pulls in Node-only deps (@vercel/oidc, undici) that read
+  // fs/path and have no react-server export condition, so webpack bundling them
+  // into the RSC server bundle throws at load. Externalize so Next require()s the
+  // package at runtime (which works) instead of bundling it.
+  serverExternalPackages: ['@vercel/blob'],
   experimental: {
     // Server Actions cap request bodies at 1MB by default; Forge card art is
     // validated up to 15MB (validateArtFile / MAX_ART_BYTES), so raise the limit
