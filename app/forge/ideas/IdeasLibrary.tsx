@@ -26,7 +26,7 @@ export default function IdeasLibrary({ cards, canCreate }: { cards: ForgeCardFul
     setCreating(true);
     const r = await createCard("");
     setCreating(false);
-    if (r.ok) router.push(`/forge/ideas/${r.id}`);
+    if (r.ok) router.push(`/forge/cards/${r.id}`);
   }
 
   return (
@@ -59,7 +59,7 @@ export default function IdeasLibrary({ cards, canCreate }: { cards: ForgeCardFul
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {filtered.map((c) => (
-            <Link key={c.id} href={`/forge/ideas/${c.id}`} className="block transition hover:opacity-90">
+            <Link key={c.id} href={`/forge/cards/${c.id}`} className="block transition hover:opacity-90">
               <ForgeCardPreview card={c.snapshot} artUrl={c.hasArt ? `/forge/api/art/${c.id}` : null} />
               <p className="mt-1 truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>
             </Link>

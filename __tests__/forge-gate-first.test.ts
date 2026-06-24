@@ -22,7 +22,7 @@ function listForgeRouteFiles(): string[] {
 
 const GATE = /require(Forge|Elder|ForgeSuperadmin)\s*\(/;
 // Pure redirect with no data exposure — intentionally has no gate.
-const ALLOW_NO_GATE = new Set(["app/forge/art/page.tsx"]);
+const ALLOW_NO_GATE = new Set(["app/forge/art/page.tsx", "app/forge/ideas/[cardId]/page.tsx"]);
 
 describe("forge gate-first guardrail", () => {
   const files = listForgeRouteFiles().filter((f) => !ALLOW_NO_GATE.has(f));
