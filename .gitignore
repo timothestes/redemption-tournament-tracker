@@ -97,3 +97,15 @@ test_shopify.py
 # Playwright e2e artifacts (root outputDir)
 /test-results
 /playwright-report
+
+# Forge: reference-only Figma frames (baked text) — never deploy/commit; keep local for visual tuning
+public/forge/frames/Complete Cards/
+public/forge/frames/Heroes/
+public/forge/frames/Good Enhancements/
+public/forge/frames/Evil Enhancements/
+public/forge/frames/Evil Characters/
+public/forge/frames/Sites/
+public/forge/frames/Covenants/
+public/forge/frames/Curses/
+# Forge: never commit raw kit PNGs (we ship .webp)
+public/forge/frames/Elements/**/*.png
