@@ -16,8 +16,8 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
     setBusy(true);
     const r = await createSet(name.trim());
     setBusy(false);
-    if (r.ok) router.push(`/forge/sets/${r.id}/cards`);
-    else alert(r.error);
+    if (r.ok === false) { alert(r.error); return; }
+    router.push(`/forge/sets/${r.id}/cards`);
   }
 
   return (
