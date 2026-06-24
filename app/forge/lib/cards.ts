@@ -63,6 +63,9 @@ export type ForgeCardFull = {
   isPlaceholder: boolean;
   status: string;
   updatedAt: string;
+  setId: string | null;
+  publishedVersionId: string | null;
+  approvedVersionId: string | null;
 };
 
 function toFull(row: any): ForgeCardFull {
@@ -74,10 +77,13 @@ function toFull(row: any): ForgeCardFull {
     isPlaceholder: !!row.working_art_is_placeholder,
     status: row.status,
     updatedAt: row.updated_at,
+    setId: row.set_id ?? null,
+    publishedVersionId: row.published_version_id ?? null,
+    approvedVersionId: row.approved_version_id ?? null,
   };
 }
 
-const CARD_COLS = "id, title, working_snapshot, working_art_key, working_art_is_placeholder, status, updated_at";
+const CARD_COLS = "id, title, working_snapshot, working_art_key, working_art_is_placeholder, status, updated_at, set_id, published_version_id, approved_version_id";
 
 export async function saveCard(
   cardId: string,
@@ -90,7 +96,7 @@ export async function saveCard(
     p_snapshot: snapshot,
   });
   if (error) return { ok: false, error: "Could not save card" };
-  revalidatePath(`/forge/ideas/${cardId}`);
+  revalidatePath(`/forge/cards/${cardId}`);
   return { ok: true, updatedAt: typeof data === "string" ? data : undefined };
 }
 
@@ -114,6 +120,7 @@ export async function listForgeCards(): Promise<ForgeCardFull[]> {
     .from("forge_cards")
     .select(CARD_COLS)
     .eq("owner_id", ctx.user.id)
+    .is("set_id", null)
     .order("updated_at", { ascending: false });
   return (data ?? []).map(toFull);
 }

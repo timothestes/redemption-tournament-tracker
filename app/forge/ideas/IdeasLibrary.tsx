@@ -2,9 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 import { createCard, type ForgeCardFull } from "@/app/forge/lib/cards";
+import ForgeCardGrid from "@/app/forge/components/ForgeCardGrid";
 import { CARD_TYPES, BRIGADES, type CardType, type Brigade } from "@/app/forge/lib/designCard";
 
 export default function IdeasLibrary({ cards, canCreate }: { cards: ForgeCardFull[]; canCreate: boolean }) {
@@ -26,7 +25,7 @@ export default function IdeasLibrary({ cards, canCreate }: { cards: ForgeCardFul
     setCreating(true);
     const r = await createCard("");
     setCreating(false);
-    if (r.ok) router.push(`/forge/ideas/${r.id}`);
+    if (r.ok) router.push(`/forge/cards/${r.id}`);
   }
 
   return (
@@ -57,14 +56,7 @@ export default function IdeasLibrary({ cards, canCreate }: { cards: ForgeCardFul
           {canCreate && <button onClick={onNew} className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white">Jot an idea</button>}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((c) => (
-            <Link key={c.id} href={`/forge/ideas/${c.id}`} className="block transition hover:opacity-90">
-              <ForgeCardPreview card={c.snapshot} artUrl={c.hasArt ? `/forge/api/art/${c.id}` : null} />
-              <p className="mt-1 truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>
-            </Link>
-          ))}
-        </div>
+        <ForgeCardGrid cards={filtered} />
       )}
     </div>
   );

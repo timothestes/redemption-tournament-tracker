@@ -13,7 +13,10 @@ const ENABLED = process.env.FORGE_LEAK_TEST === "1" && !!URL && !!ANON;
 
 // Every table that holds Forge secret data. EXTEND THIS as new Forge tables are
 // added in later plans. The anon (public) role must see ZERO rows in each.
-const FORGE_TABLES = ["playtest_members", "forge_invites", "forge_audit", "forge_cards"];
+const FORGE_TABLES = [
+  "playtest_members", "forge_invites", "forge_audit", "forge_cards",
+  "forge_sets", "forge_set_elders", "forge_set_grants", "card_versions",
+];
 
 describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
   const anon = createClient(URL!, ANON!);
@@ -52,6 +55,22 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_log_art_download", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["is_forge_superadmin", {}],
     ["forge_save_card", { p_card_id: "00000000-0000-0000-0000-000000000000", p_snapshot: {} }],
+    ["is_forge_set_elder", { p_set_id: "00000000-0000-0000-0000-000000000000" }],
+    ["is_forge_set_granted", { p_set_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_create_set", { p_name: "x" }],
+    ["forge_rename_set", { p_set_id: "00000000-0000-0000-0000-000000000000", p_name: "x" }],
+    ["forge_save_set_notes", { p_set_id: "00000000-0000-0000-0000-000000000000", p_notes: "x" }],
+    ["forge_save_set_targets", { p_set_id: "00000000-0000-0000-0000-000000000000", p_targets: {} }],
+    ["forge_add_set_elder", { p_set_id: "00000000-0000-0000-0000-000000000000", p_user_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_remove_set_elder", { p_set_id: "00000000-0000-0000-0000-000000000000", p_user_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_share_card_to_set", { p_card_id: "00000000-0000-0000-0000-000000000000", p_set_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_send_card_to_private", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_publish_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_approve_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_unapprove_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_archive_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_unarchive_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_delete_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
   ];
 
   for (const [fn, args] of FORGE_RPCS) {

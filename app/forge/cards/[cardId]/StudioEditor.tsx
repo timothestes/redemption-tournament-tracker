@@ -6,8 +6,10 @@ import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 import { saveCard, type ForgeCardFull } from "@/app/forge/lib/cards";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 import FullModeForm from "./FullModeForm";
+import LifecycleControls from "./LifecycleControls";
+import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 
-export default function StudioEditor({ card }: { card: ForgeCardFull }) {
+export default function StudioEditor({ card, sets }: { card: ForgeCardFull; sets: ForgeSetSummary[] }) {
   const [snapshot, setSnapshot] = useState<DesignCard>(card.snapshot ?? {});
   const [fullMode, setFullMode] = useState<boolean>(!!card.snapshot?.cardType?.length);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -30,14 +32,16 @@ export default function StudioEditor({ card }: { card: ForgeCardFull }) {
 
   return (
     <div className="mx-auto max-w-5xl p-4">
-      <div className="mb-3 flex items-center justify-between text-sm">
-        <Link href="/forge/ideas" className="text-muted-foreground hover:underline">← Ideas</Link>
-        <div className="flex items-center gap-3">
-          <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">Private idea</span>
+      <div className="mb-3 flex flex-col gap-2 text-sm">
+        <div className="flex items-center justify-between">
+          <Link href={card.setId ? `/forge/sets/${card.setId}/cards` : "/forge/ideas"} className="text-muted-foreground hover:underline">
+            ← {card.setId ? "Set" : "Ideas"}
+          </Link>
           <span className="text-xs text-muted-foreground">
             {saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Save failed" : ""}
           </span>
         </div>
+        <LifecycleControls card={card} sets={sets} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,360px)_1fr]">

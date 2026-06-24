@@ -12,7 +12,8 @@ function ctx(rpcImpl?: any, queryRows?: any[]) {
   const eqList = vi.fn(() => ({ order }));
   const maybeSingle = vi.fn(async () => ({ data: (queryRows ?? [])[0] ?? null, error: null }));
   const eqOne = vi.fn(() => ({ maybeSingle }));
-  const select = vi.fn(() => ({ eq: vi.fn(() => ({ order, maybeSingle })) }));
+  const isFn = vi.fn(() => ({ order }));
+  const select = vi.fn(() => ({ eq: vi.fn(() => ({ order, maybeSingle, is: isFn })) }));
   return {
     role: "elder",
     user: { id: "u1", email: "e@x" },
@@ -20,6 +21,7 @@ function ctx(rpcImpl?: any, queryRows?: any[]) {
       rpc: vi.fn(rpcImpl ?? (async () => ({ data: "2026-06-23T00:00:00Z", error: null }))),
       from: vi.fn(() => ({ select })),
     },
+    isFn,
   };
 }
 
@@ -49,9 +51,15 @@ describe("getCard / listForgeCards", () => {
     expect(await listForgeCards()).toEqual([]);
   });
   it("maps a row into ForgeCardFull", async () => {
-    const row = { id: "c1", title: "Goliath", working_snapshot: { name: "Goliath" }, working_art_key: "k", working_art_is_placeholder: false, status: "private_idea", updated_at: "t" };
+    const row = { id: "c1", title: "Goliath", working_snapshot: { name: "Goliath" }, working_art_key: "k", working_art_is_placeholder: false, status: "private_idea", updated_at: "t", set_id: null, published_version_id: null, approved_version_id: null };
     (requireForge as any).mockResolvedValue(ctx(undefined, [row]));
     const got = await getCard("c1");
-    expect(got).toMatchObject({ id: "c1", title: "Goliath", snapshot: { name: "Goliath" }, hasArt: true, status: "private_idea" });
+    expect(got).toMatchObject({ id: "c1", title: "Goliath", snapshot: { name: "Goliath" }, hasArt: true, status: "private_idea", setId: null });
+  });
+  it("listForgeCards selects only private ideas (set_id IS NULL)", async () => {
+    const c = ctx(undefined, []);
+    (requireForge as any).mockResolvedValue(c);
+    await listForgeCards();
+    expect(c.isFn).toHaveBeenCalledWith("set_id", null);
   });
 });
