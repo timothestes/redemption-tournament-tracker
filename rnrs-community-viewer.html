@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redemption National Ranking System</title>
+<style>
+  :root {
+    --teal: #238636; --teal-dark: #1a6128; --teal-mid: #56d364;
+    --gold: #BA7517; --gold-bg: #2d2208;
+    --silver: #8b949e; --silver-bg: #21262d;
+    --bronze: #CD7F32; --bronze-bg: #2d1f0d;
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d; --bg4: #2d333b; --bg5: #373e47;
+    --border: rgba(240,246,252,0.07); --border2: rgba(240,246,252,0.13);
+    --text: #c9d1d9; --text2: #8b949e; --text3: #484f58;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .header { background: var(--bg2); border-bottom: 1px solid var(--border2); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo { width: 72px; height: 72px; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+  .logo img { width: 100%; height: 100%; object-fit: contain; }
+  .header-title { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+  .header-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .season-select { background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; color: var(--teal-mid); font-size: 12px; font-weight: 700; padding: 5px 10px; cursor: pointer; letter-spacing: 0.3px; }
+  .refresh-btn { background: var(--bg3); border: 1px solid var(--border2); color: var(--text2); font-size: 12px; padding: 7px 14px; border-radius: 8px; cursor: pointer; }
+  .refresh-btn:hover { background: var(--bg4); color: var(--text); }
+  .format-nav { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; gap: 2px; overflow-x: auto; }
+  .fmt-tab { padding: 11px 16px; font-size: 13px; font-weight: 500; color: var(--text2); background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+  .fmt-tab:hover { color: var(--text); }
+  .fmt-tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .view-nav { background: var(--bg2); border-bottom: 1px solid var(--border2); padding: 0 1.5rem; display: flex; gap: 2px; }
+  .view-tab { padding: 10px 18px; font-size: 13px; font-weight: 600; color: var(--text2); background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; transition: all 0.15s; letter-spacing: 0.2px; }
+  .view-tab:hover { color: var(--text); }
+  .view-tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+  /* Player lookup */
+  .lookup-wrap { max-width: 700px; }
+  .lookup-search-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .lookup-input { flex: 1; background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 14px; font-size: 14px; color: var(--text); outline: none; }
+  .lookup-input:focus { border-color: var(--teal); }
+  .lookup-input::placeholder { color: var(--text3); }
+  .lookup-clear { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+  .lookup-clear:hover { color: var(--text); }
+  .lookup-suggestions { background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; display: none; margin-bottom: 1rem; }
+  .lookup-suggestion { padding: 10px 14px; font-size: 13px; color: var(--text2); cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .lookup-suggestion:last-child { border-bottom: none; }
+  .lookup-suggestion:hover { background: var(--bg4); color: var(--text); }
+  .lookup-hint { font-size: 12px; color: var(--text3); margin-bottom: 1rem; }
+  .profile-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; overflow: hidden; }
+  .profile-header { display: flex; align-items: center; gap: 16px; padding: 1.25rem; border-bottom: 1px solid var(--border); background: var(--bg3); }
+  .profile-avatar { width: 52px; height: 52px; border-radius: 12px; background: var(--teal-dark); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: var(--teal-mid); flex-shrink: 0; }
+  .profile-name { font-size: 18px; font-weight: 600; }
+  .profile-meta { font-size: 12px; color: var(--text2); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .profile-meta-item { display: flex; align-items: center; gap: 4px; }
+  .profile-body { padding: 1.25rem; }
+  .profile-section-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .profile-formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 1.25rem; }
+  .profile-fmt-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .profile-fmt-title { font-size: 11px; font-weight: 600; color: var(--teal); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .profile-placing { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .profile-placing:last-child { border-bottom: none; }
+  .profile-level { color: var(--text2); flex: 1; }
+  .season-results { margin-top: 0; }
+  .season-block { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
+  .season-block-title { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .season-fmt-row { display: flex; align-items: center; justify-content: space-between; padding: 3px 0; font-size: 12px; border-bottom: 1px solid var(--border); }
+  .season-fmt-row:last-child { border-bottom: none; }
+  .season-fmt-name { color: var(--text2); }
+  .season-fmt-pts { color: var(--teal); font-weight: 600; }
+  .toolbar { padding: 0.75rem 1.5rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .toolbar-group { display: flex; align-items: center; gap: 6px; }
+  .toolbar-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+  select, .search-input { background: var(--bg3); border: 1px solid var(--border2); border-radius: 7px; color: var(--text); font-size: 13px; padding: 6px 10px; outline: none; cursor: pointer; }
+  select:focus, .search-input:focus { border-color: var(--teal); }
+  .search-input { width: 180px; }
+  .search-input::placeholder { color: var(--text3); }
+  .sort-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 7px; color: var(--text2); font-size: 12px; padding: 6px 10px; cursor: pointer; transition: all 0.15s; }
+  .sort-btn.active { background: var(--bg4); border-color: var(--border2); color: var(--text); }
+  .sort-btn:hover { color: var(--text); }
+  .player-count { font-size: 12px; color: var(--text3); margin-left: auto; }
+  .main { padding: 1.25rem 1.5rem; max-width: 1060px; margin: 0 auto; }
+  .rnrs-key { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 0.875rem 1.25rem; margin-bottom: 1.25rem; }
+  .key-title { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
+  .key-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .key-item { font-size: 11px; color: var(--text3); background: var(--bg3); border-radius: 6px; padding: 4px 10px; }
+  .key-item span { color: var(--text2); font-weight: 500; }
+  .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .table-head { display: grid; padding: 9px 16px; font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border2); background: var(--bg3); }
+  .table-row { display: grid; padding: 11px 16px; border-bottom: 1px solid var(--border); align-items: center; cursor: pointer; transition: background 0.1s; }
+  .table-row:last-child { border-bottom: none; }
+  .table-row:hover, .table-row.open { background: var(--bg3); }
+  .cols { grid-template-columns: 40px 1fr 110px 70px 80px 70px 80px 80px 70px 28px; }
+  .col-rank { font-size: 13px; font-weight: 700; color: var(--text3); }
+  .rank-1 .col-rank { color: var(--gold); }
+  .rank-2 .col-rank { color: #aaa; }
+  .rank-3 .col-rank { color: #CD7F32; }
+  .player-name { font-size: 14px; font-weight: 500; color: var(--text); }
+  .player-state { font-size: 11px; color: var(--text3); }
+  .col-cell { font-size: 12px; color: var(--text2); text-align: center; }
+  .col-cell.has-data { color: var(--text); }
+  .col-total { font-size: 14px; font-weight: 700; color: var(--teal); text-align: right; }
+  .chevron { font-size: 10px; color: var(--text3); text-align: right; }
+  .expand-panel { background: var(--bg4); border-bottom: 1px solid var(--border); padding: 12px 16px 16px 56px; }
+  .expand-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .expand-levels { display: flex; flex-wrap: wrap; gap: 8px; }
+  .level-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 14px; min-width: 140px; }
+  .level-card-title { font-size: 11px; font-weight: 600; color: var(--text3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .placing-line { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .placing-line:last-child { border-bottom: none; }
+  .place-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; min-width: 28px; text-align: center; }
+  .p1 { background: #2d2208; color: #e3b341; }
+  .p2 { background: #21262d; color: #8b949e; }
+  .p3 { background: #2d1f0d; color: #CD7F32; }
+  .placing-pts { color: var(--text2); }
+  .placing-count { font-size: 10px; color: var(--text3); background: var(--bg5); border-radius: 4px; padding: 1px 5px; margin-left: auto; }
+  .cap-note { font-size: 10px; color: #E24B4A; margin-left: 4px; }
+  .pts-raw { text-decoration: line-through; color: var(--text3); font-size: 10px; }
+  .status-msg { padding: 3rem; text-align: center; color: var(--text3); font-size: 14px; }
+  .loading-bar { font-size: 12px; color: var(--text2); padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  @media (max-width: 750px) {
+    .cols { grid-template-columns: 36px 1fr 90px 55px 65px 55px 65px 65px 55px 22px; }
+    .player-name { font-size: 13px; }
+    .col-cell { font-size: 11px; }
+  }
+  @media (max-width: 520px) {
+    .cols { grid-template-columns: 30px 1fr 75px 48px 55px 48px 55px 55px 48px 18px; }
+    .toolbar { flex-direction: column; align-items: flex-start; }
+    .search-input { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <div class="logo"><img src="data:image/png;base64,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p1YirAu2mUnaI8ZMJjVvaYfAC7woBqs1KrakJ2qSDHkl5yVX8rX3T8hXs7nHgMN4Vl4ExvCKcAfxFmIEC66vrRiwpmc100Nn0I3Q/Xe1ZtqTho6t5MxLy3nNbVr/FcicorRZt8yZy1VKsCxi0hMxZzbNUlLNU3zzowNZHosS7DAnlUdVHy6UOVwsTyHEef+LmiueF5z5XHAAcsUcWTPRtiWi792ZSfqLLfxB1SwFNC2kAGaYUREskmuosGmRDLO3DWu8v9vYRWOeuud+b1BiolSwA4UnjlI8OzlF3nHOgipwGacdP0p+65Hwri13UiwVEK6947ZMcmN3JNzgfYJ/P9TBzamMmGtcc/blaZ5GVnMeo+Y8YwYG0byfYtPqP+Gt+R2pW7ySzdlNJYeSi6/1vWzWD79DD3j3xCEs19G6I6F9e9oyMY/3b9LbrB005pNqs5akzjsfqLQ5TqhGnAiunfs78x83+4N3NAQczBUYqNZHQQz5X9K83KjE7MHXZZPfGgDbtUEPr+gwQ/eC4lix4venoG5T+ovbNI8w81e5B/1D+Zat4RFqQQh1ZXMq2Sxzzs3zV3OINv+i2T3Eu0kCvxifwpaqH1SVxlrfBal4vuwAfPs/fpt/9x/+LTEzuvZUpVr8+rH+IxoIIYSuUGGlCEmFobwcUwQVzXJ2ZuM5LAG6T+wIPJDmBG8165O4iLNvhJ3mE1ITwpVK6Xg4C79nCamElrPtKnDUv7jZ/SxYzc9lA8ARDqFwiFgs9lrVse4btmwd24kj3SUo1Yu3bWOaYOfAmVmxi1k1s13WReXSqOmm+U5PcR5zp82o3m+F1yZkk/UHrGez+7ns1h80ZiGeEcJTeDewHG/vzARXd0Oo5v7xUde4eC5nAjiPtwT1sub+zbIQChL4rpwGj1LC68LXxL6kzFdiMzgBAFN41MMVyX4CWSgLDaoHSnh7JVf8Z19tANScI8zv9QH3k8fbavgjN9teaFkoF6Tj+fsoEMFzSVdb+c3yUQA0c/9VFrjs5ONkoQAI3JBO4z9CWIhnXwkJXI1LYzImOH/ZZaGUJD7k+Psi6kOOl10WWlG/b4qfK1dM8YuyKIuyKIuyKIuyKIuyKIuyKIuyKIuyKIuyKIuyKP9/yf8DgDDZmiJi0KMAAAA5dEVYdENvbnRhaW5zQWlHZW5lcmF0ZWRDb250ZW50OkNvbnRhaW5zQWlHZW5lcmF0ZWRDb250ZW50AFllc/6PQTgAAAAZdEVYdHBkZjpBdXRob3IAVGFtc2llIEhlbmRyaXimysHMAAAASHRFWHR4bXA6Q3JlYXRvclRvb2wAQ2FudmEgZG9jPURBSE5iVk1TWXJrIHVzZXI9VUFGeWdRVmdhZ3cgYnJhbmQ9QkFGeWdheTZUZUkrg9ybAAAAAElFTkSuQmCC" alt="redemptionccg.app logo"></div>
+    <div>
+      <div class="header-title">Redemption National Ranking System</div>
+      <div class="header-sub">Official RNRS Standings</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <select class="season-select" id="seasonSelect">
+      <option value="2026">2026 Season</option>
+      <option value="2025">2025 Season</option>
+      <option value="2024">2024 Season</option>
+      <option value="2023">2023 Season</option>
+      <option value="all">All Available Seasons</option>
+    </select>
+    <button class="refresh-btn" id="refreshBtn">↺ Refresh</button>
+  </div>
+</div>
+<div class="view-nav">
+  <button class="view-tab active" data-view="leaderboard">Leaderboard</button>
+  <button class="view-tab" data-view="lookup">Player Lookup</button>
+</div>
+<div id="leaderboard-view">
+<div class="format-nav" id="formatNav"></div>
+<div class="loading-bar" id="loadingBar">Loading ranking data…</div>
+<div class="toolbar" id="toolbar" style="display:none;">
+  <div class="toolbar-group">
+    <span class="toolbar-label">Sort</span>
+    <button class="sort-btn active" data-sort="total">Total pts</button>
+    <button class="sort-btn" data-sort="name">Name A–Z</button>
+    <button class="sort-btn" data-sort="home_state">State</button>
+    <button class="sort-btn" data-sort="region">Region</button>
+  </div>
+  <div class="toolbar-group">
+    <span class="toolbar-label">Level</span>
+    <select id="levelFilter">
+      <option value="all">All levels</option>
+      <option value="national">Nationals</option>
+      <option value="regional">Regional</option>
+      <option value="state">State</option>
+      <option value="district">District</option>
+      <option value="local">Local</option>
+    </select>
+    <select id="placingFilter" style="display:none;">
+      <option value="all">Any placing</option>
+      <option value="1st">1st place</option>
+      <option value="2nd">2nd place</option>
+      <option value="3rd">3rd place</option>
+    </select>
+  </div>
+  <div class="toolbar-group">
+    <span class="toolbar-label">Region</span>
+    <select id="regionFilter">
+      <option value="all">All regions</option>
+      <option value="Northwestern">Northwestern</option>
+      <option value="Southwestern">Southwestern</option>
+      <option value="North Central">North Central</option>
+      <option value="Midwest">Midwest</option>
+      <option value="South Central">South Central</option>
+      <option value="East Central">East Central</option>
+      <option value="Southeastern">Southeastern</option>
+      <option value="Northeastern">Northeastern</option>
+    </select>
+  </div>
+  <div class="toolbar-group">
+    <span class="toolbar-label">State</span>
+    <select id="stateFilter"><option value="all">All states</option></select>
+  </div>
+  <input type="text" class="search-input" id="searchInput" placeholder="Search player…" />
+  <span class="player-count" id="playerCount"></span>
+</div>
+
+<div class="main">
+  <div class="rnrs-key">
+    <div class="key-title">RNRS Point System</div>
+    <div class="key-grid">
+      <div class="key-item">Local <span>1st: 2 · 2nd: 1 · max 5 wins per format</span></div>
+      <div class="key-item">District <span>1st: 10 · 2nd: 5 · 3rd: 2 · max 2 wins per format</span></div>
+      <div class="key-item">State <span>1st: 25 · 2nd: 12 · 3rd: 6 · max 1 win per format</span></div>
+      <div class="key-item">Regional <span>1st: 35 · 2nd: 17 · 3rd: 8 · max 1 win per format</span></div>
+      <div class="key-item">Nationals <span>1st: 45 · 2nd: 22 · 3rd: 11 · max 1 win per format</span></div>
+    </div>
+  </div>
+  <div id="tableContainer"><div class="status-msg">Loading…</div></div>
+</div>
+</div><!-- end leaderboard-view -->
+
+<div id="lookup-view" style="display:none;">
+  <div class="main" style="max-width:760px;">
+    <div class="lookup-wrap">
+      <div class="lookup-search-row">
+        <input type="text" class="lookup-input" id="lookupInput" placeholder="Search player name…" />
+        <button class="lookup-clear" id="lookupClear">Clear</button>
+      </div>
+      <div class="lookup-hints" id="lookupHint" style="font-size:12px;color:var(--text3);margin-bottom:1rem;"></div>
+      <div style="font-size:11px; color:var(--text3); margin-bottom:1rem; padding:8px 12px; background:var(--bg3); border-radius:7px; border:1px solid var(--border);">
+        Shows 1st place finishes only for Local &amp; District · All placements shown for State, Regional &amp; Nationals
+      </div>
+      <div class="lookup-suggestions" id="lookupSuggestions"></div>
+      <div id="lookupProfile"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROXY = 'https://rnrs-proxy2.jhendrix6426.workers.dev';
+
+const SEASON_SHEETS = {
+  '2026': {
+    type1:  '2PACX-1vSa8W7dh2H4UNv5d5a4t6ntjeiE4hClteLSVgtoVI8j1LwsJIdR4lXvayFSt7ixZff-QcJmiF_FnIN5',
+    teams:  '2PACX-1vTrVjAXIfpeWwssgMU78DdbBh1GfVS9_1hPonWQh-aWRxvu_q1Cvw2UsN0Qch_gA9sHo7z0QgpPGNat',
+    type2:  '2PACX-1vT0t-D0-y_3G1ALKVKZbXTgjuTi2azoRayPcWNGm_9ZtQmsv6DHtRNYU-cB3c42KqhwdksaL4c63wHJ',
+    closed: '2PACX-1vRQt_IEZGoYGZKUcJRphv4r3hFTg-W2KnTfVkPkxDuGBP8FFSbO4YCQRWdcoa_lkW04FGpE5UyYHXTQ',
+    draft:  '2PACX-1vQy6JZxBZhKpkRCj79-5WkgxvssnTBLU78HeqCDgGNqFsTuJzvzvAZfQoeQ751nQbdRFi47TO0NdQTC',
+  },
+  '2025': {
+    type1:  '2PACX-1vQRriGQenvoZoolnY4iaeRAPfwiHTE6MgDk9wPPCAs_x8PODMIbVk8gRhPHLqPDrJu0s8-N6yPB_jh1',
+    teams:  '2PACX-1vRKehFie-9rK5ebtlgcHB5FBLfxZdARizG7qovBZ4u7vurtu0EG0VKcIDBWwREi_IzqhXVb9ZQVusHR',
+    type2:  '2PACX-1vRnZA42ZzbmTJDEV-Wdemgo9vbndYEFf6txNDQQDsu4LW4LNbJ91AGP8XqBKnWGAu_qGLUjhdpd6mzo',
+    closed: '2PACX-1vRF9SpZmgh2mMT3XuNaKy_R1Wuc8DSJYVezKc0-25rGvKhdvIDIhuWpQWu-er4HkoYOQmKS0VLiUpR8',
+    draft:  '2PACX-1vT9PSgLceT8kgx0nqG6bPqdNlp48WmhnoSPVGuVQZV1MsSvjIGjlm3WkoDyOF1R2iuPQTYwCGLYBKC6',
+  },
+  '2024': {
+    type1:  '2PACX-1vTuZEUrqq0gpk9nyZf_MZgBvos_mNxN4mDVKODvmCatDfsgE2NxD0wsDcddU_Z3emXZ-94L8CNItqi3',
+    teams:  '2PACX-1vTr2MxysTPY1TpKfXbC2n105OeS43Gf7ar6WKeFO83XKGrm6ocWUyje04HzqgsPD7vtWeQSrKVynMbI',
+    type2:  '2PACX-1vQBWIpOyIgYQ_LvfmtMrcG5Nq0CH7CZ11MlJvKvanIVfFG8z7bi93UddgYscPdyK1xwUuawWK_pCjvK',
+    closed: '2PACX-1vTuks77N3DW10nh43941ZotS31fQV6RCUHBTkEZOHjkLY_SxR43Pjhrad6LVCPqBClKZ1H4qkZkKCC3',
+    draft:  '2PACX-1vSDfnSfRHFaPXFbwcuVb3tN8XRrEyEPhv4bE4xorcAGaw92fo4xSUDHe6Hq9yAij70kEcdS_H02CueY',
+  },
+  '2023': {
+    type1:  '2PACX-1vR9rNLdr4m7DcJ7h2RHR9XUu0HtJ19ba3QeEiDUU9Lh2JrptR05luuas0nl-VeFMUQhDlFcZfM4YNSP',
+    teams:  '2PACX-1vR-7zRVlyn8axlxdpFYSKdGdJ4VdZZMk8or97Oe8Q5VH-Pjr0r1B3Xob6gxsJScCw0jvvnkOnVAMzfZ',
+    type2:  '2PACX-1vQQuyaPvAYLBdu5QRuwMPvOiO3N39oCeJrgoBsRpfyPeJG9yuidfuQsLxxx_pwzWdbOGQrYzuUKQ1no',
+    closed: '2PACX-1vRd32x7HofEct_AqijjQ_uw-edtDwO3jBr9iTeHBXR93-rj5152p4UR8md1NURw3m6-Ll4MIxXwUo8F',
+    draft:  '2PACX-1vRgwreIFsGpQFFgFtxGFWPrqYMmoURS4erQlOBdkCiZjsjh-n6jPY07P_aYhmTqGOqEj-73qEy61tEs',
+  },
+};
+
+const FORMATS = [
+  { label: 'Type 1 – 2 Player', key: 'type1' },
+  { label: 'Type 1 Teams',      key: 'teams'  },
+  { label: 'Type 2 – 2 Player', key: 'type2'  },
+  { label: 'Closed Deck',       key: 'closed' },
+  { label: 'Booster Draft',     key: 'draft'  },
+  { label: 'All Formats',       key: 'all'    },
+];
+
+const LEVELS = ['local','district','state','regional','national'];
+const LEVEL_LABELS = { local:'Local', district:'District', state:'State', regional:'Regional', national:'National' };
+const LEVEL_PTS = {
+  local:    [2,1],
+  district: [10,5,2],
+  state:    [25,12,6],
+  regional: [35,17,8],
+  national: [45,22,11],
+};
+const LEVEL_CAPS = { local:5, district:2, state:1, regional:1, national:1 };
+const LEVELS_OBJ = { local:'Local', district:'District', state:'State', regional:'Regional', national:'National' };
+const PLACE_LABELS = ['1st','2nd','3rd','4th','5th'];
+
+const REGIONS = {
+  'Northwestern':  ['WA','OR','ID','MT','WY','AK'],
+  'Southwestern':  ['CA','NV','UT','AZ','HI'],
+  'North Central': ['ND','SD','NE','KS','MN','IA','CO','MO'],
+  'Midwest':       ['WI','MI','IL','IN','OH'],
+  'South Central': ['OK','TX','AR','LA','NM'],
+  'East Central':  ['KY','WV','VA','TN','NC'],
+  'Southeastern':  ['FL','SC','GA','AL','MS'],
+  'Northeastern':  ['ME','VT','NH','MA','RI','CT','NY','NJ','PA','DE','MD'],
+};
+const STATE_TO_REGION = {};
+Object.entries(REGIONS).forEach(([r,states]) => states.forEach(s => STATE_TO_REGION[s]=r));
+
+let allData = {};      // allData[season][fmtKey] = rows
+let activeFmt = 'type1';
+let activeSeason = '2026';
+let sortKey = 'total';
+let sortDir = 'desc';
+let levelFilter = 'all';
+let placingFilter = 'all';
+let stateFilter = 'all';
+let regionFilter = 'all';
+let searchQuery = '';
+let expandedRows = new Set();
+
+// Known name aliases — maps typos/variants to the canonical name
+const NAME_ALIASES = {
+  'jayden alstand': 'Jayden Alstad (MN)',
+};
+
+function normName(n) { return n.replace(/\s*\([^)]*\)/,'').trim().toLowerCase(); }
+
+function resolveAlias(name) {
+  const key = name.replace(/\s*\([^)]*\)/,'').trim().toLowerCase();
+  return NAME_ALIASES[key] || name;
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const parseLine = line => {
+    const result = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+    result.push(cur.trim()); return result;
+  };
+  const allRows = lines.map(l => parseLine(l));
+  const hi = allRows.findIndex(r => r[0] === 'Player');
+  if (hi < 0) return [];
+  const headers = allRows[hi].map(h => h.toLowerCase().trim());
+  const totalIdx = headers.findIndex(h => h.includes('total'));
+  if (totalIdx < 0) return [];
+  const levelHeaders = headers.slice(1, totalIdx);
+  const rawRows = allRows.slice(hi + 1).filter(r => {
+    const name = r[0] || '';
+    return name && name !== '-' && !isNaN(parseFloat(r[totalIdx]));
+  }).map(row => {
+    const obj = { name: resolveAlias(row[0]), rnrsTotal: parseFloat(row[totalIdx]) || 0 };
+    levelHeaders.forEach((h, i) => {
+      const val = row[i + 1] || '';
+      obj[h] = (val && val !== '-') ? val.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v)) : [];
+    });
+    return obj;
+  });
+
+  // Merge any rows that resolved to the same canonical name
+  const merged = {};
+  rawRows.forEach(row => {
+    if (!merged[row.name]) {
+      merged[row.name] = { ...row };
+    } else {
+      // Combine level arrays and sum totals
+      levelHeaders.forEach(h => {
+        merged[row.name][h] = [...(merged[row.name][h]||[]), ...(row[h]||[])];
+      });
+      merged[row.name].rnrsTotal += row.rnrsTotal;
+    }
+  });
+  return Object.values(merged);
+}
+
+function cleanName(n) { return normName(n).split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '); }
+function getState(n) { const m=n.match(/\(([^)]+)\)/); return m?m[1]:''; }
+function getRegion(n) { return STATE_TO_REGION[getState(n)]||''; }
+
+// Build a map of all possible point values → placement label for each level
+// Includes ties: 2-way and 3-way at 1st, 2nd, and 3rd
+function buildPlaceMap(pts) {
+  const map = [];
+  const [p1, p2, p3] = pts;
+  if (p1 !== undefined) {
+    map.push({ val: p1,                        label: '1st' }); // 1st
+    if (p2 !== undefined) {
+      map.push({ val: (p1+p2)/2,               label: '1st' }); // 2-way tie 1st
+      if (p3 !== undefined) {
+        map.push({ val: (p1+p2+p3)/3,          label: '1st' }); // 3-way tie 1st
+      }
+    }
+  }
+  if (p2 !== undefined) {
+    map.push({ val: p2,                        label: '2nd' }); // 2nd
+    if (p3 !== undefined) {
+      map.push({ val: (p2+p3)/2,               label: '2nd' }); // 2-way tie 2nd
+      map.push({ val: (p2+p3+p3)/3,            label: '2nd' }); // 3-way tie 2nd (p3 repeated as no p4)
+    }
+  }
+  if (p3 !== undefined) {
+    map.push({ val: p3,                        label: '3rd' }); // 3rd
+    map.push({ val: p3/2,                      label: '3rd' }); // 2-way tie 3rd
+    map.push({ val: p3/3,                      label: '3rd' }); // 3-way tie 3rd
+  }
+  return map;
+}
+
+const PLACE_MAPS = {};
+Object.keys(LEVEL_PTS).forEach(level => {
+  PLACE_MAPS[level] = buildPlaceMap(LEVEL_PTS[level]);
+});
+
+function placeLabel(pts, level) {
+  const map = PLACE_MAPS[level] || [];
+  const TOLERANCE = 0.05;
+  const match = map.find(e => Math.abs(e.val - pts) < TOLERANCE);
+  return match ? match.label : null;
+}
+
+function placeBadgeClass(p) {
+  return p==='1st'?'p1':p==='2nd'?'p2':p==='3rd'?'p3':'';
+}
+
+function getRows() {
+  if (activeFmt === 'all') {
+    const playerMap = {};
+    const fmtKeys = ['type1','teams','type2','closed','draft'];
+    fmtKeys.forEach(fmtKey => {
+      (getCurrentData(fmtKey)||[]).forEach(p => {
+        if (!playerMap[p.name]) playerMap[p.name] = { name: p.name, rnrsTotal: 0, local:[], district:[], state:[], regional:[], national:[] };
+        LEVELS.forEach(l => {
+          playerMap[p.name][l] = [...(playerMap[p.name][l]||[]), ...(p[l]||[])];
+        });
+        playerMap[p.name].rnrsTotal += p.rnrsTotal;
+      });
+    });
+    return Object.values(playerMap);
+  }
+  return getCurrentData(activeFmt) || [];
+}
+
+function getCurrentData(fmtKey) {
+  if (activeSeason === 'all') {
+    const playerMap = {};
+    ['2023','2024','2025','2026'].forEach(yr => {
+      (allData[yr]?.[fmtKey]||[]).forEach(p => {
+        if (!playerMap[p.name]) playerMap[p.name] = { name: p.name, rnrsTotal: 0, local:[], district:[], state:[], regional:[], national:[] };
+        LEVELS.forEach(l => {
+          playerMap[p.name][l] = [...(playerMap[p.name][l]||[]), ...(p[l]||[])];
+        });
+        playerMap[p.name].rnrsTotal += p.rnrsTotal;
+      });
+    });
+    return Object.values(playerMap);
+  }
+  return allData[activeSeason]?.[fmtKey] || [];
+}
+
+function cellSummary(vals) {
+  if (!vals||!vals.length) return '—';
+  const t = vals.reduce((s,v)=>s+v,0);
+  return t>0?t:'—';
+}
+
+function cappedTotal(vals, level) {
+  if (!vals||!vals.length) return { counted: 0, raw: 0, capped: false };
+  const pts = LEVEL_PTS[level]||[];
+  const cap = LEVEL_CAPS[level]||99;
+  const raw = vals.reduce((s,v)=>s+v,0);
+  let counted = 0;
+
+  if (level === 'local' || level === 'district') {
+    // Sort results descending (best first), then take up to cap entries
+    const sorted = [...vals].sort((a,b)=>b-a).slice(0, cap);
+    counted = sorted.reduce((s,v)=>s+v,0);
+  } else {
+    const capped = vals.slice(0, cap);
+    counted = capped.reduce((s,v)=>s+v,0);
+  }
+  return { counted, raw, capped: raw > counted };
+}
+
+function hasPlacing(player, level, placing) {
+  const vals = player[level]||[];
+  if (!vals.length) return false;
+  if (placing === 'all') return true;
+  return vals.some(v => placeLabel(v, level) === placing);
+}
+
+function applyFilters(rows) {
+  return rows.filter(r => {
+    if (searchQuery && !normName(r.name).includes(searchQuery.toLowerCase())) return false;
+    if (stateFilter !== 'all' && getState(r.name) !== stateFilter) return false;
+    if (regionFilter !== 'all' && getRegion(r.name) !== regionFilter) return false;
+    if (levelFilter !== 'all') {
+      if (!hasPlacing(r, levelFilter, placingFilter)) return false;
+    }
+    return true;
+  });
+}
+
+function applySort(rows) {
+  const dir = sortDir === 'asc' ? 1 : -1;
+  return [...rows].sort((a,b) => {
+    let cmp = 0;
+    if (sortKey === 'name') {
+      cmp = normName(a.name).localeCompare(normName(b.name));
+    } else if (sortKey === 'home_state') {
+      cmp = (getState(a.name)||'ZZ').localeCompare(getState(b.name)||'ZZ');
+      if (cmp === 0) cmp = a.rnrsTotal - b.rnrsTotal;
+    } else if (sortKey === 'region') {
+      cmp = (getRegion(a.name)||'ZZ').localeCompare(getRegion(b.name)||'ZZ');
+      if (cmp === 0) cmp = a.rnrsTotal - b.rnrsTotal;
+    } else if (sortKey === 'total') {
+      cmp = a.rnrsTotal - b.rnrsTotal;
+    } else if (LEVELS.includes(sortKey)) {
+      const aVal = (a[sortKey]||[]).reduce((s,v)=>s+v,0);
+      const bVal = (b[sortKey]||[]).reduce((s,v)=>s+v,0);
+      cmp = aVal - bVal;
+    }
+    return cmp * dir;
+  });
+}
+
+function buildStateFilter(rows) {
+  const states=[...new Set(rows.map(r=>getState(r.name)).filter(Boolean))].sort();
+  const sel=document.getElementById('stateFilter');
+  const cur=sel.value;
+  sel.innerHTML='<option value="all">All states</option>'+states.map(s=>`<option value="${s}">${s}</option>`).join('');
+  if(states.includes(cur)) sel.value=cur;
+}
+
+function renderExpandPanel(player) {
+  let html='<div class="expand-panel"><div class="expand-title">Placing breakdown</div><div class="expand-levels">';
+  LEVELS.forEach(level=>{
+    const vals=player[level]||[];
+    if(!vals.length) return;
+    const placeCounts={};
+    vals.forEach(v=>{
+      const place=placeLabel(v,level)||`${v}pts`;
+      if(!placeCounts[place]) placeCounts[place]={count:0,pts:v};
+      placeCounts[place].count++;
+    });
+    const {counted,raw,capped}=cappedTotal(vals,level);
+    html+=`<div class="level-card"><div class="level-card-title">${LEVEL_LABELS[level]}</div>`;
+    Object.entries(placeCounts).forEach(([place,data])=>{
+      html+=`<div class="placing-line">
+        <span class="place-badge ${placeBadgeClass(place)}">${place}</span>
+        <span class="placing-pts">${data.pts} pts</span>
+        ${data.count>1?`<span class="placing-count">×${data.count}</span>`:''}
+      </div>`;
+    });
+    if(capped) {
+      html+=`<div style="font-size:11px;margin-top:5px;padding-top:4px;border-top:1px solid var(--border)">
+        Counted: <span style="color:var(--teal);font-weight:600">${counted}</span>
+        <span class="pts-raw">${raw}</span>
+        <span class="cap-note">cap reached</span>
+      </div>`;
+    } else {
+      html+=`<div style="font-size:11px;color:var(--text3);margin-top:5px;padding-top:4px;border-top:1px solid var(--border)">Total: <span style="color:var(--teal);font-weight:600">${counted}</span></div>`;
+    }
+    html+=`</div>`;
+  });
+  html+=`</div></div>`;
+  return html;
+}
+
+function renderTable() {
+  const rows=getRows();
+  if(!rows.length){
+    document.getElementById('tableContainer').innerHTML='<div class="status-msg">No data available for this format/season yet.</div>';
+    document.getElementById('playerCount').textContent='';
+    return;
+  }
+  const filtered=applyFilters(rows);
+  const sorted=applySort(filtered);
+  document.getElementById('playerCount').textContent=`${sorted.length} player${sorted.length!==1?'s':''}`;
+  if(!sorted.length){
+    document.getElementById('tableContainer').innerHTML='<div class="table-wrap"><div class="status-msg">No players match the current filters.</div></div>';
+    return;
+  }
+  const arrow = k => {
+    if (sortKey !== k) return '<span style="color:var(--text3);margin-left:3px">↕</span>';
+    return sortDir === 'asc'
+      ? '<span style="color:var(--teal);margin-left:3px">↑</span>'
+      : '<span style="color:var(--teal);margin-left:3px">↓</span>';
+  };
+  const th = (label, key, align='left') =>
+    `<span class="sortable-th" data-col="${key}" style="cursor:pointer;text-align:${align};user-select:none;" title="Sort by ${label}">${label}${arrow(key)}</span>`;
+
+  let html=`<div class="table-wrap">
+    <div class="table-head cols">
+      <span>#</span>
+      ${th('Player','name')}
+      ${th('Region','region')}
+      ${th('Local','local','center')}
+      ${th('District','district','center')}
+      ${th('State','state_col','center')}
+      ${th('Regional','regional','center')}
+      ${th('Nationals','national','center')}
+      ${th('Total','total','right')}
+      <span></span>
+    </div>`;
+  sorted.forEach((player,i)=>{
+    const rankClass=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
+    const isOpen=expandedRows.has(player.name);
+    const state=getState(player.name);
+    const region=getRegion(player.name);
+    const cc=level=>(player[level]||[]).length?'col-cell has-data':'col-cell';
+    html+=`<div class="table-row cols ${rankClass} ${isOpen?'open':''}" data-name="${player.name}">
+      <span class="col-rank">${i+1}</span>
+      <span><div class="player-name" style="cursor:pointer" class="player-name-link" data-name="${player.name}" title="View player profile">${cleanName(player.name)}</div>${state?`<div class="player-state">${state}</div>`:''}</span>
+      <span style="font-size:11px;color:var(--text2)">${region||'—'}</span>
+      <span class="${cc('local')}">${cellSummary(player.local)}</span>
+      <span class="${cc('district')}">${cellSummary(player.district)}</span>
+      <span class="${cc('state')}">${cellSummary(player.state)}</span>
+      <span class="${cc('regional')}">${cellSummary(player.regional)}</span>
+      <span class="${cc('national')}">${cellSummary(player.national)}</span>
+      <span class="col-total">${player.rnrsTotal}</span>
+      <span class="chevron">${isOpen?'▲':'▼'}</span>
+    </div>`;
+    if(isOpen) html+=renderExpandPanel(player);
+  });
+  html+='</div>';
+  document.getElementById('tableContainer').innerHTML=html;
+  document.querySelectorAll('[data-name].table-row').forEach(row=>{
+    row.addEventListener('click',()=>{
+      const name=row.dataset.name;
+      if(expandedRows.has(name)) expandedRows.delete(name);
+      else expandedRows.add(name);
+      renderTable();
+    });
+  });
+
+  // Player name click → jump to lookup
+  document.querySelectorAll('.player-name-link').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const name = el.dataset.name;
+      // Switch to lookup view
+      activeView = 'lookup';
+      document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
+      document.querySelector('.view-tab[data-view="lookup"]').classList.add('active');
+      document.getElementById('leaderboard-view').style.display = 'none';
+      document.getElementById('lookup-view').style.display = 'block';
+      document.getElementById('lookupInput').value = name;
+      document.getElementById('lookupSuggestions').style.display = 'none';
+      updateLookupHint();
+      renderLookupProfile(name);
+    });
+  });
+
+  document.querySelectorAll('.sortable-th').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const col = th.dataset.col;
+      const key = col === 'state_col' ? 'state' : col;
+      if (sortKey === key) {
+        sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+      } else {
+        sortKey = key;
+        sortDir = (key === 'name' || key === 'region' || key === 'home_state') ? 'asc' : 'desc';
+      }
+      document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
+      const match = document.querySelector(`.sort-btn[data-sort="${key}"]`);
+      if (match) match.classList.add('active');
+      renderTable();
+    });
+  });
+}
+
+function buildFormatNav() {
+  const nav=document.getElementById('formatNav');
+  nav.innerHTML=FORMATS.map(f=>
+    `<button class="fmt-tab ${f.key===activeFmt?'active':''}" data-key="${f.key}">${f.label}</button>`
+  ).join('');
+  nav.querySelectorAll('.fmt-tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      activeFmt=btn.dataset.key;
+      expandedRows.clear();
+      buildFormatNav();
+      buildStateFilter(getRows());
+      renderTable();
+    });
+  });
+}
+
+async function fetchSeason(season) {
+  if(allData[season]) return;
+  allData[season]={};
+  const sheets=SEASON_SHEETS[season]||{};
+  await Promise.all(Object.entries(sheets).map(async([fmtKey,sheetId])=>{
+    try {
+      const res=await fetch(`${PROXY}/?sheet=${fmtKey}&season=${season}&id=${sheetId}`);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text=await res.text();
+      allData[season][fmtKey]=parseCSV(text);
+    } catch(e) {
+      allData[season][fmtKey]=[];
+    }
+  }));
+}
+
+async function loadAndRender() {
+  document.getElementById('loadingBar').textContent=`Loading ${activeSeason==='all'?'all seasons':activeSeason+' season'}…`;
+  document.getElementById('toolbar').style.display='none';
+  document.getElementById('tableContainer').innerHTML='<div class="status-msg">Loading…</div>';
+  try {
+    if(activeSeason==='all') {
+      await Promise.all(['2023','2024','2025','2026'].map(yr=>fetchSeason(yr)));
+    } else {
+      await fetchSeason(activeSeason);
+    }
+    const totalPlayers=new Set(getRows().map(p=>p.name)).size;
+    document.getElementById('loadingBar').textContent=`✓ ${totalPlayers} players loaded · click any row to expand placings`;
+    document.getElementById('toolbar').style.display='flex';
+    buildFormatNav();
+    buildStateFilter(getRows());
+    renderTable();
+  } catch(e) {
+    document.getElementById('loadingBar').textContent=`Error: ${e.message}`;
+  }
+}
+
+document.getElementById('seasonSelect').addEventListener('change',e=>{
+  activeSeason=e.target.value;
+  expandedRows.clear();
+  loadAndRender();
+});
+
+document.getElementById('refreshBtn').addEventListener('click',()=>{
+  allData={};
+  expandedRows.clear();
+  loadAndRender();
+});
+
+document.querySelectorAll('.sort-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const key = btn.dataset.sort;
+    if (sortKey === key) {
+      sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+    } else {
+      sortKey = key;
+      sortDir = (key === 'name' || key === 'region' || key === 'home_state') ? 'asc' : 'desc';
+    }
+    document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+  });
+});
+
+document.getElementById('levelFilter').addEventListener('change',e=>{
+  levelFilter=e.target.value;
+  const placingSel=document.getElementById('placingFilter');
+  placingSel.style.display=levelFilter==='all'?'none':'inline-block';
+  if(levelFilter==='all') placingFilter='all';
+  renderTable();
+});
+
+document.getElementById('placingFilter').addEventListener('change',e=>{
+  placingFilter=e.target.value;
+  renderTable();
+});
+
+document.getElementById('regionFilter').addEventListener('change',e=>{
+  regionFilter=e.target.value;
+  renderTable();
+});
+
+document.getElementById('stateFilter').addEventListener('change',e=>{
+  stateFilter=e.target.value;
+  renderTable();
+});
+
+document.getElementById('searchInput').addEventListener('input',e=>{
+  searchQuery=e.target.value;
+  renderTable();
+});
+
+// View switching
+let activeView = 'leaderboard';
+document.querySelectorAll('.view-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeView = btn.dataset.view;
+    document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('leaderboard-view').style.display = activeView === 'leaderboard' ? 'block' : 'none';
+    document.getElementById('lookup-view').style.display = activeView === 'lookup' ? 'block' : 'none';
+    if (activeView === 'lookup') {
+      updateLookupHint();
+      document.getElementById('lookupInput').focus();
+      // Ensure all seasons are loaded for complete profile data
+      Promise.all(['2023','2024','2025','2026'].map(yr => fetchSeason(yr))).then(() => {
+        updateLookupHint();
+        const current = document.getElementById('lookupInput').value;
+        if (current) renderLookupProfile(current);
+      });
+    }
+  });
+});
+
+function getAllNames() {
+  const nameSet = new Set();
+  ['2023','2024','2025','2026'].forEach(yr => {
+    Object.values(allData[yr]||{}).forEach(rows => rows.forEach(r => nameSet.add(r.name)));
+  });
+  return [...nameSet].sort((a,b) => normName(a).localeCompare(normName(b)));
+}
+
+function updateLookupHint() {
+  const names = getAllNames();
+  document.getElementById('lookupHint').textContent = names.length
+    ? `${names.length} players across all loaded seasons · type to search`
+    : 'Loading player data…';
+}
+
+function getPlayerProfile(playerName) {
+  const normSearch = normName(playerName);
+  const seasons = ['2023','2024','2025','2026'];
+  const fmtKeys = ['type1','teams','type2','closed','draft'];
+  const fmtLabels = { type1:'Type 1 – 2 Player', teams:'Type 1 Teams', type2:'Type 2 – 2 Player', closed:'Closed Deck', draft:'Booster Draft' };
+  const profile = { name: playerName, seasons: {} };
+  seasons.forEach(yr => {
+    // Use whatever season data is already loaded; skip if not yet fetched
+    const seasonData = {};
+    fmtKeys.forEach(fmtKey => {
+      const rows = allData[yr]?.[fmtKey] || [];
+      const match = rows.find(r => normName(r.name) === normSearch);
+      if (!match) return;
+      const placings = [];
+      Object.keys(LEVELS_OBJ).forEach(level => {
+        const vals = match[level] || [];
+        if (!vals.length) return;
+        const placeCounts = {};
+        vals.forEach(v => {
+          const place = placeLabel(v, level);
+          if (place) placeCounts[place] = (placeCounts[place]||0) + 1;
+        });
+        Object.entries(placeCounts).forEach(([place, count]) => {
+          placings.push({ level, levelLabel: LEVELS_OBJ[level], place, count });
+        });
+      });
+      if (placings.length || match.rnrsTotal > 0) {
+        seasonData[fmtKey] = { label: fmtLabels[fmtKey], placings, rnrsTotal: match.rnrsTotal };
+      }
+    });
+    if (Object.keys(seasonData).length) profile.seasons[yr] = seasonData;
+  });
+  return profile;
+}
+
+function renderLookupProfile(playerName) {
+  const profile = getPlayerProfile(playerName);
+  const el = document.getElementById('lookupProfile');
+  const seasons = Object.keys(profile.seasons).sort((a,b) => b-a);
+  if (!seasons.length) {
+    el.innerHTML = `<div class="status-msg" style="padding:2rem 0">No data found for <strong>${cleanName(playerName)}</strong>.</div>`;
+    return;
+  }
+  const state = getState(playerName);
+  const region = getRegion(playerName);
+  const initials = normName(playerName).split(' ').filter(Boolean).map(w=>w[0].toUpperCase()).slice(0,2).join('');
+  const totalPts = seasons.reduce((s,yr) => s + Object.values(profile.seasons[yr]).reduce((ss,f)=>ss+f.rnrsTotal,0), 0);
+  const totalFormats = new Set(seasons.flatMap(yr => Object.keys(profile.seasons[yr]))).size;
+  let html = `<div class="profile-card">
+    <div class="profile-header">
+      <div class="profile-avatar">${initials}</div>
+      <div>
+        <div class="profile-name">${cleanName(playerName)}</div>
+        <div class="profile-meta">
+          ${state?`<span class="profile-meta-item">📍 ${state}${region?' · '+region:''}</span>`:''}
+          <span class="profile-meta-item">📅 ${seasons.length} season${seasons.length!==1?'s':''}</span>
+          <span class="profile-meta-item">🏆 ${totalPts} total pts</span>
+          <span class="profile-meta-item">${totalFormats} format${totalFormats!==1?'s':''}</span>
+        </div>
+      </div>
+    </div>
+    <div class="profile-body">`;
+  seasons.forEach(yr => {
+    const fmts = Object.values(profile.seasons[yr]);
+    const yrTotal = fmts.reduce((s,f)=>s+f.rnrsTotal,0);
+    html += `<div class="season-block"><div class="season-block-title">${yr} Season · ${yrTotal} pts</div>`;
+    fmts.forEach(fmt => {
+      const notablePlacings = fmt.placings.filter(p =>
+        ['state','regional','national'].includes(p.level) ||
+        (['local','district'].includes(p.level) && p.place === '1st')
+      );
+      html += `<div class="season-fmt-row">
+        <span class="season-fmt-name">${fmt.label}</span>
+        <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">`;
+      notablePlacings.forEach(p => {
+        html += `<span class="place-badge ${placeBadgeClass(p.place)}" style="font-size:10px">${p.place} ${p.levelLabel}${p.count>1?` ×${p.count}`:''}</span>`;
+      });
+      html += `<span class="season-fmt-pts">${fmt.rnrsTotal} pts</span></span></div>`;
+    });
+    html += `</div>`;
+  });
+  html += `</div></div>`;
+  el.innerHTML = html;
+}
+
+function buildLookupSuggestions(query) {
+  const sugEl = document.getElementById('lookupSuggestions');
+  const q = query.toLowerCase();
+  if (q.length < 2) { sugEl.style.display='none'; return; }
+  const matches = getAllNames().filter(n => normName(n).includes(q)).slice(0,10);
+  if (!matches.length) { sugEl.style.display='none'; return; }
+  sugEl.style.display = 'block';
+  sugEl.innerHTML = matches.map(n => {
+    const st = getState(n);
+    const rg = getRegion(n);
+    return `<div class="lookup-suggestion" data-name="${n}">${cleanName(n)}${st?`<span style="color:var(--text3);font-size:11px;margin-left:6px">${st}${rg?' · '+rg:''}</span>`:''}</div>`;
+  }).join('');
+  sugEl.querySelectorAll('.lookup-suggestion').forEach(el => {
+    el.addEventListener('click', () => {
+      document.getElementById('lookupInput').value = el.dataset.name;
+      sugEl.style.display = 'none';
+      renderLookupProfile(el.dataset.name);
+    });
+  });
+}
+
+document.getElementById('lookupInput').addEventListener('input', e => buildLookupSuggestions(e.target.value));
+document.getElementById('lookupClear').addEventListener('click', () => {
+  document.getElementById('lookupInput').value = '';
+  document.getElementById('lookupSuggestions').style.display = 'none';
+  document.getElementById('lookupProfile').innerHTML = '';
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#lookupSuggestions') && !e.target.closest('#lookupInput')) {
+    document.getElementById('lookupSuggestions').style.display = 'none';
+  }
+});
+
+loadAndRender();
+</script>
+</body>
+</html>
