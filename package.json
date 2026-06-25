@@ -21,6 +21,7 @@
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "fflate": "^0.8.3",
     "flowbite-react": "^0.10.2",
     "framer-motion": "^12.34.3",
     "geist": "^1.2.1",
