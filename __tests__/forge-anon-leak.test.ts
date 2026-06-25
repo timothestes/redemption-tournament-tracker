@@ -136,6 +136,45 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
   const ISO_ENABLED = !!(MEMBER_EMAIL && MEMBER_PW && SERVICE && OTHER_OWNER);
 
   describe.runIf(ISO_ENABLED)("member cannot read another member's card", () => {
+    it("a public channel of the same name receives no forge broadcast", async () => {
+      // Defense-in-depth: DB broadcasts go only to the PRIVATE topic. A public
+      // channel with the same name is a DISTINCT channel and must receive nothing,
+      // even when a real member write fires a broadcast on the private topic.
+      const svc = createClient(URL!, SERVICE!);
+      const ins = await svc
+        .from("forge_cards")
+        .insert({ owner_id: OTHER_OWNER!, working_snapshot: { name: "RT LEAK PROBE" } })
+        .select("id")
+        .single();
+      expect(ins.error, ins.error?.message).toBeNull();
+      const cardId = ins.data!.id as string;
+
+      const pub = createClient(URL!, ANON!);
+      let received = 0;
+      const ch = pub.channel(`forge:card:${cardId}`, { config: { private: false } });
+      ch.on("broadcast", { event: "change" }, () => { received++; });
+      try {
+        // Wait for the public channel to settle (subscribe or error), capped.
+        await new Promise<void>((resolve) => {
+          const t = setTimeout(resolve, 6000);
+          ch.subscribe((status) => {
+            if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "CLOSED") {
+              clearTimeout(t);
+              resolve();
+            }
+          });
+        });
+        // Fire a private DB broadcast: update the card as the service role.
+        await svc.from("forge_cards").update({ working_snapshot: { name: "RT LEAK PROBE 2" } }).eq("id", cardId);
+        // Give any (errant) delivery a window to arrive.
+        await new Promise((r) => setTimeout(r, 2500));
+        expect(received, "a public channel received a private forge broadcast").toBe(0);
+      } finally {
+        pub.removeChannel(ch);
+        await svc.from("forge_cards").delete().eq("id", cardId);
+      }
+    });
+
     it("a signed-in member sees zero rows for a foreign-owned card", async () => {
       const svc = createClient(URL!, SERVICE!);
       const ins = await svc
