@@ -74,6 +74,7 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_delete_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["_forge_can_read_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["_forge_is_card_field", { p_field: "name" }],
+    ["_forge_can_read_topic", { p_topic: "forge:card:00000000-0000-0000-0000-000000000000" }],
     ["forge_create_proposal", { p_card_id: "00000000-0000-0000-0000-000000000000", p_snapshot: {}, p_summary: "x" }],
     ["forge_accept_proposal", { p_proposal_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_deny_proposal", { p_proposal_id: "00000000-0000-0000-0000-000000000000", p_reason: "x" }],
@@ -89,6 +90,42 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
       expect(error, `anon was able to execute ${fn} — a definer grant leaked`).not.toBeNull();
     });
   }
+
+  // Realtime: a non-member (anon) must not be able to JOIN a private forge topic.
+  // A successful join is the only way to receive broadcasts/presence, so a rejected
+  // join (CHANNEL_ERROR / timeout, never SUBSCRIBED) proves the channel can't leak.
+  function joinStatus(
+    client: ReturnType<typeof createClient>,
+    topic: string,
+    timeoutMs = 8000
+  ): Promise<string> {
+    return new Promise((resolve) => {
+      const ch = client.channel(topic, { config: { private: true } });
+      const done = (status: string) => {
+        clearTimeout(timer);
+        client.removeChannel(ch);
+        resolve(status);
+      };
+      const timer = setTimeout(() => done("TIMEOUT"), timeoutMs);
+      ch.subscribe((status) => {
+        if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "CLOSED") {
+          done(status);
+        }
+      });
+    });
+  }
+
+  it("anon cannot join a private forge card channel", async () => {
+    const client = createClient(URL!, ANON!);
+    const status = await joinStatus(client, "forge:card:00000000-0000-0000-0000-000000000000");
+    expect(status, `anon joined a forge channel (status: ${status})`).not.toBe("SUBSCRIBED");
+  });
+
+  it("anon cannot join a private forge set channel", async () => {
+    const client = createClient(URL!, ANON!);
+    const status = await joinStatus(client, "forge:set:00000000-0000-0000-0000-000000000000");
+    expect(status, `anon joined a forge channel (status: ${status})`).not.toBe("SUBSCRIBED");
+  });
 
   // Member-vs-member isolation: a signed-in member must NOT see another member's
   // private idea. Opt-in (needs a test member + service role to seed a foreign card).
@@ -114,6 +151,12 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
         expect(auth.error, auth.error?.message).toBeNull();
         const { data } = await member.from("forge_cards").select("*").eq("id", foreignId);
         expect((data ?? []).length, "member leaked a foreign-owned card").toBe(0);
+        // ...and cannot join that card's realtime topic (per-topic authz = table RLS).
+        await member.realtime.setAuth(
+          (await member.auth.getSession()).data.session!.access_token
+        );
+        const rtStatus = await joinStatus(member, `forge:card:${foreignId}`);
+        expect(rtStatus, `member joined a foreign card's channel (status: ${rtStatus})`).not.toBe("SUBSCRIBED");
       } finally {
         await svc.from("forge_cards").delete().eq("id", foreignId);
       }
