@@ -92,40 +92,53 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
   }
 
   // Realtime: a non-member (anon) must not be able to JOIN a private forge topic.
-  // A successful join is the only way to receive broadcasts/presence, so a rejected
-  // join (CHANNEL_ERROR / timeout, never SUBSCRIBED) proves the channel can't leak.
+  // A successful join is the only way to receive broadcasts/presence, so ANY
+  // non-SUBSCRIBED terminal outcome (CHANNEL_ERROR / TIMED_OUT / CLOSED / our own
+  // timer) proves the channel can't leak. realtime-js retries a rejected private
+  // join (and can stack-overflow its reconnect timer), so callers must hand us a
+  // client created with a short `realtime.timeout`, and we tear the socket down
+  // hard (disconnect) on the first terminal status to stop the reconnect storm.
   function joinStatus(
     client: ReturnType<typeof createClient>,
     topic: string,
-    timeoutMs = 8000
+    internalTimeoutMs = 4000
   ): Promise<string> {
-    return new Promise((resolve) => {
+    return new Promise<string>((resolve) => {
       const ch = client.channel(topic, { config: { private: true } });
-      const done = (status: string) => {
+      let settled = false;
+      const finish = (status: string) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
-        client.removeChannel(ch);
+        try { client.removeChannel(ch); } catch { /* ignore */ }
+        try { client.realtime.disconnect(); } catch { /* ignore */ }
         resolve(status);
       };
-      const timer = setTimeout(() => done("TIMEOUT"), timeoutMs);
+      const timer = setTimeout(() => finish("TIMEOUT"), internalTimeoutMs);
       ch.subscribe((status) => {
-        if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "CLOSED") {
-          done(status);
+        if (
+          status === "SUBSCRIBED" || status === "CHANNEL_ERROR" ||
+          status === "CLOSED" || status === "TIMED_OUT"
+        ) {
+          finish(status);
         }
       });
     });
   }
 
   it("anon cannot join a private forge card channel", async () => {
-    const client = createClient(URL!, ANON!);
+    const client = createClient(URL!, ANON!, { realtime: { timeout: 2500 } });
+    await client.realtime.setAuth(ANON!); // anon-role JWT — private authz must reject it
     const status = await joinStatus(client, "forge:card:00000000-0000-0000-0000-000000000000");
     expect(status, `anon joined a forge channel (status: ${status})`).not.toBe("SUBSCRIBED");
-  });
+  }, 15000);
 
   it("anon cannot join a private forge set channel", async () => {
-    const client = createClient(URL!, ANON!);
+    const client = createClient(URL!, ANON!, { realtime: { timeout: 2500 } });
+    await client.realtime.setAuth(ANON!);
     const status = await joinStatus(client, "forge:set:00000000-0000-0000-0000-000000000000");
     expect(status, `anon joined a forge channel (status: ${status})`).not.toBe("SUBSCRIBED");
-  });
+  }, 15000);
 
   // Member-vs-member isolation: a signed-in member must NOT see another member's
   // private idea. Opt-in (needs a test member + service role to seed a foreign card).
@@ -185,7 +198,7 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
       expect(ins.error, ins.error?.message).toBeNull();
       const foreignId = ins.data!.id as string;
       try {
-        const member = createClient(URL!, ANON!);
+        const member = createClient(URL!, ANON!, { realtime: { timeout: 2500 } });
         const auth = await member.auth.signInWithPassword({ email: MEMBER_EMAIL!, password: MEMBER_PW! });
         expect(auth.error, auth.error?.message).toBeNull();
         const { data } = await member.from("forge_cards").select("*").eq("id", foreignId);
