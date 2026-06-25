@@ -53,6 +53,7 @@ export async function listSetApprovedArt(setId: string): Promise<ApprovedArt[]> 
   const { data: versions } = await ctx.supabase
     .from("card_versions")
     .select("id, card_id, version_number, data, art_key, art_original_key, art_is_placeholder")
+    .eq("status", "approved") // self-defend: don't lean solely on the approve RPC keeping these in lockstep
     .in("id", versionIds);
 
   return (versions ?? [])
