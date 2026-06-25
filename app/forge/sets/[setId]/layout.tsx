@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireForge } from "@/app/forge/lib/auth";
 import { getSet } from "@/app/forge/lib/sets";
+import SetRealtime from "./SetRealtime";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function SetLayout({ children, params }: { children: React.
           {tabs.map((t) => <Link key={t.href} href={t.href} className="text-muted-foreground hover:text-foreground hover:underline">{t.label}</Link>)}
         </nav>
       </div>
+      <SetRealtime setId={setId} />
       {children}
     </div>
   );
