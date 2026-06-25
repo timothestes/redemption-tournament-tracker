@@ -22,6 +22,9 @@ export const CLASSES = ["Warrior", "Weapon"] as const;
 export const ICONS = ["Territory", "Star", "Cloud"] as const;
 export const LEGALITIES = ["Rotation", "Classic", "Scrolls", "Paragon", "Banned"] as const;
 
+// NOTE: the property keys below are mirrored by the SQL allowlist
+// `_forge_is_card_field` in supabase/migrations/053_forge_review_layer.sql
+// (used to validate field-anchored suggestions). Keep the two lists in sync.
 export type DesignCard = {
   name?: string;
   cardType?: CardType[];
