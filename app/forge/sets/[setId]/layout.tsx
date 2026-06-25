@@ -15,6 +15,7 @@ export default async function SetLayout({ children, params }: { children: React.
     { href: `/forge/sets/${setId}/cards`, label: "Cards" },
     { href: `/forge/sets/${setId}/notes`, label: "Notes" },
     { href: `/forge/sets/${setId}/progress`, label: "Progress" },
+    { href: `/forge/sets/${setId}/review`, label: "Review" },
   ];
   return (
     <div className="mx-auto max-w-6xl p-4">

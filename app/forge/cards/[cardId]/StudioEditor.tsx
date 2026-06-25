@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 import { saveCard, type ForgeCardFull } from "@/app/forge/lib/cards";
+import { createProposal } from "@/app/forge/lib/proposals";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 import FullModeForm from "./FullModeForm";
 import LifecycleControls from "./LifecycleControls";
@@ -30,6 +32,25 @@ export default function StudioEditor({ card, sets }: { card: ForgeCardFull; sets
 
   const update = (patch: Partial<DesignCard>) => setSnapshot((s) => ({ ...s, ...patch }));
 
+  const router = useRouter();
+  const [proposing, setProposing] = useState(false);
+  const [proposeSummary, setProposeSummary] = useState("");
+  const [proposeBusy, setProposeBusy] = useState(false);
+
+  const submitProposal = async () => {
+    if (!proposeSummary.trim()) return;
+    setProposeBusy(true);
+    const r = await createProposal(card.id, snapshot, proposeSummary);
+    setProposeBusy(false);
+    if (r.ok === false) {
+      alert(r.error);
+      return;
+    }
+    setProposing(false);
+    setProposeSummary("");
+    router.refresh();
+  };
+
   return (
     <div className="mx-auto max-w-5xl p-4">
       <div className="mb-3 flex flex-col gap-2 text-sm">
@@ -42,6 +63,35 @@ export default function StudioEditor({ card, sets }: { card: ForgeCardFull; sets
           </span>
         </div>
         <LifecycleControls card={card} sets={sets} />
+        {card.setId &&
+          (proposing ? (
+            <div className="flex items-center gap-1 text-xs">
+              <input
+                autoFocus
+                value={proposeSummary}
+                onChange={(e) => setProposeSummary(e.target.value)}
+                placeholder="Summarize your proposed change…"
+                className="flex-1 rounded-md border bg-background px-2 py-1"
+              />
+              <button
+                disabled={proposeBusy || !proposeSummary.trim()}
+                onClick={submitProposal}
+                className="rounded-md bg-emerald-600 px-3 py-1 font-medium text-white disabled:opacity-50"
+              >
+                Submit proposal
+              </button>
+              <button onClick={() => setProposing(false)} className="rounded-md border px-2 py-1">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setProposing(true)}
+              className="self-start rounded-md border px-3 py-1 text-xs"
+            >
+              Propose changes for review
+            </button>
+          ))}
       </div>
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,360px)_1fr]">

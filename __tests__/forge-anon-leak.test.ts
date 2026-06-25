@@ -16,6 +16,7 @@ const ENABLED = process.env.FORGE_LEAK_TEST === "1" && !!URL && !!ANON;
 const FORGE_TABLES = [
   "playtest_members", "forge_invites", "forge_audit", "forge_cards",
   "forge_sets", "forge_set_elders", "forge_set_grants", "card_versions",
+  "card_proposals", "card_comments",
 ];
 
 describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
@@ -71,6 +72,15 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_archive_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_unarchive_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_delete_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["_forge_can_read_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["_forge_is_card_field", { p_field: "name" }],
+    ["forge_create_proposal", { p_card_id: "00000000-0000-0000-0000-000000000000", p_snapshot: {}, p_summary: "x" }],
+    ["forge_accept_proposal", { p_proposal_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_deny_proposal", { p_proposal_id: "00000000-0000-0000-0000-000000000000", p_reason: "x" }],
+    ["forge_add_comment", { p_card_id: "00000000-0000-0000-0000-000000000000", p_proposal_id: null, p_parent_id: null, p_field: null, p_suggested_value: null, p_body: "x" }],
+    ["forge_resolve_comment", { p_comment_id: "00000000-0000-0000-0000-000000000000", p_resolved: true }],
+    ["forge_apply_suggestion", { p_comment_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_delete_comment", { p_comment_id: "00000000-0000-0000-0000-000000000000" }],
   ];
 
   for (const [fn, args] of FORGE_RPCS) {

@@ -1,0 +1,114 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { requireForge, requireElder } from "@/app/forge/lib/auth";
+
+export type CommentRow = {
+  id: string;
+  cardId: string;
+  proposalId: string | null;
+  field: string | null;
+  suggestedValue: unknown;
+  parentId: string | null;
+  body: string;
+  resolved: boolean;
+  createdBy: string;
+  createdAt: string;
+};
+
+const COLS =
+  "id, card_id, proposal_id, field, suggested_value, parent_comment_id, body, resolved, created_by, created_at";
+
+function toComment(row: any): CommentRow {
+  return {
+    id: row.id,
+    cardId: row.card_id,
+    proposalId: row.proposal_id ?? null,
+    field: row.field ?? null,
+    suggestedValue: row.suggested_value ?? null,
+    parentId: row.parent_comment_id ?? null,
+    body: row.body,
+    resolved: !!row.resolved,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+export async function listComments(cardId: string): Promise<CommentRow[]> {
+  const ctx = await requireForge();
+  if (!ctx) return [];
+  const { data } = await ctx.supabase
+    .from("card_comments")
+    .select(COLS)
+    .eq("card_id", cardId)
+    .order("created_at", { ascending: true });
+  return (data ?? []).map(toComment);
+}
+
+export async function addComment(input: {
+  cardId: string;
+  proposalId?: string | null;
+  parentId?: string | null;
+  field?: string | null;
+  suggestedValue?: unknown;
+  body: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireForge();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  if (!input.body.trim()) return { ok: false, error: "Comment cannot be empty" };
+  const { error } = await ctx.supabase.rpc("forge_add_comment", {
+    p_card_id: input.cardId,
+    p_proposal_id: input.proposalId ?? null,
+    p_parent_id: input.parentId ?? null,
+    p_field: input.field ?? null,
+    p_suggested_value: input.suggestedValue ?? null,
+    p_body: input.body,
+  });
+  if (error) return { ok: false, error: "Could not add comment" };
+  revalidatePath(`/forge/cards/${input.cardId}`);
+  return { ok: true };
+}
+
+export async function resolveComment(
+  commentId: string,
+  cardId: string,
+  resolved: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireForge();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { error } = await ctx.supabase.rpc("forge_resolve_comment", {
+    p_comment_id: commentId,
+    p_resolved: resolved,
+  });
+  if (error) return { ok: false, error: "Could not update comment" };
+  revalidatePath(`/forge/cards/${cardId}`);
+  return { ok: true };
+}
+
+export async function applySuggestion(
+  commentId: string,
+  cardId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { error } = await ctx.supabase.rpc("forge_apply_suggestion", {
+    p_comment_id: commentId,
+  });
+  if (error) return { ok: false, error: "Could not apply suggestion" };
+  revalidatePath(`/forge/cards/${cardId}`);
+  return { ok: true };
+}
+
+export async function deleteComment(
+  commentId: string,
+  cardId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { error } = await ctx.supabase.rpc("forge_delete_comment", {
+    p_comment_id: commentId,
+  });
+  if (error) return { ok: false, error: "Could not delete comment" };
+  revalidatePath(`/forge/cards/${cardId}`);
+  return { ok: true };
+}
