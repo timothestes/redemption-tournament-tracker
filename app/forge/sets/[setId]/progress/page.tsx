@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireForge } from "@/app/forge/lib/auth";
 import { getSet, listSetCards, listSetElders } from "@/app/forge/lib/sets";
+import { listSetApprovedArt } from "@/app/forge/lib/setArtwork";
 import { computeProgress } from "@/app/forge/lib/progress";
 import ProgressDashboard from "./ProgressDashboard";
 
@@ -15,6 +16,8 @@ export default async function SetProgressPage({ params }: { params: Promise<{ se
   const cards = await listSetCards(setId);
   const model = computeProgress(cards.map((c) => ({ snapshot: c.snapshot, status: c.status })), set.targetCounts);
   const canEdit = ctx.role === "elder" || ctx.role === "superadmin";
+  // Server-side boolean only — the art list carries blob keys and must not reach the client.
+  const hasApprovedArt = (await listSetApprovedArt(setId)).length > 0;
 
   const elders = await listSetElders(setId);
   let addable: { userId: string; displayName: string | null }[] = [];
@@ -24,5 +27,5 @@ export default async function SetProgressPage({ params }: { params: Promise<{ se
     addable = (members ?? []).filter((m: any) => !onSet.has(m.user_id)).map((m: any) => ({ userId: m.user_id, displayName: m.display_name ?? null }));
   }
 
-  return <ProgressDashboard setId={setId} model={model} targets={set.targetCounts} elders={elders} addable={addable} canEdit={canEdit} />;
+  return <ProgressDashboard setId={setId} model={model} targets={set.targetCounts} elders={elders} addable={addable} canEdit={canEdit} hasApprovedArt={hasApprovedArt} />;
 }

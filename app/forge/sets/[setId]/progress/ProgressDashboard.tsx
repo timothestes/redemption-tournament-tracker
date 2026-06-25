@@ -17,10 +17,10 @@ function cellTone(actual: number, target: number): string {
 }
 
 export default function ProgressDashboard({
-  setId, model, targets, elders, addable, canEdit,
+  setId, model, targets, elders, addable, canEdit, hasApprovedArt,
 }: {
   setId: string; model: ProgressModel; targets: TargetCounts; elders: SetElder[];
-  addable: { userId: string; displayName: string | null }[]; canEdit: boolean;
+  addable: { userId: string; displayName: string | null }[]; canEdit: boolean; hasApprovedArt: boolean;
 }) {
   const live = model.headline.actual;
   return (
@@ -33,7 +33,25 @@ export default function ProgressDashboard({
           </div>
           <p className="text-xs text-muted-foreground">cards in set</p>
         </div>
-        {canEdit && <TargetsEditor setId={setId} initial={targets} />}
+        <div className="flex flex-wrap items-end gap-2">
+          {hasApprovedArt ? (
+            <a
+              href={`/forge/api/sets/${setId}/artwork`}
+              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+            >
+              Download artwork (ZIP)
+            </a>
+          ) : (
+            <span
+              className="cursor-not-allowed rounded-md border px-3 py-1.5 text-sm text-muted-foreground opacity-50"
+              title="Approve cards with art to enable"
+              aria-disabled="true"
+            >
+              Download artwork (ZIP)
+            </span>
+          )}
+          {canEdit && <TargetsEditor setId={setId} initial={targets} />}
+        </div>
       </div>
 
       {/* status breakdown bar */}
