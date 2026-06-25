@@ -114,7 +114,7 @@ create policy "forge realtime presence-send" on realtime.messages
 
 **3. No publication / replica-identity changes.** `broadcast_changes` does not use the `supabase_realtime` publication. `/board` is unaffected.
 
-**4. Project setting (documented, not a migration).** Disable **"Allow public access"** in Realtime Settings as defense-in-depth so the project serves *only* private channels. Security does not depend on it for this slice (DB broadcasts never reach a public topic), but it removes an entire class of future foot-gun. Recorded in the plan as a manual dashboard step + in the PR description.
+**4. No project-setting change.** "Allow public access" in Realtime Settings stays **on** — `/board` uses a *public* (non-private) channel and disabling it project-wide would break the projector board. Keeping it on is safe for the Forge: `realtime.broadcast_changes()` sends only to the **private** topic, and Realtime treats a private topic and a public topic of the same name as **distinct channels** (no cross-delivery), so a public listener never receives a Forge broadcast. The leak test proves this directly (a public channel of the same name receives zero messages even after a member write).
 
 **5. Anon-leak guardrail extension (the keystone).** `__tests__/forge-anon-leak.test.ts` gains a Realtime section. As **anon** and as a **signed-in non-member**:
 - `realtime.setAuth(token)` then `.channel('forge:card:<seed-id>', { config: { private: true } }).subscribe()` → assert the channel **does not reach `SUBSCRIBED`** (it gets `CHANNEL_ERROR`/timeout because the `realtime.messages` SELECT policy denies the join).
@@ -128,31 +128,32 @@ The test runs under the existing `FORGE_LEAK_TEST=1 npm run test:security` live 
 
 ## Client modules
 
-**`app/forge/lib/realtime.ts`** (new) — the single private-channel factory. Browser-only (`utils/supabase/client.ts`). Responsibilities:
-- `forgeChannel(name, opts)` — creates a channel with `config: { private: true }`, after ensuring `await supabase.realtime.setAuth()` has run (so the socket carries the member's JWT before join).
-- `forgeCardTopic(cardId)` / `forgeSetTopic(setId)` — the canonical topic-name builders (single source of truth, mirrored by the trigger SQL's topic format; both documented as `forge:card:{uuid}` / `forge:set:{uuid}`).
-- Subscribe/teardown helpers that return an unsubscribe function for React effect cleanup.
+**One channel per page-context, not per component.** A card page subscribes once to `forge:card:{id}`; a set route subscribes once to `forge:set:{id}` (mounted in the set layout so it spans all set tabs + the nav badge). The trigger SQL uses a **fixed broadcast event name `'change'`** (operation carried in the payload) so each consumer registers a single `.on('broadcast', { event: 'change' }, …)` listener.
 
-**Hooks** (new, colocated under `app/forge/` — `lib/useForgeRealtime.ts` or per-surface):
-- `useForgeChannelInvalidate(topic, onChange)` — subscribes to a topic's broadcast events and calls `onChange` (debounced ~250ms) so the consumer can `router.refresh()` / scoped-refetch. Used by review badges, progress, notes, proposal lists.
-- `useForgeComments(cardId, initial)` — subscribes to the card topic, applies INSERT/UPDATE/DELETE comment payloads to local state for an instant live thread. (The one surface that consumes payloads directly rather than refetching.)
-- `useForgePresence(cardId, me)` — joins the card topic's presence, tracks `{ userId, displayName, editing }`, returns the roster + an `othersEditing` boolean for the collision banner.
+**`app/forge/lib/realtime.ts`** (new, plain TS — imported only by client components) — the canonical topic + channel layer:
+- `forgeCardTopic(cardId)` → `` `forge:card:${cardId}` `` and `forgeSetTopic(setId)` → `` `forge:set:${setId}` `` — single source of truth for the topic format, exactly mirroring the trigger SQL. **No sub-suffixes** (the `realtime.messages` predicate parses `split_part(topic,':',3)::uuid`, so a `:comments`-style suffix would break authorization).
+- `openForgeChannel(topic, { onChange?, presence? })` — calls `await supabase.realtime.setAuth()` (member JWT) then creates the channel with `config: { private: true, presence: { key } }`, wires the `'change'` broadcast handler and/or presence callbacks, subscribes, and returns a teardown function.
 
-All hooks are no-ops/clean-teardown when their id is absent (e.g. the studio's card has `set_id === null`, so the card page still works; the set surfaces simply aren't mounted).
+**Hooks** (`app/forge/lib/useForgeRealtime.ts`, `"use client"`):
+- `useForgeRefresh(topic)` — subscribes and calls a **debounced (~250ms) `router.refresh()`** on every `'change'` event. This is the uniform liveness mechanism: because comment threads, proposal lists/diffs, review badges, and the progress dashboard all render from **server props**, a refresh re-runs the server queries and they update live — **no payload reducer, no dedupe-vs-optimistic logic**. Server stays the single source of truth.
+- `useForgePresence(topic, me)` — joins presence, tracks `{ userId, displayName, editing }`, returns the roster + an `othersEditing` boolean for the collision banner.
+
+The card page combines both into one subscription (`useForgeCardChannel(cardId, currentUser)` = presence + refresh on the same channel). Subscriptions are **gated on the card being in a set** (`setId != null`) — a setless private sketch has only its owner as a possible joiner, so realtime is skipped. All hooks clean-teardown on unmount / id change.
 
 ---
 
 ## Live surfaces & consumption strategy
 
-| Surface | Mechanism | Consumption |
+| Surface | Channel | Consumption |
 |---|---|---|
-| **Comment thread** (`CommentThread.tsx`) | `forge:card` broadcasts of `card_comments` | **Apply payloads directly** — append on INSERT, patch on UPDATE (resolve/edit), drop on DELETE. Instant live thread; reconciles against the optimistic local insert by row `id`. |
-| **Presence + collision** (`StudioEditor.tsx` / card page) | `forge:card` presence track | Avatar row of current viewers; `editing:true` set on focus/typing in the editor. ≥2 editors ⇒ soft non-blocking banner. No locking. |
-| **Review-queue badges** (`ReviewQueue.tsx`, set nav tab) | `forge:set` broadcasts of `card_proposals`/`card_comments` | **Invalidation signal** → debounced `router.refresh()` (re-derives counts server-side). |
-| **Set notes** (`NotesEditor.tsx`) | `forge:set` broadcasts of `forge_sets` | Invalidation signal → refetch notes for viewers. The editor stays single-author autosave; a viewer sees updates live. (Author's own in-flight edit is not clobbered — refresh only pulls when not dirty.) |
-| **Progress dashboard** (`ProgressDashboard.tsx`) | `forge:set` broadcasts of `forge_cards` | Invalidation signal → debounced `router.refresh()`; progress recomputes server-side via the pure `progress.ts`. |
+| **Comment thread** (`CommentThread.tsx`) | `forge:card` | Renders from the server page's `comments` prop → `router.refresh()` re-runs `listComments` and the thread updates live. No reducer. |
+| **Proposal list + diffs** (`ReviewPanel.tsx`) | `forge:card` | Same `router.refresh()` re-runs the page's proposal/diff queries. |
+| **Presence + collision** (`StudioEditor.tsx`) | `forge:card` (presence) | Avatar row of current viewers; `editing:true` set on focus/typing in the editor. ≥2 editors ⇒ soft non-blocking banner. No locking. |
+| **Review-queue badges** (`ReviewQueue.tsx` + set nav tab in `layout.tsx`) | `forge:set` | `router.refresh()` re-derives counts server-side via `review.ts`. Subscription mounted in the set layout so the badge updates on every set tab. |
+| **Set notes** (`NotesEditor.tsx`) | `forge:set` | `router.refresh()` passes fresh `initial`; `NotesEditor` syncs `initial → notes` **only when its buffer is not dirty**, so a viewer sees updates live while an active author's in-progress edit is never clobbered. |
+| **Progress dashboard** (`ProgressDashboard.tsx`) | `forge:set` | `router.refresh()` recomputes `progress.ts` server-side; the dashboard renders from the refreshed `model` prop. |
 
-**Why "invalidation signal" for the derived surfaces:** badges/progress/notes are *derived* (counts, cartesian cells, rendered markdown). Reconstructing them from raw INSERT/UPDATE/DELETE payloads is bug-prone (ordering, dedupe, old-row handling) for no user-visible gain at this scale. A debounced server refetch keeps the server as the single source of truth and slots directly into 1b.1's existing `router.refresh()` model. Only the comment thread, where instant append is the whole point and the payload maps 1:1 to a list item, consumes payloads directly.
+**Why uniform `router.refresh()`:** every live surface here already renders from server props (1b.1 shipped them that way and uses `router.refresh()` after each local mutation). Treating a broadcast as "something changed → refresh" reuses that exact model, keeps the server as the single source of truth, and avoids fragile client-side reconciliation of raw INSERT/UPDATE/DELETE payloads (ordering, dedupe, old-row handling) for no perceptible gain at a few-elders scale. The editors (`StudioEditor`, `NotesEditor`) hold a local dirty buffer seeded once on mount, so a refresh does not clobber an in-progress edit; the dirty-guarded prop-sync in `NotesEditor` is the only place that re-reads server state into a field, and only when safe.
 
 ---
 
@@ -181,7 +182,7 @@ All hooks are no-ops/clean-teardown when their id is absent (e.g. the studio's c
 - **Topic parsing in RLS.** The join gate parses `realtime.topic()` and casts a substring to `uuid`. The cast is wrapped in an exception guard that returns `false`, so a malformed/unknown topic fails closed rather than erroring the join. Per-topic authz means Realtime visibility equals table RLS — no intra-member content exposure — at the cost of one `stable` helper call per join.
 - **Refetch on every set-topic event.** Debounced, and write volume is tiny (a few elders). If it ever became chatty, the derived surfaces could move to payload-applied reducers — deferred under YAGNI.
 - **`realtime.messages` RLS join latency.** One `_forge_can_read_topic()` call per join (which itself runs one existing read predicate). Negligible at this scale; Supabase's complexity warning is about heavier policies.
-- **Project setting drift.** "Allow public access" is a dashboard setting, not in the migration. Mitigated by documenting it in the PR and by the design not depending on it for correctness.
+- **Shared Realtime settings.** "Allow public access" must stay on for `/board`; the Forge's safety does not depend on it (private vs. public topics are distinct channels), and the leak test proves a public same-named channel receives nothing.
 
 ---
 
