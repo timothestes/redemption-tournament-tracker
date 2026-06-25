@@ -10,13 +10,31 @@ import type { DesignCard } from "@/app/forge/lib/designCard";
 import FullModeForm from "./FullModeForm";
 import LifecycleControls from "./LifecycleControls";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
+import { forgeCardTopic } from "@/app/forge/lib/realtime";
+import { useForgeCardChannel } from "@/app/forge/lib/useForgeRealtime";
+import PresenceBar from "./PresenceBar";
 
-export default function StudioEditor({ card, sets }: { card: ForgeCardFull; sets: ForgeSetSummary[] }) {
+export default function StudioEditor({
+  card,
+  sets,
+  currentUser,
+  setId,
+}: {
+  card: ForgeCardFull;
+  sets: ForgeSetSummary[];
+  currentUser: { userId: string; displayName: string | null };
+  setId: string | null;
+}) {
   const [snapshot, setSnapshot] = useState<DesignCard>(card.snapshot ?? {});
   const [fullMode, setFullMode] = useState<boolean>(!!card.snapshot?.cardType?.length);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstRender = useRef(true);
+
+  const { others, setEditing } = useForgeCardChannel(
+    setId ? forgeCardTopic(card.id) : null,
+    { userId: currentUser.userId, displayName: currentUser.displayName, editing: false },
+  );
 
   // Debounced autosave — fires only after the user edits (skips mount).
   useEffect(() => {
@@ -53,6 +71,7 @@ export default function StudioEditor({ card, sets }: { card: ForgeCardFull; sets
 
   return (
     <div className="mx-auto max-w-5xl p-4">
+      <PresenceBar others={others} />
       <div className="mb-3 flex flex-col gap-2 text-sm">
         <div className="flex items-center justify-between">
           <Link href={card.setId ? `/forge/sets/${card.setId}/cards` : "/forge/ideas"} className="text-muted-foreground hover:underline">
@@ -101,7 +120,11 @@ export default function StudioEditor({ card, sets }: { card: ForgeCardFull; sets
         </div>
 
         {/* Form */}
-        <div className="space-y-4">
+        <div
+          className="space-y-4"
+          onFocusCapture={() => setEditing(true)}
+          onBlurCapture={() => setEditing(false)}
+        >
           {!fullMode ? (
             <div className="space-y-2">
               <input

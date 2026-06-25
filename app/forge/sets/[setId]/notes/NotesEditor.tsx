@@ -8,6 +8,7 @@ export default function NotesEditor({ setId, initial, canEdit }: { setId: string
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const first = useRef(true);
+  const lastServer = useRef(initial);
 
   useEffect(() => {
     if (first.current) { first.current = false; return; }
@@ -19,6 +20,13 @@ export default function NotesEditor({ setId, initial, canEdit }: { setId: string
     }, 700);
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [notes, setId]);
+
+  useEffect(() => {
+    if (initial === lastServer.current) return;     // our own save / no remote change
+    const wasDirty = notes !== lastServer.current;   // local edits not yet reflected
+    lastServer.current = initial;
+    if (!wasDirty) setNotes(initial);                // safe to adopt the remote value
+  }, [initial, notes]);
 
   if (!canEdit) {
     return <pre className="whitespace-pre-wrap rounded-md border bg-muted/30 p-4 text-sm">{notes || "No notes yet."}</pre>;

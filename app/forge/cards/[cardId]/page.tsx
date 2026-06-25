@@ -23,9 +23,16 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
     : [[], [], []];
   const canReview = ctx.role === "elder" || ctx.role === "superadmin";
 
+  const { data: meRow } = await ctx.supabase
+    .from("playtest_members")
+    .select("display_name")
+    .eq("user_id", ctx.user.id)
+    .single();
+  const currentUser = { userId: ctx.user.id, displayName: meRow?.display_name ?? null };
+
   return (
     <>
-      <StudioEditor card={card} sets={sets} />
+      <StudioEditor card={card} sets={sets} currentUser={currentUser} setId={card.setId ?? null} />
       {inSet && (
         <ReviewPanel
           card={card}

@@ -74,6 +74,7 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_delete_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["_forge_can_read_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["_forge_is_card_field", { p_field: "name" }],
+    ["_forge_can_read_topic", { p_topic: "forge:card:00000000-0000-0000-0000-000000000000" }],
     ["forge_create_proposal", { p_card_id: "00000000-0000-0000-0000-000000000000", p_snapshot: {}, p_summary: "x" }],
     ["forge_accept_proposal", { p_proposal_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_deny_proposal", { p_proposal_id: "00000000-0000-0000-0000-000000000000", p_reason: "x" }],
@@ -90,6 +91,55 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     });
   }
 
+  // Realtime: a non-member (anon) must not be able to JOIN a private forge topic.
+  // A successful join is the only way to receive broadcasts/presence, so ANY
+  // non-SUBSCRIBED terminal outcome (CHANNEL_ERROR / TIMED_OUT / CLOSED / our own
+  // timer) proves the channel can't leak. realtime-js retries a rejected private
+  // join (and can stack-overflow its reconnect timer), so callers must hand us a
+  // client created with a short `realtime.timeout`, and we tear the socket down
+  // hard (disconnect) on the first terminal status to stop the reconnect storm.
+  function joinStatus(
+    client: ReturnType<typeof createClient>,
+    topic: string,
+    internalTimeoutMs = 4000
+  ): Promise<string> {
+    return new Promise<string>((resolve) => {
+      const ch = client.channel(topic, { config: { private: true } });
+      let settled = false;
+      const finish = (status: string) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { client.removeChannel(ch); } catch { /* ignore */ }
+        try { client.realtime.disconnect(); } catch { /* ignore */ }
+        resolve(status);
+      };
+      const timer = setTimeout(() => finish("TIMEOUT"), internalTimeoutMs);
+      ch.subscribe((status) => {
+        if (
+          status === "SUBSCRIBED" || status === "CHANNEL_ERROR" ||
+          status === "CLOSED" || status === "TIMED_OUT"
+        ) {
+          finish(status);
+        }
+      });
+    });
+  }
+
+  it("anon cannot join a private forge card channel", async () => {
+    const client = createClient(URL!, ANON!, { realtime: { timeout: 2500 } });
+    await client.realtime.setAuth(ANON!); // anon-role JWT — private authz must reject it
+    const status = await joinStatus(client, "forge:card:00000000-0000-0000-0000-000000000000");
+    expect(status, `anon joined a forge channel (status: ${status})`).not.toBe("SUBSCRIBED");
+  }, 15000);
+
+  it("anon cannot join a private forge set channel", async () => {
+    const client = createClient(URL!, ANON!, { realtime: { timeout: 2500 } });
+    await client.realtime.setAuth(ANON!);
+    const status = await joinStatus(client, "forge:set:00000000-0000-0000-0000-000000000000");
+    expect(status, `anon joined a forge channel (status: ${status})`).not.toBe("SUBSCRIBED");
+  }, 15000);
+
   // Member-vs-member isolation: a signed-in member must NOT see another member's
   // private idea. Opt-in (needs a test member + service role to seed a foreign card).
   const MEMBER_EMAIL = process.env.FORGE_TEST_MEMBER_EMAIL;
@@ -99,6 +149,45 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
   const ISO_ENABLED = !!(MEMBER_EMAIL && MEMBER_PW && SERVICE && OTHER_OWNER);
 
   describe.runIf(ISO_ENABLED)("member cannot read another member's card", () => {
+    it("a public channel of the same name receives no forge broadcast", async () => {
+      // Defense-in-depth: DB broadcasts go only to the PRIVATE topic. A public
+      // channel with the same name is a DISTINCT channel and must receive nothing,
+      // even when a real member write fires a broadcast on the private topic.
+      const svc = createClient(URL!, SERVICE!);
+      const ins = await svc
+        .from("forge_cards")
+        .insert({ owner_id: OTHER_OWNER!, working_snapshot: { name: "RT LEAK PROBE" } })
+        .select("id")
+        .single();
+      expect(ins.error, ins.error?.message).toBeNull();
+      const cardId = ins.data!.id as string;
+
+      const pub = createClient(URL!, ANON!);
+      let received = 0;
+      const ch = pub.channel(`forge:card:${cardId}`, { config: { private: false } });
+      ch.on("broadcast", { event: "change" }, () => { received++; });
+      try {
+        // Wait for the public channel to settle (subscribe or error), capped.
+        await new Promise<void>((resolve) => {
+          const t = setTimeout(resolve, 6000);
+          ch.subscribe((status) => {
+            if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "CLOSED") {
+              clearTimeout(t);
+              resolve();
+            }
+          });
+        });
+        // Fire a private DB broadcast: update the card as the service role.
+        await svc.from("forge_cards").update({ working_snapshot: { name: "RT LEAK PROBE 2" } }).eq("id", cardId);
+        // Give any (errant) delivery a window to arrive.
+        await new Promise((r) => setTimeout(r, 2500));
+        expect(received, "a public channel received a private forge broadcast").toBe(0);
+      } finally {
+        pub.removeChannel(ch);
+        await svc.from("forge_cards").delete().eq("id", cardId);
+      }
+    });
+
     it("a signed-in member sees zero rows for a foreign-owned card", async () => {
       const svc = createClient(URL!, SERVICE!);
       const ins = await svc
@@ -109,11 +198,17 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
       expect(ins.error, ins.error?.message).toBeNull();
       const foreignId = ins.data!.id as string;
       try {
-        const member = createClient(URL!, ANON!);
+        const member = createClient(URL!, ANON!, { realtime: { timeout: 2500 } });
         const auth = await member.auth.signInWithPassword({ email: MEMBER_EMAIL!, password: MEMBER_PW! });
         expect(auth.error, auth.error?.message).toBeNull();
         const { data } = await member.from("forge_cards").select("*").eq("id", foreignId);
         expect((data ?? []).length, "member leaked a foreign-owned card").toBe(0);
+        // ...and cannot join that card's realtime topic (per-topic authz = table RLS).
+        await member.realtime.setAuth(
+          (await member.auth.getSession()).data.session!.access_token
+        );
+        const rtStatus = await joinStatus(member, `forge:card:${foreignId}`);
+        expect(rtStatus, `member joined a foreign card's channel (status: ${rtStatus})`).not.toBe("SUBSCRIBED");
       } finally {
         await svc.from("forge_cards").delete().eq("id", foreignId);
       }
