@@ -62,7 +62,7 @@ $$;
 -- 4b) Raw-DesignCard-key allowlist. MUST mirror the DesignCard type keys in
 --     app/forge/lib/designCard.ts (NOT the synthetic FieldKey union).
 create or replace function public._forge_is_card_field(p_field text)
-returns boolean language sql immutable set search_path = '' as $$
+returns boolean language sql immutable security definer set search_path = '' as $$
   select p_field = any (array[
     'name','cardType','alignment','brigades','strength','toughness',
     'strengthModifier','toughnessModifier','class','icons','identifiers',
