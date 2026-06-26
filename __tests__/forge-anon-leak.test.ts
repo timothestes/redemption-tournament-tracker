@@ -16,7 +16,7 @@ const ENABLED = process.env.FORGE_LEAK_TEST === "1" && !!URL && !!ANON;
 const FORGE_TABLES = [
   "playtest_members", "forge_invites", "forge_audit", "forge_cards",
   "forge_sets", "forge_set_elders", "forge_set_grants", "card_versions",
-  "card_proposals", "card_comments",
+  "card_proposals", "card_comments", "forge_decks",
 ];
 
 describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
