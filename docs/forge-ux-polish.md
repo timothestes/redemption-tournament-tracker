@@ -23,9 +23,10 @@ All on branch `forge-ux-polish`, committed locally (nothing pushed). Each verifi
 | 4 | **Card preview fidelity**: per-type corner icons (GE/EE/Artifact/Curse/Covenant/…) · real brigade chip colors · identifier pills · LostSoul identifiers | `4a8bdec` | ✅ live + 2 reviewers + 514 tests |
 | 5 | **Playtesting cards are now playtestable** (semantics Option A: RLS migration 057 + readers + labels) | `60d1552` | ✅ RLS-simulated (granted sees it, non-granted=0) + 61 leak tests |
 | 6 | **Placeholder-art control** clarified (checkbox + help text) | `843444b` | ✅ live |
-| 7 | **Targets editor redesign + set-creation defaults** | _in flight (pipeline)_ | pending |
+| 7 | **Targets editor redesign + set-creation defaults** (clean modal + "how many cards?" seeded distribution) | `1e850a0` | ✅ live + 2 reviewers |
+| 8 | **Deck-builder unification design** ([forge-deckbuilder-unification.md](forge-deckbuilder-unification.md)) — 2 subagents agreed | `7fa8547` | design only |
 
-**Left for you / next session:** type-first card creation w/ templates; click-to-edit on the preview; hero-left/enhancement-right dual icon; deck-builder **replacement** (blocked on your call — see bottom); artwork-loading perf on the deck builder.
+**Left for next session:** execute the deck-builder unification (Phase 0 is safe/mechanical — greenlit, ready to start); type-first card creation w/ templates; click-to-edit on the preview; hero-left/enhancement-right dual icon; artwork-loading perf on the deck builder.
 
 ---
 
