@@ -136,6 +136,7 @@ const TopNav: React.FC = () => {
   const tournamentLinks: NavLink[] = [
     { href: "/tournaments", label: "Upcoming Events", icon: HiCalendar },
     { href: "/tournaments/rnrs-points", label: "RNRS Points", icon: HiChartBar },
+    { href: "/tournaments/history", label: "History", icon: FaBookOpen },
     { href: "/tracker/tournaments", label: "My Tournaments", icon: FaTrophy, authRequired: true },
   ];
 
