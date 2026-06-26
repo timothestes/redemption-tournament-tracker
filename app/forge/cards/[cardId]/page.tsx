@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireForge } from "@/app/forge/lib/auth";
 import { getCard } from "@/app/forge/lib/cards";
 import { listSets } from "@/app/forge/lib/sets";
@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function StudioPage({ params }: { params: Promise<{ cardId: string }> }) {
   const ctx = await requireForge();
   if (!ctx) notFound();
+  if (ctx.role === "playtester") redirect("/forge/play");
   const { cardId } = await params;
   const card = await getCard(cardId);
   if (!card) notFound();
