@@ -50,7 +50,7 @@ export async function saveForgeDeck(
     updated_at: new Date().toISOString(),
   };
   if (input.id) {
-    const { error } = await ctx.supabase.from("forge_decks").update(row).eq("id", input.id);
+    const { error } = await ctx.supabase.from("forge_decks").update(row).eq("id", input.id).eq("owner_id", ctx.user.id);
     if (error) return { ok: false, error: "Could not save deck" };
     revalidatePath("/forge/play/decks");
     return { ok: true, id: input.id };
@@ -64,7 +64,7 @@ export async function saveForgeDeck(
 export async function deleteForgeDeck(id: string): Promise<{ ok: boolean; error?: string }> {
   const ctx = await requireForge();
   if (!ctx) return { ok: false, error: "Not authorized" };
-  const { error } = await ctx.supabase.from("forge_decks").delete().eq("id", id);
+  const { error } = await ctx.supabase.from("forge_decks").delete().eq("id", id).eq("owner_id", ctx.user.id);
   if (error) return { ok: false, error: "Could not delete deck" };
   revalidatePath("/forge/play/decks");
   return { ok: true };
