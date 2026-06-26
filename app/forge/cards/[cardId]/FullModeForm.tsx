@@ -101,9 +101,25 @@ export default function FullModeForm({
             placeholder="e.g. 2 Kings 25:8" className="w-full rounded-md border bg-background px-3 py-2" /></label>
       )}
 
+      {show("identifiers") && (
+        <label className="block"><span className="mb-1 block font-medium">Identifiers</span>
+          <input
+            value={(snapshot.identifiers ?? []).join(", ")}
+            onChange={(e) => update({ identifiers: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+            placeholder="Comma-separated, e.g. Genesis, Patriarch"
+            className="w-full rounded-md border bg-background px-3 py-2" />
+          <span className="mt-1 block text-xs text-muted-foreground">Shown as pills on the card (e.g. Lost Soul / Hero identifiers).</span>
+        </label>
+      )}
+
       <label className="block"><span className="mb-1 block font-medium">Flavor text</span>
         <textarea value={snapshot.flavorText ?? ""} onChange={(e) => update({ flavorText: e.target.value })}
           className="h-20 w-full rounded-md border bg-background px-3 py-2" /></label>
+
+      <label className="block"><span className="mb-1 block font-medium">Artist</span>
+        <input value={snapshot.artistCredit ?? ""} onChange={(e) => update({ artistCredit: e.target.value })}
+          placeholder="Illustrator name — shown in the card footer"
+          className="w-full rounded-md border bg-background px-3 py-2" /></label>
 
       <label className="block"><span className="mb-1 block font-medium">Legality</span>
         <select value={snapshot.legality ?? ""} onChange={(e) => update({ legality: (e.target.value || undefined) as any })}

@@ -92,8 +92,8 @@ export default function DeckBuilder({
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Deck name"
-          className="flex-1 rounded-md border px-3 py-2 text-sm" />
-        <select value={format} onChange={(e) => setFormat(e.target.value)} className="rounded-md border px-2 py-2 text-sm">
+          className="flex-1 rounded-md border bg-background text-foreground px-3 py-2 text-sm" />
+        <select value={format} onChange={(e) => setFormat(e.target.value)} className="rounded-md border bg-background text-foreground px-2 py-2 text-sm">
           {FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>
         <button onClick={onSave} disabled={pending}

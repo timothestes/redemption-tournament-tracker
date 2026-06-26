@@ -59,13 +59,13 @@ export default function PoolSearch({
     <div>
       <div className="flex flex-wrap gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search cards…"
-          className="flex-1 rounded-md border px-3 py-2 text-sm" />
-        <select value={source} onChange={(e) => setSource(e.target.value as any)} className="rounded-md border px-2 py-2 text-sm">
+          className="flex-1 rounded-md border bg-background text-foreground px-3 py-2 text-sm" />
+        <select value={source} onChange={(e) => setSource(e.target.value as any)} className="rounded-md border bg-background text-foreground px-2 py-2 text-sm">
           <option value="all">All</option>
           <option value="forge">Forge only</option>
           <option value="public">Public only</option>
         </select>
-        <select value={type} onChange={(e) => setType(e.target.value)} className="rounded-md border px-2 py-2 text-sm">
+        <select value={type} onChange={(e) => setType(e.target.value)} className="rounded-md border bg-background text-foreground px-2 py-2 text-sm">
           <option value="">All types</option>
           {types.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>

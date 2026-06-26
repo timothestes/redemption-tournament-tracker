@@ -13,7 +13,7 @@ const G = {
   title:     { left: "28%", top: "3.5%", width: "68%", height: "8%" },
   ability:   { left: "9%", top: "64%", width: "82%", height: "16%" },
   scripture: { left: "9%", top: "80%", width: "82%", height: "12%" },
-  footer:    { left: "9%", top: "93%", width: "82%", height: "5%" },
+  footer:    { left: "9%", top: "92%", width: "82%", height: "4%" },
 } as const;
 
 // eslint-disable-next-line @next/next/no-img-element
@@ -82,9 +82,9 @@ export default function ForgeCardPreview({
         <span style={{ textAlign: "right", fontStyle: "normal", fontWeight: 700 }}>{card.reference || ""}</span>
       </div>
       {/* 9. footer */}
-      <div style={{ ...abs(G.footer), zIndex: 5, display: "flex", justifyContent: "space-between", alignItems: "flex-end", color: "#fff", fontSize: "2.3cqw", opacity: 0.85 }}>
-        <span>{card.artistCredit ? `Illus. ${card.artistCredit}` : "Illus. Artist Unknown"}</span>
-        <span>© Cactus Game Design, Inc.</span>
+      <div style={{ ...abs(G.footer), zIndex: 5, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "2cqw", color: "#fff", fontSize: "2.6cqw", opacity: 0.95, textShadow: "0 1px 2px rgba(0,0,0,.85)" }}>
+        <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{card.artistCredit ? `Illus. ${card.artistCredit}` : "Illus. Artist Unknown"}</span>
+        <span style={{ whiteSpace: "nowrap" }}>© Cactus Game Design, Inc.</span>
       </div>
       {/* approximate badge */}
       {approximate && (
