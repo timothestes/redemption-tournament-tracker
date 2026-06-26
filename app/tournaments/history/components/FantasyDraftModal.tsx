@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { HiX } from "react-icons/hi";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from "@/components/ui/dialog";
 import type { FantasyDraft, FantasyTeam } from "@/lib/nationals/types";
 
@@ -78,8 +79,16 @@ export function FantasyDraftModal({ year, fantasyDraft, open, onClose }: Fantasy
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent size="md">
-        <DialogHeader>
+        <DialogHeader className="relative">
           <DialogTitle>{year} Nationals Fantasy Draft</DialogTitle>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <HiX className="h-4 w-4" />
+          </button>
         </DialogHeader>
         <DialogBody className="space-y-4">
           {/* Standings table */}

@@ -1,5 +1,6 @@
 "use client";
 
+import { HiX } from "react-icons/hi";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from "@/components/ui/dialog";
 import { getCardImageUrl } from "@/app/shared/utils/cardImageUrl";
 import { promosForYear } from "@/lib/nationals/promos";
@@ -16,8 +17,16 @@ export function PromoCardsModal({ year, open, onClose }: PromoCardsModalProps) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent size="lg" className="max-w-2xl">
-        <DialogHeader>
+        <DialogHeader className="relative">
           <DialogTitle>{year} Nationals Promo Cards</DialogTitle>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <HiX className="h-4 w-4" />
+          </button>
         </DialogHeader>
         <DialogBody>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -29,6 +38,7 @@ export function PromoCardsModal({ year, open, onClose }: PromoCardsModalProps) {
                     <img
                       src={imgUrl}
                       alt={promo.cardName}
+                      loading="lazy"
                       className="w-full h-auto rounded-md shadow-md border border-border"
                     />
                   ) : (
