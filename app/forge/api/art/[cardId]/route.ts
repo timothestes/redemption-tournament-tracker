@@ -11,20 +11,39 @@ export async function GET(
   if (!ctx) return notFoundResponse(); // 404, never 401/403 — the area stays secret
 
   const { cardId } = await params;
+  const url = new URL(req.url);
+  const wantApproved = url.searchParams.get("v") === "approved";
 
-  // RLS-checked lookup: only Forge members can see any row; non-members are
-  // already rejected above. maybeSingle() → null (not throw) on no/invalid id.
-  const { data: card } = await ctx.supabase
-    .from("forge_cards")
-    .select("working_art_key")
-    .eq("id", cardId)
-    .maybeSingle();
-
-  if (!card?.working_art_key) return notFoundResponse();
+  // RLS-checked: non-members are already rejected above. Playtesters can SELECT only
+  // approved cards/versions of granted sets — so the approved branch is leak-safe.
+  let artKey: string | null = null;
+  if (wantApproved) {
+    const { data: card } = await ctx.supabase
+      .from("forge_cards")
+      .select("approved_version_id")
+      .eq("id", cardId)
+      .maybeSingle();
+    if (!card?.approved_version_id) return notFoundResponse();
+    const { data: version } = await ctx.supabase
+      .from("card_versions")
+      .select("art_original_key, art_key, art_is_placeholder")
+      .eq("id", card.approved_version_id)
+      .maybeSingle();
+    if (!version || version.art_is_placeholder) return notFoundResponse();
+    artKey = version.art_original_key ?? version.art_key ?? null;
+  } else {
+    const { data: card } = await ctx.supabase
+      .from("forge_cards")
+      .select("working_art_key")
+      .eq("id", cardId)
+      .maybeSingle();
+    artKey = card?.working_art_key ?? null;
+  }
+  if (!artKey) return notFoundResponse();
 
   let result;
   try {
-    result = await readForgeArt(card.working_art_key);
+    result = await readForgeArt(artKey);
   } catch {
     return notFoundResponse();
   }

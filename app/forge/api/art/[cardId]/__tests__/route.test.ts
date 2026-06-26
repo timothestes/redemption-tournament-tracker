@@ -24,6 +24,26 @@ function memberCtx(workingArtKey: string | null) {
   return { supabase: { from, rpc }, user: { id: "u1", email: "e@x" }, role: "elder" };
 }
 
+// Dispatches forge_cards (approved_version_id) then card_versions (art keys) for ?v=approved.
+function approvedCtx(opts: {
+  approvedVersionId: string | null;
+  version?: { art_original_key: string | null; art_key: string | null; art_is_placeholder: boolean } | null;
+}) {
+  const from = vi.fn((table: string) => {
+    if (table === "forge_cards") {
+      const maybeSingle = vi.fn().mockResolvedValue({
+        data: opts.approvedVersionId === null ? null : { approved_version_id: opts.approvedVersionId },
+      });
+      return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })) };
+    }
+    // card_versions
+    const maybeSingle = vi.fn().mockResolvedValue({ data: opts.version ?? null });
+    return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })) };
+  });
+  const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+  return { supabase: { from, rpc }, user: { id: "u1", email: "e@x" }, role: "playtester" };
+}
+
 describe("GET /forge/api/art/[cardId]", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -77,5 +97,39 @@ describe("GET /forge/api/art/[cardId]", () => {
     const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
     expect(res.headers.get("content-disposition")).toContain("attachment");
     expect(ctx.supabase.rpc).toHaveBeenCalledWith("forge_log_art_download", { p_card_id: "abc" });
+  });
+
+  it("404 when ?v=approved but the card has no approved version", async () => {
+    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(approvedCtx({ approvedVersionId: null }));
+    const req = new Request("http://localhost/forge/api/art/abc?v=approved") as never;
+    const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
+    expect(res.status).toBe(404);
+    expect(readForgeArt).not.toHaveBeenCalled();
+  });
+
+  it("404 when the approved version's art is a placeholder", async () => {
+    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(approvedCtx({
+      approvedVersionId: "v1",
+      version: { art_original_key: null, art_key: null, art_is_placeholder: true },
+    }));
+    const req = new Request("http://localhost/forge/api/art/abc?v=approved") as never;
+    const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
+    expect(res.status).toBe(404);
+    expect(readForgeArt).not.toHaveBeenCalled();
+  });
+
+  it("streams the approved version's original art for ?v=approved", async () => {
+    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(approvedCtx({
+      approvedVersionId: "v1",
+      version: { art_original_key: "forge-art/orig", art_key: "forge-art/disp", art_is_placeholder: false },
+    }));
+    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue({
+      statusCode: 200, stream: new ReadableStream(), blob: { contentType: "image/webp" },
+    });
+    const req = new Request("http://localhost/forge/api/art/abc?v=approved") as never;
+    const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
+    expect(res.status).toBe(200);
+    expect(readForgeArt).toHaveBeenCalledWith("forge-art/orig"); // original preferred over display key
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
   });
 });
