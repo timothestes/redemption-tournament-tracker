@@ -177,11 +177,30 @@ Every bullet from your readme list, mapped. ✅ = high-confidence I can do auton
 
 ---
 
-## Open decisions I'll resolve via 2 subagents (not asking you)
-1. Playtesting semantics: reveal `playtesting` to playtesters vs. rename status. _[D]_
-2. Brigade color palette: exact hex per brigade to match the real game.
-3. Icon placement convention per card type (left/right, stat box vs corner).
-4. Targets default distribution for a new set of N cards.
+## Decisions resolved via 2 subagents (not asking you)
+
+**1. Playtesting semantics → OPTION A (reveal `playtesting` to granted playtesters).** _[D]_
+Both subagents independently chose A: the testable window is `playtesting`; `approved` is the
+locked/"Final" state. A playtester who only sees *approved* cards can't influence approval — that
+inverts the point of a playtest pool. **Key technical insight:** reveal the **published** version,
+not the approved one — a `playtesting` card has `published_version_id` set and a `card_versions` row
+at `status='published'`, while `approved_version_id` stays null until approval. Implementation
+(after the preview pipeline lands):
+- **Migration** (new `057_forge_reveal_playtesting.sql`): relax the *granted-playtester* RLS branch
+  only — `forge_cards` SELECT → `status IN ('playtesting','approved')`; `card_versions` SELECT →
+  `status IN ('published','approved')`. Leave owner/elder/super branches untouched.
+- `app/forge/lib/play.ts`: filter `status IN ('playtesting','approved')`, reveal
+  `COALESCE(approved_version_id, published_version_id)`, version filter `IN ('published','approved')`.
+- `app/forge/api/art/[cardId]/route.ts`: `?v=approved` falls back to `published_version_id`.
+- `deckPool.ts` flows through automatically (it forwards play.ts). Labels: display `approved` → "Final"
+  (keep the enum value), stepper → "Playtesting (testable)".
+- **Verify:** run the anon-leak + forge RLS tests; confirm a *granted* playtester sees the
+  playtesting card and a *non-granted* one (and anon) still cannot.
+
+Still to resolve in-flight (handled inside the preview pipeline now running):
+2. Brigade color palette — exact hex per brigade.
+3. Icon placement convention per card type (hero icon left / enhancement icon right).
+4. Targets default distribution for a new set of N cards (will decide when building targets).
 
 ## Blocked on you (only thing I won't guess)
 - **The deck-builder replacement.** You said "drop in my cool deckbuilder" — confirm you mean reusing the

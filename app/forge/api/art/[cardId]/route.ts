@@ -14,20 +14,23 @@ export async function GET(
   const url = new URL(req.url);
   const wantApproved = url.searchParams.get("v") === "approved";
 
-  // RLS-checked: non-members are already rejected above. Playtesters can SELECT only
-  // approved cards/versions of granted sets — so the approved branch is leak-safe.
+  // RLS-checked: non-members are already rejected above. Granted playtesters can SELECT
+  // only the published/approved versions of granted playtesting/approved cards (migration
+  // 057) — so the reveal branch is leak-safe. We serve the approved snapshot if finalized,
+  // else the published (in-testing) snapshot.
   let artKey: string | null = null;
   if (wantApproved) {
     const { data: card } = await ctx.supabase
       .from("forge_cards")
-      .select("approved_version_id")
+      .select("approved_version_id, published_version_id")
       .eq("id", cardId)
       .maybeSingle();
-    if (!card?.approved_version_id) return notFoundResponse();
+    const versionId = card?.approved_version_id ?? card?.published_version_id ?? null;
+    if (!versionId) return notFoundResponse();
     const { data: version } = await ctx.supabase
       .from("card_versions")
       .select("art_original_key, art_key, art_is_placeholder")
-      .eq("id", card.approved_version_id)
+      .eq("id", versionId)
       .maybeSingle();
     if (!version || version.art_is_placeholder) return notFoundResponse();
     artKey = version.art_original_key ?? version.art_key ?? null;

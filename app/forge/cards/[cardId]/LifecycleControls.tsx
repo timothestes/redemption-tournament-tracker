@@ -8,6 +8,13 @@ import type { ForgeCardFull } from "@/app/forge/lib/cards";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 
 const STEPS = ["draft", "playtesting", "approved"] as const;
+// Display labels: 'playtesting' cards are now visible to granted playtesters (migration
+// 057), so the word finally means what it says; 'approved' reads as the locked "Final".
+const STEP_LABELS: Record<(typeof STEPS)[number], string> = {
+  draft: "Draft",
+  playtesting: "Playtesting",
+  approved: "Final",
+};
 
 export default function LifecycleControls({ card, sets }: { card: ForgeCardFull; sets: ForgeSetSummary[] }) {
   const router = useRouter();
@@ -38,7 +45,7 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
           <ol className="flex items-center gap-1 text-muted-foreground">
             {STEPS.map((s) => (
               <li key={s} className={card.status === s ? "font-semibold text-foreground" : ""}>
-                {s === "playtesting" ? "Playtesting" : s[0].toUpperCase() + s.slice(1)}
+                {STEP_LABELS[s]}
                 {s !== "approved" ? " ›" : ""}
               </li>
             ))}
