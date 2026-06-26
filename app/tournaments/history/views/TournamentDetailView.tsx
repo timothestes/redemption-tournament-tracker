@@ -9,6 +9,7 @@ import { FormatBadge } from "../components/FormatBadge";
 import { PlacementBadge } from "../components/PlacementBadge";
 import { SectionTitle } from "../components/SectionTitle";
 import { EmptyState } from "../components/EmptyState";
+import StateMap from "../components/StateMap.loader";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -334,8 +335,8 @@ export function TournamentDetailView({
           <p className="text-sm text-muted-foreground mb-3">{tournament.notes}</p>
         )}
 
-        {/* ── State map placeholder (Task 6) ──────────────────────────── */}
-        {/* TODO Task 6: <StateMap location={tournament.location} /> */}
+        {/* ── State map ────────────────────────────────────────────────── */}
+        <StateMap location={tournament.location} />
 
         {/* ── Action buttons row ───────────────────────────────────────── */}
         <div className="flex flex-wrap items-center gap-2 mt-3">
