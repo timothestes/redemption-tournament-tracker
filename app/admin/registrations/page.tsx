@@ -574,6 +574,82 @@ export default function AdminRegistrationsPage() {
     return selectedWithPhotos;
   };
 
+  // Export the currently-filtered registrations to a CSV file
+  const handleExportCsv = () => {
+    if (filteredRegistrations.length === 0) return;
+
+    const yesNo = (v: boolean) => (v ? "Yes" : "No");
+    const escapeCsv = (value: string | number): string => {
+      const str = String(value ?? "");
+      return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+
+    const headers = [
+      "First Name",
+      "Last Name",
+      "Email",
+      "Discord",
+      "Thursday Event",
+      "Friday Event",
+      "Saturday Event",
+      "Fantasy Draft",
+      "First Nationals",
+      "Airport Transport",
+      "Hotel Transport",
+      "Iron Man",
+      "Staying Overnight",
+      "Overnight Nights",
+      "Lunch Thursday",
+      "Lunch Friday",
+      "Lunch Saturday",
+      "Lunch Form Filled",
+      "Has Photo",
+      "Paid",
+      "Total Owed",
+      "Registered",
+    ];
+
+    const rows = filteredRegistrations.map((reg) => [
+      reg.first_name,
+      reg.last_name,
+      reg.email,
+      reg.discord_username || "",
+      formatEventName(reg.thursday_event),
+      formatEventName(reg.friday_event),
+      formatEventName(reg.saturday_event),
+      yesNo(reg.fantasy_draft_opt_in),
+      yesNo(reg.first_nationals),
+      yesNo(reg.needs_airport_transportation),
+      yesNo(reg.needs_hotel_transportation),
+      yesNo(reg.iron_man_interest),
+      yesNo(reg.staying_overnight),
+      reg.overnight_stay_nights?.join("; ") || "",
+      yesNo(reg.lunch_thursday),
+      yesNo(reg.lunch_friday),
+      yesNo(reg.lunch_saturday),
+      yesNo(reg.lunch_form_filled),
+      yesNo(reg.photo_url !== null),
+      yesNo(reg.paid),
+      calculateTotalOwed(reg).toFixed(2),
+      formatDate(reg.created_at),
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCsv).join(","))
+      .join("\r\n");
+
+    // Prepend a BOM so Excel reads it as UTF-8
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `registrations-${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
   if (!canManageRegistrations) {
     return null;
   }
@@ -669,6 +745,15 @@ export default function AdminRegistrationsPage() {
                   className="text-xs"
                 >
                   Select All Filtered ({filteredRegistrations.length})
+                </Button>
+                <Button
+                  onClick={handleExportCsv}
+                  variant="outline"
+                  size="sm"
+                  disabled={filteredRegistrations.length === 0}
+                  className="text-xs"
+                >
+                  Export CSV ({filteredRegistrations.length})
                 </Button>
                 <Button
                   onClick={clearFilters}
