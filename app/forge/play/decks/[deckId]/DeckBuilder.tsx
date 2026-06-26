@@ -32,17 +32,20 @@ export default function DeckBuilder({
   const [name, setName] = useState(initialName);
   const [format, setFormat] = useState(initialFormat);
 
-  // Forge cards → Card[], plus a cardId→DesignCard map for thumbnail rendering.
-  const { forgeCards, forgeData, forgeById } = useMemo(() => {
+  // Forge cards → Card[], a cardId→DesignCard map for thumbnail rendering, and the
+  // set of cardIds that have approved art (so art-less cards skip the proxy request).
+  const { forgeCards, forgeData, forgeById, forgeArtIds } = useMemo(() => {
     const forgeData = new Map<string, DesignCard>();
     const forgeById = new Map<string, Card>();
+    const forgeArtIds = new Set<string>();
     const forgeCards = granted.map((g) => {
       const card = designCardToCard(g.data, g.cardId, g.setName);
       forgeData.set(g.cardId, g.data);
       forgeById.set(g.cardId, card);
+      if (g.hasApprovedArt) forgeArtIds.add(g.cardId);
       return card;
     });
-    return { forgeCards, forgeData, forgeById };
+    return { forgeCards, forgeData, forgeById, forgeArtIds };
   }, [granted]);
 
   // Public lookup by name|set for hydration.
@@ -99,9 +102,9 @@ export default function DeckBuilder({
         </button>
       </div>
       <div className="mt-4 grid gap-6 md:grid-cols-2">
-        <PoolSearch pool={pool} forgeData={forgeData} onAdd={(c) => addCard(c, "main")} />
+        <PoolSearch pool={pool} forgeData={forgeData} forgeArtIds={forgeArtIds} onAdd={(c) => addCard(c, "main")} />
         <DeckPanel
-          cards={cards} forgeData={forgeData} validation={validation}
+          cards={cards} validation={validation}
           onAdd={(dataLine, zone) => { const dc = cards.find((c) => c.card.dataLine === dataLine && c.zone === zone); if (dc) addCard(dc.card, zone); }}
           onRemove={removeCard}
           onZone={moveZone}

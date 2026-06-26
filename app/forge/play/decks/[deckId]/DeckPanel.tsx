@@ -1,20 +1,18 @@
 "use client";
 
 import type { DeckCard, DeckZone } from "@/app/decklist/card-search/types/deck";
-import type { DesignCard } from "@/app/forge/lib/designCard";
 import type { DeckValidation } from "@/app/decklist/card-search/utils/deckValidation";
 
-const ZONES: { key: DeckZone; label: string }[] = [
-  { key: "main", label: "Main deck" },
-  { key: "reserve", label: "Reserve" },
-  { key: "maybeboard", label: "Maybeboard" },
+const ZONES: { key: DeckZone; label: string; short: string }[] = [
+  { key: "main", label: "Main deck", short: "Mn" },
+  { key: "reserve", label: "Reserve", short: "Rs" },
+  { key: "maybeboard", label: "Maybeboard", short: "Mb" },
 ];
 
 export default function DeckPanel({
   cards, validation, onAdd, onRemove, onZone,
 }: {
   cards: DeckCard[];
-  forgeData: Map<string, DesignCard>;
   validation: DeckValidation;
   onAdd: (dataLine: string, zone: DeckZone) => void;
   onRemove: (dataLine: string, zone: DeckZone) => void;
@@ -49,7 +47,7 @@ export default function DeckPanel({
                     {ZONES.filter((z) => z.key !== key).map((z) => (
                       <button key={z.key} onClick={() => onZone(c.card.dataLine, key, z.key)}
                         className="rounded border px-1.5 text-xs text-muted-foreground" title={`Move to ${z.label}`}>
-                        {z.label[0]}
+                        {z.short}
                       </button>
                     ))}
                   </li>

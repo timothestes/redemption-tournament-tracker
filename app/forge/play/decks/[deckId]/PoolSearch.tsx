@@ -12,19 +12,22 @@ const RENDER_CAP = 60;
 // Forge cards render via ForgeCardPreview (plain <img> + ?v=approved proxy — never
 // next/image). Public cards render via CardImage. This keeps Forge art off the image
 // optimizer (forge-no-next-image guardrail).
-export function MixedThumb({ card, forgeData }: { card: Card; forgeData: Map<string, DesignCard> }) {
+export function MixedThumb({ card, forgeData, forgeArtIds }: { card: Card; forgeData: Map<string, DesignCard>; forgeArtIds: Set<string> }) {
   if (isForgeDataLine(card.dataLine)) {
     const id = cardIdFromDataLine(card.dataLine);
     const data = forgeData.get(id);
     if (!data) return null;
-    return <ForgeCardPreview card={data} artUrl={`/forge/api/art/${id}?v=approved`} className="w-full rounded-md" />;
+    // Only request the approved-art proxy when the card actually has approved art;
+    // otherwise render the composite with no art (matches the reveal grid).
+    const artUrl = forgeArtIds.has(id) ? `/forge/api/art/${id}?v=approved` : null;
+    return <ForgeCardPreview card={data} artUrl={artUrl} className="w-full rounded-md" />;
   }
   return <CardImage imgFile={card.imgFile} alt={card.name} />;
 }
 
 export default function PoolSearch({
-  pool, forgeData, onAdd,
-}: { pool: Card[]; forgeData: Map<string, DesignCard>; onAdd: (card: Card) => void }) {
+  pool, forgeData, forgeArtIds, onAdd,
+}: { pool: Card[]; forgeData: Map<string, DesignCard>; forgeArtIds: Set<string>; onAdd: (card: Card) => void }) {
   const [q, setQ] = useState("");
   const [type, setType] = useState("");
   const [source, setSource] = useState<"all" | "forge" | "public">("all");
@@ -73,7 +76,7 @@ export default function PoolSearch({
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {shown.map((c) => (
           <button key={c.dataLine} onClick={() => onAdd(c)} className="block w-full text-left" title={`Add ${c.name}`}>
-            <MixedThumb card={c} forgeData={forgeData} />
+            <MixedThumb card={c} forgeData={forgeData} forgeArtIds={forgeArtIds} />
             <div className="mt-1 truncate text-xs">{c.name}</div>
           </button>
         ))}
