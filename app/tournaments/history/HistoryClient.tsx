@@ -6,6 +6,7 @@ import type { SeedData, LeaderboardEntry } from "@/lib/nationals/types";
 import { SeedContext } from "./seed-context";
 import NavTabs, { type ViewId } from "./NavTabs";
 import HistorySkeleton from "./HistorySkeleton";
+import { TournamentsView } from "./views/TournamentsView";
 
 const VALID_VIEWS = new Set<ViewId>([
   "tournaments",
@@ -100,11 +101,7 @@ export default function HistoryClient({
   function renderView() {
     switch (view) {
       case "tournaments":
-        return (
-          <div className="p-6 text-muted-foreground">
-            tournaments — coming soon
-          </div>
-        );
+        return <TournamentsView setView={setView} />;
       case "champions":
         return (
           <div className="p-6 text-muted-foreground">
@@ -154,11 +151,7 @@ export default function HistoryClient({
           </div>
         );
       default:
-        return (
-          <div className="p-6 text-muted-foreground">
-            tournaments — coming soon
-          </div>
-        );
+        return <TournamentsView setView={setView} />;
     }
   }
 
