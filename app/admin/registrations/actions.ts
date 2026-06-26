@@ -96,6 +96,10 @@ export async function updateRegistration(id: string, data: {
   overnight_stay_nights?: string[];
   photo_url?: string | null;
   paid?: boolean;
+  lunch_thursday?: boolean;
+  lunch_friday?: boolean;
+  lunch_saturday?: boolean;
+  lunch_form_filled?: boolean;
 }) {
   const { isAdmin } = await checkAdminAccess();
   
@@ -123,7 +127,11 @@ export async function updateRegistration(id: string, data: {
   if (data.overnight_stay_nights !== undefined) updateData.overnight_stay_nights = data.overnight_stay_nights;
   if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
   if (data.paid !== undefined) updateData.paid = data.paid;
-  
+  if (data.lunch_thursday !== undefined) updateData.lunch_thursday = data.lunch_thursday;
+  if (data.lunch_friday !== undefined) updateData.lunch_friday = data.lunch_friday;
+  if (data.lunch_saturday !== undefined) updateData.lunch_saturday = data.lunch_saturday;
+  if (data.lunch_form_filled !== undefined) updateData.lunch_form_filled = data.lunch_form_filled;
+
   const { error } = await supabase
     .from("registrations")
     .update(updateData)

@@ -31,6 +31,11 @@ interface NationalsConfig {
     saturday: EventOption[];
   };
   overnightStayNights: OvernightStayNight[];
+  lunchPrices: {
+    thursday: number;
+    friday: number;
+    saturday: number;
+  };
 }
 
 export const NATIONALS_CONFIG: NationalsConfig = {
@@ -118,5 +123,12 @@ export const NATIONALS_CONFIG: NationalsConfig = {
         price: null
       },
     ],
+  },
+
+  // Lunch prices per day (admin-entered; folds into each registrant's Total Owed)
+  lunchPrices: {
+    thursday: 8,
+    friday: 8,
+    saturday: 11,
   },
 };

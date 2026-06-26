@@ -30,8 +30,22 @@ interface Registration {
   overnight_stay_nights: string[] | null;
   photo_url: string | null;
   paid: boolean;
+  lunch_thursday: boolean;
+  lunch_friday: boolean;
+  lunch_saturday: boolean;
+  lunch_form_filled: boolean;
   created_at: string;
 }
+
+type LunchDayField = "lunch_thursday" | "lunch_friday" | "lunch_saturday";
+
+// Per-day lunch config (admin-entered). Prices come from the Nationals config
+// and fold into each registrant's Total Owed when checked.
+const LUNCH_DAYS: { field: LunchDayField; letter: string; label: string; price: number }[] = [
+  { field: "lunch_thursday", letter: "T", label: "Thursday", price: NATIONALS_CONFIG.lunchPrices.thursday },
+  { field: "lunch_friday", letter: "F", label: "Friday", price: NATIONALS_CONFIG.lunchPrices.friday },
+  { field: "lunch_saturday", letter: "S", label: "Saturday", price: NATIONALS_CONFIG.lunchPrices.saturday },
+];
 
 export default function AdminRegistrationsPage() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
@@ -69,7 +83,8 @@ export default function AdminRegistrationsPage() {
   const [overnightStayFilter, setOvernightStayFilter] = useState("all");
   const [photoFilter, setPhotoFilter] = useState("all");
   const [paidFilter, setPaidFilter] = useState("all");
-  
+  const [lunchFormFilter, setLunchFormFilter] = useState("all");
+
   const router = useRouter();
   const supabase = createClient();
 
@@ -162,6 +177,9 @@ export default function AdminRegistrationsPage() {
     if (paidFilter !== "all") {
       filtered = filtered.filter((reg) => reg.paid === (paidFilter === "yes"));
     }
+    if (lunchFormFilter !== "all") {
+      filtered = filtered.filter((reg) => reg.lunch_form_filled === (lunchFormFilter === "yes"));
+    }
 
     setFilteredRegistrations(filtered);
   }, [
@@ -178,6 +196,7 @@ export default function AdminRegistrationsPage() {
     overnightStayFilter,
     photoFilter,
     paidFilter,
+    lunchFormFilter,
   ]);
 
   const handleDelete = (id: string, name: string) => {
@@ -222,6 +241,10 @@ export default function AdminRegistrationsPage() {
       staying_overnight: editingRegistration.staying_overnight,
       overnight_stay_nights: editingRegistration.overnight_stay_nights || [],
       paid: editingRegistration.paid,
+      lunch_thursday: editingRegistration.lunch_thursday,
+      lunch_friday: editingRegistration.lunch_friday,
+      lunch_saturday: editingRegistration.lunch_saturday,
+      lunch_form_filled: editingRegistration.lunch_form_filled,
     });
 
     if (result.success) {
@@ -267,6 +290,7 @@ export default function AdminRegistrationsPage() {
     setOvernightStayFilter("all");
     setPhotoFilter("all");
     setPaidFilter("all");
+    setLunchFormFilter("all");
   };
 
   const handleCreateTournament = async () => {
@@ -360,17 +384,42 @@ export default function AdminRegistrationsPage() {
       .join(" ");
   };
 
-  // Calculate total amount owed based on events
-  const calculateTotalOwed = (thursdayEvent: string, fridayEvent: string, saturdayEvent: string): number => {
+  // Calculate total amount owed based on events + lunch
+  const calculateTotalOwed = (reg: Registration): number => {
     const getEventPrice = (eventValue: string, day: 'thursday' | 'friday' | 'saturday'): number => {
       const event = NATIONALS_CONFIG.events[day].find(e => e.value === eventValue);
       if (!event || !event.price) return 0;
       return parseFloat(event.price.replace('$', ''));
     };
 
-    return getEventPrice(thursdayEvent, 'thursday') + 
-           getEventPrice(fridayEvent, 'friday') + 
-           getEventPrice(saturdayEvent, 'saturday');
+    const eventTotal =
+      getEventPrice(reg.thursday_event, 'thursday') +
+      getEventPrice(reg.friday_event, 'friday') +
+      getEventPrice(reg.saturday_event, 'saturday');
+
+    const { thursday, friday, saturday } = NATIONALS_CONFIG.lunchPrices;
+    const lunchTotal =
+      (reg.lunch_thursday ? thursday : 0) +
+      (reg.lunch_friday ? friday : 0) +
+      (reg.lunch_saturday ? saturday : 0);
+
+    return eventTotal + lunchTotal;
+  };
+
+  // Toggle a lunch field with an optimistic update (mirrors the Paid toggle)
+  const toggleLunchField = (
+    reg: Registration,
+    field: LunchDayField | "lunch_form_filled"
+  ) => {
+    const newValue = !reg[field];
+    setRegistrations(prev => prev.map(r => (r.id === reg.id ? { ...r, [field]: newValue } : r)));
+    (async () => {
+      const result = await updateRegistration(reg.id, { [field]: newValue });
+      if (!result.success) {
+        setRegistrations(prev => prev.map(r => (r.id === reg.id ? { ...r, [field]: !newValue } : r)));
+        alert(`Error updating lunch: ${result.error}`);
+      }
+    })();
   };
 
   // Photo management functions
@@ -805,6 +854,20 @@ export default function AdminRegistrationsPage() {
                   <option value="no">No</option>
                 </select>
               </div>
+
+              <div>
+                <Label htmlFor="lunchForm">Lunch Form?</Label>
+                <select
+                  id="lunchForm"
+                  value={lunchFormFilter}
+                  onChange={(e) => setLunchFormFilter(e.target.value)}
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
+                >
+                  <option value="all">All</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -848,6 +911,7 @@ export default function AdminRegistrationsPage() {
                       <th className="px-4 py-3 text-left text-sm font-semibold">Friday</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Saturday</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Options</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Lunch</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Paid</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Total Owed</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Registered</th>
@@ -958,6 +1022,50 @@ export default function AdminRegistrationsPage() {
                             )}
                           </div>
                         </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              {LUNCH_DAYS.map(({ field, letter, label, price }) => (
+                                <div key={field} className="flex flex-col items-center gap-0.5">
+                                  <span className="text-[10px] font-medium text-muted-foreground leading-none">{letter}</span>
+                                  <button
+                                    type="button"
+                                    title={`${label} lunch (+$${price})`}
+                                    onClick={() => toggleLunchField(reg, field)}
+                                    className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                      reg[field]
+                                        ? 'bg-green-500 border-green-600 hover:bg-green-600'
+                                        : 'border-border hover:border-green-400 hover:bg-green-50 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                                    }`}
+                                  >
+                                    {reg[field] && (
+                                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              title="Filled out the lunch form (informational)"
+                              onClick={() => toggleLunchField(reg, 'lunch_form_filled')}
+                              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <span className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all ${
+                                reg.lunch_form_filled ? 'bg-blue-500 border-blue-600' : 'border-border'
+                              }`}>
+                                {reg.lunch_form_filled && (
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </span>
+                              Form
+                            </button>
+                          </div>
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => {
@@ -993,11 +1101,11 @@ export default function AdminRegistrationsPage() {
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`font-semibold ${
-                            calculateTotalOwed(reg.thursday_event, reg.friday_event, reg.saturday_event) > 0
+                            calculateTotalOwed(reg) > 0
                               ? 'text-primary'
                               : 'text-muted-foreground'
                           }`}>
-                            ${calculateTotalOwed(reg.thursday_event, reg.friday_event, reg.saturday_event).toFixed(2)}
+                            ${calculateTotalOwed(reg).toFixed(2)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">
@@ -1464,6 +1572,44 @@ export default function AdminRegistrationsPage() {
                       <Label htmlFor="edit-paid" className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, paid: !editingRegistration.paid})}>
                         Paid
                       </Label>
+                    </div>
+
+                    {/* Lunch (admin-entered from the lunch form) */}
+                    <div className="pt-3 space-y-3">
+                      <p className="text-sm font-medium text-muted-foreground">Lunch</p>
+                      {LUNCH_DAYS.map(({ field, label, price }) => (
+                        <div key={field} className="flex items-center space-x-3">
+                          <button
+                            onClick={() => setEditingRegistration({...editingRegistration, [field]: !editingRegistration[field]})}
+                            className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration[field] ? 'bg-green-500 border-green-600' : 'border-border'}`}
+                          >
+                            {editingRegistration[field] && (
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                          <Label className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, [field]: !editingRegistration[field]})}>
+                            {label} Lunch (+${price})
+                          </Label>
+                        </div>
+                      ))}
+
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => setEditingRegistration({...editingRegistration, lunch_form_filled: !editingRegistration.lunch_form_filled})}
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.lunch_form_filled ? 'bg-blue-500 border-blue-600' : 'border-border'}`}
+                        >
+                          {editingRegistration.lunch_form_filled && (
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                        <Label className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, lunch_form_filled: !editingRegistration.lunch_form_filled})}>
+                          Lunch form filled out
+                        </Label>
+                      </div>
                     </div>
                   </div>
 
