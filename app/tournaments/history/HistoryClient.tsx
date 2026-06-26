@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { SeedData, LeaderboardEntry } from "@/lib/nationals/types";
+import type { SeedData, TriviaScoreEntry } from "@/lib/nationals/types";
 import { SeedContext } from "./seed-context";
 import NavTabs, { type ViewId } from "./NavTabs";
 import HistorySkeleton from "./HistorySkeleton";
@@ -14,6 +14,7 @@ import { PlayerProfileView } from "./views/PlayerProfileView";
 import { MetricsView } from "./views/MetricsView";
 import { SearchView } from "./views/SearchView";
 import { TaleOfTheTapeView } from "./views/TaleOfTheTapeView";
+import { TriviaView } from "./views/TriviaView";
 
 const VALID_VIEWS = new Set<ViewId>([
   "tournaments",
@@ -33,7 +34,7 @@ function parseView(raw: string | null): ViewId {
 }
 
 interface HistoryClientProps {
-  initialLeaderboard?: LeaderboardEntry[];
+  initialLeaderboard?: TriviaScoreEntry[];
 }
 
 export default function HistoryClient({
@@ -103,8 +104,6 @@ export default function HistoryClient({
 
   if (!seed) return <HistorySkeleton />;
 
-  void initialLeaderboard; // used in Task 15
-
   function renderView() {
     switch (view) {
       case "tournaments":
@@ -114,11 +113,7 @@ export default function HistoryClient({
       case "players":
         return <PlayersView setView={setView} />;
       case "trivia":
-        return (
-          <div className="p-6 text-muted-foreground">
-            trivia — coming soon
-          </div>
-        );
+        return <TriviaView initialLeaderboard={initialLeaderboard} />;
       case "stats":
         return <MetricsView />;
       case "tape":

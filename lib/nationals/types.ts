@@ -9,6 +9,13 @@ export interface LeaderboardEntry {
   appearances: number;
 }
 
+/** A single trivia leaderboard row (from nationals_trivia_scores table). */
+export interface TriviaScoreEntry {
+  name: string;
+  score: number;
+  created_at: string;
+}
+
 // ── Tournament ──────────────────────────────────────────────────────────────
 
 export interface FantasyPickBreakdown {
