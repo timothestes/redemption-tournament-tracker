@@ -9,6 +9,8 @@ import HistorySkeleton from "./HistorySkeleton";
 import { TournamentsView } from "./views/TournamentsView";
 import { TournamentDetailView } from "./views/TournamentDetailView";
 import { ChampionsView } from "./views/ChampionsView";
+import { PlayersView } from "./views/PlayersView";
+import { PlayerProfileView } from "./views/PlayerProfileView";
 
 const VALID_VIEWS = new Set<ViewId>([
   "tournaments",
@@ -107,11 +109,7 @@ export default function HistoryClient({
       case "champions":
         return <ChampionsView setView={setView} />;
       case "players":
-        return (
-          <div className="p-6 text-muted-foreground">
-            players — coming soon
-          </div>
-        );
+        return <PlayersView setView={setView} />;
       case "trivia":
         return (
           <div className="p-6 text-muted-foreground">
@@ -146,9 +144,11 @@ export default function HistoryClient({
         );
       case "player":
         return (
-          <div className="p-6 text-muted-foreground">
-            player — coming soon
-          </div>
+          <PlayerProfileView
+            playerName={playerName}
+            setView={setView}
+            back={back}
+          />
         );
       default:
         return <TournamentsView setView={setView} />;
