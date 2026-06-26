@@ -48,6 +48,9 @@ export default function RegistrationPage() {
     ironManInterest: false,
     stayingOvernight: false,
     overnightStayNights: [] as string[],
+    lunchThursday: false,
+    lunchFriday: false,
+    lunchSaturday: false,
   });
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -80,6 +83,9 @@ export default function RegistrationPage() {
           ironManInterest: false,
           stayingOvernight: false,
           overnightStayNights: [],
+          lunchThursday: false,
+          lunchFriday: false,
+          lunchSaturday: false,
         });
         setPhotoFile(null);
         setPhotoPreview(null);
@@ -323,6 +329,9 @@ export default function RegistrationPage() {
                       ironManInterest: false,
                       stayingOvernight: false,
                       overnightStayNights: [],
+                      lunchThursday: false,
+                      lunchFriday: false,
+                      lunchSaturday: false,
                     });
                     setPhotoFile(null);
                     setPhotoPreview(null);
@@ -578,6 +587,54 @@ export default function RegistrationPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Lunch */}
+            <div className="space-y-4 pt-4">
+              <h2 className="text-xl font-semibold">
+                Lunch
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Let us know which days you plan to eat lunch at the venue. Each meal
+                includes a choice of chips, a cookie, and a drink. Pay at check-in
+                along with your event fees.
+              </p>
+              <div className="space-y-3 p-4 bg-card rounded-lg border-2 border-border">
+                {[
+                  { key: "lunchThursday", label: "Thursday", date: NATIONALS_CONFIG.eventDates.thursday, price: NATIONALS_CONFIG.lunchPrices.thursday },
+                  { key: "lunchFriday", label: "Friday", date: NATIONALS_CONFIG.eventDates.friday, price: NATIONALS_CONFIG.lunchPrices.friday },
+                  { key: "lunchSaturday", label: "Saturday", date: NATIONALS_CONFIG.eventDates.saturday, price: NATIONALS_CONFIG.lunchPrices.saturday },
+                ].map((day) => {
+                  const fieldKey = day.key as "lunchThursday" | "lunchFriday" | "lunchSaturday";
+                  const checked = formData[fieldKey];
+                  return (
+                    <label key={day.key} className="flex items-center space-x-3 cursor-pointer">
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={checked}
+                        onClick={() => setFormData({ ...formData, [fieldKey]: !checked })}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${checked ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-border'}`}
+                      >
+                        {checked && (
+                          <svg className="w-4 h-4 text-white pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                      <span className="text-sm font-normal text-foreground">
+                        {day.label} Lunch{" "}
+                        <span className="text-muted-foreground">({day.date})</span>
+                        {" — "}${day.price}
+                      </span>
+                    </label>
+                  );
+                })}
+                <p className="text-sm text-muted-foreground pt-1">
+                  Not sure yet? Check the days you might eat &mdash; we&apos;d rather
+                  over-plan. You can adjust at check-in.
+                </p>
               </div>
             </div>
 

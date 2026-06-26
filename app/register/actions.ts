@@ -19,6 +19,9 @@ export interface RegistrationData {
   ironManInterest: boolean;
   stayingOvernight: boolean;
   overnightStayNights: string[];
+  lunchThursday: boolean;
+  lunchFriday: boolean;
+  lunchSaturday: boolean;
 }
 
 export async function submitRegistration(data: RegistrationData, photoUrl: string | null = null) {
@@ -39,6 +42,12 @@ export async function submitRegistration(data: RegistrationData, photoUrl: strin
     iron_man_interest: data.ironManInterest,
     staying_overnight: data.stayingOvernight,
     overnight_stay_nights: data.overnightStayNights,
+    lunch_thursday: data.lunchThursday,
+    lunch_friday: data.lunchFriday,
+    lunch_saturday: data.lunchSaturday,
+    // Lunch plans are now captured at registration, so mark the form as filled.
+    // (Admins still toggle this manually for legacy/Google-Form registrants.)
+    lunch_form_filled: true,
     photo_url: photoUrl,
   });
 
