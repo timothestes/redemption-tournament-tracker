@@ -3,7 +3,17 @@
 **Question:** make the Forge use the main player-facing deck builder instead of its bespoke
 one, in a way that's best to maintain long-term.
 **Decision owner:** Tim. **Investigated by:** two independent subagents (both converged on the
-same architecture — strong signal). **Status:** designed, not yet implemented.
+same architecture — strong signal). **Status:** ✅ implemented on branch `forge-deckbuilder-unification`
+(phases 0→3b, commits `1149d8f`→`65ff578`). Plan + per-phase notes:
+`docs/superpowers/plans/2026-06-26-forge-deckbuilder-unification.md`.
+
+**Deferred (known, non-blocking):**
+- Loaded forge cards fall back to a minimal `Card` (type `"Unknown"`) for deck-panel
+  grouping/deckcheck — art + save/load round-trip are correct (image seam keys on
+  `imgFile`); full fidelity needs the optional `mapLoadedCard` persistence seam.
+- The hidden image preloaders fire a wasted 404 for forge `imgFile`s (`forge:<id>`).
+- Live forge save/load round-trip still wants a manual pass in a forge-authenticated
+  session (CI can't auth as a forge member).
 
 ---
 
