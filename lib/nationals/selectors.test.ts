@@ -73,6 +73,35 @@ describe("headToHead", () => {
   });
 });
 
+describe("playerProfile Teams record (per-round, not per-game)", () => {
+  it("counts one W/L/D per team round for a clean player (no per-game doubling)", () => {
+    // Chris Ericson has 22 Teams game records across 11 unanimous rounds.
+    // Per-round = 9-2-0; the per-game bug would report 18-4-0.
+    const p = playerProfile(data, "Chris Ericson");
+    expect(p.matchStatsByFmt["Teams"]).toEqual({ wins: 9, losses: 2, draws: 0 });
+  });
+
+  it("resolves split Teams rounds by majority with ties as draws (order-independent)", () => {
+    // Andrew Wills, 2013 Teams: three 2-2 rounds (each W/L split) -> 3 draws.
+    // Per-round majority = 3-5-3; first-encountered (the PR bug) = 3-8-0;
+    // raw per-game = 18-26-0.
+    const p = playerProfile(data, "Andrew Wills");
+    expect(p.matchStatsByFmt["Teams"]).toEqual({ wins: 3, losses: 5, draws: 3 });
+  });
+
+  it("keeps full per-game head-to-head credit for Teams cross-pairings", () => {
+    // Head-to-head must not be collapsed per round: Wills met two distinct
+    // opponents per 2013 round, so each is credited separately.
+    const p = playerProfile(data, "Andrew Wills");
+    const oppGames = Object.values(p.matchStatsByOpp).reduce(
+      (s, v) => s + v.wins + v.losses + v.draws,
+      0
+    );
+    // Per-round Teams total is 11 (3+5+3); per-game H2H must exceed it.
+    expect(oppGames).toBeGreaterThan(11);
+  });
+});
+
 describe("playerProfile multiWL", () => {
   it("returns numeric totals and an object for a player with multiplayer data", () => {
     // Pick the first player listed in multiWL so we exercise the typed path

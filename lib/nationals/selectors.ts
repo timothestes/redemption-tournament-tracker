@@ -237,6 +237,14 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
     const i = key.indexOf("_");
     const year = parseInt(key.slice(0, i), 10);
     const fmt = key.slice(i + 1);
+    const isTeams = fmt === "Teams";
+
+    // Teams is team-vs-team: each player plays every opposing player, so a player
+    // has multiple cross-pairing records per round. Head-to-head keeps full per-game
+    // credit, but the format record should count one result per team round. Tally
+    // this player's games per round, then collapse by majority (tie -> draw).
+    // Round labels are unique within a year+format key, so a plain map is safe.
+    const roundTally: Record<string, WLDRecord> = {};
 
     for (const m of matches) {
       if (m.playerA !== name && m.playerB !== name) continue;
@@ -246,21 +254,40 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
       const lost = !!m.winner && m.winner !== name;
       const draw = !m.winner;
 
-      if (!matchStatsByFmt[fmt]) matchStatsByFmt[fmt] = { wins: 0, losses: 0, draws: 0 };
+      // Head-to-head: always full per-game credit, every format.
       if (!matchStatsByOpp[opp]) matchStatsByOpp[opp] = { wins: 0, losses: 0, draws: 0 };
+      if (won) matchStatsByOpp[opp].wins++;
+      else if (lost) matchStatsByOpp[opp].losses++;
+      else if (draw) matchStatsByOpp[opp].draws++;
 
-      if (won) {
-        matchStatsByFmt[fmt].wins++;
-        matchStatsByOpp[opp].wins++;
-      } else if (lost) {
-        matchStatsByFmt[fmt].losses++;
-        matchStatsByOpp[opp].losses++;
-      } else if (draw) {
-        matchStatsByFmt[fmt].draws++;
-        matchStatsByOpp[opp].draws++;
+      // Keep every individual game in allMatches (only consumed for top-cut and a
+      // non-empty flag; no Teams record has topCut, so this is pure data fidelity).
+      allMatches.push({ year, format: fmt, ...m });
+
+      if (isTeams) {
+        // Defer format credit until the whole round is aggregated.
+        if (!roundTally[m.round]) roundTally[m.round] = { wins: 0, losses: 0, draws: 0 };
+        if (won) roundTally[m.round].wins++;
+        else if (lost) roundTally[m.round].losses++;
+        else if (draw) roundTally[m.round].draws++;
+        continue;
       }
 
-      allMatches.push({ year, format: fmt, ...m });
+      // Non-Teams: one record == one game == one format credit.
+      if (!matchStatsByFmt[fmt]) matchStatsByFmt[fmt] = { wins: 0, losses: 0, draws: 0 };
+      if (won) matchStatsByFmt[fmt].wins++;
+      else if (lost) matchStatsByFmt[fmt].losses++;
+      else if (draw) matchStatsByFmt[fmt].draws++;
+    }
+
+    // Teams: collapse each round into a single W/L/D by majority of its games.
+    if (isTeams) {
+      for (const t of Object.values(roundTally)) {
+        if (!matchStatsByFmt[fmt]) matchStatsByFmt[fmt] = { wins: 0, losses: 0, draws: 0 };
+        if (t.wins > t.losses) matchStatsByFmt[fmt].wins++;
+        else if (t.losses > t.wins) matchStatsByFmt[fmt].losses++;
+        else matchStatsByFmt[fmt].draws++;
+      }
     }
   }
 
