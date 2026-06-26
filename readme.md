@@ -138,3 +138,30 @@ Offline intallable app on phone (Progressive Web app with offline capabilities)
 save game, load game, invite to game?
 battle phase/zone could be better
 
+
+
+
+## Forge improvements
+
+Improve delete dialog box
+Deleting a card leads to 404 page
+Brigade boxes off color
+Clicking on card should let user edit that place easily
+Cactus copyright and artist not visible
+artist not editable
+Lost soul
+No identifier pill
+Have prebuilt template starters for each card type. Start with card type THEN prompt for ability instead of having ability be its own
+GE doesn't add icon box
+Hero/GE should have special handling to make hero icon on the left and enhancement icon on the right
+Curse/Covenant will need this handling
+Artifact not showing icon
+WTF is mark as placeholder...
+When creating a set, have default targets (ask for number of cards, have them approve initial card type targets)
+The target UI is crap
+Deckbuilding UI is crap
+UI to navigate forge is nonexistent
+deckbuilding UI is diff than deckbuilding UI everyone is used to
+some dropdowns don't have darkmode in mind at http://localhost:3000/forge/play/decks/new
+artwork loading for playtest cards is ROUGH.
+card has "playtesting" status but not able to be playtested. So dumb.
