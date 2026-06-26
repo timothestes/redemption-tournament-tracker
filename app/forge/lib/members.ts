@@ -18,6 +18,7 @@ export async function mintInvite(input: {
   role: ForgeRole;
   email?: string | null;
   expiresInDays?: number;
+  setIds?: string[];
 }): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   // Elder gate first; an elder invite additionally needs superadmin.
   const ctx = await requireElder();
@@ -34,7 +35,7 @@ export async function mintInvite(input: {
   const { error } = await ctx.supabase.rpc("forge_mint_invite", {
     p_token_hash: hashToken(raw),
     p_role: input.role,
-    p_set_ids: [],
+    p_set_ids: input.role === "playtester" ? (input.setIds ?? []) : [],
     p_email: input.email ?? null,
     p_expires_at: expiresAt,
   });
