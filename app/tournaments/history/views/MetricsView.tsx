@@ -1,9 +1,10 @@
 "use client";
 
-import { useReducer, useMemo, useRef, useEffect, useCallback } from "react";
+import { useReducer, useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { useSeed } from "../seed-context";
 import { SectionTitle } from "../components/SectionTitle";
 import { EmptyState } from "../components/EmptyState";
+import { DataCoverageModal } from "../components/DataCoverageModal";
 import {
   AM_MODES,
   AM_COLS,
@@ -546,6 +547,9 @@ export function MetricsView() {
     return () => document.removeEventListener("mousedown", handleDocClick);
   }, [handleDocClick]);
 
+  // Data-coverage disclaimer modal
+  const [coverageOpen, setCoverageOpen] = useState(false);
+
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   function handleFmtSelectChange(val: string) {
@@ -580,6 +584,20 @@ export function MetricsView() {
   return (
     <div>
       <SectionTitle title="Advanced Metrics" sub={subtitle} />
+
+      {/* Data coverage disclaimer — not all years/formats have full data */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-border bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground">
+        <span>⚠️ Data not available for all years and formats.</span>
+        <button
+          type="button"
+          onClick={() => setCoverageOpen(true)}
+          className="font-medium text-primary underline-offset-2 hover:underline"
+        >
+          Click for details
+        </button>
+      </div>
+
+      <DataCoverageModal open={coverageOpen} onClose={() => setCoverageOpen(false)} />
 
       {/* Mode tabs */}
       <div className="flex flex-wrap gap-1.5 mb-3">
