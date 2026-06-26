@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireForge } from "@/app/forge/lib/auth";
 import { getSet } from "@/app/forge/lib/sets";
@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function SetLayout({ children, params }: { children: React.ReactNode; params: Promise<{ setId: string }> }) {
   const ctx = await requireForge();
   if (!ctx) notFound();
+  if (ctx.role === "playtester") redirect("/forge/play");
   const { setId } = await params;
   const set = await getSet(setId);
   if (!set) notFound(); // RLS hides sets the caller can't see → 404

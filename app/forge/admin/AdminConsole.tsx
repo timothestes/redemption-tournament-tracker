@@ -19,10 +19,12 @@ export default function AdminConsole({
   callerRole,
   members,
   invites,
+  sets,
 }: {
   callerRole: ForgeRole;
   members: Member[];
   invites: Invite[];
+  sets: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -30,6 +32,7 @@ export default function AdminConsole({
   const [inviteRole, setInviteRole] = useState<ForgeRole>(grantable(callerRole)[0] ?? "playtester");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteSetIds, setInviteSetIds] = useState<string[]>([]);
   const canManage = new Set(grantable(callerRole));
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>, okMsg: string) {
@@ -45,7 +48,7 @@ export default function AdminConsole({
     e.preventDefault();
     setMsg(null);
     setInviteUrl(null);
-    const r = await mintInvite({ role: inviteRole, email: inviteEmail || null });
+    const r = await mintInvite({ role: inviteRole, email: inviteEmail || null, setIds: inviteSetIds });
     if (r.ok === false) return setMsg(r.error);
     setInviteUrl(r.url);
     setMsg(inviteEmail ? "Invite emailed." : "Invite link created.");
@@ -79,6 +82,21 @@ export default function AdminConsole({
               placeholder="name@example.com"
             />
           </label>
+          {inviteRole === "playtester" && sets.length > 0 && (
+            <label className="text-sm">
+              Sets (grants access)
+              <select
+                multiple
+                className="mt-1 block min-w-40 rounded-md border bg-background px-2 py-1.5 text-sm"
+                value={inviteSetIds}
+                onChange={(e) => setInviteSetIds(Array.from(e.target.selectedOptions, (o) => o.value))}
+              >
+                {sets.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" disabled={pending}>
             Send invite
           </button>

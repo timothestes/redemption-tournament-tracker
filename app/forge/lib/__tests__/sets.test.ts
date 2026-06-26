@@ -4,7 +4,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/app/forge/lib/auth", () => ({ requireForge: vi.fn(), requireElder: vi.fn() }));
 
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
-import { createSet, saveSetNotes, listSets } from "../sets";
+import { createSet, saveSetNotes, listSets, grantSet, revokeSet } from "../sets";
 
 function ctx(opts: { rpc?: any; rows?: any[] } = {}) {
   const order = vi.fn(async () => ({ data: opts.rows ?? [], error: null }));
@@ -50,5 +50,25 @@ describe("listSets", () => {
   it("returns [] when not a member", async () => {
     (requireForge as any).mockResolvedValue(null);
     expect(await listSets()).toEqual([]);
+  });
+});
+
+describe("grantSet / revokeSet", () => {
+  it("grantSet rejects a non-elder", async () => {
+    (requireElder as any).mockResolvedValue(null);
+    expect((await grantSet("s1", "u1")).ok).toBe(false);
+  });
+
+  it("grantSet calls forge_grant_set and returns ok", async () => {
+    const c = ctx({ rpc: async () => ({ data: null, error: null }) });
+    (requireElder as any).mockResolvedValue(c);
+    expect((await grantSet("s1", "u1")).ok).toBe(true);
+    expect(c.supabase.rpc).toHaveBeenCalledWith("forge_grant_set", { p_set_id: "s1", p_user_id: "u1" });
+  });
+
+  it("revokeSet surfaces an RPC error", async () => {
+    const c = ctx({ rpc: async () => ({ data: null, error: { message: "boom" } }) });
+    (requireElder as any).mockResolvedValue(c);
+    expect((await revokeSet("s1", "u1")).ok).toBe(false);
   });
 });
