@@ -30,15 +30,25 @@ export function TournamentsView({ setView }: TournamentsViewProps) {
       <div className="grid gap-4 justify-start [grid-template-columns:repeat(auto-fill,minmax(240px,320px))]">
         {sorted.map((t) => {
           const att = t.attendance ? `${t.attendance} players` : null;
-          const meta = [t.dates, att].filter(Boolean).join(" · ");
+          const meta = [t.venue || null, att, t.dates]
+            .filter(Boolean)
+            .join(" · ");
 
           return (
             <div
               key={t.id}
-              className="group cursor-pointer rounded-lg border border-border bg-card p-5 transition hover:border-primary hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden"
+              role="button"
+              tabIndex={0}
+              className="group cursor-pointer rounded-lg border border-border bg-card p-5 transition hover:border-primary hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden focus-visible:border-primary focus-visible:outline-none"
               onClick={() =>
                 setView("detail", { tournamentId: t.id, backTo: "tournaments" })
               }
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setView("detail", { tournamentId: t.id, backTo: "tournaments" });
+                }
+              }}
             >
               {/* top accent bar */}
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
