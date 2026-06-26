@@ -238,6 +238,13 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
     const year = parseInt(key.slice(0, i), 10);
     const fmt = key.slice(i + 1);
 
+    // Teams matches are stored as 4 cross-pairings per round (P1vP3, P1vP4, P2vP3, P2vP4)
+    // so each player appears in 2 records per round. We want full head-to-head credit for
+    // every individual opponent pairing, but only one W/L credit per round toward format
+    // totals and allMatches (to avoid doubling the aggregate record).
+    const isTeams = fmt === "Teams";
+    const creditedRounds = new Set<string>();
+
     for (const m of matches) {
       if (m.playerA !== name && m.playerB !== name) continue;
 
@@ -246,19 +253,20 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
       const lost = !!m.winner && m.winner !== name;
       const draw = !m.winner;
 
-      if (!matchStatsByFmt[fmt]) matchStatsByFmt[fmt] = { wins: 0, losses: 0, draws: 0 };
+      // Always credit head-to-head vs this specific opponent regardless of format.
       if (!matchStatsByOpp[opp]) matchStatsByOpp[opp] = { wins: 0, losses: 0, draws: 0 };
+      if (won) matchStatsByOpp[opp].wins++;
+      else if (lost) matchStatsByOpp[opp].losses++;
+      else if (draw) matchStatsByOpp[opp].draws++;
 
-      if (won) {
-        matchStatsByFmt[fmt].wins++;
-        matchStatsByOpp[opp].wins++;
-      } else if (lost) {
-        matchStatsByFmt[fmt].losses++;
-        matchStatsByOpp[opp].losses++;
-      } else if (draw) {
-        matchStatsByFmt[fmt].draws++;
-        matchStatsByOpp[opp].draws++;
-      }
+      // For Teams format, only count one W/L per round toward format totals and allMatches.
+      if (isTeams && creditedRounds.has(m.round)) continue;
+      if (isTeams) creditedRounds.add(m.round);
+
+      if (!matchStatsByFmt[fmt]) matchStatsByFmt[fmt] = { wins: 0, losses: 0, draws: 0 };
+      if (won) matchStatsByFmt[fmt].wins++;
+      else if (lost) matchStatsByFmt[fmt].losses++;
+      else if (draw) matchStatsByFmt[fmt].draws++;
 
       allMatches.push({ year, format: fmt, ...m });
     }
