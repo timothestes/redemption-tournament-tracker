@@ -56,6 +56,8 @@ export function ChampionsView({ setView }: ChampionsViewProps) {
             Math.min(...a.years) - Math.min(...b.years) ||
             a.name.localeCompare(b.name)
         );
+      default:
+        return arr;
     }
   }, [filtered, sort]);
 
