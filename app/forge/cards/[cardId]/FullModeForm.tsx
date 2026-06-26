@@ -7,6 +7,10 @@ import {
   CARD_TYPES, ALIGNMENTS, BRIGADES, LEGALITIES,
   cardApplicability, isStatBearing, type DesignCard, type CardType, type Brigade,
 } from "@/app/forge/lib/designCard";
+import { BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
+
+// Light-colored brigades need dark text for legible chip labels.
+const LIGHT_BRIGADES = new Set<Brigade>(["White", "Silver", "GoodGold", "PaleGreen"]);
 
 export default function FullModeForm({
   card, snapshot, update,
@@ -67,13 +71,17 @@ export default function FullModeForm({
         <fieldset>
           <legend className="mb-1 font-medium">Brigade{app.brigades === "required" ? "" : " (optional)"}</legend>
           <div className="flex flex-wrap gap-2">
-            {BRIGADES.map((b) => (
-              <button key={b} type="button"
-                onClick={() => update({ brigades: toggle<Brigade>(snapshot.brigades, b) })}
-                className={`rounded-full border px-3 py-1 text-xs ${(snapshot.brigades ?? []).includes(b) ? "bg-emerald-600 text-white" : ""}`}>
-                {b}
-              </button>
-            ))}
+            {BRIGADES.map((b) => {
+              const selected = (snapshot.brigades ?? []).includes(b);
+              return (
+                <button key={b} type="button"
+                  onClick={() => update({ brigades: toggle<Brigade>(snapshot.brigades, b) })}
+                  style={selected ? { backgroundColor: BRIGADE_HEX[b] } : undefined}
+                  className={`rounded-full border px-3 py-1 text-xs ${selected ? `border-transparent ${LIGHT_BRIGADES.has(b) ? "text-gray-900" : "text-white"}` : "text-foreground"}`}>
+                  {b}
+                </button>
+              );
+            })}
           </div>
         </fieldset>
       )}

@@ -63,7 +63,7 @@ const MATRIX: Record<CardType, Partial<Record<FieldKey, Applicability>>> = {
   EvilCharacter: { brigades: "required", stats: "required", class: "optional", icons: "optional", identifiers: "optional", specialAbility: "optional", reference: "optional" },
   GE:            { brigades: "required", strengthModifier: "optional", specialAbility: "required", reference: "optional" },
   EE:            { brigades: "required", strengthModifier: "optional", specialAbility: "required", reference: "optional" },
-  LostSoul:      { specialAbility: "optional", reference: "optional" },
+  LostSoul:      { specialAbility: "optional", reference: "optional", identifiers: "optional" },
   Artifact:      { specialAbility: "required", identifiers: "optional", reference: "optional" },
   Dominant:      { specialAbility: "required", identifiers: "optional", reference: "optional" },
   Fortress:      { brigades: "optional", specialAbility: "optional", reference: "optional" },

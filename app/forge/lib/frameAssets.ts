@@ -56,11 +56,21 @@ export function statBoxPath(_card: DesignCard): string | null {
   return null;
 }
 
-// Type icon shown in the stat box / corner. Tuned visually against references.
+// Type icon shown in the stat box (stat-bearers) or corner box (everything else).
+// Uses ONLY verified PNGs under public/forge/frames/Icons/.
 const ICON_BY_TYPE: Partial<Record<CardType, string>> = {
   Hero: "Cross Icon.png",
   EvilCharacter: "Evil Character.png",
+  GE: "Cross Icon.png",
+  EE: "Evil Character.png",
+  Artifact: "Group 1.png",
+  Dominant: "Group 1.png",
+  City: "Group 1.png",
+  Fortress: "Site.png",
   Site: "Site.png",
+  Curse: "Skull.png",
+  Covenant: "Bible.png",
+  LostSoul: "Skull.png",
 };
 export function iconPath(card: DesignCard): string | null {
   const t = (card.cardType ?? [])[0];
