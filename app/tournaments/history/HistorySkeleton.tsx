@@ -1,3 +1,5 @@
+"use client";
+
 export default function HistorySkeleton() {
   return (
     <div className="max-w-[1200px] mx-auto px-5 py-6">

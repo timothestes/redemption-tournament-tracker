@@ -7,6 +7,23 @@ import { SeedContext } from "./seed-context";
 import NavTabs, { type ViewId } from "./NavTabs";
 import HistorySkeleton from "./HistorySkeleton";
 
+const VALID_VIEWS = new Set<ViewId>([
+  "tournaments",
+  "champions",
+  "players",
+  "trivia",
+  "stats",
+  "tape",
+  "search",
+  "detail",
+  "player",
+]);
+
+function parseView(raw: string | null): ViewId {
+  if (raw !== null && VALID_VIEWS.has(raw as ViewId)) return raw as ViewId;
+  return "tournaments";
+}
+
 interface HistoryClientProps {
   initialLeaderboard?: LeaderboardEntry[];
 }
@@ -18,8 +35,9 @@ export default function HistoryClient({
   const searchParams = useSearchParams();
 
   const [seed, setSeed] = useState<SeedData | null>(null);
+  const [fetchError, setFetchError] = useState(false);
   const [view, setViewState] = useState<ViewId>(
-    (searchParams.get("view") as ViewId | null) ?? "tournaments"
+    parseView(searchParams.get("view"))
   );
   const [tournamentId, setTournamentId] = useState<string | null>(
     searchParams.get("t")
@@ -33,7 +51,8 @@ export default function HistoryClient({
   useEffect(() => {
     fetch("/data/nationals-history.json")
       .then((res) => res.json())
-      .then((data: SeedData) => setSeed(data));
+      .then((data: SeedData) => setSeed(data))
+      .catch(() => setFetchError(true));
   }, []);
 
   function setView(
@@ -66,61 +85,88 @@ export default function HistoryClient({
     setView(target);
   }
 
+  if (fetchError) {
+    return (
+      <div className="p-6 text-center text-muted-foreground">
+        Couldn&apos;t load Nationals history. Please refresh.
+      </div>
+    );
+  }
+
   if (!seed) return <HistorySkeleton />;
 
   void initialLeaderboard; // used in Task 15
+
+  function renderView() {
+    switch (view) {
+      case "tournaments":
+        return (
+          <div className="p-6 text-muted-foreground">
+            tournaments — coming soon
+          </div>
+        );
+      case "champions":
+        return (
+          <div className="p-6 text-muted-foreground">
+            champions — coming soon
+          </div>
+        );
+      case "players":
+        return (
+          <div className="p-6 text-muted-foreground">
+            players — coming soon
+          </div>
+        );
+      case "trivia":
+        return (
+          <div className="p-6 text-muted-foreground">
+            trivia — coming soon
+          </div>
+        );
+      case "stats":
+        return (
+          <div className="p-6 text-muted-foreground">
+            stats — coming soon
+          </div>
+        );
+      case "tape":
+        return (
+          <div className="p-6 text-muted-foreground">
+            tape — coming soon
+          </div>
+        );
+      case "search":
+        return (
+          <div className="p-6 text-muted-foreground">
+            search — coming soon
+          </div>
+        );
+      case "detail":
+        return (
+          <div className="p-6 text-muted-foreground">
+            detail — coming soon
+          </div>
+        );
+      case "player":
+        return (
+          <div className="p-6 text-muted-foreground">
+            player — coming soon
+          </div>
+        );
+      default:
+        return (
+          <div className="p-6 text-muted-foreground">
+            tournaments — coming soon
+          </div>
+        );
+    }
+  }
 
   return (
     <SeedContext.Provider value={seed}>
       <div className="max-w-[1200px] mx-auto px-5 py-6">
         <NavTabs view={view} setView={setView} />
-        <div className="mt-4">
-          {view === "tournaments" && (
-            <div className="p-6 text-muted-foreground">
-              tournaments — coming soon
-            </div>
-          )}
-          {view === "champions" && (
-            <div className="p-6 text-muted-foreground">
-              champions — coming soon
-            </div>
-          )}
-          {view === "players" && (
-            <div className="p-6 text-muted-foreground">
-              players — coming soon
-            </div>
-          )}
-          {view === "trivia" && (
-            <div className="p-6 text-muted-foreground">
-              trivia — coming soon
-            </div>
-          )}
-          {view === "stats" && (
-            <div className="p-6 text-muted-foreground">
-              stats — coming soon
-            </div>
-          )}
-          {view === "tape" && (
-            <div className="p-6 text-muted-foreground">
-              tape — coming soon
-            </div>
-          )}
-          {view === "search" && (
-            <div className="p-6 text-muted-foreground">
-              search — coming soon
-            </div>
-          )}
-          {view === "detail" && (
-            <div className="p-6 text-muted-foreground">
-              detail — coming soon
-            </div>
-          )}
-          {view === "player" && (
-            <div className="p-6 text-muted-foreground">
-              player — coming soon
-            </div>
-          )}
-        </div>
+        <div className="mt-4">{renderView()}</div>
       </div>
     </SeedContext.Provider>
   );

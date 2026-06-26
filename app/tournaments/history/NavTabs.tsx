@@ -11,6 +11,7 @@ export type ViewId =
   | "detail"
   | "player";
 
+// Note: "detail" and "player" are intentionally excluded — they are drill-down views, not top-level tabs.
 const TABS: { id: ViewId; label: string }[] = [
   { id: "tournaments", label: "Tournaments" },
   { id: "champions", label: "Hall of Champions" },
