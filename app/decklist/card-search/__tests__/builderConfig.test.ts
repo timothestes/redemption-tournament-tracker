@@ -35,6 +35,13 @@ describe("PUBLIC_BUILDER_CONFIG defaults", () => {
     expect(PUBLIC_BUILDER_CONFIG.features?.localStoragePersist).toBe(true);
   });
 
+  it("keeps all public features on (url sync, sharing, delete)", () => {
+    const f = PUBLIC_BUILDER_CONFIG.features;
+    expect(f?.syncFiltersToUrl).toBe(true);
+    expect(f?.enableSharing).toBe(true);
+    expect(f?.enableDeckDelete).toBe(true);
+  });
+
   it("injects no persistence override (useDeckState uses the decks-table default)", () => {
     expect(PUBLIC_BUILDER_CONFIG.persistence).toBeUndefined();
   });

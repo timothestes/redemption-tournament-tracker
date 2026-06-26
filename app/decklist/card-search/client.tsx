@@ -147,17 +147,25 @@ function NewDeckRenameForm({
 
 export default function CardSearchClient({
   config = PUBLIC_BUILDER_CONFIG,
-}: { config?: DeckBuilderConfig } = {}) {
+  initialDeckId,
+  initialIsNew,
+}: {
+  config?: DeckBuilderConfig;
+  /** Deck id to load, when the host route carries it in the path (e.g. the Forge). Falls back to `?deckId=`. */
+  initialDeckId?: string;
+  /** Whether to boot in "new deck" mode. Falls back to `?new=true`. */
+  initialIsNew?: boolean;
+} = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getImageUrl } = useCardImageUrl();
   
-  // Get deck ID from URL params if editing existing deck
-  const deckIdFromUrl = searchParams.get("deckId") || undefined;
+  // Get deck ID from the host route (path param) if provided, else from URL query.
+  const deckIdFromUrl = initialDeckId ?? (searchParams.get("deckId") || undefined);
   // Get folder ID from URL params if creating a new deck in a folder
   const folderIdFromUrl = searchParams.get("folderId") || undefined;
-  // Check if this is an explicit "new deck" request
-  const isNewDeck = searchParams.get("new") === "true";
+  // Check if this is an explicit "new deck" request (path-driven for the Forge, else `?new=true`).
+  const isNewDeck = initialIsNew ?? (searchParams.get("new") === "true");
   
   // Collapse state for filter grid — collapsed by default on mobile
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
@@ -539,6 +547,9 @@ export default function CardSearchClient({
   // Function to update URL with current filter state
   // Two modes: deck editing (deckId in URL, no filter params) vs browse (filter params in URL)
   const updateURL = React.useCallback((filters: Record<string, any>) => {
+    // Hosts that aren't the public route (the Forge) disable URL sync — these
+    // router.replace()s would navigate the user off their route.
+    if (config.features?.syncFiltersToUrl === false) return;
     // Mode 1: Deck editing - keep only deckId in the URL, filters are ephemeral
     if (deck.id) {
       router.replace(`/decklist/card-search?deckId=${deck.id}`, { scroll: false });
@@ -1396,9 +1407,11 @@ export default function CardSearchClient({
     setGospelNot(false);
     
     setVisibleCount(0); // Don't show any cards after reset
-    
-    // Clear URL
-    router.replace('/decklist/card-search', { scroll: false });
+
+    // Clear URL (skip for hosts that disable URL sync, e.g. the Forge)
+    if (config.features?.syncFiltersToUrl !== false) {
+      router.replace('/decklist/card-search', { scroll: false });
+    }
   }
 
   // Copy current search URL to clipboard
@@ -1554,6 +1567,14 @@ export default function CardSearchClient({
 
   // Delete deck
   async function handleDeleteDeck() {
+    // Hosts that disable delete (the Forge) never touch the public `decks` table;
+    // "delete" just clears the working deck. Forge decks are removed from their list.
+    if (config.features?.enableDeckDelete === false) {
+      clearDeck();
+      clearUnsavedChanges();
+      return;
+    }
+
     if (!deck.id) {
       // If deck hasn't been saved yet, just clear it
       clearDeck();
@@ -2696,6 +2717,8 @@ export default function CardSearchClient({
             onDownloadBySet={handleDownloadDeckBySet}
             onImport={() => setShowImportModal(true)}
             onDelete={handleDeleteDeck}
+            canShare={config.features?.enableSharing !== false}
+            canDelete={config.features?.enableDeckDelete !== false}
             onDuplicate={() => {
               // Duplicate will be handled internally by DeckBuilderPanel
               // Just need to provide the callback for re-rendering
@@ -2798,6 +2821,8 @@ export default function CardSearchClient({
               onDownloadBySet={handleDownloadDeckBySet}
               onImport={() => setShowImportModal(true)}
               onDelete={handleDeleteDeck}
+              canShare={config.features?.enableSharing !== false}
+              canDelete={config.features?.enableDeckDelete !== false}
               onDuplicate={() => {}}
               onNewDeck={handleNewDeck}
               onLoadDeck={loadDeckFromCloud}

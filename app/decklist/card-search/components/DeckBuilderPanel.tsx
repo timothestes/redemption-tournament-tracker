@@ -142,6 +142,10 @@ interface DeckBuilderPanelProps {
   onImport: () => void;
   /** Callback to delete deck */
   onDelete: () => void;
+  /** Whether the delete control is available (off for the Forge — its decks aren't in the public table). Default true. */
+  canDelete?: boolean;
+  /** Whether share/visibility + duplicate controls are available (off for the Forge — they'd write public data). Default true. */
+  canShare?: boolean;
   /** Callback to duplicate current deck */
   onDuplicate?: () => void;
   /** Callback to load a deck from cloud by ID */
@@ -209,6 +213,8 @@ export default function DeckBuilderPanel({
   onDownloadBySet,
   onImport,
   onDelete,
+  canDelete = true,
+  canShare = true,
   onDuplicate,
   onLoadDeck,
   onReplaceGood,
@@ -1140,7 +1146,7 @@ export default function DeckBuilderPanel({
             </button>
 
             {/* Share button (opens the share/visibility modal) */}
-            {isAuthenticated && deck.id && (
+            {canShare && isAuthenticated && deck.id && (
               <button
                 onClick={() => setShowShareModal(true)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
@@ -1214,7 +1220,7 @@ export default function DeckBuilderPanel({
                     </button>
                   )}
                   <div className="border-t border-border my-1" />
-                  {onDuplicate && isAuthenticated && deck.id && (
+                  {canShare && onDuplicate && isAuthenticated && deck.id && (
                     <button
                       onClick={async () => {
                         setShowMenu(false);
@@ -1267,7 +1273,7 @@ export default function DeckBuilderPanel({
                       Replace Evil…
                     </button>
                   )}
-                  {isAuthenticated && deck.id && (
+                  {canShare && isAuthenticated && deck.id && (
                     <button
                       onClick={() => { setShowShareModal(true); setShowMenu(false); }}
                       className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
@@ -1319,7 +1325,7 @@ export default function DeckBuilderPanel({
                       Check my collection
                     </button>
                   )}
-                  {isAuthenticated && (
+                  {canDelete && isAuthenticated && (
                     <>
                       <div className="border-t border-border my-1" />
                       <button
@@ -1640,7 +1646,7 @@ export default function DeckBuilderPanel({
             </button>
 
             {/* Share button (opens the share/visibility modal) */}
-            {isAuthenticated && deck.id && (
+            {canShare && isAuthenticated && deck.id && (
               <button
                 onClick={() => setShowShareModal(true)}
                 className="px-3 py-1.5 rounded border border-border bg-card hover:bg-muted text-muted-foreground transition-colors flex items-center"
@@ -1729,7 +1735,7 @@ export default function DeckBuilderPanel({
               <div className="border-t border-border my-1"></div>
               
               {/* Duplicate/Load Section */}
-              {onDuplicate && isAuthenticated && deck.id && (
+              {canShare && onDuplicate && isAuthenticated && deck.id && (
                 <button
                   onClick={async () => {
                     setShowMenu(false);
@@ -1792,7 +1798,7 @@ export default function DeckBuilderPanel({
               )}
 
               {/* Sharing Section */}
-              {isAuthenticated && deck.id && (
+              {canShare && isAuthenticated && deck.id && (
                 <button
                   onClick={() => { setShowShareModal(true); setShowMenu(false); }}
                   className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
@@ -1854,7 +1860,7 @@ export default function DeckBuilderPanel({
                 </button>
               )}
 
-              {isAuthenticated && (
+              {canDelete && isAuthenticated && (
                 <>
                   <div className="border-t border-border my-1"></div>
                   <button
@@ -3589,7 +3595,7 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Share / visibility modal */}
-      {deck.id && (
+      {canShare && deck.id && (
         <ShareDeckModal
           open={showShareModal}
           onOpenChange={setShowShareModal}

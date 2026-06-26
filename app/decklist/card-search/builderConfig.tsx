@@ -42,11 +42,21 @@ export interface DeckBuilderPersistence {
   loadById: typeof loadDeckByIdAction;
 }
 
-/** Feature toggles. Public has everything on; the Forge hard-disables several. */
+/** Feature toggles. Public has everything on; the Forge hard-disables several.
+ *  All gates treat `=== false` as off, so an omitted flag stays public-default-on. */
 export interface DeckBuilderFeatures {
   /** Persist the working deck to localStorage. On for public drafts; off for the
    *  Forge (its decks are RLS-scoped, and a shared key would bleed a public draft in). */
   localStoragePersist?: boolean;
+  /** Mirror filter/deck state into the `/decklist/card-search` URL. Off for the
+   *  Forge — those `router.replace`s would navigate the user off the Forge route. */
+  syncFiltersToUrl?: boolean;
+  /** Share/visibility + duplicate controls (write to the public `decks` table /
+   *  create public links). Off for the Forge — secret content must never go public. */
+  enableSharing?: boolean;
+  /** Delete control (calls the public `deleteDeckAction`). Off for the Forge,
+   *  whose decks live in `forge_decks`; deletion happens from the Forge deck list. */
+  enableDeckDelete?: boolean;
 }
 
 /**
@@ -93,7 +103,12 @@ export const PUBLIC_BUILDER_CONFIG: DeckBuilderConfig = {
     );
   },
   // persistence omitted → useDeckState uses the public `decks`-table default.
-  features: { localStoragePersist: true },
+  features: {
+    localStoragePersist: true,
+    syncFiltersToUrl: true,
+    enableSharing: true,
+    enableDeckDelete: true,
+  },
 };
 
 const BuilderConfigContext = createContext<DeckBuilderConfig>(PUBLIC_BUILDER_CONFIG);
