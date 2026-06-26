@@ -4,8 +4,16 @@ import { Deck, DeckCard, DeckStats, DeckZone, DeckVisibility } from "../types/de
 import { saveDeckAction, loadDeckByIdAction, DeckCardData } from "../../actions";
 import { CARD_BY_FULL_KEY } from "../data/cardIndex";
 import { buildReplacedHalf, type ReplaceAlignment } from "../utils/replaceHalf";
+import type { DeckBuilderPersistence } from "../builderConfig";
 
 const STORAGE_KEY = "redemption-deck-builder-current-deck";
+
+// Public default persistence: the `decks` table. Module-level so it's a stable
+// reference (no re-creation per render) when no override is injected.
+const DEFAULT_PERSISTENCE: DeckBuilderPersistence = {
+  save: saveDeckAction,
+  loadById: loadDeckByIdAction,
+};
 
 // Stable serialization of the persisted parts of a deck for change detection.
 // Drives the "Unsaved Changes" indicator and skips no-op saves.
@@ -43,8 +51,17 @@ export interface SyncStatus {
 export function useDeckState(
   initialDeckId?: string,
   initialFolderId?: string | null,
-  isNewDeck?: boolean
+  isNewDeck?: boolean,
+  options?: { persistence?: DeckBuilderPersistence; localStoragePersist?: boolean }
 ) {
+  // Injected persistence + localStorage gate. Held in refs so async callbacks and
+  // effects read the latest without threading them through dependency arrays.
+  const persistenceRef = useRef<DeckBuilderPersistence>(options?.persistence ?? DEFAULT_PERSISTENCE);
+  persistenceRef.current = options?.persistence ?? DEFAULT_PERSISTENCE;
+  const localStoragePersist = options?.localStoragePersist ?? true;
+  const localStoragePersistRef = useRef(localStoragePersist);
+  localStoragePersistRef.current = localStoragePersist;
+
   // Initialize with default deck to avoid hydration mismatch
   const [deck, setDeck] = useState<Deck>(getDefaultDeck);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
@@ -88,10 +105,12 @@ export function useDeckState(
       
       // Only load from storage if no deckId and not creating new deck
       if (!initialDeckId && !isNewDeck) {
-        const storedDeck = loadDeckFromStorage();
-        // Only update if there's actually a deck in storage (not just the default)
-        if (storedDeck.cards.length > 0 || storedDeck.name !== "Untitled Deck" || storedDeck.id) {
-          setDeck(storedDeck);
+        if (localStoragePersistRef.current) {
+          const storedDeck = loadDeckFromStorage();
+          // Only update if there's actually a deck in storage (not just the default)
+          if (storedDeck.cards.length > 0 || storedDeck.name !== "Untitled Deck" || storedDeck.id) {
+            setDeck(storedDeck);
+          }
         }
         // This path owns initialization; the cloud-load and new-deck effects own
         // theirs. Flipping isInitializing here when a deckId is present would
@@ -107,7 +126,7 @@ export function useDeckState(
 
   // Persist deck to localStorage whenever it changes
   useEffect(() => {
-    saveDeckToStorage(deck);
+    if (localStoragePersistRef.current) saveDeckToStorage(deck);
 
     // Derive the dirty flag from the saved-snapshot ref so it reflects reality
     // after both edits and successful saves (rather than always flipping to true).
@@ -146,8 +165,8 @@ export function useDeckState(
     try {
       setSyncStatus({ isSaving: false, lastSavedAt: null, error: null });
       
-      const result = await loadDeckByIdAction(deckId);
-      
+      const result = await persistenceRef.current.loadById(deckId);
+
       if (result.success && result.deck) {
         const cloudDeck = result.deck;
         const isOwner = result.isOwner ?? false;
@@ -249,7 +268,7 @@ export function useDeckState(
           previewCard2 = previewCard2 ?? firstEvil?.card.imgFile ?? (mainCards.length > 1 ? mainCards[1]?.card.imgFile : null) ?? null;
         }
 
-        const result = await saveDeckAction({
+        const result = await persistenceRef.current.save({
           deckId: targetDeck.id,
           name: overrideName || targetDeck.name,
           description: targetDeck.description,
@@ -640,7 +659,7 @@ export function useDeckState(
       error?: string;
     }> => {
       try {
-        const result = await loadDeckByIdAction(sourceDeckId);
+        const result = await persistenceRef.current.loadById(sourceDeckId);
         if (!result.success || !result.deck) {
           return { success: false, error: result.error || "Failed to load source deck" };
         }

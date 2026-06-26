@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { requireForge } from "@/app/forge/lib/auth";
 import { getForgeDeck } from "@/app/forge/lib/forgeDecks";
 import { listGrantedForgeCards } from "@/app/forge/lib/deckPool";
@@ -13,19 +14,17 @@ export default async function ForgeDeckBuilderPage({ params }: { params: Promise
   const isNew = deckId === "new";
 
   const granted = await listGrantedForgeCards();
-  const deck = isNew ? null : await getForgeDeck(deckId);
-  if (!isNew && !deck) notFound();
+  // The builder loads the deck itself via the persistence seam; here we only
+  // 404 a non-existent id so we don't drop the user into a blank builder.
+  if (!isNew) {
+    const deck = await getForgeDeck(deckId);
+    if (!deck) notFound();
+  }
 
+  // CardSearchClient uses useSearchParams → needs a Suspense boundary.
   return (
-    <main className="mx-auto max-w-6xl p-6">
-      <h1 className="text-xl font-semibold">{isNew ? "New deck" : deck!.name}</h1>
-      <DeckBuilder
-        deckId={isNew ? null : deck!.id}
-        initialName={isNew ? "" : deck!.name}
-        initialFormat={isNew ? "Type 1" : deck!.format}
-        initialEntries={isNew ? [] : deck!.entries}
-        granted={granted}
-      />
-    </main>
+    <Suspense>
+      <DeckBuilder deckId={isNew ? null : deckId} isNew={isNew} granted={granted} />
+    </Suspense>
   );
 }

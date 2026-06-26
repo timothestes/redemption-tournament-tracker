@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Deck } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { CardThumb } from "./CardThumb";
 import { validateDeck } from "../utils/deckValidation";
 import { loadGlobalTagsAction, updateDeckTagsAction, GlobalTag } from "../../actions";
 import { createGlobalTagAction } from "../../../admin/tags/actions";
@@ -433,8 +434,8 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
         {/* Card image - compact */}
         <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all cursor-pointer shadow-md">
           {imageUrl ? (
-            <img
-              src={imageUrl}
+            <CardThumb
+              card={card}
               alt={card.name}
               className="w-full h-full object-cover"
               loading="eager"
@@ -888,8 +889,8 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
               {hoveredCard ? (
                 <div className="transition-opacity duration-150">
                   <div className="aspect-[2.5/3.5] rounded-lg overflow-hidden shadow-lg bg-muted">
-                    <img
-                      src={getImageUrl(hoveredCard.imgFile)}
+                    <CardThumb
+                      card={hoveredCard}
                       alt={hoveredCard.name}
                       className="w-full h-full object-cover"
                     />

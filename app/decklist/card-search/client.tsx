@@ -5,7 +5,6 @@ const BATCH_SIZE = 60;
 import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
-import CardImage from "./components/CardImage";
 import DeckBuilderPanel, { TabType } from "./components/DeckBuilderPanel";
 import SpotlightPanel from "./components/SpotlightPanel";
 import {
@@ -14,7 +13,7 @@ import {
   isNativityReference,
   iconPredicates,
 } from "./utils";
-import { ALL_CARDS } from "./data/cardIndex";
+import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG, BuilderConfigProvider } from "./builderConfig";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
@@ -146,17 +145,27 @@ function NewDeckRenameForm({
   );
 }
 
-export default function CardSearchClient() {
+export default function CardSearchClient({
+  config = PUBLIC_BUILDER_CONFIG,
+  initialDeckId,
+  initialIsNew,
+}: {
+  config?: DeckBuilderConfig;
+  /** Deck id to load, when the host route carries it in the path (e.g. the Forge). Falls back to `?deckId=`. */
+  initialDeckId?: string;
+  /** Whether to boot in "new deck" mode. Falls back to `?new=true`. */
+  initialIsNew?: boolean;
+} = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getImageUrl } = useCardImageUrl();
   
-  // Get deck ID from URL params if editing existing deck
-  const deckIdFromUrl = searchParams.get("deckId") || undefined;
+  // Get deck ID from the host route (path param) if provided, else from URL query.
+  const deckIdFromUrl = initialDeckId ?? (searchParams.get("deckId") || undefined);
   // Get folder ID from URL params if creating a new deck in a folder
   const folderIdFromUrl = searchParams.get("folderId") || undefined;
-  // Check if this is an explicit "new deck" request
-  const isNewDeck = searchParams.get("new") === "true";
+  // Check if this is an explicit "new deck" request (path-driven for the Forge, else `?new=true`).
+  const isNewDeck = initialIsNew ?? (searchParams.get("new") === "true");
   
   // Collapse state for filter grid — collapsed by default on mobile
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
@@ -458,7 +467,10 @@ export default function CardSearchClient() {
     getCardQuantity,
     getDeckStats,
     clearUnsavedChanges,
-  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
+  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck, {
+    persistence: config.persistence,
+    localStoragePersist: config.features?.localStoragePersist,
+  });
 
   const [ignoreLegalityChecks, setIgnoreLegalityChecksRaw] = useState(() => {
     if (typeof window === 'undefined' || !deck.id) return false;
@@ -535,6 +547,9 @@ export default function CardSearchClient() {
   // Function to update URL with current filter state
   // Two modes: deck editing (deckId in URL, no filter params) vs browse (filter params in URL)
   const updateURL = React.useCallback((filters: Record<string, any>) => {
+    // Hosts that aren't the public route (the Forge) disable URL sync — these
+    // router.replace()s would navigate the user off their route.
+    if (config.features?.syncFiltersToUrl === false) return;
     // Mode 1: Deck editing - keep only deckId in the URL, filters are ephemeral
     if (deck.id) {
       router.replace(`/decklist/card-search?deckId=${deck.id}`, { scroll: false });
@@ -868,8 +883,8 @@ export default function CardSearchClient() {
 
   // Card data is built once at module load from the generated CARDS artifact.
   useEffect(() => {
-    setCards(ALL_CARDS);
-  }, []);
+    setCards(config.pool);
+  }, [config.pool]);
 
   // Quick icon filters for type-based icons (reordered) and color-coded brigades
   const colorIcons = [
@@ -1392,9 +1407,11 @@ export default function CardSearchClient() {
     setGospelNot(false);
     
     setVisibleCount(0); // Don't show any cards after reset
-    
-    // Clear URL
-    router.replace('/decklist/card-search', { scroll: false });
+
+    // Clear URL (skip for hosts that disable URL sync, e.g. the Forge)
+    if (config.features?.syncFiltersToUrl !== false) {
+      router.replace('/decklist/card-search', { scroll: false });
+    }
   }
 
   // Copy current search URL to clipboard
@@ -1550,6 +1567,14 @@ export default function CardSearchClient() {
 
   // Delete deck
   async function handleDeleteDeck() {
+    // Hosts that disable delete (the Forge) never touch the public `decks` table;
+    // "delete" just clears the working deck. Forge decks are removed from their list.
+    if (config.features?.enableDeckDelete === false) {
+      clearDeck();
+      clearUnsavedChanges();
+      return;
+    }
+
     if (!deck.id) {
       // If deck hasn't been saved yet, just clear it
       clearDeck();
@@ -1595,7 +1620,7 @@ export default function CardSearchClient() {
   }
 
   return (
-    <>
+    <BuilderConfigProvider config={config}>
       {/* Modal - Rendered outside main container to avoid z-index issues */}
       {modalCard && (
         <ModalWithClose
@@ -2419,12 +2444,11 @@ export default function CardSearchClient() {
                     className="relative overflow-hidden rounded"
                     onClick={() => isSpotlight ? setSpotlightCard(c) : setModalCard(c)}
                   >
-                    <CardImage
-                      imgFile={c.imgFile}
-                      alt={c.name}
-                      className="rounded w-full"
-                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                    />
+                    {config.renderThumb(c, {
+                      alt: c.name,
+                      className: "rounded w-full",
+                      sizes: "(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw",
+                    })}
 
                     {/* Controls Overlay - Centered on Card */}
                     <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-200">
@@ -2693,6 +2717,8 @@ export default function CardSearchClient() {
             onDownloadBySet={handleDownloadDeckBySet}
             onImport={() => setShowImportModal(true)}
             onDelete={handleDeleteDeck}
+            canShare={config.features?.enableSharing !== false}
+            canDelete={config.features?.enableDeckDelete !== false}
             onDuplicate={() => {
               // Duplicate will be handled internally by DeckBuilderPanel
               // Just need to provide the callback for re-rendering
@@ -2795,6 +2821,8 @@ export default function CardSearchClient() {
               onDownloadBySet={handleDownloadDeckBySet}
               onImport={() => setShowImportModal(true)}
               onDelete={handleDeleteDeck}
+              canShare={config.features?.enableSharing !== false}
+              canDelete={config.features?.enableDeckDelete !== false}
               onDuplicate={() => {}}
               onNewDeck={handleNewDeck}
               onLoadDeck={loadDeckFromCloud}
@@ -3190,6 +3218,6 @@ export default function CardSearchClient() {
         </div>
       )}
     </div>
-    </>
+    </BuilderConfigProvider>
   );
 }

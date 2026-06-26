@@ -22,7 +22,7 @@ export default async function ForgePlaySetPage({ params }: { params: Promise<{ s
   return (
     <main className="mx-auto max-w-5xl p-6">
       <h1 className="text-xl font-semibold">{set.name}</h1>
-      <p className="text-sm text-muted-foreground">Approved cards</p>
+      <p className="text-sm text-muted-foreground">Cards shared for playtesting</p>
       <RevealGrid items={items} />
     </main>
   );

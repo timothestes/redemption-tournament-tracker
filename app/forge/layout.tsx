@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireForge } from "./lib/auth";
+import TopNav from "../../components/top-nav";
+import ForgeNav from "./components/ForgeNav";
 import "./forge-fonts.css";
 
 export const dynamic = "force-dynamic";
@@ -12,5 +14,11 @@ export default async function ForgeLayout({
 }) {
   const ctx = await requireForge();
   if (!ctx) notFound();
-  return <div className="min-h-screen">{children}</div>;
+  return (
+    <div className="flex min-h-screen flex-col">
+      <TopNav />
+      <ForgeNav role={ctx.role} />
+      <div className="flex-1">{children}</div>
+    </div>
+  );
 }

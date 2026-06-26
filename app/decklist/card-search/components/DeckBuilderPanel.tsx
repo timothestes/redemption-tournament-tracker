@@ -44,6 +44,7 @@ import { getParagonNames, getParagonByName } from "../data/paragons";
 import { useCardPrices } from "../hooks/useCardPrices";
 import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { CardThumb } from "./CardThumb";
 import ReactMarkdown from "react-markdown";
 import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
 import CollectionCheckModal from "./CollectionCheckModal";
@@ -141,6 +142,10 @@ interface DeckBuilderPanelProps {
   onImport: () => void;
   /** Callback to delete deck */
   onDelete: () => void;
+  /** Whether the delete control is available (off for the Forge — its decks aren't in the public table). Default true. */
+  canDelete?: boolean;
+  /** Whether share/visibility + duplicate controls are available (off for the Forge — they'd write public data). Default true. */
+  canShare?: boolean;
   /** Callback to duplicate current deck */
   onDuplicate?: () => void;
   /** Callback to load a deck from cloud by ID */
@@ -208,6 +213,8 @@ export default function DeckBuilderPanel({
   onDownloadBySet,
   onImport,
   onDelete,
+  canDelete = true,
+  canShare = true,
   onDuplicate,
   onLoadDeck,
   onReplaceGood,
@@ -1139,7 +1146,7 @@ export default function DeckBuilderPanel({
             </button>
 
             {/* Share button (opens the share/visibility modal) */}
-            {isAuthenticated && deck.id && (
+            {canShare && isAuthenticated && deck.id && (
               <button
                 onClick={() => setShowShareModal(true)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
@@ -1213,7 +1220,7 @@ export default function DeckBuilderPanel({
                     </button>
                   )}
                   <div className="border-t border-border my-1" />
-                  {onDuplicate && isAuthenticated && deck.id && (
+                  {canShare && onDuplicate && isAuthenticated && deck.id && (
                     <button
                       onClick={async () => {
                         setShowMenu(false);
@@ -1266,7 +1273,7 @@ export default function DeckBuilderPanel({
                       Replace Evil…
                     </button>
                   )}
-                  {isAuthenticated && deck.id && (
+                  {canShare && isAuthenticated && deck.id && (
                     <button
                       onClick={() => { setShowShareModal(true); setShowMenu(false); }}
                       className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
@@ -1318,7 +1325,7 @@ export default function DeckBuilderPanel({
                       Check my collection
                     </button>
                   )}
-                  {isAuthenticated && (
+                  {canDelete && isAuthenticated && (
                     <>
                       <div className="border-t border-border my-1" />
                       <button
@@ -1639,7 +1646,7 @@ export default function DeckBuilderPanel({
             </button>
 
             {/* Share button (opens the share/visibility modal) */}
-            {isAuthenticated && deck.id && (
+            {canShare && isAuthenticated && deck.id && (
               <button
                 onClick={() => setShowShareModal(true)}
                 className="px-3 py-1.5 rounded border border-border bg-card hover:bg-muted text-muted-foreground transition-colors flex items-center"
@@ -1728,7 +1735,7 @@ export default function DeckBuilderPanel({
               <div className="border-t border-border my-1"></div>
               
               {/* Duplicate/Load Section */}
-              {onDuplicate && isAuthenticated && deck.id && (
+              {canShare && onDuplicate && isAuthenticated && deck.id && (
                 <button
                   onClick={async () => {
                     setShowMenu(false);
@@ -1791,7 +1798,7 @@ export default function DeckBuilderPanel({
               )}
 
               {/* Sharing Section */}
-              {isAuthenticated && deck.id && (
+              {canShare && isAuthenticated && deck.id && (
                 <button
                   onClick={() => { setShowShareModal(true); setShowMenu(false); }}
                   className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
@@ -1853,7 +1860,7 @@ export default function DeckBuilderPanel({
                 </button>
               )}
 
-              {isAuthenticated && (
+              {canDelete && isAuthenticated && (
                 <>
                   <div className="border-t border-border my-1"></div>
                   <button
@@ -2931,8 +2938,8 @@ export default function DeckBuilderPanel({
                           className="relative aspect-[2.5/3.5] rounded overflow-hidden border border-border hover:border-blue-500 hover:scale-105 transition-all"
                           title={dc.card.name}
                         >
-                          <img
-                            src={getImageUrl(dc.card.imgFile)}
+                          <CardThumb
+                            card={dc.card}
                             alt={dc.card.name}
                             className="w-full h-full object-cover"
                           />
@@ -3588,7 +3595,7 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Share / visibility modal */}
-      {deck.id && (
+      {canShare && deck.id && (
         <ShareDeckModal
           open={showShareModal}
           onOpenChange={setShowShareModal}
@@ -3730,8 +3737,8 @@ export default function DeckBuilderPanel({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-                <img
-                  src={getImageUrl(fullViewPreviewCard.imgFile)}
+                <CardThumb
+                  card={fullViewPreviewCard}
                   alt={fullViewPreviewCard.name}
                   className="w-full rounded-lg shadow-2xl"
                 />

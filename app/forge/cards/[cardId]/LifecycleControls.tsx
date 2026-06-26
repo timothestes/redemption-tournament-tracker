@@ -5,18 +5,35 @@ import { useRouter } from "next/navigation";
 import { shareToSet, sendToPrivate, publish, approve, unapprove, archive, unarchive, deleteCard } from "@/app/forge/lib/lifecycle";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
+import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 
 const STEPS = ["draft", "playtesting", "approved"] as const;
+// Display labels: 'playtesting' cards are now visible to granted playtesters (migration
+// 057), so the word finally means what it says; 'approved' reads as the locked "Final".
+const STEP_LABELS: Record<(typeof STEPS)[number], string> = {
+  draft: "Draft",
+  playtesting: "Playtesting",
+  approved: "Final",
+};
 
 export default function LifecycleControls({ card, sets }: { card: ForgeCardFull; sets: ForgeSetSummary[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [picking, setPicking] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => {
       const r = await fn();
       if (!r.ok) alert(r.error ?? "Action failed");
       router.refresh();
+    });
+
+  // Delete navigates away (the card no longer exists) — refreshing in place would 404.
+  const onDelete = () =>
+    start(async () => {
+      const r = await deleteCard(card.id);
+      if (!r.ok) { alert(r.error ?? "Could not delete card"); return; }
+      router.push(card.setId ? `/forge/sets/${card.setId}/cards` : "/forge/ideas");
     });
 
   const inSet = card.setId !== null;
@@ -28,7 +45,7 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
           <ol className="flex items-center gap-1 text-muted-foreground">
             {STEPS.map((s) => (
               <li key={s} className={card.status === s ? "font-semibold text-foreground" : ""}>
-                {s === "playtesting" ? "Playtesting" : s[0].toUpperCase() + s.slice(1)}
+                {STEP_LABELS[s]}
                 {s !== "approved" ? " ›" : ""}
               </li>
             ))}
@@ -49,7 +66,7 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
               <button disabled={pending} onClick={() => run(() => archive(card.id))} className="rounded-md border px-3 py-1">Archive</button>
             )}
             <button disabled={pending} onClick={() => confirm("Send this card back to your private sketchbook? Its published versions will be retired.") && run(() => sendToPrivate(card.id))} className="rounded-md border px-3 py-1">Send back to private</button>
-            <button disabled={pending} onClick={() => confirm("Delete this card and all its versions? This cannot be undone.") && run(() => deleteCard(card.id))} className="rounded-md border border-red-300 px-3 py-1 text-red-600">Delete</button>
+            <button disabled={pending} onClick={() => setConfirmDelete(true)} className="rounded-md border border-red-300 px-3 py-1 text-red-600">Delete</button>
           </div>
         </>
       ) : (
@@ -64,6 +81,15 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
           )}
         </div>
       )}
+      <ConfirmationDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        onConfirm={onDelete}
+        variant="destructive"
+        title="Delete this card?"
+        description="This permanently removes the card and all of its versions. This cannot be undone."
+        confirmLabel="Delete card"
+      />
     </div>
   );
 }

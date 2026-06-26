@@ -7,6 +7,10 @@ import {
   CARD_TYPES, ALIGNMENTS, BRIGADES, LEGALITIES,
   cardApplicability, isStatBearing, type DesignCard, type CardType, type Brigade,
 } from "@/app/forge/lib/designCard";
+import { BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
+
+// Light-colored brigades need dark text for legible chip labels.
+const LIGHT_BRIGADES = new Set<Brigade>(["White", "Silver", "GoodGold", "PaleGreen"]);
 
 export default function FullModeForm({
   card, snapshot, update,
@@ -67,13 +71,17 @@ export default function FullModeForm({
         <fieldset>
           <legend className="mb-1 font-medium">Brigade{app.brigades === "required" ? "" : " (optional)"}</legend>
           <div className="flex flex-wrap gap-2">
-            {BRIGADES.map((b) => (
-              <button key={b} type="button"
-                onClick={() => update({ brigades: toggle<Brigade>(snapshot.brigades, b) })}
-                className={`rounded-full border px-3 py-1 text-xs ${(snapshot.brigades ?? []).includes(b) ? "bg-emerald-600 text-white" : ""}`}>
-                {b}
-              </button>
-            ))}
+            {BRIGADES.map((b) => {
+              const selected = (snapshot.brigades ?? []).includes(b);
+              return (
+                <button key={b} type="button"
+                  onClick={() => update({ brigades: toggle<Brigade>(snapshot.brigades, b) })}
+                  style={selected ? { backgroundColor: BRIGADE_HEX[b] } : undefined}
+                  className={`rounded-full border px-3 py-1 text-xs ${selected ? `border-transparent ${LIGHT_BRIGADES.has(b) ? "text-gray-900" : "text-white"}` : "text-foreground"}`}>
+                  {b}
+                </button>
+              );
+            })}
           </div>
         </fieldset>
       )}
@@ -101,9 +109,25 @@ export default function FullModeForm({
             placeholder="e.g. 2 Kings 25:8" className="w-full rounded-md border bg-background px-3 py-2" /></label>
       )}
 
+      {show("identifiers") && (
+        <label className="block"><span className="mb-1 block font-medium">Identifiers</span>
+          <input
+            value={(snapshot.identifiers ?? []).join(", ")}
+            onChange={(e) => update({ identifiers: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+            placeholder="Comma-separated, e.g. Genesis, Patriarch"
+            className="w-full rounded-md border bg-background px-3 py-2" />
+          <span className="mt-1 block text-xs text-muted-foreground">Shown as pills on the card (e.g. Lost Soul / Hero identifiers).</span>
+        </label>
+      )}
+
       <label className="block"><span className="mb-1 block font-medium">Flavor text</span>
         <textarea value={snapshot.flavorText ?? ""} onChange={(e) => update({ flavorText: e.target.value })}
           className="h-20 w-full rounded-md border bg-background px-3 py-2" /></label>
+
+      <label className="block"><span className="mb-1 block font-medium">Artist</span>
+        <input value={snapshot.artistCredit ?? ""} onChange={(e) => update({ artistCredit: e.target.value })}
+          placeholder="Illustrator name — shown in the card footer"
+          className="w-full rounded-md border bg-background px-3 py-2" /></label>
 
       <label className="block"><span className="mb-1 block font-medium">Legality</span>
         <select value={snapshot.legality ?? ""} onChange={(e) => update({ legality: (e.target.value || undefined) as any })}
@@ -118,11 +142,17 @@ export default function FullModeForm({
         <input type="file" accept="image/jpeg,image/png,image/webp"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }}
           className="block w-full text-xs" />
+        <label className="mt-3 flex items-start gap-2">
+          <input type="checkbox" className="mt-0.5" checked={!!card.isPlaceholder}
+            onChange={async () => { await setPlaceholder(card.id, !card.isPlaceholder); router.refresh(); }} />
+          <span>
+            <span className="font-medium">Temporary / placeholder art</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Mark this art as a stand-in. Placeholder art isn’t shown on the card in playtests — upload final art and uncheck this when it’s ready.
+            </span>
+          </span>
+        </label>
         <div className="mt-2 flex gap-3">
-          <button type="button" onClick={async () => { await setPlaceholder(card.id, !card.isPlaceholder); router.refresh(); }}
-            className="text-emerald-600 hover:underline">
-            {card.isPlaceholder ? "Unmark placeholder" : "Mark placeholder"}
-          </button>
           {card.hasArt && <a href={`/forge/api/art/${card.id}?download=1`} className="text-emerald-600 hover:underline">Download original</a>}
         </div>
       </fieldset>
