@@ -11,6 +11,24 @@
 
 ---
 
+## ✅ Shipped overnight (status)
+
+All on branch `forge-ux-polish`, committed locally (nothing pushed). Each verified live in Playwright as baboonytim unless noted.
+
+| # | Item | Commit | Verified |
+|---|------|--------|----------|
+| 1 | Handoff plan + mount TopNav on forge pages | `1e7636e` | — |
+| 2 | **Phase 1 wins**: 404-on-card-delete fix · styled delete dialogs (card+deck) · dark-mode dropdowns · artist+identifiers editable · footer legibility | `ad4a27d` | ✅ live |
+| 3 | **Forge sub-nav** (Desk·Ideas·Sets·Play·Admin, role-aware) | `c2e3c7d` | ✅ live |
+| 4 | **Card preview fidelity**: per-type corner icons (GE/EE/Artifact/Curse/Covenant/…) · real brigade chip colors · identifier pills · LostSoul identifiers | `4a8bdec` | ✅ live + 2 reviewers + 514 tests |
+| 5 | **Playtesting cards are now playtestable** (semantics Option A: RLS migration 057 + readers + labels) | `60d1552` | ✅ RLS-simulated (granted sees it, non-granted=0) + 61 leak tests |
+| 6 | **Placeholder-art control** clarified (checkbox + help text) | `843444b` | ✅ live |
+| 7 | **Targets editor redesign + set-creation defaults** | _in flight (pipeline)_ | pending |
+
+**Left for you / next session:** type-first card creation w/ templates; click-to-edit on the preview; hero-left/enhancement-right dual icon; deck-builder **replacement** (blocked on your call — see bottom); artwork-loading perf on the deck builder.
+
+---
+
 ## How I gathered this
 
 Logged in as `baboonytim@gmail.com` (set a temp password — **see "Account notes" at the bottom; reset it**),
