@@ -11,10 +11,15 @@ import { CITY_COORDS } from "@/lib/nationals/cityCoords";
 let _topoPromise: Promise<Topology> | null = null;
 function getTopoData(): Promise<Topology> {
   if (!_topoPromise) {
-    _topoPromise = fetch("/data/us-states-10m.json").then((r) => {
-      if (!r.ok) throw new Error(`atlas fetch failed: ${r.status}`);
-      return r.json() as Promise<Topology>;
-    });
+    _topoPromise = fetch("/data/us-states-10m.json")
+      .then((r) => {
+        if (!r.ok) throw new Error(`atlas fetch failed: ${r.status}`);
+        return r.json() as Promise<Topology>;
+      })
+      .catch((e) => {
+        _topoPromise = null; // allow retry on next mount
+        throw e;
+      });
   }
   return _topoPromise;
 }
