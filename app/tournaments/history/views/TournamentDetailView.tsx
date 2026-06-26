@@ -10,6 +10,9 @@ import { PlacementBadge } from "../components/PlacementBadge";
 import { SectionTitle } from "../components/SectionTitle";
 import { EmptyState } from "../components/EmptyState";
 import StateMap from "../components/StateMap.loader";
+import { PromoCardsModal } from "../components/PromoCardsModal";
+import { FantasyDraftModal } from "../components/FantasyDraftModal";
+import { promosForYear } from "@/lib/nationals/promos";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -201,6 +204,10 @@ export function TournamentDetailView({
   const formats = tournament?.formats?.length ? tournament.formats : ["General"];
   const [selectedFormat, setSelectedFormat] = useState<string>(formats[0]);
 
+  // Modal state
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [fantasyOpen, setFantasyOpen] = useState(false);
+
   // Reset selected format when the tournament changes (prev/next navigation)
   useEffect(() => {
     setSelectedFormat(formats[0]);
@@ -340,25 +347,36 @@ export function TournamentDetailView({
 
         {/* ── Action buttons row ───────────────────────────────────────── */}
         <div className="flex flex-wrap items-center gap-2 mt-3">
-          {/* TODO Task 7: Promo Cards button — wire up openPromoModal when PROMO_DATA[year] exists */}
-          <button
-            disabled
-            className="px-3 py-1.5 text-xs text-muted-foreground border border-border rounded-md opacity-40 cursor-not-allowed"
-            title="Promo Cards (coming soon)"
-          >
-            🎴 Promo Cards
-          </button>
-          {/* TODO Task 7: Fantasy Draft link — show when tournament.fantasyDraft exists */}
+          {promosForYear(tournament.year).length > 0 && (
+            <button
+              onClick={() => setPromoOpen(true)}
+              className="px-3 py-1.5 text-xs text-muted-foreground border border-border rounded-md hover:text-foreground hover:border-primary transition"
+            >
+              🎴 Promo Cards
+            </button>
+          )}
           {tournament.fantasyDraft && (
             <button
-              disabled
-              className="px-3 py-1.5 text-xs text-muted-foreground border border-border rounded-md opacity-40 cursor-not-allowed"
-              title="Fantasy Draft (coming soon)"
+              onClick={() => setFantasyOpen(true)}
+              className="px-3 py-1.5 text-xs text-muted-foreground border border-border rounded-md hover:text-foreground hover:border-primary transition"
             >
               🏆 Fantasy Draft
             </button>
           )}
         </div>
+
+        {/* ── Modals ───────────────────────────────────────────────────── */}
+        {promoOpen && (
+          <PromoCardsModal year={tournament.year} open={promoOpen} onClose={() => setPromoOpen(false)} />
+        )}
+        {tournament.fantasyDraft && fantasyOpen && (
+          <FantasyDraftModal
+            year={tournament.year}
+            fantasyDraft={tournament.fantasyDraft}
+            open={fantasyOpen}
+            onClose={() => setFantasyOpen(false)}
+          />
+        )}
       </div>
 
       {/* ── Format filter tabs ───────────────────────────────────────────── */}
