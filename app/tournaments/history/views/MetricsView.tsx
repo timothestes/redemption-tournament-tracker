@@ -382,16 +382,39 @@ function activeYearsSet(filters: MetricFilters): Set<number> {
 
 // ── Cell formatter ────────────────────────────────────────────────────────────
 
-function formatCell(col: Col, val: unknown): string {
+function formatCell(col: Col, val: unknown, mode: string): string {
   if (val === null || val === undefined) return "—";
   if (col.id === "pct" || col.id === "podiumRate") {
     const n = val as number;
     return (n * 100).toFixed(1) + "%";
   }
-  if (col.id === "avg" && typeof val === "number") {
-    return val.toFixed(2);
+  const n = typeof val === "number" ? val : null;
+  if (mode === "lsd") {
+    if (col.id === "avg" && n !== null) {
+      const sign = n >= 0 ? "+" : "";
+      return sign + (n % 1 === 0 ? String(n) : n.toFixed(1));
+    }
+    if (col.id === "best" && n !== null) {
+      return "+" + String(n);
+    }
+    if (col.id === "worst" && n !== null) {
+      return String(n);
+    }
+    if (col.id === "total" && n !== null) {
+      return (n >= 0 ? "+" : "") + String(n);
+    }
   }
-  if (typeof val === "number") return String(val);
+  if (mode === "pts") {
+    if ((col.id === "avg" || col.id === "total" || col.id === "best") && n !== null) {
+      return n.toFixed(1);
+    }
+  }
+  if (mode === "placement") {
+    if (col.id === "avg" && n !== null) {
+      return n % 1 === 0 ? String(n) : n.toFixed(2);
+    }
+  }
+  if (n !== null) return String(n);
   return String(val);
 }
 
@@ -986,7 +1009,7 @@ export function MetricsView() {
                             ? col.id === "_rank"
                               ? i + 1
                               : row[col.id]
-                            : formatCell(col, row[col.id])}
+                            : formatCell(col, row[col.id], filters.mode)}
                         </td>
                       ))}
                     </tr>

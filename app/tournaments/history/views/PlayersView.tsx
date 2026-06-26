@@ -32,7 +32,11 @@ export function PlayersView({ setView }: PlayersViewProps) {
     <div>
       <SectionTitle
         title="Players"
-        sub={`${seed.players.length} player${seed.players.length === 1 ? "" : "s"}`}
+        sub={
+          query
+            ? `${filtered.length} of ${seed.players.length} players`
+            : `${seed.players.length} player${seed.players.length === 1 ? "" : "s"}`
+        }
       />
 
       {/* Search input — no focus:ring-* per project preference */}

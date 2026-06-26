@@ -279,7 +279,7 @@ export function TriviaView({ initialLeaderboard }: TriviaViewProps) {
             }
             return (
               <button
-                key={i}
+                key={opt}
                 className={cls}
                 disabled={state.answered}
                 onClick={() => handleAnswer(i)}
@@ -293,6 +293,7 @@ export function TriviaView({ initialLeaderboard }: TriviaViewProps) {
         {/* Feedback */}
         {state.answered && (
           <div
+            aria-live="polite"
             className={`rounded-lg px-4 py-2.5 text-sm font-medium border ${
               q.options[state.selectedIdx!] === q.correct
                 ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300"

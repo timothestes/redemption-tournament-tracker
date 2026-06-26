@@ -84,10 +84,23 @@ export default function HistoryClient({
     params.set("view", nextView);
     if (nextTournamentId) params.set("t", nextTournamentId);
     if (nextPlayerName) params.set("p", nextPlayerName);
-    router.replace(`/tournaments/history?${params.toString()}`, {
+    router.push(`/tournaments/history?${params.toString()}`, {
       scroll: false,
     });
   }
+
+  // Sync state FROM URL on browser back/forward
+  useEffect(() => {
+    const urlView = parseView(searchParams.get("view"));
+    const urlT = searchParams.get("t");
+    const urlP = searchParams.get("p");
+    if (urlView !== view || urlT !== tournamentId || urlP !== playerName) {
+      setViewState(urlView);
+      setTournamentId(urlT);
+      setPlayerName(urlP);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   function back() {
     const target = backToRef.current ?? "tournaments";
