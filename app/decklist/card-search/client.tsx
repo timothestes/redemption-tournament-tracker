@@ -5,7 +5,6 @@ const BATCH_SIZE = 60;
 import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
-import CardImage from "./components/CardImage";
 import DeckBuilderPanel, { TabType } from "./components/DeckBuilderPanel";
 import SpotlightPanel from "./components/SpotlightPanel";
 import {
@@ -14,7 +13,7 @@ import {
   isNativityReference,
   iconPredicates,
 } from "./utils";
-import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG } from "./builderConfig";
+import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG, BuilderConfigProvider } from "./builderConfig";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
@@ -1597,7 +1596,7 @@ export default function CardSearchClient({
   }
 
   return (
-    <>
+    <BuilderConfigProvider config={config}>
       {/* Modal - Rendered outside main container to avoid z-index issues */}
       {modalCard && (
         <ModalWithClose
@@ -2421,12 +2420,11 @@ export default function CardSearchClient({
                     className="relative overflow-hidden rounded"
                     onClick={() => isSpotlight ? setSpotlightCard(c) : setModalCard(c)}
                   >
-                    <CardImage
-                      imgFile={c.imgFile}
-                      alt={c.name}
-                      className="rounded w-full"
-                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                    />
+                    {config.renderThumb(c, {
+                      alt: c.name,
+                      className: "rounded w-full",
+                      sizes: "(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw",
+                    })}
 
                     {/* Controls Overlay - Centered on Card */}
                     <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-200">
@@ -3192,6 +3190,6 @@ export default function CardSearchClient({
         </div>
       )}
     </div>
-    </>
+    </BuilderConfigProvider>
   );
 }

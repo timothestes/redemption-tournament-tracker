@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import CardImage from "./CardImage";
+import { useBuilderConfig } from "../builderConfig";
 import type { Card } from "../utils";
 
 interface SpotlightPanelProps {
@@ -161,6 +161,7 @@ export default function SpotlightPanel({
   onPlayer2ScoreChange,
   onResetScoreboard,
 }: SpotlightPanelProps) {
+  const config = useBuilderConfig();
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
       {/* Clear button — only when a card is spotlighted (absolute, no layout impact) */}
@@ -179,12 +180,11 @@ export default function SpotlightPanel({
       {/* Card slot — same footprint whether empty or filled, so nothing shifts */}
       <div style={{ width: "min(100%, 400px)" }}>
         {card ? (
-          <CardImage
-            imgFile={card.imgFile}
-            alt={card.name}
-            className="rounded-xl w-full shadow-2xl transition-opacity duration-200"
-            sizes="400px"
-          />
+          config.renderThumb(card, {
+            alt: card.name,
+            className: "rounded-xl w-full shadow-2xl transition-opacity duration-200",
+            sizes: "400px",
+          })
         ) : (
           <div
             className="border-2 border-dashed border-border rounded-xl w-full"

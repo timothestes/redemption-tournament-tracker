@@ -44,6 +44,7 @@ import { getParagonNames, getParagonByName } from "../data/paragons";
 import { useCardPrices } from "../hooks/useCardPrices";
 import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { CardThumb } from "./CardThumb";
 import ReactMarkdown from "react-markdown";
 import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
 import CollectionCheckModal from "./CollectionCheckModal";
@@ -2931,8 +2932,8 @@ export default function DeckBuilderPanel({
                           className="relative aspect-[2.5/3.5] rounded overflow-hidden border border-border hover:border-blue-500 hover:scale-105 transition-all"
                           title={dc.card.name}
                         >
-                          <img
-                            src={getImageUrl(dc.card.imgFile)}
+                          <CardThumb
+                            card={dc.card}
                             alt={dc.card.name}
                             className="w-full h-full object-cover"
                           />
@@ -3730,8 +3731,8 @@ export default function DeckBuilderPanel({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-                <img
-                  src={getImageUrl(fullViewPreviewCard.imgFile)}
+                <CardThumb
+                  card={fullViewPreviewCard}
                   alt={fullViewPreviewCard.name}
                   className="w-full rounded-lg shadow-2xl"
                 />

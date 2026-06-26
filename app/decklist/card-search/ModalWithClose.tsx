@@ -1,7 +1,7 @@
 import React from "react";
 
 import { openYTGSearchPage } from "./ytgUtils";
-import { useCardImageUrl } from "./hooks/useCardImageUrl";
+import { CardThumb } from "./components/CardThumb";
 import { useCardPrices } from "./hooks/useCardPrices";
 import { useCardRulings, type CardRuling } from "./hooks/useCardRulings";
 import { useDuplicateCards } from "./hooks/useDuplicateCards";
@@ -527,7 +527,6 @@ export default function ModalWithClose({
   /** True when there is definitely no signed-in user — shows a sign-in hint instead of the stepper. */
   collectionSignedOut?: boolean;
 }) {
-  const { getImageUrl } = useCardImageUrl();
   const { getPrice, getProductUrl } = useCardPrices();
   const { rulings, refetch: refetchRulings } = useCardRulings(modalCard?.name ?? null);
   const { siblings: duplicateSiblings } = useDuplicateCards(modalCard?.name ?? null);
@@ -885,8 +884,8 @@ export default function ModalWithClose({
               {hasNavigation && (() => {
                 const prev = getAdjacentCard('left');
                 return prev ? (
-                  <img
-                    src={getImageUrl(prev.imgFile)}
+                  <CardThumb
+                    card={prev}
                     alt={prev.name}
                     className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
                     draggable={false}
@@ -897,8 +896,8 @@ export default function ModalWithClose({
 
             {/* Current card */}
             <div className="w-full h-full flex-shrink-0 flex items-center justify-center px-2 py-1">
-              <img
-                src={getImageUrl(modalCard.imgFile)}
+              <CardThumb
+                card={modalCard}
                 alt={modalCard.name}
                 className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
                 draggable={false}
@@ -910,8 +909,8 @@ export default function ModalWithClose({
               {hasNavigation && (() => {
                 const next = getAdjacentCard('right');
                 return next ? (
-                  <img
-                    src={getImageUrl(next.imgFile)}
+                  <CardThumb
+                    card={next}
                     alt={next.name}
                     className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
                     draggable={false}
@@ -1248,8 +1247,8 @@ export default function ModalWithClose({
           /* Side-by-side layout: card image left, form right */
           <div className="px-4 py-4 flex gap-6 flex-1 overflow-hidden">
             <div className="w-2/5 flex-shrink-0 flex flex-col items-start overflow-hidden">
-              <img
-                src={getImageUrl(modalCard.imgFile)}
+              <CardThumb
+                card={modalCard}
                 alt={modalCard.name}
                 className="max-w-full max-h-full object-contain rounded shadow-lg flex-shrink"
               />
@@ -1284,8 +1283,8 @@ export default function ModalWithClose({
           /* Normal side-by-side layout: image left, details + rulings right */
           <div className="px-4 py-4 flex gap-6 flex-1 overflow-hidden">
             <div className="w-2/5 flex-shrink-0 flex items-start overflow-hidden">
-              <img
-                src={getImageUrl(modalCard.imgFile)}
+              <CardThumb
+                card={modalCard}
                 alt={modalCard.name}
                 className={`max-w-full max-h-full object-contain rounded shadow-lg ${canDragToDeck ? "cursor-grab active:cursor-grabbing" : ""}`}
                 draggable={canDragToDeck}

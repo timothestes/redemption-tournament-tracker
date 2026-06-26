@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Card } from "../utils";
-import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { CardThumb } from "./CardThumb";
 
 interface DragGhostProps {
   card: Card;
@@ -17,7 +17,6 @@ interface DragGhostProps {
  * column) to telegraph that releasing there will discard one copy.
  */
 export default function DragGhost({ card, willRemove = false }: DragGhostProps) {
-  const { getImageUrl } = useCardImageUrl();
   return (
     <div
       className={`relative rounded-md overflow-hidden shadow-2xl pointer-events-none ring-2 transition-colors ${
@@ -25,8 +24,8 @@ export default function DragGhost({ card, willRemove = false }: DragGhostProps) 
       }`}
       style={{ width: 96, opacity: 0.6 }}
     >
-      <img
-        src={getImageUrl(card.imgFile)}
+      <CardThumb
+        card={card}
         alt={card.name}
         className="block w-full h-auto"
         crossOrigin="anonymous"

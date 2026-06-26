@@ -2,7 +2,7 @@ import React from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { DeckCard, DeckZone } from "../types/deck";
 import { Card } from "../utils";
-import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { CardThumb } from "./CardThumb";
 import { useCardPrices } from "../hooks/useCardPrices";
 
 /**
@@ -77,7 +77,6 @@ export default function DeckCardList({
 }: DeckCardListProps) {
   const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
   const [previewCard, setPreviewCard] = React.useState<{ card: Card; x: number; y: number } | null>(null);
-  const { getImageUrl } = useCardImageUrl();
   const { getPrice } = useCardPrices();
   
   // Close menu when clicking outside or pressing ESC
@@ -222,8 +221,8 @@ export default function DeckCardList({
                 className="aspect-[2.5/3.5] bg-muted animate-pulse cursor-pointer relative"
                 onClick={() => onViewCard?.(card)}
               >
-                <img
-                  src={getImageUrl(card.imgFile)}
+                <CardThumb
+                  card={card}
                   alt={card.name}
                   className="w-full h-full object-cover"
                   crossOrigin="anonymous"
@@ -483,8 +482,8 @@ export default function DeckCardList({
               maxWidth: '300px',
             }}
           >
-            <img
-              src={getImageUrl(previewCard.card.imgFile)}
+            <CardThumb
+              card={previewCard.card}
               alt={previewCard.card.name}
               className="rounded-lg shadow-2xl border-2 border-border"
               style={{ maxHeight: '400px', width: 'auto' }}
@@ -957,8 +956,8 @@ export default function DeckCardList({
             maxWidth: '300px',
           }}
         >
-          <img
-            src={getImageUrl(previewCard.card.imgFile)}
+          <CardThumb
+            card={previewCard.card}
             alt={previewCard.card.name}
             className="rounded-lg shadow-2xl border-2 border-border"
             style={{ maxHeight: '400px', width: 'auto' }}
