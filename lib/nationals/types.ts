@@ -1,5 +1,14 @@
 /** Redemption Nationals History — shared types. */
 
+// ── Leaderboard ──────────────────────────────────────────────────────────────
+
+export interface LeaderboardEntry {
+  playerName: string;
+  firstPlaces: number;
+  podiums: number;  // top-3 finishes
+  appearances: number;
+}
+
 // ── Tournament ──────────────────────────────────────────────────────────────
 
 export interface FantasyPickBreakdown {
@@ -88,3 +97,6 @@ export interface NationalsData {
   results: ResultsMap;
   matches: MatchesMap;
 }
+
+/** Alias used by HistoryClient for the full JSON payload. */
+export type SeedData = NationalsData;
