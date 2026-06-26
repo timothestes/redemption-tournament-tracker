@@ -446,7 +446,7 @@ export function PlayerProfileView({
                       <td className="px-4 py-2.5">
                         {playerNames.has(opp) ? (
                           <button
-                            className="text-primary hover:underline text-left"
+                            className="hover:text-primary hover:underline text-left transition-colors"
                             onClick={() =>
                               setView("player", {
                                 playerName: opp,
@@ -517,7 +517,7 @@ export function PlayerProfileView({
                       <td className="px-4 py-2.5 font-medium">
                         {playerNames.has(opp) ? (
                           <button
-                            className="text-primary hover:underline text-left"
+                            className="hover:text-primary hover:underline text-left transition-colors"
                             onClick={() =>
                               setView("player", {
                                 playerName: opp,

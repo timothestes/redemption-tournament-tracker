@@ -102,6 +102,11 @@ export default function HistoryClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  // Scroll to top on any navigation (tab switch, drill-down, back/forward)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [view, tournamentId, playerName]);
+
   function back() {
     const target = backToRef.current ?? "tournaments";
     setView(target);

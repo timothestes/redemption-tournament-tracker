@@ -33,7 +33,7 @@ interface PlayerLinkProps {
 function PlayerLink({ name, setView }: PlayerLinkProps) {
   return (
     <button
-      className="text-primary hover:underline text-left"
+      className="hover:text-primary hover:underline text-left transition-colors"
       onClick={() => setView("player", { playerName: name, backTo: "detail" })}
     >
       {name}
@@ -124,7 +124,7 @@ function TeamsRound({
             className="grid grid-cols-[1fr_80px_1fr] items-center gap-2 py-2 px-3 border-b border-border last:border-0"
           >
             <div
-              className={`flex flex-wrap gap-1 ${aWon ? "text-primary font-medium" : bWon ? "text-muted-foreground" : ""}`}
+              className={`flex flex-wrap gap-1 ${aWon ? "text-foreground font-semibold" : bWon ? "text-muted-foreground" : ""}`}
             >
               {aNamesArr.map((n) => (
                 <PlayerLink key={n} name={n} setView={setView} />
@@ -134,7 +134,7 @@ function TeamsRound({
               {sc}
             </div>
             <div
-              className={`flex flex-wrap gap-1 justify-end ${bWon ? "text-primary font-medium" : aWon ? "text-muted-foreground" : ""}`}
+              className={`flex flex-wrap gap-1 justify-end ${bWon ? "text-foreground font-semibold" : aWon ? "text-muted-foreground" : ""}`}
             >
               {bNamesArr.map((n) => (
                 <PlayerLink key={n} name={n} setView={setView} />
@@ -163,14 +163,14 @@ function MatchRow({
     <div className="grid grid-cols-[1fr_64px_1fr] items-center gap-2 py-2 px-3 border-b border-border last:border-0 odd:bg-muted/40">
       <div
         className={
-          aW ? "text-primary font-medium" : bW ? "text-muted-foreground" : ""
+          aW ? "text-foreground font-semibold" : bW ? "text-muted-foreground" : ""
         }
       >
         <PlayerLink name={m.playerA} setView={setView} />
       </div>
       <div className="text-center text-xs text-muted-foreground">{sc}</div>
       <div
-        className={`text-right ${bW ? "text-primary font-medium" : aW ? "text-muted-foreground" : ""}`}
+        className={`text-right ${bW ? "text-foreground font-semibold" : aW ? "text-muted-foreground" : ""}`}
       >
         <PlayerLink name={m.playerB} setView={setView} />
       </div>

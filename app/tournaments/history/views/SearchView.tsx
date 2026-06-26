@@ -70,7 +70,7 @@ export function SearchView({ setView }: SearchViewProps) {
                           })
                         }
                       >
-                        <td className="px-4 py-2.5 font-medium text-primary hover:underline">
+                        <td className="px-4 py-2.5 font-medium text-foreground hover:text-primary hover:underline transition-colors">
                           {p.name}
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground text-xs">
@@ -103,7 +103,7 @@ export function SearchView({ setView }: SearchViewProps) {
                           })
                         }
                       >
-                        <td className="px-4 py-2.5 font-medium text-primary hover:underline">
+                        <td className="px-4 py-2.5 font-medium text-foreground hover:text-primary hover:underline transition-colors">
                           {t.year} Nationals
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground text-xs">

@@ -77,7 +77,7 @@ export function PlayersView({ setView }: PlayersViewProps) {
                     setView("player", { playerName: p.name, backTo: "players" })
                   }
                 >
-                  <td className="px-4 py-2.5 font-medium text-primary hover:underline">
+                  <td className="px-4 py-2.5 font-medium text-foreground hover:text-primary hover:underline transition-colors">
                     {p.name}
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">
