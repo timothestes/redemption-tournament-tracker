@@ -126,3 +126,33 @@ export async function listSetElders(setId: string): Promise<SetElder[]> {
   const { data: members } = await ctx.supabase.from("playtest_members").select("user_id, display_name, role").in("user_id", ids);
   return (members ?? []).map((m: any) => ({ userId: m.user_id, displayName: m.display_name ?? null, role: m.role }));
 }
+
+export type SetGrant = { userId: string; displayName: string | null };
+
+export async function grantSet(setId: string, userId: string): Promise<Result> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { error } = await ctx.supabase.rpc("forge_grant_set", { p_set_id: setId, p_user_id: userId });
+  if (error) return { ok: false, error: "Could not grant access" };
+  revalidatePath(`/forge/sets/${setId}/progress`);
+  return { ok: true };
+}
+
+export async function revokeSet(setId: string, userId: string): Promise<Result> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { error } = await ctx.supabase.rpc("forge_revoke_set", { p_set_id: setId, p_user_id: userId });
+  if (error) return { ok: false, error: "Could not revoke access" };
+  revalidatePath(`/forge/sets/${setId}/progress`);
+  return { ok: true };
+}
+
+export async function listSetGrants(setId: string): Promise<SetGrant[]> {
+  const ctx = await requireForge();
+  if (!ctx) return [];
+  const { data: rows } = await ctx.supabase.from("forge_set_grants").select("user_id").eq("set_id", setId);
+  const ids = (rows ?? []).map((r: any) => r.user_id);
+  if (ids.length === 0) return [];
+  const { data: members } = await ctx.supabase.from("playtest_members").select("user_id, display_name").in("user_id", ids);
+  return (members ?? []).map((m: any) => ({ userId: m.user_id, displayName: m.display_name ?? null }));
+}
