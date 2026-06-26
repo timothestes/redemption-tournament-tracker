@@ -173,7 +173,7 @@ function amActiveYears(filters: MetricFilters): Set<number> {
  * Returns formats that have full standings (>FULL_THRESH entries), keyed by format.
  * Mirrors amGetFullYearsByFmt() from source.
  */
-function amGetFullYearsByFmt(seed: NationalsData): Record<string, Set<number>> {
+export function amGetFullYearsByFmt(seed: NationalsData): Record<string, Set<number>> {
   const out: Record<string, Set<number>> = {};
   Object.entries(seed.results).forEach(([k, entries]) => {
     const { yr, fmt } = amParseKey(k);

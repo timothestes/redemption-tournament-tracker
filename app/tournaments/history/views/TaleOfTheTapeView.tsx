@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useSeed } from "../seed-context";
 import { SectionTitle } from "../components/SectionTitle";
 import { headToHead, playerProfile } from "@/lib/nationals/selectors";
+import { amGetFullYearsByFmt } from "@/lib/nationals/metrics";
 import type { PlayerProfile } from "@/lib/nationals/selectors";
 import { cn } from "@/lib/utils";
 
@@ -212,7 +213,7 @@ interface TapeStats {
   initials: string;
 }
 
-function tapeGetStats(profile: PlayerProfile): TapeStats {
+function tapeGetStats(profile: PlayerProfile, fullByFmt: Record<string, Set<number>>): TapeStats {
   // nat years = unique years appeared
   const natYrs = new Set(profile.placements.map((p) => p.year)).size;
 
@@ -220,10 +221,12 @@ function tapeGetStats(profile: PlayerProfile): TapeStats {
   const p2 = profile.placements.filter((p) => p.placement === 2).length;
   const p3 = profile.placements.filter((p) => p.placement === 3).length;
 
-  // Average placement (all placements with a valid placement value)
-  const validPls = profile.placements.filter((h) => h.placement).map((h) => h.placement);
-  const avgPl = validPls.length
-    ? validPls.reduce((s, v) => s + v, 0) / validPls.length
+  // Average placement — full-data years only (matches source "Avg Finish (full data)")
+  const fullPls = profile.placements
+    .filter((h) => h.placement && (fullByFmt[h.format] || new Set()).has(h.year))
+    .map((h) => h.placement);
+  const avgPl = fullPls.length
+    ? fullPls.reduce((s, v) => s + v, 0) / fullPls.length
     : null;
 
   // Soul differential from notes
@@ -340,14 +343,16 @@ export function TaleOfTheTapeView() {
     [seed, playerL, playerR, ready]
   );
 
+  const fullByFmt = useMemo(() => amGetFullYearsByFmt(seed), [seed]);
+
   const statsL = useMemo(
-    () => (ready ? tapeGetStats(playerProfile(seed, playerL)) : null),
-    [seed, playerL, ready]
+    () => (ready ? tapeGetStats(playerProfile(seed, playerL), fullByFmt) : null),
+    [seed, playerL, ready, fullByFmt]
   );
 
   const statsR = useMemo(
-    () => (ready ? tapeGetStats(playerProfile(seed, playerR)) : null),
-    [seed, playerR, ready]
+    () => (ready ? tapeGetStats(playerProfile(seed, playerR), fullByFmt) : null),
+    [seed, playerR, ready, fullByFmt]
   );
 
   const sharedFmts = useMemo(() => {
@@ -459,7 +464,7 @@ export function TaleOfTheTapeView() {
             <StatRow label="Titles" aVal={statsL.p1} bVal={statsR.p1} />
             <StatRow label="Podiums (Top 3)" aVal={statsL.podiums} bVal={statsR.podiums} />
             <StatRow
-              label="Avg Finish"
+              label="Avg Finish (full data)"
               aVal={statsL.avgPl}
               bVal={statsR.avgPl}
               lowerBetter
