@@ -29,3 +29,13 @@ describe("PUBLIC_BUILDER_CONFIG.resolveCardImage — public invariant", () => {
     expect(r.kind).toBe("url");
   });
 });
+
+describe("PUBLIC_BUILDER_CONFIG defaults", () => {
+  it("keeps localStorage drafts enabled for the public builder", () => {
+    expect(PUBLIC_BUILDER_CONFIG.features?.localStoragePersist).toBe(true);
+  });
+
+  it("injects no persistence override (useDeckState uses the decks-table default)", () => {
+    expect(PUBLIC_BUILDER_CONFIG.persistence).toBeUndefined();
+  });
+});

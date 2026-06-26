@@ -459,7 +459,10 @@ export default function CardSearchClient({
     getCardQuantity,
     getDeckStats,
     clearUnsavedChanges,
-  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
+  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck, {
+    persistence: config.persistence,
+    localStoragePersist: config.features?.localStoragePersist,
+  });
 
   const [ignoreLegalityChecks, setIgnoreLegalityChecksRaw] = useState(() => {
     if (typeof window === 'undefined' || !deck.id) return false;
