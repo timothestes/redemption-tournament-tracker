@@ -11,6 +11,7 @@ import { TournamentDetailView } from "./views/TournamentDetailView";
 import { ChampionsView } from "./views/ChampionsView";
 import { PlayersView } from "./views/PlayersView";
 import { PlayerProfileView } from "./views/PlayerProfileView";
+import { MetricsView } from "./views/MetricsView";
 
 const VALID_VIEWS = new Set<ViewId>([
   "tournaments",
@@ -117,11 +118,7 @@ export default function HistoryClient({
           </div>
         );
       case "stats":
-        return (
-          <div className="p-6 text-muted-foreground">
-            stats — coming soon
-          </div>
-        );
+        return <MetricsView />;
       case "tape":
         return (
           <div className="p-6 text-muted-foreground">
