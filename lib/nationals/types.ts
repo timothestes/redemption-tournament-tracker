@@ -90,6 +90,11 @@ export interface MatchEntry {
 /** Key: "<year>_<format>", value: array of matches */
 export type MatchesMap = Record<string, MatchEntry[]>;
 
+// ── Multiplayer W/L/D map ────────────────────────────────────────────────────
+
+/** Per-format multiplayer win/loss/draw record for a single player. */
+export type MultiWLMap = Record<string, Record<string, { W: number; L: number; D: number }>>;
+
 // ── Root data shape ──────────────────────────────────────────────────────────
 
 export interface NationalsData {
@@ -97,6 +102,7 @@ export interface NationalsData {
   players: Player[];
   results: ResultsMap;
   matches: MatchesMap;
+  multiWL: MultiWLMap;
 }
 
 /** Alias used by HistoryClient for the full JSON payload. */

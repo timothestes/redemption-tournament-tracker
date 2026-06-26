@@ -72,3 +72,21 @@ describe("headToHead", () => {
     expect(h2h.matches.length).toBe(0);
   });
 });
+
+describe("playerProfile multiWL", () => {
+  it("returns numeric totals and an object for a player with multiplayer data", () => {
+    // Pick the first player listed in multiWL so we exercise the typed path
+    const multiWLKeys = Object.keys(data.multiWL ?? {});
+    expect(multiWLKeys.length).toBeGreaterThan(0);
+    const playerName = multiWLKeys[0];
+    const p = playerProfile(data, playerName);
+    expect(typeof p.multiWins).toBe("number");
+    expect(typeof p.multiLosses).toBe("number");
+    expect(typeof p.multiDraws).toBe("number");
+    expect(p.multiWins).toBeGreaterThanOrEqual(0);
+    expect(p.multiLosses).toBeGreaterThanOrEqual(0);
+    expect(p.multiDraws).toBeGreaterThanOrEqual(0);
+    expect(typeof p.multiWLByFmt).toBe("object");
+    expect(p.hasMulti).toBe(true);
+  });
+});

@@ -14,7 +14,7 @@ export interface Champion {
   wins: number;
   /** Years in which they won at least one format */
   years: number[];
-  /** Formats they won (may contain duplicates for multi-win years) */
+  /** Distinct set of formats in which they won at least once (NOT parallel to `years`) */
   formats: string[];
 }
 
@@ -61,17 +61,18 @@ export function buildChampionData(seed: NationalsData): Champion[] {
   }
 
   return Object.entries(byPlayer).map(([name, fmtMap]) => {
-    const formats: string[] = [];
     const years: number[] = [];
 
-    for (const [fmt, fmtYears] of Object.entries(fmtMap)) {
+    for (const fmtYears of Object.values(fmtMap)) {
       for (const y of fmtYears) {
-        formats.push(fmt);
         years.push(y);
       }
     }
 
     years.sort((a, b) => a - b);
+
+    // formats is a de-duped list of distinct formats won (not index-parallel to years)
+    const formats = Array.from(new Set(Object.keys(fmtMap)));
 
     return { name, wins: years.length, years, formats };
   });
@@ -265,7 +266,7 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
 
   // ── Multiplayer W/L/D (from multiWL map) ───────────────────────────────────
   const multiWLByFmt: Record<string, { W: number; L: number; D: number }> =
-    (seed as any).multiWL?.[name] ?? {};
+    seed.multiWL?.[name] ?? {};
 
   const mwlTotals = Object.values(multiWLByFmt).reduce(
     (acc, v) => { acc.W += v.W || 0; acc.L += v.L || 0; acc.D += v.D || 0; return acc; },
