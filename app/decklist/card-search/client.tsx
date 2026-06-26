@@ -14,7 +14,7 @@ import {
   isNativityReference,
   iconPredicates,
 } from "./utils";
-import { ALL_CARDS } from "./data/cardIndex";
+import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG } from "./builderConfig";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
@@ -146,7 +146,9 @@ function NewDeckRenameForm({
   );
 }
 
-export default function CardSearchClient() {
+export default function CardSearchClient({
+  config = PUBLIC_BUILDER_CONFIG,
+}: { config?: DeckBuilderConfig } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getImageUrl } = useCardImageUrl();
@@ -868,8 +870,8 @@ export default function CardSearchClient() {
 
   // Card data is built once at module load from the generated CARDS artifact.
   useEffect(() => {
-    setCards(ALL_CARDS);
-  }, []);
+    setCards(config.pool);
+  }, [config.pool]);
 
   // Quick icon filters for type-based icons (reordered) and color-coded brigades
   const colorIcons = [
