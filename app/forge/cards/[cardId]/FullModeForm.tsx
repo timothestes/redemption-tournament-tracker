@@ -142,11 +142,17 @@ export default function FullModeForm({
         <input type="file" accept="image/jpeg,image/png,image/webp"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }}
           className="block w-full text-xs" />
+        <label className="mt-3 flex items-start gap-2">
+          <input type="checkbox" className="mt-0.5" checked={!!card.isPlaceholder}
+            onChange={async () => { await setPlaceholder(card.id, !card.isPlaceholder); router.refresh(); }} />
+          <span>
+            <span className="font-medium">Temporary / placeholder art</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Mark this art as a stand-in. Placeholder art isn’t shown on the card in playtests — upload final art and uncheck this when it’s ready.
+            </span>
+          </span>
+        </label>
         <div className="mt-2 flex gap-3">
-          <button type="button" onClick={async () => { await setPlaceholder(card.id, !card.isPlaceholder); router.refresh(); }}
-            className="text-emerald-600 hover:underline">
-            {card.isPlaceholder ? "Unmark placeholder" : "Mark placeholder"}
-          </button>
           {card.hasArt && <a href={`/forge/api/art/${card.id}?download=1`} className="text-emerald-600 hover:underline">Download original</a>}
         </div>
       </fieldset>
