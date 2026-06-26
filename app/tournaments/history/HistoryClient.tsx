@@ -8,6 +8,7 @@ import NavTabs, { type ViewId } from "./NavTabs";
 import HistorySkeleton from "./HistorySkeleton";
 import { TournamentsView } from "./views/TournamentsView";
 import { TournamentDetailView } from "./views/TournamentDetailView";
+import { ChampionsView } from "./views/ChampionsView";
 
 const VALID_VIEWS = new Set<ViewId>([
   "tournaments",
@@ -104,11 +105,7 @@ export default function HistoryClient({
       case "tournaments":
         return <TournamentsView setView={setView} />;
       case "champions":
-        return (
-          <div className="p-6 text-muted-foreground">
-            champions — coming soon
-          </div>
-        );
+        return <ChampionsView setView={setView} />;
       case "players":
         return (
           <div className="p-6 text-muted-foreground">
