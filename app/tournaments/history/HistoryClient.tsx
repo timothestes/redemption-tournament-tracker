@@ -7,6 +7,7 @@ import { SeedContext } from "./seed-context";
 import NavTabs, { type ViewId } from "./NavTabs";
 import HistorySkeleton from "./HistorySkeleton";
 import { TournamentsView } from "./views/TournamentsView";
+import { TournamentDetailView } from "./views/TournamentDetailView";
 
 const VALID_VIEWS = new Set<ViewId>([
   "tournaments",
@@ -140,9 +141,11 @@ export default function HistoryClient({
         );
       case "detail":
         return (
-          <div className="p-6 text-muted-foreground">
-            detail — coming soon
-          </div>
+          <TournamentDetailView
+            tournamentId={tournamentId}
+            setView={setView}
+            back={back}
+          />
         );
       case "player":
         return (

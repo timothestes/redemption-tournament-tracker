@@ -80,10 +80,11 @@ export interface MatchEntry {
   table: number | null;
   playerA: string;
   playerB: string;
-  scoreA: number;
-  scoreB: number;
+  scoreA: number | null;
+  scoreB: number | null;
   winner: string;
   notes: string;
+  topCut?: boolean;
 }
 
 /** Key: "<year>_<format>", value: array of matches */
