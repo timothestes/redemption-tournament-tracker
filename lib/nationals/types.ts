@@ -69,8 +69,8 @@ export interface ResultEntry {
   notes: string;
 }
 
-/** Key: "<year>_<format>", value: player-name → ResultEntry */
-export type ResultsMap = Record<string, Record<string, ResultEntry>>;
+/** Key: "<year>_<format>", value: array of result rows */
+export type ResultsMap = Record<string, ResultEntry[]>;
 
 // ── Match ────────────────────────────────────────────────────────────────────
 

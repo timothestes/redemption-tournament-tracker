@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ViewId } from "../NavTabs";
 import { useSeed } from "../seed-context";
-import type { ResultEntry, MatchEntry } from "@/lib/nationals/types";
+import type { MatchEntry } from "@/lib/nationals/types";
 import { buildKey } from "@/lib/nationals/format";
 import { FormatBadge } from "../components/FormatBadge";
 import { PlacementBadge } from "../components/PlacementBadge";
@@ -125,7 +125,6 @@ function TeamsRound({
               {aNamesArr.map((n) => (
                 <PlayerLink key={n} name={n} setView={setView} />
               ))}
-              {aWon && <span className="ml-1">🏆</span>}
             </div>
             <div className="text-center text-xs text-muted-foreground">
               {sc}
@@ -133,7 +132,6 @@ function TeamsRound({
             <div
               className={`flex flex-wrap gap-1 justify-end ${bWon ? "text-primary font-medium" : aWon ? "text-muted-foreground" : ""}`}
             >
-              {bWon && <span className="mr-1">🏆</span>}
               {bNamesArr.map((n) => (
                 <PlayerLink key={n} name={n} setView={setView} />
               ))}
@@ -165,13 +163,11 @@ function MatchRow({
         }
       >
         <PlayerLink name={m.playerA} setView={setView} />
-        {aW && <span className="ml-1">🏆</span>}
       </div>
       <div className="text-center text-xs text-muted-foreground">{sc}</div>
       <div
         className={`text-right ${bW ? "text-primary font-medium" : aW ? "text-muted-foreground" : ""}`}
       >
-        {bW && <span className="mr-1">🏆</span>}
         <PlayerLink name={m.playerB} setView={setView} />
       </div>
     </div>
@@ -204,6 +200,12 @@ export function TournamentDetailView({
   const formats = tournament?.formats?.length ? tournament.formats : ["General"];
   const [selectedFormat, setSelectedFormat] = useState<string>(formats[0]);
 
+  // Reset selected format when the tournament changes (prev/next navigation)
+  useEffect(() => {
+    setSelectedFormat(formats[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournamentId]);
+
   if (!tournament) {
     return <EmptyState icon="🏛️" title="Tournament not found" />;
   }
@@ -214,10 +216,8 @@ export function TournamentDetailView({
   const prevT = idx > 0 ? sorted[idx - 1] : null;
   const nextT = idx < sorted.length - 1 ? sorted[idx + 1] : null;
 
-  // Coerce results to array (actual data is ResultEntry[])
   const key = buildKey(tournament.year, selectedFormat);
-  const resultsRaw = (seed.results as unknown as Record<string, ResultEntry[]>)[key];
-  const results = (resultsRaw ?? []).slice().sort((a, b) => a.placement - b.placement);
+  const results = (seed.results[key] ?? []).slice().sort((a, b) => a.placement - b.placement);
 
   const matches: MatchEntry[] = seed.matches[key] ?? [];
   const hasMatchData = tournament.year >= MATCH_DATA_START_YEAR;
@@ -458,47 +458,11 @@ export function TournamentDetailView({
                       className="rounded-lg border border-amber-500/40 bg-card overflow-hidden"
                     >
                       <div className="px-3 py-2 bg-amber-500/10 border-b border-amber-500/30 text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wide">
-                        🏆 {round}
+                        {round}
                       </div>
-                      {ms.map((m) => {
-                        const aW = m.winner === m.playerA;
-                        const bW = m.winner === m.playerB;
-                        const sc = score(m.scoreA, m.scoreB);
-                        return (
-                          <div
-                            key={m.id}
-                            className="grid grid-cols-[1fr_64px_1fr] items-center gap-2 py-2 px-3 border-b border-border last:border-0 odd:bg-muted/40"
-                          >
-                            <div
-                              className={
-                                aW
-                                  ? "text-primary font-medium"
-                                  : bW
-                                    ? "text-muted-foreground"
-                                    : ""
-                              }
-                            >
-                              <PlayerLink
-                                name={m.playerA}
-                                setView={setView}
-                              />
-                              {aW && <span className="ml-1">🏆</span>}
-                            </div>
-                            <div className="text-center text-xs text-muted-foreground">
-                              {sc}
-                            </div>
-                            <div
-                              className={`text-right ${bW ? "text-primary font-medium" : aW ? "text-muted-foreground" : ""}`}
-                            >
-                              {bW && <span className="mr-1">🏆</span>}
-                              <PlayerLink
-                                name={m.playerB}
-                                setView={setView}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {ms.map((m) => (
+                        <MatchRow key={m.id} m={m} setView={setView} />
+                      ))}
                     </div>
                   );
                 })}
