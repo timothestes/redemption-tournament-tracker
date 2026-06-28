@@ -1217,6 +1217,19 @@ export default function AdminRegistrationsPage() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-border bg-muted/30">
+                      <td className="px-4 py-3 text-sm text-right font-semibold" colSpan={11}>
+                        Total ({filteredRegistrations.length} {filteredRegistrations.length === 1 ? 'registrant' : 'registrants'})
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="font-semibold text-primary">
+                          ${filteredRegistrations.reduce((sum, reg) => sum + calculateTotalOwed(reg), 0).toFixed(2)}
+                        </span>
+                      </td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
