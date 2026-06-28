@@ -99,6 +99,7 @@ export async function updateRegistration(id: string, data: {
   lunch_thursday?: boolean;
   lunch_friday?: boolean;
   lunch_saturday?: boolean;
+  lunch_saturday_no_pickles?: boolean;
   lunch_form_filled?: boolean;
 }) {
   const { isAdmin } = await checkAdminAccess();
@@ -130,6 +131,7 @@ export async function updateRegistration(id: string, data: {
   if (data.lunch_thursday !== undefined) updateData.lunch_thursday = data.lunch_thursday;
   if (data.lunch_friday !== undefined) updateData.lunch_friday = data.lunch_friday;
   if (data.lunch_saturday !== undefined) updateData.lunch_saturday = data.lunch_saturday;
+  if (data.lunch_saturday_no_pickles !== undefined) updateData.lunch_saturday_no_pickles = data.lunch_saturday_no_pickles;
   if (data.lunch_form_filled !== undefined) updateData.lunch_form_filled = data.lunch_form_filled;
 
   const { error } = await supabase

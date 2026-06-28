@@ -22,6 +22,7 @@ export interface RegistrationData {
   lunchThursday: boolean;
   lunchFriday: boolean;
   lunchSaturday: boolean;
+  lunchSaturdayNoPickles: boolean;
 }
 
 export async function submitRegistration(data: RegistrationData, photoUrl: string | null = null) {
@@ -45,6 +46,7 @@ export async function submitRegistration(data: RegistrationData, photoUrl: strin
     lunch_thursday: data.lunchThursday,
     lunch_friday: data.lunchFriday,
     lunch_saturday: data.lunchSaturday,
+    lunch_saturday_no_pickles: data.lunchSaturdayNoPickles,
     // Lunch plans are now captured at registration, so mark the form as filled.
     // (Admins still toggle this manually for legacy/Google-Form registrants.)
     lunch_form_filled: true,

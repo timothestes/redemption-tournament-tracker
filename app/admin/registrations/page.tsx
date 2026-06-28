@@ -33,6 +33,7 @@ interface Registration {
   lunch_thursday: boolean;
   lunch_friday: boolean;
   lunch_saturday: boolean;
+  lunch_saturday_no_pickles: boolean;
   lunch_form_filled: boolean;
   created_at: string;
 }
@@ -244,6 +245,7 @@ export default function AdminRegistrationsPage() {
       lunch_thursday: editingRegistration.lunch_thursday,
       lunch_friday: editingRegistration.lunch_friday,
       lunch_saturday: editingRegistration.lunch_saturday,
+      lunch_saturday_no_pickles: editingRegistration.lunch_saturday_no_pickles,
       lunch_form_filled: editingRegistration.lunch_form_filled,
     });
 
@@ -409,7 +411,7 @@ export default function AdminRegistrationsPage() {
   // Toggle a lunch field with an optimistic update (mirrors the Paid toggle)
   const toggleLunchField = (
     reg: Registration,
-    field: LunchDayField | "lunch_form_filled"
+    field: LunchDayField | "lunch_saturday_no_pickles" | "lunch_form_filled"
   ) => {
     const newValue = !reg[field];
     setRegistrations(prev => prev.map(r => (r.id === reg.id ? { ...r, [field]: newValue } : r)));
@@ -602,6 +604,7 @@ export default function AdminRegistrationsPage() {
       "Lunch Thursday",
       "Lunch Friday",
       "Lunch Saturday",
+      "Saturday No Pickles",
       "Lunch Form Filled",
       "Has Photo",
       "Paid",
@@ -627,6 +630,7 @@ export default function AdminRegistrationsPage() {
       yesNo(reg.lunch_thursday),
       yesNo(reg.lunch_friday),
       yesNo(reg.lunch_saturday),
+      reg.lunch_saturday ? yesNo(reg.lunch_saturday_no_pickles) : "",
       yesNo(reg.lunch_form_filled),
       yesNo(reg.photo_url !== null),
       yesNo(reg.paid),
@@ -956,6 +960,54 @@ export default function AdminRegistrationsPage() {
             </div>
           </div>
 
+          {/* Lunch Order Summary — the instant "what to order" view, computed live
+              from the registrants currently shown (clear filters to count everyone). */}
+          {!loading && filteredRegistrations.length > 0 && (() => {
+            const { thursday, friday, saturday } = NATIONALS_CONFIG.lunchPrices;
+            const thuCount = filteredRegistrations.filter((r) => r.lunch_thursday).length;
+            const friCount = filteredRegistrations.filter((r) => r.lunch_friday).length;
+            const satCount = filteredRegistrations.filter((r) => r.lunch_saturday).length;
+            const satNoPickles = filteredRegistrations.filter((r) => r.lunch_saturday && r.lunch_saturday_no_pickles).length;
+            const satWithPickles = satCount - satNoPickles;
+            const totalMeals = thuCount + friCount + satCount;
+            const expected = thuCount * thursday + friCount * friday + satCount * saturday;
+            return (
+              <div className="bg-card border rounded-lg shadow-sm p-6 mb-6">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <h2 className="text-lg font-semibold">🍽 Lunch Order Summary</h2>
+                  <span className="text-xs text-muted-foreground">
+                    Based on {filteredRegistrations.length} {filteredRegistrations.length === 1 ? "registrant" : "registrants"} shown
+                    {filteredRegistrations.length !== registrations.length ? " (filtered)" : ""}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="rounded-lg border border-border p-4">
+                    <p className="text-xs font-medium text-muted-foreground">Thursday · Two hot dogs (${thursday})</p>
+                    <p className="text-3xl font-bold mt-1">{thuCount}</p>
+                    <p className="text-xs text-muted-foreground">meals</p>
+                  </div>
+                  <div className="rounded-lg border border-border p-4">
+                    <p className="text-xs font-medium text-muted-foreground">Friday · Hamburger (${friday})</p>
+                    <p className="text-3xl font-bold mt-1">{friCount}</p>
+                    <p className="text-xs text-muted-foreground">meals</p>
+                  </div>
+                  <div className="rounded-lg border border-border p-4">
+                    <p className="text-xs font-medium text-muted-foreground">Saturday · Chick-fil-A (${saturday})</p>
+                    <p className="text-3xl font-bold mt-1">{satCount}</p>
+                    <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                      <p>{satWithPickles} with pickles</p>
+                      <p className="text-amber-600 dark:text-amber-400">{satNoPickles} no pickles</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-sm">
+                  <span className="font-medium">{totalMeals} total meals</span>
+                  <span className="font-semibold text-primary">~${expected.toFixed(2)} expected</span>
+                </div>
+              </div>
+            );
+          })()}
+
           {loading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
@@ -1132,6 +1184,25 @@ export default function AdminRegistrationsPage() {
                                 </div>
                               ))}
                             </div>
+                            {reg.lunch_saturday && (
+                              <button
+                                type="button"
+                                title="Saturday Chick-fil-A sandwich without pickles"
+                                onClick={() => toggleLunchField(reg, 'lunch_saturday_no_pickles')}
+                                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <span className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all ${
+                                  reg.lunch_saturday_no_pickles ? 'bg-amber-500 border-amber-600' : 'border-border'
+                                }`}>
+                                  {reg.lunch_saturday_no_pickles && (
+                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </span>
+                                No pickles (Sat)
+                              </button>
+                            )}
                             <button
                               type="button"
                               title="Filled out the lunch form (informational)"
@@ -1692,6 +1763,24 @@ export default function AdminRegistrationsPage() {
                           </Label>
                         </div>
                       ))}
+
+                      {editingRegistration.lunch_saturday && (
+                        <div className="flex items-center space-x-3 pl-9">
+                          <button
+                            onClick={() => setEditingRegistration({...editingRegistration, lunch_saturday_no_pickles: !editingRegistration.lunch_saturday_no_pickles})}
+                            className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.lunch_saturday_no_pickles ? 'bg-amber-500 border-amber-600' : 'border-border'}`}
+                          >
+                            {editingRegistration.lunch_saturday_no_pickles && (
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                          <Label className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, lunch_saturday_no_pickles: !editingRegistration.lunch_saturday_no_pickles})}>
+                            Saturday sandwich — no pickles
+                          </Label>
+                        </div>
+                      )}
 
                       <div className="flex items-center space-x-3">
                         <button

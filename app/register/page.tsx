@@ -51,6 +51,7 @@ export default function RegistrationPage() {
     lunchThursday: false,
     lunchFriday: false,
     lunchSaturday: false,
+    lunchSaturdayNoPickles: false,
   });
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -86,6 +87,7 @@ export default function RegistrationPage() {
           lunchThursday: false,
           lunchFriday: false,
           lunchSaturday: false,
+          lunchSaturdayNoPickles: false,
         });
         setPhotoFile(null);
         setPhotoPreview(null);
@@ -332,6 +334,7 @@ export default function RegistrationPage() {
                       lunchThursday: false,
                       lunchFriday: false,
                       lunchSaturday: false,
+                      lunchSaturdayNoPickles: false,
                     });
                     setPhotoFile(null);
                     setPhotoPreview(null);
@@ -608,27 +611,58 @@ export default function RegistrationPage() {
                 ].map((day) => {
                   const fieldKey = day.key as "lunchThursday" | "lunchFriday" | "lunchSaturday";
                   const checked = formData[fieldKey];
+                  const isSaturday = fieldKey === "lunchSaturday";
                   return (
-                    <label key={day.key} className="flex items-center space-x-3 cursor-pointer">
-                      <button
-                        type="button"
-                        role="checkbox"
-                        aria-checked={checked}
-                        onClick={() => setFormData({ ...formData, [fieldKey]: !checked })}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${checked ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-border'}`}
-                      >
-                        {checked && (
-                          <svg className="w-4 h-4 text-white pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </button>
-                      <span className="text-sm font-normal text-foreground">
-                        {day.label} Lunch{" "}
-                        <span className="text-muted-foreground">({day.date})</span>
-                        {" — "}${day.price}
-                      </span>
-                    </label>
+                    <div key={day.key} className="space-y-2">
+                      <label className="flex items-center space-x-3 cursor-pointer">
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={checked}
+                          onClick={() => setFormData({ ...formData, [fieldKey]: !checked, ...(isSaturday && checked ? { lunchSaturdayNoPickles: false } : {}) })}
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${checked ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-border'}`}
+                        >
+                          {checked && (
+                            <svg className="w-4 h-4 text-white pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                        <span className="text-sm font-normal text-foreground">
+                          {day.label} Lunch{" "}
+                          <span className="text-muted-foreground">({day.date})</span>
+                          {" — "}${day.price}
+                          {isSaturday && (
+                            <span className="text-muted-foreground"> · Chick-fil-A sandwich</span>
+                          )}
+                        </span>
+                      </label>
+                      {isSaturday && checked && (
+                        <div className="ml-9 flex flex-wrap items-center gap-x-5 gap-y-2">
+                          <span className="text-sm text-muted-foreground">Pickles?</span>
+                          {[
+                            { value: false, label: "With pickles" },
+                            { value: true, label: "No pickles" },
+                          ].map((opt) => {
+                            const selected = formData.lunchSaturdayNoPickles === opt.value;
+                            return (
+                              <label key={String(opt.value)} className="flex items-center gap-2 cursor-pointer">
+                                <button
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={selected}
+                                  onClick={() => setFormData({ ...formData, lunchSaturdayNoPickles: opt.value })}
+                                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${selected ? 'border-slate-600 dark:border-slate-400' : 'border-border'}`}
+                                >
+                                  {selected && <span className="w-2 h-2 rounded-full bg-slate-600 dark:bg-slate-400" />}
+                                </button>
+                                <span className="text-sm font-normal text-foreground">{opt.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
                 <p className="text-sm text-muted-foreground pt-1">
