@@ -3,8 +3,29 @@
  */
 
 /**
+ * Opens printable HTML in a new tab and lets the user print it reliably.
+ *
+ * We deliberately avoid `window.open('') + document.write()`: Chromium treats that
+ * popup as the initial about:blank document and can discard the written DOM a moment
+ * later (the tab goes blank ~2s after Print) and/or snapshot an unsettled document
+ * when Print is pressed (blank printout). Loading the HTML through a Blob URL yields a
+ * real, committed document, so both the on-screen page and the printout render.
+ */
+const openPrintWindow = (html: string): void => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups for this site to print');
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  printWindow.location.href = url;
+  // Release the blob once the document has had time to load.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+};
+
+/**
  * Prints the final standings of a tournament in a printer-friendly format
- * 
+ *
  * @param participants - Array of participant objects containing ranking information
  * @param tournamentName - Name of the tournament
  * @returns void - Opens a new window with printable content
@@ -13,14 +34,7 @@ export const printFinalStandings = (
   participants: any[],
   tournamentName?: string | null,
 ): void => {
-  // Create a printable version of the standings
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Please allow popups for this site to print standings');
-    return;
-  }
-  
-  const pageTitle = tournamentName 
+  const pageTitle = tournamentName
     ? `${tournamentName} - Final Standings`
     : `Final Tournament Standings`;
   
@@ -61,11 +75,11 @@ export const printFinalStandings = (
         </style>
       </head>
       <body>
-        <img src="/lightmode_redemptionccgapp.webp" alt="RedemptionCCG App Logo" class="logo" />
+        <img src="${window.location.origin}/lightmode_redemptionccgapp.webp" alt="RedemptionCCG App Logo" class="logo" />
         <h1>${pageTitle}</h1>
         <button onclick="window.print();return false;" style="padding:10px 20px; margin:10px 0; background:#4a90e2; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
   `;
-  
+
   // Add standings table
   if (sortedParticipants && sortedParticipants.length > 0) {
     printContent += `
@@ -128,10 +142,8 @@ export const printFinalStandings = (
       </body>
     </html>
   `;
-  
-  // Write to the new window and close the document writing
-  printWindow.document.write(printContent);
-  printWindow.document.close();
+
+  openPrintWindow(printContent);
 };
 
 /**
@@ -151,14 +163,7 @@ export const printTournamentPairings = (
   startingTableNumber: number = 1,
   tournamentName?: string | null
 ): void => {
-  // Create a printable version of the pairings that only shows essential info
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Please allow popups for this site to print pairings');
-    return;
-  }
-  
-  const pageTitle = tournamentName 
+  const pageTitle = tournamentName
     ? `${tournamentName} - Round ${roundNumber} Pairings`
     : `Round ${roundNumber} Pairings`;
   
@@ -182,11 +187,11 @@ export const printTournamentPairings = (
         </style>
       </head>
       <body>
-        <img src="/lightmode_redemptionccgapp.webp" alt="RedemptionCCG App Logo" class="logo" />
+        <img src="${window.location.origin}/lightmode_redemptionccgapp.webp" alt="RedemptionCCG App Logo" class="logo" />
         <h1>${pageTitle}</h1>
         <button onclick="window.print();return false;" style="padding:10px 20px; margin:10px 0; background:#4a90e2; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
   `;
-  
+
   // Add matches table
   if (matches && matches.length > 0) {
     printContent += `
@@ -249,10 +254,8 @@ export const printTournamentPairings = (
       </body>
     </html>
   `;
-  
-  // Write to the new window and close the document writing
-  printWindow.document.write(printContent);
-  printWindow.document.close();
+
+  openPrintWindow(printContent);
 };
 
 /**
@@ -270,13 +273,7 @@ export const printMatchSlips = (
   startingTableNumber: number = 1,
   tournamentName?: string | null
 ): void => {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Please allow popups for this site to print match slips');
-    return;
-  }
-  
-  const pageTitle = tournamentName 
+  const pageTitle = tournamentName
     ? `${tournamentName} - Round ${roundNumber} Match Slips`
     : `Round ${roundNumber} Match Slips`;
   
@@ -486,8 +483,6 @@ export const printMatchSlips = (
       </body>
     </html>
   `;
-  
-  // Write to the new window and close the document writing
-  printWindow.document.write(printContent);
-  printWindow.document.close();
+
+  openPrintWindow(printContent);
 };

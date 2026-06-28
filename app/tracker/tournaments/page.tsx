@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Breadcrumb from "../../../components/ui/breadcrumb";
 import { createClient } from "../../../utils/supabase/client";
+import { getUserSafe } from "../../../utils/supabase/getUserSafe";
 import ToastNotification from "../../../components/ui/toast-notification";
 import { Button } from "../../../components/ui/button";
 import { HiPencil, HiTrash, HiPlus, HiOutlineDesktopComputer } from "react-icons/hi";
@@ -14,6 +15,7 @@ const supabase = createClient();
 function TournamentsPageInner() {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sessionError, setSessionError] = useState(false);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddTournamentModalOpen, setisAddTournamentModalOpen] =
@@ -39,6 +41,22 @@ function TournamentsPageInner() {
       setisAddTournamentModalOpen(true);
     }
   }, [searchParams]);
+
+  // Recover automatically when the session comes back (e.g. token refreshed),
+  // and surface the session-expired state if the user gets signed out.
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        fetchTournaments();
+      } else if (event === "SIGNED_OUT") {
+        setSessionError(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAddTournament = async (name: string) => {
     try {
@@ -80,6 +98,21 @@ function TournamentsPageInner() {
   };
 
   const fetchTournaments = async () => {
+    // Verify the session first. The tournaments list is scoped entirely by the
+    // RLS policy (auth.uid() = host_id), so a missing/expired token makes the
+    // query return zero rows with no error — which would otherwise render as a
+    // silent "No tournaments found". getUserSafe refreshes the token if it can
+    // (self-heals a transient hiccup) and, crucially, keeps the session on a
+    // network blip — so flaky venue wifi doesn't trigger a false "session
+    // expired"; it only returns null when the server truly rejects the session.
+    const user = await getUserSafe(supabase);
+    if (!user) {
+      setSessionError(true);
+      setLoading(false);
+      return;
+    }
+    setSessionError(false);
+
     const { data: tournaments, error } = await supabase
       .from("tournaments")
       .select("*")
@@ -158,6 +191,16 @@ function TournamentsPageInner() {
         </div>
         {loading ? (
           <p>Loading tournaments...</p>
+        ) : sessionError ? (
+          <div className="rounded-lg border border-border bg-card px-4 py-6 text-center space-y-3">
+            <p className="font-medium text-foreground">Your session expired</p>
+            <p className="text-sm text-muted-foreground">
+              We couldn&apos;t verify your sign-in, so your tournaments
+              can&apos;t load right now. Don&apos;t worry — none of your data is
+              lost. Reload to sign back in.
+            </p>
+            <Button onClick={() => window.location.reload()}>Reload</Button>
+          </div>
         ) : tournaments.length === 0 ? (
           <p className="text-muted-foreground">No tournaments found.</p>
         ) : (

@@ -4,6 +4,7 @@ import { Button } from "./button";
 import { Pencil } from "lucide-react";
 import { Dispatch, FormEvent, SetStateAction, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
+import { getUserSafe } from "../../utils/supabase/getUserSafe";
 import { Dialog, DialogContent } from "./dialog";
 
 export default function MatchEditModal({
@@ -165,6 +166,16 @@ export default function MatchEditModal({
     }
     const client = createClient();
 
+    // A read/write failure mid-round is most often a dead/expired session (the
+    // owner-scoped RLS query returns no row). getUserSafe distinguishes that
+    // (returns null) from a transient network blip (keeps the session), so flaky
+    // venue wifi shows a generic retry message rather than a false "session
+    // expired"; it also refreshes the token if it still can, enabling recovery
+    // on retry.
+    const sessionExpiredMessage =
+      "Your session expired — reload the page to sign back in, then re-enter the score.";
+    const hasValidSession = async () => !!(await getUserSafe(client));
+
     const player1 = await client
       .from("participants")
       .select("differential, match_points, id")
@@ -178,6 +189,11 @@ export default function MatchEditModal({
 
     if (player1.error || player2.error) {
       console.log(player1.error, player2.error);
+      setError(
+        (await hasValidSession())
+          ? "Couldn't load player data. Please try again."
+          : sessionExpiredMessage,
+      );
       return;
     }
 
@@ -234,7 +250,11 @@ export default function MatchEditModal({
       setOpen(false);
     } else {
       console.log(error);
-      setError("Failed to save match scores. Please try again.");
+      setError(
+        (await hasValidSession())
+          ? "Failed to save match scores. Please try again."
+          : sessionExpiredMessage,
+      );
       return;
     }
 
