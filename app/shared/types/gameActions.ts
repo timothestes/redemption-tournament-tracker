@@ -22,6 +22,11 @@ export interface CountPromptRequest {
   title: string;
   cardName: string;
   defaultCount: number;
+  // Upper bound for the chosen count (e.g. Angel of the Harvest's "limit 7").
+  // When set, the stepper/input clamp to this and the confirmed value is capped.
+  maxCount?: number;
+  // Verb shown on the confirm button — "Draw 3", "Look at 3". Defaults to "Draw".
+  confirmVerb?: string;
   onConfirm: (count: number) => void;
   onCancel: () => void;
 }

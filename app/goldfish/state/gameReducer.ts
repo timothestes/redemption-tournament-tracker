@@ -1473,12 +1473,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return shuffleAndDrawInState(state, source.ownerId, ability.shuffleCount, ability.drawCount, history);
         case 'reveal_own_deck':
         case 'look_at_own_deck':
+        case 'look_at_own_deck_choose':
         case 'look_at_opponent_deck':
         case 'reveal_opponent_deck':
         case 'discard_opponent_deck':
         case 'reserve_opponent_deck':
           // Modal-driven or opponent-required — GoldfishCanvas intercepts, or
-          // the effect is multiplayer-only. No-op here.
+          // the effect is multiplayer-only. No-op here. (look_at_own_deck_choose
+          // is opened via the count prompt → executeCardAbilityWithCount path.)
           return state;
         case 'reserve_top_of_deck':
           return reserveTopOfDeckInState(state, source, ability, history);

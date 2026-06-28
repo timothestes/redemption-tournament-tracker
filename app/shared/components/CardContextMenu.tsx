@@ -307,6 +307,18 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
                       },
                       onCancel: () => {},
                     });
+                  } else if (ability.type === 'look_at_own_deck_choose') {
+                    actions.beginCountPrompt?.({
+                      title: `Look at ${ability.position === 'random' ? 'X random' : `${ability.position} X`} cards of deck (limit ${ability.maxCount})`,
+                      cardName: card.cardName,
+                      defaultCount: ability.defaultCount,
+                      maxCount: ability.maxCount,
+                      confirmVerb: 'Look at',
+                      onConfirm: (count) => {
+                        actions.executeCardAbilityWithCount?.(card.instanceId, index, count);
+                      },
+                      onCancel: () => {},
+                    });
                   } else if (ability.type === 'resurrect_heroes') {
                     // The canvas builds the per-player discard pages from its
                     // own state and shows ResurrectHeroesModal.

@@ -1677,6 +1677,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       gameState.stopImitatingLostSoul(sourceInstanceId);
     },
     executeCardAbilityWithCount: (sourceInstanceId, abilityIndex, count) => {
+      // look_at_own_deck_choose is a private, client-side look (like
+      // look_at_own_deck) — open the look modal with the player-chosen count
+      // (capped at the ability limit) instead of routing through the server.
+      const source = findMyCardById(sourceInstanceId);
+      const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
+      if (ability?.type === 'look_at_own_deck_choose') {
+        const n = Math.min(count, ability.maxCount);
+        setLookState({ position: ability.position, count: n });
+        if (source) gameState.logLookAtTop(n, source.cardName, ability.position);
+        return;
+      }
       gameState.executeCardAbilityWithCount(sourceInstanceId, abilityIndex, count);
     },
     beginCountPrompt: (req) => setCountPrompt(req),

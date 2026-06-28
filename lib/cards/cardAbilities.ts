@@ -30,6 +30,11 @@ export type CardAbility = AbilityBase & (
   | { type: 'all_players_shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  // Player-chosen-count variant of look_at_own_deck (e.g. Angel of the Harvest's
+  // "look at top X, limit 7"). The menu opens a count prompt seeded with
+  // defaultCount and capped at maxCount; like look_at_own_deck it's modal-driven
+  // client-side (intercepted in the canvas, never routed through the reducer).
+  | { type: 'look_at_own_deck_choose'; position: 'top' | 'bottom' | 'random'; defaultCount: number; maxCount: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reveal_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'discard_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
@@ -68,7 +73,7 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'The Accumulator (GoC)':                               [{ type: 'spawn_token', tokenName: 'Wicked Spirit Token', count: 7 }],
   'The Proselytizers (GoC)':                             [{ type: 'spawn_token', tokenName: 'Proselyte Token' }],
   'The Church of Christ (GoC)':                          [{ type: 'spawn_token', tokenName: 'Follower Token' }],
-  'Angel of the Harvest (GoC)':                          [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }, { type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'Angel of the Harvest (GoC)':                          [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }, { type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }],
   'The Heavenly Host (GoC)':                             [{ type: 'spawn_token', tokenName: 'Heavenly Host Token', cyclingTokenNames: ['Heavenly Host Token (Blue)', 'Heavenly Host Token (Purple)', 'Heavenly Host Token (Silver)'], cyclingAllowedUsers: ['jaychambers'] }],
   'Kingdom of the Divine':                               [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
   'Kingdom of the Divine [T2C AB]':                      [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
@@ -462,6 +467,10 @@ export function abilityLabel(a: CardAbility): string {
     case 'look_at_own_deck': {
       const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
       return `Look at ${where} card${a.count === 1 ? '' : 's'} of deck`;
+    }
+    case 'look_at_own_deck_choose': {
+      const where = a.position === 'random' ? 'X random' : `${a.position} X`;
+      return `Look at ${where} cards of deck…`;
     }
     case 'look_at_opponent_deck': {
       const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;

@@ -144,6 +144,42 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const [countPrompt, setCountPrompt] = useState<CountPromptRequest | null>(null);
   const [resurrectReq, setResurrectReq] = useState<{ sourceInstanceId: string; abilityIndex: number } | null>(null);
 
+  // Opens the "look at / reveal top N" peek modal for an own-deck inspection
+  // ability. Shared by the fixed-count path (look_at_own_deck / reveal_own_deck)
+  // and the player-chosen-count path (look_at_own_deck_choose). requestedCount is
+  // clamped to the deck size here; the choose path caps it to the ability limit
+  // before calling. setPeekState is a stable useState setter — intentionally
+  // omitted from the deps to avoid a TDZ access (it's declared further down).
+  const openOwnDeckPeek = useCallback(
+    (position: 'top' | 'bottom' | 'random', requestedCount: number, source: GameCard | undefined) => {
+      const deck = state.zones.deck;
+      if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+      const n = Math.min(requestedCount, deck.length);
+      let ids: string[];
+      let title: string;
+      if (position === 'top') {
+        ids = deck.slice(0, n).map(c => c.instanceId);
+        title = `Top ${n} of Deck`;
+      } else if (position === 'bottom') {
+        ids = deck.slice(-n).map(c => c.instanceId);
+        title = `Bottom ${n} of Deck`;
+      } else {
+        const shuffled = [...deck];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        ids = shuffled.slice(0, n).map(c => c.instanceId);
+        title = `Random ${n} from Deck`;
+      }
+      // (Star) abilities fired from hand — flash the source card so the implicit
+      // "reveal from hand" cost is visible (parity with multiplayer behavior).
+      if (source && source.zone === 'hand') revealCardInHand(source.instanceId);
+      setPeekState({ cardIds: ids, title });
+    },
+    [state.zones, revealCardInHand],
+  );
+
   // Adapter: bridge goldfish game context to shared GameActions interface
   const goldfishActions: GameActions = useMemo(() => ({
     moveCard: (cardId, toZone, posX, posY) => moveCard(cardId, toZone as ZoneId, undefined, posX !== undefined ? Number(posX) : undefined, posY !== undefined ? Number(posY) : undefined),
@@ -173,31 +209,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       }
       const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
       if (ability?.type === 'reveal_own_deck' || ability?.type === 'look_at_own_deck') {
-        const deck = state.zones.deck;
-        if (deck.length === 0) { showGameToast('Deck is empty'); return; }
-        const n = Math.min(ability.count, deck.length);
-        let ids: string[];
-        let title: string;
-        if (ability.position === 'top') {
-          ids = deck.slice(0, n).map(c => c.instanceId);
-          title = `Top ${n} of Deck`;
-        } else if (ability.position === 'bottom') {
-          ids = deck.slice(-n).map(c => c.instanceId);
-          title = `Bottom ${n} of Deck`;
-        } else {
-          const shuffled = [...deck];
-          for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-          }
-          ids = shuffled.slice(0, n).map(c => c.instanceId);
-          title = `Random ${n} from Deck`;
-        }
-        // (Star) abilities fired from hand — flash the source card so the
-        // implicit "reveal from hand" cost is visible. Goldfish is single
-        // player; matters mostly for parity with multiplayer behavior.
-        if (source && source.zone === 'hand') revealCardInHand(cardId);
-        setPeekState({ cardIds: ids, title });
+        openOwnDeckPeek(ability.position, ability.count, source);
         return;
       }
       // Non-modal abilities fired from hand still flash the source so the
@@ -216,11 +228,24 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     },
     beginTargeting: (req) => setTargeting(req),
     executeCardAbilityWithCount: (cardId, abilityIndex, count) => {
+      // look_at_own_deck_choose is modal-driven client-side (like look_at_own_deck) —
+      // open the peek modal with the player-chosen count (capped at the ability
+      // limit) instead of routing the count through the reducer.
+      let source: GameCard | undefined;
+      for (const zone of Object.values(state.zones)) {
+        const found = zone.find(c => c.instanceId === cardId);
+        if (found) { source = found; break; }
+      }
+      const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
+      if (ability?.type === 'look_at_own_deck_choose') {
+        openOwnDeckPeek(ability.position, Math.min(count, ability.maxCount), source);
+        return;
+      }
       dispatch(gameActionCreators.executeCardAbilityWithCount(cardId, abilityIndex, count));
     },
     beginCountPrompt: (req) => setCountPrompt(req),
     beginResurrectPrompt: (sourceInstanceId, abilityIndex) => setResurrectReq({ sourceInstanceId, abilityIndex }),
-  }), [moveCard, moveCardsBatch, flipCard, revealCardInHand, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones, dispatch]);
+  }), [moveCard, moveCardsBatch, flipCard, revealCardInHand, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, openOwnDeckPeek, state.zones, dispatch]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({

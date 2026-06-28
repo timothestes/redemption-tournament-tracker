@@ -24,9 +24,12 @@ export function CountPromptDialog({ req }: CountPromptDialogProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [req]);
 
+  const max = req.maxCount ?? Infinity;
+  const verb = req.confirmVerb ?? 'Draw';
+
   const confirm = () => {
     if (count < 1 || !Number.isFinite(count)) return;
-    req.onConfirm(Math.floor(count));
+    req.onConfirm(Math.min(max, Math.floor(count)));
   };
 
   return (
@@ -79,10 +82,11 @@ export function CountPromptDialog({ req }: CountPromptDialogProps) {
             ref={inputRef}
             type="number"
             min={1}
+            max={Number.isFinite(max) ? max : undefined}
             value={Number.isFinite(count) ? count : ''}
             onChange={(e) => {
               const v = parseInt(e.target.value, 10);
-              setCount(Number.isFinite(v) ? v : NaN);
+              setCount(Number.isFinite(v) ? Math.min(max, v) : NaN);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') confirm();
@@ -100,7 +104,7 @@ export function CountPromptDialog({ req }: CountPromptDialogProps) {
             }}
           />
           <button
-            onClick={() => setCount((c) => (Number.isFinite(c) ? c + 1 : 1))}
+            onClick={() => setCount((c) => Math.min(max, Number.isFinite(c) ? c + 1 : 1))}
             style={stepBtnStyle}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
@@ -132,7 +136,7 @@ export function CountPromptDialog({ req }: CountPromptDialogProps) {
             }}
             onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
           >
-            Draw {Number.isFinite(count) && count >= 1 ? count : ''}
+            {verb} {Number.isFinite(count) && count >= 1 ? Math.min(max, count) : ''}
           </button>
         </div>
       </div>
