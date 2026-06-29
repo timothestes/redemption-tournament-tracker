@@ -219,10 +219,11 @@
   .tourn-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
   .tourn-block {
     flex: 0 0 auto; width: calc(33.333% - 6px);
-    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 6px 22px;
+    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 8px 22px;
     border-left: 3px solid var(--teal-light); position: relative;
-    cursor: default; transition: box-shadow 0.15s;
+    cursor: pointer; transition: box-shadow 0.15s;
   }
+  .tourn-block:hover { box-shadow: 0 0 0 2px var(--teal); }
   .tourn-block.dragging { opacity: 0.4; }
   .tourn-block-drag-handle {
     position: absolute; top: 6px; left: 4px; width: 14px; text-align: center;
@@ -231,6 +232,26 @@
   .tourn-block-drag-handle:hover { color: var(--teal-dark); }
   .tourn-block-has-results { border-left-color: var(--teal) !important; }
   .tourn-block .tourn-remove-btn { position: absolute; top: 6px; right: 6px; }
+  /* Tile content */
+  .tourn-tile { display: flex; flex-direction: column; justify-content: center; min-height: 60px; }
+  .tourn-tile-add {
+    align-items: center; justify-content: center; display: flex;
+    color: var(--teal); font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 15px; letter-spacing: 0.5px; gap: 4px; min-height: 60px;
+  }
+  .tourn-tile-add::before { content: '+'; font-size: 20px; line-height: 1; }
+  .tourn-tile-name {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px;
+    letter-spacing: 0.3px; color: var(--teal-dark); text-transform: uppercase;
+    margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tourn-tile-meta { font-size: 11px; color: #fff; line-height: 1.4; }
+  .tourn-tile-results-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--teal); margin-left: 5px; vertical-align: middle;
+  }
+  body.dark-mode .tourn-tile-name { color: var(--teal); }
+  body.dark-mode .tourn-tile-meta { color: #fff; }
 
   .tourn-name-input {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
@@ -287,16 +308,42 @@
   #tourn-results-editor-modal {
     background: #fff; border-radius: 8px; width: 100%; max-width: 680px;
     max-height: 90vh; overflow-y: auto; position: relative;
+    display: flex; flex-direction: column;
   }
   #tre-header {
     background: var(--teal-dark); border-radius: 8px 8px 0 0;
     padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
   }
   #tre-title {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 16px;
     color: #fff; letter-spacing: 0.5px;
   }
-  #tre-body { padding: 14px 16px 18px; }
+  #tre-fields {
+    padding: 14px 16px 10px; border-bottom: 2px solid var(--teal-light);
+    display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
+  }
+  .tre-fields-row { display: flex; gap: 10px; }
+  .tre-field-wrap { display: flex; flex-direction: column; flex: 1; }
+  .tre-field-wrap.tre-field-sm { flex: 0 0 70px; }
+  .tre-field-wrap.tre-field-state { flex: 0 0 60px; }
+  .tre-field-wrap.tre-field-city { flex: 1; }
+  .tre-field-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 10px;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal); margin-bottom: 3px;
+  }
+  .tre-field-input {
+    border: 1px solid var(--teal-light); border-radius: 4px; padding: 6px 8px;
+    font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--text);
+    background: var(--gray-light); outline: none; width: 100%;
+  }
+  .tre-field-input:focus { border-color: var(--teal); }
+  #tre-results-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--teal-dark);
+    padding: 10px 16px 0; flex-shrink: 0;
+  }
+  #tre-body { padding: 8px 16px 18px; }
   .tre-format-block { margin-bottom: 16px; }
   .tre-format-block:last-child { margin-bottom: 0; }
   .tre-format-label {
@@ -416,7 +463,12 @@
   /* dark mode for new modals */
   body.dark-mode #tourn-results-editor-modal,
   body.dark-mode #tourn-results-display-modal,
-  body.dark-mode #mtf-modal { background: var(--white); }
+  body.dark-mode #mtf-modal { background: var(--teal-dark); }
+  body.dark-mode #tre-fields { border-bottom-color: rgba(255,255,255,0.08); }
+  body.dark-mode #tre-results-label { color: var(--teal-mid); }
+  body.dark-mode .tre-field-label { color: var(--teal-mid); }
+  body.dark-mode .tre-field-input { background: rgba(255,255,255,0.07); color: var(--text); border-color: rgba(255,255,255,0.15); }
+  body.dark-mode .tre-field-input:focus { border-color: var(--teal-mid); }
   body.dark-mode .tre-format-label,
   body.dark-mode .trd-format-label { color: var(--teal-mid); border-bottom-color: rgba(255,255,255,0.1); }
   body.dark-mode .tre-player-input { color: var(--text); }
@@ -495,26 +547,124 @@
   .deadline-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
   .deadline-pill {
     display: flex; align-items: center; gap: 6px; background: var(--gray-light);
-    border-radius: 20px; padding: 4px 6px 4px 12px; font-size: 11px;
+    border-radius: 20px; padding: 5px 8px 5px 14px; font-size: 11px;
+    cursor: pointer; border: 1px solid transparent; transition: border-color 0.15s;
+    position: relative;
   }
-  .deadline-pill input.dp-label {
-    border: none; background: transparent; font-weight: 600; font-size: 11px;
-    width: 130px; color: var(--text); outline: none;
+  .deadline-pill:hover { border-color: var(--teal); }
+  .deadline-pill-add {
+    color: var(--teal); font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 12px; letter-spacing: 0.3px;
   }
-  .deadline-pill input.dp-label::placeholder { color: var(--placeholder); font-style: italic; font-weight: 400; }
-  .deadline-pill input.dp-date {
-    border: none; background: #fff; border-radius: 12px; font-size: 10px;
-    padding: 2px 6px; color: var(--teal-dark); outline: none;
+  .deadline-pill-label {
+    font-weight: 600; font-size: 11px; color: var(--text); white-space: nowrap;
+  }
+  .deadline-pill-date {
+    background: #fff; border-radius: 12px; font-size: 10px;
+    padding: 2px 7px; color: var(--teal-dark); white-space: nowrap; flex-shrink: 0;
   }
   .deadline-pill .rtn-row-remove { flex-shrink: 0; }
+  body.dark-mode .deadline-pill { background: rgba(255,255,255,0.07); }
+  body.dark-mode .deadline-pill:hover { border-color: var(--teal-mid); }
+  body.dark-mode .deadline-pill-label { color: var(--text); }
+  body.dark-mode .deadline-pill-date { background: var(--teal-dark); color: var(--teal-mid); }
+
+  /* Deadline edit/view modal */
+  #dl-modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1050;
+    background: rgba(2,30,28,0.65); align-items: center; justify-content: center; padding: 20px;
+  }
+  #dl-modal-overlay.open { display: flex; }
+  #dl-modal {
+    background: #fff; border-radius: 8px; padding: 0;
+    min-width: 420px; max-width: min(720px, 95vw); width: max-content;
+    max-height: 90vh; overflow-y: auto; position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.28); display: flex; flex-direction: column;
+  }
+  #dl-modal-header {
+    background: var(--teal-dark); padding: 14px 18px 12px; border-radius: 8px 8px 0 0;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  #dl-modal-header-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 16px;
+    letter-spacing: 0.5px; color: #fff; text-transform: uppercase;
+  }
+  #dl-modal-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .dl-modal-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
+    color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;
+  }
+  /* Edit mode fields */
+  #dl-edit-section .dl-modal-label { color: var(--teal); }
+  .dl-edit-input {
+    width: 100%; font-family: 'Barlow', sans-serif; font-size: 13px;
+    padding: 7px 10px; border: 1px solid var(--teal-light); border-radius: 4px;
+    color: var(--text); background: var(--gray-light); outline: none;
+  }
+  .dl-edit-input:focus { border-color: var(--teal); }
+  #dl-edit-notes-wrap { border: 1px solid var(--teal-light); border-radius: 4px; overflow: hidden; }
+  #dl-edit-bullet-editor {
+    width: 100%; min-height: 140px; border: none; outline: none;
+    font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--text);
+    padding: 10px 12px; line-height: 1.7; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word; cursor: text; box-sizing: border-box;
+    background: var(--gray-light);
+  }
+  #dl-edit-bullet-editor .bn-line { display: block; min-height: 1.7em; }
+  #dl-edit-bullet-editor .bn-line::before { display: inline-block; width: 1.2em; }
+  #dl-edit-bullet-editor .bn-l0::before { content: '•'; }
+  #dl-edit-bullet-editor .bn-l1 { padding-left: 20px; }
+  #dl-edit-bullet-editor .bn-l1::before { content: '–'; color: var(--gray); }
+  #dl-edit-bullet-editor .bn-l2 { padding-left: 40px; }
+  #dl-edit-bullet-editor .bn-l2::before { content: '◦'; color: var(--gray); }
+  #dl-edit-notes-hint {
+    font-size: 10px; color: var(--gray); font-style: italic;
+    padding: 4px 12px 6px; background: var(--gray-light); border-top: 1px solid var(--teal-light);
+  }
+  /* View mode fields */
+  #dl-view-section { display: none; }
+  #dl-view-name {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 18px;
+    color: var(--teal-dark); text-transform: uppercase; margin-bottom: 2px;
+  }
+  #dl-view-date { font-size: 12px; color: var(--teal); font-weight: 600; margin-bottom: 10px; }
+  #dl-view-notes-list { margin: 0; padding-left: 18px; list-style: none; }
+  #dl-view-notes-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 6px; word-break: break-word; white-space: pre-wrap; max-width: 680px; }
+  #dl-view-notes-list li.bullet-l0::before { content: '•'; margin-right: 6px; }
+  #dl-view-notes-list li.bullet-l1 { padding-left: 20px; }
+  #dl-view-notes-list li.bullet-l1::before { content: '–'; margin-right: 6px; color: var(--gray); }
+  #dl-view-notes-list li.bullet-l2 { padding-left: 40px; }
+  #dl-view-notes-list li.bullet-l2::before { content: '◦'; margin-right: 6px; color: var(--gray); }
+  #dl-view-notes-empty { font-size: 12px; color: var(--placeholder); font-style: italic; }
+  #dl-modal-footer {
+    padding: 12px 18px; border-top: 1px solid var(--teal-light);
+    display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0;
+  }
+  body.dark-mode #dl-modal { background: var(--teal-dark); }
+  body.dark-mode .dl-modal-label { color: var(--teal-mid); }
+  body.dark-mode #dl-edit-section .dl-modal-label { color: var(--teal-mid); }
+  body.dark-mode .dl-edit-input { background: rgba(255,255,255,0.07); color: var(--text); border-color: rgba(255,255,255,0.15); }
+  body.dark-mode .dl-edit-input:focus { border-color: var(--teal-mid); }
+  body.dark-mode #dl-edit-notes-wrap { border-color: rgba(255,255,255,0.15); }
+  body.dark-mode #dl-edit-bullet-editor { background: rgba(255,255,255,0.05); color: var(--text); }
+  body.dark-mode #dl-edit-notes-hint { background: rgba(255,255,255,0.04); border-top-color: rgba(255,255,255,0.1); color: var(--placeholder); }
+  body.dark-mode #dl-modal-footer { border-top-color: rgba(255,255,255,0.08); }
+  body.dark-mode #dl-view-name { color: var(--teal-mid); }
+  body.dark-mode #dl-view-date { color: var(--teal-mid); }
+  body.dark-mode #dl-view-notes-list li { color: rgba(255,255,255,0.9); }
+  body.dark-mode #dl-view-notes-list li.bullet-l1::before,
+  body.dark-mode #dl-view-notes-list li.bullet-l2::before { color: var(--teal-mid); }
+  body.dark-mode #dl-view-notes-empty { color: var(--placeholder); }
 
   /* Road to Nationals: event cards */
   .event-cards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
   .event-card {
     flex: 0 0 auto; width: calc(33.333% - 6px);
-    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 6px 22px;
-    border-left: 3px solid var(--teal); position: relative;
+    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 8px 22px;
+    border-left: 3px solid var(--teal); position: relative; cursor: pointer;
+    transition: box-shadow 0.15s;
   }
+  .event-card:hover { box-shadow: 0 0 0 2px var(--teal); }
   .event-card.dragging { opacity: 0.4; }
   .event-card-drag-handle {
     position: absolute; top: 6px; left: 4px; width: 14px; text-align: center;
@@ -522,22 +672,85 @@
   }
   .event-card-drag-handle:hover { color: var(--teal-dark); }
   .event-card .rtn-row-remove { position: absolute; top: 6px; right: 6px; }
-  .event-card input.ec-name {
+  /* Tile content */
+  .se-tile { display: flex; flex-direction: column; justify-content: center; min-height: 52px; }
+  .se-tile-add {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--teal); font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 15px; letter-spacing: 0.5px; gap: 4px; min-height: 52px;
+  }
+  .se-tile-add::before { content: '+'; font-size: 20px; line-height: 1; }
+  .se-tile-name {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
-    letter-spacing: 0.5px; text-transform: uppercase; color: var(--teal-dark);
-    border: none; background: transparent; width: 85%; margin-bottom: 2px; outline: none;
+    letter-spacing: 0.3px; color: var(--teal-dark); text-transform: uppercase;
+    margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .event-card input.ec-name::placeholder { text-transform: none; font-style: italic; color: var(--placeholder); letter-spacing: normal; font-weight: 400; }
-  .event-card input.ec-host {
-    font-size: 10px; color: var(--gray); border: none; background: transparent;
-    font-style: italic; width: 100%; margin-bottom: 4px; outline: none;
+  .se-tile-host { font-size: 11px; color: #fff; line-height: 1.3; }
+  body.dark-mode .se-tile-name { color: var(--teal); }
+  body.dark-mode .se-tile-host { color: #fff; }
+
+  /* SE edit modal */
+  #se-edit-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1050;
+    background: rgba(2,30,28,0.65); align-items: center; justify-content: center; padding: 20px;
   }
-  .event-card input.ec-host::placeholder { color: var(--placeholder); }
-  .event-card input.ec-desc {
-    font-size: 11px; border: none; background: transparent; width: 100%;
-    border-top: 1px solid #fff; padding-top: 4px; outline: none; color: var(--text);
+  #se-edit-overlay.open { display: flex; }
+  #se-edit-modal {
+    background: #fff; border-radius: 8px; padding: 0;
+    width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+    position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+    display: flex; flex-direction: column;
   }
-  .event-card input.ec-desc::placeholder { color: var(--placeholder); font-style: italic; }
+  #se-edit-header {
+    background: var(--teal-dark); padding: 14px 18px 12px; border-radius: 8px 8px 0 0;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  #se-edit-header-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 16px;
+    letter-spacing: 0.5px; color: #fff; text-transform: uppercase;
+  }
+  #se-edit-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .se-edit-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
+    color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;
+  }
+  .se-edit-input {
+    width: 100%; font-family: 'Barlow', sans-serif; font-size: 13px;
+    padding: 7px 10px; border: 1px solid var(--teal-light); border-radius: 4px;
+    color: var(--text); background: var(--gray-light); outline: none;
+  }
+  .se-edit-input:focus { border-color: var(--teal); }
+  #se-edit-notes-wrap { border: 1px solid var(--teal-light); border-radius: 4px; overflow: hidden; }
+  #se-edit-bullet-editor {
+    width: 100%; min-height: 140px; border: none; outline: none;
+    font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--text);
+    padding: 10px 12px; line-height: 1.7; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word; cursor: text; box-sizing: border-box;
+    background: var(--gray-light);
+  }
+  #se-edit-bullet-editor .bn-line { display: block; min-height: 1.7em; }
+  #se-edit-bullet-editor .bn-line::before { display: inline-block; width: 1.2em; }
+  #se-edit-bullet-editor .bn-l0::before { content: '•'; }
+  #se-edit-bullet-editor .bn-l1 { padding-left: 20px; }
+  #se-edit-bullet-editor .bn-l1::before { content: '–'; color: var(--gray); }
+  #se-edit-bullet-editor .bn-l2 { padding-left: 40px; }
+  #se-edit-bullet-editor .bn-l2::before { content: '◦'; color: var(--gray); }
+  #se-edit-notes-hint {
+    font-size: 10px; color: var(--gray); font-style: italic;
+    padding: 4px 12px 6px; background: var(--gray-light); border-top: 1px solid var(--teal-light);
+  }
+  #se-edit-footer {
+    padding: 12px 18px; border-top: 1px solid var(--teal-light);
+    display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0;
+  }
+  body.dark-mode #se-edit-modal { background: var(--teal-dark); }
+  body.dark-mode .se-edit-label { color: var(--teal-mid); }
+  body.dark-mode .se-edit-input { background: rgba(255,255,255,0.07); color: var(--text); border-color: rgba(255,255,255,0.15); }
+  body.dark-mode .se-edit-input:focus { border-color: var(--teal-mid); }
+  body.dark-mode #se-edit-notes-wrap { border-color: rgba(255,255,255,0.15); }
+  body.dark-mode #se-edit-bullet-editor { background: rgba(255,255,255,0.05); color: var(--text); }
+  body.dark-mode #se-edit-notes-hint { background: rgba(255,255,255,0.04); border-top-color: rgba(255,255,255,0.1); color: var(--placeholder); }
+  body.dark-mode #se-edit-footer { border-top-color: rgba(255,255,255,0.08); }
 
   /* Side event: notes button on card */
   .ec-notes-btn {
@@ -559,7 +772,8 @@
   }
   #se-detail-overlay.open { display: flex; }
   #se-detail-modal {
-    background: #fff; border-radius: 8px; padding: 0; max-width: 420px; width: 100%;
+    background: #fff; border-radius: 8px; padding: 0;
+    min-width: 420px; max-width: min(720px, 95vw); width: max-content;
     max-height: 90vh; overflow-y: auto; overflow-x: hidden; position: relative;
     box-shadow: 0 8px 32px rgba(0,0,0,0.22);
   }
@@ -578,16 +792,19 @@
     font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
     color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
   }
-  #se-detail-notes-list {
-    margin: 0; padding-left: 18px; list-style: disc;
-  }
-  #se-detail-notes-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 3px; word-break: break-word; overflow-wrap: anywhere; }
+  #se-detail-notes-list { margin: 0; padding-left: 18px; list-style: none; }
+  #se-detail-notes-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 6px; word-break: break-word; overflow-wrap: anywhere; white-space: pre-wrap; max-width: 680px; }
+  #se-detail-notes-list li.bullet-l0::before { content: '•'; margin-right: 6px; }
+  #se-detail-notes-list li.bullet-l1 { padding-left: 20px; }
+  #se-detail-notes-list li.bullet-l1::before { content: '–'; margin-right: 6px; color: var(--gray); }
+  #se-detail-notes-list li.bullet-l2 { padding-left: 40px; }
+  #se-detail-notes-list li.bullet-l2::before { content: '◦'; margin-right: 6px; color: var(--gray); }
   #se-detail-notes-empty { font-size: 12px; color: var(--placeholder); font-style: italic; }
-  body.dark-mode #se-detail-modal { background: var(--white); }
-  body.dark-mode #se-detail-name { color: #fff; }
-  body.dark-mode #se-detail-host { color: rgba(255,255,255,0.7); }
+  body.dark-mode #se-detail-modal { background: var(--teal-dark); }
   body.dark-mode #se-detail-notes-label { color: var(--teal-mid); }
-  body.dark-mode #se-detail-notes-list li { color: var(--text); }
+  body.dark-mode #se-detail-notes-list li { color: rgba(255,255,255,0.9); }
+  body.dark-mode #se-detail-notes-list li.bullet-l1::before,
+  body.dark-mode #se-detail-notes-list li.bullet-l2::before { color: var(--teal-mid); }
   body.dark-mode #se-detail-notes-empty { color: var(--placeholder); }
   /* #deck-viewer-panel is permanently dark regardless of mode toggle, but the
      shared .spoiler-modal-close idle-state colors are mode-relative -- without
@@ -601,7 +818,8 @@
   }
   #news-detail-overlay.open { display: flex; }
   #news-detail-modal {
-    background: #fff; border-radius: 8px; padding: 0; max-width: 420px; width: 100%;
+    background: #fff; border-radius: 8px; padding: 0;
+    min-width: 420px; max-width: min(720px, 95vw); width: max-content;
     max-height: 90vh; overflow-y: auto; overflow-x: hidden; position: relative;
     box-shadow: 0 8px 32px rgba(0,0,0,0.22);
   }
@@ -620,15 +838,121 @@
     font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
     color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
   }
-  #news-detail-notes-list { margin: 0; padding-left: 18px; list-style: disc; }
-  #news-detail-notes-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 3px; word-break: break-word; overflow-wrap: anywhere; }
+  #news-detail-notes-list { margin: 0; padding-left: 18px; list-style: none; }
+  #news-detail-notes-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 6px; word-break: break-word; overflow-wrap: anywhere; white-space: pre-wrap; max-width: 680px; }
+  #news-detail-notes-list li.bullet-l0::before { content: '•'; margin-right: 6px; }
+  #news-detail-notes-list li.bullet-l1 { padding-left: 20px; }
+  #news-detail-notes-list li.bullet-l1::before { content: '–'; margin-right: 6px; color: var(--gray); }
+  #news-detail-notes-list li.bullet-l2 { padding-left: 40px; }
+  #news-detail-notes-list li.bullet-l2::before { content: '◦'; margin-right: 6px; color: var(--gray); }
   #news-detail-notes-empty { font-size: 12px; color: var(--placeholder); font-style: italic; }
-  body.dark-mode #news-detail-modal { background: var(--white); }
-  body.dark-mode #news-detail-topic { color: #fff; }
-  body.dark-mode #news-detail-overview { color: rgba(255,255,255,0.7); }
+  body.dark-mode #news-detail-modal { background: var(--teal-dark); }
   body.dark-mode #news-detail-notes-label { color: var(--teal-mid); }
-  body.dark-mode #news-detail-notes-list li { color: var(--text); }
+  body.dark-mode #news-detail-notes-list li { color: rgba(255,255,255,0.9); }
+  body.dark-mode #news-detail-notes-list li.bullet-l1::before,
+  body.dark-mode #news-detail-notes-list li.bullet-l2::before { color: var(--teal-mid); }
   body.dark-mode #news-detail-notes-empty { color: var(--placeholder); }
+
+  /* News card tile (editor) */
+  .news-tile {
+    display: flex; flex-direction: column; justify-content: center;
+    min-height: 72px; cursor: pointer; user-select: none;
+    border-radius: 6px; transition: box-shadow 0.15s;
+  }
+  .news-tile:hover { box-shadow: 0 0 0 2px var(--teal); }
+  .news-tile-add {
+    align-items: center; justify-content: center;
+    color: var(--teal); font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 15px; letter-spacing: 0.5px;
+    gap: 4px;
+  }
+  .news-tile-add::before { content: '+'; font-size: 20px; line-height: 1; }
+  .news-tile-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 14px; letter-spacing: 0.3px; color: var(--teal-dark);
+    text-transform: uppercase; margin-bottom: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .news-tile-desc {
+    font-size: 12px; color: #fff; line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; word-break: break-word;
+  }
+  body.dark-mode .news-tile-title { color: var(--teal); }
+  body.dark-mode .news-tile-desc { color: #fff; }
+
+  /* News edit modal */
+  #news-edit-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1050;
+    background: rgba(2,30,28,0.65); align-items: center; justify-content: center; padding: 20px;
+  }
+  #news-edit-overlay.open { display: flex; }
+  #news-edit-modal {
+    background: #fff; border-radius: 8px; padding: 0;
+    width: 100%; max-width: 560px;
+    max-height: 90vh; overflow-y: auto; position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+    display: flex; flex-direction: column;
+  }
+  #news-edit-header {
+    background: var(--teal-dark); padding: 14px 18px 12px; border-radius: 8px 8px 0 0;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  #news-edit-header-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 16px;
+    letter-spacing: 0.5px; color: #fff; text-transform: uppercase;
+  }
+  #news-edit-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  #news-edit-title-input {
+    width: 100%; font-family: 'Barlow', sans-serif; font-size: 14px;
+    padding: 8px 10px; border: 1px solid var(--teal-light); border-radius: 4px;
+    color: var(--text); background: var(--gray-light); outline: none;
+  }
+  #news-edit-title-input:focus { border-color: var(--teal); }
+  #news-edit-desc-input {
+    width: 100%; font-family: 'Barlow', sans-serif; font-size: 13px;
+    padding: 8px 10px; border: 1px solid var(--teal-light); border-radius: 4px;
+    color: var(--text); background: var(--gray-light); outline: none; resize: none;
+    min-height: 52px; line-height: 1.5;
+  }
+  #news-edit-desc-input:focus { border-color: var(--teal); }
+  .news-edit-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
+    color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;
+  }
+  #news-edit-notes-wrap {
+    border: 1px solid var(--teal-light); border-radius: 4px; overflow: hidden;
+  }
+  #news-edit-bullet-editor {
+    width: 100%; min-height: 160px; border: none; outline: none;
+    font-family: 'Barlow', sans-serif; font-size: 13px; color: #1a2a29;
+    padding: 10px 12px; line-height: 1.7; overflow-y: auto;
+    background-image: repeating-linear-gradient(transparent, transparent calc(1.7em - 1px), #d6f5f3 calc(1.7em - 1px), #d6f5f3 1.7em);
+    white-space: pre-wrap; word-break: break-word; cursor: text; box-sizing: border-box;
+  }
+  #news-edit-bullet-editor .bn-line { display: block; min-height: 1.7em; }
+  #news-edit-bullet-editor .bn-line::before { display: inline-block; width: 1.2em; }
+  #news-edit-bullet-editor .bn-l0::before { content: '•'; }
+  #news-edit-bullet-editor .bn-l1 { padding-left: 20px; }
+  #news-edit-bullet-editor .bn-l1::before { content: '–'; color: var(--gray); }
+  #news-edit-bullet-editor .bn-l2 { padding-left: 40px; }
+  #news-edit-bullet-editor .bn-l2::before { content: '◦'; color: var(--gray); }
+  #news-edit-notes-hint {
+    font-size: 10px; color: var(--gray); font-style: italic;
+    padding: 4px 12px 6px; background: var(--gray-light); border-top: 1px solid var(--teal-light);
+  }
+  #news-edit-footer {
+    padding: 12px 18px; border-top: 1px solid var(--teal-light);
+    display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0;
+  }
+  body.dark-mode #news-edit-modal { background: var(--teal-dark); }
+  body.dark-mode #news-edit-title-input,
+  body.dark-mode #news-edit-desc-input { background: rgba(255,255,255,0.07); color: var(--text); border-color: var(--teal); }
+  body.dark-mode #news-edit-bullet-editor {
+    background: rgba(255,255,255,0.05); color: var(--text);
+    background-image: repeating-linear-gradient(transparent, transparent calc(1.7em - 1px), var(--teal-light) calc(1.7em - 1px), var(--teal-light) 1.7em);
+  }
+  body.dark-mode #news-edit-notes-hint { background: rgba(255,255,255,0.04); }
 
   /* Upcoming Tournaments: pills + detail modal */
   .tournament-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
@@ -890,6 +1214,27 @@
     border-top-color: var(--teal-light);
   }
   body.dark-mode #card-notes-popup-hint { color: var(--placeholder); }
+
+  /* Live bullet editor in card-notes popup */
+  #card-notes-bullet-editor {
+    width: 100%; min-height: 200px; border: none; outline: none;
+    font-family: 'Barlow', sans-serif; font-size: 13px; color: #1a2a29;
+    padding: 14px 16px; line-height: 1.7; overflow-y: auto; resize: vertical;
+    background-image: repeating-linear-gradient(transparent, transparent calc(1.7em - 1px), #d6f5f3 calc(1.7em - 1px), #d6f5f3 1.7em);
+    white-space: pre-wrap; word-break: break-word; cursor: text;
+    box-sizing: border-box;
+  }
+  #card-notes-bullet-editor .bn-line { display: block; min-height: 1.7em; position: relative; }
+  #card-notes-bullet-editor .bn-line::before { display: inline-block; width: 1.2em; }
+  #card-notes-bullet-editor .bn-l0::before { content: '•'; }
+  #card-notes-bullet-editor .bn-l1 { padding-left: 20px; }
+  #card-notes-bullet-editor .bn-l1::before { content: '–'; color: var(--gray); }
+  #card-notes-bullet-editor .bn-l2 { padding-left: 40px; }
+  #card-notes-bullet-editor .bn-l2::before { content: '◦'; color: var(--gray); }
+  body.dark-mode #card-notes-bullet-editor {
+    background: rgba(255,255,255,0.05); color: var(--text);
+    background-image: repeating-linear-gradient(transparent, transparent calc(1.7em - 1px), var(--teal-light) calc(1.7em - 1px), var(--teal-light) 1.7em);
+  }
   #player-registry-overlay {
     display: none; position: fixed; inset: 0; z-index: 1100;
     background: rgba(2,30,28,0.6);
@@ -1203,13 +1548,8 @@
     border-left-color: var(--teal);
   }
   body.dark-mode .tourn-block-has-results { border-left-color: var(--teal-mid) !important; }
-  body.dark-mode .tourn-name-input { color: var(--teal-mid); }
-  body.dark-mode .tourn-host-input,
-  body.dark-mode .tourn-location-input,
-  body.dark-mode .tourn-participants-input { color: var(--placeholder); }
-  body.dark-mode .tourn-results-btn { color: var(--teal-mid); border-color: var(--teal-mid); }
-  body.dark-mode .tourn-results-btn:hover { background: rgba(10,173,166,0.12); }
-  body.dark-mode .tourn-results-btn.has-results { color: var(--teal-mid); border-color: var(--teal-mid); }
+  body.dark-mode .tourn-tile-name { color: var(--teal-mid); }
+  body.dark-mode .tourn-tile-meta { color: #fff; }
   body.dark-mode .tournament-pill:hover { background: var(--teal-dark); }
   body.dark-mode .tournament-pill-date { color: var(--teal-mid); }
   body.dark-mode .tournament-pill-loc { color: var(--text); }
@@ -1247,7 +1587,7 @@
 
   /* ── Player Profile Modal ─────────────────────────────────────────────── */
   .player-profile-modal {
-    background: #fff; border-radius: 10px; padding: 20px 22px 18px; max-width: 320px; width: 100%;
+    background: #fff; border-radius: 10px; padding: 20px 22px 18px; max-width: 360px; width: 100%;
     max-height: 90vh; overflow-y: auto; position: relative; text-align: left;
     box-shadow: 0 8px 32px rgba(0,0,0,0.18);
   }
@@ -1282,7 +1622,18 @@
   .rank-profile-btn:hover { opacity: 1; color: var(--teal); }
   .rank-profile-btn-add { font-weight: 900; font-size: 15px; color: var(--teal); opacity: 0.75; }
   .rank-profile-btn-add:hover { opacity: 1; color: var(--teal-dark); }
-  body.dark-mode .player-profile-modal { background: var(--white); color: var(--text); }
+  /* Profile modal edit form — override registry panel's white-on-dark field styles for light bg */
+  #ppm-edit-form .pr-field-label { color: var(--teal); }
+  #ppm-edit-form .pr-field-input {
+    background: var(--gray-light); border-color: var(--teal-light);
+    color: var(--text);
+  }
+  #ppm-edit-form .pr-field-input::placeholder { color: var(--placeholder); }
+  #ppm-edit-form .pr-field-input:focus { border-color: var(--teal); }
+  body.dark-mode #ppm-edit-form .pr-field-label { color: var(--teal-mid); }
+  body.dark-mode #ppm-edit-form .pr-field-input { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.15); color: var(--text); }
+  body.dark-mode #ppm-edit-form .pr-field-input::placeholder { color: var(--placeholder); }
+  body.dark-mode .player-profile-modal { background: var(--teal-dark); color: var(--text); }
   body.dark-mode .player-profile-modal-name { color: var(--teal-mid); }
   body.dark-mode .player-profile-modal-row { border-top-color: rgba(255,255,255,0.08); }
   body.dark-mode .player-profile-modal-label { color: var(--teal-mid); }
@@ -1333,7 +1684,14 @@
   .pp-footer-link button:hover { color: var(--teal-dark); }
   .player-picker-modal .spoiler-modal-close { background: var(--gray-light); color: var(--teal-dark); }
   .player-picker-modal .spoiler-modal-close:hover { background: var(--red); color: #fff; }
-  body.dark-mode .player-picker-modal { background: var(--white); color: var(--text); }
+  body.dark-mode .player-picker-modal { background: var(--teal-dark); color: var(--text); }
+  #pp-add-fields .pr-field-label { color: var(--teal); }
+  #pp-add-fields .pr-field-input { background: var(--gray-light); border-color: var(--teal-light); color: var(--text); }
+  #pp-add-fields .pr-field-input::placeholder { color: var(--placeholder); }
+  #pp-add-fields .pr-field-input:focus { border-color: var(--teal); }
+  body.dark-mode #pp-add-fields .pr-field-label { color: var(--teal-mid); }
+  body.dark-mode #pp-add-fields .pr-field-input { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.15); color: var(--text); }
+  body.dark-mode #pp-add-fields .pr-field-input::placeholder { color: var(--placeholder); }
   body.dark-mode .player-picker-title { color: var(--teal-mid); }
   body.dark-mode .pp-search-input { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.15); }
   body.dark-mode .pp-list { border-color: rgba(255,255,255,0.1); }
@@ -1407,7 +1765,7 @@
   }
   .spoiler-modal-note:empty { display: none; }
   .spoiler-modal-note ul { margin: 0; padding-left: 18px; }
-  .spoiler-modal-note li { margin-bottom: 4px; line-height: 1.4; }
+  .spoiler-modal-note li { margin-bottom: 6px; line-height: 1.4; }
 
   /* Spoilers: side-by-side modal (card image left, talking points right) */
   .spoiler-modal-content-split {
@@ -1425,6 +1783,7 @@
     font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 12px;
     letter-spacing: 1.5px; text-transform: uppercase; color: var(--teal-dark); margin-bottom: 8px;
   }
+  body.dark-mode .spoiler-modal-notes-label { color: var(--teal-mid); }
   .spoiler-modal-notes-col .spoiler-modal-note {
     border-top: none; margin-top: 0; padding-top: 0; font-size: 13px; line-height: 1.6;
   }
@@ -1434,6 +1793,27 @@
     font-size: 12px; color: var(--placeholder); font-style: italic; display: none;
   }
   .spoiler-modal-note:empty ~ .spoiler-modal-note-empty { display: block; }
+  /* Inline editor inside spoiler modal (editor mode only) */
+  #spoiler-modal-note-editor {
+    width: 100%; min-height: 120px; border: 1px solid var(--teal-light); border-radius: 4px;
+    outline: none; font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--text);
+    padding: 8px 10px; line-height: 1.7; background: var(--gray-light);
+    white-space: pre-wrap; word-break: break-word; cursor: text; box-sizing: border-box;
+    display: none;
+  }
+  #spoiler-modal-note-editor .bn-line { display: block; min-height: 1.7em; }
+  #spoiler-modal-note-editor .bn-line::before { display: inline-block; width: 1.2em; }
+  #spoiler-modal-note-editor .bn-l0::before { content: '•'; }
+  #spoiler-modal-note-editor .bn-l1 { padding-left: 20px; }
+  #spoiler-modal-note-editor .bn-l1::before { content: '–'; color: var(--gray); }
+  #spoiler-modal-note-editor .bn-l2 { padding-left: 40px; }
+  #spoiler-modal-note-editor .bn-l2::before { content: '◦'; color: var(--gray); }
+  #spoiler-modal-note-hint {
+    font-size: 10px; color: var(--gray); font-style: italic; margin-top: 4px; display: none;
+  }
+  body.dark-mode #spoiler-modal-note-editor {
+    background: rgba(255,255,255,0.05); color: var(--text); border-color: rgba(255,255,255,0.15);
+  }
 
   @media (max-width: 620px) {
     .spoiler-modal-content-split { flex-direction: column; max-width: 400px; }
@@ -1453,11 +1833,45 @@
   .spoiler-modal-badge { font-size: 18px; padding: 10px 8px; margin-bottom: 10px; }
   .spoiler-modal-badge:empty { display: none; margin-bottom: 0; }
 
-  .rankings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
-  .rank-item { display: flex; align-items: center; gap: 5px; padding: 2px 0; border-bottom: 1px solid var(--teal-light); }
-  .rank-num { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 900; color: var(--teal); width: 18px; flex-shrink: 0; }
-  .rank-input { flex: 1; border: none; background: transparent; font-family: 'Barlow', sans-serif; font-size: 11px; color: var(--text); outline: none; padding: 1px 0; }
-  .rank-input::placeholder { color: var(--placeholder); font-style: italic; }
+  .rankings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+  /* Rank card */
+  .rank-card {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--gray-light); border-radius: 5px;
+    padding: 5px 6px 5px 6px; position: relative; cursor: pointer;
+    border-left: 2px solid var(--teal-light); transition: box-shadow 0.12s;
+    min-height: 38px;
+  }
+  .rank-card:hover { box-shadow: 0 0 0 2px var(--teal); }
+  .rank-card.rank-card-empty {
+    border-left-color: var(--teal-light); cursor: pointer;
+    justify-content: center; color: var(--teal);
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 12px; letter-spacing: 0.3px;
+  }
+  .rank-card.rank-card-empty:hover { box-shadow: 0 0 0 2px var(--teal); }
+  .rank-card-num {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 900;
+    color: var(--teal); width: 16px; flex-shrink: 0; text-align: center; line-height: 1;
+  }
+  .rank-card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .rank-card-name {
+    font-family: 'Barlow', sans-serif; font-size: 11px; font-weight: 600;
+    color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .rank-card-team-logo {
+    height: 12px; width: auto; max-width: 52px; object-fit: contain;
+    display: block; opacity: 0.85;
+  }
+  .rank-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+  .rank-card-clear {
+    width: 14px; height: 14px; border: none; background: rgba(0,0,0,0.1);
+    color: var(--gray); border-radius: 50%; font-size: 9px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    padding: 0; transition: background 0.12s, color 0.12s; flex-shrink: 0;
+  }
+  .rank-card-clear:hover { background: var(--red); color: #fff; }
   .rank-delta {
     font-family: 'Barlow Condensed', sans-serif; font-size: 10px; font-weight: 700;
     min-width: 28px; text-align: center; border-radius: 3px; padding: 1px 4px; flex-shrink: 0;
@@ -1467,21 +1881,22 @@
   .rank-delta.same { background: transparent; color: #8a9e9d; }
   .rank-delta.new  { background: transparent; color: #0aada6; }
   .rank-delta.empty { visibility: hidden; }
-  .rank-clear {
-    width: 14px; height: 14px; flex-shrink: 0; border: none; background: var(--gray-light);
-    color: var(--gray); border-radius: 50%; font-size: 9px; line-height: 1; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; padding: 0;
-    transition: background 0.15s, color 0.15s;
-  }
-  .rank-clear:hover { background: var(--red); color: #fff; }
+  /* keep old rank-input/clear hidden — still in DOM for store compat */
+  .rank-input { display: none !important; }
+  .rank-clear { display: none !important; }
+  .rank-profile-btn { display: none !important; }
+  body.dark-mode .rank-card { background: rgba(255,255,255,0.06); border-left-color: var(--teal-deep); }
+  body.dark-mode .rank-card:hover { box-shadow: 0 0 0 2px var(--teal-mid); }
+  body.dark-mode .rank-card-name { color: var(--text); }
+  body.dark-mode .rank-card-clear { background: rgba(255,255,255,0.1); color: var(--gray); }
 
   .repeat-item { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--teal-light); }
   .repeat-item:last-child { border-bottom: none; margin-bottom: 0; }
 
-  #news-body { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+  #news-body { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
   #news-body .repeat-item {
-    flex: 1 1 260px; min-width: 220px; border: none; border-radius: 6px;
-    background: var(--gray-light); padding: 8px 10px; margin-bottom: 0;
+    flex: 0 0 auto; width: calc(33.333% - 6px); border: none; border-radius: 6px;
+    background: var(--gray-light); padding: 8px 10px 8px 22px; margin-bottom: 0;
   }
   #news-body .repeat-item.repeat-item-draggable { padding-left: 22px; }
   #news-add-row { flex-basis: 100%; }
@@ -1540,7 +1955,7 @@
       break-after: avoid;
       page-break-after: avoid;
     }
-    #tourn-add-row, .tourn-remove-btn, .rank-clear, .rank-profile-btn, .ec-notes-btn, .tourn-results-btn { display: none; }
+    #tourn-add-row, .tourn-remove-btn, .rank-clear, .rank-card-clear, .rank-profile-btn, .ec-notes-btn, .tourn-results-btn { display: none; }
     #tourn-results-section:not(:has(.tourn-block)) { display: none; }
     /* Hide empty tournament card fields (Host/Location/# Players placeholders) in
        print/PDF -- previously this was only handled for the published view-mode
@@ -1615,6 +2030,8 @@
   body.view-mode .tourn-remove-btn,
   body.view-mode .rank-clear,
   body.view-mode .rank-profile-btn,
+  body.view-mode .rank-card-clear { display: none !important; }
+  body.view-mode .rank-card.rank-card-empty { display: none !important; }
   body.view-mode #prev-rankings-field,
   body.view-mode #rankings-export-row,
   body.view-mode #meta-export-row,
@@ -1692,13 +2109,6 @@
   body.view-mode #tourn-results-editor-overlay { display: none !important; }
   body.view-mode #mtf-overlay { display: none !important; }
   body.view-mode #tourn-results-section:not(:has(.tourn-block)) { display: none; }
-  body.view-mode .tourn-name-input,
-  body.view-mode .tourn-host-input,
-  body.view-mode .tourn-location-input,
-  body.view-mode .tourn-participants-input { pointer-events: none; }
-  body.view-mode .tourn-host-input:placeholder-shown,
-  body.view-mode .tourn-location-input:placeholder-shown,
-  body.view-mode .tourn-participants-input:placeholder-shown { display: none; }
   body.view-mode .tourn-block { cursor: pointer; pointer-events: auto; }
   body.view-mode .tourn-block:hover { box-shadow: 0 2px 8px rgba(4,78,74,0.18); }
 </style>
@@ -1806,17 +2216,24 @@
 <div id="player-profile-modal-overlay" class="spoiler-modal-overlay" onclick="closePlayerProfileModal(event)">
   <div class="player-profile-modal">
     <button type="button" class="spoiler-modal-close" onclick="closePlayerProfileModal(event)">&times;</button>
-    <div class="player-profile-modal-name" id="ppm-handle"></div>
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:2px;">
+      <div class="player-profile-modal-name" id="ppm-handle"></div>
+      <img id="ppm-team-logo" src="" alt="" style="display:none; height:28px; width:auto; max-width:80px; object-fit:contain; flex-shrink:0; margin-top:2px;">
+    </div>
 
     <div id="ppm-view">
       <div id="ppm-rows"></div>
-      <button type="button" class="btn btn-ghost" id="ppm-edit-btn" onclick="enterPlayerProfileEditMode()">Edit</button>
+      <button type="button" class="btn btn-ghost" id="ppm-edit-btn" onclick="enterPlayerProfileEditMode()" style="margin-top:10px; padding:3px 10px; font-size:10px;">Edit Profile</button>
     </div>
 
     <div id="ppm-edit-form" style="display:none;">
       <div>
         <label class="pr-field-label">Real Name</label>
         <input class="pr-field-input" id="ppm-realname" placeholder="Optional" autocomplete="off">
+      </div>
+      <div>
+        <label class="pr-field-label">Pronunciation <span style="font-weight:400;opacity:0.6;">(optional)</span></label>
+        <input class="pr-field-input" id="ppm-pronunciation" placeholder="e.g. HEN-drix" autocomplete="off">
       </div>
       <div>
         <label class="pr-field-label">Region</label>
@@ -1892,6 +2309,78 @@
   </div>
 </div>
 
+<!-- Side Event Edit Modal (editor only) -->
+<div id="se-edit-overlay" onclick="closeSeEditModal(event)">
+  <div id="se-edit-modal">
+    <div id="se-edit-header">
+      <span id="se-edit-header-label">Side Event</span>
+      <button type="button" class="spoiler-modal-close" onclick="saveAndCloseSeEdit()">&times;</button>
+    </div>
+    <div id="se-edit-body">
+      <div>
+        <div class="se-edit-label">Event Name</div>
+        <input class="se-edit-input" id="se-edit-name-input" type="text" placeholder="e.g. Type 2 Side Event" autocomplete="off">
+      </div>
+      <div>
+        <div class="se-edit-label">Host</div>
+        <input class="se-edit-input" id="se-edit-host-input" type="text" placeholder="Hosted by..." autocomplete="off">
+      </div>
+      <div>
+        <div class="se-edit-label">Details</div>
+        <div id="se-edit-notes-wrap">
+          <div id="se-edit-bullet-editor" contenteditable="true" spellcheck="true"></div>
+          <div id="se-edit-notes-hint">• top level &nbsp;|&nbsp; Tab → – sub &nbsp;|&nbsp; Tab again → ◦ sub-sub &nbsp;|&nbsp; Shift+Tab to outdent</div>
+        </div>
+      </div>
+    </div>
+    <div id="se-edit-footer">
+      <button type="button" class="btn btn-ghost" onclick="saveAndCloseSeEdit(false)">Cancel</button>
+      <button type="button" class="btn btn-teal" onclick="saveAndCloseSeEdit(true)">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Deadline Edit/View Modal -->
+<div id="dl-modal-overlay" onclick="closeDlModal(event)">
+  <div id="dl-modal">
+    <div id="dl-modal-header">
+      <span id="dl-modal-header-label">Deadline</span>
+      <button type="button" class="spoiler-modal-close" onclick="closeDlModal()">&times;</button>
+    </div>
+    <div id="dl-modal-body">
+      <!-- Edit section -->
+      <div id="dl-edit-section">
+        <div>
+          <div class="dl-modal-label">Deadline Title</div>
+          <input class="dl-edit-input" id="dl-edit-title-input" type="text" placeholder="e.g. Nametag deadline" autocomplete="off">
+        </div>
+        <div>
+          <div class="dl-modal-label">Date</div>
+          <input class="dl-edit-input" id="dl-edit-date-input" type="date">
+        </div>
+        <div>
+          <div class="dl-modal-label">Details</div>
+          <div id="dl-edit-notes-wrap">
+            <div id="dl-edit-bullet-editor" contenteditable="true" spellcheck="true"></div>
+            <div id="dl-edit-notes-hint">• top level &nbsp;|&nbsp; Tab → – sub &nbsp;|&nbsp; Tab again → ◦ sub-sub &nbsp;|&nbsp; Shift+Tab to outdent</div>
+          </div>
+        </div>
+      </div>
+      <!-- View section -->
+      <div id="dl-view-section">
+        <div id="dl-view-name"></div>
+        <div id="dl-view-date"></div>
+        <ul id="dl-view-notes-list"></ul>
+        <div id="dl-view-notes-empty" style="display:none;">No details added yet.</div>
+      </div>
+    </div>
+    <div id="dl-modal-footer">
+      <button type="button" class="btn btn-ghost" id="dl-cancel-btn" onclick="closeDlModal()">Cancel</button>
+      <button type="button" class="btn btn-teal" id="dl-save-btn" onclick="saveDlModal()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- News Topic Detail Modal (read-only; works in both editor and published view) -->
 <div id="news-detail-overlay" onclick="closeNewsDetailModal(event)">
   <div id="news-detail-modal">
@@ -1908,17 +2397,77 @@
   </div>
 </div>
 
+<!-- News Topic Edit Modal (editor only) -->
+<div id="news-edit-overlay" onclick="closeNewsEditModal(event)">
+  <div id="news-edit-modal">
+    <div id="news-edit-header">
+      <span id="news-edit-header-label">News Topic</span>
+      <button type="button" class="spoiler-modal-close" onclick="saveAndCloseNewsEdit()">&times;</button>
+    </div>
+    <div id="news-edit-body">
+      <div>
+        <div class="news-edit-label">Topic Title</div>
+        <input id="news-edit-title-input" type="text" placeholder="Topic name — e.g. Redemption with Jayden, or a one-off headline" autocomplete="off">
+      </div>
+      <div>
+        <div class="news-edit-label">Short Description</div>
+        <textarea id="news-edit-desc-input" placeholder="One or two sentences summarizing this topic..." rows="2"></textarea>
+      </div>
+      <div>
+        <div class="news-edit-label">Full Details</div>
+        <div id="news-edit-notes-wrap">
+          <div id="news-edit-bullet-editor" contenteditable="true" spellcheck="true"></div>
+          <div id="news-edit-notes-hint">• top level &nbsp;|&nbsp; Tab → – sub &nbsp;|&nbsp; Tab again → ◦ sub-sub &nbsp;|&nbsp; Shift+Tab to outdent</div>
+        </div>
+      </div>
+    </div>
+    <div id="news-edit-footer">
+      <button type="button" class="btn btn-ghost" onclick="saveAndCloseNewsEdit()">Cancel</button>
+      <button type="button" class="btn btn-teal" onclick="saveAndCloseNewsEdit(true)">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Tournament Results Editor Modal (editor only) -->
 <div id="tourn-results-editor-overlay" onclick="closeTournResultsEditor(event)">
   <div id="tourn-results-editor-modal">
     <div id="tre-header">
-      <div id="tre-title">Edit Results</div>
+      <div id="tre-title">Tournament</div>
       <button type="button" class="spoiler-modal-close" onclick="closeTournResultsEditor()">&times;</button>
     </div>
+    <div id="tre-fields">
+      <div class="tre-fields-row">
+        <div class="tre-field-wrap tre-field-name">
+          <div class="tre-field-label">Tournament Name</div>
+          <input class="tre-field-input" id="tre-name-input" type="text" placeholder="e.g. Alabama State Championship" autocomplete="off">
+        </div>
+      </div>
+      <div class="tre-fields-row">
+        <div class="tre-field-wrap">
+          <div class="tre-field-label">Host</div>
+          <input class="tre-field-input" id="tre-host-input" type="text" placeholder="Hosted by..." autocomplete="off">
+        </div>
+        <div class="tre-field-wrap tre-field-sm">
+          <div class="tre-field-label">Players</div>
+          <input class="tre-field-input" id="tre-players-input" type="text" placeholder="#" autocomplete="off">
+        </div>
+      </div>
+      <div class="tre-fields-row">
+        <div class="tre-field-wrap tre-field-city">
+          <div class="tre-field-label">City</div>
+          <input class="tre-field-input" id="tre-city-input" type="text" placeholder="City" autocomplete="off">
+        </div>
+        <div class="tre-field-wrap tre-field-state">
+          <div class="tre-field-label">State</div>
+          <input class="tre-field-input" id="tre-state-input" type="text" placeholder="ST" autocomplete="off" maxlength="2">
+        </div>
+      </div>
+    </div>
+    <div id="tre-results-label">Results</div>
     <div id="tre-body"></div>
     <div id="tre-footer">
       <button type="button" class="btn btn-ghost" onclick="closeTournResultsEditor()">Cancel</button>
-      <button type="button" class="btn btn-teal" onclick="saveTournResults()">Save Results</button>
+      <button type="button" class="btn btn-teal" onclick="saveTournResults()">Save</button>
     </div>
   </div>
 </div>
@@ -1941,9 +2490,10 @@
       <span id="card-notes-popup-title"></span>
       <button type="button" class="spoiler-modal-close" onclick="saveAndCloseCardNotes()">&times;</button>
     </div>
-    <textarea id="card-notes-popup-textarea" placeholder="Enter talking points, one per line..."></textarea>
+    <div id="card-notes-bullet-editor" contenteditable="true" spellcheck="true"></div>
+    <textarea id="card-notes-popup-textarea" style="display:none;" placeholder="Enter talking points, one per line..."></textarea>
     <div id="card-notes-popup-footer">
-      <span id="card-notes-popup-hint">One talking point per line — renders as a bullet list in PDF</span>
+      <span id="card-notes-popup-hint">• top level &nbsp;|&nbsp; Tab → – sub &nbsp;|&nbsp; Tab again → ◦ sub-sub &nbsp;|&nbsp; Shift+Tab to outdent</span>
       <button type="button" class="btn btn-teal" onclick="saveAndCloseCardNotes()">Save &amp; Close</button>
     </div>
   </div>
@@ -2223,14 +2773,10 @@
           <input type="hidden" id="dotw-color">
           <datalist id="dotw-color-options"></datalist>
 
-          <div class="field">
-            <label class="field-label bullet-field-label">Key Cards &amp; Strategy</label>
-            <div class="bullet-wrap">
-              <div class="bullet-marks" id="dotw-notes-marks"><span>&#8226;</span></div>
-              <textarea class="bullet-textarea xtall" id="dotw-notes" placeholder="Key cards and their roles, strategy overview, talking points... (one per line)"></textarea>
-            </div>
-            <ul class="bullet-notes-print" id="dotw-notes-print"></ul>
-          </div>
+          <!-- dotw-notes kept hidden — deck viewer reads/writes it directly -->
+          <textarea id="dotw-notes" style="display:none;"></textarea>
+          <ul class="bullet-notes-print" id="dotw-notes-print" style="display:none;"></ul>
+          <div style="display:none;" id="dotw-notes-marks"></div>
         </div>
       </div>
     </div>
@@ -2340,18 +2886,16 @@
                 <div class="spoiler-modal-notes-label">Talking Points</div>
                 <div class="spoiler-modal-note" id="spoiler-modal-note"></div>
                 <div class="spoiler-modal-note-empty" id="spoiler-modal-note-empty">No notes added for this card.</div>
+                <div id="spoiler-modal-note-editor" contenteditable="true" spellcheck="true"></div>
+                <div id="spoiler-modal-note-hint">• top level &nbsp;|&nbsp; Tab → – sub &nbsp;|&nbsp; Tab again → ◦ sub-sub &nbsp;|&nbsp; Shift+Tab to outdent</div>
               </div>
             </div>
           </div>
 
-          <div class="field">
-            <label class="field-label bullet-field-label">Discussion Notes</label>
-            <div class="bullet-wrap">
-              <div class="bullet-marks" id="spoiler-notes-marks"><span>&#8226;</span></div>
-              <textarea class="bullet-textarea" id="spoiler-notes" placeholder="Talking points, comparisons, community reaction... (one per line)"></textarea>
-            </div>
-            <ul class="bullet-notes-print" id="spoiler-notes-print"></ul>
-          </div>
+          <!-- spoiler-notes kept hidden for store save/recall compat -->
+          <textarea id="spoiler-notes" style="display:none;"></textarea>
+          <ul class="bullet-notes-print" id="spoiler-notes-print" style="display:none;"></ul>
+          <div style="display:none;" id="spoiler-notes-marks"></div>
         </div>
       </div>
     </div>
@@ -2780,19 +3324,83 @@
     });
   });
 
+  function getTeamLogoUrl(team) {
+    if (!team || typeof TEAM_WORDMARKS === 'undefined') return '';
+    return TEAM_WORDMARKS[team] || '';
+  }
+
+  function refreshRankCard(rowNum) {
+    var card = document.getElementById('rank-card-' + rowNum);
+    if (!card) return;
+    var input = document.getElementById('rank-' + rowNum);
+    var name = input ? input.value.trim() : '';
+    card.innerHTML = '';
+    if (!name) {
+      card.className = 'rank-card rank-card-empty';
+      card.textContent = '+ Add Player';
+    } else {
+      card.className = 'rank-card';
+      var numEl = document.createElement('span');
+      numEl.className = 'rank-card-num';
+      numEl.textContent = rowNum;
+      card.appendChild(numEl);
+      var info = document.createElement('div');
+      info.className = 'rank-card-info';
+      var nameEl = document.createElement('div');
+      nameEl.className = 'rank-card-name';
+      nameEl.textContent = name;
+      info.appendChild(nameEl);
+      var profile = findPlayerProfile(name);
+      var team = profile ? profile.team : '';
+      var logoUrl = getTeamLogoUrl(team);
+      if (logoUrl) {
+        var logoImg = document.createElement('img');
+        logoImg.className = 'rank-card-team-logo';
+        logoImg.src = logoUrl;
+        logoImg.alt = team;
+        info.appendChild(logoImg);
+      }
+      card.appendChild(info);
+      var right = document.createElement('div');
+      right.className = 'rank-card-right';
+      var clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'rank-card-clear';
+      clearBtn.title = 'Remove player';
+      clearBtn.innerHTML = '&times;';
+      (function(rn, inp) {
+        clearBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (inp) inp.value = '';
+          updateRankDelta(rn);
+          refreshRankCard(rn);
+        });
+      })(rowNum, input);
+      right.appendChild(clearBtn);
+      var delta = document.createElement('span');
+      delta.className = 'rank-delta empty';
+      delta.id = 'rank-delta-' + rowNum;
+      right.appendChild(delta);
+      card.appendChild(right);
+    }
+  }
+
   for (var i = 1; i <= 10; i++) {
     rankingsGrid.insertAdjacentHTML('beforeend',
-      '<div class="rank-item"><span class="rank-num">' + i + '</span>' +
-      '<input class="rank-input" id="rank-' + i + '" placeholder="Player name" autocomplete="off">' +
-      '<button type="button" class="rank-profile-btn" title="Add / select player" id="rank-profile-btn-' + i + '" onclick="handlePlayerProfileBtnClick(\'rank-' + i + '\')">+</button>' +
-      '<button type="button" class="rank-clear" title="Clear" onclick="clearRankField(' + i + ')">&times;</button>' +
-      '<span class="rank-delta empty" id="rank-delta-' + i + '"></span></div>');
+      '<div style="position:relative;">' +
+        '<input type="hidden" class="rank-input" id="rank-' + i + '">' +
+        '<button type="button" class="rank-profile-btn" id="rank-profile-btn-' + i + '" style="display:none!important;"></button>' +
+        '<button type="button" class="rank-clear" id="rank-clear-' + i + '" style="display:none!important;"></button>' +
+        '<div class="rank-card rank-card-empty" id="rank-card-' + i + '">+ Add Player</div>' +
+      '</div>');
   }
 
   // Update delta badge for a given row based on a previous-rankings map
   function updateRankDeltaGeneric(prefix, rowNum, prevMap) {
     var input = document.getElementById(prefix + '-' + rowNum);
     var badge = document.getElementById(prefix + '-delta-' + rowNum);
+    // Empty rank rows no longer render a delta badge; bail before dereferencing.
+    if (!input || !badge) return;
     var name = input.value.trim();
 
     if (!name || !prevMap) {
@@ -2822,6 +3430,7 @@
   }
 
   function updateRankDelta(rowNum) {
+    refreshRankCard(rowNum);
     updateRankDeltaGeneric('rank', rowNum, window.previousRankings);
   }
 
@@ -2831,9 +3440,9 @@
 
   function clearRankField(rowNum) {
     var input = document.getElementById('rank-' + rowNum);
-    input.value = '';
-    input.focus();
+    if (input) input.value = '';
     updateRankDelta(rowNum);
+    refreshRankCard(rowNum);
   }
 
   // ---- Meta Forecast: community deck archetype rankings ----
@@ -2934,15 +3543,43 @@
     if (!block) return;
     var hasRes = hasAnyResults(b);
     block.classList.toggle('tourn-block-has-results', hasRes);
-    var btn = document.getElementById('t' + b + '-results-btn');
-    if (btn) {
-      btn.classList.toggle('has-results', hasRes);
-      btn.textContent = hasRes ? '📋 Results ●' : '📋 Results';
-    }
+    refreshTournTile(b);
   }
 
   var tournGrid = document.getElementById('tourn-grid');
   window.tournBlockCount = 0;
+
+  function refreshTournTile(b) {
+    var tile = document.getElementById('tourn-tile-' + b);
+    if (!tile) return;
+    var name = (document.getElementById('t' + b + '-name') || {}).value || '';
+    var host = (document.getElementById('t' + b + '-host') || {}).value || '';
+    var loc  = (document.getElementById('t' + b + '-location') || {}).value || '';
+    tile.innerHTML = '';
+    if (!name.trim()) {
+      tile.className = 'tourn-tile tourn-tile-add';
+      tile.textContent = 'Tournament';
+    } else {
+      tile.className = 'tourn-tile';
+      var nameEl = document.createElement('div');
+      nameEl.className = 'tourn-tile-name';
+      nameEl.textContent = name;
+      tile.appendChild(nameEl);
+      var metaParts = [host, loc].filter(Boolean);
+      if (metaParts.length) {
+        var metaEl = document.createElement('div');
+        metaEl.className = 'tourn-tile-meta';
+        metaEl.textContent = metaParts.join(' · ');
+        tile.appendChild(metaEl);
+      }
+      if (hasAnyResults(b)) {
+        var dot = document.createElement('span');
+        dot.className = 'tourn-tile-results-dot';
+        dot.title = 'Has results';
+        nameEl.appendChild(dot);
+      }
+    }
+  }
 
   function buildTournamentBlock(forceId) {
     var b;
@@ -2960,11 +3597,15 @@
     block.id = 'tourn-block-' + b;
     if (!document.body.classList.contains('view-mode')) block.draggable = true;
 
-    // In view mode, clicking the whole card opens the display modal
     block.addEventListener('click', function(e) {
-      if (!document.body.classList.contains('view-mode')) return;
-      openTournResultsDisplay(b);
+      if (e.target.closest('button, .tourn-block-drag-handle')) return;
+      if (document.body.classList.contains('view-mode')) {
+        openTournResultsDisplay(b);
+      } else {
+        openTournResultsEditor(b);
+      }
     });
+
     var tournHandleGrabbed = false;
     block.addEventListener('dragstart', function(e) {
       if (document.body.classList.contains('view-mode')) { e.preventDefault(); return; }
@@ -2997,61 +3638,20 @@
     });
     block.appendChild(removeBtn);
 
-    var nameInput = document.createElement('input');
-    nameInput.className = 'tourn-name-input';
-    nameInput.id = 't' + b + '-name';
-    nameInput.placeholder = 'Tournament Name';
-    nameInput.autocomplete = 'off';
-    block.appendChild(nameInput);
+    // Visible tile
+    var tile = document.createElement('div');
+    tile.id = 'tourn-tile-' + b;
+    tile.className = 'tourn-tile tourn-tile-add';
+    tile.textContent = 'Tournament';
+    block.appendChild(tile);
 
-    var metaRow = document.createElement('div');
-    metaRow.className = 'tourn-meta-row';
-
-    var hostInput = document.createElement('input');
-    hostInput.className = 'tourn-host-input';
-    hostInput.id = 't' + b + '-host';
-    hostInput.placeholder = 'Hosted by...';
-    hostInput.autocomplete = 'off';
-    metaRow.appendChild(hostInput);
-
-    var participantsInput = document.createElement('input');
-    participantsInput.className = 'tourn-participants-input';
-    participantsInput.id = 't' + b + '-participants';
-    participantsInput.placeholder = '# players';
-    participantsInput.autocomplete = 'off';
-    participantsInput.type = 'text';
-    metaRow.appendChild(participantsInput);
-
-    var participantsSuffix = document.createElement('span');
-    participantsSuffix.className = 'tourn-participants-suffix';
-    participantsSuffix.id = 't' + b + '-participants-suffix';
-    participantsSuffix.textContent = 'players';
-    participantsSuffix.style.display = 'none';
-    metaRow.appendChild(participantsSuffix);
-
-    participantsInput.addEventListener('input', function() {
-      participantsSuffix.style.display = participantsInput.value.trim() ? '' : 'none';
-    });
-
-    block.appendChild(metaRow);
-
-    var locationInput = document.createElement('input');
-    locationInput.className = 'tourn-location-input';
-    locationInput.id = 't' + b + '-location';
-    locationInput.placeholder = 'City, State';
-    locationInput.autocomplete = 'off';
-    block.appendChild(locationInput);
-
-    var resultsBtn = document.createElement('button');
-    resultsBtn.type = 'button';
-    resultsBtn.className = 'tourn-results-btn';
-    resultsBtn.id = 't' + b + '-results-btn';
-    resultsBtn.textContent = '📋 Results';
-    resultsBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      openTournResultsEditor(b);
-    });
-    block.appendChild(resultsBtn);
+    // Hidden data fields — store/recall uses these IDs unchanged
+    block.insertAdjacentHTML('beforeend',
+      '<input type="hidden" id="t' + b + '-name">' +
+      '<input type="hidden" id="t' + b + '-host">' +
+      '<input type="hidden" id="t' + b + '-location">' +
+      '<input type="hidden" id="t' + b + '-participants">' +
+      '<span style="display:none;" id="t' + b + '-participants-suffix"></span>');
 
     return block;
   }
@@ -3117,14 +3717,21 @@
     var hostEl = document.getElementById('t' + b + '-host');
     var locEl  = document.getElementById('t' + b + '-location');
     var partEl = document.getElementById('t' + b + '-participants');
+
+    // Populate the unified fields
+    document.getElementById('tre-name-input').value  = nameEl  ? nameEl.value  : '';
+    document.getElementById('tre-host-input').value  = hostEl  ? hostEl.value  : '';
+    document.getElementById('tre-players-input').value = partEl ? partEl.value : '';
+
+    // Split location into city/state
+    var loc = locEl ? locEl.value.trim() : '';
+    var locParts = loc.split(',');
+    document.getElementById('tre-city-input').value  = locParts[0] ? locParts[0].trim() : '';
+    document.getElementById('tre-state-input').value = locParts[1] ? locParts[1].trim() : '';
+
+    // Update header title
     var name = nameEl ? nameEl.value.trim() : '';
-    var host = hostEl ? hostEl.value.trim() : '';
-    var loc  = locEl  ? locEl.value.trim()  : '';
-    var part = partEl ? partEl.value.trim()  : '';
-    var subtitleParts = [host, loc].filter(Boolean);
-    if (part) subtitleParts.push(part + ' players');
-    var subtitle = subtitleParts.join(' — ');
-    document.getElementById('tre-title').textContent = (name || 'Tournament') + (subtitle ? ' · ' + subtitle : '');
+    document.getElementById('tre-title').textContent = name || 'Tournament';
 
     var body = document.getElementById('tre-body');
     body.innerHTML = '';
@@ -3144,9 +3751,12 @@
         row.className = 'tre-rank-row';
         row.id = 'tre-row-' + fmt.key + '-' + ri;
 
-        // 3rd place (ri=2) is suppressed if any earlier rank has a tie
-        var anyEarlierTie = ri === 2 && (_treDraftResults[fmt.key][0].tie || _treDraftResults[fmt.key][1].tie);
-        if (anyEarlierTie) {
+        // Suppress rows based on corrected tie logic:
+        // tie at 1st hides 2nd; tie at 2nd hides 3rd; tie at 3rd hides nothing
+        var suppressRow = false;
+        if (ri === 1 && _treDraftResults[fmt.key][0].tie) suppressRow = true;
+        if (ri === 2 && _treDraftResults[fmt.key][1].tie) suppressRow = true;
+        if (suppressRow) {
           row.style.display = 'none';
         }
 
@@ -3296,10 +3906,23 @@
             }
           }
 
-          // A tie at 1st or 2nd consumes the 3rd place slot (two winners fill both spots).
-          // A tie AT 3rd place does not displace anything — it just allows a second
-          // name in the 3rd place row, so this only applies when ri is 0 or 1.
-          if (ri === 0 || ri === 1) {
+          // Corrected tie logic:
+          // - Tie at 1st: hides 2nd place (3rd remains)
+          // - Tie at 2nd: hides 3rd place
+          // - Tie at 3rd: just adds a second slot; no rows hidden
+          if (ri === 0) {
+            // Tie at 1st — hide/show 2nd place row
+            var secondRow = document.getElementById('tre-row-' + fmt.key + '-1');
+            if (secondRow) {
+              secondRow.style.display = isTied ? 'none' : '';
+              if (isTied) {
+                _treDraftResults[fmt.key][1] = { p1: '', p2: '', p3: '', p4: '', tie: false };
+                var secondTiedRow = document.getElementById('tre-tiedrow-' + fmt.key + '-1');
+                if (secondTiedRow) secondTiedRow.style.display = 'none';
+              }
+            }
+          } else if (ri === 1) {
+            // Tie at 2nd — hide/show 3rd place row
             var thirdRow = document.getElementById('tre-row-' + fmt.key + '-2');
             if (thirdRow) {
               thirdRow.style.display = isTied ? 'none' : '';
@@ -3310,6 +3933,7 @@
               }
             }
           }
+          // ri === 2 (tie at 3rd): no rows to hide, second slot already shown via p2tie/tiedTeamRow above
         });
 
       });
@@ -3329,8 +3953,23 @@
 
   function saveTournResults() {
     if (_treEditingBlock === null || !_treDraftResults) return;
-    window.tournResults[_treEditingBlock] = JSON.parse(JSON.stringify(_treDraftResults));
-    syncTournBlockAppearance(_treEditingBlock);
+    var b = _treEditingBlock;
+    window.tournResults[b] = JSON.parse(JSON.stringify(_treDraftResults));
+
+    // Write info fields back to hidden inputs
+    var nameEl = document.getElementById('t' + b + '-name');
+    var hostEl = document.getElementById('t' + b + '-host');
+    var locEl  = document.getElementById('t' + b + '-location');
+    var partEl = document.getElementById('t' + b + '-participants');
+    if (nameEl) nameEl.value = document.getElementById('tre-name-input').value;
+    if (hostEl) hostEl.value = document.getElementById('tre-host-input').value;
+    if (partEl) partEl.value = document.getElementById('tre-players-input').value;
+    // Reconstruct city, ST location string
+    var city  = document.getElementById('tre-city-input').value.trim();
+    var state = document.getElementById('tre-state-input').value.trim();
+    if (locEl) locEl.value = city && state ? city + ', ' + state : city || state;
+
+    syncTournBlockAppearance(b);
     document.getElementById('tourn-results-editor-overlay').classList.remove('open');
     _treEditingBlock = null;
     _treDraftResults = null;
@@ -3439,17 +4078,26 @@
     document.getElementById('tourn-results-display-overlay').classList.remove('open');
   }
 
-  // Wire up input listeners + add to known players on change
+  // Wire up rank card click handlers
   for (var i = 1; i <= 10; i++) {
     (function(rowNum) {
+      var card = document.getElementById('rank-card-' + rowNum);
       var input = document.getElementById('rank-' + rowNum);
-      var profileBtn = document.getElementById('rank-profile-btn-' + rowNum);
-      function syncProfileBtn() {
-        syncPlayerProfileBtn(input.value, profileBtn);
-      }
-      input.addEventListener('input', function() { updateRankDelta(rowNum); syncProfileBtn(); });
-      input.addEventListener('change', function() {
-        syncProfileBtn();
+      card.addEventListener('click', function(e) {
+        if (e.target.closest('.rank-card-clear')) return;
+        var name = input ? input.value.trim() : '';
+        if (!name) {
+          // Empty — open picker to assign a player
+          openPlayerPicker('rank-' + rowNum, '');
+        } else {
+          // Filled — open profile modal
+          var key = findPlayerKey(name);
+          if (key) {
+            openPlayerProfileModal(key, false);
+          } else {
+            openPlayerPicker('rank-' + rowNum, name);
+          }
+        }
       });
     })(i);
   }
@@ -3459,50 +4107,6 @@
   // ---- Recent News: repeating topic + notes items ----
   var newsBody = document.getElementById('news-body');
   window.newsCount = 0;
-  window.knownNewsTopics = [];
-
-  newsBody.insertAdjacentHTML('beforebegin', '<datalist id="news-topic-options"></datalist>');
-  var newsTopicDatalist = document.getElementById('news-topic-options');
-
-  function rebuildNewsTopicOptions() {
-    newsTopicDatalist.innerHTML = '';
-    window.knownNewsTopics.forEach(function(t) {
-      var opt = document.createElement('option');
-      opt.value = t;
-      newsTopicDatalist.appendChild(opt);
-    });
-  }
-
-  var NEWS_TOPICS_STORE_URL = '/threshingfloor/api/store/news-topics';
-  window.knownNewsTopicsSyncedCount = 0;
-
-  function persistNewsTopics() {
-    if (!window.knownNewsTopics.length) return;
-    if (window.knownNewsTopics.length <= window.knownNewsTopicsSyncedCount) return;
-    var count = window.knownNewsTopics.length;
-    fetch(NEWS_TOPICS_STORE_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: window.knownNewsTopics })
-    })
-    .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
-    .then(function() { window.knownNewsTopicsSyncedCount = count; })
-    .catch(function() {});
-  }
-
-  // Load recurring news topics from store on startup
-  fetch(NEWS_TOPICS_STORE_URL)
-    .then(function(res) { if (res.status === 404) return null; if (!res.ok) throw new Error(); return res.json(); })
-    .then(function(row) {
-      if (row && Array.isArray(row.data)) {
-        row.data.forEach(function(t) {
-          if (t && window.knownNewsTopics.indexOf(t) === -1) window.knownNewsTopics.push(t);
-        });
-        rebuildNewsTopicOptions();
-        window.knownNewsTopicsSyncedCount = window.knownNewsTopics.length;
-      }
-    })
-    .catch(function() {});
 
   function createNewsAddRow() {
     var addRow = document.createElement('div');
@@ -3516,6 +4120,32 @@
     addBtn.addEventListener('click', function() { addNewsItem(); });
     addRow.appendChild(addBtn);
     return addRow;
+  }
+
+  function refreshNewsTile(n) {
+    var tile = document.getElementById('news-tile-' + n);
+    if (!tile) return;
+    var topicEl = document.getElementById('news-topic-' + n);
+    var overviewEl = document.getElementById('news-overview-' + n);
+    var topic = topicEl ? topicEl.value : '';
+    var overview = overviewEl ? overviewEl.value : '';
+    tile.innerHTML = '';
+    if (!topic.trim()) {
+      tile.className = 'news-tile news-tile-add';
+      tile.textContent = 'News Topic';
+    } else {
+      tile.className = 'news-tile';
+      var titleEl = document.createElement('div');
+      titleEl.className = 'news-tile-title';
+      titleEl.textContent = topic;
+      tile.appendChild(titleEl);
+      if (overview.trim()) {
+        var descEl = document.createElement('div');
+        descEl.className = 'news-tile-desc';
+        descEl.textContent = overview;
+        tile.appendChild(descEl);
+      }
+    }
   }
 
   function addNewsItem(forceId) {
@@ -3564,54 +4194,28 @@
     });
     item.appendChild(removeBtn);
 
-    // Clicking the card (outside inputs/buttons) opens the read-only detail
-    // view -- same click-to-view pattern as RTN Side Events, works in both
-    // editor and published view.
-    item.style.cursor = 'pointer';
-    item.title = 'Click to view details';
-    item.addEventListener('click', function(e) {
-      if (e.target.closest('button, input, label, .repeat-item-drag-handle')) return;
-      openNewsDetailModal(n);
+    // Visible tile — editor opens edit modal, view-mode opens read-only detail
+    var tile = document.createElement('div');
+    tile.id = 'news-tile-' + n;
+    tile.className = 'news-tile news-tile-add';
+    tile.textContent = 'News Topic';
+    tile.addEventListener('click', function(e) {
+      if (e.target.closest('button, .repeat-item-drag-handle')) return;
+      if (document.body.classList.contains('view-mode')) {
+        openNewsDetailModal(n);
+      } else {
+        openNewsEditModal(n);
+      }
     });
+    item.appendChild(tile);
 
+    // Hidden data fields — store/recall uses these IDs unchanged
     item.insertAdjacentHTML('beforeend',
-      '<div class="field">' +
-        '<label class="field-label">Topic</label>' +
-        '<div style="display:flex; gap:6px; align-items:center; padding-right:26px;">' +
-          '<input class="field-input" id="news-topic-' + n + '" list="news-topic-options" placeholder="Topic name -- e.g. Redemption with Jayden, or a one-off headline" autocomplete="off" style="flex:1;">' +
-          '<label style="display:flex; align-items:center; gap:4px; font-size:10px; color:var(--gray); white-space:nowrap; cursor:pointer;">' +
-            '<input type="checkbox" id="news-save-topic-' + n + '" style="margin:0;">Save as recurring' +
-          '</label>' +
-        '</div>' +
-      '</div>' +
-      '<div class="field">' +
-        '<label class="field-label">Overview</label>' +
-        '<input class="field-input" id="news-overview-' + n + '" placeholder="One-line summary of this topic..." autocomplete="off">' +
-      '</div>' +
-      '<div class="field" id="news-notes-field-' + n + '" style="display:none;">' +
-        '<label class="field-label bullet-field-label">Notes</label>' +
-        '<div class="bullet-wrap">' +
-          '<div class="bullet-marks" id="news-notes-marks-' + n + '"><span>&#8226;</span></div>' +
-          '<textarea class="bullet-textarea short" id="news-notes-' + n + '" placeholder="Talking points -- details, links, context... (one per line)"></textarea>' +
-        '</div>' +
-      '</div>' +
+      '<input type="hidden" id="news-topic-' + n + '">' +
+      '<input type="hidden" id="news-overview-' + n + '">' +
+      '<textarea style="display:none;" id="news-notes-' + n + '"></textarea>' +
+      '<div style="display:none;" id="news-notes-marks-' + n + '"></div>' +
       '<ul class="bullet-notes-print" id="news-notes-print-' + n + '"></ul>');
-
-    var notesBtn = document.createElement('button');
-    notesBtn.type = 'button';
-    notesBtn.className = 'ec-notes-btn';
-    notesBtn.id = 'news-notes-btn-' + n;
-    notesBtn.title = 'Add full details';
-    notesBtn.textContent = '✏ Notes';
-    notesBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var syncFn = function() {
-        syncBulletField('news-notes-' + n, 'news-notes-marks-' + n, 'news-notes-print-' + n);
-      };
-      var topicVal = document.getElementById('news-topic-' + n).value.trim();
-      openCardNotesPopup('news-notes-' + n, topicVal || 'Topic Notes', syncFn, notesBtn);
-    });
-    item.appendChild(notesBtn);
 
     var addRow = document.getElementById('news-add-row');
     if (addRow) {
@@ -3620,31 +4224,8 @@
       newsBody.appendChild(item);
     }
 
-    var topicInput = document.getElementById('news-topic-' + n);
-    var saveCheckbox = document.getElementById('news-save-topic-' + n);
-    saveCheckbox.addEventListener('change', function() {
-      var v = topicInput.value.trim();
-      if (this.checked && v && window.knownNewsTopics.indexOf(v) === -1) {
-        window.knownNewsTopics.push(v);
-        rebuildNewsTopicOptions();
-        persistNewsTopics();
-      }
-    });
-    topicInput.addEventListener('change', function() {
-      if (saveCheckbox.checked) {
-        var v = this.value.trim();
-        if (v && window.knownNewsTopics.indexOf(v) === -1) {
-          window.knownNewsTopics.push(v);
-          rebuildNewsTopicOptions();
-          persistNewsTopics();
-        }
-      }
-    });
-
-    // Initialize the (now hidden) print-list/marks for this item -- the
-    // textarea itself is only ever written to via the Notes popup above,
-    // which calls syncBulletField again through its own syncFn after saving.
     syncBulletField('news-notes-' + n, 'news-notes-marks-' + n, 'news-notes-print-' + n);
+    refreshNewsTile(n);
   }
 
   // Start with one topic
@@ -4735,15 +5316,18 @@
 
     card.appendChild(note);
     card.appendChild(printList);
-    card.appendChild(editNoteBtn);
+    // Note button removed — notes entered directly in the card modal
 
     document.getElementById('spoiler-card-grid').appendChild(card);
     document.getElementById('spoiler-empty-state').style.display = 'none';
   }
 
+  window._spoilerModalCurrentN = null;
+
   function openSpoilerModal(n) {
     var card = document.getElementById('spoiler-card-' + n);
     if (!card) return;
+    window._spoilerModalCurrentN = n;
     var img = card.querySelector('.spoiler-card-img-wrap img');
     var noteEl = document.getElementById('spoiler-note-' + n);
 
@@ -4759,18 +5343,43 @@
     modalBadge.textContent = setLine;
     applyBadgeColor(modalBadge, card.dataset.setName);
 
+    var isEditor = !document.body.classList.contains('view-mode');
     var modalNote = document.getElementById('spoiler-modal-note');
-    modalNote.innerHTML = '';
-    if (noteEl && noteEl.value.trim()) {
-      var ul = document.createElement('ul');
-      noteEl.value.split('\n').forEach(function(line) {
-        line = line.trim();
-        if (!line) return;
-        var li = document.createElement('li');
-        li.textContent = line;
-        ul.appendChild(li);
-      });
-      modalNote.appendChild(ul);
+    var noteEmpty = document.getElementById('spoiler-modal-note-empty');
+    var noteEditor = document.getElementById('spoiler-modal-note-editor');
+    var noteHint = document.getElementById('spoiler-modal-note-hint');
+
+    if (isEditor) {
+      // Show editable bullet editor, hide read-only view
+      modalNote.style.display = 'none';
+      noteEmpty.style.display = 'none';
+      noteEditor.style.display = 'block';
+      noteHint.style.display = 'block';
+      bnValueToEditor(noteEditor, noteEl ? noteEl.value : '');
+    } else {
+      // Show read-only note, hide editor
+      noteEditor.style.display = 'none';
+      noteHint.style.display = 'none';
+      modalNote.style.display = '';
+      modalNote.innerHTML = '';
+      if (noteEl && noteEl.value.trim()) {
+        noteEl.value.split('\n').forEach(function(line) {
+          var level = 0;
+          var m = line.match(/^(\t*)/);
+          if (m) level = Math.min(m[1].length, 2);
+          var text = line.replace(/^\t+/, '').trim();
+          if (!text) return;
+          var li = document.createElement('li');
+          li.className = 'bullet-l' + level;
+          li.textContent = text;
+          var ul = modalNote.querySelector('ul') || document.createElement('ul');
+          if (!ul.parentNode) modalNote.appendChild(ul);
+          ul.appendChild(li);
+        });
+        noteEmpty.style.display = 'none';
+      } else {
+        noteEmpty.style.display = '';
+      }
     }
 
     document.getElementById('spoiler-modal-overlay').classList.add('open');
@@ -4780,6 +5389,30 @@
     if (event && event.target.closest('.spoiler-modal-content') && !event.target.classList.contains('spoiler-modal-close')) {
       return;
     }
+    // Save inline editor content back to the card's hidden textarea
+    var n = window._spoilerModalCurrentN;
+    if (n && !document.body.classList.contains('view-mode')) {
+      var noteEl = document.getElementById('spoiler-note-' + n);
+      var noteEditor = document.getElementById('spoiler-modal-note-editor');
+      var btn = document.getElementById('spoiler-editnote-btn-' + n);
+      if (noteEl && noteEditor) {
+        noteEl.value = bnEditorToValue(noteEditor);
+        // Sync print list
+        var printList = document.getElementById('spoiler-note-print-' + n);
+        if (printList) {
+          printList.innerHTML = '';
+          noteEl.value.split('\n').forEach(function(line) {
+            var text = line.replace(/^\t+/, '').trim();
+            if (!text) return;
+            var li = document.createElement('li');
+            li.textContent = text;
+            printList.appendChild(li);
+          });
+        }
+        if (btn) btn.textContent = noteEl.value.trim() ? '✏ Notes ●' : '✏ Notes';
+      }
+    }
+    window._spoilerModalCurrentN = null;
     document.getElementById('spoiler-modal-overlay').classList.remove('open');
   }
 
@@ -5305,7 +5938,7 @@
     window.ppmCurrentHandle = handle;
     window.ppmIsNew = !!isNew;
     document.getElementById('ppm-handle').textContent = handle;
-    if (window.ppmIsNew) {
+    if (window.ppmIsNew || !document.body.classList.contains('view-mode')) {
       enterPlayerProfileEditMode();
     } else {
       renderPlayerProfileView(handle);
@@ -5316,11 +5949,22 @@
 
   function renderPlayerProfileView(handle) {
     var profile = (window.playerProfiles && window.playerProfiles[handle]) ? window.playerProfiles[handle] : {};
+    // Team logo
+    var logoEl = document.getElementById('ppm-team-logo');
+    var logoUrl = getTeamLogoUrl(profile.team);
+    if (logoUrl) {
+      logoEl.src = logoUrl;
+      logoEl.alt = profile.team || '';
+      logoEl.style.display = '';
+    } else {
+      logoEl.style.display = 'none';
+    }
     var rows = '';
     var fields = [
-      { label: 'Real Name', value: profile.realName },
-      { label: 'Region',    value: profile.region },
-      { label: 'Team Affiliation', value: profile.team }
+      { label: 'Real Name',      value: profile.realName },
+      { label: 'Pronunciation',  value: profile.pronunciation },
+      { label: 'Region',         value: profile.region },
+      { label: 'Team',           value: profile.team }
     ];
     var hasAny = false;
     fields.forEach(function(f) {
@@ -5352,20 +5996,36 @@
     var handle = window.ppmCurrentHandle;
     var profile = (!window.ppmIsNew && window.playerProfiles && window.playerProfiles[handle]) ? window.playerProfiles[handle] : {};
     document.getElementById('ppm-realname').value = profile.realName || '';
+    document.getElementById('ppm-pronunciation').value = profile.pronunciation || '';
     document.getElementById('ppm-region').value = profile.region || '';
     document.getElementById('ppm-team').value = profile.team || '';
     document.getElementById('ppm-edit-status').textContent = '';
+    // Show team logo in edit mode too
+    var logoEl = document.getElementById('ppm-team-logo');
+    var logoUrl = getTeamLogoUrl(profile.team);
+    if (logoUrl) { logoEl.src = logoUrl; logoEl.alt = profile.team || ''; logoEl.style.display = ''; }
+    else { logoEl.style.display = 'none'; }
     showPlayerProfileEditState();
+    // Update logo live as team field changes
+    var teamInput = document.getElementById('ppm-team');
+    teamInput.oninput = function() {
+      var url = getTeamLogoUrl(teamInput.value.trim());
+      if (url) { logoEl.src = url; logoEl.style.display = ''; }
+      else { logoEl.style.display = 'none'; }
+    };
   }
 
   function cancelPlayerProfileEdit() {
     if (window.ppmIsNew) {
-      // Nothing was ever saved for a brand-new add -- just close.
       closePlayerProfileModal();
       return;
     }
-    renderPlayerProfileView(window.ppmCurrentHandle);
-    showPlayerProfileViewState();
+    if (document.body.classList.contains('view-mode')) {
+      renderPlayerProfileView(window.ppmCurrentHandle);
+      showPlayerProfileViewState();
+    } else {
+      closePlayerProfileModal();
+    }
   }
 
   function savePlayerProfileFromModal() {
@@ -5373,15 +6033,25 @@
     if (!handle) return;
     var status = document.getElementById('ppm-edit-status');
     var profileData = {
-      realName: document.getElementById('ppm-realname').value.trim(),
-      region: document.getElementById('ppm-region').value.trim(),
-      team: document.getElementById('ppm-team').value.trim()
+      realName:      document.getElementById('ppm-realname').value.trim(),
+      pronunciation: document.getElementById('ppm-pronunciation').value.trim(),
+      region:        document.getElementById('ppm-region').value.trim(),
+      team:          document.getElementById('ppm-team').value.trim()
     };
     status.textContent = 'Saving...';
     persistPlayerProfile(handle, profileData, function() {
       window.ppmIsNew = false;
-      renderPlayerProfileView(handle);
-      showPlayerProfileViewState();
+      // Refresh any rank cards that show this player
+      for (var rc = 1; rc <= 10; rc++) {
+        var inp = document.getElementById('rank-' + rc);
+        if (inp && findPlayerKey(inp.value) === handle) refreshRankCard(rc);
+      }
+      if (document.body.classList.contains('view-mode')) {
+        renderPlayerProfileView(handle);
+        showPlayerProfileViewState();
+      } else {
+        closePlayerProfileModal();
+      }
       if (document.getElementById('player-registry-overlay').classList.contains('open')) {
         renderPlayerList(document.getElementById('player-registry-search').value);
       }
@@ -5519,9 +6189,14 @@
     var input = document.getElementById(targetId);
     if (!input) return;
     input.value = name;
+    // If this is a rank input, refresh the card and delta
+    var rankMatch = targetId.match(/^rank-(\d+)$/);
+    if (rankMatch) {
+      var rn = parseInt(rankMatch[1], 10);
+      updateRankDelta(rn); // also calls refreshRankCard
+    }
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
-    input.focus();
   }
 
   function openFullRegistryFromPicker() {
@@ -5556,6 +6231,7 @@
 
   function syncAllPlayerProfileButtons() {
     for (var spi = 1; spi <= 10; spi++) {
+      refreshRankCard(spi);
       var spInp = document.getElementById('rank-' + spi);
       var spBtn = document.getElementById('rank-profile-btn-' + spi);
       if (spInp && spBtn) syncPlayerProfileBtn(spInp.value, spBtn);
@@ -5592,10 +6268,14 @@
     list.innerHTML = '';
     if (notes) {
       notes.split('\n').forEach(function(line) {
-        line = line.trim();
-        if (!line) return;
+        var level = 0;
+        var m = line.match(/^(\t*)/);
+        if (m) level = Math.min(m[1].length, 2);
+        var text = line.replace(/^\t+/, '').trim();
+        if (!text) return;
         var li = document.createElement('li');
-        li.textContent = line;
+        li.className = 'bullet-l' + level;
+        li.textContent = text;
         list.appendChild(li);
       });
     }
@@ -5609,6 +6289,81 @@
   function closeSeDetailModal(event) {
     if (event && event.target !== document.getElementById('se-detail-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
     document.getElementById('se-detail-overlay').classList.remove('open');
+  }
+
+  // SE edit modal
+  var _seEditTarget = null;
+  var _seEditBulletEditor = null;
+
+  function openSeEditModal(rowNum) {
+    _seEditTarget = rowNum;
+    var nameEl = document.getElementById('rtn-event-name-' + rowNum);
+    var hostEl = document.getElementById('rtn-event-host-' + rowNum);
+    var notesEl = document.getElementById('rtn-event-notes-' + rowNum);
+
+    document.getElementById('se-edit-name-input').value = nameEl ? nameEl.value : '';
+    document.getElementById('se-edit-host-input').value = hostEl ? hostEl.value : '';
+
+    if (!_seEditBulletEditor) {
+      _seEditBulletEditor = document.getElementById('se-edit-bullet-editor');
+      _seEditBulletEditor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          var line = bnGetCurrentLine(_seEditBulletEditor);
+          if (!line) return;
+          bnSetLevel(line, bnGetLevel(line) + (e.shiftKey ? -1 : 1));
+        }
+        if (e.key === 'Enter') {
+          setTimeout(function() { bnEnsureLineOnEnter(_seEditBulletEditor); }, 0);
+        }
+      });
+      _seEditBulletEditor.addEventListener('paste', function(e) {
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        var sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        var range = sel.getRangeAt(0);
+        range.deleteContents();
+        var currentLine = bnGetCurrentLine(_seEditBulletEditor);
+        var insertLevel = currentLine ? bnGetLevel(currentLine) : 0;
+        var frag = document.createDocumentFragment();
+        text.split('\n').forEach(function(raw) {
+          var level = bnLevelFromPrefix(raw) || insertLevel;
+          var div = document.createElement('div');
+          div.className = 'bn-line bn-l' + level;
+          div.textContent = bnLineText(raw);
+          frag.appendChild(div);
+        });
+        range.insertNode(frag);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+    }
+
+    bnValueToEditor(_seEditBulletEditor, notesEl ? notesEl.value : '');
+    document.getElementById('se-edit-overlay').classList.add('open');
+    document.getElementById('se-edit-name-input').focus();
+  }
+
+  function saveAndCloseSeEdit(doSave) {
+    if (doSave && _seEditTarget !== null) {
+      var n = _seEditTarget;
+      var nameEl = document.getElementById('rtn-event-name-' + n);
+      var hostEl = document.getElementById('rtn-event-host-' + n);
+      var notesEl = document.getElementById('rtn-event-notes-' + n);
+      if (nameEl) nameEl.value = document.getElementById('se-edit-name-input').value;
+      if (hostEl) hostEl.value = document.getElementById('se-edit-host-input').value;
+      if (notesEl && _seEditBulletEditor) notesEl.value = bnEditorToValue(_seEditBulletEditor);
+      refreshSeTile(n);
+    }
+    document.getElementById('se-edit-overlay').classList.remove('open');
+    _seEditTarget = null;
+  }
+
+  function closeSeEditModal(event) {
+    if (event && event.target !== document.getElementById('se-edit-overlay')) return;
+    saveAndCloseSeEdit(false);
   }
 
   function openNewsDetailModal(rowNum) {
@@ -5629,10 +6384,15 @@
     list.innerHTML = '';
     if (notes) {
       notes.split('\n').forEach(function(line) {
-        line = line.trim();
-        if (!line) return;
+        var rawLine = line;
+        var level = 0;
+        var m = rawLine.match(/^(\t*)/);
+        if (m) level = Math.min(m[1].length, 2);
+        var text = rawLine.replace(/^\t+/, '').trim();
+        if (!text) return;
         var li = document.createElement('li');
-        li.textContent = line;
+        li.className = 'bullet-l' + level;
+        li.textContent = text;
         list.appendChild(li);
       });
     }
@@ -5646,6 +6406,85 @@
   function closeNewsDetailModal(event) {
     if (event && event.target !== document.getElementById('news-detail-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
     document.getElementById('news-detail-overlay').classList.remove('open');
+  }
+
+  // News edit modal (editor only)
+  var _newsEditTarget = null;
+  var _newsEditBulletEditor = null;
+
+  function openNewsEditModal(rowNum) {
+    _newsEditTarget = rowNum;
+    var topicEl = document.getElementById('news-topic-' + rowNum);
+    var overviewEl = document.getElementById('news-overview-' + rowNum);
+    var notesEl = document.getElementById('news-notes-' + rowNum);
+
+    document.getElementById('news-edit-title-input').value = topicEl ? topicEl.value : '';
+    document.getElementById('news-edit-desc-input').value = overviewEl ? overviewEl.value : '';
+
+    if (!_newsEditBulletEditor) {
+      _newsEditBulletEditor = document.getElementById('news-edit-bullet-editor');
+      _newsEditBulletEditor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          var line = bnGetCurrentLine(_newsEditBulletEditor);
+          if (!line) return;
+          bnSetLevel(line, bnGetLevel(line) + (e.shiftKey ? -1 : 1));
+        }
+        if (e.key === 'Enter') {
+          setTimeout(function() { bnEnsureLineOnEnter(_newsEditBulletEditor); }, 0);
+        }
+      });
+      _newsEditBulletEditor.addEventListener('paste', function(e) {
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        var sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        var range = sel.getRangeAt(0);
+        range.deleteContents();
+        var currentLine = bnGetCurrentLine(_newsEditBulletEditor);
+        var insertLevel = currentLine ? bnGetLevel(currentLine) : 0;
+        var lines = text.split('\n');
+        var frag = document.createDocumentFragment();
+        lines.forEach(function(raw) {
+          var level = bnLevelFromPrefix(raw) || insertLevel;
+          var div = document.createElement('div');
+          div.className = 'bn-line bn-l' + level;
+          div.textContent = bnLineText(raw);
+          frag.appendChild(div);
+        });
+        range.insertNode(frag);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+    }
+
+    bnValueToEditor(_newsEditBulletEditor, notesEl ? notesEl.value : '');
+    document.getElementById('news-edit-overlay').classList.add('open');
+    document.getElementById('news-edit-title-input').focus();
+  }
+
+  function saveAndCloseNewsEdit(doSave) {
+    if (doSave && _newsEditTarget !== null) {
+      var n = _newsEditTarget;
+      var topicEl = document.getElementById('news-topic-' + n);
+      var overviewEl = document.getElementById('news-overview-' + n);
+      var notesEl = document.getElementById('news-notes-' + n);
+      if (topicEl) topicEl.value = document.getElementById('news-edit-title-input').value;
+      if (overviewEl) overviewEl.value = document.getElementById('news-edit-desc-input').value;
+      if (notesEl && _newsEditBulletEditor) {
+        notesEl.value = bnEditorToValue(_newsEditBulletEditor);
+        syncBulletField('news-notes-' + n, 'news-notes-marks-' + n, 'news-notes-print-' + n);
+      }
+      refreshNewsTile(n);
+    }
+    document.getElementById('news-edit-overlay').classList.remove('open');
+    _newsEditTarget = null;
+  }
+
+  function closeNewsEditModal(event) {
+    if (event && event.target !== document.getElementById('news-edit-overlay')) return;
+    saveAndCloseNewsEdit(false);
   }
 
   function addUpcomingPick() {
@@ -5756,6 +6595,47 @@
 
   // ---- Road to Nationals: Key Deadlines (add/remove rows) ----
   window.rtnDeadlineCount = 0;
+
+  function formatDeadlineDate(dateVal) {
+    if (!dateVal) return '';
+    var parts = dateVal.split('-');
+    if (parts.length < 3) return dateVal;
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var m = parseInt(parts[1], 10) - 1;
+    return (months[m] || '') + ' ' + parseInt(parts[2], 10);
+  }
+
+  function refreshDlPill(n) {
+    var pill = document.getElementById('rtn-deadline-row-' + n);
+    if (!pill) return;
+    var label = (document.getElementById('rtn-deadline-label-' + n) || {}).value || '';
+    var date  = (document.getElementById('rtn-deadline-date-' + n) || {}).value || '';
+    var removeBtn = pill.querySelector('.rtn-row-remove');
+    // Remove only visible display elements — preserve hidden inputs/textarea
+    Array.from(pill.childNodes).forEach(function(c) {
+      if (c === removeBtn) return;
+      if (c.nodeType === Node.ELEMENT_NODE && (c.type === 'hidden' || c.style.display === 'none')) return;
+      c.remove();
+    });
+    if (!label.trim()) {
+      var addSpan = document.createElement('span');
+      addSpan.className = 'deadline-pill-add';
+      addSpan.textContent = '+ Add Deadline';
+      pill.insertBefore(addSpan, removeBtn);
+    } else {
+      var labelSpan = document.createElement('span');
+      labelSpan.className = 'deadline-pill-label';
+      labelSpan.textContent = label;
+      pill.insertBefore(labelSpan, removeBtn);
+      if (date) {
+        var dateSpan = document.createElement('span');
+        dateSpan.className = 'deadline-pill-date';
+        dateSpan.textContent = formatDeadlineDate(date);
+        pill.insertBefore(dateSpan, removeBtn);
+      }
+    }
+  }
+
   function addDeadlineRow(forceId) {
     document.getElementById('rtn-deadlines-field').style.display = '';
     var n;
@@ -5770,37 +6650,177 @@
     row.className = 'deadline-pill';
     row.id = 'rtn-deadline-row-' + n;
 
-    var labelInput = document.createElement('input');
-    labelInput.className = 'dp-label';
-    labelInput.id = 'rtn-deadline-label-' + n;
-    labelInput.placeholder = 'e.g. Nametag deadline';
-    labelInput.autocomplete = 'off';
-
-    var dateInput = document.createElement('input');
-    dateInput.className = 'dp-date';
-    dateInput.id = 'rtn-deadline-date-' + n;
-    dateInput.type = 'date';
-
     var removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'rtn-row-remove';
     removeBtn.title = 'Remove';
     removeBtn.innerHTML = '&times;';
-    removeBtn.addEventListener('click', function() {
+    removeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       row.remove();
       if (document.getElementById('rtn-deadlines-list').children.length === 0) {
         document.getElementById('rtn-deadlines-field').style.display = 'none';
       }
     });
 
-    row.appendChild(labelInput);
-    row.appendChild(dateInput);
+    row.insertAdjacentHTML('beforeend',
+      '<input type="hidden" id="rtn-deadline-label-' + n + '">' +
+      '<input type="hidden" id="rtn-deadline-date-' + n + '">' +
+      '<textarea style="display:none;" id="rtn-deadline-notes-' + n + '"></textarea>');
+
     row.appendChild(removeBtn);
+
+    row.addEventListener('click', function(e) {
+      if (e.target.closest('.rtn-row-remove')) return;
+      openDlModal(n);
+    });
+
     document.getElementById('rtn-deadlines-list').appendChild(row);
+    refreshDlPill(n);
+  }
+
+  // Deadline modal
+  var _dlModalTarget = null;
+  var _dlEditBulletEditor = null;
+
+  function openDlModal(n) {
+    _dlModalTarget = n;
+    var isEditor = !document.body.classList.contains('view-mode');
+    var labelEl = document.getElementById('rtn-deadline-label-' + n);
+    var dateEl  = document.getElementById('rtn-deadline-date-' + n);
+    var notesEl = document.getElementById('rtn-deadline-notes-' + n);
+
+    document.getElementById('dl-modal-header-label').textContent =
+      (labelEl && labelEl.value.trim()) ? labelEl.value.trim() : 'Deadline';
+
+    if (isEditor) {
+      document.getElementById('dl-edit-section').style.display = '';
+      document.getElementById('dl-view-section').style.display = 'none';
+      document.getElementById('dl-save-btn').style.display = '';
+      document.getElementById('dl-cancel-btn').textContent = 'Cancel';
+      document.getElementById('dl-edit-title-input').value = labelEl ? labelEl.value : '';
+      document.getElementById('dl-edit-date-input').value  = dateEl  ? dateEl.value  : '';
+
+      if (!_dlEditBulletEditor) {
+        _dlEditBulletEditor = document.getElementById('dl-edit-bullet-editor');
+        _dlEditBulletEditor.addEventListener('keydown', function(e) {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            var line = bnGetCurrentLine(_dlEditBulletEditor);
+            if (!line) return;
+            bnSetLevel(line, bnGetLevel(line) + (e.shiftKey ? -1 : 1));
+          }
+          if (e.key === 'Enter') {
+            setTimeout(function() { bnEnsureLineOnEnter(_dlEditBulletEditor); }, 0);
+          }
+        });
+        _dlEditBulletEditor.addEventListener('paste', function(e) {
+          e.preventDefault();
+          var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+          var sel = window.getSelection();
+          if (!sel.rangeCount) return;
+          var range = sel.getRangeAt(0);
+          range.deleteContents();
+          var currentLine = bnGetCurrentLine(_dlEditBulletEditor);
+          var insertLevel = currentLine ? bnGetLevel(currentLine) : 0;
+          var frag = document.createDocumentFragment();
+          text.split('\n').forEach(function(raw) {
+            var level = bnLevelFromPrefix(raw) || insertLevel;
+            var div = document.createElement('div');
+            div.className = 'bn-line bn-l' + level;
+            div.textContent = bnLineText(raw);
+            frag.appendChild(div);
+          });
+          range.insertNode(frag);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        });
+      }
+      bnValueToEditor(_dlEditBulletEditor, notesEl ? notesEl.value : '');
+      document.getElementById('dl-edit-title-input').focus();
+    } else {
+      document.getElementById('dl-edit-section').style.display = 'none';
+      document.getElementById('dl-view-section').style.display = '';
+      document.getElementById('dl-save-btn').style.display = 'none';
+      document.getElementById('dl-cancel-btn').textContent = 'Close';
+
+      document.getElementById('dl-view-name').textContent = (labelEl && labelEl.value.trim()) ? labelEl.value.trim() : '';
+      var dateFormatted = dateEl && dateEl.value ? formatDeadlineDate(dateEl.value) : '';
+      document.getElementById('dl-view-date').textContent = dateFormatted;
+      document.getElementById('dl-view-date').style.display = dateFormatted ? '' : 'none';
+
+      var list = document.getElementById('dl-view-notes-list');
+      var empty = document.getElementById('dl-view-notes-empty');
+      list.innerHTML = '';
+      var notes = notesEl ? notesEl.value.trim() : '';
+      if (notes) {
+        notes.split('\n').forEach(function(line) {
+          var level = 0;
+          var m = line.match(/^(\t*)/);
+          if (m) level = Math.min(m[1].length, 2);
+          var text = line.replace(/^\t+/, '').trim();
+          if (!text) return;
+          var li = document.createElement('li');
+          li.className = 'bullet-l' + level;
+          li.textContent = text;
+          list.appendChild(li);
+        });
+      }
+      var hasNotes = list.children.length > 0;
+      list.style.display = hasNotes ? '' : 'none';
+      empty.style.display = hasNotes ? 'none' : '';
+    }
+
+    document.getElementById('dl-modal-overlay').classList.add('open');
+  }
+
+  function saveDlModal() {
+    if (_dlModalTarget === null) return;
+    var n = _dlModalTarget;
+    var labelEl = document.getElementById('rtn-deadline-label-' + n);
+    var dateEl  = document.getElementById('rtn-deadline-date-' + n);
+    var notesEl = document.getElementById('rtn-deadline-notes-' + n);
+    if (labelEl) labelEl.value = document.getElementById('dl-edit-title-input').value;
+    if (dateEl)  dateEl.value  = document.getElementById('dl-edit-date-input').value;
+    if (notesEl && _dlEditBulletEditor) notesEl.value = bnEditorToValue(_dlEditBulletEditor);
+    refreshDlPill(n);
+    document.getElementById('dl-modal-overlay').classList.remove('open');
+    _dlModalTarget = null;
+  }
+
+  function closeDlModal(event) {
+    if (event && event.target !== document.getElementById('dl-modal-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
+    document.getElementById('dl-modal-overlay').classList.remove('open');
+    _dlModalTarget = null;
   }
 
   // ---- Road to Nationals: Side Events (add/remove rows) ----
   window.rtnEventCount = 0;
+  function refreshSeTile(n) {
+    var tile = document.getElementById('se-tile-' + n);
+    if (!tile) return;
+    var name = (document.getElementById('rtn-event-name-' + n) || {}).value || '';
+    var host = (document.getElementById('rtn-event-host-' + n) || {}).value || '';
+    tile.innerHTML = '';
+    if (!name.trim()) {
+      tile.className = 'se-tile se-tile-add';
+      tile.textContent = 'Side Event';
+    } else {
+      tile.className = 'se-tile';
+      var nameEl = document.createElement('div');
+      nameEl.className = 'se-tile-name';
+      nameEl.textContent = name;
+      tile.appendChild(nameEl);
+      if (host.trim()) {
+        var hostEl = document.createElement('div');
+        hostEl.className = 'se-tile-host';
+        hostEl.textContent = host;
+        tile.appendChild(hostEl);
+      }
+    }
+  }
+
   function addSideEventRow(forceId) {
     document.getElementById('rtn-events-field').style.display = '';
     var n;
@@ -5814,14 +6834,8 @@
     var row = document.createElement('div');
     row.className = 'event-card';
     row.id = 'rtn-event-row-' + n;
-    row.style.cursor = 'pointer';
-    row.title = 'Click to view details';
     if (!document.body.classList.contains('view-mode')) row.draggable = true;
-    row.addEventListener('click', function(e) {
-      // Don't open detail modal if clicking a button/input/drag handle inside the card
-      if (e.target.closest('button, input, .event-card-drag-handle')) return;
-      openSeDetailModal(n);
-    });
+
     var seHandleGrabbed = false;
     row.addEventListener('dragstart', function(e) {
       if (document.body.classList.contains('view-mode')) { e.preventDefault(); return; }
@@ -5842,46 +6856,6 @@
     dragHandle.addEventListener('mouseup', function() { seHandleGrabbed = false; });
     row.appendChild(dragHandle);
 
-    var nameInput = document.createElement('input');
-    nameInput.className = 'ec-name';
-    nameInput.id = 'rtn-event-name-' + n;
-    nameInput.placeholder = 'Event Name';
-    nameInput.autocomplete = 'off';
-    nameInput.addEventListener('click', function(e) { e.stopPropagation(); });
-
-    var hostInput = document.createElement('input');
-    hostInput.className = 'ec-host';
-    hostInput.id = 'rtn-event-host-' + n;
-    hostInput.placeholder = 'Hosted by...';
-    hostInput.autocomplete = 'off';
-    hostInput.addEventListener('click', function(e) { e.stopPropagation(); });
-
-    // Hidden textarea for bullet notes (saved to draft)
-    var notesTextarea = document.createElement('textarea');
-    notesTextarea.id = 'rtn-event-notes-' + n;
-    notesTextarea.style.display = 'none';
-    notesTextarea.setAttribute('aria-hidden', 'true');
-
-    // Notes button
-    var notesBtn = document.createElement('button');
-    notesBtn.type = 'button';
-    notesBtn.className = 'ec-notes-btn';
-    notesBtn.id = 'rtn-event-notes-btn-' + n;
-    notesBtn.title = 'Add event notes';
-    notesBtn.textContent = '✏ Notes';
-    notesBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var syncFn = function() {
-        var val = document.getElementById('rtn-event-notes-' + n).value.trim();
-        var btn = document.getElementById('rtn-event-notes-btn-' + n);
-        if (btn) {
-          btn.textContent = val ? '✏ Notes ●' : '✏ Notes';
-          btn.classList.toggle('has-notes', !!val);
-        }
-      };
-      openCardNotesPopup('rtn-event-notes-' + n, nameInput.value.trim() || 'Event Notes', syncFn, notesBtn);
-    });
-
     var removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'rtn-row-remove';
@@ -5894,13 +6868,30 @@
         document.getElementById('rtn-events-field').style.display = 'none';
       }
     });
-
-    row.appendChild(nameInput);
-    row.appendChild(hostInput);
-    row.appendChild(notesTextarea);
-    row.appendChild(notesBtn);
     row.appendChild(removeBtn);
+
+    var tile = document.createElement('div');
+    tile.id = 'se-tile-' + n;
+    tile.className = 'se-tile se-tile-add';
+    tile.textContent = 'Side Event';
+    tile.addEventListener('click', function(e) {
+      if (e.target.closest('button, .event-card-drag-handle')) return;
+      if (document.body.classList.contains('view-mode')) {
+        openSeDetailModal(n);
+      } else {
+        openSeEditModal(n);
+      }
+    });
+    row.appendChild(tile);
+
+    row.insertAdjacentHTML('beforeend',
+      '<input type="hidden" id="rtn-event-name-' + n + '">' +
+      '<input type="hidden" id="rtn-event-host-' + n + '">' +
+      '<textarea style="display:none;" id="rtn-event-notes-' + n + '"></textarea>' +
+      '<button type="button" id="rtn-event-notes-btn-' + n + '" style="display:none;"></button>');
+
     document.getElementById('rtn-events-list').appendChild(row);
+    refreshSeTile(n);
   }
 
   // Drag-and-drop reordering for Side Event cards (editor only -- dragstart/draggable
@@ -5952,11 +6943,13 @@
       }
     }
 
-    // Deadlines (labels only — dates are episode-specific)
+    // Deadlines (labels + notes — dates are episode-specific)
     for (var j = 1; j <= window.rtnDeadlineCount; j++) {
       var labelEl = document.getElementById('rtn-deadline-label-' + j);
       if (labelEl && labelEl.value.trim()) {
         data['rtn-deadline-label-' + j] = labelEl.value;
+        var dlNotesEl = document.getElementById('rtn-deadline-notes-' + j);
+        if (dlNotesEl) data['rtn-deadline-notes-' + j] = dlNotesEl.value;
       }
     }
 
@@ -6033,13 +7026,17 @@
           }
         }
 
-        // Deadlines (labels only)
+        // Deadlines (labels + notes)
         for (var j = 1; j <= 20; j++) {
           var label = data['rtn-deadline-label-' + j];
           if (label && label.trim()) {
             addDeadlineRow();
             var m = window.rtnDeadlineCount;
-            document.getElementById('rtn-deadline-label-' + m).value = label.trim();
+            var dlLabelEl = document.getElementById('rtn-deadline-label-' + m);
+            if (dlLabelEl) dlLabelEl.value = label.trim();
+            var dlNotesEl2 = document.getElementById('rtn-deadline-notes-' + m);
+            if (dlNotesEl2 && data['rtn-deadline-notes-' + j]) dlNotesEl2.value = data['rtn-deadline-notes-' + j];
+            refreshDlPill(m);
             deadlinesAdded++;
           }
         }
@@ -6580,7 +7577,7 @@
           // for drafts saved before drag reordering existed.
           var newsIndices = [];
           Object.keys(data).forEach(function(k) {
-            var m = k.match(/^news-(topic|notes|save-topic|overview)-(\d+)$/);
+            var m = k.match(/^news-(topic|notes|overview)-(\d+)$/);
             if (m) {
               var idx = parseInt(m[2], 10);
               if (newsIndices.indexOf(idx) === -1) newsIndices.push(idx);
@@ -6608,7 +7605,7 @@
           // Restore checkbox states for dynamically-rebuilt items
           Object.keys(data).forEach(function(id) {
             var el = document.getElementById(id);
-            if (el && el.type === 'checkbox' && /^news-save-topic-\d+$/.test(id)) {
+            if (el && el.type === 'checkbox') {
               el.checked = data[id];
             }
           });
@@ -6637,11 +7634,10 @@
             updateNatsCountdown();
             updateAllRankDeltas();
             updateAllMetaRankDeltas();
-            // Sync rank profile button state after draft load
+            // Refresh rank cards after draft load (values restored above)
             for (var rp = 1; rp <= 10; rp++) {
-              var rpInp = document.getElementById('rank-' + rp);
-              var rpBtn = document.getElementById('rank-profile-btn-' + rp);
-              if (rpInp && rpBtn) syncPlayerProfileBtn(rpInp.value, rpBtn);
+              refreshRankCard(rp);
+              updateRankDeltaGeneric('rank', rp, window.previousRankings);
             }
             // Sync participants suffix visibility after draft load
             for (var ps = 1; ps <= tournCount; ps++) {
@@ -6657,19 +7653,20 @@
             var guestBtn = document.getElementById('guest-profile-btn');
             var guestInp = document.getElementById('guest-name');
             if (guestInp && guestBtn) syncPlayerProfileBtn(guestInp.value, guestBtn);
-            // Sync side event notes button state after draft load
+            // Refresh side event tiles after draft load
             for (var se = 1; se <= window.rtnEventCount; se++) {
-              var seNotes = document.getElementById('rtn-event-notes-' + se);
-              var seBtn = document.getElementById('rtn-event-notes-btn-' + se);
-              if (seBtn && seNotes && seNotes.value.trim()) {
-                seBtn.textContent = '✏ Notes ●';
-                seBtn.classList.add('has-notes');
-              }
+              refreshSeTile(se);
+            }
+            // Refresh deadline pills after draft load
+            for (var dl = 1; dl <= window.rtnDeadlineCount; dl++) {
+              refreshDlPill(dl);
             }
             syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
             syncEpDatePrint();
             syncEpNumPrint();
             syncEpRuntimePrint();
+            // Refresh tournament tiles now that hidden field values are restored
+            for (var trt = 1; trt <= window.tournBlockCount; trt++) { refreshTournTile(trt); }
             syncBulletField('opening-notes', 'opening-notes-marks', 'opening-notes-print');
             syncBulletField('close-reminders', 'close-reminders-marks', 'close-reminders-print');
             ['dotw-notes', 'spoiler-notes', 'meta-notes', 'agur-notes', 'potm-notes', 'guest-bio', 'guest-links'].forEach(function(bid) {
@@ -6682,6 +7679,7 @@
 
             for (var nwi = 1; nwi <= window.newsCount; nwi++) {
               syncBulletField('news-notes-' + nwi, 'news-notes-marks-' + nwi, 'news-notes-print-' + nwi);
+              refreshNewsTile(nwi);
             }
 
             if (data['agur-cards'] && data['agur-cards'].length) {
@@ -7830,6 +8828,172 @@
   window._cardNotesSyncFn = null;   // function to call after saving (syncs print list)
   window._cardNotesBtn = null;      // button that opened the popup (for visual feedback)
 
+  // ---- Live bullet editor helpers ----
+  function bnLevelFromPrefix(line) {
+    // Stored format: leading tabs encode indent level (0, 1, or 2)
+    var m = line.match(/^(\t*)/);
+    return m ? Math.min(m[1].length, 2) : 0;
+  }
+  function bnLineText(line) {
+    return line.replace(/^\t+/, '');
+  }
+  function bnEditorToValue(editor) {
+    // Walk child nodes; each .bn-line div = one line
+    var lines = [];
+    editor.childNodes.forEach(function(node) {
+      if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('bn-line')) {
+        var level = node.classList.contains('bn-l2') ? 2 : node.classList.contains('bn-l1') ? 1 : 0;
+        var text = node.textContent;
+        lines.push('\t'.repeat(level) + text);
+      } else if (node.nodeType === Node.TEXT_NODE) {
+        lines.push(node.textContent);
+      }
+    });
+    return lines.join('\n');
+  }
+  function bnValueToEditor(editor, value) {
+    editor.innerHTML = '';
+    var lines = value ? value.split('\n') : [''];
+    if (!lines.length) lines = [''];
+    lines.forEach(function(raw) {
+      var level = bnLevelFromPrefix(raw);
+      var text = bnLineText(raw);
+      var div = document.createElement('div');
+      div.className = 'bn-line bn-l' + level;
+      div.textContent = text;
+      editor.appendChild(div);
+    });
+    // Ensure at least one line
+    if (!editor.querySelector('.bn-line')) {
+      var div = document.createElement('div');
+      div.className = 'bn-line bn-l0';
+      div.textContent = '';
+      editor.appendChild(div);
+    }
+  }
+  function bnGetCurrentLine(editor) {
+    var sel = window.getSelection();
+    if (!sel.rangeCount) return null;
+    var node = sel.anchorNode;
+    while (node && node !== editor) {
+      if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('bn-line')) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+  function bnSetLevel(lineEl, level) {
+    level = Math.max(0, Math.min(2, level));
+    lineEl.classList.remove('bn-l0', 'bn-l1', 'bn-l2');
+    lineEl.classList.add('bn-l' + level);
+  }
+  function bnGetLevel(lineEl) {
+    return lineEl.classList.contains('bn-l2') ? 2 : lineEl.classList.contains('bn-l1') ? 1 : 0;
+  }
+  function bnEnsureLineOnEnter(editor) {
+    // After Enter, browser may insert a plain div — normalise it
+    editor.querySelectorAll('div:not(.bn-line)').forEach(function(d) {
+      d.classList.add('bn-line', 'bn-l0');
+    });
+    // Also handle bare text nodes at root by wrapping them
+    var toWrap = [];
+    editor.childNodes.forEach(function(n) {
+      if (n.nodeType === Node.TEXT_NODE && n.textContent) toWrap.push(n);
+    });
+    toWrap.forEach(function(n) {
+      var div = document.createElement('div');
+      div.className = 'bn-line bn-l0';
+      div.textContent = n.textContent;
+      editor.replaceChild(div, n);
+    });
+  }
+
+  var _bnEditor = null;
+  function initBulletEditor() {
+    _bnEditor = document.getElementById('card-notes-bullet-editor');
+    _bnEditor.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        var line = bnGetCurrentLine(_bnEditor);
+        if (!line) return;
+        bnSetLevel(line, bnGetLevel(line) + (e.shiftKey ? -1 : 1));
+      }
+      if (e.key === 'Enter') {
+        // Let browser insert line, then normalise on next tick
+        setTimeout(function() { bnEnsureLineOnEnter(_bnEditor); }, 0);
+      }
+    });
+    _bnEditor.addEventListener('paste', function(e) {
+      e.preventDefault();
+      var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      // Insert each line as a bn-line
+      var sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      var range = sel.getRangeAt(0);
+      range.deleteContents();
+      var currentLine = bnGetCurrentLine(_bnEditor);
+      var insertLevel = currentLine ? bnGetLevel(currentLine) : 0;
+      var lines = text.split('\n');
+      var frag = document.createDocumentFragment();
+      lines.forEach(function(raw) {
+        var level = bnLevelFromPrefix(raw) || insertLevel;
+        var div = document.createElement('div');
+        div.className = 'bn-line bn-l' + level;
+        div.textContent = bnLineText(raw);
+        frag.appendChild(div);
+      });
+      range.insertNode(frag);
+      // Move cursor to end
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+  }
+  // Init after DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBulletEditor);
+  } else {
+    initBulletEditor();
+  }
+
+  // Init spoiler modal note editor -- must be after bn* helpers are defined above
+  (function() {
+    var ed = document.getElementById('spoiler-modal-note-editor');
+    if (!ed) return;
+    ed.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        var line = bnGetCurrentLine(ed);
+        if (!line) return;
+        bnSetLevel(line, bnGetLevel(line) + (e.shiftKey ? -1 : 1));
+      }
+      if (e.key === 'Enter') {
+        setTimeout(function() { bnEnsureLineOnEnter(ed); }, 0);
+      }
+    });
+    ed.addEventListener('paste', function(e) {
+      e.preventDefault();
+      var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      var sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      var range = sel.getRangeAt(0);
+      range.deleteContents();
+      var currentLine = bnGetCurrentLine(ed);
+      var insertLevel = currentLine ? bnGetLevel(currentLine) : 0;
+      var frag = document.createDocumentFragment();
+      text.split('\n').forEach(function(raw) {
+        var level = bnLevelFromPrefix(raw) || insertLevel;
+        var div = document.createElement('div');
+        div.className = 'bn-line bn-l' + level;
+        div.textContent = bnLineText(raw);
+        frag.appendChild(div);
+      });
+      range.insertNode(frag);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+  })();
+
   function openCardNotesPopup(textareaId, cardName, syncFn, btn) {
     var noteEl = document.getElementById(textareaId);
     if (!noteEl) return;
@@ -7838,9 +9002,19 @@
     window._cardNotesBtn = btn;
 
     document.getElementById('card-notes-popup-title').textContent = cardName || 'Card Notes';
-    document.getElementById('card-notes-popup-textarea').value = noteEl.value;
+    // Populate bullet editor from stored value
+    if (_bnEditor) bnValueToEditor(_bnEditor, noteEl.value);
     document.getElementById('card-notes-popup-overlay').classList.add('open');
-    document.getElementById('card-notes-popup-textarea').focus();
+    if (_bnEditor) {
+      _bnEditor.focus();
+      // Place cursor at end
+      var range = document.createRange();
+      range.selectNodeContents(_bnEditor);
+      range.collapse(false);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
 
     // Visual indicator on button if notes exist
     if (btn) btn.style.fontWeight = noteEl.value.trim() ? '900' : '';
@@ -7849,11 +9023,9 @@
   function saveAndCloseCardNotes() {
     if (window._cardNotesTarget) {
       var noteEl = document.getElementById(window._cardNotesTarget);
-      var popup = document.getElementById('card-notes-popup-textarea');
-      if (noteEl && popup) {
-        noteEl.value = popup.value;
+      if (noteEl && _bnEditor) {
+        noteEl.value = bnEditorToValue(_bnEditor);
         if (window._cardNotesSyncFn) window._cardNotesSyncFn();
-        // Update button appearance
         if (window._cardNotesBtn) {
           window._cardNotesBtn.textContent = noteEl.value.trim() ? '✏ Notes ●' : '✏ Notes';
         }
