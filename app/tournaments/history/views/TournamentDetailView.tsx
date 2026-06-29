@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import type { ViewId } from "../NavTabs";
 import { useSeed } from "../seed-context";
 import type { MatchEntry } from "@/lib/nationals/types";
@@ -15,6 +15,36 @@ import { FantasyDraftModal } from "../components/FantasyDraftModal";
 import { promosForYear } from "@/lib/nationals/promos";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+// Turn bare URLs in freeform notes (e.g. "redemptionccg.app/register") into
+// clickable links. Matches http(s) URLs and bare domain/path tokens; links read
+// as plain text at rest (underline, not color) and go green on hover.
+function linkifyNotes(text: string): ReactNode[] {
+  const urlPattern = /(https?:\/\/[^\s]+|(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s]*)/gi;
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+  let match: RegExpExecArray | null;
+  while ((match = urlPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    const raw = match[0];
+    const href = raw.startsWith("http") ? raw : `https://${raw}`;
+    parts.push(
+      <a
+        key={key++}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-foreground underline underline-offset-2 hover:text-primary transition-colors"
+      >
+        {raw}
+      </a>
+    );
+    lastIndex = match.index + raw.length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
 
 const MATCH_DATA_START_YEAR = 2003;
 const TC_ROUND_ORDER = ["Quarterfinal", "Semifinal", "3rd Place", "Final"];
@@ -339,7 +369,7 @@ export function TournamentDetailView({
 
         {/* Notes */}
         {tournament.notes && (
-          <p className="text-sm text-muted-foreground mb-3">{tournament.notes}</p>
+          <p className="text-sm text-muted-foreground mb-3">{linkifyNotes(tournament.notes)}</p>
         )}
 
         {/* ── State map ────────────────────────────────────────────────── */}
