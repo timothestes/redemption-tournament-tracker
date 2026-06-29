@@ -3399,6 +3399,8 @@
   function updateRankDeltaGeneric(prefix, rowNum, prevMap) {
     var input = document.getElementById(prefix + '-' + rowNum);
     var badge = document.getElementById(prefix + '-delta-' + rowNum);
+    // Empty rank rows no longer render a delta badge; bail before dereferencing.
+    if (!input || !badge) return;
     var name = input.value.trim();
 
     if (!name || !prevMap) {
