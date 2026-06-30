@@ -11,12 +11,12 @@ export interface CategoryDefaults {
 // Categories offered when hosting a tournament that isn't tied to an official
 // listing's own format list.
 export const STANDARD_CATEGORIES = [
-  "Type 1 - 2P",
-  "Type 2 - 2P",
+  "Type 1",
+  "Type 2",
   "Booster Draft",
   "Sealed Deck",
   "Teams",
-  "Type A - 2P",
+  "Type A",
   "Paragon",
 ] as const;
 

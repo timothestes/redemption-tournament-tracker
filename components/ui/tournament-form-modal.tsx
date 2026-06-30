@@ -20,6 +20,9 @@ interface TournamentFormModalProps {
   categoryOptions?: string[];
 }
 
+// Drop a trailing "- 2P" / "2P" player-count suffix; it reads as clutter.
+const cleanCategory = (label: string) => label.replace(/\s*-?\s*2P$/i, "").trim();
+
 const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   isOpen,
   onClose,
@@ -28,33 +31,61 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   categoryOptions,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState("");
   const [category, setCategory] = useState("");
+  // Once the host edits the name, we stop auto-building it from the category.
+  const [nameTouched, setNameTouched] = useState(false);
 
-  const options =
+  const options = (
     categoryOptions && categoryOptions.length > 0
       ? categoryOptions
-      : [...STANDARD_CATEGORIES];
+      : [...STANDARD_CATEGORIES]
+  ).map(cleanCategory);
+
+  // Build a name like "Jun 29, 2026 Type 1" from the selected category.
+  const buildAutoName = (type: string) => {
+    if (!type) return "";
+    const date = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date());
+    return `${date} ${type}`;
+  };
 
   useEffect(() => {
-    if (isOpen) {
-      setCategory("");
-      if (inputRef.current) {
-        inputRef.current.value = defaultName ?? "";
-        inputRef.current.focus();
-      }
-    }
+    if (!isOpen) return;
+    const initialCategory = options[0] ?? "";
+    setCategory(initialCategory);
+    setNameTouched(false);
+    // A listing-provided name wins; otherwise auto-build from the default category.
+    setName(defaultName ? defaultName : buildAutoName(initialCategory));
+    // Focus and select the name so it's easy to override.
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, defaultName]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const name = formData.get("name")?.toString();
-    if (name) {
-      onSubmit(name, category || null);
+  const handleCategoryChange = (value: string) => {
+    setCategory(value);
+    // Rebuild the name from the category only when the host hasn't edited it and
+    // we're not preserving a listing-provided name.
+    if (!nameTouched && !defaultName && value) {
+      setName(buildAutoName(value));
     }
   };
 
-  const selectClasses =
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed) {
+      onSubmit(trimmed, category || null);
+    }
+  };
+
+  const fieldClasses =
     "w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none";
 
   return (
@@ -65,16 +96,6 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <DialogBody className="space-y-3">
-            <input
-              id="name"
-              name="name"
-              type="text"
-              placeholder="Tournament Name (max 35 characters)"
-              required
-              maxLength={35}
-              ref={inputRef}
-              className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none"
-            />
             <div>
               <label
                 htmlFor="category"
@@ -84,10 +105,9 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
               </label>
               <select
                 id="category"
-                name="category"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className={selectClasses}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className={fieldClasses}
               >
                 <option value="">No specific category</option>
                 {options.map((opt) => (
@@ -100,6 +120,28 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
                 Sets sensible defaults (souls to win, round length) you can change
                 later.
               </p>
+            </div>
+            <div>
+              <label
+                htmlFor="name"
+                className="block text-xs font-medium text-muted-foreground mb-1"
+              >
+                Tournament name
+              </label>
+              <input
+                id="name"
+                type="text"
+                placeholder="Tournament name (max 35 characters)"
+                required
+                maxLength={35}
+                ref={inputRef}
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameTouched(true);
+                }}
+                className={fieldClasses}
+              />
             </div>
           </DialogBody>
           <DialogFooter className="justify-end">
