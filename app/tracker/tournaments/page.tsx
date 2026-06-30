@@ -200,7 +200,40 @@ function TournamentsPageInner() {
       year: "numeric",
     }).format(new Date(value));
 
-  const renderRow = (tournament: any, label: string) => (
+  const deckFormatLabel = (format: string | null) => {
+    if (!format) return null;
+    if (format === "T1") return "Type 1";
+    if (format === "T2") return "Type 2";
+    return format; // Paragon, Other
+  };
+
+  // Subtle, scannable tint per category — mirrors the listing badges and keeps
+  // the primary green reserved for actions.
+  const typePillClasses = (type: string) => {
+    const t = type.toLowerCase();
+    const base =
+      "inline-flex items-center flex-shrink-0 whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ";
+    if (t.includes("teams"))
+      return base + "bg-purple-500/15 text-purple-700 dark:text-purple-400";
+    if (t.includes("type 2") || t === "t2")
+      return base + "bg-amber-500/15 text-amber-700 dark:text-amber-400";
+    if (t.includes("draft"))
+      return base + "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400";
+    if (t.includes("sealed"))
+      return base + "bg-teal-500/15 text-teal-700 dark:text-teal-400";
+    if (t.includes("paragon"))
+      return base + "bg-rose-500/15 text-rose-700 dark:text-rose-400";
+    if (t.includes("type 1") || t.includes("type a") || t === "t1")
+      return base + "bg-blue-500/15 text-blue-700 dark:text-blue-400";
+    return base + "bg-muted text-muted-foreground";
+  };
+
+  // showName=false is used inside an event group, where the event name is in the
+  // header and the category pill is the row's identity.
+  const renderRow = (tournament: any, showName: boolean) => {
+    const type = tournament.category || deckFormatLabel(tournament.deck_format);
+    const showNameText = showName || !type;
+    return (
     <li
       key={tournament.id}
       className="bg-card cursor-pointer hover:bg-muted transition-colors"
@@ -208,7 +241,16 @@ function TournamentsPageInner() {
     >
       <div className="flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-foreground truncate">{label}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            {showNameText && (
+              <p className="font-medium text-foreground truncate">
+                {tournament.name}
+              </p>
+            )}
+            {type && (
+              <span className={typePillClasses(type)}>{type}</span>
+            )}
+          </div>
           <p className="text-xs sm:text-sm text-muted-foreground truncate">
             {formatCreatedAt(tournament.created_at)}
           </p>
@@ -237,7 +279,8 @@ function TournamentsPageInner() {
         </div>
       </div>
     </li>
-  );
+    );
+  };
 
   return (
     <div className="flex min-h-screen px-4 sm:px-5 w-full">
@@ -324,14 +367,14 @@ function TournamentsPageInner() {
                   </Button>
                 </div>
                 <ul className="divide-y divide-border">
-                  {group.map((t) => renderRow(t, t.category || t.name))}
+                  {group.map((t) => renderRow(t, false))}
                 </ul>
               </div>
             ))}
             {ungrouped.length > 0 && (
               <div className="jayden-gradient-bg rounded-lg overflow-hidden border border-border">
                 <ul className="divide-y divide-border">
-                  {ungrouped.map((t) => renderRow(t, t.name))}
+                  {ungrouped.map((t) => renderRow(t, true))}
                 </ul>
               </div>
             )}
