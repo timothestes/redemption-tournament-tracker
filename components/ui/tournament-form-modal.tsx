@@ -30,7 +30,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   defaultName,
   categoryOptions,
 }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   // Once the host edits the name, we stop auto-building it from the category.
@@ -60,10 +60,9 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
     setNameTouched(false);
     // A listing-provided name wins; otherwise auto-build from the default category.
     setName(defaultName ? defaultName : buildAutoName(initialCategory));
-    // Focus and select the name so it's easy to override.
+    // Start on the category dropdown — picking it is the first decision.
     requestAnimationFrame(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
+      selectRef.current?.focus();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, defaultName]);
@@ -105,6 +104,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
               </label>
               <select
                 id="category"
+                ref={selectRef}
                 value={category}
                 onChange={(e) => handleCategoryChange(e.target.value)}
                 className={fieldClasses}
@@ -134,7 +134,6 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
                 placeholder="Tournament name"
                 required
                 maxLength={60}
-                ref={inputRef}
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
