@@ -42,7 +42,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
       : [...STANDARD_CATEGORIES]
   ).map(cleanCategory);
 
-  // Build a name like "Jun 29, 2026 Type 1" from the selected category.
+  // Build a name like "Jun 29, 2026 Type 1 Tournament" from the selected category.
   const buildAutoName = (type: string) => {
     if (!type) return "";
     const date = new Intl.DateTimeFormat("en-US", {
@@ -50,7 +50,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
       day: "numeric",
       year: "numeric",
     }).format(new Date());
-    return `${date} ${type}`;
+    return `${date} ${type} Tournament`;
   };
 
   useEffect(() => {
@@ -131,9 +131,9 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
               <input
                 id="name"
                 type="text"
-                placeholder="Tournament name (max 35 characters)"
+                placeholder="Tournament name"
                 required
-                maxLength={35}
+                maxLength={60}
                 ref={inputRef}
                 value={name}
                 onChange={(e) => {
