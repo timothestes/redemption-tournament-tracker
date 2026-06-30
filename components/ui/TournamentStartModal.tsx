@@ -17,6 +17,15 @@ interface TournamentStartModalProps {
   onConfirm: (numberOfRounds: number, roundLength: number, maxScore: number, byePoints: number, byeDifferential: number, startingTableNumber: number, soundNotifications: boolean) => void;
   participantCount: number;
   suggestedRounds: number;
+  // Persisted tournament settings to seed the form with (e.g. values prefilled
+  // from the chosen category, or anything the host set beforehand). Each falls
+  // back to the standard default when null/undefined.
+  defaultRoundLength?: number | null;
+  defaultMaxScore?: number | null;
+  defaultByePoints?: number | null;
+  defaultByeDifferential?: number | null;
+  defaultStartingTableNumber?: number | null;
+  defaultSoundNotifications?: boolean | null;
 }
 
 export default function TournamentStartModal({
@@ -25,27 +34,51 @@ export default function TournamentStartModal({
   onConfirm,
   participantCount,
   suggestedRounds,
+  defaultRoundLength,
+  defaultMaxScore,
+  defaultByePoints,
+  defaultByeDifferential,
+  defaultStartingTableNumber,
+  defaultSoundNotifications,
 }: TournamentStartModalProps) {
+  const initialRoundLength = defaultRoundLength ?? 45;
+  const initialMaxScore = defaultMaxScore ?? 5;
+  const initialByePoints = defaultByePoints ?? 3;
+  const initialByeDifferential = defaultByeDifferential ?? 0;
+  const initialStartingTableNumber = defaultStartingTableNumber ?? 1;
+  const initialSoundNotifications = defaultSoundNotifications ?? false;
+
   const [numberOfRounds, setNumberOfRounds] = useState(suggestedRounds);
-  const [roundLength, setRoundLength] = useState(45);
-  const [maxScore, setMaxScore] = useState(5);
-  const [byePoints, setByePoints] = useState(3);
-  const [byeDifferential, setByeDifferential] = useState(0);
-  const [startingTableNumber, setStartingTableNumber] = useState(1);
-  const [soundNotifications, setSoundNotifications] = useState(false);
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [roundLength, setRoundLength] = useState(initialRoundLength);
+  const [maxScore, setMaxScore] = useState(initialMaxScore);
+  const [byePoints, setByePoints] = useState(initialByePoints);
+  const [byeDifferential, setByeDifferential] = useState(initialByeDifferential);
+  const [startingTableNumber, setStartingTableNumber] = useState(initialStartingTableNumber);
+  const [soundNotifications, setSoundNotifications] = useState(initialSoundNotifications);
+
+  // Open Advanced Settings up front when any value there was seeded away from the
+  // standard default, so a prefilled souls score (etc.) isn't hidden.
+  const hasNonDefaultAdvanced =
+    initialMaxScore !== 5 ||
+    initialByePoints !== 3 ||
+    initialByeDifferential !== 0 ||
+    initialStartingTableNumber !== 1 ||
+    initialSoundNotifications !== false;
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(hasNonDefaultAdvanced);
 
   useEffect(() => {
     if (isOpen) {
       setNumberOfRounds(suggestedRounds);
-      setRoundLength(45);
-      setMaxScore(5);
-      setByePoints(3);
-      setByeDifferential(0);
-      setStartingTableNumber(1);
-      setSoundNotifications(false);
+      setRoundLength(initialRoundLength);
+      setMaxScore(initialMaxScore);
+      setByePoints(initialByePoints);
+      setByeDifferential(initialByeDifferential);
+      setStartingTableNumber(initialStartingTableNumber);
+      setSoundNotifications(initialSoundNotifications);
+      setIsAdvancedOpen(hasNonDefaultAdvanced);
     }
-  }, [isOpen, suggestedRounds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, suggestedRounds, initialRoundLength, initialMaxScore, initialByePoints, initialByeDifferential, initialStartingTableNumber, initialSoundNotifications]);
 
   const handleIncrement = () => {
     setNumberOfRounds(prev => prev + 1);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import Breadcrumb from "../../../components/ui/breadcrumb";
 import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
@@ -9,6 +9,7 @@ import { Button } from "../../../components/ui/button";
 import { HiPencil, HiTrash, HiPlus, HiOutlineDesktopComputer } from "react-icons/hi";
 import { useRouter, useSearchParams } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
+import { categoryDefaults } from "../../../utils/tournament/categoryDefaults";
 
 const supabase = createClient();
 
@@ -24,6 +25,7 @@ function TournamentsPageInner() {
   const [newTournamentName, setNewTournamentName] = useState("");
   const [prefillName, setPrefillName] = useState("");
   const [fromListingId, setFromListingId] = useState<string | null>(null);
+  const [listingFormats, setListingFormats] = useState<string[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -35,9 +37,11 @@ function TournamentsPageInner() {
     // Auto-open modal if coming from "Host This Event" on /tournaments
     const listingId = searchParams.get("from_listing");
     const name = searchParams.get("name");
+    const formats = searchParams.get("formats");
     if (listingId && name) {
       setPrefillName(name);
       setFromListingId(listingId);
+      setListingFormats(formats ? formats.split("|").filter(Boolean) : []);
       setisAddTournamentModalOpen(true);
     }
   }, [searchParams]);
@@ -58,7 +62,7 @@ function TournamentsPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleAddTournament = async (name: string) => {
+  const handleAddTournament = async (name: string, category: string | null) => {
     try {
       const {
         data: { user },
@@ -70,15 +74,28 @@ function TournamentsPageInner() {
         return;
       }
 
+      const insert: Record<string, unknown> = { name, host_id: user.id };
+      if (fromListingId) insert.listing_id = fromListingId;
+      // A chosen category records the format and pre-fills sensible settings the
+      // host can still change later in Tournament Settings.
+      if (category) {
+        insert.category = category;
+        const defaults = categoryDefaults(category);
+        insert.deck_format = defaults.deck_format;
+        insert.max_score = defaults.max_score;
+        insert.round_length = defaults.round_length;
+      }
+
       const { data, error } = await supabase
         .from("tournaments")
-        .insert([{ name, host_id: user.id }])
+        .insert([insert])
         .select("id")
         .single();
       if (error) {
         console.error("Error adding tournament:", error);
       } else {
-        // If created from a listing, link the tournament to the listing
+        // If created from a listing, also point the listing back at the
+        // tournament so the public page can show it's been picked up.
         if (fromListingId && data?.id) {
           await supabase
             .from("tournament_listings")
@@ -86,6 +103,7 @@ function TournamentsPageInner() {
             .eq("id", fromListingId);
           setFromListingId(null);
           setPrefillName("");
+          setListingFormats([]);
           // Clean up URL params
           router.replace("/tracker/tournaments", { scroll: false });
         }
@@ -95,6 +113,15 @@ function TournamentsPageInner() {
     } catch (error) {
       console.error("Unexpected error:", error);
     }
+  };
+
+  // Open the create modal pre-targeted at an existing event's listing so the
+  // host can add a category that was played later (or skipped on the day).
+  const openHostAnotherCategory = (listingId: string, baseName: string) => {
+    setFromListingId(listingId);
+    setPrefillName(baseName);
+    setListingFormats([]);
+    setisAddTournamentModalOpen(true);
   };
 
   const fetchTournaments = async () => {
@@ -150,6 +177,111 @@ function TournamentsPageInner() {
     }
   };
 
+  // Tournaments linked to the same listing are one real-world event with
+  // multiple categories; everything else stands alone.
+  const { groups, ungrouped } = useMemo(() => {
+    const byListing = new Map<string, any[]>();
+    const standalone: any[] = [];
+    for (const t of tournaments) {
+      if (t.listing_id) {
+        if (!byListing.has(t.listing_id)) byListing.set(t.listing_id, []);
+        byListing.get(t.listing_id)!.push(t);
+      } else {
+        standalone.push(t);
+      }
+    }
+    return { groups: Array.from(byListing.entries()), ungrouped: standalone };
+  }, [tournaments]);
+
+  const formatCreatedAt = (value: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(value));
+
+  const deckFormatLabel = (format: string | null) => {
+    if (!format) return null;
+    if (format === "T1") return "Type 1";
+    if (format === "T2") return "Type 2";
+    return format; // Paragon, Other
+  };
+
+  // Subtle, scannable tint per category — mirrors the listing badges and keeps
+  // the primary green reserved for actions.
+  const typePillClasses = (type: string) => {
+    const t = type.toLowerCase();
+    const base =
+      "inline-flex items-center flex-shrink-0 whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ";
+    if (t.includes("teams"))
+      return base + "bg-purple-500/15 text-purple-700 dark:text-purple-400";
+    if (t.includes("type 2") || t === "t2")
+      return base + "bg-amber-500/15 text-amber-700 dark:text-amber-400";
+    if (t.includes("draft"))
+      return base + "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400";
+    if (t.includes("sealed"))
+      return base + "bg-teal-500/15 text-teal-700 dark:text-teal-400";
+    if (t.includes("paragon"))
+      return base + "bg-rose-500/15 text-rose-700 dark:text-rose-400";
+    if (t.includes("type 1") || t.includes("type a") || t === "t1")
+      return base + "bg-blue-500/15 text-blue-700 dark:text-blue-400";
+    return base + "bg-muted text-muted-foreground";
+  };
+
+  // showName=false is used inside an event group, where the event name is in the
+  // header and the category pill is the row's identity.
+  const renderRow = (tournament: any, showName: boolean) => {
+    const type = tournament.category || deckFormatLabel(tournament.deck_format);
+    const showNameText = showName || !type;
+    return (
+    <li
+      key={tournament.id}
+      className="bg-card cursor-pointer hover:bg-muted transition-colors"
+      onClick={() => router.push(`/tracker/tournaments/${tournament.id}`)}
+    >
+      <div className="flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            {showNameText && (
+              <p className="font-medium text-foreground truncate">
+                {tournament.name}
+              </p>
+            )}
+            {type && (
+              <span className={typePillClasses(type)}>{type}</span>
+            )}
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground truncate">
+            {formatCreatedAt(tournament.created_at)}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/tracker/tournaments/${tournament.id}`);
+            }}
+            className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors touch-manipulation"
+            aria-label="Edit"
+          >
+            <HiPencil className="w-5 h-5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteTournament(tournament.id);
+            }}
+            className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors touch-manipulation"
+            aria-label="Delete"
+          >
+            <HiTrash className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </li>
+    );
+  };
+
   return (
     <div className="flex min-h-screen px-4 sm:px-5 w-full">
       <div className="max-w-4xl mx-auto space-y-3 w-full">
@@ -182,11 +314,13 @@ function TournamentsPageInner() {
               if (fromListingId) {
                 setFromListingId(null);
                 setPrefillName("");
+                setListingFormats([]);
                 router.replace("/tracker/tournaments", { scroll: false });
               }
             }}
             onSubmit={handleAddTournament}
             defaultName={prefillName}
+            categoryOptions={listingFormats.length > 0 ? listingFormats : undefined}
           />
         </div>
         {loading ? (
@@ -204,55 +338,46 @@ function TournamentsPageInner() {
         ) : tournaments.length === 0 ? (
           <p className="text-muted-foreground">No tournaments found.</p>
         ) : (
-          <div className="jayden-gradient-bg rounded-lg overflow-hidden border border-border">
-            <ul className="divide-y divide-border">
-              {tournaments.map((tournament) => (
-                <li
-                  key={tournament.id}
-                  className="bg-card cursor-pointer hover:bg-muted transition-colors"
-                  onClick={() =>
-                    router.push(`/tracker/tournaments/${tournament.id}`)
-                  }
-                >
-                  <div className="flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">
-                        {tournament.name}
-                      </p>
-                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                        {new Intl.DateTimeFormat("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        }).format(new Date(tournament.created_at))}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/tracker/tournaments/${tournament.id}`);
-                        }}
-                        className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors touch-manipulation"
-                        aria-label="Edit"
-                      >
-                        <HiPencil className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteTournament(tournament.id);
-                        }}
-                        className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors touch-manipulation"
-                        aria-label="Delete"
-                      >
-                        <HiTrash className="w-5 h-5" />
-                      </button>
-                    </div>
+          <div className="space-y-4">
+            {groups.map(([listingId, group]) => (
+              <div
+                key={listingId}
+                className="jayden-gradient-bg rounded-lg overflow-hidden border border-border"
+              >
+                <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-3 bg-muted/40 border-b border-border">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground truncate">
+                      {group[0].name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {group.length}{" "}
+                      {group.length === 1 ? "category" : "categories"}
+                    </p>
                   </div>
-                </li>
-              ))}
-            </ul>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      openHostAnotherCategory(listingId, group[0].name)
+                    }
+                    className="flex items-center gap-1.5 flex-shrink-0 text-xs px-2.5 py-1.5"
+                  >
+                    <HiPlus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Host another category</span>
+                    <span className="sm:hidden">Category</span>
+                  </Button>
+                </div>
+                <ul className="divide-y divide-border">
+                  {group.map((t) => renderRow(t, false))}
+                </ul>
+              </div>
+            ))}
+            {ungrouped.length > 0 && (
+              <div className="jayden-gradient-bg rounded-lg overflow-hidden border border-border">
+                <ul className="divide-y divide-border">
+                  {ungrouped.map((t) => renderRow(t, true))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
         <ToastNotification
