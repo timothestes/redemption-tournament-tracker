@@ -62,7 +62,13 @@ function TournamentsPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleAddTournament = async (name: string, category: string | null) => {
+  // Each item becomes one tournament. Hosting an event that offers several types
+  // creates one per checked type in a single insert; when hosting from a listing
+  // they share its listing_id and group under one event card.
+  const handleAddTournament = async (
+    items: { name: string; category: string | null }[]
+  ) => {
+    if (items.length === 0) return;
     try {
       const {
         data: { user },
@@ -73,33 +79,41 @@ function TournamentsPageInner() {
         console.error("Error fetching user:", userError);
         return;
       }
-
-      const insert: Record<string, unknown> = { name, host_id: user.id };
-      if (fromListingId) insert.listing_id = fromListingId;
-      // A chosen category records the format and pre-fills sensible settings the
-      // host can still change later in Tournament Settings.
-      if (category) {
-        insert.category = category;
-        const defaults = categoryDefaults(category);
-        insert.deck_format = defaults.deck_format;
-        insert.max_score = defaults.max_score;
-        insert.round_length = defaults.round_length;
+      // A silently-gone session returns no error but a null user; surface it the
+      // same way the list does rather than throwing on user.id below.
+      if (!user) {
+        setSessionError(true);
+        return;
       }
+
+      const rows = items.map(({ name, category }) => {
+        const row: Record<string, unknown> = { name, host_id: user.id };
+        if (fromListingId) row.listing_id = fromListingId;
+        // A chosen category records the format and pre-fills sensible settings the
+        // host can still change later in Tournament Settings.
+        if (category) {
+          row.category = category;
+          const defaults = categoryDefaults(category);
+          row.deck_format = defaults.deck_format;
+          row.max_score = defaults.max_score;
+          row.round_length = defaults.round_length;
+        }
+        return row;
+      });
 
       const { data, error } = await supabase
         .from("tournaments")
-        .insert([insert])
-        .select("id")
-        .single();
+        .insert(rows)
+        .select("id");
       if (error) {
         console.error("Error adding tournament:", error);
       } else {
-        // If created from a listing, also point the listing back at the
+        // If created from a listing, point the listing back at the first new
         // tournament so the public page can show it's been picked up.
-        if (fromListingId && data?.id) {
+        if (fromListingId && data?.[0]?.id) {
           await supabase
             .from("tournament_listings")
-            .update({ linked_tournament_id: data.id })
+            .update({ linked_tournament_id: data[0].id })
             .eq("id", fromListingId);
           setFromListingId(null);
           setPrefillName("");
