@@ -74,11 +74,13 @@ export const iconPredicates: Record<string, (c: Card) => boolean> = {
   "Good Fortress": (c) => c.type.includes("Fortress") && c.alignment.includes("Good"),
   "Evil Fortress": (c) => c.type.includes("Fortress") && c.alignment.includes("Evil"),
   // other icons use existing category filters
-  GE: (c) => c.type.includes("GE"),
+  // Good Enhancements also surface Covenants (a good-side enhancement-like type)
+  GE: (c) => c.type.includes("GE") || c.type === "Covenant",
   "Evil Character": (c) => c.type.includes("Evil Character"),
   Hero: (c) => c.type.includes("Hero"),
   Site: (c) => c.type === "Site",
-  EE: (c) => c.type.includes("EE"),
+  // Evil Enhancements also surface Curses (an evil-side enhancement-like type)
+  EE: (c) => c.type.includes("EE") || c.type === "Curse",
   "Territory-Class": (c) => c.class.includes("Territory"),
   "Warrior-Class": (c) => c.class.includes("Warrior"),
   "Weapon-Class": (c) => c.class.includes("Weapon"),

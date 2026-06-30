@@ -1064,7 +1064,7 @@ export default function CardSearchClient({
           let result: boolean;
           const firstFilter = selectedIconFilters[0];
           const pred = iconPredicates[firstFilter.icon];
-          const matches = pred ? pred(c) : c.brigade.toLowerCase().includes(firstFilter.icon.toLowerCase());
+          const matches = pred ? pred(c) : c.brigade.split("/").some((b) => b.toLowerCase() === firstFilter.icon.toLowerCase());
           
           // First filter is always evaluated positively
           result = matches;
@@ -1073,7 +1073,7 @@ export default function CardSearchClient({
           for (let i = 1; i < selectedIconFilters.length; i++) {
             const filter = selectedIconFilters[i];
             const filterPred = iconPredicates[filter.icon];
-            const filterMatches = filterPred ? filterPred(c) : c.brigade.toLowerCase().includes(filter.icon.toLowerCase());
+            const filterMatches = filterPred ? filterPred(c) : c.brigade.split("/").some((b) => b.toLowerCase() === filter.icon.toLowerCase());
             
             // Get the operator from the PREVIOUS filter (operator between prev and current)
             const prevOperator = selectedIconFilters[i - 1].operator;
