@@ -1081,6 +1081,12 @@ export default function TournamentPage({
           onConfirm={handleStartTournament}
           participantCount={participants.length}
           suggestedRounds={suggestNumberOfRounds(participants.length)}
+          defaultRoundLength={tournament?.round_length}
+          defaultMaxScore={tournament?.max_score}
+          defaultByePoints={tournament?.bye_points}
+          defaultByeDifferential={tournament?.bye_differential}
+          defaultStartingTableNumber={tournament?.starting_table_number}
+          defaultSoundNotifications={tournament?.sound_notifications}
         />
         {tournament && (
           // Typed-confirmation gate — owner explicitly wanted a higher bar
