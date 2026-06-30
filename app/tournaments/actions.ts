@@ -23,7 +23,12 @@ export interface TournamentListing {
 export async function loadUpcomingListings(): Promise<TournamentListing[]> {
   const supabase = await createClient();
 
-  const today = new Date().toISOString().split("T")[0];
+  // Keep a listing visible for a few days after its start date. Categories often
+  // get played a day or two late (low turnout / time), and the host still needs
+  // the "Host This Event" link during that window.
+  const grace = new Date();
+  grace.setDate(grace.getDate() - 3);
+  const graceDate = grace.toISOString().split("T")[0];
 
   const { data, error } = await supabase
     .from("tournament_listings")
@@ -31,7 +36,7 @@ export async function loadUpcomingListings(): Promise<TournamentListing[]> {
       "id, title, tournament_type, start_date, end_date, start_time, city, state, venue_name, venue_address, host_name, formats, door_fee, description, linked_tournament_id"
     )
     .eq("status", "upcoming")
-    .gte("start_date", today)
+    .gte("start_date", graceDate)
     .order("start_date", { ascending: true });
 
   if (error) {

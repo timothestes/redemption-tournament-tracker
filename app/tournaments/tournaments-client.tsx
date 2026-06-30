@@ -325,7 +325,7 @@ function ListingCard({
 
           <div className="mt-4 flex items-center gap-3">
             <Link
-              href={`/tracker/tournaments?from_listing=${listing.id}&name=${encodeURIComponent(`${listing.city} ${listing.tournament_type || ""} ${listing.start_date.slice(5)}`.trim())}`}
+              href={`/tracker/tournaments?from_listing=${listing.id}&name=${encodeURIComponent(`${listing.city} ${listing.tournament_type || ""} ${listing.start_date.slice(5)}`.trim())}${listing.formats.length > 0 ? `&formats=${encodeURIComponent(listing.formats.map((f) => f.format).join("|"))}` : ""}`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <FaTrophy className="w-3 h-3" />
