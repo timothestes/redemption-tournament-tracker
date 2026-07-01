@@ -3185,6 +3185,10 @@
             <input class="pr-field-input" id="pr-handle" placeholder="Optional -- e.g. Hendrix" autocomplete="off">
           </div>
           <div>
+            <label class="pr-field-label">Pronunciation</label>
+            <input class="pr-field-input" id="pr-pronunciation" placeholder="e.g. HEN-drix" autocomplete="off">
+          </div>
+          <div>
             <label class="pr-field-label">Region</label>
             <input class="pr-field-input" id="pr-region" placeholder="e.g. Southeast, New England..." autocomplete="off">
           </div>
@@ -10574,6 +10578,7 @@
     // prefill the real name box with that.
     document.getElementById('pr-handle').value = (profile.handle !== undefined) ? profile.handle : (saved ? key : '');
     document.getElementById('pr-realname').value = profile.realName || (saved ? '' : key);
+    document.getElementById('pr-pronunciation').value = profile.pronunciation || '';
     document.getElementById('pr-region').value = profile.region || '';
     document.getElementById('pr-team').value = profile.team || '';
 
@@ -10615,6 +10620,7 @@
     var profileData = {
       realName: realName,
       handle: handleVal,
+      pronunciation: document.getElementById('pr-pronunciation').value.trim(),
       region: document.getElementById('pr-region').value.trim(),
       team: document.getElementById('pr-team').value.trim()
     };
