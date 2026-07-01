@@ -3238,6 +3238,7 @@
     <button class="btn btn-teal" onclick="saveData()">Save Draft</button>
     <button class="btn btn-ghost" onclick="loadData()">Load Draft</button>
     <button class="btn btn-ghost" onclick="publishEpisode()">Publish</button>
+    <button class="btn btn-ghost" onclick="openPublishPreview()" title="See how this would look if published, without actually publishing it">Preview</button>
     <button class="btn btn-ghost" onclick="window.print()">Print / Export PDF</button>
     <button class="btn btn-red" onclick="clearAll()">Clear All</button>
     <span class="save-status" id="save-status">No draft saved yet</span>
@@ -8681,6 +8682,41 @@
       syncRtnStore();
       syncRankingsStore();
     }).catch(function() { status.textContent = 'Publish failed -- try again.'; });
+  }
+
+  // Render the current, unsaved draft exactly as the public page would show
+  // it -- reuses the same collectData()/applyDraft() data shape as a real
+  // publish, but only ever touches a new browser tab, never the network/DB.
+  function openPublishPreview() {
+    var ep = draftEpisodeKey();
+    var winName = 'tf-preview-' + ep.replace(/[^a-zA-Z0-9_-]/g, '-');
+    var win = window.open('', winName);
+    if (!win) {
+      alert('Preview blocked -- please allow pop-ups for this site and try again.');
+      return;
+    }
+    win.document.write('<p style="font-family:sans-serif;padding:20px;">Loading preview&hellip;</p>');
+    var data = collectData();
+    fetch('/threshingfloor/outline').then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.text();
+    }).then(function(shellHtml) {
+      var payload = JSON.stringify({ episode: ep, data: data })
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/&/g, '\\u0026')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029');
+      var bootstrap = '<script>window.__TF_VIEW__ = ' + payload + ';<\/script>\n';
+      var html = shellHtml.replace('<script>', bootstrap + '<script>');
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    }).catch(function() {
+      win.document.open();
+      win.document.write('<p style="font-family:sans-serif;padding:20px;">Preview failed to load -- try again.</p>');
+      win.document.close();
+    });
   }
 
   function unpublishEpisode() {
