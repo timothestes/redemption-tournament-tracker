@@ -522,6 +522,88 @@
     letter-spacing: 0.5px; text-transform: uppercase; line-height: 1.2;
   }
   .countdown-info-venue { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+
+  /* RTN Venue Notes card */
+  .venue-notes-card {
+    flex: 0 0 auto; width: calc(33.333% - 6px); margin-top: 8px; background: var(--gray-light);
+    border-radius: 6px; border-left: 3px solid var(--teal-light);
+    padding: 8px 10px 8px 14px; cursor: pointer;
+    transition: box-shadow 0.15s; box-sizing: border-box; min-height: 52px;
+    display: flex; align-items: center;
+  }
+  .venue-notes-card:hover { box-shadow: 0 0 0 2px var(--teal); }
+  .venue-notes-card-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
+    color: var(--teal-dark); text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .venue-notes-card-preview { display: none; }
+  body.dark-mode .venue-notes-card { background: rgba(255,255,255,0.06); }
+  body.dark-mode .venue-notes-card-label { color: var(--teal); }
+  body.view-mode .venue-notes-card-empty { display: none !important; }
+  body.view-mode .venue-notes-card { cursor: pointer; }
+
+  /* Venue Notes modal */
+  #venue-notes-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1050;
+    background: rgba(2,30,28,0.65); align-items: center; justify-content: center; padding: 20px;
+  }
+  #venue-notes-overlay.open { display: flex; }
+  #venue-notes-modal {
+    background: #fff; border-radius: 8px; padding: 0;
+    min-width: 420px; max-width: min(720px, 95vw); width: max-content;
+    max-height: 90vh; overflow-y: auto; position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.28); display: flex; flex-direction: column;
+  }
+  #venue-notes-header {
+    background: var(--teal-dark); padding: 14px 18px 12px; border-radius: 8px 8px 0 0;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  #venue-notes-header-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 16px;
+    letter-spacing: 0.5px; color: #fff; text-transform: uppercase;
+  }
+  #venue-notes-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  /* Edit view */
+  #venue-notes-edit-wrap { border: 1px solid var(--teal-light); border-radius: 4px; overflow: hidden; }
+  #venue-notes-bullet-editor {
+    width: 100%; min-height: 160px; border: none; outline: none;
+    font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--text);
+    padding: 10px 12px; line-height: 1.7; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word; cursor: text; box-sizing: border-box;
+    background: var(--gray-light);
+  }
+  #venue-notes-bullet-editor .bn-line { display: block; min-height: 1.7em; }
+  #venue-notes-bullet-editor .bn-line::before { display: inline-block; width: 1.2em; }
+  #venue-notes-bullet-editor .bn-l0::before { content: '•'; }
+  #venue-notes-bullet-editor .bn-l1 { padding-left: 20px; }
+  #venue-notes-bullet-editor .bn-l1::before { content: '–'; color: var(--gray); }
+  #venue-notes-bullet-editor .bn-l2 { padding-left: 40px; }
+  #venue-notes-bullet-editor .bn-l2::before { content: '◦'; color: var(--gray); }
+  #venue-notes-edit-hint {
+    font-size: 10px; color: var(--gray); font-style: italic;
+    padding: 4px 12px 6px; background: var(--gray-light); border-top: 1px solid var(--teal-light);
+  }
+  /* Read-only view */
+  #venue-notes-view { display: none; }
+  #venue-notes-view-list { margin: 0; padding-left: 18px; list-style: none; }
+  #venue-notes-view-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 6px; word-break: break-word; white-space: pre-wrap; max-width: 680px; }
+  #venue-notes-view-list li.bullet-l0::before { content: '•'; margin-right: 6px; }
+  #venue-notes-view-list li.bullet-l1 { padding-left: 20px; }
+  #venue-notes-view-list li.bullet-l1::before { content: '–'; margin-right: 6px; color: var(--gray); }
+  #venue-notes-view-list li.bullet-l2 { padding-left: 40px; }
+  #venue-notes-view-list li.bullet-l2::before { content: '◦'; margin-right: 6px; color: var(--gray); }
+  #venue-notes-footer {
+    padding: 12px 18px; border-top: 1px solid var(--teal-light);
+    display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0;
+  }
+  body.dark-mode #venue-notes-modal { background: var(--teal-dark); }
+  body.dark-mode #venue-notes-edit-wrap { border-color: rgba(255,255,255,0.15); }
+  body.dark-mode #venue-notes-bullet-editor { background: rgba(255,255,255,0.05); color: var(--text); }
+  body.dark-mode #venue-notes-edit-hint { background: rgba(255,255,255,0.04); border-top-color: rgba(255,255,255,0.1); color: var(--placeholder); }
+  body.dark-mode #venue-notes-footer { border-top-color: rgba(255,255,255,0.08); }
+  body.dark-mode #venue-notes-view-list li { color: rgba(255,255,255,0.9); }
+  body.dark-mode #venue-notes-view-list li.bullet-l1::before,
+  body.dark-mode #venue-notes-view-list li.bullet-l2::before { color: var(--teal-mid); }
   .countdown-info-dates { font-size: 10px; opacity: 0.75; margin-top: 2px; letter-spacing: 0.5px; }
   .countdown-date { margin-left: auto; text-align: right; font-size: 10px; opacity: 0.9; line-height: 1.6; }
   .countdown-date input {
@@ -856,7 +938,7 @@
   /* News card tile (editor) */
   .news-tile {
     display: flex; flex-direction: column; justify-content: center;
-    min-height: 72px; cursor: pointer; user-select: none;
+    min-height: 60px; cursor: pointer; user-select: none;
     border-radius: 6px; transition: box-shadow 0.15s;
   }
   .news-tile:hover { box-shadow: 0 0 0 2px var(--teal); }
@@ -1356,54 +1438,373 @@
   .spoiler-card-addnote-btn:hover { background: var(--teal-light); }
 
   /* Agur the Creator: fan-art card grid (mirrors spoiler cards minus set/badge) */
-  .agur-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 4px 0 10px; }
-  .agur-card { position: relative; }
-  .agur-card-img-wrap {
-    position: relative; aspect-ratio: 5 / 7; width: 100%; border-radius: 6px;
-    overflow: hidden; background: var(--gray-light); cursor: pointer;
+  /* Agur the Creator — tile grid (mirrors Collector's Corner) */
+  .agur-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .agur-block {
+    flex: 0 0 auto; width: calc(33.333% - 6px);
+    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 8px 22px;
+    border-left: 3px solid var(--teal-light); position: relative;
+    cursor: pointer; transition: box-shadow 0.15s;
   }
-  .agur-card-img-wrap img { width: 100%; height: 100%; object-fit: contain; }
-  .agur-card-remove {
-    position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border: none;
-    background: rgba(0,0,0,0.5); color: #fff; border-radius: 50%; font-size: 11px; line-height: 1;
-    cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2;
+  .agur-block:hover { box-shadow: 0 0 0 2px var(--teal); }
+  .agur-block.dragging { opacity: 0.4; }
+  .agur-block-drag-handle {
+    position: absolute; top: 6px; left: 4px; width: 14px; text-align: center;
+    font-size: 11px; line-height: 1; color: var(--gray); cursor: grab; user-select: none;
   }
-  .agur-card-remove:hover { background: var(--red); }
-  .agur-card-caption-input {
-    width: 100%; font-size: 10px; font-weight: 600; color: var(--text); margin-top: 4px;
-    text-align: center; border: none; background: transparent; outline: none;
-    font-family: 'Barlow', sans-serif; padding: 1px;
+  .agur-block-drag-handle:hover { color: var(--teal-dark); }
+  .agur-block .tourn-remove-btn { position: absolute; top: 6px; right: 6px; }
+  .agur-tile { display: flex; flex-direction: column; justify-content: center; min-height: 60px; }
+  .agur-tile-add {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--teal); font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 15px; letter-spacing: 0.5px; gap: 4px; min-height: 60px;
   }
-  .agur-card-caption-input::placeholder { color: var(--placeholder); font-style: italic; font-weight: 400; }
-  .agur-card-caption-input:hover, .agur-card-caption-input:focus { background: var(--gray-light); border-radius: 3px; }
-  .agur-card-note {
-    width: 100%; border: none; border-top: 1px solid var(--teal-light); background: transparent;
-    font-size: 10px; color: var(--text); padding: 3px 0 0; margin-top: 3px; outline: none;
-    font-family: 'Barlow', sans-serif; resize: vertical; min-height: 42px;
+  .agur-tile-add::before { content: '+'; font-size: 20px; line-height: 1; }
+  .agur-tile-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
+    letter-spacing: 0.3px; color: var(--teal-dark); text-transform: uppercase;
+    margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .agur-card-note::placeholder { color: var(--placeholder); font-style: italic; }
-  .agur-card-note-print { display: none; }
-  .agur-card-addnote-btn {
-    display: block; width: 100%; margin-top: 3px; font-size: 9px; color: var(--teal);
-    background: none; border: 1px dashed var(--teal-mid); border-radius: 4px; padding: 2px 0;
-    cursor: pointer; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 0.5px;
-  }
-  .agur-card-addnote-btn:hover { background: var(--teal-light); }
+  .agur-tile-sub { font-size: 11px; color: #fff; line-height: 1.3; }
+  body.dark-mode .agur-block { background: rgba(255,255,255,0.06); }
+  body.dark-mode .agur-tile-title { color: var(--teal); }
+  body.dark-mode .agur-tile-sub { color: #fff; }
 
-  /* Collector's Corner */
-  .collectors-topic-input {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px;
-    letter-spacing: 1px; color: var(--teal-dark); border: none;
-    border-bottom: 1.5px solid var(--teal-light); background: transparent;
-    width: 100%; padding: 3px 0; outline: none; margin-bottom: 8px;
-    transition: border-color 0.2s;
+  /* Agur edit modal */
+  #agur-edit-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1050;
+    background: rgba(2,30,28,0.65); align-items: center; justify-content: center; padding: 20px;
   }
-  .collectors-topic-input:focus { border-color: var(--teal); }
-  .collectors-topic-input::placeholder { color: var(--placeholder); font-style: italic; font-weight: 400; letter-spacing: normal; }
+  #agur-edit-overlay.open { display: flex; }
+  #agur-edit-modal {
+    background: #fff; border-radius: 8px; padding: 0;
+    width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto;
+    position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+    display: flex; flex-direction: column;
+  }
+  #agur-edit-header {
+    background: var(--teal-dark); padding: 14px 18px 12px; border-radius: 8px 8px 0 0;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  #agur-edit-header-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 16px;
+    letter-spacing: 0.5px; color: #fff; text-transform: uppercase;
+  }
+  /* Mode tabs */
+  #agur-edit-tabs {
+    display: flex; border-bottom: 2px solid var(--teal-light); flex-shrink: 0;
+    background: var(--gray-light);
+  }
+  .agur-edit-tab {
+    padding: 8px 16px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--gray); cursor: pointer; border: none; background: transparent;
+    border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.15s;
+  }
+  .agur-edit-tab.active { color: var(--teal-dark); border-bottom-color: var(--teal); }
+  .agur-edit-tab:hover { color: var(--teal-dark); }
+  #agur-edit-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .agur-edit-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
+    color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;
+  }
+  .agur-edit-input {
+    width: 100%; font-family: 'Barlow', sans-serif; font-size: 13px;
+    padding: 7px 10px; border: 1px solid var(--teal-light); border-radius: 4px;
+    color: var(--text); background: var(--gray-light); outline: none;
+  }
+  .agur-edit-input:focus { border-color: var(--teal); }
+  .agur-edit-textarea {
+    width: 100%; font-family: 'Barlow', sans-serif; font-size: 13px;
+    padding: 7px 10px; border: 1px solid var(--teal-light); border-radius: 4px;
+    color: var(--text); background: var(--gray-light); outline: none;
+    resize: vertical; min-height: 80px; line-height: 1.5;
+  }
+  .agur-edit-textarea:focus { border-color: var(--teal); }
+  .agur-str-tgh-row { display: flex; gap: 10px; }
+  .agur-str-tgh-row .agur-edit-input { flex: 1; }
+  #agur-edit-notes-wrap { border: 1px solid var(--teal-light); border-radius: 4px; overflow: hidden; }
+  #agur-edit-bullet-editor {
+    width: 100%; min-height: 100px; border: none; outline: none;
+    font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--text);
+    padding: 10px 12px; line-height: 1.7; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word; cursor: text; box-sizing: border-box;
+    background: var(--gray-light);
+  }
+  #agur-edit-bullet-editor .bn-line { display: block; min-height: 1.7em; }
+  #agur-edit-bullet-editor .bn-line::before { display: inline-block; width: 1.2em; }
+  #agur-edit-bullet-editor .bn-l0::before { content: '•'; }
+  #agur-edit-bullet-editor .bn-l1 { padding-left: 20px; }
+  #agur-edit-bullet-editor .bn-l1::before { content: '–'; color: var(--gray); }
+  #agur-edit-bullet-editor .bn-l2 { padding-left: 40px; }
+  #agur-edit-bullet-editor .bn-l2::before { content: '◦'; color: var(--gray); }
+  #agur-edit-notes-hint {
+    font-size: 10px; color: var(--gray); font-style: italic;
+    padding: 4px 12px 6px; background: var(--gray-light); border-top: 1px solid var(--teal-light);
+  }
+  /* Image tab */
+  #agur-edit-img-thumb {
+    width: 90px; flex-shrink: 0; border-radius: 5px; overflow: hidden;
+    background: var(--gray-light); aspect-ratio: 5/7; display: none; position: relative;
+  }
+  #agur-edit-img-thumb img { width: 100%; height: 100%; object-fit: contain; }
+  #agur-edit-img-thumb-remove {
+    position: absolute; top: 3px; right: 3px; width: 16px; height: 16px;
+    border: none; background: rgba(0,0,0,0.55); color: #fff; border-radius: 50%;
+    font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  #agur-edit-img-thumb-remove:hover { background: var(--red); }
+  #agur-edit-img-row { display: flex; align-items: flex-start; gap: 12px; }
+  #agur-edit-img-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  #agur-edit-footer {
+    padding: 12px 18px; border-top: 1px solid var(--teal-light);
+    display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0;
+  }
+  body.dark-mode #agur-edit-modal { background: var(--teal-dark); }
+  body.dark-mode #agur-edit-tabs { background: rgba(255,255,255,0.04); border-bottom-color: rgba(255,255,255,0.1); }
+  body.dark-mode .agur-edit-tab { color: var(--placeholder); }
+  body.dark-mode .agur-edit-tab.active { color: var(--teal-mid); border-bottom-color: var(--teal-mid); }
+  body.dark-mode .agur-edit-label { color: var(--teal-mid); }
+  body.dark-mode .agur-edit-input,
+  body.dark-mode .agur-edit-textarea { background: rgba(255,255,255,0.07); color: var(--text); border-color: rgba(255,255,255,0.15); }
+  body.dark-mode #agur-edit-notes-wrap { border-color: rgba(255,255,255,0.15); }
+  body.dark-mode #agur-edit-bullet-editor { background: rgba(255,255,255,0.05); color: var(--text); }
+  body.dark-mode #agur-edit-notes-hint { background: rgba(255,255,255,0.04); border-top-color: rgba(255,255,255,0.1); color: var(--placeholder); }
+  body.dark-mode #agur-edit-footer { border-top-color: rgba(255,255,255,0.08); }
+  body.dark-mode #agur-edit-img-thumb { background: rgba(255,255,255,0.05); }
 
-  .collectors-layout { display: flex; gap: 14px; align-items: flex-start; }
-  .collectors-notes-col { flex: 1; min-width: 0; }
-  .collectors-card-col { width: 130px; flex-shrink: 0; }
+  /* Agur view modal */
+  #agur-view-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(2,46,43,0.75);
+    z-index: 1100; align-items: center; justify-content: center; padding: 20px;
+  }
+  #agur-view-overlay.open { display: flex; }
+  #agur-view-content {
+    background: #fff; border-radius: 8px; padding: 20px;
+    max-width: 700px; width: 100%; max-height: 90vh;
+    position: relative; display: flex; gap: 20px; align-items: flex-start; overflow-y: auto;
+  }
+  #agur-view-left { flex: 0 0 240px; max-width: 240px; }
+  /* Text card spec display */
+  #agur-view-spec {
+    background: var(--gray-light); border-radius: 8px; padding: 14px 16px;
+    border-left: 3px solid var(--teal); font-family: 'Barlow', sans-serif;
+  }
+  #agur-view-spec-type {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 10px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--teal); margin-bottom: 4px;
+  }
+  #agur-view-spec-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 18px;
+    color: var(--teal-dark); text-transform: uppercase; margin-bottom: 6px; line-height: 1.1;
+  }
+  #agur-view-spec-brigade {
+    font-size: 11px; color: var(--gray); margin-bottom: 6px; font-style: italic;
+  }
+  #agur-view-spec-stats {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700;
+    color: var(--teal-dark); margin-bottom: 4px;
+  }
+  #agur-view-spec-class {
+    font-size: 11px; color: var(--gray); margin-bottom: 4px; font-style: italic;
+  }
+  #agur-view-spec-identifier {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 11px; color: var(--teal);
+    margin-bottom: 8px; letter-spacing: 0.3px;
+  }
+  #agur-view-spec-ability {
+    font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 8px;
+    border-top: 1px solid var(--teal-light); padding-top: 8px;
+  }
+  #agur-view-spec-scripture {
+    font-size: 10px; color: var(--gray); font-style: italic; margin-top: 6px;
+  }
+  /* Image display */
+  #agur-view-img-wrap { border-radius: 6px; overflow: hidden; }
+  #agur-view-img-wrap img { width: 100%; border-radius: 6px; object-fit: contain; }
+  #agur-view-img-caption {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 14px;
+    color: var(--teal-dark); margin-top: 8px; text-align: center;
+  }
+  /* Right notes column */
+  #agur-view-right {
+    flex: 1; min-width: 0; border-left: 1px solid var(--gray-light);
+    padding-left: 18px; max-height: 75vh; overflow-y: auto;
+  }
+  #agur-view-notes-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 12px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--teal-dark); margin-bottom: 10px;
+  }
+  #agur-view-notes-list { list-style: none; padding-left: 18px; margin: 0; }
+  #agur-view-notes-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 6px; word-break: break-word; white-space: pre-wrap; }
+  #agur-view-notes-list li.bullet-l0::before { content: '•'; margin-right: 6px; }
+  #agur-view-notes-list li.bullet-l1 { padding-left: 20px; }
+  #agur-view-notes-list li.bullet-l1::before { content: '–'; margin-right: 6px; color: var(--gray); }
+  #agur-view-notes-list li.bullet-l2 { padding-left: 40px; }
+  #agur-view-notes-list li.bullet-l2::before { content: '◦'; margin-right: 6px; color: var(--gray); }
+  #agur-view-notes-empty { font-size: 12px; color: var(--placeholder); font-style: italic; }
+  body.dark-mode #agur-view-content { background: var(--teal-dark); }
+  body.dark-mode #agur-view-spec { background: rgba(255,255,255,0.06); }
+  body.dark-mode #agur-view-spec-title { color: var(--teal-mid); }
+  body.dark-mode #agur-view-spec-stats { color: var(--teal-mid); }
+  body.dark-mode #agur-view-spec-ability { color: rgba(255,255,255,0.85); border-top-color: rgba(255,255,255,0.1); }
+  body.dark-mode #agur-view-img-caption { color: var(--teal-mid); }
+  body.dark-mode #agur-view-right { border-left-color: rgba(255,255,255,0.1); }
+  body.dark-mode #agur-view-notes-label { color: var(--teal-mid); }
+  body.dark-mode #agur-view-notes-list li { color: rgba(255,255,255,0.9); }
+
+  /* Keep old classes hidden for compat */
+  .agur-card-grid, .agur-card-addnote-btn, .agur-card-note { display: none !important; }
+
+  /* Collector's Corner — tile grid */
+  .collectors-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .collectors-block {
+    flex: 0 0 auto; width: calc(33.333% - 6px);
+    background: var(--gray-light); border-radius: 6px; padding: 8px 10px 8px 22px;
+    border-left: 3px solid var(--teal-light); position: relative;
+    cursor: pointer; transition: box-shadow 0.15s;
+  }
+  .collectors-block:hover { box-shadow: 0 0 0 2px var(--teal); }
+  .collectors-block.dragging { opacity: 0.4; }
+  .collectors-block-drag-handle {
+    position: absolute; top: 6px; left: 4px; width: 14px; text-align: center;
+    font-size: 11px; line-height: 1; color: var(--gray); cursor: grab; user-select: none;
+  }
+  .collectors-block-drag-handle:hover { color: var(--teal-dark); }
+  .collectors-block .tourn-remove-btn { position: absolute; top: 6px; right: 6px; }
+  .collectors-tile { display: flex; flex-direction: column; justify-content: center; min-height: 60px; }
+  .collectors-tile-add {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--teal); font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 15px; letter-spacing: 0.5px; gap: 4px; min-height: 60px;
+  }
+  .collectors-tile-add::before { content: '+'; font-size: 20px; line-height: 1; }
+  .collectors-tile-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
+    letter-spacing: 0.3px; color: var(--teal-dark); text-transform: uppercase;
+    margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .collectors-tile-sub { font-size: 11px; color: #fff; line-height: 1.3; }
+  body.dark-mode .collectors-block { background: rgba(255,255,255,0.06); }
+  body.dark-mode .collectors-tile-title { color: var(--teal); }
+  body.dark-mode .collectors-tile-sub { color: #fff; }
+
+  /* Collector's Corner edit modal */
+  #collectors-edit-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1050;
+    background: rgba(2,30,28,0.65); align-items: center; justify-content: center; padding: 20px;
+  }
+  #collectors-edit-overlay.open { display: flex; }
+  #collectors-edit-modal {
+    background: #fff; border-radius: 8px; padding: 0;
+    width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto;
+    position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+    display: flex; flex-direction: column;
+  }
+  #collectors-edit-header {
+    background: var(--teal-dark); padding: 14px 18px 12px; border-radius: 8px 8px 0 0;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  #collectors-edit-header-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 16px;
+    letter-spacing: 0.5px; color: #fff; text-transform: uppercase;
+  }
+  #collectors-edit-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .collectors-edit-label {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px;
+    color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;
+  }
+  .collectors-edit-input {
+    width: 100%; font-family: 'Barlow', sans-serif; font-size: 13px;
+    padding: 7px 10px; border: 1px solid var(--teal-light); border-radius: 4px;
+    color: var(--text); background: var(--gray-light); outline: none;
+  }
+  .collectors-edit-input:focus { border-color: var(--teal); }
+  #collectors-edit-notes-wrap { border: 1px solid var(--teal-light); border-radius: 4px; overflow: hidden; }
+  #collectors-edit-bullet-editor {
+    width: 100%; min-height: 140px; border: none; outline: none;
+    font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--text);
+    padding: 10px 12px; line-height: 1.7; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word; cursor: text; box-sizing: border-box;
+    background: var(--gray-light);
+  }
+  #collectors-edit-bullet-editor .bn-line { display: block; min-height: 1.7em; }
+  #collectors-edit-bullet-editor .bn-line::before { display: inline-block; width: 1.2em; }
+  #collectors-edit-bullet-editor .bn-l0::before { content: '•'; }
+  #collectors-edit-bullet-editor .bn-l1 { padding-left: 20px; }
+  #collectors-edit-bullet-editor .bn-l1::before { content: '–'; color: var(--gray); }
+  #collectors-edit-bullet-editor .bn-l2 { padding-left: 40px; }
+  #collectors-edit-bullet-editor .bn-l2::before { content: '◦'; color: var(--gray); }
+  #collectors-edit-notes-hint {
+    font-size: 10px; color: var(--gray); font-style: italic;
+    padding: 4px 12px 6px; background: var(--gray-light); border-top: 1px solid var(--teal-light);
+  }
+  #collectors-edit-card-row { display: flex; align-items: flex-start; gap: 12px; }
+  #collectors-edit-card-thumb {
+    width: 80px; flex-shrink: 0; border-radius: 5px; overflow: hidden;
+    background: var(--gray-light); aspect-ratio: 5/7; display: none; position: relative;
+  }
+  #collectors-edit-card-thumb img { width: 100%; height: 100%; object-fit: contain; }
+  #collectors-edit-card-thumb-remove {
+    position: absolute; top: 3px; right: 3px; width: 16px; height: 16px;
+    border: none; background: rgba(0,0,0,0.55); color: #fff; border-radius: 50%;
+    font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  #collectors-edit-card-thumb-remove:hover { background: var(--red); }
+  #collectors-edit-card-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  #collectors-edit-footer {
+    padding: 12px 18px; border-top: 1px solid var(--teal-light);
+    display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0;
+  }
+  body.dark-mode #collectors-edit-modal { background: var(--teal-dark); }
+  body.dark-mode .collectors-edit-label { color: var(--teal-mid); }
+  body.dark-mode .collectors-edit-input { background: rgba(255,255,255,0.07); color: var(--text); border-color: rgba(255,255,255,0.15); }
+  body.dark-mode #collectors-edit-notes-wrap { border-color: rgba(255,255,255,0.15); }
+  body.dark-mode #collectors-edit-bullet-editor { background: rgba(255,255,255,0.05); color: var(--text); }
+  body.dark-mode #collectors-edit-notes-hint { background: rgba(255,255,255,0.04); border-top-color: rgba(255,255,255,0.1); color: var(--placeholder); }
+  body.dark-mode #collectors-edit-footer { border-top-color: rgba(255,255,255,0.08); }
+  body.dark-mode #collectors-edit-card-thumb { background: rgba(255,255,255,0.05); }
+
+  /* Collector's Corner text-only view modal */
+  #collectors-view-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1050;
+    background: rgba(2,30,28,0.65); align-items: center; justify-content: center; padding: 20px;
+  }
+  #collectors-view-overlay.open { display: flex; }
+  #collectors-view-modal {
+    background: #fff; border-radius: 8px; padding: 0;
+    min-width: 420px; max-width: min(720px, 95vw); width: max-content;
+    max-height: 90vh; overflow-y: auto; overflow-x: hidden; position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  }
+  #collectors-view-header {
+    background: var(--teal-dark); padding: 14px 18px 12px; border-radius: 8px 8px 0 0; position: relative;
+  }
+  #collectors-view-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 20px;
+    letter-spacing: 0.5px; color: #fff; text-transform: uppercase; margin-right: 28px;
+  }
+  #collectors-view-body { padding: 14px 18px 18px; }
+  #collectors-view-notes-list { margin: 0; padding-left: 18px; list-style: none; }
+  #collectors-view-notes-list li { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 6px; word-break: break-word; white-space: pre-wrap; max-width: 680px; }
+  #collectors-view-notes-list li.bullet-l0::before { content: '•'; margin-right: 6px; }
+  #collectors-view-notes-list li.bullet-l1 { padding-left: 20px; }
+  #collectors-view-notes-list li.bullet-l1::before { content: '–'; margin-right: 6px; color: var(--gray); }
+  #collectors-view-notes-list li.bullet-l2 { padding-left: 40px; }
+  #collectors-view-notes-list li.bullet-l2::before { content: '◦'; margin-right: 6px; color: var(--gray); }
+  #collectors-view-notes-empty { font-size: 12px; color: var(--placeholder); font-style: italic; }
+  body.dark-mode #collectors-view-modal { background: var(--teal-dark); }
+  body.dark-mode #collectors-view-title { color: #fff; }
+  body.dark-mode #collectors-view-notes-list li { color: rgba(255,255,255,0.9); }
+  body.dark-mode #collectors-view-notes-list li.bullet-l1::before,
+  body.dark-mode #collectors-view-notes-list li.bullet-l2::before { color: var(--teal-mid); }
+
+  /* Hide old single-item layout */
+  .collectors-topic-input { display: none !important; }
+  .collectors-layout { display: none !important; }
+  .collectors-notes-col { display: none !important; }
+  .collectors-card-col { display: none !important; }
 
   .bullet-wrap { position: relative; }
   .bullet-textarea {
@@ -1855,16 +2256,20 @@
     color: var(--teal); width: 16px; flex-shrink: 0; text-align: center; line-height: 1;
   }
   .rank-card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .rank-card-name-row { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; }
   .rank-card-name {
     font-family: 'Barlow', sans-serif; font-size: 11px; font-weight: 600;
     color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    line-height: 1.2;
+    line-height: 1.2; flex-shrink: 1; min-width: 0;
   }
   .rank-card-team-logo {
-    height: 12px; width: auto; max-width: 52px; object-fit: contain;
-    display: block; opacity: 0.85;
+    height: 11px; width: auto; max-width: 44px; object-fit: contain;
+    flex-shrink: 0; opacity: 0.85; display: block;
   }
-  .rank-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+  .rank-card-right {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+    flex-shrink: 0; min-width: 28px; padding-left: 4px;
+  }
   .rank-card-clear {
     width: 14px; height: 14px; border: none; background: rgba(0,0,0,0.1);
     color: var(--gray); border-radius: 50%; font-size: 9px; line-height: 1;
@@ -1895,10 +2300,20 @@
 
   #news-body { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
   #news-body .repeat-item {
-    flex: 0 0 auto; width: calc(33.333% - 6px); border: none; border-radius: 6px;
-    background: var(--gray-light); padding: 8px 10px 8px 22px; margin-bottom: 0;
+    flex: 0 0 auto; width: calc(33.333% - 6px);
+    background: transparent; padding: 0; margin-bottom: 0;
+    border: none; border-bottom: none; position: relative;
   }
-  #news-body .repeat-item.repeat-item-draggable { padding-left: 22px; }
+  #news-body .repeat-item.repeat-item-draggable { padding: 0; }
+  #news-body .repeat-item .tourn-remove-btn { position: absolute; top: 6px; right: 6px; z-index: 2; }
+  #news-body .news-tile, #news-body .news-tile-add {
+    background: var(--gray-light); border-radius: 6px;
+    padding: 8px 10px 8px 22px;
+    border-left: 3px solid var(--teal-light);
+    cursor: pointer; transition: box-shadow 0.15s;
+    min-height: 60px; display: flex; flex-direction: column; justify-content: center;
+  }
+  #news-body .news-tile:hover, #news-body .news-tile-add:hover { box-shadow: 0 0 0 2px var(--teal); }
   #news-add-row { flex-basis: 100%; }
 
   .repeat-item.dragging { opacity: 0.4; }
@@ -1943,6 +2358,8 @@
     .sec-order-controls { display: none !important; }
     .page-header { border-radius: 0; }
     .canvas { box-shadow: none; border-radius: 0; }
+    .venue-notes-card-empty { display: none !important; }
+    .venue-notes-card { display: none !important; }
 
     /* Keep each section together on one page; if it doesn't fit, push the whole thing to the next page */
     .movable-section, .grid-1, .grid-2 {
@@ -2032,6 +2449,8 @@
   body.view-mode .rank-profile-btn,
   body.view-mode .rank-card-clear { display: none !important; }
   body.view-mode .rank-card.rank-card-empty { display: none !important; }
+  body.view-mode .rank-card-right { min-width: 28px; }
+  body.view-mode .rank-delta.empty { display: none; }
   body.view-mode #prev-rankings-field,
   body.view-mode #rankings-export-row,
   body.view-mode #meta-export-row,
@@ -2059,13 +2478,17 @@
   body.view-mode .spoiler-card-note-print,
   body.view-mode .collectors-card-remove,
   body.view-mode #spoiler-empty-state,
+  body.view-mode #agur-add-row { display: none !important; }
+  body.view-mode .agur-block .tourn-remove-btn { display: none !important; }
+  body.view-mode .agur-block-drag-handle { display: none !important; }
+  body.view-mode #agur-edit-overlay { display: none !important; }
   body.view-mode #agur-empty-state,
   body.view-mode #collectors-card-placeholder,
-  body.view-mode #agur-section label.btn,
-  body.view-mode .agur-card-remove,
-  body.view-mode .agur-card-addnote-btn,
-  body.view-mode .agur-card-note,
-  body.view-mode .agur-card-note-print,
+  body.view-mode #collectors-add-row { display: none !important; }
+  body.view-mode .collectors-block .tourn-remove-btn { display: none !important; }
+  body.view-mode .collectors-block-drag-handle { display: none !important; }
+  body.view-mode #collectors-edit-overlay { display: none !important; }
+  body.view-mode #agur-section button, body.view-mode #agur-section label.btn { display: none; }
   body.view-mode #dotw-fetch-status,
   body.view-mode #dotw-section button:not(.spoiler-modal-close):not(#dotw-view-deck-btn),
   body.view-mode #news-body label:has(input[type=checkbox]),
@@ -2094,7 +2517,7 @@
   body.view-mode textarea::placeholder { color: transparent !important; }
   /* The enlarge modals stay clickable */
   body.view-mode .spoiler-card-img-wrap,
-  body.view-mode .agur-card-img-wrap { pointer-events: auto; cursor: pointer; }
+  body.view-mode .agur-block { cursor: pointer; pointer-events: auto; }
   body.view-mode .movable-section[data-content-empty="true"],
   body.view-mode .movable-section[data-content-empty="true"] + .section-divider,
   body.view-mode #guest-background-wrapper:has(input:placeholder-shown):has(.bullet-notes-print:empty),
@@ -2115,9 +2538,10 @@
 </head>
 <body>
 
-<div id="collectors-card-modal-overlay" onclick="closeCollectorsModal(event)">
+<!-- Collectors Card Image Modal (publish: card + notes) -->
+<div id="collectors-card-modal-overlay" onclick="closeCollectorsCardModal(event)">
   <div id="collectors-card-modal-content">
-    <button type="button" class="spoiler-modal-close" onclick="closeCollectorsModal()">&times;</button>
+    <button type="button" class="spoiler-modal-close" onclick="closeCollectorsCardModal()">&times;</button>
     <div id="collectors-card-modal-img-col">
       <img id="collectors-card-modal-img" src="" alt="Card reference">
       <div id="collectors-card-modal-img-caption"></div>
@@ -2127,6 +2551,176 @@
       <div id="collectors-card-modal-topic"></div>
       <ul id="collectors-card-modal-notes-list"></ul>
       <div id="collectors-card-modal-notes-empty">No notes added yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Collectors Edit Modal (editor only) -->
+<div id="collectors-edit-overlay" onclick="closeCollectorsEditModal(event)">
+  <div id="collectors-edit-modal">
+    <div id="collectors-edit-header">
+      <span id="collectors-edit-header-label">Collector's Corner Topic</span>
+      <button type="button" class="spoiler-modal-close" onclick="saveAndCloseCollectorsEdit()">&times;</button>
+    </div>
+    <div id="collectors-edit-body">
+      <div>
+        <div class="collectors-edit-label">Topic Title</div>
+        <input class="collectors-edit-input" id="collectors-edit-title" type="text" placeholder="e.g. Foil price trends, rare finds..." autocomplete="off">
+      </div>
+      <div>
+        <div class="collectors-edit-label">Notes</div>
+        <div id="collectors-edit-notes-wrap">
+          <div id="collectors-edit-bullet-editor" contenteditable="true" spellcheck="true"></div>
+          <div id="collectors-edit-notes-hint">• top level &nbsp;|&nbsp; Tab → – sub &nbsp;|&nbsp; Tab again → ◦ sub-sub &nbsp;|&nbsp; Shift+Tab to outdent</div>
+        </div>
+      </div>
+      <div>
+        <div class="collectors-edit-label">Reference Card <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+        <div id="collectors-edit-card-row">
+          <div id="collectors-edit-card-thumb">
+            <img id="collectors-edit-card-thumb-img" src="" alt="">
+            <button type="button" id="collectors-edit-card-thumb-remove" onclick="removeCollectorsEditCard()">&times;</button>
+          </div>
+          <div id="collectors-edit-card-fields">
+            <button type="button" class="btn btn-ghost" id="collectors-edit-card-btn" style="font-size:11px; padding:4px 10px;" onclick="document.getElementById('collectors-edit-card-file').click()">+ Add Card Image</button>
+            <input type="file" id="collectors-edit-card-file" accept="image/*" style="display:none;" onchange="loadCollectorsEditCard(this)">
+            <input class="collectors-edit-input" id="collectors-edit-caption" type="text" placeholder="Card name / note" autocomplete="off" style="display:none; margin-top:6px;">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="collectors-edit-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeCollectorsEditModal()">Cancel</button>
+      <button type="button" class="btn btn-teal" onclick="saveAndCloseCollectorsEdit(true)">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Collectors Text-Only View Modal (publish: no card image) -->
+<div id="collectors-view-overlay" onclick="closeCollectorsViewModal(event)">
+  <div id="collectors-view-modal">
+    <div id="collectors-view-header">
+      <button type="button" class="spoiler-modal-close" onclick="closeCollectorsViewModal()">&times;</button>
+      <div id="collectors-view-title"></div>
+    </div>
+    <div id="collectors-view-body">
+      <ul id="collectors-view-notes-list"></ul>
+      <div id="collectors-view-notes-empty" style="display:none;">No notes added yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Agur Edit Modal (editor only) -->
+<div id="agur-edit-overlay" onclick="closeAgurEditModal(event)">
+  <div id="agur-edit-modal">
+    <div id="agur-edit-header">
+      <span id="agur-edit-header-label">Card Design</span>
+      <button type="button" class="spoiler-modal-close" onclick="saveAndCloseAgurEdit()">&times;</button>
+    </div>
+    <div id="agur-edit-tabs">
+      <button type="button" class="agur-edit-tab active" id="agur-tab-text" onclick="setAgurEditTab('text')">Text Entry</button>
+      <button type="button" class="agur-edit-tab" id="agur-tab-image" onclick="setAgurEditTab('image')">Upload Image</button>
+    </div>
+    <div id="agur-edit-body">
+      <!-- Text entry section -->
+      <div id="agur-text-section">
+        <div>
+          <div class="agur-edit-label">Card Title <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+          <input class="agur-edit-input" id="agur-edit-title" type="text" placeholder="e.g. Warrior of Light" autocomplete="off">
+        </div>
+        <div>
+          <div class="agur-edit-label">Card Type <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+          <input class="agur-edit-input" id="agur-edit-type" type="text" placeholder="e.g. Hero, Evil Character, Enhancement..." autocomplete="off">
+        </div>
+        <div>
+          <div class="agur-edit-label">Brigade <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+          <input class="agur-edit-input" id="agur-edit-brigade" type="text" placeholder="e.g. Gold, Purple, Multi..." autocomplete="off">
+        </div>
+        <div>
+          <div class="agur-edit-label">STR / TGH <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+          <div class="agur-str-tgh-row">
+            <input class="agur-edit-input" id="agur-edit-str" type="text" placeholder="STR" autocomplete="off">
+            <input class="agur-edit-input" id="agur-edit-tgh" type="text" placeholder="TGH" autocomplete="off">
+          </div>
+        </div>
+        <div>
+          <div class="agur-edit-label">Class <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+          <select class="agur-edit-input" id="agur-edit-class">
+            <option value="">— Select Class —</option>
+            <option value="Territory">Territory</option>
+            <option value="Warrior">Warrior</option>
+            <option value="Weapon">Weapon</option>
+          </select>
+        </div>
+        <div>
+          <div class="agur-edit-label">Identifier <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+          <input class="agur-edit-input" id="agur-edit-identifier" type="text" placeholder="e.g. card set, number, version..." autocomplete="off">
+        </div>
+        <div>
+          <div class="agur-edit-label">Card Ability <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+          <textarea class="agur-edit-textarea" id="agur-edit-ability" placeholder="Card text / ability description..."></textarea>
+        </div>
+        <div>
+          <div class="agur-edit-label">Scripture Reference <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+          <input class="agur-edit-input" id="agur-edit-scripture" type="text" placeholder="e.g. John 3:16" autocomplete="off">
+        </div>
+      </div>
+      <!-- Image upload section -->
+      <div id="agur-image-section" style="display:none;">
+        <div id="agur-edit-img-row">
+          <div id="agur-edit-img-thumb">
+            <img id="agur-edit-img-thumb-img" src="" alt="">
+            <button type="button" id="agur-edit-img-thumb-remove" onclick="removeAgurEditImg()">&times;</button>
+          </div>
+          <div id="agur-edit-img-fields">
+            <button type="button" class="btn btn-ghost" id="agur-edit-img-btn" style="font-size:11px; padding:4px 10px;" onclick="document.getElementById('agur-edit-img-file').click()">+ Upload Card Image</button>
+            <input type="file" id="agur-edit-img-file" accept="image/*" style="display:none;" onchange="loadAgurEditImg(this)">
+            <input class="agur-edit-input" id="agur-edit-img-caption" type="text" placeholder="Card title / design name" autocomplete="off" style="display:none; margin-top:6px;">
+          </div>
+        </div>
+      </div>
+      <!-- Notes (shared between both tabs) -->
+      <div>
+        <div class="agur-edit-label">Discussion Notes <span style="font-weight:400;opacity:0.6;">(optional)</span></div>
+        <div id="agur-edit-notes-wrap">
+          <div id="agur-edit-bullet-editor" contenteditable="true" spellcheck="true"></div>
+          <div id="agur-edit-notes-hint">• top level &nbsp;|&nbsp; Tab → – sub &nbsp;|&nbsp; Tab again → ◦ sub-sub &nbsp;|&nbsp; Shift+Tab to outdent</div>
+        </div>
+      </div>
+    </div>
+    <div id="agur-edit-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeAgurEditModal()">Cancel</button>
+      <button type="button" class="btn btn-teal" onclick="saveAndCloseAgurEdit(true)">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Agur View Modal (publish) -->
+<div id="agur-view-overlay" onclick="closeAgurViewModal(event)">
+  <div id="agur-view-content">
+    <button type="button" class="spoiler-modal-close" onclick="closeAgurViewModal()">&times;</button>
+    <div id="agur-view-left">
+      <!-- Text spec card -->
+      <div id="agur-view-spec">
+        <div id="agur-view-spec-type"></div>
+        <div id="agur-view-spec-title"></div>
+        <div id="agur-view-spec-brigade"></div>
+        <div id="agur-view-spec-stats"></div>
+        <div id="agur-view-spec-class"></div>
+        <div id="agur-view-spec-identifier"></div>
+        <div id="agur-view-spec-ability"></div>
+        <div id="agur-view-spec-scripture"></div>
+      </div>
+      <!-- Image display -->
+      <div id="agur-view-img-wrap" style="display:none;">
+        <img id="agur-view-img" src="" alt="">
+        <div id="agur-view-img-caption"></div>
+      </div>
+    </div>
+    <div id="agur-view-right">
+      <div id="agur-view-notes-label">Discussion Notes</div>
+      <ul id="agur-view-notes-list"></ul>
+      <div id="agur-view-notes-empty" style="display:none;">No notes added for this design.</div>
     </div>
   </div>
 </div>
@@ -2218,7 +2812,7 @@
     <button type="button" class="spoiler-modal-close" onclick="closePlayerProfileModal(event)">&times;</button>
     <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:2px;">
       <div class="player-profile-modal-name" id="ppm-handle"></div>
-      <img id="ppm-team-logo" src="" alt="" style="display:none; height:28px; width:auto; max-width:80px; object-fit:contain; flex-shrink:0; margin-top:2px;">
+      <img id="ppm-team-logo" src="" alt="" style="display:none; height:28px; width:auto; max-width:80px; object-fit:contain; flex-shrink:0; margin-top:2px; margin-right:28px;">
     </div>
 
     <div id="ppm-view">
@@ -2227,7 +2821,10 @@
     </div>
 
     <div id="ppm-edit-form" style="display:none;">
-      <div>
+      <div style="margin-bottom:6px;">
+        <div class="pr-field-label" style="display:block; margin-bottom:2px;">Handle</div>
+        <div id="ppm-edit-handle-display" style="font-family:'Barlow',sans-serif; font-size:13px; color:var(--text); padding:4px 0; opacity:0.7;"></div>
+      </div>
         <label class="pr-field-label">Real Name</label>
         <input class="pr-field-input" id="ppm-realname" placeholder="Optional" autocomplete="off">
       </div>
@@ -2381,6 +2978,31 @@
   </div>
 </div>
 
+<!-- Venue / Other Notes Modal -->
+<div id="venue-notes-overlay" onclick="closeVenueNotesModal(event)">
+  <div id="venue-notes-modal">
+    <div id="venue-notes-header">
+      <span id="venue-notes-header-label">Venue / Other Notes</span>
+      <button type="button" class="spoiler-modal-close" onclick="closeVenueNotesModal()">&times;</button>
+    </div>
+    <div id="venue-notes-body">
+      <div id="venue-notes-edit-section">
+        <div id="venue-notes-edit-wrap">
+          <div id="venue-notes-bullet-editor" contenteditable="true" spellcheck="true"></div>
+          <div id="venue-notes-edit-hint">• top level &nbsp;|&nbsp; Tab → – sub &nbsp;|&nbsp; Tab again → ◦ sub-sub &nbsp;|&nbsp; Shift+Tab to outdent</div>
+        </div>
+      </div>
+      <div id="venue-notes-view">
+        <ul id="venue-notes-view-list"></ul>
+      </div>
+    </div>
+    <div id="venue-notes-footer">
+      <button type="button" class="btn btn-ghost" id="venue-notes-cancel-btn" onclick="closeVenueNotesModal()">Cancel</button>
+      <button type="button" class="btn btn-teal" id="venue-notes-save-btn" onclick="saveVenueNotes()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- News Topic Detail Modal (read-only; works in both editor and published view) -->
 <div id="news-detail-overlay" onclick="closeNewsDetailModal(event)">
   <div id="news-detail-modal">
@@ -2509,8 +3131,8 @@
       </div>
       <div id="deck-viewer-header-badges"></div>
       <div id="deck-viewer-view-toggle">
-        <button type="button" class="dv-toggle-btn active" id="dv-btn-grid" onclick="setDeckViewerMode('grid')">Grid</button>
-        <button type="button" class="dv-toggle-btn" id="dv-btn-stack" onclick="setDeckViewerMode('stack')">Stacked</button>
+        <button type="button" class="dv-toggle-btn" id="dv-btn-grid" onclick="setDeckViewerMode('grid')">Grid</button>
+        <button type="button" class="dv-toggle-btn active" id="dv-btn-stack" onclick="setDeckViewerMode('stack')">Stacked</button>
       </div>
     </div>
     <div id="deck-viewer-notes-bar" style="display:none;">
@@ -2819,20 +3441,19 @@
             <div class="event-cards" id="rtn-events-list"></div>
           </div>
 
-          <div class="field" id="rtn-extra-notes-field" style="display:none; margin-top:8px; position:relative;">
-            <label class="field-label bullet-field-label">Venue / Other Notes</label>
-            <div class="bullet-wrap">
-              <div class="bullet-marks" id="rtn-extra-notes-marks"><span>&#8226;</span></div>
-              <textarea class="bullet-textarea" id="rtn-extra-notes" placeholder="Venue logistics, parking, hotel info, special arrangements... (one per line)"></textarea>
-            </div>
-            <ul class="bullet-notes-print" id="rtn-extra-notes-print"></ul>
-            <button type="button" class="countdown-remove" title="Remove" onclick="removeExtraNotesField()" style="position:absolute; top:0; right:0;">&times;</button>
+          <!-- Venue / Other Notes static card -->
+          <div id="venue-notes-card" class="venue-notes-card venue-notes-card-empty" onclick="openVenueNotesModal()" style="display:none;">
+            <div class="venue-notes-card-label" id="venue-notes-card-label">+ Add Venue / Other Notes</div>
+            <div class="venue-notes-card-preview" id="venue-notes-card-preview" style="display:none;"></div>
           </div>
+          <!-- Hidden textarea for store save/recall compat -->
+          <textarea id="rtn-extra-notes" style="display:none;"></textarea>
+          <div style="display:none;" id="rtn-extra-notes-marks"></div>
+          <ul class="bullet-notes-print" id="rtn-extra-notes-print" style="display:none;"></ul>
 
           <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px;">
             <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="addDeadlineRow()">+ Add Deadline</button>
             <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="addSideEventRow()">+ Add Side Event</button>
-            <button class="btn btn-ghost" type="button" id="rtn-add-extra-notes-btn" style="padding:3px 10px; font-size:10px;" onclick="showExtraNotesField()">+ Add Venue / Other Notes</button>
             <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px;" onclick="carryForwardRtn()">&#8635; Recall Previous RTN Data</button>
             <span id="rtn-carryforward-status" style="font-size:9px; color:var(--placeholder); font-style:italic;"></span>
           </div>
@@ -2914,23 +3535,17 @@
           </span>
         </div>
         <div class="sec-body">
-          <input class="collectors-topic-input" id="collectors-topic" placeholder="Segment topic -- e.g. Foil price trends, grading talk, rare finds..." autocomplete="off">
-
-          <div class="collectors-layout">
-            <div class="collectors-notes-col">
-              <div class="bullet-wrap">
-                <div class="bullet-marks" id="collectors-bullet-marks"><span>&#8226;</span></div>
-                <textarea class="bullet-textarea" id="collectors-notes" placeholder="Talking points -- price trends, demand shifts, reprints, grading, rumors... (one per line)"></textarea>
-              </div>
-              <ul class="bullet-notes-print" id="collectors-notes-print"></ul>
-            </div>
-            <div class="collectors-card-col" id="collectors-card-col">
-              <div class="collectors-card-placeholder" id="collectors-card-placeholder" onclick="document.getElementById('collectors-card-file').click()">
-                <span class="collectors-card-placeholder-text">+ Reference a Card</span>
-              </div>
-              <input type="file" id="collectors-card-file" accept="image/*" style="display:none;" onchange="addCollectorsCard(this)">
-            </div>
+          <!-- Legacy hidden fields for store compat -->
+          <input type="hidden" id="collectors-topic">
+          <textarea id="collectors-notes" style="display:none;"></textarea>
+          <div style="display:none;" id="collectors-bullet-marks"></div>
+          <ul class="bullet-notes-print" id="collectors-notes-print" style="display:none;"></ul>
+          <div style="display:none;" id="collectors-card-col">
+            <input type="file" id="collectors-card-file" accept="image/*" style="display:none;">
           </div>
+
+          <div class="collectors-grid" id="collectors-grid"></div>
+          <div id="collectors-add-row"></div>
         </div>
       </div>
     </div>
@@ -2987,40 +3602,24 @@
           </span>
         </div>
         <div class="sec-body">
-          <div class="field">
-            <label class="field-label">Fan Card Designs</label>
-            <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px; flex-wrap:wrap;">
-              <label class="btn btn-ghost" style="padding:3px 10px; font-size:10px; white-space:nowrap; cursor:pointer; margin-bottom:0;">
-                + Upload Card Image
-                <input type="file" id="agur-manual-file" accept="image/*" style="display:none;" onchange="addAgurCard()">
-              </label>
-            </div>
-            <div class="agur-card-grid" id="agur-card-grid"></div>
-            <div id="agur-empty-state" style="font-size:10px; color:var(--placeholder); font-style:italic; padding:6px 0;">No designs added yet -- upload a fan card image to get started.</div>
+          <!-- Legacy hidden field for store compat -->
+          <input type="hidden" id="agur-manual-file-compat">
+
+          <div class="agur-grid" id="agur-grid"></div>
+          <div id="agur-add-row"></div>
+
+          <!-- Legacy agur modal overlay (kept for store compat reference) -->
+          <div id="agur-modal-overlay" style="display:none!important;">
+            <img id="agur-modal-img" src="" alt="">
+            <div id="agur-modal-caption"></div>
+            <div id="agur-modal-note"></div>
+            <div id="agur-modal-note-empty"></div>
           </div>
 
-          <div id="agur-modal-overlay" class="spoiler-modal-overlay" onclick="closeAgurModal(event)">
-            <div class="spoiler-modal-content spoiler-modal-content-split">
-              <button type="button" class="spoiler-modal-close" onclick="closeAgurModal(event)">&times;</button>
-              <div class="spoiler-modal-media">
-                <img id="agur-modal-img" src="" alt="">
-                <div class="spoiler-modal-caption" id="agur-modal-caption"></div>
-              </div>
-              <div class="spoiler-modal-notes-col">
-                <div class="spoiler-modal-notes-label">Talking Points</div>
-                <div class="spoiler-modal-note" id="agur-modal-note"></div>
-                <div class="spoiler-modal-note-empty" id="agur-modal-note-empty">No notes added for this card.</div>
-              </div>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label bullet-field-label">Discussion Notes</label>
-            <div class="bullet-wrap">
-              <div class="bullet-marks" id="agur-notes-marks"><span>&#8226;</span></div>
-              <textarea class="bullet-textarea tall" id="agur-notes" placeholder="Custom card design, homebrew content, creative projects... (one per line)"></textarea>
-            </div>
-            <ul class="bullet-notes-print" id="agur-notes-print"></ul>
-          </div>
+          <!-- agur-notes kept hidden for store compat -->
+          <textarea id="agur-notes" style="display:none;"></textarea>
+          <div style="display:none;" id="agur-notes-marks"></div>
+          <ul class="bullet-notes-print" id="agur-notes-print" style="display:none;"></ul>
         </div>
       </div>
     </div>
@@ -3346,10 +3945,13 @@
       card.appendChild(numEl);
       var info = document.createElement('div');
       info.className = 'rank-card-info';
+      var nameRow = document.createElement('div');
+      nameRow.className = 'rank-card-name-row';
       var nameEl = document.createElement('div');
       nameEl.className = 'rank-card-name';
       nameEl.textContent = name;
-      info.appendChild(nameEl);
+      nameRow.appendChild(nameEl);
+      // Team logo inline with name
       var profile = findPlayerProfile(name);
       var team = profile ? profile.team : '';
       var logoUrl = getTeamLogoUrl(team);
@@ -3358,8 +3960,9 @@
         logoImg.className = 'rank-card-team-logo';
         logoImg.src = logoUrl;
         logoImg.alt = team;
-        info.appendChild(logoImg);
+        nameRow.appendChild(logoImg);
       }
+      info.appendChild(nameRow);
       card.appendChild(info);
       var right = document.createElement('div');
       right.className = 'rank-card-right';
@@ -4748,6 +5351,7 @@
     if (maybeCards.length) renderCardGrid(maybeCards, 'Considering');
 
     document.getElementById('deck-viewer-overlay').classList.add('open');
+    setDeckViewerMode('stack');
     populateDeckViewerNotes();
 
     // Show loading state then render once types are ready
@@ -5416,40 +6020,340 @@
     document.getElementById('spoiler-modal-overlay').classList.remove('open');
   }
 
-  function openAgurModal(n) {
-    var card = document.getElementById('agur-card-' + n);
-    if (!card) return;
-    var img = card.querySelector('.agur-card-img-wrap img');
-    var caption = card.querySelector('.agur-card-caption-input');
-    var noteEl = document.getElementById('agur-note-' + n);
+  // ---- Agur the Creator: multi-item tile system ----
+  window.agurCount = 0;
+  window.agurCardImgs = {}; // { n: dataUrl }
+  window.agurCardCaptions = {};
 
-    document.getElementById('agur-modal-img').src = img.src;
-    document.getElementById('agur-modal-img').alt = (caption && caption.value) || '';
-    document.getElementById('agur-modal-caption').textContent = (caption && caption.value) || '';
+  function refreshAgurTile(n) {
+    var tile = document.getElementById('agur-tile-' + n);
+    if (!tile) return;
+    var title = (document.getElementById('agur-title-' + n) || {}).value || '';
+    var hasImg = !!(window.agurCardImgs[n]);
+    tile.innerHTML = '';
+    if (!title.trim() && !hasImg) {
+      tile.className = 'agur-tile agur-tile-add';
+      tile.textContent = 'Card Design';
+    } else {
+      tile.className = 'agur-tile';
+      var titleEl = document.createElement('div');
+      titleEl.className = 'agur-tile-title';
+      titleEl.textContent = title || 'Untitled';
+      tile.appendChild(titleEl);
+    }
+  }
 
-    var modalNote = document.getElementById('agur-modal-note');
-    modalNote.innerHTML = '';
-    if (noteEl && noteEl.value.trim()) {
-      var ul = document.createElement('ul');
-      noteEl.value.split('\n').forEach(function(line) {
-        line = line.trim();
-        if (!line) return;
-        var li = document.createElement('li');
-        li.textContent = line;
-        ul.appendChild(li);
+  function addAgurItem(forceId) {
+    var n;
+    if (forceId) {
+      n = forceId;
+      if (n > window.agurCount) window.agurCount = n;
+    } else {
+      window.agurCount++;
+      n = window.agurCount;
+    }
+
+    var block = document.createElement('div');
+    block.className = 'agur-block';
+    block.id = 'agur-block-' + n;
+
+    var handle = document.createElement('span');
+    handle.className = 'agur-block-drag-handle';
+    handle.title = 'Drag to reorder';
+    handle.textContent = '\u22ee\u22ee';
+    block.appendChild(handle);
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'tourn-remove-btn';
+    removeBtn.title = 'Remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      block.remove();
+      delete window.agurCardImgs[n];
+      delete window.agurCardCaptions[n];
+    });
+    block.appendChild(removeBtn);
+
+    var tile = document.createElement('div');
+    tile.id = 'agur-tile-' + n;
+    tile.className = 'agur-tile agur-tile-add';
+    tile.textContent = 'Card Design';
+    tile.addEventListener('click', function(e) {
+      if (e.target.closest('button, .agur-block-drag-handle')) return;
+      if (document.body.classList.contains('view-mode')) {
+        openAgurViewModal(n);
+      } else {
+        openAgurEditModal(n);
+      }
+    });
+    block.appendChild(tile);
+
+    block.insertAdjacentHTML('beforeend',
+      '<input type="hidden" id="agur-title-' + n + '">' +
+      '<input type="hidden" id="agur-type-' + n + '">' +
+      '<input type="hidden" id="agur-brigade-' + n + '">' +
+      '<input type="hidden" id="agur-str-' + n + '">' +
+      '<input type="hidden" id="agur-tgh-' + n + '">' +
+      '<input type="hidden" id="agur-class-' + n + '">' +
+      '<input type="hidden" id="agur-identifier-' + n + '">' +
+      '<input type="hidden" id="agur-scripture-' + n + '">' +
+      '<textarea style="display:none;" id="agur-ability-' + n + '"></textarea>' +
+      '<textarea style="display:none;" id="agur-notes-item-' + n + '"></textarea>');
+
+    document.getElementById('agur-grid').appendChild(block);
+    refreshAgurTile(n);
+  }
+
+  function createAgurAddRow() {
+    var addRow = document.getElementById('agur-add-row');
+    addRow.innerHTML = '';
+    addRow.style.textAlign = 'center';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-ghost';
+    btn.style.marginTop = '6px';
+    btn.textContent = '+ Add Design';
+    btn.addEventListener('click', function() { addAgurItem(); });
+    addRow.appendChild(btn);
+  }
+
+  // Agur edit modal
+  var _agurEditTarget = null;
+  var _agurEditTab = 'text';
+  var _agurEditBulletEditor = null;
+
+  function setAgurEditTab(tab) {
+    _agurEditTab = tab;
+    document.getElementById('agur-tab-text').classList.toggle('active', tab === 'text');
+    document.getElementById('agur-tab-image').classList.toggle('active', tab === 'image');
+    document.getElementById('agur-text-section').style.display = tab === 'text' ? '' : 'none';
+    document.getElementById('agur-image-section').style.display = tab === 'image' ? '' : 'none';
+  }
+
+  function openAgurEditModal(n) {
+    _agurEditTarget = n;
+    var hasImg = !!(window.agurCardImgs[n]);
+    setAgurEditTab(hasImg ? 'image' : 'text');
+
+    // Populate text fields
+    document.getElementById('agur-edit-title').value    = (document.getElementById('agur-title-' + n) || {}).value || '';
+    document.getElementById('agur-edit-type').value     = (document.getElementById('agur-type-' + n) || {}).value || '';
+    document.getElementById('agur-edit-brigade').value  = (document.getElementById('agur-brigade-' + n) || {}).value || '';
+    document.getElementById('agur-edit-str').value      = (document.getElementById('agur-str-' + n) || {}).value || '';
+    document.getElementById('agur-edit-tgh').value      = (document.getElementById('agur-tgh-' + n) || {}).value || '';
+    document.getElementById('agur-edit-class').value    = (document.getElementById('agur-class-' + n) || {}).value || '';
+    document.getElementById('agur-edit-identifier').value = (document.getElementById('agur-identifier-' + n) || {}).value || '';
+    document.getElementById('agur-edit-scripture').value= (document.getElementById('agur-scripture-' + n) || {}).value || '';
+    var abilityEl = document.getElementById('agur-ability-' + n);
+    document.getElementById('agur-edit-ability').value  = abilityEl ? abilityEl.value : '';
+
+    // Image state
+    var thumb = document.getElementById('agur-edit-img-thumb');
+    var thumbImg = document.getElementById('agur-edit-img-thumb-img');
+    var captionInput = document.getElementById('agur-edit-img-caption');
+    var addBtn = document.getElementById('agur-edit-img-btn');
+    if (hasImg) {
+      thumbImg.src = window.agurCardImgs[n];
+      thumb.style.display = 'block';
+      captionInput.style.display = '';
+      captionInput.value = (document.getElementById('agur-title-' + n) || {}).value || window.agurCardCaptions[n] || '';
+      addBtn.style.display = 'none';
+    } else {
+      thumb.style.display = 'none';
+      captionInput.style.display = 'none';
+      captionInput.value = '';
+      addBtn.style.display = '';
+    }
+
+    // Notes
+    if (!_agurEditBulletEditor) {
+      _agurEditBulletEditor = document.getElementById('agur-edit-bullet-editor');
+      _agurEditBulletEditor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          var line = bnGetCurrentLine(_agurEditBulletEditor);
+          if (!line) return;
+          bnSetLevel(line, bnGetLevel(line) + (e.shiftKey ? -1 : 1));
+        }
+        if (e.key === 'Enter') setTimeout(function() { bnEnsureLineOnEnter(_agurEditBulletEditor); }, 0);
       });
-      modalNote.appendChild(ul);
+      _agurEditBulletEditor.addEventListener('paste', function(e) {
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        var sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        var range = sel.getRangeAt(0);
+        range.deleteContents();
+        var currentLine = bnGetCurrentLine(_agurEditBulletEditor);
+        var insertLevel = currentLine ? bnGetLevel(currentLine) : 0;
+        var frag = document.createDocumentFragment();
+        text.split('\n').forEach(function(raw) {
+          var level = bnLevelFromPrefix(raw) || insertLevel;
+          var div = document.createElement('div');
+          div.className = 'bn-line bn-l' + level;
+          div.textContent = bnLineText(raw);
+          frag.appendChild(div);
+        });
+        range.insertNode(frag);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
     }
+    var notesEl = document.getElementById('agur-notes-item-' + n);
+    bnValueToEditor(_agurEditBulletEditor, notesEl ? notesEl.value : '');
 
-    document.getElementById('agur-modal-overlay').classList.add('open');
+    document.getElementById('agur-edit-overlay').classList.add('open');
+    document.getElementById('agur-edit-title').focus();
   }
 
-  function closeAgurModal(event) {
-    if (event && event.target.closest('.spoiler-modal-content') && !event.target.classList.contains('spoiler-modal-close')) {
-      return;
-    }
-    document.getElementById('agur-modal-overlay').classList.remove('open');
+  function loadAgurEditImg(input) {
+    var file = input.files[0];
+    if (!file) return;
+    resizeImageFile(file, 600, 0.8, function(dataUrl) {
+      var thumb = document.getElementById('agur-edit-img-thumb');
+      var thumbImg = document.getElementById('agur-edit-img-thumb-img');
+      var captionInput = document.getElementById('agur-edit-img-caption');
+      var addBtn = document.getElementById('agur-edit-img-btn');
+      thumbImg.src = dataUrl;
+      thumb.style.display = 'block';
+      captionInput.style.display = '';
+      addBtn.style.display = 'none';
+    });
+    input.value = '';
   }
+
+  function removeAgurEditImg() {
+    var thumb = document.getElementById('agur-edit-img-thumb');
+    var captionInput = document.getElementById('agur-edit-img-caption');
+    var addBtn = document.getElementById('agur-edit-img-btn');
+    thumb.style.display = 'none';
+    captionInput.style.display = 'none';
+    captionInput.value = '';
+    addBtn.style.display = '';
+  }
+
+  function saveAndCloseAgurEdit(doSave) {
+    if (doSave && _agurEditTarget !== null) {
+      var n = _agurEditTarget;
+      var setHidden = function(id, val) { var el = document.getElementById(id); if (el) el.value = val; };
+      setHidden('agur-title-' + n,      document.getElementById('agur-edit-title').value);
+      setHidden('agur-type-' + n,       document.getElementById('agur-edit-type').value);
+      setHidden('agur-brigade-' + n,    document.getElementById('agur-edit-brigade').value);
+      setHidden('agur-str-' + n,        document.getElementById('agur-edit-str').value);
+      setHidden('agur-tgh-' + n,        document.getElementById('agur-edit-tgh').value);
+      setHidden('agur-class-' + n,      document.getElementById('agur-edit-class').value);
+      setHidden('agur-identifier-' + n, document.getElementById('agur-edit-identifier').value);
+      setHidden('agur-scripture-' + n,  document.getElementById('agur-edit-scripture').value);
+      var abilityEl = document.getElementById('agur-ability-' + n);
+      if (abilityEl) abilityEl.value = document.getElementById('agur-edit-ability').value;
+      var notesEl = document.getElementById('agur-notes-item-' + n);
+      if (notesEl && _agurEditBulletEditor) notesEl.value = bnEditorToValue(_agurEditBulletEditor);
+      // Image
+      var thumb = document.getElementById('agur-edit-img-thumb');
+      if (_agurEditTab === 'image' && thumb.style.display !== 'none') {
+        var captionVal = document.getElementById('agur-edit-img-caption').value;
+        setHidden('agur-title-' + n, captionVal);
+        window.agurCardImgs[n] = document.getElementById('agur-edit-img-thumb-img').src;
+        window.agurCardCaptions[n] = captionVal;
+      } else {
+        delete window.agurCardImgs[n];
+        delete window.agurCardCaptions[n];
+      }
+      refreshAgurTile(n);
+    }
+    document.getElementById('agur-edit-overlay').classList.remove('open');
+    _agurEditTarget = null;
+  }
+
+  function closeAgurEditModal(event) {
+    if (event && event.target !== document.getElementById('agur-edit-overlay')) return;
+    saveAndCloseAgurEdit(false);
+  }
+
+  // Agur view modal (publish)
+  function openAgurViewModal(n) {
+    var hasImg = !!(window.agurCardImgs[n]);
+    var spec = document.getElementById('agur-view-spec');
+    var imgWrap = document.getElementById('agur-view-img-wrap');
+
+    if (hasImg) {
+      spec.style.display = 'none';
+      imgWrap.style.display = '';
+      document.getElementById('agur-view-img').src = window.agurCardImgs[n];
+      document.getElementById('agur-view-img-caption').textContent = window.agurCardCaptions[n] || '';
+    } else {
+      imgWrap.style.display = 'none';
+      spec.style.display = '';
+      var g = function(id) { return (document.getElementById(id) || {}).value || ''; };
+      var setSpec = function(elId, val) {
+        var el = document.getElementById(elId);
+        if (el) { el.textContent = val; el.style.display = val ? '' : 'none'; }
+      };
+      // Order: Title, Type, Brigade, STR/TGH, Class, Identifier, Ability, Scripture
+      setSpec('agur-view-spec-title',      g('agur-title-' + n));
+      setSpec('agur-view-spec-type',       g('agur-type-' + n));
+      setSpec('agur-view-spec-brigade',    g('agur-brigade-' + n) ? 'Brigade: ' + g('agur-brigade-' + n) : '');
+      var str = g('agur-str-' + n), tgh = g('agur-tgh-' + n);
+      setSpec('agur-view-spec-stats',      (str || tgh) ? (str || '?') + ' / ' + (tgh || '?') : '');
+      setSpec('agur-view-spec-class',      g('agur-class-' + n) ? 'Class: ' + g('agur-class-' + n) : '');
+      setSpec('agur-view-spec-identifier', g('agur-identifier-' + n) ? 'ID: ' + g('agur-identifier-' + n) : '');
+      var abilityEl = document.getElementById('agur-ability-' + n);
+      setSpec('agur-view-spec-ability',    abilityEl ? abilityEl.value : '');
+      setSpec('agur-view-spec-scripture',  g('agur-scripture-' + n));
+    }
+
+    // Notes
+    var notesEl = document.getElementById('agur-notes-item-' + n);
+    var notes = notesEl ? notesEl.value.trim() : '';
+    var list = document.getElementById('agur-view-notes-list');
+    var empty = document.getElementById('agur-view-notes-empty');
+    list.innerHTML = '';
+    if (notes) {
+      notes.split('\n').forEach(function(line) {
+        var level = 0; var m = line.match(/^(\t*)/);
+        if (m) level = Math.min(m[1].length, 2);
+        var text = line.replace(/^\t+/, '').trim();
+        if (!text) return;
+        var li = document.createElement('li');
+        li.className = 'bullet-l' + level; li.textContent = text;
+        list.appendChild(li);
+      });
+    }
+    var hasNotes = list.children.length > 0;
+    list.style.display = hasNotes ? '' : 'none';
+    empty.style.display = hasNotes ? 'none' : '';
+
+    document.getElementById('agur-view-overlay').classList.add('open');
+  }
+
+  function closeAgurViewModal(event) {
+    if (event && event.target !== document.getElementById('agur-view-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
+    document.getElementById('agur-view-overlay').classList.remove('open');
+  }
+
+  // Legacy stubs
+  function openAgurModal(n) { if (document.body.classList.contains('view-mode')) openAgurViewModal(n); else openAgurEditModal(n); }
+  function closeAgurModal(event) { closeAgurViewModal(event); }
+  function addAgurCard() {}
+  function buildAgurCard(cardName, imageUrl) {
+    // backward compat: restore old single-image cards as agur items
+    addAgurItem();
+    var n = window.agurCount;
+    var titleEl = document.getElementById('agur-title-' + n);
+    if (titleEl) titleEl.value = cardName || '';
+    if (imageUrl) {
+      window.agurCardImgs[n] = imageUrl;
+      window.agurCardCaptions[n] = cardName || '';
+    }
+    refreshAgurTile(n);
+  }
+
+  // Init
+  addAgurItem();
+  createAgurAddRow();
 
 
   // ---- Shared helper: downscale/compress an uploaded image to keep draft size manageable ----
@@ -5961,6 +6865,7 @@
     }
     var rows = '';
     var fields = [
+      { label: 'Handle',         value: handle },
       { label: 'Real Name',      value: profile.realName },
       { label: 'Pronunciation',  value: profile.pronunciation },
       { label: 'Region',         value: profile.region },
@@ -6000,6 +6905,7 @@
     document.getElementById('ppm-region').value = profile.region || '';
     document.getElementById('ppm-team').value = profile.team || '';
     document.getElementById('ppm-edit-status').textContent = '';
+    document.getElementById('ppm-edit-handle-display').textContent = handle || '';
     // Show team logo in edit mode too
     var logoEl = document.getElementById('ppm-team-logo');
     var logoUrl = getTeamLogoUrl(profile.team);
@@ -6577,20 +7483,131 @@
     renderNationalsInfo();
   }
 
-  function showExtraNotesField() {
-    document.getElementById('rtn-extra-notes-field').style.display = 'block';
-    document.getElementById('rtn-add-extra-notes-btn').style.display = 'none';
-    syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+  function refreshVenueNotesCard() {
+    var notesEl = document.getElementById('rtn-extra-notes');
+    var card = document.getElementById('venue-notes-card');
+    var cardLabel = document.getElementById('venue-notes-card-label');
+    var cardPreview = document.getElementById('venue-notes-card-preview');
+    if (!card) return;
+    var val = notesEl ? notesEl.value.trim() : '';
+    card.style.display = 'block';
+    if (!val) {
+      card.classList.add('venue-notes-card-empty');
+      cardLabel.textContent = '+ Add Venue / Other Notes';
+      cardPreview.style.display = 'none';
+      cardPreview.textContent = '';
+    } else {
+      card.classList.remove('venue-notes-card-empty');
+      cardLabel.textContent = 'Venue / Other Notes';
+      cardPreview.style.display = 'none';
+    }
+    // Hide card entirely in view mode if no notes
+    if (document.body.classList.contains('view-mode') && !val) {
+      card.style.display = 'none';
+    }
   }
+
+  var _venueNotesBulletEditor = null;
+
+  function openVenueNotesModal() {
+    var notesEl = document.getElementById('rtn-extra-notes');
+    var isEditor = !document.body.classList.contains('view-mode');
+
+    if (isEditor) {
+      document.getElementById('venue-notes-edit-section').style.display = '';
+      document.getElementById('venue-notes-view').style.display = 'none';
+      document.getElementById('venue-notes-save-btn').style.display = '';
+      document.getElementById('venue-notes-cancel-btn').textContent = 'Cancel';
+
+      if (!_venueNotesBulletEditor) {
+        _venueNotesBulletEditor = document.getElementById('venue-notes-bullet-editor');
+        _venueNotesBulletEditor.addEventListener('keydown', function(e) {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            var line = bnGetCurrentLine(_venueNotesBulletEditor);
+            if (!line) return;
+            bnSetLevel(line, bnGetLevel(line) + (e.shiftKey ? -1 : 1));
+          }
+          if (e.key === 'Enter') {
+            setTimeout(function() { bnEnsureLineOnEnter(_venueNotesBulletEditor); }, 0);
+          }
+        });
+        _venueNotesBulletEditor.addEventListener('paste', function(e) {
+          e.preventDefault();
+          var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+          var sel = window.getSelection();
+          if (!sel.rangeCount) return;
+          var range = sel.getRangeAt(0);
+          range.deleteContents();
+          var currentLine = bnGetCurrentLine(_venueNotesBulletEditor);
+          var insertLevel = currentLine ? bnGetLevel(currentLine) : 0;
+          var frag = document.createDocumentFragment();
+          text.split('\n').forEach(function(raw) {
+            var level = bnLevelFromPrefix(raw) || insertLevel;
+            var div = document.createElement('div');
+            div.className = 'bn-line bn-l' + level;
+            div.textContent = bnLineText(raw);
+            frag.appendChild(div);
+          });
+          range.insertNode(frag);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        });
+      }
+      bnValueToEditor(_venueNotesBulletEditor, notesEl ? notesEl.value : '');
+    } else {
+      document.getElementById('venue-notes-edit-section').style.display = 'none';
+      document.getElementById('venue-notes-view').style.display = '';
+      document.getElementById('venue-notes-save-btn').style.display = 'none';
+      document.getElementById('venue-notes-cancel-btn').textContent = 'Close';
+
+      var list = document.getElementById('venue-notes-view-list');
+      list.innerHTML = '';
+      var notes = notesEl ? notesEl.value.trim() : '';
+      if (notes) {
+        notes.split('\n').forEach(function(line) {
+          var level = 0;
+          var m = line.match(/^(\t*)/);
+          if (m) level = Math.min(m[1].length, 2);
+          var text = line.replace(/^\t+/, '').trim();
+          if (!text) return;
+          var li = document.createElement('li');
+          li.className = 'bullet-l' + level;
+          li.textContent = text;
+          list.appendChild(li);
+        });
+      }
+    }
+    document.getElementById('venue-notes-overlay').classList.add('open');
+  }
+
+  function saveVenueNotes() {
+    var notesEl = document.getElementById('rtn-extra-notes');
+    if (notesEl && _venueNotesBulletEditor) {
+      notesEl.value = bnEditorToValue(_venueNotesBulletEditor);
+      syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+    }
+    refreshVenueNotesCard();
+    document.getElementById('venue-notes-overlay').classList.remove('open');
+  }
+
+  function closeVenueNotesModal(event) {
+    if (event && event.target !== document.getElementById('venue-notes-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
+    document.getElementById('venue-notes-overlay').classList.remove('open');
+  }
+
+  // Legacy stubs — kept in case anything else calls them
+  function showExtraNotesField() { openVenueNotesModal(); }
   function removeExtraNotesField() {
-    document.getElementById('rtn-extra-notes-field').style.display = 'none';
-    document.getElementById('rtn-add-extra-notes-btn').style.display = '';
-    document.getElementById('rtn-extra-notes').value = '';
+    var notesEl = document.getElementById('rtn-extra-notes');
+    if (notesEl) notesEl.value = '';
     syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+    refreshVenueNotesCard();
   }
-  document.getElementById('rtn-extra-notes').addEventListener('input', function() {
-    syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
-  });
+
+  // Always show the card in editor mode; refresh on load
+  refreshVenueNotesCard();
 
 
   // ---- Road to Nationals: Key Deadlines (add/remove rows) ----
@@ -6998,9 +8015,9 @@
         if (data['rtn-extra-notes'] && data['rtn-extra-notes'].trim()) {
           var notesField = document.getElementById('rtn-extra-notes');
           if (!notesField.value.trim()) {
-            showExtraNotesField();
             notesField.value = data['rtn-extra-notes'];
             syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+            refreshVenueNotesCard();
             notesAdded = true;
           }
         }
@@ -7089,11 +8106,307 @@
     });
   }
 
-  function syncCollectorsBullets() {
-    syncBulletField('collectors-notes', 'collectors-bullet-marks', 'collectors-notes-print');
+  // ---- Collector's Corner: multi-item tile system ----
+  window.collectorsCount = 0;
+  // Storage for card image data URLs (not in DOM hidden inputs due to size)
+  window.collectorsCardImgs = {};
+  window.collectorsCardCaptions = {};
+
+  function refreshCollectorsTile(n) {
+    var tile = document.getElementById('collectors-tile-' + n);
+    if (!tile) return;
+    var title = (document.getElementById('collectors-title-' + n) || {}).value || '';
+    var hasCard = !!(window.collectorsCardImgs[n]);
+    tile.innerHTML = '';
+    if (!title.trim()) {
+      tile.className = 'collectors-tile collectors-tile-add';
+      tile.textContent = 'Topic';
+    } else {
+      tile.className = 'collectors-tile';
+      var titleEl = document.createElement('div');
+      titleEl.className = 'collectors-tile-title';
+      titleEl.textContent = title;
+      if (hasCard) {
+        var dot = document.createElement('span');
+        dot.className = 'collectors-tile-sub';
+        dot.style.cssText = 'display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-left:5px;vertical-align:middle;';
+        titleEl.appendChild(dot);
+      }
+      tile.appendChild(titleEl);
+    }
   }
-  document.getElementById('collectors-notes').addEventListener('input', syncCollectorsBullets);
-  syncCollectorsBullets();
+
+  function addCollectorsItem(forceId) {
+    var n;
+    if (forceId) {
+      n = forceId;
+      if (n > window.collectorsCount) window.collectorsCount = n;
+    } else {
+      window.collectorsCount++;
+      n = window.collectorsCount;
+    }
+
+    var block = document.createElement('div');
+    block.className = 'collectors-block';
+    block.id = 'collectors-block-' + n;
+
+    var handleEl = document.createElement('span');
+    handleEl.className = 'collectors-block-drag-handle';
+    handleEl.title = 'Drag to reorder';
+    handleEl.textContent = '\u22ee\u22ee';
+    block.appendChild(handleEl);
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'tourn-remove-btn';
+    removeBtn.title = 'Remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      block.remove();
+      delete window.collectorsCardImgs[n];
+      delete window.collectorsCardCaptions[n];
+    });
+    block.appendChild(removeBtn);
+
+    var tile = document.createElement('div');
+    tile.id = 'collectors-tile-' + n;
+    tile.className = 'collectors-tile collectors-tile-add';
+    tile.textContent = 'Topic';
+    tile.addEventListener('click', function(e) {
+      if (e.target.closest('button, .collectors-block-drag-handle')) return;
+      if (document.body.classList.contains('view-mode')) {
+        openCollectorsViewModal(n);
+      } else {
+        openCollectorsEditModal(n);
+      }
+    });
+    block.appendChild(tile);
+
+    // Hidden data fields
+    block.insertAdjacentHTML('beforeend',
+      '<input type="hidden" id="collectors-title-' + n + '">' +
+      '<textarea style="display:none;" id="collectors-notes-' + n + '"></textarea>');
+
+    document.getElementById('collectors-grid').appendChild(block);
+    refreshCollectorsTile(n);
+  }
+
+  // Collectors edit modal
+  var _collectorsEditTarget = null;
+  var _collectorsEditBulletEditor = null;
+
+  function openCollectorsEditModal(n) {
+    _collectorsEditTarget = n;
+    var titleEl = document.getElementById('collectors-title-' + n);
+    var notesEl = document.getElementById('collectors-notes-' + n);
+    document.getElementById('collectors-edit-title').value = titleEl ? titleEl.value : '';
+
+    if (!_collectorsEditBulletEditor) {
+      _collectorsEditBulletEditor = document.getElementById('collectors-edit-bullet-editor');
+      _collectorsEditBulletEditor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          var line = bnGetCurrentLine(_collectorsEditBulletEditor);
+          if (!line) return;
+          bnSetLevel(line, bnGetLevel(line) + (e.shiftKey ? -1 : 1));
+        }
+        if (e.key === 'Enter') setTimeout(function() { bnEnsureLineOnEnter(_collectorsEditBulletEditor); }, 0);
+      });
+      _collectorsEditBulletEditor.addEventListener('paste', function(e) {
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        var sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        var range = sel.getRangeAt(0);
+        range.deleteContents();
+        var currentLine = bnGetCurrentLine(_collectorsEditBulletEditor);
+        var insertLevel = currentLine ? bnGetLevel(currentLine) : 0;
+        var frag = document.createDocumentFragment();
+        text.split('\n').forEach(function(raw) {
+          var level = bnLevelFromPrefix(raw) || insertLevel;
+          var div = document.createElement('div');
+          div.className = 'bn-line bn-l' + level;
+          div.textContent = bnLineText(raw);
+          frag.appendChild(div);
+        });
+        range.insertNode(frag);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+    }
+
+    bnValueToEditor(_collectorsEditBulletEditor, notesEl ? notesEl.value : '');
+
+    // Card image state
+    var thumb = document.getElementById('collectors-edit-card-thumb');
+    var thumbImg = document.getElementById('collectors-edit-card-thumb-img');
+    var captionInput = document.getElementById('collectors-edit-caption');
+    var addBtn = document.getElementById('collectors-edit-card-btn');
+    var imgData = window.collectorsCardImgs[n];
+    if (imgData) {
+      thumbImg.src = imgData;
+      thumb.style.display = 'block';
+      captionInput.style.display = '';
+      captionInput.value = window.collectorsCardCaptions[n] || '';
+      addBtn.style.display = 'none';
+    } else {
+      thumb.style.display = 'none';
+      captionInput.style.display = 'none';
+      captionInput.value = '';
+      addBtn.style.display = '';
+    }
+
+    document.getElementById('collectors-edit-overlay').classList.add('open');
+    document.getElementById('collectors-edit-title').focus();
+  }
+
+  function loadCollectorsEditCard(input) {
+    var file = input.files[0];
+    if (!file) return;
+    resizeImageFile(file, 600, 0.8, function(dataUrl) {
+      var thumb = document.getElementById('collectors-edit-card-thumb');
+      var thumbImg = document.getElementById('collectors-edit-card-thumb-img');
+      var captionInput = document.getElementById('collectors-edit-caption');
+      var addBtn = document.getElementById('collectors-edit-card-btn');
+      thumbImg.src = dataUrl;
+      thumb.style.display = 'block';
+      captionInput.style.display = '';
+      addBtn.style.display = 'none';
+    });
+    input.value = '';
+  }
+
+  function removeCollectorsEditCard() {
+    var thumb = document.getElementById('collectors-edit-card-thumb');
+    var captionInput = document.getElementById('collectors-edit-caption');
+    var addBtn = document.getElementById('collectors-edit-card-btn');
+    thumb.style.display = 'none';
+    captionInput.style.display = 'none';
+    captionInput.value = '';
+    addBtn.style.display = '';
+  }
+
+  function saveAndCloseCollectorsEdit(doSave) {
+    if (doSave && _collectorsEditTarget !== null) {
+      var n = _collectorsEditTarget;
+      var titleEl = document.getElementById('collectors-title-' + n);
+      var notesEl = document.getElementById('collectors-notes-' + n);
+      if (titleEl) titleEl.value = document.getElementById('collectors-edit-title').value;
+      if (notesEl && _collectorsEditBulletEditor) notesEl.value = bnEditorToValue(_collectorsEditBulletEditor);
+      // Card image
+      var thumb = document.getElementById('collectors-edit-card-thumb');
+      if (thumb.style.display !== 'none') {
+        window.collectorsCardImgs[n] = document.getElementById('collectors-edit-card-thumb-img').src;
+        window.collectorsCardCaptions[n] = document.getElementById('collectors-edit-caption').value;
+      } else {
+        delete window.collectorsCardImgs[n];
+        delete window.collectorsCardCaptions[n];
+      }
+      refreshCollectorsTile(n);
+    }
+    document.getElementById('collectors-edit-overlay').classList.remove('open');
+    _collectorsEditTarget = null;
+  }
+
+  function closeCollectorsEditModal(event) {
+    if (event && event.target !== document.getElementById('collectors-edit-overlay')) return;
+    saveAndCloseCollectorsEdit(false);
+  }
+
+  // Collectors view modals (publish)
+  function openCollectorsViewModal(n) {
+    var titleEl = document.getElementById('collectors-title-' + n);
+    var notesEl = document.getElementById('collectors-notes-' + n);
+    var title = titleEl ? titleEl.value.trim() : '';
+    var notes = notesEl ? notesEl.value.trim() : '';
+    var imgData = window.collectorsCardImgs[n];
+
+    if (imgData) {
+      // Card image modal
+      document.getElementById('collectors-card-modal-img').src = imgData;
+      document.getElementById('collectors-card-modal-img-caption').textContent = window.collectorsCardCaptions[n] || '';
+      var topicEl = document.getElementById('collectors-card-modal-topic');
+      topicEl.textContent = title;
+      topicEl.style.display = title ? '' : 'none';
+      var list = document.getElementById('collectors-card-modal-notes-list');
+      var empty = document.getElementById('collectors-card-modal-notes-empty');
+      list.innerHTML = '';
+      if (notes) {
+        notes.split('\n').forEach(function(line) {
+          var level = 0; var m = line.match(/^(\t*)/);
+          if (m) level = Math.min(m[1].length, 2);
+          var text = line.replace(/^\t+/, '').trim();
+          if (!text) return;
+          var li = document.createElement('li');
+          li.className = 'bullet-l' + level; li.textContent = text;
+          list.appendChild(li);
+        });
+      }
+      var hasNotes = list.children.length > 0;
+      list.style.display = hasNotes ? '' : 'none';
+      empty.style.display = hasNotes ? 'none' : '';
+      document.getElementById('collectors-card-modal-overlay').classList.add('open');
+    } else {
+      // Text-only modal
+      document.getElementById('collectors-view-title').textContent = title;
+      var vList = document.getElementById('collectors-view-notes-list');
+      var vEmpty = document.getElementById('collectors-view-notes-empty');
+      vList.innerHTML = '';
+      if (notes) {
+        notes.split('\n').forEach(function(line) {
+          var level = 0; var m = line.match(/^(\t*)/);
+          if (m) level = Math.min(m[1].length, 2);
+          var text = line.replace(/^\t+/, '').trim();
+          if (!text) return;
+          var li = document.createElement('li');
+          li.className = 'bullet-l' + level; li.textContent = text;
+          vList.appendChild(li);
+        });
+      }
+      var hasVNotes = vList.children.length > 0;
+      vList.style.display = hasVNotes ? '' : 'none';
+      vEmpty.style.display = hasVNotes ? 'none' : '';
+      document.getElementById('collectors-view-overlay').classList.add('open');
+    }
+  }
+
+  function closeCollectorsCardModal(event) {
+    if (event && event.target !== document.getElementById('collectors-card-modal-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
+    document.getElementById('collectors-card-modal-overlay').classList.remove('open');
+  }
+
+  function closeCollectorsViewModal(event) {
+    if (event && event.target !== document.getElementById('collectors-view-overlay') && !event.target.classList.contains('spoiler-modal-close')) return;
+    document.getElementById('collectors-view-overlay').classList.remove('open');
+  }
+
+  // Legacy stubs for store compat
+  function syncCollectorsBullets() {}
+  function addCollectorsCard() {}
+  function removeCollectorsCard() {}
+  function openCollectorsModal() {}
+  function closeCollectorsModal() {
+    document.getElementById('collectors-card-modal-overlay').classList.remove('open');
+  }
+
+  function createCollectorsAddRow() {
+    var addRow = document.getElementById('collectors-add-row');
+    addRow.innerHTML = '';
+    addRow.style.textAlign = 'center';
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn btn-ghost';
+    addBtn.style.marginTop = '6px';
+    addBtn.textContent = '+ Add Topic';
+    addBtn.addEventListener('click', function() { addCollectorsItem(); });
+    addRow.appendChild(addBtn);
+  }
+
+  // Start with one default topic card
+  addCollectorsItem();
+  createCollectorsAddRow();
 
   // Opening Topic / Notes (bulleted)
   document.getElementById('opening-notes').addEventListener('input', function() {
@@ -7118,69 +8431,6 @@
     syncBulletField(id, id + '-marks', id + '-print');
   });
 
-
-  function addCollectorsCard(input) {
-    var file = input.files[0];
-    if (!file) return;
-    resizeImageFile(file, 600, 0.8, function(dataUrl) {
-      var col = document.getElementById('collectors-card-col');
-      col.innerHTML =
-        '<div class="collectors-card-img-wrap">' +
-          '<img id="collectors-card-img" src="' + dataUrl + '" alt="Card reference">' +
-          '<button type="button" class="collectors-card-remove" title="Remove" onclick="removeCollectorsCard()">&times;</button>' +
-        '</div>' +
-        '<input class="collectors-card-caption-input" id="collectors-card-caption" placeholder="Card name / note" autocomplete="off">';
-      document.querySelector('.collectors-card-img-wrap').addEventListener('click', function(e) {
-        if (e.target.classList.contains('collectors-card-remove')) return;
-        openCollectorsModal();
-      });
-    });
-  }
-
-  function removeCollectorsCard() {
-    var col = document.getElementById('collectors-card-col');
-    col.innerHTML =
-      '<div class="collectors-card-placeholder" id="collectors-card-placeholder" onclick="document.getElementById(\'collectors-card-file\').click()">' +
-        '<span class="collectors-card-placeholder-text">+ Reference a Card</span>' +
-      '</div>' +
-      '<input type="file" id="collectors-card-file" accept="image/*" style="display:none;" onchange="addCollectorsCard(this)">';
-  }
-
-  function openCollectorsModal() {
-    var img = document.getElementById('collectors-card-img');
-    if (!img) return;
-    document.getElementById('collectors-card-modal-img').src = img.src;
-    var caption = (document.getElementById('collectors-card-caption') || {}).value || '';
-    document.getElementById('collectors-card-modal-img-caption').textContent = caption;
-    var topic = (document.getElementById('collectors-topic') || {}).value || '';
-    var topicEl = document.getElementById('collectors-card-modal-topic');
-    topicEl.textContent = topic;
-    topicEl.style.display = topic ? '' : 'none';
-    var notes = (document.getElementById('collectors-notes') || {}).value || '';
-    var list = document.getElementById('collectors-card-modal-notes-list');
-    var empty = document.getElementById('collectors-card-modal-notes-empty');
-    list.innerHTML = '';
-    var lines = notes.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-    if (lines.length) {
-      lines.forEach(function(line) {
-        var li = document.createElement('li');
-        li.textContent = line;
-        list.appendChild(li);
-      });
-      empty.style.display = 'none';
-      list.style.display = '';
-    } else {
-      list.style.display = 'none';
-      empty.style.display = '';
-    }
-    document.getElementById('collectors-card-modal-overlay').classList.add('open');
-  }
-
-  function closeCollectorsModal(e) {
-    if (e && e.target !== document.getElementById('collectors-card-modal-overlay') && e.type !== 'click') return;
-    if (e && e.currentTarget === document.getElementById('collectors-card-modal-overlay') && e.target !== e.currentTarget) return;
-    document.getElementById('collectors-card-modal-overlay').classList.remove('open');
-  }
 
   function updateSection(sectionId, checkbox) {
 
@@ -7262,8 +8512,17 @@
         data[el.id] = el.value;
       }
     });
-    var collImg = document.getElementById('collectors-card-img');
-    if (collImg) data['collectors-card-img'] = collImg.src;
+    // Collectors multi-item data
+    data['collectors-count'] = window.collectorsCount;
+    data['collectors-ids'] = [...document.querySelectorAll('.collectors-block')].map(function(el) {
+      return parseInt(el.id.replace('collectors-block-', ''), 10);
+    });
+    for (var ci = 1; ci <= window.collectorsCount; ci++) {
+      if (window.collectorsCardImgs[ci]) {
+        data['collectors-card-img-' + ci] = window.collectorsCardImgs[ci];
+        data['collectors-card-caption-' + ci] = window.collectorsCardCaptions[ci] || '';
+      }
+    }
 
     data['tourn-block-count'] = window.tournBlockCount;
     data['tourn-block-ids'] = [...document.querySelectorAll('.tourn-block')].map(function(el) {
@@ -7280,16 +8539,18 @@
     data['previous-rankings'] = window.previousRankings;
     data['previous-meta-rankings'] = window.previousMetaRankings;
 
-    data['agur-cards'] = [...document.querySelectorAll('.agur-card')].map(function(card) {
-      var img = card.querySelector('img');
-      var caption = card.querySelector('.agur-card-caption-input');
-      var note = card.querySelector('.agur-card-note');
-      return {
-        img: img ? img.src : '',
-        caption: caption ? caption.value : '',
-        note: note ? note.value : ''
-      };
+    data['agur-count'] = window.agurCount;
+    data['agur-ids'] = [...document.querySelectorAll('.agur-block')].map(function(el) {
+      return parseInt(el.id.replace('agur-block-', ''), 10);
     });
+    for (var ai = 1; ai <= window.agurCount; ai++) {
+      if (window.agurCardImgs[ai]) {
+        data['agur-card-img-' + ai] = window.agurCardImgs[ai];
+        data['agur-card-caption-' + ai] = window.agurCardCaptions[ai] || '';
+      }
+    }
+    // Keep old format for compat
+    data['agur-cards'] = [];
 
     data['spoiler-cards'] = [...document.querySelectorAll('.spoiler-card')].map(function(card) {
       var img = card.querySelector('.spoiler-card-img-wrap img');
@@ -7613,23 +8874,29 @@
           setTimeout(function() {
             Object.keys(data).forEach(function(id) {
               var el = document.getElementById(id);
-              if (el && el.type !== 'checkbox' && id !== 'collectors-card-img') el.value = data[id];
+              if (el && el.type !== 'checkbox' && !id.startsWith('collectors-card-img-')) el.value = data[id];
             });
-            if (data['collectors-card-img']) {
-              var col = document.getElementById('collectors-card-col');
-              col.innerHTML =
-                '<div class="collectors-card-img-wrap">' +
-                  '<img id="collectors-card-img" alt="Card reference">' +
-                  '<button type="button" class="collectors-card-remove" title="Remove" onclick="removeCollectorsCard()">&times;</button>' +
-                '</div>' +
-                '<input class="collectors-card-caption-input" id="collectors-card-caption" placeholder="Card name / note" autocomplete="off">';
-              document.getElementById('collectors-card-img').src = data['collectors-card-img'];
-              if (data['collectors-card-caption']) document.getElementById('collectors-card-caption').value = data['collectors-card-caption'];
-              document.querySelector('.collectors-card-img-wrap').addEventListener('click', function(e) {
-                if (e.target.classList.contains('collectors-card-remove')) return;
-                openCollectorsModal();
+            // Restore collectors items
+            if (data['collectors-ids'] && data['collectors-ids'].length) {
+              // Clear the default item added on init before restoring
+              document.getElementById('collectors-grid').innerHTML = '';
+              window.collectorsCount = 0;
+              window.collectorsCardImgs = {};
+              window.collectorsCardCaptions = {};
+              data['collectors-ids'].forEach(function(idx) {
+                addCollectorsItem(idx);
+                var titleEl = document.getElementById('collectors-title-' + idx);
+                var notesEl = document.getElementById('collectors-notes-' + idx);
+                if (titleEl && data['collectors-title-' + idx]) titleEl.value = data['collectors-title-' + idx];
+                if (notesEl && data['collectors-notes-' + idx]) notesEl.value = data['collectors-notes-' + idx];
+                if (data['collectors-card-img-' + idx]) {
+                  window.collectorsCardImgs[idx] = data['collectors-card-img-' + idx];
+                  window.collectorsCardCaptions[idx] = data['collectors-card-caption-' + idx] || '';
+                }
+                refreshCollectorsTile(idx);
               });
             }
+            createCollectorsAddRow();
             syncCollectorsBullets();
             updateNatsCountdown();
             updateAllRankDeltas();
@@ -7662,6 +8929,7 @@
               refreshDlPill(dl);
             }
             syncBulletField('rtn-extra-notes', 'rtn-extra-notes-marks', 'rtn-extra-notes-print');
+            refreshVenueNotesCard();
             syncEpDatePrint();
             syncEpNumPrint();
             syncEpRuntimePrint();
@@ -7682,20 +8950,48 @@
               refreshNewsTile(nwi);
             }
 
-            if (data['agur-cards'] && data['agur-cards'].length) {
+            // Restore agur items
+            var agurRestored = false;
+            if (data['agur-ids'] && data['agur-ids'].length) {
+              document.getElementById('agur-grid').innerHTML = '';
+              window.agurCount = 0;
+              window.agurCardImgs = {};
+              window.agurCardCaptions = {};
+              agurRestored = true;
+              data['agur-ids'].forEach(function(idx) {
+                addAgurItem(idx);
+                ['agur-title-','agur-type-','agur-brigade-','agur-str-','agur-tgh-','agur-class-','agur-identifier-','agur-scripture-'].forEach(function(pfx) {
+                  var el = document.getElementById(pfx + idx);
+                  if (el && data[pfx + idx]) el.value = data[pfx + idx];
+                });
+                var abilityEl = document.getElementById('agur-ability-' + idx);
+                if (abilityEl && data['agur-ability-' + idx]) abilityEl.value = data['agur-ability-' + idx];
+                var notesEl = document.getElementById('agur-notes-item-' + idx);
+                if (notesEl && data['agur-notes-item-' + idx]) notesEl.value = data['agur-notes-item-' + idx];
+                if (data['agur-card-img-' + idx]) {
+                  window.agurCardImgs[idx] = data['agur-card-img-' + idx];
+                  window.agurCardCaptions[idx] = data['agur-card-caption-' + idx] || '';
+                }
+                refreshAgurTile(idx);
+              });
+              createAgurAddRow();
+            }
+            // Backward compat: old agur-cards array
+            if (!agurRestored && data['agur-cards'] && data['agur-cards'].length) {
+              document.getElementById('agur-grid').innerHTML = '';
+              window.agurCount = 0;
+              window.agurCardImgs = {};
+              window.agurCardCaptions = {};
               data['agur-cards'].forEach(function(c) {
                 buildAgurCard(c.caption, c.img);
-                var n = window.agurCardCount;
+                var n = window.agurCount;
                 if (c.note) {
-                  var noteEl = document.getElementById('agur-note-' + n);
-                  if (noteEl) {
-                    noteEl.value = c.note;
-                    noteEl.dispatchEvent(new Event('input'));
-                    var btn = document.getElementById('agur-card-' + n) && document.getElementById('agur-card-' + n).querySelector('.agur-card-addnote-btn');
-                    if (btn) btn.textContent = '✏ Notes ●';
-                  }
+                  var noteEl = document.getElementById('agur-notes-item-' + n);
+                  if (noteEl) noteEl.value = c.note;
                 }
+                refreshAgurTile(n);
               });
+              createAgurAddRow();
             }
 
             if (data['spoiler-cards'] && data['spoiler-cards'].length) {
@@ -7942,6 +9238,12 @@
     window.newsCount = 0;
     addNewsItem();
     newsBody.appendChild(createNewsAddRow());
+    document.getElementById('collectors-grid').innerHTML = '';
+    window.collectorsCount = 0;
+    window.collectorsCardImgs = {};
+    window.collectorsCardCaptions = {};
+    addCollectorsItem();
+    createCollectorsAddRow();
     window.previousRankings = null;
     window.previousMetaRankings = null;
     updateAllRankDeltas();
@@ -8053,12 +9355,12 @@
       if (addAllBtn) addAllBtn.style.display = 'none';
     },
     'collectors': function() {
-      var topic = document.getElementById('collectors-topic');
-      if (topic) topic.value = '';
-      var notes = document.getElementById('collectors-notes');
-      if (notes) notes.value = '';
-      syncCollectorsBullets();
-      removeCollectorsCard();
+      document.getElementById('collectors-grid').innerHTML = '';
+      window.collectorsCount = 0;
+      window.collectorsCardImgs = {};
+      window.collectorsCardCaptions = {};
+      addCollectorsItem();
+      createCollectorsAddRow();
     },
     'meta': function() {
       for (var r = 1; r <= 10; r++) {
@@ -8073,10 +9375,14 @@
       if (notes) notes.value = '';
     },
     'agur': function() {
-      document.getElementById('agur-card-grid').innerHTML = '';
-      document.getElementById('agur-empty-state').style.display = '';
+      document.getElementById('agur-grid').innerHTML = '';
+      window.agurCount = 0;
+      window.agurCardImgs = {};
+      window.agurCardCaptions = {};
       var notes = document.getElementById('agur-notes');
       if (notes) notes.value = '';
+      addAgurItem();
+      createAgurAddRow();
     },
     'potm': function() {
       var name = document.getElementById('potm-name');
@@ -8746,7 +10052,7 @@
         if (teamName) {
           var wmImg = _teamWordmarkImgs[teamName];
           var deltaReserve = (row.deltaClass && row.deltaClass !== 'empty') ? 90 : 0;
-          var wmRight = W - padX - 10 - deltaReserve;
+          var wmRight = W - padX - 24 - deltaReserve;
           if (wmImg && wmImg.complete && wmImg.naturalWidth > 0) {
             var maxH = 30;
             var maxW = 170;
