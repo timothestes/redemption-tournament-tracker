@@ -6028,10 +6028,14 @@
   function refreshAgurTile(n) {
     var tile = document.getElementById('agur-tile-' + n);
     if (!tile) return;
-    var title = (document.getElementById('agur-title-' + n) || {}).value || '';
+    var g = function(id) { return (document.getElementById(id) || {}).value || ''; };
+    var title = g('agur-title-' + n);
     var hasImg = !!(window.agurCardImgs[n]);
+    var hasOtherContent = ['agur-type-', 'agur-brigade-', 'agur-str-', 'agur-tgh-', 'agur-class-', 'agur-identifier-', 'agur-scripture-', 'agur-ability-'].some(function(pfx) {
+      return g(pfx + n).trim();
+    });
     tile.innerHTML = '';
-    if (!title.trim() && !hasImg) {
+    if (!title.trim() && !hasImg && !hasOtherContent) {
       tile.className = 'agur-tile agur-tile-add';
       tile.textContent = 'Card Design';
     } else {
@@ -6253,7 +6257,7 @@
       if (notesEl && _agurEditBulletEditor) notesEl.value = bnEditorToValue(_agurEditBulletEditor);
       // Image
       var thumb = document.getElementById('agur-edit-img-thumb');
-      if (_agurEditTab === 'image' && thumb.style.display !== 'none') {
+      if (thumb.style.display !== 'none') {
         var captionVal = document.getElementById('agur-edit-img-caption').value;
         setHidden('agur-title-' + n, captionVal);
         window.agurCardImgs[n] = document.getElementById('agur-edit-img-thumb-img').src;
