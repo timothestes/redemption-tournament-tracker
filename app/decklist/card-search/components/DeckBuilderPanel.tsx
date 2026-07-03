@@ -3179,7 +3179,7 @@ export default function DeckBuilderPanel({
                         Paragon Cards PDF
                       </a>
                       <a 
-                        href="https://landofredemption.com/wp-content/uploads/2026/03/Redemption-Paragon-Format-Rules-v1-1.pdf"
+                        href="https://landofredemption.com/wp-content/uploads/2026/07/Redemption-Paragon-Format-Rules.pdf"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
