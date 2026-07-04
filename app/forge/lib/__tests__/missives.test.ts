@@ -148,7 +148,7 @@ describe("sendMissive", () => {
     (requireElder as any).mockResolvedValue(c);
     const r = await sendMissive({ subject: "Hi", body: "Body", recipientIds: ["p1"] });
     expect(r.ok).toBe(false);
-    expect(r.error).toBe("Set your Forge display name before sending a missive.");
+    expect(r.error).toBe("Set your Forge display name before sending an announcement.");
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
@@ -207,7 +207,7 @@ describe("sendMissive", () => {
       p_body_text: "Hello {name}",
       p_recipient_ids: ["p1", "p2"],
     });
-    expect(revalidatePath).toHaveBeenCalledWith("/forge/missives");
+    expect(revalidatePath).toHaveBeenCalledWith("/forge/announcements");
     expect(r).toEqual({ ok: true, sent: 2, failed: 0, error: undefined });
   });
 

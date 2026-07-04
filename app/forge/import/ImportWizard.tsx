@@ -15,6 +15,15 @@ import {
   lackeyRowToDesignCard, type LackeyRow,
 } from "@/app/forge/lib/lackey";
 import { createSet, type ForgeSetSummary } from "@/app/forge/lib/sets";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const BATCH_SIZE = 8;            // cards per request (must stay ≤ the route's cap of 12)
 const BATCH_CONCURRENCY = 4;     // requests in flight
@@ -78,6 +87,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
   const [newSetName, setNewSetName] = useState("");
   const [existingSetId, setExistingSetId] = useState(sets[0]?.id ?? "");
   const [overwrite, setOverwrite] = useState(false);
+  const [newSetDialogOpen, setNewSetDialogOpen] = useState(false);
 
   const [items, setItems] = useState<ImportItem[] | null>(null);
   const [running, setRunning] = useState(false);
@@ -308,14 +318,6 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
       {rows && (
         <fieldset className="mt-4 rounded-md border p-3">
           <legend className="px-1 text-sm font-medium">2 · Which set?</legend>
-          <div className="mb-2 flex flex-wrap gap-1">
-            {zipSets.slice(0, 12).map(({ set, count }) => (
-              <button key={set} type="button" onClick={() => onFilterChange(set)} disabled={running}
-                className={`rounded-full border px-2 py-0.5 text-xs disabled:opacity-50 ${filter === set ? "border-primary bg-primary/10" : "hover:bg-muted"}`}>
-                {set} <span className="text-muted-foreground">({count})</span>
-              </button>
-            ))}
-          </div>
           <input value={filter} onChange={(e) => onFilterChange(e.target.value)} disabled={running}
             aria-label="Set filter" placeholder="Set code, e.g. EoT — or /regex/"
             className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50" />
@@ -369,11 +371,6 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
                 onChange={() => { setMode("new"); setOverwrite(false); }} />
               Create a new set
             </label>
-            {mode === "new" && (
-              <input value={newSetName} onChange={(e) => setNewSetName(e.target.value)}
-                aria-label="New set name" placeholder="Set name"
-                className="ml-6 w-64 rounded-md border bg-background px-2 py-1 text-sm" />
-            )}
             <label className="flex items-center gap-2">
               <input type="radio" name="dest" checked={mode === "existing"} onChange={() => setMode("existing")}
                 disabled={sets.length === 0} />
@@ -401,12 +398,36 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
             )}
           </div>
           {runError && <p className="mt-2 text-sm text-red-500">{runError}</p>}
-          <button type="button" onClick={runImport} disabled={running || matched.length === 0}
+          <button type="button" onClick={() => (mode === "new" ? setNewSetDialogOpen(true) : runImport())}
+            disabled={running || matched.length === 0}
             className="mt-3 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
             {matched.length === 1 ? "Import 1 card" : `Import ${matched.length} cards`}
           </button>
         </fieldset>
       )}
+
+      <Dialog open={newSetDialogOpen} onOpenChange={(o) => !running && setNewSetDialogOpen(o)}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>New set for this import</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Set name</span>
+              <input value={newSetName} onChange={(e) => setNewSetName(e.target.value)}
+                aria-label="New set name" placeholder="Set name"
+                className="w-full rounded-md border bg-background px-2 py-1 text-sm" />
+            </label>
+          </DialogBody>
+          <DialogFooter className="justify-end">
+            <Button variant="cancel" onClick={() => setNewSetDialogOpen(false)}>Cancel</Button>
+            <Button disabled={running || !newSetName.trim()}
+              onClick={() => { setNewSetDialogOpen(false); runImport(); }}>
+              {matched.length === 1 ? "Create set & import 1 card" : `Create set & import ${matched.length} cards`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 5 — progress + summary */}
       {items && (

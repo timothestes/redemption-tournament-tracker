@@ -62,8 +62,9 @@ test.describe("forge lackey set import", () => {
 
       // destination: new set (name is prefilled with the filter "TST")
       const setName = `E2E Import ${Date.now()}`;
-      await page.getByLabel("New set name").fill(setName);
       await page.getByRole("button", { name: "Import 3 cards" }).click();
+      await page.getByLabel("New set name").fill(setName);
+      await page.getByRole("button", { name: "Create set & import 3 cards" }).click();
 
       await expect(page.getByText("Imported 3 · Skipped 0 · Failed 0")).toBeVisible({ timeout: 120_000 });
 
