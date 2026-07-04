@@ -31,6 +31,8 @@ export default function StudioEditor({
   const [err, setErr] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstRender = useRef(true);
+  const fieldsDirty = useRef(false);
+  const [pendingFinished, setPendingFinished] = useState<File | null>(null);
   const router = useRouter();
 
   const { others, setEditing } = useForgeCardChannel(
@@ -50,7 +52,10 @@ export default function StudioEditor({
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [snapshot, card.id]);
 
-  const update = (patch: Partial<DesignCard>) => setSnapshot((s) => ({ ...s, ...patch }));
+  const update = (patch: Partial<DesignCard>) => {
+    fieldsDirty.current = true;
+    setSnapshot((s) => ({ ...s, ...patch }));
+  };
 
   async function onUpload(file: File, kind: "art" | "finished") {
     setErr(null);
@@ -74,6 +79,10 @@ export default function StudioEditor({
     setProposeSummary("");
     router.refresh();
   };
+
+  // Cache-buster: updated_at bumps on every image/snapshot write, so the browser can
+  // cache each t-stamped art URL indefinitely and still swap after router.refresh().
+  const t = Date.parse(card.updatedAt) || 0;
 
   return (
     <div className="mx-auto max-w-5xl p-4">
@@ -112,8 +121,8 @@ export default function StudioEditor({
           <ForgeCardFace
             name={snapshot.name ?? null}
             rawText={cardRawText(snapshot)}
-            finishedUrl={card.hasFinished ? `/forge/api/art/${card.id}?kind=finished` : null}
-            artUrl={card.hasArt ? `/forge/api/art/${card.id}` : null}
+            finishedUrl={card.hasFinished ? `/forge/api/art/${card.id}?kind=finished&t=${t}` : null}
+            artUrl={card.hasArt ? `/forge/api/art/${card.id}?t=${t}` : null}
           />
         </div>
 
@@ -155,8 +164,36 @@ export default function StudioEditor({
           <fieldset className="rounded-md border p-3">
             <legend className="px-1 font-medium">Finished card (full composed image)</legend>
             <input type="file" accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f, "finished"); e.target.value = ""; }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  // Replacing an existing finished image without touching any field this session
+                  // usually means the printed ability text changed — confirm before overwriting.
+                  if (card.hasFinished && !fieldsDirty.current) setPendingFinished(f);
+                  else onUpload(f, "finished");
+                }
+                e.target.value = "";
+              }}
               className="block w-full text-xs" />
+            {pendingFinished && (
+              <div role="alertdialog" className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
+                <p className="font-medium">Replace image without updating the card fields?</p>
+                <p className="mt-1 text-muted-foreground">
+                  You’re replacing the finished card image but haven’t changed any card fields this
+                  session. If the new image changed the ability text, update the fields to match.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button type="button"
+                    onClick={() => { const f = pendingFinished; setPendingFinished(null); if (f) onUpload(f, "finished"); }}
+                    className="rounded-md bg-amber-600 px-3 py-1 font-medium text-white">
+                    Replace anyway
+                  </button>
+                  <button type="button" onClick={() => setPendingFinished(null)} className="rounded-md border px-2 py-1">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
             <p className="mt-2 text-xs text-muted-foreground">
               A finished card image made elsewhere. When present, it’s shown everywhere instead of the artwork.
             </p>
