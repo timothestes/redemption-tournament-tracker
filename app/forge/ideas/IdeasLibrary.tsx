@@ -3,15 +3,26 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createCard, type ForgeCardFull } from "@/app/forge/lib/cards";
+import { bulkShareToSet, bulkLifecycle, type BulkResult } from "@/app/forge/lib/lifecycle";
+import { BULK_DONE_VERB, CONFIRM_COPY } from "@/app/forge/lib/lifecycleCopy";
 import ForgeCardGrid from "@/app/forge/components/ForgeCardGrid";
 import { CARD_TYPES, BRIGADES, type CardType, type Brigade } from "@/app/forge/lib/designCard";
+import type { ForgeSetSummary } from "@/app/forge/lib/sets";
+import { Button } from "@/components/ui/button";
+import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 
-export default function IdeasLibrary({ cards, canCreate }: { cards: ForgeCardFull[]; canCreate: boolean }) {
+export default function IdeasLibrary({ cards, canCreate, sets }: { cards: ForgeCardFull[]; canCreate: boolean; sets: ForgeSetSummary[] }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [type, setType] = useState<CardType | "">("");
   const [brigade, setBrigade] = useState<Brigade | "">("");
   const [creating, setCreating] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [targetSet, setTargetSet] = useState("");
 
   const filtered = useMemo(() => cards.filter((c) => {
     const s = c.snapshot ?? {};
@@ -21,6 +32,13 @@ export default function IdeasLibrary({ cards, canCreate }: { cards: ForgeCardFul
     return true;
   }), [cards, q, type, brigade]);
 
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
   async function onNew() {
     setCreating(true);
     const r = await createCard("");
@@ -28,8 +46,28 @@ export default function IdeasLibrary({ cards, canCreate }: { cards: ForgeCardFul
     if (r.ok) router.push(`/forge/cards/${r.id}`);
   }
 
+  async function onBulkSend() {
+    setBusy(true); setSummary(null);
+    const r: BulkResult = await bulkShareToSet(targetSet, [...selected]);
+    setBusy(false);
+    if (r.ok === false) { setSummary(r.error); return; }
+    setSummary(`Sent ${r.done} · ${r.skipped} skipped · ${r.failed} failed`);
+    setSelected(new Set());
+    router.refresh();
+  }
+
+  async function onBulkDelete() {
+    setBusy(true); setSummary(null);
+    const r: BulkResult = await bulkLifecycle("delete", [...selected]);
+    setBusy(false);
+    if (r.ok === false) { setSummary(r.error); return; }
+    setSummary(`${BULK_DONE_VERB.delete} ${r.done} · ${r.failed} failed`);
+    setSelected(new Set());
+    router.refresh();
+  }
+
   return (
-    <div className="mx-auto max-w-6xl p-4">
+    <div className="mx-auto max-w-6xl p-4 pb-20">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h1 className="mr-auto text-lg font-semibold">Ideas</h1>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…"
@@ -42,22 +80,64 @@ export default function IdeasLibrary({ cards, canCreate }: { cards: ForgeCardFul
           <option value="">All brigades</option>
           {BRIGADES.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
+        <Button size="sm" variant={selecting ? "secondary" : "outline"} className="h-8"
+          onClick={() => { setSelecting(!selecting); setSelected(new Set()); setSummary(null); }}>
+          {selecting ? "Done selecting" : "Select"}
+        </Button>
         {canCreate && (
-          <button onClick={onNew} disabled={creating} className="rounded-md bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50">
-            New card
-          </button>
+          <Button size="sm" className="h-8" onClick={onNew} disabled={creating}>New card</Button>
         )}
       </div>
+
+      {selecting && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{selected.size} selected</span>
+          <button type="button" className="hover:text-foreground hover:underline"
+            onClick={() => setSelected(new Set(filtered.map((c) => c.id)))}>
+            Select all ({filtered.length})
+          </button>
+          <button type="button" className="hover:text-foreground hover:underline" onClick={() => setSelected(new Set())}>
+            Clear
+          </button>
+          {summary && <span aria-live="polite" className="text-foreground">{summary}</span>}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="mx-auto mt-16 max-w-xs text-center">
           <div className="mx-auto mb-4 aspect-[750/1050] w-40 rounded-lg border-2 border-dashed" />
           <p className="mb-3 text-sm text-muted-foreground">No ideas yet. Start with a name and a thought.</p>
-          {canCreate && <button onClick={onNew} className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white">Jot an idea</button>}
+          {canCreate && <Button onClick={onNew} disabled={creating}>Jot an idea</Button>}
         </div>
       ) : (
-        <ForgeCardGrid cards={filtered} />
+        <ForgeCardGrid cards={filtered} selection={{ active: selecting, selected, onToggle: toggle }} />
       )}
+
+      {selecting && selected.size > 0 && (
+        <div className="fixed inset-x-0 bottom-4 z-40 mx-auto flex w-fit max-w-[95vw] flex-wrap items-center justify-center gap-2 rounded-lg border bg-background/95 p-2 shadow-lg backdrop-blur">
+          <select value={targetSet} onChange={(e) => setTargetSet(e.target.value)} className="rounded-md border bg-background px-2 py-1.5 text-sm" aria-label="Destination set">
+            <option value="">Send to set…</option>
+            {sets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <Button size="sm" className="h-8 text-xs" disabled={busy || !targetSet} onClick={onBulkSend}>
+            {busy ? "Working…" : `Send ${selected.size} to set`}
+          </Button>
+          <Button size="sm" variant="outline" className="h-8 border-destructive/40 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+            disabled={busy} onClick={() => setConfirmDelete(true)}>
+            Delete
+          </Button>
+        </div>
+      )}
+
+      <ConfirmationDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        onConfirm={onBulkDelete}
+        variant="destructive"
+        title={CONFIRM_COPY.delete.title}
+        description={`${CONFIRM_COPY.delete.description} (${selected.size} cards)`}
+        confirmLabel={CONFIRM_COPY.delete.confirmLabel}
+      />
     </div>
   );
 }
