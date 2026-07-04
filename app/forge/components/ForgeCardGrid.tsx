@@ -51,8 +51,8 @@ export default function ForgeCardGrid({
             >
               <span
                 aria-hidden
-                className={`absolute left-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded border text-xs ${
-                  isSel ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background"
+                className={`absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md border-2 text-sm font-bold shadow-md ${
+                  isSel ? "border-primary bg-primary text-primary-foreground" : "border-gray-400 bg-white text-transparent"
                 }`}
               >
                 {isSel ? "✓" : ""}
