@@ -1,3 +1,5 @@
+// UI name: "Announcements" (renamed 2026-07-04). DB objects keep the missive name (migration 062 is live).
+//
 // Forge missive email template.
 // Pure, synchronous HTML builders for the "Forge Missives" feature: elders emailing
 // playtesters. Emails ship as raw HTML via Resend, so every style that carries the
@@ -66,7 +68,7 @@ export function wrapForgeMissive(opts: {
             <tr>
               <td align="center" style="padding:28px 30px 22px;border-bottom:1px solid #33261e;">
                 <div style="font-family:${display};font-size:26px;color:#fafaf9;letter-spacing:4px;text-transform:uppercase;">THE FORGE</div>
-                <div style="font-family:${display};font-size:12px;color:#fbbf24;letter-spacing:3px;text-transform:uppercase;margin-top:8px;">A MISSIVE FROM THE ELDERS</div>
+                <div style="font-family:${display};font-size:12px;color:#fbbf24;letter-spacing:3px;text-transform:uppercase;margin-top:8px;">AN ANNOUNCEMENT FROM THE ELDERS</div>
               </td>
             </tr>
             <!-- Body + signature -->
@@ -84,7 +86,7 @@ export function wrapForgeMissive(opts: {
             <tr>
               <td style="padding:0 30px 28px;">
                 <div style="background:#201409;border:1px solid #7c2d12;border-left:4px solid #ea580c;border-radius:6px;padding:16px 18px;font-size:14px;line-height:1.65;color:#e9e4de;font-family:${bodyFont};">
-                  <span style="color:#fbbf24;font-weight:bold;">Keep it in the Forge.</span> Everything in this missive — card designs, names, mechanics, set details, images, and timelines — is confidential playtest material. Do not share, screenshot, forward, or discuss it outside the Forge. You are reading this because the elders trust you with unfinished work; that trust is what makes the Forge possible. Guard it.
+                  <span style="color:#fbbf24;font-weight:bold;">Keep it in the Forge.</span> Everything in this announcement — card designs, names, mechanics, set details, images, and timelines — is confidential playtest material. Do not share, screenshot, forward, or discuss it outside the Forge. You are reading this because the elders trust you with unfinished work; that trust is what makes the Forge possible. Guard it.
                 </div>
               </td>
             </tr>

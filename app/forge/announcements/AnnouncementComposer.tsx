@@ -9,7 +9,7 @@ type ForgeRole = "superadmin" | "elder" | "playtester";
 type Member = { userId: string; displayName: string | null; role: ForgeRole; email: string; setIds: string[] };
 type Recent = { id: string; sender: string; subject: string; recipientCount: number; sentAt: string };
 
-export default function MissiveComposer({
+export default function AnnouncementComposer({
   members,
   sets,
   recent,
@@ -62,7 +62,7 @@ export default function MissiveComposer({
   }
 
   function handleSend() {
-    if (!window.confirm(`Send this missive to ${selected.size} member(s)?`)) return;
+    if (!window.confirm(`Send this announcement to ${selected.size} member(s)?`)) return;
     setMsg(null);
     startTransition(async () => {
       const r = await sendMissive({ subject, body, recipientIds: Array.from(selected) });
@@ -80,7 +80,7 @@ export default function MissiveComposer({
   return (
     <div className="mt-6 space-y-8">
       <section>
-        <h2 className="text-lg font-medium">Compose a missive</h2>
+        <h2 className="text-lg font-medium">Compose an announcement</h2>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <button
@@ -213,7 +213,7 @@ export default function MissiveComposer({
       </section>
 
       <section>
-        <h2 className="text-lg font-medium">Recent missives</h2>
+        <h2 className="text-lg font-medium">Recent announcements</h2>
         <ul className="mt-2 space-y-1 text-sm">
           {recent.map((r) => (
             <li key={r.id} className="text-muted-foreground">
@@ -222,7 +222,7 @@ export default function MissiveComposer({
               {new Date(r.sentAt).toLocaleDateString()}
             </li>
           ))}
-          {recent.length === 0 && <li className="text-muted-foreground">No missives sent yet.</li>}
+          {recent.length === 0 && <li className="text-muted-foreground">No announcements sent yet.</li>}
         </ul>
       </section>
     </div>
