@@ -43,10 +43,10 @@ export default function ProposalDiff({
             disabled={pending}
             onClick={() =>
               confirm(
-                "Accept this proposal? It publishes a new version and overwrites the working draft."
+                "Accept this proposal? It releases a new version and overwrites the working draft."
               ) && run(() => acceptProposal(proposal.id, proposal.cardId))
             }
-            className="rounded-md bg-emerald-600 px-3 py-1 font-medium text-white disabled:opacity-50"
+            className="rounded-md bg-primary px-3 py-1 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             Accept
           </button>
@@ -84,9 +84,9 @@ export default function ProposalDiff({
           {changes.map((c) => (
             <li key={c.field as string}>
               <span className="font-medium">{c.label}:</span>{" "}
-              <span className="text-red-600 line-through">{c.before ?? "—"}</span>
+              <span className="text-destructive line-through">{c.before ?? "—"}</span>
               {" → "}
-              <span className="text-emerald-700">{c.after ?? "—"}</span>
+              <span className="text-primary">{c.after ?? "—"}</span>
             </li>
           ))}
         </ul>

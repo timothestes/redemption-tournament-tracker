@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createSet, saveSetTargets, type ForgeSetSummary } from "@/app/forge/lib/sets";
+import { createSet, saveSetTargets, bulkDeleteSets, type ForgeSetSummary } from "@/app/forge/lib/sets";
 import { defaultTargets } from "@/app/forge/lib/progress";
 import { CARD_TYPES } from "@/app/forge/lib/designCard";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
+import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 
 const inputClass = "rounded-md border border-input bg-background px-2 py-1 text-sm";
 
@@ -28,6 +29,30 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
   // Per-type counts shown in the preview. Recomputed from `total` only when the
   // total changes (via the seed key), so manual per-type nudges aren't clobbered.
   const [perType, setPerType] = useState<Record<string, number>>(() => seedPerType(100));
+
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [summary, setSummary] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
+  const selectedSets = sets.filter((s) => selected.has(s.id));
+
+  async function onBulkDelete() {
+    setBusy(true); setSummary(null);
+    const r = await bulkDeleteSets([...selected]);
+    setBusy(false);
+    if (r.ok === false) { setSummary(r.error); return; }
+    setSummary(`Deleted ${r.done} · ${r.failed} failed`);
+    setSelected(new Set());
+    router.refresh();
+  }
 
   function seedTotal(next: number) {
     setTotal(next);
@@ -85,9 +110,22 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New set name…" className="rounded-md border bg-background px-3 py-1.5 text-sm" />
               <Button type="submit" variant="success" size="sm">Create</Button>
             </form>
+            <Button
+              size="sm"
+              variant={selecting ? "secondary" : "outline"}
+              onClick={() => { setSelecting(!selecting); setSelected(new Set()); setSummary(null); }}
+            >
+              {selecting ? "Done selecting" : "Select"}
+            </Button>
           </div>
         )}
       </div>
+      {selecting && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{selected.size} selected</span>
+          <span aria-live="polite" className="text-foreground">{summary}</span>
+        </div>
+      )}
       {sets.length === 0 ? (
         <div className="mx-auto mt-16 max-w-xs text-center">
           <div className="mx-auto mb-4 aspect-[750/1050] w-40 rounded-lg border-2 border-dashed" />
@@ -96,17 +134,69 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
       ) : (
         <ul className="divide-y rounded-md border">
           {sets.map((s) => (
-            <li key={s.id}>
-              <Link href={`/forge/sets/${s.id}/cards`} className="flex items-center justify-between p-3 hover:bg-muted/50">
-                <span className="font-medium">{s.name}</span>
-                <span className="text-sm text-muted-foreground">
-                  {s.total}{s.targetTotal ? ` / ${s.targetTotal}` : ""} cards
-                </span>
-              </Link>
+            <li key={s.id} className="flex items-center gap-2 p-1">
+              {selecting && (
+                <input
+                  type="checkbox"
+                  checked={selected.has(s.id)}
+                  onChange={() => toggle(s.id)}
+                  aria-label={`Select ${s.name}`}
+                  className="ml-2 h-4 w-4 rounded border-input"
+                />
+              )}
+              {selecting ? (
+                <button
+                  type="button"
+                  onClick={() => toggle(s.id)}
+                  className="flex flex-1 items-center justify-between p-2 text-left hover:bg-muted/50"
+                >
+                  <span className="font-medium">{s.name}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {s.total}{s.targetTotal ? ` / ${s.targetTotal}` : ""} cards
+                  </span>
+                </button>
+              ) : (
+                <Link href={`/forge/sets/${s.id}/cards`} className="flex flex-1 items-center justify-between p-2 hover:bg-muted/50">
+                  <span className="font-medium">{s.name}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {s.total}{s.targetTotal ? ` / ${s.targetTotal}` : ""} cards
+                  </span>
+                </Link>
+              )}
             </li>
           ))}
         </ul>
       )}
+
+      {selecting && selected.size > 0 && (
+        <div className="mt-3">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            disabled={busy}
+            onClick={() => setConfirmOpen(true)}
+          >
+            Delete {selected.size} {selected.size === 1 ? "set" : "sets"}
+          </Button>
+        </div>
+      )}
+
+      <ConfirmationDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={onBulkDelete}
+        variant="destructive"
+        title={`Delete ${selected.size} set(s)?`}
+        description="This permanently deletes the sets AND every card in them, including released versions, comments, and proposals. This cannot be undone."
+        confirmLabel="Delete sets"
+      >
+        <ul className="list-disc space-y-1 pl-5 text-sm">
+          {selectedSets.map((s) => (
+            <li key={s.id}>{s.name} ({s.total} cards)</li>
+          ))}
+        </ul>
+      </ConfirmationDialog>
 
       <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
         <DialogContent size="md">

@@ -3,15 +3,16 @@
 import Link from "next/link";
 import type { ProgressModel, TargetCounts } from "@/app/forge/lib/progress";
 import type { SetElder } from "@/app/forge/lib/sets";
+import { STATUS_LABEL } from "@/app/forge/lib/lifecycleCopy";
 import TargetsEditor from "./TargetsEditor";
 import SetEldersPanel from "./SetEldersPanel";
 
 const STATUS_ORDER = ["draft", "playtesting", "approved"];
-const STATUS_COLOR: Record<string, string> = { draft: "bg-zinc-400", playtesting: "bg-amber-500", approved: "bg-emerald-600" };
+const STATUS_COLOR: Record<string, string> = { draft: "bg-muted-foreground/40", playtesting: "bg-amber-500", approved: "bg-primary" };
 
 function cellTone(actual: number, target: number): string {
-  if (target === 0) return actual > 0 ? "bg-emerald-50 dark:bg-emerald-950" : "";
-  if (actual >= target) return "bg-emerald-200 dark:bg-emerald-900";
+  if (target === 0) return actual > 0 ? "bg-primary/10" : "";
+  if (actual >= target) return "bg-primary/25";
   if (actual === 0) return "bg-muted";
   return "bg-amber-100 dark:bg-amber-950";
 }
@@ -44,7 +45,7 @@ export default function ProgressDashboard({
           ) : (
             <span
               className="cursor-not-allowed rounded-md border px-3 py-1.5 text-sm text-muted-foreground opacity-50"
-              title="Approve cards with art to enable"
+              title="Mark cards final with art to enable"
               aria-disabled="true"
             >
               Download artwork (ZIP)
@@ -64,7 +65,7 @@ export default function ProgressDashboard({
             })}
           </div>
           <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
-            {STATUS_ORDER.map((s) => <span key={s}>{s}: {model.byStatus[s] ?? 0}</span>)}
+            {STATUS_ORDER.map((s) => <span key={s}>{STATUS_LABEL[s] ?? s}: {model.byStatus[s] ?? 0}</span>)}
           </div>
         </div>
       )}

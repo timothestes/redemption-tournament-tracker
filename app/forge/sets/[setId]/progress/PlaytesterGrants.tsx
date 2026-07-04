@@ -30,7 +30,7 @@ export default function PlaytesterGrants({
   return (
     <section className="mt-8">
       <h2 className="text-lg font-medium">Playtesters</h2>
-      <p className="text-sm text-muted-foreground">Members who can view this set's approved cards.</p>
+      <p className="text-sm text-muted-foreground">Members who can view this set's playtest cards.</p>
       <ul className="mt-2 space-y-1 text-sm">
         {grants.length === 0 && <li className="text-muted-foreground">None yet.</li>}
         {grants.map((g) => (

@@ -148,3 +148,4 @@ export async function listForgeCards(): Promise<ForgeCardFull[]> {
     .order("updated_at", { ascending: false });
   return (data ?? []).map(toFull);
 }
+

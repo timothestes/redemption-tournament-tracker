@@ -4,7 +4,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/app/forge/lib/auth", () => ({ requireForge: vi.fn(), requireElder: vi.fn() }));
 
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
-import { createSet, saveSetNotes, listSets, grantSet, revokeSet } from "../sets";
+import { createSet, saveSetNotes, listSets, grantSet, revokeSet, bulkDeleteSets } from "../sets";
 
 function ctx(opts: { rpc?: any; rows?: any[] } = {}) {
   const order = vi.fn(async () => ({ data: opts.rows ?? [], error: null }));
@@ -70,5 +70,25 @@ describe("grantSet / revokeSet", () => {
     const c = ctx({ rpc: async () => ({ data: null, error: { message: "boom" } }) });
     (requireElder as any).mockResolvedValue(c);
     expect((await revokeSet("s1", "u1")).ok).toBe(false);
+  });
+});
+
+describe("bulkDeleteSets", () => {
+  it("rejects a non-elder", async () => {
+    (requireElder as any).mockResolvedValue(null);
+    expect((await bulkDeleteSets(["s1"])).ok).toBe(false);
+  });
+  it("loops forge_delete_set per id and counts failures without stopping", async () => {
+    let calls = 0;
+    const rpc = vi.fn(async () => ({ data: null, error: ++calls === 2 ? { message: "boom" } : null }));
+    (requireElder as any).mockResolvedValue({ role: "elder", user: { id: "u1" }, supabase: { rpc } });
+    const r = await bulkDeleteSets(["s1", "s2", "s3"]);
+    expect(r).toEqual({ ok: true, done: 2, failed: 1 });
+    expect((rpc as any).mock.calls.map((c: any) => c[1].p_set_id)).toEqual(["s1", "s2", "s3"]);
+    expect((rpc as any).mock.calls[0][0]).toBe("forge_delete_set");
+  });
+  it("rejects more than 100 ids", async () => {
+    (requireElder as any).mockResolvedValue({ role: "elder", user: { id: "u1" }, supabase: { rpc: vi.fn() } });
+    expect((await bulkDeleteSets(Array.from({ length: 101 }, (_, i) => `s${i}`))).ok).toBe(false);
   });
 });

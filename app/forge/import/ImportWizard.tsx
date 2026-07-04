@@ -20,7 +20,7 @@ const BATCH_SIZE = 8;            // cards per request (must stay ≤ the route's
 const BATCH_CONCURRENCY = 4;     // requests in flight
 const MAX_BATCH_BYTES = 3_500_000; // keep each request under Vercel's ~4.5MB body cap
 
-type CardStatus = "queued" | "importing" | "imported" | "skipped" | "failed";
+type CardStatus = "queued" | "importing" | "imported" | "updated" | "skipped" | "failed";
 interface ImportItem {
   row: LackeyRow;
   entryName: string | null; // zip entry for the finished-card image, if present
@@ -39,7 +39,7 @@ function baseName(entryName: string): string {
   return entryName.split("/").pop() ?? entryName;
 }
 
-interface BatchCardResult { name: string; ok: boolean; cardId?: string; skipped?: boolean; error?: string }
+interface BatchCardResult { name: string; ok: boolean; cardId?: string; skipped?: boolean; updated?: boolean; error?: string }
 
 // Greedy chunking: ≤ BATCH_SIZE cards and ≤ MAX_BATCH_BYTES of image data per request.
 // An image bigger than the cap still gets its own single-card batch.
@@ -77,6 +77,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [newSetName, setNewSetName] = useState("");
   const [existingSetId, setExistingSetId] = useState(sets[0]?.id ?? "");
+  const [overwrite, setOverwrite] = useState(false);
 
   const [items, setItems] = useState<ImportItem[] | null>(null);
   const [running, setRunning] = useState(false);
@@ -170,7 +171,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
       }
       return { name: it.row.name, snapshot: lackeyRowToDesignCard(it.row), fileField };
     });
-    fd.set("payload", JSON.stringify({ setId, cards }));
+    fd.set("payload", JSON.stringify({ setId, cards, overwrite }));
 
     const res = await fetch("/forge/api/import", { method: "POST", body: fd });
     if (!res.ok) {
@@ -189,7 +190,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
         work[idx].status = "failed";
         work[idx].error = r?.error ?? "Unexpected error";
       } else {
-        work[idx].status = r.skipped ? "skipped" : "imported";
+        work[idx].status = r.skipped ? "skipped" : r.updated ? "updated" : "imported";
       }
     });
   }
@@ -266,16 +267,17 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
   }
 
   const counts = useMemo(() => {
-    const c = { imported: 0, skipped: 0, failed: 0 };
+    const c = { imported: 0, updated: 0, skipped: 0, failed: 0 };
     for (const it of items ?? []) {
       if (it.status === "imported") c.imported++;
+      else if (it.status === "updated") c.updated++;
       else if (it.status === "skipped") c.skipped++;
       else if (it.status === "failed") c.failed++;
     }
     return c;
   }, [items]);
   const finished = !!items && !running && items.every((it) =>
-    it.status === "imported" || it.status === "skipped" || it.status === "failed");
+    it.status === "imported" || it.status === "updated" || it.status === "skipped" || it.status === "failed");
 
   return (
     <div className="mx-auto max-w-4xl p-4">
@@ -309,7 +311,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
           <div className="mb-2 flex flex-wrap gap-1">
             {zipSets.slice(0, 12).map(({ set, count }) => (
               <button key={set} type="button" onClick={() => onFilterChange(set)} disabled={running}
-                className={`rounded-full border px-2 py-0.5 text-xs disabled:opacity-50 ${filter === set ? "border-emerald-600 bg-emerald-600/10" : "hover:bg-muted"}`}>
+                className={`rounded-full border px-2 py-0.5 text-xs disabled:opacity-50 ${filter === set ? "border-primary bg-primary/10" : "hover:bg-muted"}`}>
                 {set} <span className="text-muted-foreground">({count})</span>
               </button>
             ))}
@@ -363,7 +365,8 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
           <legend className="px-1 text-sm font-medium">4 · Destination</legend>
           <div className="space-y-2 text-sm">
             <label className="flex items-center gap-2">
-              <input type="radio" name="dest" checked={mode === "new"} onChange={() => setMode("new")} />
+              <input type="radio" name="dest" checked={mode === "new"}
+                onChange={() => { setMode("new"); setOverwrite(false); }} />
               Create a new set
             </label>
             {mode === "new" && (
@@ -377,15 +380,29 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
               Add to an existing set
             </label>
             {mode === "existing" && (
-              <select value={existingSetId} onChange={(e) => setExistingSetId(e.target.value)}
-                aria-label="Existing set" className="ml-6 w-64 rounded-md border bg-background px-2 py-1 text-sm">
-                {sets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <>
+                <select value={existingSetId} onChange={(e) => setExistingSetId(e.target.value)}
+                  aria-label="Existing set" className="ml-6 w-64 rounded-md border bg-background px-2 py-1 text-sm">
+                  {sets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <label className="mt-2 flex items-start gap-2 text-sm">
+                  <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)}
+                    className="mt-0.5" />
+                  <span>
+                    <span className="font-medium">Overwrite existing cards</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Cards whose names already exist in the set get their text and finished
+                      image replaced (a new testing version — release the update when ready).
+                      Cards not in this zip are untouched.
+                    </span>
+                  </span>
+                </label>
+              </>
             )}
           </div>
           {runError && <p className="mt-2 text-sm text-red-500">{runError}</p>}
           <button type="button" onClick={runImport} disabled={running || matched.length === 0}
-            className="mt-3 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+            className="mt-3 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
             {matched.length === 1 ? "Import 1 card" : `Import ${matched.length} cards`}
           </button>
         </fieldset>
@@ -396,7 +413,11 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
         <fieldset className="mt-4 rounded-md border p-3">
           <legend className="px-1 text-sm font-medium">5 · Import</legend>
           <p className="text-sm">
-            Imported {counts.imported} · Skipped {counts.skipped} · Failed {counts.failed}
+            {overwrite ? (
+              <>Imported {counts.imported} · Updated {counts.updated} · Skipped {counts.skipped} · Failed {counts.failed}</>
+            ) : (
+              <>Imported {counts.imported} · Skipped {counts.skipped} · Failed {counts.failed}</>
+            )}
           </p>
           {finished && counts.failed > 0 && (
             <button type="button" onClick={retryFailed}
@@ -404,7 +425,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
           )}
           {finished && doneSetId && (
             <Link href={`/forge/sets/${doneSetId}/cards`}
-              className="mt-2 block text-sm text-emerald-600 hover:underline">
+              className="mt-2 block text-sm font-medium text-primary hover:underline">
               View set →
             </Link>
           )}
@@ -414,7 +435,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
                 <span className="truncate">{it.row.name}</span>
                 <span className={
                   it.status === "failed" ? "text-red-500"
-                    : it.status === "imported" ? "text-emerald-600"
+                    : it.status === "imported" || it.status === "updated" ? "text-primary"
                     : "text-muted-foreground"
                 }>
                   {it.status === "failed" ? `failed: ${it.error ?? "unknown"}` : it.status}

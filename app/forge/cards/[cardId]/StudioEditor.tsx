@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
+import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
+import { Button } from "@/components/ui/button";
+import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 import { saveCard, uploadArt, uploadFinished, setPlaceholder, type ForgeCardFull } from "@/app/forge/lib/cards";
 import { createProposal } from "@/app/forge/lib/proposals";
 import { cardRawText, type DesignCard } from "@/app/forge/lib/designCard";
@@ -19,12 +21,13 @@ import PresenceBar from "./PresenceBar";
 // disk (unused here) for recovery.
 
 export default function StudioEditor({
-  card, sets, currentUser, setId,
+  card, sets, currentUser, setId, setName,
 }: {
   card: ForgeCardFull;
   sets: ForgeSetSummary[];
   currentUser: { userId: string; displayName: string | null };
   setId: string | null;
+  setName: string | null;
 }) {
   const [snapshot, setSnapshot] = useState<DesignCard>(card.snapshot ?? {});
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -33,6 +36,7 @@ export default function StudioEditor({
   const firstRender = useRef(true);
   const fieldsDirty = useRef(false);
   const [pendingFinished, setPendingFinished] = useState<File | null>(null);
+  const [uploading, setUploading] = useState<"art" | "finished" | null>(null);
   const router = useRouter();
 
   const { others, setEditing } = useForgeCardChannel(
@@ -59,11 +63,16 @@ export default function StudioEditor({
 
   async function onUpload(file: File, kind: "art" | "finished") {
     setErr(null);
-    const fd = new FormData();
-    fd.set("file", file);
-    const r = kind === "art" ? await uploadArt(card.id, fd) : await uploadFinished(card.id, fd);
-    if (!r.ok) setErr(r.error ?? "Upload failed");
-    else router.refresh();
+    setUploading(kind);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      const r = kind === "art" ? await uploadArt(card.id, fd) : await uploadFinished(card.id, fd);
+      if (r.ok === false) setErr(r.error ?? "Upload failed");
+      else router.refresh();
+    } finally {
+      setUploading(null);
+    }
   }
 
   const [proposing, setProposing] = useState(false);
@@ -89,9 +98,20 @@ export default function StudioEditor({
       <PresenceBar others={others} />
       <div className="mb-3 flex flex-col gap-2 text-sm">
         <div className="flex items-center justify-between">
-          <Link href={card.setId ? `/forge/sets/${card.setId}/cards` : "/forge/ideas"} className="text-muted-foreground hover:underline">
-            ← {card.setId ? "Set" : "Ideas"}
-          </Link>
+          <ForgeBreadcrumbs items={
+            card.setId
+              ? [
+                  { label: "The Forge", href: "/forge" },
+                  { label: "Sets", href: "/forge/sets" },
+                  { label: setName ?? "Set", href: `/forge/sets/${card.setId}/cards` },
+                  { label: card.title?.trim() || "Untitled" },
+                ]
+              : [
+                  { label: "The Forge", href: "/forge" },
+                  { label: "Ideas", href: "/forge/ideas" },
+                  { label: card.title?.trim() || "Untitled" },
+                ]
+          } />
           <span className="text-xs text-muted-foreground">
             {saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Save failed" : ""}
           </span>
@@ -102,16 +122,15 @@ export default function StudioEditor({
             <div className="flex items-center gap-1 text-xs">
               <input autoFocus value={proposeSummary} onChange={(e) => setProposeSummary(e.target.value)}
                 placeholder="Summarize your proposed change…" className="flex-1 rounded-md border bg-background px-2 py-1" />
-              <button disabled={proposeBusy || !proposeSummary.trim()} onClick={submitProposal}
-                className="rounded-md bg-emerald-600 px-3 py-1 font-medium text-white disabled:opacity-50">
+              <Button size="sm" className="h-7 px-3 text-xs" disabled={proposeBusy || !proposeSummary.trim()} onClick={submitProposal}>
                 Submit proposal
-              </button>
-              <button onClick={() => setProposing(false)} className="rounded-md border px-2 py-1">Cancel</button>
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setProposing(false)}>Cancel</Button>
             </div>
           ) : (
-            <button onClick={() => setProposing(true)} className="self-start rounded-md border px-3 py-1 text-xs">
+            <Button size="sm" variant="outline" className="h-7 self-start px-3 text-xs" onClick={() => setProposing(true)}>
               Propose changes for review
-            </button>
+            </Button>
           ))}
       </div>
 
@@ -128,7 +147,7 @@ export default function StudioEditor({
 
         {/* Form */}
         <div className="space-y-4" onFocusCapture={() => setEditing(true)} onBlurCapture={() => setEditing(false)}>
-          {err && <p className="text-sm text-red-500">{err}</p>}
+          {err && <p className="text-sm text-destructive">{err}</p>}
 
           <input autoFocus value={snapshot.name ?? ""} onChange={(e) => update({ name: e.target.value })}
             placeholder="Name your card…" className="w-full rounded-md border bg-background px-3 py-2 text-lg" />
@@ -138,9 +157,12 @@ export default function StudioEditor({
             className="h-64 w-full rounded-md border bg-background px-3 py-2 text-sm" />
 
           {/* Artwork (illustration) */}
-          <fieldset className="rounded-md border p-3">
-            <legend className="px-1 font-medium">Artwork (illustration)</legend>
-            <input type="file" accept="image/jpeg,image/png,image/webp"
+          <fieldset className="rounded-lg border bg-card p-4">
+            <legend className="px-1 text-sm font-medium">
+              Artwork (illustration)
+              {uploading === "art" && <span className="ml-2 text-xs text-muted-foreground">Uploading…</span>}
+            </legend>
+            <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading !== null}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f, "art"); e.target.value = ""; }}
               className="block w-full text-xs" />
             <label className="mt-3 flex items-start gap-2">
@@ -154,16 +176,20 @@ export default function StudioEditor({
               </span>
             </label>
             {card.hasArt && (
-              <a href={`/forge/api/art/${card.id}?download=1`} className="mt-2 inline-block text-emerald-600 hover:underline">
+              <a href={`/forge/api/art/${card.id}?download=1`}
+                className="mt-2 inline-block font-medium text-foreground underline-offset-2 hover:text-primary hover:underline">
                 Download original
               </a>
             )}
           </fieldset>
 
           {/* Finished card (full composed image) */}
-          <fieldset className="rounded-md border p-3">
-            <legend className="px-1 font-medium">Finished card (full composed image)</legend>
-            <input type="file" accept="image/jpeg,image/png,image/webp"
+          <fieldset className="rounded-lg border bg-card p-4">
+            <legend className="px-1 text-sm font-medium">
+              Finished card (full composed image)
+              {uploading === "finished" && <span className="ml-2 text-xs text-muted-foreground">Uploading…</span>}
+            </legend>
+            <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading !== null}
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) {
@@ -175,36 +201,28 @@ export default function StudioEditor({
                 e.target.value = "";
               }}
               className="block w-full text-xs" />
-            {pendingFinished && (
-              <div role="alertdialog" className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
-                <p className="font-medium">Replace image without updating the card fields?</p>
-                <p className="mt-1 text-muted-foreground">
-                  You’re replacing the finished card image but haven’t changed any card fields this
-                  session. If the new image changed the ability text, update the fields to match.
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <button type="button"
-                    onClick={() => { const f = pendingFinished; setPendingFinished(null); if (f) onUpload(f, "finished"); }}
-                    className="rounded-md bg-amber-600 px-3 py-1 font-medium text-white">
-                    Replace anyway
-                  </button>
-                  <button type="button" onClick={() => setPendingFinished(null)} className="rounded-md border px-2 py-1">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
             <p className="mt-2 text-xs text-muted-foreground">
               A finished card image made elsewhere. When present, it’s shown everywhere instead of the artwork.
             </p>
             {card.hasFinished && (
-              <a href={`/forge/api/art/${card.id}?kind=finished&download=1`} className="mt-2 inline-block text-emerald-600 hover:underline">
+              <a href={`/forge/api/art/${card.id}?kind=finished&download=1`}
+                className="mt-2 inline-block font-medium text-foreground underline-offset-2 hover:text-primary hover:underline">
                 Download finished card
               </a>
             )}
           </fieldset>
         </div>
       </div>
+
+      <ConfirmationDialog
+        open={pendingFinished !== null}
+        onOpenChange={(o) => { if (!o) setPendingFinished(null); }}
+        onConfirm={() => { const f = pendingFinished; setPendingFinished(null); if (f) onUpload(f, "finished"); }}
+        variant="warning"
+        title="Replace image without updating the card fields?"
+        description="You're replacing the finished card image but haven't changed any card fields this session. If the new image changed the ability text, update the fields to match."
+        confirmLabel="Replace anyway"
+      />
     </div>
   );
 }

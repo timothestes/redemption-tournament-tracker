@@ -3,28 +3,22 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { shareToSet, sendToPrivate, publish, approve, unapprove, archive, unarchive, deleteCard } from "@/app/forge/lib/lifecycle";
+import { STATUS_PATH, STATUS_LABEL, ACTION_LABEL, releaseLabel, CONFIRM_COPY } from "@/app/forge/lib/lifecycleCopy";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
+import { Button } from "@/components/ui/button";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
-
-const STEPS = ["draft", "playtesting", "approved"] as const;
-// Display labels: 'playtesting' cards are now visible to granted playtesters (migration
-// 057), so the word finally means what it says; 'approved' reads as the locked "Final".
-const STEP_LABELS: Record<(typeof STEPS)[number], string> = {
-  draft: "Draft",
-  playtesting: "Playtesting",
-  approved: "Final",
-};
 
 export default function LifecycleControls({ card, sets }: { card: ForgeCardFull; sets: ForgeSetSummary[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [picking, setPicking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmReturn, setConfirmReturn] = useState(false);
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => {
       const r = await fn();
-      if (!r.ok) alert(r.error ?? "Action failed");
+      if (r.ok === false) alert(r.error ?? "Action failed");
       router.refresh();
     });
 
@@ -32,7 +26,7 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
   const onDelete = () =>
     start(async () => {
       const r = await deleteCard(card.id);
-      if (!r.ok) { alert(r.error ?? "Could not delete card"); return; }
+      if (r.ok === false) { alert(r.error ?? "Could not delete card"); return; }
       router.push(card.setId ? `/forge/sets/${card.setId}/cards` : "/forge/ideas");
     });
 
@@ -43,30 +37,45 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
       {inSet ? (
         <>
           <ol className="flex items-center gap-1 text-muted-foreground">
-            {STEPS.map((s) => (
+            {STATUS_PATH.map((s) => (
               <li key={s} className={card.status === s ? "font-semibold text-foreground" : ""}>
-                {STEP_LABELS[s]}
+                {STATUS_LABEL[s]}
                 {s !== "approved" ? " ›" : ""}
               </li>
             ))}
+            {card.status === "archived" && <li className="font-semibold text-foreground">· {STATUS_LABEL.archived}</li>}
           </ol>
           <div className="ml-auto flex flex-wrap gap-2">
             {(card.status === "draft" || card.status === "playtesting") && (
-              <button disabled={pending} onClick={() => run(() => publish(card.id))} className="rounded-md bg-emerald-600 px-3 py-1 font-medium text-white disabled:opacity-50">Publish</button>
+              <Button size="sm" className="h-7 px-3 text-xs" disabled={pending} onClick={() => run(() => publish(card.id))}>
+                {releaseLabel(card.status)}
+              </Button>
             )}
             {card.status === "playtesting" && (
-              <button disabled={pending} onClick={() => run(() => approve(card.id))} className="rounded-md border px-3 py-1">Approve</button>
+              <Button size="sm" variant="outline" className="h-7 px-3 text-xs" disabled={pending} onClick={() => run(() => approve(card.id))}>
+                {ACTION_LABEL.markFinal}
+              </Button>
             )}
             {card.status === "approved" && (
-              <button disabled={pending} onClick={() => run(() => unapprove(card.id))} className="rounded-md border px-3 py-1">Unapprove</button>
+              <Button size="sm" variant="outline" className="h-7 px-3 text-xs" disabled={pending} onClick={() => run(() => unapprove(card.id))}>
+                {ACTION_LABEL.reopen}
+              </Button>
             )}
             {card.status === "archived" ? (
-              <button disabled={pending} onClick={() => run(() => unarchive(card.id))} className="rounded-md border px-3 py-1">Unarchive</button>
+              <Button size="sm" variant="outline" className="h-7 px-3 text-xs" disabled={pending} onClick={() => run(() => unarchive(card.id))}>
+                {ACTION_LABEL.restore}
+              </Button>
             ) : (
-              <button disabled={pending} onClick={() => run(() => archive(card.id))} className="rounded-md border px-3 py-1">Archive</button>
+              <Button size="sm" variant="outline" className="h-7 px-3 text-xs" disabled={pending} onClick={() => run(() => archive(card.id))}>
+                {ACTION_LABEL.shelve}
+              </Button>
             )}
-            <button disabled={pending} onClick={() => confirm("Send this card back to your private sketchbook? Its published versions will be retired.") && run(() => sendToPrivate(card.id))} className="rounded-md border px-3 py-1">Send back to private</button>
-            <button disabled={pending} onClick={() => setConfirmDelete(true)} className="rounded-md border border-red-300 px-3 py-1 text-red-600">Delete</button>
+            <Button size="sm" variant="outline" className="h-7 px-3 text-xs" disabled={pending} onClick={() => setConfirmReturn(true)}>
+              {ACTION_LABEL.returnToIdeas}
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 border-destructive/40 px-3 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={pending} onClick={() => setConfirmDelete(true)}>
+              {ACTION_LABEL.delete}
+            </Button>
           </div>
         </>
       ) : (
@@ -77,17 +86,26 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
               {sets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           ) : (
-            <button onClick={() => setPicking(true)} className="rounded-md border px-3 py-1">Share to a set</button>
+            <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={() => setPicking(true)}>Share to a set</Button>
           )}
         </div>
       )}
+      <ConfirmationDialog
+        open={confirmReturn}
+        onOpenChange={setConfirmReturn}
+        onConfirm={() => run(() => sendToPrivate(card.id))}
+        variant="warning"
+        title={CONFIRM_COPY.returnToIdeas.title}
+        description={CONFIRM_COPY.returnToIdeas.description}
+        confirmLabel={CONFIRM_COPY.returnToIdeas.confirmLabel}
+      />
       <ConfirmationDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         onConfirm={onDelete}
         variant="destructive"
         title="Delete this card?"
-        description="This permanently removes the card and all of its versions. This cannot be undone."
+        description={CONFIRM_COPY.delete.description}
         confirmLabel="Delete card"
       />
     </div>

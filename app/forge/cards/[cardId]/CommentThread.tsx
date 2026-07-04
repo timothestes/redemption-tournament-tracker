@@ -74,7 +74,7 @@ export default function CommentThread({
       <p className="whitespace-pre-wrap">{c.body}</p>
       <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
         {c.field && c.suggestedValue != null && canApply && !c.resolved && (
-          <button disabled={pending} onClick={() => run(() => applySuggestion(c.id, cardId))} className="text-emerald-700 hover:underline">
+          <button disabled={pending} onClick={() => run(() => applySuggestion(c.id, cardId))} className="text-foreground underline-offset-2 hover:text-primary hover:underline">
             Apply
           </button>
         )}
@@ -86,7 +86,7 @@ export default function CommentThread({
             Reply
           </button>
         )}
-        <button disabled={pending} onClick={() => confirm("Delete this comment?") && run(() => deleteComment(c.id, cardId))} className="text-red-600 hover:underline">
+        <button disabled={pending} onClick={() => confirm("Delete this comment?") && run(() => deleteComment(c.id, cardId))} className="text-destructive hover:underline">
           Delete
         </button>
       </div>
@@ -149,7 +149,7 @@ export default function CommentThread({
           <button
             disabled={pending || !body.trim()}
             onClick={submitTop}
-            className="ml-auto rounded-md bg-emerald-600 px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
+            className="ml-auto rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             Post
           </button>

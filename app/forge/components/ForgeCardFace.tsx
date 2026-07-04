@@ -34,8 +34,8 @@ export default function ForgeCardFace({
 
   return (
     <div
-      className={className}
-      style={{ ...box, display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: "4%", border: "1px solid rgba(0,0,0,0.15)", background: "rgba(127,127,127,0.06)" }}
+      className={`overflow-hidden rounded-[4%] border bg-muted/30 ${className ?? ""}`}
+      style={{ ...box, display: "flex", flexDirection: "column", overflow: "hidden" }}
     >
       {artUrl && <Img src={artUrl} style={{ width: "100%", height: "48%", objectFit: "cover" }} />}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden", padding: "6%" }}>

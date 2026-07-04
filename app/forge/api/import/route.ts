@@ -16,7 +16,7 @@ const MAX_NAME_LENGTH = 200;
 const MAX_SNAPSHOT_BYTES = 32_000; // forge_save_card enforces 64KB; fail earlier & clearer
 
 interface BatchCard { name?: string; snapshot?: DesignCard; fileField?: string }
-interface CardResult { name: string; ok: boolean; cardId?: string; skipped?: boolean; error?: string }
+interface CardResult { name: string; ok: boolean; cardId?: string; skipped?: boolean; updated?: boolean; error?: string }
 
 function badRequest(message: string): Response {
   return Response.json({ error: message }, { status: 400 });
@@ -34,7 +34,7 @@ export async function POST(req: Request): Promise<Response> {
   }
   const raw = form.get("payload");
   if (typeof raw !== "string" || raw.length > MAX_PAYLOAD_CHARS) return badRequest("Invalid payload");
-  let payload: { setId?: unknown; cards?: unknown };
+  let payload: { setId?: unknown; cards?: unknown; overwrite?: unknown };
   try {
     payload = JSON.parse(raw);
   } catch {
@@ -42,6 +42,7 @@ export async function POST(req: Request): Promise<Response> {
   }
   const setId = typeof payload.setId === "string" ? payload.setId : "";
   const cards = Array.isArray(payload.cards) ? (payload.cards as BatchCard[]) : [];
+  const overwrite = payload.overwrite === true;
   if (!setId || cards.length === 0 || cards.length > MAX_CARDS_PER_BATCH) {
     return badRequest("Invalid batch");
   }
@@ -81,9 +82,30 @@ export async function POST(req: Request): Promise<Response> {
         if (invalid) return { name, ok: false, error: invalid };
       }
 
-      // Idempotency: a card with this title already in the target set → skip (safe re-runs).
+      // Idempotency: a card with this title already in the target set → skip (safe re-runs),
+      // unless overwrite is on — then update its working snapshot + finished image in place.
       const dupId = existingByTitle.get(name);
-      if (dupId) return { name, ok: true, cardId: dupId, skipped: true };
+      if (dupId && !overwrite) return { name, ok: true, cardId: dupId, skipped: true };
+
+      if (dupId && overwrite) {
+        const { error: saveErr } = await ctx.supabase
+          .rpc("forge_save_card", { p_card_id: dupId, p_snapshot: card.snapshot ?? {} });
+        if (saveErr) return { name, ok: false, error: saveErr.message };
+
+        if (file) {
+          let key: string;
+          try {
+            key = await uploadForgeFinished(file);
+          } catch {
+            return { name, ok: false, error: "Image upload failed" };
+          }
+          const { error: artErr } = await ctx.supabase
+            .rpc("forge_set_working_finished", { p_card_id: dupId, p_key: key });
+          if (artErr) return { name, ok: false, error: artErr.message };
+        }
+
+        return { name, ok: true, cardId: dupId, updated: true };
+      }
 
       const { data: cardId, error: createErr } = await ctx.supabase
         .rpc("forge_create_card", { p_title: name });

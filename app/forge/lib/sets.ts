@@ -6,7 +6,7 @@ import type { TargetCounts } from "@/app/forge/lib/progress";
 import { type ForgeCardFull } from "@/app/forge/lib/cards";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 
-export type ForgeSetSummary = { id: string; name: string; slug: string; status: string; total: number; targetTotal: number };
+export type ForgeSetSummary = { id: string; name: string; slug: string; status: string; total: number; targetTotal: number; statusCounts: Record<string, number> };
 export type ForgeSetDetail = { id: string; name: string; slug: string; notes: string | null; targetCounts: TargetCounts; status: string };
 export type SetElder = { userId: string; displayName: string | null; role: string };
 
@@ -31,13 +31,19 @@ export async function listSets(): Promise<ForgeSetSummary[]> {
     .order("created_at", { ascending: false });
   const { data: cards } = await ctx.supabase.from("forge_cards").select("set_id, status");
   const counts = new Map<string, number>();
+  const statusCounts = new Map<string, Record<string, number>>();
   for (const c of cards ?? []) {
-    if (c.set_id && c.status !== "archived") counts.set(c.set_id, (counts.get(c.set_id) ?? 0) + 1);
+    if (!c.set_id) continue;
+    if (c.status !== "archived") counts.set(c.set_id, (counts.get(c.set_id) ?? 0) + 1);
+    const m = statusCounts.get(c.set_id) ?? {};
+    m[c.status] = (m[c.status] ?? 0) + 1;
+    statusCounts.set(c.set_id, m);
   }
   return (sets ?? []).map((s: any) => ({
     id: s.id, name: s.name, slug: s.slug, status: s.status,
     total: counts.get(s.id) ?? 0,
     targetTotal: (s.target_counts?.total as number) ?? 0,
+    statusCounts: statusCounts.get(s.id) ?? {},
   }));
 }
 
@@ -145,6 +151,22 @@ export async function revokeSet(setId: string, userId: string): Promise<Result> 
   if (error) return { ok: false, error: "Could not revoke access" };
   revalidatePath(`/forge/sets/${setId}/progress`);
   return { ok: true };
+}
+
+export async function bulkDeleteSets(
+  setIds: string[]
+): Promise<{ ok: true; done: number; failed: number } | { ok: false; error: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  if (setIds.length === 0) return { ok: true, done: 0, failed: 0 };
+  if (setIds.length > 100) return { ok: false, error: "Too many sets selected" };
+  let done = 0, failed = 0;
+  for (const id of setIds) {
+    const { error } = await ctx.supabase.rpc("forge_delete_set", { p_set_id: id });
+    if (error) failed++; else done++;
+  }
+  revalidatePath("/forge", "layout");
+  return { ok: true, done, failed };
 }
 
 export async function listSetGrants(setId: string): Promise<SetGrant[]> {

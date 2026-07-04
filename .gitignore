@@ -110,3 +110,4 @@ public/forge/frames/Curses/
 # Forge: never commit raw kit PNGs (we ship .webp)
 public/forge/frames/Elements/**/*.png
 nationals-history-source.html
+.superpowers/
