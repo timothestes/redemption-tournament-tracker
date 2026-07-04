@@ -15,12 +15,10 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
   const items: NavItem[] =
     role === "playtester"
       ? [
-          { href: "/forge", label: "Desk", match: (p) => p === "/forge" },
           { href: "/forge/play", label: "Sets", match: (p) => p === "/forge/play" || /^\/forge\/play\/[^/]+$/.test(p) },
           { href: "/forge/play/decks", label: "Decks", match: (p) => p.startsWith("/forge/play/decks") },
         ]
       : [
-          { href: "/forge", label: "Desk", match: (p) => p === "/forge" },
           { href: "/forge/ideas", label: "Ideas", match: (p) => p.startsWith("/forge/ideas") },
           { href: "/forge/sets", label: "Sets", match: (p) => p.startsWith("/forge/sets") },
           { href: "/forge/play", label: "Play", match: (p) => p.startsWith("/forge/play") },

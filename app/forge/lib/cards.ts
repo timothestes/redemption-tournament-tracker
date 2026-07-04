@@ -148,3 +148,16 @@ export async function listForgeCards(): Promise<ForgeCardFull[]> {
     .order("updated_at", { ascending: false });
   return (data ?? []).map(toFull);
 }
+
+// Most recently edited cards the caller can see (RLS scopes this to own ideas +
+// set-elder cards; for playtesters, granted playtesting/approved cards).
+export async function listRecentCards(limit = 6): Promise<ForgeCardFull[]> {
+  const ctx = await requireForge();
+  if (!ctx) return [];
+  const { data } = await ctx.supabase
+    .from("forge_cards")
+    .select(CARD_COLS)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []).map(toFull);
+}
