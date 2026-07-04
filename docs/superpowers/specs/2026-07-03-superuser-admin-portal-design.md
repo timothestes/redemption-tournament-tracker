@@ -49,12 +49,12 @@ All four: `SECURITY DEFINER`, `set search_path = ''`, EXECUTE revoked from `anon
 
 ```ts
 export const ADMIN_PERMISSIONS = [
-  { key: "manage_registrations", label: "Registrations", href: "/admin/registrations" },
-  { key: "manage_tags",          label: "Tags",          href: "/admin/tags" },
-  { key: "manage_spoilers",      label: "Spoilers",      href: "/admin/spoilers" },
-  { key: "manage_cards",         label: "Cards",         href: "/admin/cards" },
-  { key: "manage_rulings",       label: "Rulings",       href: "/admin/rulings" },
-  { key: "threshing_floor",      label: "Threshing Floor", href: "/threshingfloor" },
+  { key: "manage_registrations", label: "Registrations" },
+  { key: "manage_tags",          label: "Tags" },
+  { key: "manage_spoilers",      label: "Spoilers" },
+  { key: "manage_cards",         label: "Cards" },
+  { key: "manage_rulings",       label: "Rulings" },
+  { key: "threshing_floor",      label: "Threshing Floor" },
 ] as const;
 ```
 
