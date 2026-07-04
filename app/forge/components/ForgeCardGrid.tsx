@@ -29,8 +29,8 @@ export default function ForgeCardGrid({
               finishedUrl={c.hasFinished ? `/forge/api/art/${c.id}?kind=finished&t=${t}` : null}
               artUrl={c.hasArt ? `/forge/api/art/${c.id}?t=${t}` : null}
             />
-            <div className="mt-1 flex items-center justify-between gap-2">
-              <p className="truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+              <p className="min-w-[6rem] flex-1 truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>
               {showStatus && (
                 <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] ${STATUS_BADGE_CLASS[c.status] ?? "text-muted-foreground"}`}>
                   {STATUS_LABEL[c.status] ?? c.status}

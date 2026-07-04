@@ -67,7 +67,7 @@ export default function IdeasLibrary({ cards, canCreate, sets }: { cards: ForgeC
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-4 pb-20">
+    <div className="mx-auto max-w-6xl p-4 pb-28 sm:pb-20">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h1 className="mr-auto text-lg font-semibold">Ideas</h1>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…"
