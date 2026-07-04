@@ -120,6 +120,12 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
           </div>
         )}
       </div>
+      {selecting && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{selected.size} selected</span>
+          <span aria-live="polite" className="text-foreground">{summary}</span>
+        </div>
+      )}
       {sets.length === 0 ? (
         <div className="mx-auto mt-16 max-w-xs text-center">
           <div className="mx-auto mb-4 aspect-[750/1050] w-40 rounded-lg border-2 border-dashed" />
@@ -163,7 +169,7 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
       )}
 
       {selecting && selected.size > 0 && (
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3">
           <Button
             size="sm"
             variant="outline"
@@ -173,7 +179,6 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
           >
             Delete {selected.size} {selected.size === 1 ? "set" : "sets"}
           </Button>
-          {summary && <span aria-live="polite" className="text-xs text-muted-foreground">{summary}</span>}
         </div>
       )}
 
