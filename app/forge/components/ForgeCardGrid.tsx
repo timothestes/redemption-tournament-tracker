@@ -4,13 +4,25 @@ import { cardRawText } from "@/app/forge/lib/designCard";
 import { STATUS_LABEL } from "@/app/forge/lib/lifecycleCopy";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
 
-export default function ForgeCardGrid({ cards, showStatus = false }: { cards: ForgeCardFull[]; showStatus?: boolean }) {
+export type GridSelection = {
+  active: boolean;
+  selected: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+};
+
+export default function ForgeCardGrid({
+  cards, showStatus = false, selection,
+}: {
+  cards: ForgeCardFull[];
+  showStatus?: boolean;
+  selection?: GridSelection;
+}) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
       {cards.map((c) => {
         const t = Date.parse(c.updatedAt) || 0;
-        return (
-          <Link key={c.id} href={`/forge/cards/${c.id}`} className="block transition hover:opacity-90">
+        const inner = (
+          <>
             <ForgeCardFace
               name={c.snapshot.name ?? null}
               rawText={cardRawText(c.snapshot)}
@@ -25,6 +37,36 @@ export default function ForgeCardGrid({ cards, showStatus = false }: { cards: Fo
                 </span>
               )}
             </div>
+          </>
+        );
+        if (selection?.active) {
+          const isSel = selection.selected.has(c.id);
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => selection.onToggle(c.id)}
+              aria-pressed={isSel}
+              className="relative block text-left transition hover:opacity-90"
+            >
+              <span
+                aria-hidden
+                className={`absolute left-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded border text-xs ${
+                  isSel ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background"
+                }`}
+              >
+                {isSel ? "✓" : ""}
+              </span>
+              {isSel && (
+                <span aria-hidden className="pointer-events-none absolute -inset-1 rounded-lg border-2 border-primary/60" />
+              )}
+              {inner}
+            </button>
+          );
+        }
+        return (
+          <Link key={c.id} href={`/forge/cards/${c.id}`} className="block transition hover:opacity-90">
+            {inner}
           </Link>
         );
       })}
