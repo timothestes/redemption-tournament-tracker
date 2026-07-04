@@ -2,9 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireForge } from "./lib/auth";
 import { listSets } from "./lib/sets";
-import { listRecentCards } from "./lib/cards";
 import { STATUS_LABEL } from "./lib/lifecycleCopy";
-import ForgeCardGrid from "./components/ForgeCardGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +12,7 @@ export default async function ForgeHomePage() {
   const ctx = await requireForge();
   if (!ctx) notFound();
   const isPlaytester = ctx.role === "playtester";
-  const [sets, recent] = await Promise.all([listSets(), isPlaytester ? Promise.resolve([]) : listRecentCards(6)]);
+  const sets = await listSets();
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 p-6">
@@ -99,13 +97,6 @@ export default async function ForgeHomePage() {
               </ul>
             )}
           </section>
-
-          {recent.length > 0 && (
-            <section>
-              <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Recently edited</h2>
-              <ForgeCardGrid cards={recent} showStatus />
-            </section>
-          )}
         </>
       )}
 
