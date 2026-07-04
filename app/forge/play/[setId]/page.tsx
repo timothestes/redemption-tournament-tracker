@@ -17,6 +17,7 @@ export default async function ForgePlaySetPage({ params }: { params: Promise<{ s
     cardId: c.cardId,
     data: c.data,
     artUrl: c.hasApprovedArt ? `/forge/api/art/${c.cardId}?v=approved` : null,
+    finishedUrl: c.hasApprovedFinished ? `/forge/api/art/${c.cardId}?v=approved&kind=finished` : null,
   }));
 
   return (
