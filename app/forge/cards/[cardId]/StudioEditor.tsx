@@ -14,6 +14,7 @@ import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 import { forgeCardTopic } from "@/app/forge/lib/realtime";
 import { useForgeCardChannel } from "@/app/forge/lib/useForgeRealtime";
 import PresenceBar from "./PresenceBar";
+import CardDetailsFields from "./CardDetailsFields";
 
 // DESCOPE (2026-07-03): the structured template (FullModeForm) and the composite
 // renderer (ForgeCardPreview) were removed from the studio. A card is now a name +
@@ -155,6 +156,8 @@ export default function StudioEditor({
           <textarea value={snapshot.rawText ?? ""} onChange={(e) => update({ rawText: e.target.value })}
             placeholder="Type the card — type, brigade, stats, ability, reference, flavor… Freeform; not rendered."
             className="h-64 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+
+          <CardDetailsFields snapshot={snapshot} update={update} />
 
           {/* Artwork (illustration) */}
           <fieldset className="rounded-lg border bg-card p-4">

@@ -1,7 +1,8 @@
 // Set artwork export helpers. The pure helpers (artExt/artFileName) are unit-tested;
-// listSetApprovedArt is SERVER-ONLY (it reads private blob keys — never serialize its
-// result to a client component).
+// listSetApprovedArt / listSetWorkingCards are SERVER-ONLY (they read private blob keys —
+// never serialize their result to a client component).
 import { requireForge } from "@/app/forge/lib/auth";
+import type { DesignCard } from "@/app/forge/lib/designCard";
 
 const EXT_BY_TYPE: Record<string, string> = {
   "image/png": "png",
@@ -65,4 +66,36 @@ export async function listSetApprovedArt(setId: string): Promise<ApprovedArt[]> 
       versionNumber: (v.version_number ?? 0) as number,
     }))
     .filter((a: ApprovedArt) => a.key !== "" && !a.isPlaceholder);
+}
+
+export type WorkingCard = {
+  cardId: string;
+  title: string;
+  snapshot: DesignCard;
+  finishedKey: string | null;
+};
+
+/**
+ * SERVER-ONLY. Every non-archived card of a set with its current working snapshot and
+ * working finished-image key, read under the caller's RLS. This is the "being worked on"
+ * state the Forge editor edits — used by the Lackey export. Carries a private blob key;
+ * never pass the result to a client component.
+ */
+export async function listSetWorkingCards(setId: string): Promise<WorkingCard[]> {
+  const ctx = await requireForge();
+  if (!ctx) return [];
+
+  const { data } = await ctx.supabase
+    .from("forge_cards")
+    .select("id, title, working_snapshot, working_finished_key")
+    .eq("set_id", setId)
+    .neq("status", "archived")
+    .order("title", { ascending: true });
+
+  return (data ?? []).map((c: any) => ({
+    cardId: c.id as string,
+    title: (c.title ?? "").toString(),
+    snapshot: (c.working_snapshot ?? {}) as DesignCard,
+    finishedKey: (c.working_finished_key ?? null) as string | null,
+  }));
 }

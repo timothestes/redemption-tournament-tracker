@@ -41,7 +41,7 @@ export function designCardToCard(data: DesignCard, cardId: string, setName: stri
     toughness: data.toughness != null ? String(data.toughness) : "—",
     class: (data.class ?? []).join("/"),
     identifier: (data.identifiers ?? []).join(", "),
-    specialAbility: data.specialAbility ?? "",
+    specialAbility: data.specialAbility || data.rawText || "",
     rarity: data.rarity ?? "",
     reference: data.reference ?? "",
     alignment: alignmentDisplay(data.alignment),
