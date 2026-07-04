@@ -151,6 +151,26 @@ action (unchanged from today: it's linked, not a tab).
 - Verification: Playwright screenshots of landing, set cards (with selection mode open),
   card detail, and ideas in **light, dark, and jayden** — reviewed before completion.
 
+## Addendum (2026-07-04, user follow-ups on PR #148)
+
+1. **Drop "Recently edited"** from the landing dashboard; remove the now-unused
+   `listRecentCards` (added by this branch, no other consumers).
+2. **Bulk delete sets (cascade), with confirmation.** New migration
+   `063_forge_delete_set.sql`: `forge_delete_set(p_set_id)` SECURITY DEFINER RPC
+   (set-elder-or-superadmin, `search_path=''`, anon-revoked, added to the anon-leak
+   probe list) that deletes every card in the set via `forge_delete_card`, then the
+   set's grants/elders rows, then the set. User chose **cascade** (junk-set cleanup);
+   prod apply authorized. UI: selection mode on `/forge/sets` with a destructive
+   ConfirmationDialog listing each selected set + its card count; summary
+   "Deleted N · K failed". Server action `bulkDeleteSets(setIds)` loops the RPC.
+3. **Import overwrite.** "Overwrite existing cards" toggle in the wizard (only for
+   the add-to-existing-set destination). Matched titles get `forge_save_card`
+   (name + rawText) + `forge_set_working_finished` (when the zip has an image)
+   on the EXISTING card instead of a skip; new titles still created; cards absent
+   from the zip untouched; frozen released versions untouched (re-release via bulk
+   "Release update"). No migration. Summary gains an "Updated Y" segment only when
+   overwrite was on (existing e2e assertions on the exact skip-summary stay valid).
+
 ## Out of scope (stays in the follow-up doc)
 
 Import wizard stepper, chip ranking, progress bar/ETA, beforeunload guard,
