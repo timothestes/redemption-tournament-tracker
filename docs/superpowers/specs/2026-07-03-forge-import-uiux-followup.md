@@ -42,11 +42,12 @@ real 147-card EoT zip (5,609-row carddata, 37MB), plus concrete proposals for a 
 - **No progress bar / ETA.** Just a counting summary line ("Imported 39 · …") and a
   scrolling per-card status list. Proposal: progress bar with percent + rolling ETA, and
   an `aria-live="polite"` region so the count is announced.
-- **Throughput is ~30 cards/min** (concurrency 3; each card = 4 sequential RPC round-trips
-  + a blob upload through the server action). 147 cards ≈ 5 minutes — tolerable, but a
-  single `forge_import_card` definer RPC (create+save+share in one transaction) would cut
-  round-trips ~4× and also close the "half-created card on mid-failure" window the spec
-  documents. Worth doing if imports become routine.
+- **Throughput** — ADDRESSED post-review: the per-card Server Action ran single-lane
+  (Next serializes same-client action calls; ~30 cards/min measured) and was replaced by
+  batched parallel POSTs to `/forge/api/import` (8 cards/batch × 4 in flight). Remaining
+  follow-up: a single `forge_import_card` definer RPC (create+save+share in one
+  transaction) would cut the per-card DB round-trips ~4× further and close the
+  "half-created card on mid-failure" window the spec documents.
 - **Navigation away mid-run loses the run silently.** Proposal: `beforeunload` guard while
   `running`.
 - **Raw Postgres error strings** surface directly in the per-card status ("not authorized

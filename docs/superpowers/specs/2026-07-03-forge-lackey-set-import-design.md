@@ -2,6 +2,13 @@
 
 **Date:** 2026-07-03
 **Status:** Approved for implementation (autonomous session; user pre-authorized)
+**Revision (2026-07-03, post-build):** §4.4's per-card Server Action was replaced by a
+batched route handler `app/forge/api/import/route.ts` (POST multipart: `payload` JSON +
+`file-N` parts, ≤12 cards/request, per-card results). Next.js serializes Server Action
+calls from one client, so the action-based import ran single-lane (~30 cards/min
+measured); route-handler batches run genuinely in parallel (wizard: 8 cards/batch,
+4 batches in flight, one shared dup-check query per batch). Gate, validation,
+RPC pipeline, idempotency, and error semantics are unchanged.
 **Depends on:** Forge phases 1a.x/2.x on `main`, incl. the 2026-07-03 descope (raw-text cards + finished-card images, migration 061)
 
 ## 1. Problem

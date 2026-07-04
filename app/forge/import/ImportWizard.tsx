@@ -2,8 +2,10 @@
 
 // Lackey zip import wizard. The zip NEVER goes to the server (37MB > Vercel's ~4.5MB
 // request cap): fflate unpacks it in the browser, carddata.txt is parsed/filtered
-// locally, preview renders from zip bytes, and only the matched cards (each ~200KB)
-// are sent — one importLackeyCard server-action call per card, concurrency 3.
+// locally, preview renders from zip bytes, and only the matched cards are sent —
+// batched multipart POSTs to /forge/api/import. A route handler (not a Server Action)
+// because Next serializes Server Action calls from one client; these batches genuinely
+// run in parallel.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -12,10 +14,11 @@ import {
   parseCarddata, matchesFilter, distinctSets, findImageEntry,
   lackeyRowToDesignCard, type LackeyRow,
 } from "@/app/forge/lib/lackey";
-import { importLackeyCard } from "@/app/forge/lib/importSet";
 import { createSet, type ForgeSetSummary } from "@/app/forge/lib/sets";
 
-const CONCURRENCY = 3;
+const BATCH_SIZE = 8;            // cards per request (must stay ≤ the route's cap of 12)
+const BATCH_CONCURRENCY = 4;     // requests in flight
+const MAX_BATCH_BYTES = 3_500_000; // keep each request under Vercel's ~4.5MB body cap
 
 type CardStatus = "queued" | "importing" | "imported" | "skipped" | "failed";
 interface ImportItem {
@@ -34,6 +37,33 @@ function mimeFor(entryName: string): string {
 
 function baseName(entryName: string): string {
   return entryName.split("/").pop() ?? entryName;
+}
+
+interface BatchCardResult { name: string; ok: boolean; cardId?: string; skipped?: boolean; error?: string }
+
+// Greedy chunking: ≤ BATCH_SIZE cards and ≤ MAX_BATCH_BYTES of image data per request.
+// An image bigger than the cap still gets its own single-card batch.
+function chunkIntoBatches(
+  indexes: number[],
+  work: { entryName: string | null }[],
+  images: Record<string, Uint8Array>,
+): number[][] {
+  const batches: number[][] = [];
+  let current: number[] = [];
+  let currentBytes = 0;
+  for (const idx of indexes) {
+    const entry = work[idx].entryName;
+    const size = entry && images[entry] ? images[entry].length : 0;
+    if (current.length > 0 && (current.length >= BATCH_SIZE || currentBytes + size > MAX_BATCH_BYTES)) {
+      batches.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(idx);
+    currentBytes += size;
+  }
+  if (current.length) batches.push(current);
+  return batches;
 }
 
 export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
@@ -123,6 +153,75 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
     if (filter && !filter.startsWith("/")) setNewSetName(filter.trim());
   }, [filter]);
 
+  // POST one batch; write each card's result (or the batch-level error) into `work`.
+  async function importBatch(
+    setId: string,
+    batch: number[],
+    work: ImportItem[],
+    images: Record<string, Uint8Array>,
+  ) {
+    const fd = new FormData();
+    const cards = batch.map((idx, j) => {
+      const it = work[idx];
+      let fileField: string | undefined;
+      if (it.entryName && images[it.entryName]) {
+        fileField = `file-${j}`;
+        fd.set(fileField, new File([images[it.entryName].slice()], baseName(it.entryName), { type: mimeFor(it.entryName) }));
+      }
+      return { name: it.row.name, snapshot: lackeyRowToDesignCard(it.row), fileField };
+    });
+    fd.set("payload", JSON.stringify({ setId, cards }));
+
+    const res = await fetch("/forge/api/import", { method: "POST", body: fd });
+    if (!res.ok) {
+      let message = `Import failed (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) message = body.error;
+      } catch { /* non-JSON error body */ }
+      for (const idx of batch) { work[idx].status = "failed"; work[idx].error = message; }
+      return;
+    }
+    const body = (await res.json()) as { results?: BatchCardResult[] };
+    batch.forEach((idx, j) => {
+      const r = body.results?.[j];
+      if (!r || r.ok === false) {
+        work[idx].status = "failed";
+        work[idx].error = r?.error ?? "Unexpected error";
+      } else {
+        work[idx].status = r.skipped ? "skipped" : "imported";
+      }
+    });
+  }
+
+  // Chunk the given items into batches and run them BATCH_CONCURRENCY at a time.
+  async function runBatches(setId: string, indexes: number[], work: ImportItem[]) {
+    const bytes = zipBytes.current!;
+    const wanted = new Set(indexes.map((i) => work[i].entryName).filter(Boolean) as string[]);
+    const images = unzipSync(bytes, { filter: (f) => wanted.has(f.name) });
+    const batches = chunkIntoBatches(indexes, work, images);
+
+    let cursor = 0;
+    const runOne = async () => {
+      for (;;) {
+        const b = cursor++;
+        if (b >= batches.length) return;
+        for (const idx of batches[b]) work[idx].status = "importing";
+        setItems([...work]);
+        try {
+          await importBatch(setId, batches[b], work, images);
+        } catch (e) {
+          const message = e instanceof Error ? e.message : "Unexpected error";
+          for (const idx of batches[b]) {
+            if (work[idx].status === "importing") { work[idx].status = "failed"; work[idx].error = message; }
+          }
+        }
+        setItems([...work]);
+      }
+    };
+    await Promise.all(Array.from({ length: BATCH_CONCURRENCY }, runOne));
+  }
+
   async function runImport() {
     if (running || matched.length === 0) return;
     setRunError(null);
@@ -142,41 +241,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
         row, entryName: findImageEntry(row, entryNames), status: "queued" as CardStatus,
       }));
       setItems([...work]);
-
-      const bytes = zipBytes.current!;
-      const wanted = new Set(work.map((w) => w.entryName).filter(Boolean) as string[]);
-      const images = unzipSync(bytes, { filter: (f) => wanted.has(f.name) });
-
-      let cursor = 0;
-      const runOne = async () => {
-        for (;;) {
-          const i = cursor++;
-          if (i >= work.length) return;
-          work[i].status = "importing";
-          setItems([...work]);
-          try {
-            const fd = new FormData();
-            const entry = work[i].entryName;
-            if (entry && images[entry]) {
-              fd.set("file", new File([images[entry].slice()], baseName(entry), { type: mimeFor(entry) }));
-            }
-            const r = await importLackeyCard(setId, {
-              name: work[i].row.name,
-              snapshot: lackeyRowToDesignCard(work[i].row),
-            }, fd);
-            if (r.ok === false) {
-              work[i].status = "failed"; work[i].error = r.error;
-            } else {
-              work[i].status = r.skipped ? "skipped" : "imported";
-            }
-          } catch (e) {
-            work[i].status = "failed";
-            work[i].error = e instanceof Error ? e.message : "Unexpected error";
-          }
-          setItems([...work]);
-        }
-      };
-      await Promise.all(Array.from({ length: CONCURRENCY }, runOne));
+      await runBatches(setId, work.map((_, i) => i), work);
       setDoneSetId(setId);
     } finally {
       setRunning(false);
@@ -187,24 +252,14 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
     if (!items || !doneSetId || running) return;
     setRunning(true);
     try {
-      const bytes = zipBytes.current!;
-      const failed = items.map((it, i) => [it, i] as const).filter(([it]) => it.status === "failed");
-      const wanted = new Set(failed.map(([it]) => it.entryName).filter(Boolean) as string[]);
-      const images = unzipSync(bytes, { filter: (f) => wanted.has(f.name) });
-      for (const [it, i] of failed) {
-        items[i] = { ...it, status: "importing", error: undefined };
-        setItems([...items]);
-        const fd = new FormData();
-        if (it.entryName && images[it.entryName]) {
-          fd.set("file", new File([images[it.entryName].slice()], baseName(it.entryName), { type: mimeFor(it.entryName) }));
-        }
-        const r = await importLackeyCard(doneSetId, {
-          name: it.row.name, snapshot: lackeyRowToDesignCard(it.row),
-        }, fd);
-        if (r.ok === false) items[i] = { ...it, status: "failed", error: r.error };
-        else items[i] = { ...it, status: r.skipped ? "skipped" : "imported" };
-        setItems([...items]);
-      }
+      const work = items.map((it) =>
+        it.status === "failed" ? { ...it, error: undefined } : it,
+      );
+      const failedIndexes = work
+        .map((it, i) => (it.status === "failed" ? i : -1))
+        .filter((i) => i >= 0);
+      setItems([...work]);
+      await runBatches(doneSetId, failedIndexes, work);
     } finally {
       setRunning(false);
     }
@@ -237,7 +292,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
       <fieldset className="rounded-md border p-3">
         <legend className="px-1 text-sm font-medium">1 · Lackey zip</legend>
         <input type="file" accept=".zip,application/zip" aria-label="Lackey zip file"
-          className="block w-full text-xs"
+          className="block w-full text-xs disabled:opacity-50" disabled={running}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickZip(f); e.target.value = ""; }} />
         {zipName && !zipError && rows && (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -253,15 +308,15 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
           <legend className="px-1 text-sm font-medium">2 · Which set?</legend>
           <div className="mb-2 flex flex-wrap gap-1">
             {zipSets.slice(0, 12).map(({ set, count }) => (
-              <button key={set} type="button" onClick={() => onFilterChange(set)}
-                className={`rounded-full border px-2 py-0.5 text-xs ${filter === set ? "border-emerald-600 bg-emerald-600/10" : "hover:bg-muted"}`}>
+              <button key={set} type="button" onClick={() => onFilterChange(set)} disabled={running}
+                className={`rounded-full border px-2 py-0.5 text-xs disabled:opacity-50 ${filter === set ? "border-emerald-600 bg-emerald-600/10" : "hover:bg-muted"}`}>
                 {set} <span className="text-muted-foreground">({count})</span>
               </button>
             ))}
           </div>
-          <input value={filter} onChange={(e) => onFilterChange(e.target.value)}
+          <input value={filter} onChange={(e) => onFilterChange(e.target.value)} disabled={running}
             aria-label="Set filter" placeholder="Set code, e.g. EoT — or /regex/"
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50" />
           {invalidRegex && <p className="mt-1 text-xs text-red-500">Invalid regular expression.</p>}
           <p className="mt-2 text-sm">
             {matched.length === 1 ? "1 card matches" : `${matched.length} cards match`}
