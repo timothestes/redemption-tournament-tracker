@@ -9,6 +9,7 @@ create or replace function public.is_superuser()
 returns boolean
 language sql
 stable
+set search_path = ''
 as $$
   select auth.uid() = '6d30f6e3-838e-4f11-9416-95996da6e5b9'::uuid
 $$;
