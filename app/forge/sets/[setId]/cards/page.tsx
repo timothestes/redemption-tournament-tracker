@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireForge } from "@/app/forge/lib/auth";
 import { listSetCards } from "@/app/forge/lib/sets";
-import ForgeCardGrid from "@/app/forge/components/ForgeCardGrid";
+import SetCardsBrowser from "./SetCardsBrowser";
 
 export const dynamic = "force-dynamic";
 
@@ -19,5 +19,5 @@ export default async function SetCardsPage({ params }: { params: Promise<{ setId
       </div>
     );
   }
-  return <ForgeCardGrid cards={cards} showStatus />;
+  return <SetCardsBrowser cards={cards} />;
 }
