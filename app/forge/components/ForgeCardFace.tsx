@@ -5,7 +5,9 @@
 // authed /forge/api/art proxy).
 
 // eslint-disable-next-line @next/next/no-img-element
-const Img = (p: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt="" {...p} />;
+const Img = (p: React.ImgHTMLAttributes<HTMLImageElement>) => (
+  <img alt="" loading="lazy" decoding="async" {...p} />
+);
 
 export default function ForgeCardFace({
   name, rawText, finishedUrl, artUrl, className,
