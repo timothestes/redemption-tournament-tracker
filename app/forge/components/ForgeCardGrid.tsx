@@ -1,12 +1,8 @@
 import Link from "next/link";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import { cardRawText } from "@/app/forge/lib/designCard";
+import { STATUS_LABEL } from "@/app/forge/lib/lifecycleCopy";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
-
-const STATUS_LABEL: Record<string, string> = {
-  private_idea: "Idea", draft: "Draft", playtesting: "Playtesting",
-  approved: "Approved", archived: "Archived",
-};
 
 export default function ForgeCardGrid({ cards, showStatus = false }: { cards: ForgeCardFull[]; showStatus?: boolean }) {
   return (
