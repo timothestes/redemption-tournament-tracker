@@ -90,6 +90,25 @@ export const Emote = __t.object("Emote", {
 });
 export type Emote = __Infer<typeof Emote>;
 
+export const ForgeConfig = __t.object("ForgeConfig", {
+  id: __t.u64(),
+  serverIdentityHex: __t.string(),
+});
+export type ForgeConfig = __Infer<typeof ForgeConfig>;
+
+export const ForgeGame = __t.object("ForgeGame", {
+  gameId: __t.u64(),
+});
+export type ForgeGame = __Infer<typeof ForgeGame>;
+
+export const ForgeSeatAuth = __t.object("ForgeSeatAuth", {
+  id: __t.u64(),
+  code: __t.string(),
+  identityHex: __t.string(),
+  authorizedAtMicros: __t.u64(),
+});
+export type ForgeSeatAuth = __Infer<typeof ForgeSeatAuth>;
+
 export const Game = __t.object("Game", {
   id: __t.u64(),
   code: __t.string(),

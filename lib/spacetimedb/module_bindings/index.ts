@@ -41,6 +41,7 @@ import CancelPauseRequestReducer from "./cancel_pause_request_reducer";
 import ClaimTimeoutVictoryReducer from "./claim_timeout_victory_reducer";
 import ClearRevealedCardsReducer from "./clear_revealed_cards_reducer";
 import CompleteZoneSearchReducer from "./complete_zone_search_reducer";
+import CreateForgeGameReducer from "./create_forge_game_reducer";
 import CreateGameReducer from "./create_game_reducer";
 import DenyZoneSearchReducer from "./deny_zone_search_reducer";
 import DetachCardReducer from "./detach_card_reducer";
@@ -53,8 +54,10 @@ import ExchangeFromDeckReducer from "./exchange_from_deck_reducer";
 import ExecuteCardAbilityReducer from "./execute_card_ability_reducer";
 import ExecuteCardAbilityWithCountReducer from "./execute_card_ability_with_count_reducer";
 import FlipCardReducer from "./flip_card_reducer";
+import ForgeAuthorizeSeatReducer from "./forge_authorize_seat_reducer";
 import ImitateLostSoulReducer from "./imitate_lost_soul_reducer";
 import JoinAsSpectatorReducer from "./join_as_spectator_reducer";
+import JoinForgeGameReducer from "./join_forge_game_reducer";
 import JoinGameReducer from "./join_game_reducer";
 import KickSpectatorReducer from "./kick_spectator_reducer";
 import LeaveAsSpectatorReducer from "./leave_as_spectator_reducer";
@@ -103,6 +106,7 @@ import RevealCardsReducer from "./reveal_cards_reducer";
 import RollDiceReducer from "./roll_dice_reducer";
 import SendChatReducer from "./send_chat_reducer";
 import SendEmoteReducer from "./send_emote_reducer";
+import SetForgeServerIdentityReducer from "./set_forge_server_identity_reducer";
 import SetGamePrivateReducer from "./set_game_private_reducer";
 import SetGamePublicReducer from "./set_game_public_reducer";
 import SetNoteReducer from "./set_note_reducer";
@@ -134,6 +138,7 @@ import ChooseFirstTimeoutRow from "./choose_first_timeout_table";
 import CleanupScheduleRow from "./cleanup_schedule_table";
 import DisconnectTimeoutRow from "./disconnect_timeout_table";
 import EmoteRow from "./emote_table";
+import ForgeGameRow from "./forge_game_table";
 import GameRow from "./game_table";
 import GameActionRow from "./game_action_table";
 import PlayerRow from "./player_table";
@@ -245,6 +250,17 @@ const tablesSchema = __schema({
       { name: 'emote_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, EmoteRow),
+  ForgeGame: __table({
+    name: 'forge_game',
+    indexes: [
+      { accessor: 'gameId', name: 'forge_game_game_id_idx_btree', algorithm: 'btree', columns: [
+        'gameId',
+      ] },
+    ],
+    constraints: [
+      { name: 'forge_game_game_id_key', constraint: 'unique', columns: ['gameId'] },
+    ],
+  }, ForgeGameRow),
   Game: __table({
     name: 'game',
     indexes: [
@@ -374,6 +390,7 @@ const reducersSchema = __reducers(
   __reducerSchema("claim_timeout_victory", ClaimTimeoutVictoryReducer),
   __reducerSchema("clear_revealed_cards", ClearRevealedCardsReducer),
   __reducerSchema("complete_zone_search", CompleteZoneSearchReducer),
+  __reducerSchema("create_forge_game", CreateForgeGameReducer),
   __reducerSchema("create_game", CreateGameReducer),
   __reducerSchema("deny_zone_search", DenyZoneSearchReducer),
   __reducerSchema("detach_card", DetachCardReducer),
@@ -386,8 +403,10 @@ const reducersSchema = __reducers(
   __reducerSchema("execute_card_ability", ExecuteCardAbilityReducer),
   __reducerSchema("execute_card_ability_with_count", ExecuteCardAbilityWithCountReducer),
   __reducerSchema("flip_card", FlipCardReducer),
+  __reducerSchema("forge_authorize_seat", ForgeAuthorizeSeatReducer),
   __reducerSchema("imitate_lost_soul", ImitateLostSoulReducer),
   __reducerSchema("join_as_spectator", JoinAsSpectatorReducer),
+  __reducerSchema("join_forge_game", JoinForgeGameReducer),
   __reducerSchema("join_game", JoinGameReducer),
   __reducerSchema("kick_spectator", KickSpectatorReducer),
   __reducerSchema("leave_as_spectator", LeaveAsSpectatorReducer),
@@ -436,6 +455,7 @@ const reducersSchema = __reducers(
   __reducerSchema("roll_dice", RollDiceReducer),
   __reducerSchema("send_chat", SendChatReducer),
   __reducerSchema("send_emote", SendEmoteReducer),
+  __reducerSchema("set_forge_server_identity", SetForgeServerIdentityReducer),
   __reducerSchema("set_game_private", SetGamePrivateReducer),
   __reducerSchema("set_game_public", SetGamePublicReducer),
   __reducerSchema("set_note", SetNoteReducer),
