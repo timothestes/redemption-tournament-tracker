@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { createSet, saveSetTargets, bulkDeleteSets, type ForgeSetSummary } from "@/app/forge/lib/sets";
 import { defaultTargets } from "@/app/forge/lib/progress";
 import { CARD_TYPES } from "@/app/forge/lib/designCard";
@@ -303,9 +304,14 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
               Cancel
             </Button>
             <Button disabled={exporting || exportSel.size === 0} onClick={runExport}>
-              {exporting
-                ? "Preparing…"
-                : `Export ${exportSel.size || ""} ${exportSel.size === 1 ? "set" : "sets"}`.trim()}
+              {exporting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  Preparing…
+                </span>
+              ) : (
+                `Export ${exportSel.size || ""} ${exportSel.size === 1 ? "set" : "sets"}`.trim()
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
