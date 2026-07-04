@@ -13,6 +13,7 @@ export async function GET(
   const { cardId } = await params;
   const url = new URL(req.url);
   const wantApproved = url.searchParams.get("v") === "approved";
+  const kind = url.searchParams.get("kind") === "finished" ? "finished" : "art";
 
   // RLS-checked: non-members are already rejected above. Granted playtesters can SELECT
   // only the published/approved versions of granted playtesting/approved cards (migration
@@ -27,20 +28,30 @@ export async function GET(
       .maybeSingle();
     const versionId = card?.approved_version_id ?? card?.published_version_id ?? null;
     if (!versionId) return notFoundResponse();
-    const { data: version } = await ctx.supabase
-      .from("card_versions")
-      .select("art_original_key, art_key, art_is_placeholder")
-      .eq("id", versionId)
-      .maybeSingle();
-    if (!version || version.art_is_placeholder) return notFoundResponse();
-    artKey = version.art_original_key ?? version.art_key ?? null;
+    if (kind === "finished") {
+      const { data: version } = await ctx.supabase
+        .from("card_versions")
+        .select("finished_key")
+        .eq("id", versionId)
+        .maybeSingle();
+      artKey = version?.finished_key ?? null;
+    } else {
+      const { data: version } = await ctx.supabase
+        .from("card_versions")
+        .select("art_original_key, art_key, art_is_placeholder")
+        .eq("id", versionId)
+        .maybeSingle();
+      if (!version || version.art_is_placeholder) return notFoundResponse();
+      artKey = version.art_original_key ?? version.art_key ?? null;
+    }
   } else {
+    const col = kind === "finished" ? "working_finished_key" : "working_art_key";
     const { data: card } = await ctx.supabase
       .from("forge_cards")
-      .select("working_art_key")
+      .select(col)
       .eq("id", cardId)
       .maybeSingle();
-    artKey = card?.working_art_key ?? null;
+    artKey = (card as any)?.[col] ?? null;
   }
   if (!artKey) return notFoundResponse();
 
