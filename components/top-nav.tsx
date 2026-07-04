@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { IconType } from "react-icons";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey } from "react-icons/hi";
 import { GiCrossedSwords } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
@@ -32,7 +32,7 @@ const TopNav: React.FC = () => {
   const [isTournamentsOpen, setIsTournamentsOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
+  const { isAdmin, isSuperuser, permissions, loading: adminLoading } = useIsAdmin();
   const pathname = usePathname();
 
   // Nav is "ready" when both auth and admin checks have resolved
@@ -297,6 +297,16 @@ const TopNav: React.FC = () => {
                         >
                           <HiDocumentText className="w-4 h-4" />
                           Manage Rulings
+                        </Link>
+                      )}
+                      {isSuperuser && (
+                        <Link
+                          href="/admin/permissions"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiKey className="w-4 h-4" />
+                          Permissions
                         </Link>
                       )}
                     </div>
@@ -681,6 +691,16 @@ const TopNav: React.FC = () => {
                       >
                         <HiDocumentText className="w-4 h-4" />
                         Manage Rulings
+                      </Link>
+                    )}
+                    {isSuperuser && (
+                      <Link
+                        href="/admin/permissions"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiKey className="w-4 h-4" />
+                        Permissions
                       </Link>
                     )}
                   </div>
