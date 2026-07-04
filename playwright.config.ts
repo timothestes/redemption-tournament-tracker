@@ -1,4 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
+import { config as loadEnv } from "dotenv";
+
+// Seed helpers (e2e/*Seed.ts) run in the Playwright process and read
+// process.env directly; `npm run dev` loads .env.local on its own.
+loadEnv({ path: ".env.local", quiet: true });
 
 export default defineConfig({
   testDir: "./e2e",
