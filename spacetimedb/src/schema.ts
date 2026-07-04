@@ -415,7 +415,49 @@ export const Emote = table(
 );
 
 // ---------------------------------------------------------------------------
-// 12. CleanupSchedule (scheduled table)
+// 13. ForgeGame (public marker — a row flags its game as a Forge playtest game)
+//     Deliberately a separate table, NOT a Game column: adding a column would
+//     change the game row's BSATN shape and break deployed clients' game
+//     subscriptions during the publish window.
+// ---------------------------------------------------------------------------
+export const ForgeGame = table(
+  { name: 'forge_game', public: true },
+  {
+    gameId: t.u64().primaryKey(),
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 14. ForgeConfig (PRIVATE singleton — trusted server identity)
+//     NO `public: true` — this table must never be client-visible.
+// ---------------------------------------------------------------------------
+export const ForgeConfig = table(
+  { name: 'forge_config' },
+  {
+    id: t.u64().primaryKey(),
+    serverIdentityHex: t.string(),
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 15. ForgeSeatAuth (PRIVATE allowlist — one row = one pending seat grant)
+//     NO `public: true` — this table must never be client-visible.
+// ---------------------------------------------------------------------------
+export const ForgeSeatAuth = table(
+  {
+    name: 'forge_seat_auth',
+    indexes: [{ accessor: 'seat_auth_code', algorithm: 'btree' as const, columns: ['code'] }],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    code: t.string(),
+    identityHex: t.string(),
+    authorizedAtMicros: t.u64(),
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 16. CleanupSchedule (scheduled table)
 // ---------------------------------------------------------------------------
 
 let _handleCleanupStaleGames: any;
@@ -453,6 +495,9 @@ const spacetimedb = schema({
   ZoneSearchRequest,
   ChooseFirstTimeout,
   Emote,
+  ForgeGame,
+  ForgeConfig,
+  ForgeSeatAuth,
   CleanupSchedule,
 });
 
