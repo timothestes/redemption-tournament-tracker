@@ -69,8 +69,10 @@ returns uuid language plpgsql security definer set search_path = '' as $$
 declare v_prop public.card_proposals%rowtype; v_card public.forge_cards%rowtype;
         v_next int; v_version_id uuid;
 begin
+  -- initial read to learn the card_id
   select * into v_prop from public.card_proposals where id = p_proposal_id;
   if not found then raise exception 'proposal not found'; end if;
+  -- lock the card first, then re-read+lock the proposal under that lock
   select * into v_card from public.forge_cards where id = v_prop.card_id for update;
   if not found then raise exception 'card not found'; end if;
   select * into v_prop from public.card_proposals where id = p_proposal_id for update;
@@ -82,12 +84,14 @@ begin
   if v_card.status not in ('draft','playtesting') then
     raise exception 'unapprove or unarchive this card before accepting changes';
   end if;
+  -- stale-base guard (NULL-aware). DO NOT raise — a raise would roll back this update.
   if v_prop.base_version_id is distinct from v_card.published_version_id then
     update public.card_proposals
        set status = 'superseded', closed_at = now(), closed_by = auth.uid()
      where id = p_proposal_id;
     return null;
   end if;
+  -- freeze a new published version from the proposed snapshot
   select coalesce(max(version_number), 0) + 1 into v_next
     from public.card_versions where card_id = v_card.id;
   update public.card_versions set status = 'superseded'
@@ -99,6 +103,7 @@ begin
      v_card.working_art_key, v_card.working_art_is_placeholder, v_card.working_art_original_key,
      v_card.working_finished_key, auth.uid())
   returning id into v_version_id;
+  -- point the card at it, sync the working draft + title, advance status
   update public.forge_cards
      set published_version_id = v_version_id,
          working_snapshot = v_prop.proposed_snapshot,
@@ -106,6 +111,7 @@ begin
          status = 'playtesting',
          updated_at = now()
    where id = v_card.id;
+  -- close this proposal accepted; supersede sibling open proposals
   update public.card_proposals
      set status = 'accepted', resulting_version_id = v_version_id, closed_at = now(), closed_by = auth.uid()
    where id = p_proposal_id;
