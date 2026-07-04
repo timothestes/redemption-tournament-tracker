@@ -1,5 +1,7 @@
 "use server";
 
+// UI name: "Announcements" (renamed 2026-07-04). DB objects keep the missive name (migration 062 is live).
+
 import { revalidatePath } from "next/cache";
 import { requireElder, type ForgeRole } from "@/app/forge/lib/auth";
 import { sendEmail } from "@/utils/email";
@@ -98,7 +100,7 @@ export async function sendMissive(input: {
       ok: false,
       sent: 0,
       failed: 0,
-      error: "Set your Forge display name before sending a missive.",
+      error: "Set your Forge display name before sending an announcement.",
     };
   }
 
@@ -155,13 +157,13 @@ export async function sendMissive(input: {
     p_recipient_ids: recipients.map((r) => r.userId),
   });
   if (logError) console.error("forge_log_missive failed:", logError);
-  revalidatePath("/forge/missives");
+  revalidatePath("/forge/announcements");
 
   let error = failed > 0 ? "Some sends failed" : undefined;
   if (logError) {
     error = error
-      ? error + " Sent, but the missive log could not be written."
-      : "Sent, but the missive log could not be written.";
+      ? error + " Sent, but the announcement log could not be written."
+      : "Sent, but the announcement log could not be written.";
   }
 
   return { ok: failed === 0, sent, failed, error };
@@ -191,7 +193,7 @@ export async function sendMissiveTest(input: {
 
   const sender = directory.find((m) => m.userId === ctx.user.id);
   if (!sender || !sender.displayName) {
-    return { ok: false, error: "Set your Forge display name before sending a missive." };
+    return { ok: false, error: "Set your Forge display name before sending an announcement." };
   }
 
   const html = wrapForgeMissive({

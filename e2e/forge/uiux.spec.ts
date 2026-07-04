@@ -44,8 +44,9 @@ test.describe("forge uiux pass", () => {
       await page.getByLabel("Set filter").fill("TST");
       await expect(page.getByText("3 cards match")).toBeVisible();
       const setName = `E2E UIUX ${Date.now()}`;
-      await page.getByLabel("New set name").fill(setName);
       await page.getByRole("button", { name: "Import 3 cards" }).click();
+      await page.getByLabel("New set name").fill(setName);
+      await page.getByRole("button", { name: "Create set & import 3 cards" }).click();
       await expect(page.getByText("Imported 3 · Skipped 0 · Failed 0")).toBeVisible({ timeout: 120_000 });
       await page.getByRole("link", { name: "View set →" }).click();
 
