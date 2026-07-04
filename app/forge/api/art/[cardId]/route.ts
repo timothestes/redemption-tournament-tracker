@@ -63,7 +63,7 @@ export async function GET(
   }
   if (!result || result.statusCode !== 200) return notFoundResponse();
 
-  const download = new URL(req.url).searchParams.get("download") === "1";
+  const download = url.searchParams.get("download") === "1";
   if (download) {
     try {
       await ctx.supabase.rpc("forge_log_art_download", { p_card_id: cardId });
@@ -72,9 +72,13 @@ export async function GET(
     }
   }
 
+  // `t` is a cache-buster derived from forge_cards.updated_at (bumped on every image/
+  // snapshot write), so a `t`-stamped response can be cached by the member's OWN browser
+  // indefinitely. `private` forbids shared/CDN caches; auth + RLS above are unchanged.
+  const cacheable = !download && url.searchParams.get("t") !== null;
   const headers = new Headers({
     "Content-Type": result.blob.contentType,
-    "Cache-Control": "private, no-store",
+    "Cache-Control": cacheable ? "private, max-age=31536000, immutable" : "private, no-store",
   });
   if (download) {
     headers.set("Content-Disposition", `attachment; filename="card-${encodeURIComponent(cardId)}"`);
