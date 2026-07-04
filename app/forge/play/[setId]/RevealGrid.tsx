@@ -11,7 +11,7 @@ export default function RevealGrid({ items }: { items: RevealItem[] }) {
   const [active, setActive] = useState<RevealItem | null>(null);
 
   if (items.length === 0) {
-    return <p className="mt-8 text-sm text-muted-foreground">No approved cards in this set yet.</p>;
+    return <p className="mt-8 text-sm text-muted-foreground">No cards shared for playtesting yet.</p>;
   }
 
   return (

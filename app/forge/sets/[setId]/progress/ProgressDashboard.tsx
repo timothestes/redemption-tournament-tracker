@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ProgressModel, TargetCounts } from "@/app/forge/lib/progress";
 import type { SetElder } from "@/app/forge/lib/sets";
+import { STATUS_LABEL } from "@/app/forge/lib/lifecycleCopy";
 import TargetsEditor from "./TargetsEditor";
 import SetEldersPanel from "./SetEldersPanel";
 
@@ -44,7 +45,7 @@ export default function ProgressDashboard({
           ) : (
             <span
               className="cursor-not-allowed rounded-md border px-3 py-1.5 text-sm text-muted-foreground opacity-50"
-              title="Approve cards with art to enable"
+              title="Mark cards final with art to enable"
               aria-disabled="true"
             >
               Download artwork (ZIP)
@@ -64,7 +65,7 @@ export default function ProgressDashboard({
             })}
           </div>
           <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
-            {STATUS_ORDER.map((s) => <span key={s}>{s}: {model.byStatus[s] ?? 0}</span>)}
+            {STATUS_ORDER.map((s) => <span key={s}>{STATUS_LABEL[s] ?? s}: {model.byStatus[s] ?? 0}</span>)}
           </div>
         </div>
       )}

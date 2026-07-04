@@ -43,7 +43,7 @@ export default function ProposalDiff({
             disabled={pending}
             onClick={() =>
               confirm(
-                "Accept this proposal? It publishes a new version and overwrites the working draft."
+                "Accept this proposal? It releases a new version and overwrites the working draft."
               ) && run(() => acceptProposal(proposal.id, proposal.cardId))
             }
             className="rounded-md bg-primary px-3 py-1 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
