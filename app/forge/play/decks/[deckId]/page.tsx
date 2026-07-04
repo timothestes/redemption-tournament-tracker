@@ -5,6 +5,7 @@ import { getForgeDeck } from "@/app/forge/lib/forgeDecks";
 import { listGrantedForgeCards } from "@/app/forge/lib/deckPool";
 import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
 import DeckBuilder from "./DeckBuilder";
+import DeleteDeckButton from "./DeleteDeckButton";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function ForgeDeckBuilderPage({ params }: { params: Promise
       {/* Slim toolbar attached under ForgeNav — full-width with the builder
           (not max-w-centered) and opaque so the page backdrop can't bleed
           through in dark mode. */}
-      <div className="border-b border-border bg-background px-4 py-2 [&>nav]:mb-0">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-2 [&>nav]:mb-0">
         <ForgeBreadcrumbs
           items={[
             { label: "The Forge", href: "/forge" },
@@ -38,6 +39,7 @@ export default async function ForgeDeckBuilderPage({ params }: { params: Promise
             { label: deckName ?? "New deck" },
           ]}
         />
+        {!isNew && <DeleteDeckButton deckId={deckId} deckName={deckName ?? "this deck"} />}
       </div>
       <Suspense>
         <DeckBuilder deckId={isNew ? null : deckId} isNew={isNew} granted={granted} />
