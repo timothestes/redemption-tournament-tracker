@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
-import { validateArtFile, uploadForgeArt } from "@/app/forge/lib/art";
+import { validateArtFile, uploadForgeArt, uploadForgeFinished } from "@/app/forge/lib/art";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 
 export async function createCard(
@@ -40,6 +40,28 @@ export async function uploadArt(
   return { ok: true };
 }
 
+export async function uploadFinished(
+  cardId: string,
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "No file provided" };
+  const invalid = validateArtFile(file);
+  if (invalid) return { ok: false, error: invalid };
+
+  const key = await uploadForgeFinished(file);
+  const { error } = await ctx.supabase.rpc("forge_set_working_finished", {
+    p_card_id: cardId,
+    p_key: key,
+  });
+  if (error) return { ok: false, error: "Could not save finished card" };
+  revalidatePath("/forge/ideas");
+  return { ok: true };
+}
+
 export async function setPlaceholder(
   cardId: string,
   isPlaceholder: boolean
@@ -60,6 +82,7 @@ export type ForgeCardFull = {
   title: string | null;
   snapshot: DesignCard;
   hasArt: boolean;
+  hasFinished: boolean;
   isPlaceholder: boolean;
   status: string;
   updatedAt: string;
@@ -74,6 +97,7 @@ function toFull(row: any): ForgeCardFull {
     title: row.title,
     snapshot: (row.working_snapshot ?? {}) as DesignCard,
     hasArt: !!row.working_art_key,
+    hasFinished: !!row.working_finished_key,
     isPlaceholder: !!row.working_art_is_placeholder,
     status: row.status,
     updatedAt: row.updated_at,
@@ -83,7 +107,7 @@ function toFull(row: any): ForgeCardFull {
   };
 }
 
-const CARD_COLS = "id, title, working_snapshot, working_art_key, working_art_is_placeholder, status, updated_at, set_id, published_version_id, approved_version_id";
+const CARD_COLS = "id, title, working_snapshot, working_art_key, working_art_is_placeholder, working_finished_key, status, updated_at, set_id, published_version_id, approved_version_id";
 
 export async function saveCard(
   cardId: string,

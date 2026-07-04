@@ -23,6 +23,7 @@ const forgeAuth: { token: string } | { storeId: string } =
     : { storeId: process.env.FORGE_BLOB_STORE_ID! };
 
 const ART_PREFIX = "forge-art/";
+const FINISHED_PREFIX = "forge-finished/";
 export const ALLOWED_ART_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export const MAX_ART_BYTES = 15 * 1024 * 1024; // 15MB
 
@@ -40,6 +41,18 @@ export function validateArtFile(file: { type: string; size: number }): string | 
 /** Upload to the PRIVATE blob store under an unguessable UUID key. Returns the stored pathname. */
 export async function uploadForgeArt(file: File): Promise<string> {
   const key = `${ART_PREFIX}${randomUUID()}`;
+  const blob = await put(key, file, {
+    access: "private",
+    addRandomSuffix: false,
+    ...forgeAuth,
+    contentType: file.type,
+  });
+  return blob.pathname;
+}
+
+/** Upload a finished-card image to the PRIVATE store under an unguessable UUID key. */
+export async function uploadForgeFinished(file: File): Promise<string> {
+  const key = `${FINISHED_PREFIX}${randomUUID()}`;
   const blob = await put(key, file, {
     access: "private",
     addRandomSuffix: false,
