@@ -66,35 +66,35 @@ export function wrapForgeMissive(opts: {
             <tr>
               <td align="center" style="padding:28px 30px 22px;border-bottom:1px solid #33261e;">
                 <div style="font-family:${display};font-size:26px;color:#fafaf9;letter-spacing:4px;text-transform:uppercase;">THE FORGE</div>
-                <div style="font-family:${display};font-size:11px;color:#fbbf24;letter-spacing:3px;text-transform:uppercase;margin-top:8px;">A MISSIVE FROM THE ELDERS</div>
+                <div style="font-family:${display};font-size:12px;color:#fbbf24;letter-spacing:3px;text-transform:uppercase;margin-top:8px;">A MISSIVE FROM THE ELDERS</div>
               </td>
             </tr>
             <!-- Body + signature -->
             <tr>
-              <td style="padding:32px 30px;color:#e7e5e4;font-size:16px;line-height:1.7;font-family:${bodyFont};">
+              <td style="padding:32px 30px;color:#f5f5f4;font-size:17px;line-height:1.75;font-family:${bodyFont};">
                 ${bodyHtml}
                 <div style="margin-top:28px;padding-top:18px;border-top:1px solid #33261e;">
-                  <div style="color:#78716c;font-size:12px;">Sent from the Forge by</div>
-                  <div style="margin-top:4px;"><strong style="color:#fafaf9;">${senderName}</strong> <span style="color:#a8a29e;"> — Elder of the Forge</span></div>
-                  <div style="margin-top:4px;color:#a8a29e;font-size:13px;">${senderEmail}</div>
+                  <div style="color:#a8a29e;font-size:13px;">Sent from the Forge by</div>
+                  <div style="margin-top:4px;"><strong style="color:#ffffff;">${senderName}</strong> <span style="color:#c9c3bc;"> — Elder of the Forge</span></div>
+                  <div style="margin-top:4px;color:#c9c3bc;font-size:14px;">${senderEmail}</div>
                 </div>
               </td>
             </tr>
             <!-- Confidentiality block -->
             <tr>
               <td style="padding:0 30px 28px;">
-                <div style="background:#201409;border:1px solid #7c2d12;border-left:4px solid #ea580c;border-radius:6px;padding:16px 18px;font-size:13px;line-height:1.6;color:#d6d3d1;font-family:${bodyFont};">
+                <div style="background:#201409;border:1px solid #7c2d12;border-left:4px solid #ea580c;border-radius:6px;padding:16px 18px;font-size:14px;line-height:1.65;color:#e9e4de;font-family:${bodyFont};">
                   <span style="color:#fbbf24;font-weight:bold;">Keep it in the Forge.</span> Everything in this missive — card designs, names, mechanics, set details, images, and timelines — is confidential playtest material. Do not share, screenshot, forward, or discuss it outside the Forge. You are reading this because the elders trust you with unfinished work; that trust is what makes the Forge possible. Guard it.
                 </div>
               </td>
             </tr>
             <!-- Footer -->
             <tr>
-              <td align="center" style="padding:20px 30px 26px;border-top:1px solid #33261e;text-align:center;color:#78716c;font-size:12px;font-family:${bodyFont};">
+              <td align="center" style="padding:20px 30px 26px;border-top:1px solid #33261e;text-align:center;color:#a8a29e;font-size:13px;line-height:1.6;font-family:${bodyFont};">
                 <div>
-                  <strong style="color:#a8a29e;">Need to respond?</strong> DM <strong style="color:#a8a29e;">${senderName}</strong> on Discord — that's where the Forge talks. Replies to this email reach ${senderName} as a backstop, but Discord is faster.
+                  <strong style="color:#e7e5e4;">Need to respond?</strong> DM <strong style="color:#e7e5e4;">${senderName}</strong> on Discord — that's where the Forge talks. Replies to this email reach ${senderName} as a backstop, but Discord is faster.
                 </div>
-                <div style="margin-top:12px;font-style:italic;color:#57534e;letter-spacing:1px;">Forged in fire. Kept in shadow.</div>
+                <div style="margin-top:12px;font-style:italic;color:#857c72;letter-spacing:1px;">Forged in fire. Kept in shadow.</div>
               </td>
             </tr>
           </table>
