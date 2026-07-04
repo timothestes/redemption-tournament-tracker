@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
+import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
 import { saveCard, uploadArt, uploadFinished, setPlaceholder, type ForgeCardFull } from "@/app/forge/lib/cards";
 import { createProposal } from "@/app/forge/lib/proposals";
 import { cardRawText, type DesignCard } from "@/app/forge/lib/designCard";
@@ -19,12 +19,13 @@ import PresenceBar from "./PresenceBar";
 // disk (unused here) for recovery.
 
 export default function StudioEditor({
-  card, sets, currentUser, setId,
+  card, sets, currentUser, setId, setName,
 }: {
   card: ForgeCardFull;
   sets: ForgeSetSummary[];
   currentUser: { userId: string; displayName: string | null };
   setId: string | null;
+  setName: string | null;
 }) {
   const [snapshot, setSnapshot] = useState<DesignCard>(card.snapshot ?? {});
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -89,9 +90,20 @@ export default function StudioEditor({
       <PresenceBar others={others} />
       <div className="mb-3 flex flex-col gap-2 text-sm">
         <div className="flex items-center justify-between">
-          <Link href={card.setId ? `/forge/sets/${card.setId}/cards` : "/forge/ideas"} className="text-muted-foreground hover:underline">
-            ← {card.setId ? "Set" : "Ideas"}
-          </Link>
+          <ForgeBreadcrumbs items={
+            card.setId
+              ? [
+                  { label: "The Forge", href: "/forge" },
+                  { label: "Sets", href: "/forge/sets" },
+                  { label: setName ?? "Set", href: `/forge/sets/${card.setId}/cards` },
+                  { label: card.title?.trim() || "Untitled" },
+                ]
+              : [
+                  { label: "The Forge", href: "/forge" },
+                  { label: "Ideas", href: "/forge/ideas" },
+                  { label: card.title?.trim() || "Untitled" },
+                ]
+          } />
           <span className="text-xs text-muted-foreground">
             {saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Save failed" : ""}
           </span>
