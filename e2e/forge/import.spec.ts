@@ -86,6 +86,14 @@ test.describe("forge lackey set import", () => {
       await page.getByLabel("Existing set", { exact: true }).selectOption({ label: setName });
       await page.getByRole("button", { name: "Import 3 cards" }).click();
       await expect(page.getByText("Imported 0 · Skipped 3 · Failed 0")).toBeVisible({ timeout: 120_000 });
+
+      // overwrite re-run into the same set: everything updates instead of skipping
+      await uploadFixture(page);
+      await page.getByLabel("Add to an existing set").check();
+      await page.getByLabel("Existing set", { exact: true }).selectOption({ label: setName });
+      await page.getByLabel("Overwrite existing cards").check();
+      await page.getByRole("button", { name: "Import 3 cards" }).click();
+      await expect(page.getByText("Imported 0 · Updated 3 · Skipped 0 · Failed 0")).toBeVisible({ timeout: 120_000 });
     } finally {
       await cleanupForgeMember(seed);
     }
