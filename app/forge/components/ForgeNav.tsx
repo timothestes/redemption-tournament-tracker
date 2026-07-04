@@ -34,10 +34,18 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
       <div className="mx-auto flex max-w-6xl items-center gap-1 px-4">
         <Link
           href="/forge"
-          className="mr-3 shrink-0 py-3 text-sm font-semibold tracking-wide text-foreground"
+          className="mr-3 flex shrink-0 items-center gap-2 py-2 text-sm font-semibold tracking-wide text-foreground"
           style={{ fontFamily: "Cinzel, serif" }}
         >
-          The Forge
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/forge/forge-anvil.webp"
+            width={293}
+            height={128}
+            alt=""
+            className="h-7 w-auto"
+          />
+          <span>The Forge</span>
         </Link>
         <nav className="flex items-center gap-1 overflow-x-auto">
           {items.map((it) => {
