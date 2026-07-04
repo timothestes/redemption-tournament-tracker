@@ -77,10 +77,15 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold">Sets</h1>
         {canCreate && (
-          <form onSubmit={openCreate} className="flex gap-2">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New set name…" className="rounded-md border bg-background px-3 py-1.5 text-sm" />
-            <Button type="submit" variant="success" size="sm">Create</Button>
-          </form>
+          <div className="flex items-center gap-2">
+            <Link href="/forge/import" className="rounded-md border px-3 py-1 text-sm hover:bg-muted">
+              Import a set
+            </Link>
+            <form onSubmit={openCreate} className="flex gap-2">
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New set name…" className="rounded-md border bg-background px-3 py-1.5 text-sm" />
+              <Button type="submit" variant="success" size="sm">Create</Button>
+            </form>
+          </div>
         )}
       </div>
       {sets.length === 0 ? (
