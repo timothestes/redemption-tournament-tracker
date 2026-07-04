@@ -12,6 +12,7 @@ const grantedCard = (cardId: string, name: string): GrantedForgeCard => ({
   setName: "Test Set",
   hasApprovedArt: false,
   hasApprovedFinished: false,
+  versionId: "version-1",
   data: {
     name,
     cardType: ["LostSoul"],
