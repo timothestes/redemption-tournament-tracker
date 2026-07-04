@@ -20,6 +20,7 @@ export function sanitizeImgFile(f: string): string {
  */
 export function getCardImageUrl(imgFile: string): string {
   if (!imgFile) return '';
+  if (imgFile.startsWith('forge:')) return ''; // opaque Forge ref — resolved via the forge resolver, never the public CDN
   if (imgFile.startsWith('/')) return imgFile;
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
@@ -31,6 +32,8 @@ export function getCardImageUrl(imgFile: string): string {
  */
 export function getCardImageUrlOrNull(imgFile: string | null | undefined): string | null {
   if (!imgFile) return null;
+  if (imgFile.startsWith('forge:')) return null;
+  if (imgFile.startsWith('/')) return imgFile; // local assets & same-origin proxy URLs
   if (!BLOB_BASE_URL) return null;
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
