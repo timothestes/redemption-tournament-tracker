@@ -62,6 +62,14 @@ as `working_snapshot.name`. Frozen `card_versions.data` carries `rawText`
 automatically (it is just the snapshot jsonb), so the reveal text tile reads it
 from the frozen version.
 
+**Existing-data caveat (review finding #3):** the studio's current "napkin"
+textarea (`StudioEditor.tsx`) binds the freeform box to `snapshot.specialAbility`,
+**not** `rawText`. We introduce `rawText` and rebind the textarea to it — but any
+card already saved in napkin mode has its text in `specialAbility` and would read
+blank. To avoid silent data loss WITHOUT a backfill migration, **every read of the
+raw text falls back**: `snapshot.rawText ?? snapshot.specialAbility` (in
+`ForgeCardFace` and the reveal tile). Writes go to `rawText` only.
+
 We do **not** touch the `_forge_is_card_field` suggestion allowlist (053) — the
 review layer is out of scope and no longer surfaces field-anchored suggestions in
 the descoped studio.
@@ -78,13 +86,29 @@ placeholder concept — a finished card is by definition final):
 1. `forge_cards`: add `working_finished_key text` (private-blob UUID pathname).
 2. `card_versions`: add `finished_key text` (frozen at publish).
 3. `forge_set_working_finished(p_card_id uuid, p_key text)` — SECURITY DEFINER,
-   `search_path=''`, owner-or-elder-or-super gate (verbatim copy of
-   `forge_set_working_art`'s auth check), sets `working_finished_key` +
-   `updated_at`. `revoke execute … from public, anon; grant … to authenticated`.
-4. **Replace** `forge_publish_card` (CREATE OR REPLACE — currently defined in 052)
-   to also freeze `finished_key`: add the column to the `card_versions` INSERT
-   with value `v_card.working_finished_key`. All other publish behavior verbatim
-   (FOR UPDATE, max+1 version, supersede prior, status transitions).
+   `search_path=''`, sets `working_finished_key` + `updated_at`.
+   `revoke execute … from public, anon; grant … to authenticated`. **Copy the
+   auth gate from the 052 version of `forge_set_working_art`** (owner OR
+   `is_forge_superadmin()` OR `is_forge_set_elder(set_id)` of *this card's* set) —
+   NOT the older 050 version (`is_forge_elder_or_super()`), which 052 tightened
+   for the I1 write-authz fix. (Finding #5.)
+4. **Freeze `finished_key` into `card_versions` at BOTH writers.** Two RPCs INSERT
+   into `card_versions` and MUST each add the `finished_key` column (value
+   `v_card.working_finished_key`) to their INSERT — otherwise the finished image
+   silently vanishes from playtest reveal on whichever path is taken:
+   - `forge_publish_card` (defined in 052) — CREATE OR REPLACE.
+   - **`forge_accept_proposal` (defined in 053) — CREATE OR REPLACE.** (Finding
+     #1, BLOCKER: the review→accept flow also freezes a new published version. Its
+     INSERT is at 053 lines ~156–161.)
+   All other behavior of both RPCs verbatim (FOR UPDATE, auth gates, status
+   guards, stale-base guard, max+1 version, supersede-prior, working-snapshot
+   sync).
+   - The other lifecycle RPCs (`forge_approve_card` / `forge_unapprove_card` /
+     `forge_archive_card` / `forge_send_card_to_private`) only UPDATE status or
+     flip pointers — they carry the existing row's `finished_key` forward, so no
+     change is needed. **Implementer guard (finding #2):** before writing 058,
+     run `grep -rn "insert into public.card_versions" supabase/migrations/` to
+     confirm these two are still the only version writers.
 
 No new tables → no new entry in `FORGE_TABLES`. The new RPC **is** added to the
 anon-cannot-exec probe list in `__tests__/forge-anon-leak.test.ts`.
@@ -107,8 +131,11 @@ audit. Key selection:
 
 - `kind=finished`, working: select `working_finished_key`.
 - `kind=finished`, `v=approved`: read `approved_version_id ?? published_version_id`
-  → `card_versions.finished_key` (404 if null). Serves the **frozen** finished
-  image, never the elder's live working slot — same guarantee art already gives.
+  → select **`card_versions.finished_key`** from that version row (404 if null).
+  Serves the **frozen** finished image, never the elder's live working slot — same
+  guarantee art already gives. (No placeholder guard: finished cards have no
+  placeholder concept, so unlike the art branch there is no `is_placeholder`
+  check — just null → 404. Finding #6.)
 - `kind=art` (default): unchanged.
 
 ## 6. Server actions & types (`app/forge/lib/cards.ts`)
@@ -134,7 +161,7 @@ proxy). Card-shaped tile (`aspectRatio: 750/1050`). Render priority:
 ```ts
 type Props = {
   name: string | null;
-  rawText: string | null;
+  rawText: string | null;   // callers pass snapshot.rawText ?? snapshot.specialAbility (finding #3)
   finishedUrl: string | null;
   artUrl: string | null;
   className?: string;
@@ -147,10 +174,15 @@ type Props = {
   `name={c.snapshot.name}`, `rawText={c.snapshot.rawText}`,
   `finishedUrl={c.hasFinished ? `/forge/api/art/${c.id}?kind=finished` : null}`,
   `artUrl={c.hasArt ? `/forge/api/art/${c.id}` : null}`.
-- **`play.ts` `listSetApprovedCards`**: select `finished_key` from
-  `card_versions`; expose `hasApprovedFinished: boolean` on `RevealCard` (keep
-  `hasApprovedArt`). The `finished_key` stays server-side — only the boolean
-  crosses to the client, mirroring `art_key`.
+- **`play.ts` `listSetApprovedCards`**: add `finished_key` to the `card_versions`
+  select; map `hasApprovedFinished: !!v.finished_key` on `RevealCard` (keep
+  `hasApprovedArt`). The `finished_key` value stays server-side — it must never
+  enter the returned object; only the boolean crosses to the client, mirroring
+  `art_key`. **Second consumer (finding #4):** `app/forge/lib/deckPool.ts` also
+  calls `listSetApprovedCards` and destructures `RevealCard`. Adding the new
+  boolean field does not break it (it ignores the field); the deckbuilder pool
+  simply won't show finished images — consistent with the deckbuilder being out
+  of scope. No change needed to `deckPool.ts`.
 - **`play/[setId]/page.tsx`**: build `RevealItem` with
   `finishedUrl: c.hasApprovedFinished ? `…?v=approved&kind=finished` : null`.
 - **`RevealGrid.tsx`**: `RevealItem` gains `finishedUrl`; render `ForgeCardFace`
@@ -164,10 +196,17 @@ type Props = {
   snapshot + `card.hasFinished`/`card.hasArt` proxy URLs.
 - Form body = **name input + one raw-text `<textarea>`** (bound to
   `snapshot.name` / `snapshot.rawText` via the existing debounced-autosave
-  `update()`), plus an **Artwork** upload (unchanged, from what is currently in
-  `FullModeForm`) and a new **Finished card** upload (calls `uploadFinished`,
-  with its own `?kind=finished&download=1` download link). Keep the existing
-  placeholder-art checkbox for artwork; no placeholder control for finished.
+  `update()` — note the textarea currently binds `specialAbility`; rebind it to
+  `rawText`).
+- **Lift the art-upload UI out of `FullModeForm` (finding #8).** The artwork
+  `<input type=file>`, its `onUpload` handler, the placeholder-art checkbox, and
+  the "Download original" link currently live *inside* `FullModeForm.tsx`
+  (lines ~139–158), which we are commenting out. Move that art fieldset into the
+  descoped `StudioEditor` body (or a small shared `ArtUpload` subcomponent) so it
+  is not orphaned. Keep the placeholder-art checkbox for artwork.
+- Add a new **Finished card** upload beside it (calls `uploadFinished`, with its
+  own `?kind=finished&download=1` download link). No placeholder control for
+  finished.
 - Realtime presence/proposal wiring stays as-is (still keyed on `card.setId`).
 
 ## 10. Tests / guardrails
