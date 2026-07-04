@@ -6,7 +6,8 @@ import { listSetApprovedCards } from "@/app/forge/lib/play";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 
 export type GrantedForgeCard = {
-  cardId: string; setId: string; setName: string; data: DesignCard; hasApprovedArt: boolean;
+  cardId: string; setId: string; setName: string; data: DesignCard;
+  hasApprovedArt: boolean; hasApprovedFinished: boolean;
 };
 
 export async function listGrantedForgeCards(): Promise<GrantedForgeCard[]> {
@@ -15,7 +16,10 @@ export async function listGrantedForgeCards(): Promise<GrantedForgeCard[]> {
   for (const s of sets) {
     const cards = await listSetApprovedCards(s.id);
     for (const c of cards) {
-      out.push({ cardId: c.cardId, setId: s.id, setName: s.name, data: c.data, hasApprovedArt: c.hasApprovedArt });
+      out.push({
+        cardId: c.cardId, setId: s.id, setName: s.name, data: c.data,
+        hasApprovedArt: c.hasApprovedArt, hasApprovedFinished: c.hasApprovedFinished,
+      });
     }
   }
   return out;

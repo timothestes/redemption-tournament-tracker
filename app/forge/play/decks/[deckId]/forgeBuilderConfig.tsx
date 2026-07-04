@@ -39,11 +39,13 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
   const forgeData = new Map<string, DesignCard>();
   const forgeById = new Map<string, Card>();
   const forgeArtIds = new Set<string>();
+  const forgeFinishedIds = new Set<string>();
   const forgeCards: Card[] = granted.map((g) => {
     const card: Card = { ...designCardToCard(g.data, g.cardId, g.setName), imgFile: forgeDataLine(g.cardId) };
     forgeData.set(g.cardId, g.data);
     forgeById.set(g.cardId, card);
     if (g.hasApprovedArt) forgeArtIds.add(g.cardId);
+    if (g.hasApprovedFinished) forgeFinishedIds.add(g.cardId);
     return card;
   });
 
@@ -57,6 +59,25 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
     if (isForgeDataLine(card.imgFile)) {
       const id = cardIdFromDataLine(card.imgFile);
       const data = forgeData.get(id);
+      // Uploaded finished card image wins (same priority as the reveal grid's
+      // ForgeCardFace); the CSS composite is the fallback for cards without one.
+      // Plain <img> — next/image is banned under app/forge/**.
+      if (data && forgeFinishedIds.has(id)) {
+        return {
+          kind: "element",
+          node: (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/forge/api/art/${id}?v=approved&kind=finished`}
+              alt={data.name ?? "Forge card"}
+              loading="lazy"
+              decoding="async"
+              className="w-full rounded-md"
+              style={{ aspectRatio: "750 / 1050", objectFit: "contain" }}
+            />
+          ),
+        };
+      }
       const artUrl = data && forgeArtIds.has(id) ? `/forge/api/art/${id}?v=approved` : null;
       return {
         kind: "element",
@@ -184,6 +205,7 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
       enableShopping: false,
       enableDetailsTab: false,
       serverDeckCheck: false,
+      enableLegalityChecks: false,
     },
   };
 }

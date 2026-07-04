@@ -27,7 +27,10 @@ export default async function ForgeDeckBuilderPage({ params }: { params: Promise
   // CardSearchClient uses useSearchParams → needs a Suspense boundary.
   return (
     <>
-      <div className="mx-auto max-w-6xl px-4 pt-3 [&>nav]:mb-0">
+      {/* Slim toolbar attached under ForgeNav — full-width with the builder
+          (not max-w-centered) and opaque so the page backdrop can't bleed
+          through in dark mode. */}
+      <div className="border-b border-border bg-background px-4 py-2 [&>nav]:mb-0">
         <ForgeBreadcrumbs
           items={[
             { label: "The Forge", href: "/forge" },

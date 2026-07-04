@@ -11,6 +11,7 @@ const grantedCard = (cardId: string, name: string): GrantedForgeCard => ({
   setId: "set-1",
   setName: "Test Set",
   hasApprovedArt: false,
+  hasApprovedFinished: false,
   data: {
     name,
     cardType: ["LostSoul"],
@@ -42,6 +43,7 @@ describe("makeForgeBuilderConfig", () => {
       enableShopping: false,
       enableDetailsTab: false,
       serverDeckCheck: false,
+      enableLegalityChecks: false,
     });
   });
 

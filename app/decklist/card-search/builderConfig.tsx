@@ -84,6 +84,10 @@ export interface DeckBuilderFeatures {
    *  can't know forge cards and flags each one as not-found; the client-side
    *  validateDeck covers structural rules. */
   serverDeckCheck?: boolean;
+  /** Client-side legality checks (validateDeck badge/checklist + the "Ignore
+   *  Legality Checks" toggle). Off for the Forge — playtest decks are
+   *  work-in-progress by nature, so legality noise is unwanted. */
+  enableLegalityChecks?: boolean;
 }
 
 /**
@@ -140,6 +144,7 @@ export const PUBLIC_BUILDER_CONFIG: DeckBuilderConfig = {
     enableShopping: true,
     enableDetailsTab: true,
     serverDeckCheck: true,
+    enableLegalityChecks: true,
   },
 };
 

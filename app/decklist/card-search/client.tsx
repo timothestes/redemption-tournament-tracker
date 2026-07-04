@@ -472,10 +472,15 @@ export default function CardSearchClient({
     localStoragePersist: config.features?.localStoragePersist,
   });
 
-  const [ignoreLegalityChecks, setIgnoreLegalityChecksRaw] = useState(() => {
+  // When the config turns legality checks off entirely (the Forge), the builder
+  // behaves as if "Ignore Legality Checks" is permanently on and hides the toggle.
+  const legalityChecksEnabled = config.features?.enableLegalityChecks !== false;
+
+  const [ignoreLegalityChecksRawState, setIgnoreLegalityChecksRaw] = useState(() => {
     if (typeof window === 'undefined' || !deck.id) return false;
     return localStorage.getItem(`deck-ignore-legality-${deck.id}`) === 'true';
   });
+  const ignoreLegalityChecks = !legalityChecksEnabled || ignoreLegalityChecksRawState;
   const setIgnoreLegalityChecks = (val: boolean) => {
     setIgnoreLegalityChecksRaw(val);
     if (deck.id) {
@@ -1844,6 +1849,9 @@ export default function CardSearchClient({
             >
               Reset Filters
             </button>
+            {/* Copy-search-link shares a /decklist/card-search URL — a sharing
+                affordance, so it follows the enableSharing gate. */}
+            {config.features?.enableSharing !== false && (
             <button
               className={`px-4 rounded border transition font-medium shadow-sm text-center relative h-9 sm:h-11 ${
                 queries.filter(q => q.text.trim()).length > 1
@@ -1860,6 +1868,7 @@ export default function CardSearchClient({
             >
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
+            )}
             <button
               className="px-4 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-border transition font-medium shadow-sm text-center h-9 sm:h-11"
               onClick={() => router.push('/decklist/card-search/random')}
@@ -2748,7 +2757,7 @@ export default function CardSearchClient({
             onPreviewCardsChange={setPreviewCards}
             onDescriptionChange={setDeckDescription}
             ignoreLegalityChecks={ignoreLegalityChecks}
-            onIgnoreLegalityChecksChange={setIgnoreLegalityChecks}
+            onIgnoreLegalityChecksChange={legalityChecksEnabled ? setIgnoreLegalityChecks : undefined}
             onSpotlightToggle={() => {
               setMode("spotlight");
               setShowDeckBuilder(true);
@@ -2851,7 +2860,7 @@ export default function CardSearchClient({
               onPreviewCardsChange={setPreviewCards}
               onDescriptionChange={setDeckDescription}
               ignoreLegalityChecks={ignoreLegalityChecks}
-              onIgnoreLegalityChecksChange={setIgnoreLegalityChecks}
+              onIgnoreLegalityChecksChange={legalityChecksEnabled ? setIgnoreLegalityChecks : undefined}
             />
           )}
         </div>
