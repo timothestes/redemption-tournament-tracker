@@ -8,11 +8,13 @@ interface EmailOptions {
   to: string;
   subject: string;
   html: string;
+  from?: string;
+  replyTo?: string;
 }
 
-export async function sendEmail({ to, subject, html }: EmailOptions) {
+export async function sendEmail({ to, subject, html, from, replyTo }: EmailOptions) {
   const resendApiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.FROM_EMAIL || "RedemptionCCG.app <noreply@landofredemption.com>";
+  const fromEmail = from ?? (process.env.FROM_EMAIL || "RedemptionCCG.app <noreply@landofredemption.com>");
 
   if (!resendApiKey) {
     console.warn("RESEND_API_KEY not configured. Email not sent.");
@@ -31,6 +33,7 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
         to,
         subject,
         html,
+        ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });
 
