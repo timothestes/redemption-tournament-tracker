@@ -168,4 +168,5 @@ thumbnails-at-import, reveal-grid `t=` caching, diff-mode re-import,
    seeded set flips statuses.
 4. Theme screenshots (3 themes × 4 pages) captured and visually sane.
 5. No `emerald-`, `bg-zinc-`, raw `red-600` classes remain under `app/forge`
-   (grep check), excluding `ForgeCardPreview.tsx`.
+   (grep check), excluding `ForgeCardPreview.tsx` and `FullModeForm.tsx` (both
+   descoped 2026-07-03, kept on disk unused for recovery).

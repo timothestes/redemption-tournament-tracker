@@ -84,7 +84,7 @@ export default function ProposalDiff({
           {changes.map((c) => (
             <li key={c.field as string}>
               <span className="font-medium">{c.label}:</span>{" "}
-              <span className="text-red-600 line-through">{c.before ?? "—"}</span>
+              <span className="text-destructive line-through">{c.before ?? "—"}</span>
               {" → "}
               <span className="text-primary">{c.after ?? "—"}</span>
             </li>

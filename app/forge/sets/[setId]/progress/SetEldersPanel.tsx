@@ -23,7 +23,7 @@ export default function SetEldersPanel({ setId, elders, addable }: { setId: stri
           <li key={e.userId} className="flex items-center justify-between">
             <span>{e.displayName ?? e.userId}</span>
             {elders.length > 1 && (
-              <button disabled={busy} onClick={() => run(() => removeSetElder(setId, e.userId))} className="text-xs text-red-600 hover:underline">remove</button>
+              <button disabled={busy} onClick={() => run(() => removeSetElder(setId, e.userId))} className="text-xs text-destructive hover:underline">remove</button>
             )}
           </li>
         ))}

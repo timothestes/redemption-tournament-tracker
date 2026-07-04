@@ -86,7 +86,7 @@ export default function CommentThread({
             Reply
           </button>
         )}
-        <button disabled={pending} onClick={() => confirm("Delete this comment?") && run(() => deleteComment(c.id, cardId))} className="text-red-600 hover:underline">
+        <button disabled={pending} onClick={() => confirm("Delete this comment?") && run(() => deleteComment(c.id, cardId))} className="text-destructive hover:underline">
           Delete
         </button>
       </div>
