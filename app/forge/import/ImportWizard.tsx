@@ -88,7 +88,10 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
   const zipSets = useMemo(() => distinctSets(rows ?? []), [rows]);
 
   // Changing the filter starts a fresh selection — clear any previous run.
+  // Locked while a run is in flight: in-flight workers would resurrect the old
+  // status list over the new selection.
   function onFilterChange(value: string) {
+    if (running) return;
     setFilter(value);
     setItems(null);
     setDoneSetId(null);
