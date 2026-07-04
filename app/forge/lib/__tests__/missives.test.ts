@@ -168,9 +168,14 @@ describe("sendMissive", () => {
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect((sendEmail as any).mock.calls[0][0].to).toBe("alice@x.com");
     expect(r.ok).toBe(true);
+    expect(c.supabase.rpc).toHaveBeenCalledWith(
+      "forge_log_missive",
+      expect.objectContaining({ p_recipient_ids: ["p1"] })
+    );
   });
 
   it("happy path: 2 recipients get personalized, prefixed, reply-to'd emails and the send is logged", async () => {
+    expect(process.env.FORGE_FROM_EMAIL).toBeUndefined();
     vi.useFakeTimers();
     const c = ctx();
     (requireElder as any).mockResolvedValue(c);
@@ -194,6 +199,8 @@ describe("sendMissive", () => {
     expect(call2.html).toContain("Bob");
     expect(call1.replyTo).toBe("c@x.com");
     expect(call2.replyTo).toBe("c@x.com");
+    expect(call1.from).toBe("The Forge <noreply@landofredemption.com>");
+    expect(call2.from).toBe("The Forge <noreply@landofredemption.com>");
 
     expect(c.supabase.rpc).toHaveBeenCalledWith("forge_log_missive", {
       p_subject: "Update",
@@ -227,6 +234,49 @@ describe("sendMissive", () => {
       "forge_log_missive",
       expect.objectContaining({ p_recipient_ids: ["p1", "p2"] })
     );
+  });
+
+  it("returns a directory error when the directory RPC fails, without sending anything", async () => {
+    const c = ctx(async (name: string) => {
+      if (name === "forge_member_directory") {
+        return { data: null, error: { message: "db down" } };
+      }
+      return { data: null, error: null };
+    });
+    (requireElder as any).mockResolvedValue(c);
+    const r = await sendMissive({ subject: "Hi", body: "Body", recipientIds: ["p1"] });
+    expect(r).toEqual({
+      ok: false,
+      sent: 0,
+      failed: 0,
+      error: "Could not load the member directory.",
+    });
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("returns an unconfigured-email error and does not log when every send fails", async () => {
+    vi.useFakeTimers();
+    (sendEmail as any)
+      .mockResolvedValueOnce({ success: false, error: "Email service not configured" })
+      .mockResolvedValueOnce({ success: false, error: "Email service not configured" });
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    const promise = sendMissive({
+      subject: "Update",
+      body: "Hello {name}",
+      recipientIds: ["p1", "p2"],
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    const r = await promise;
+    vi.useRealTimers();
+
+    expect(r).toEqual({
+      ok: false,
+      sent: 0,
+      failed: 2,
+      error: "No emails were sent — email service may be unconfigured.",
+    });
+    expect(c.supabase.rpc).not.toHaveBeenCalledWith("forge_log_missive", expect.anything());
   });
 });
 

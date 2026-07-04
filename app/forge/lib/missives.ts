@@ -42,8 +42,10 @@ export async function getMissiveDirectory(): Promise<{
   const ctx = await requireElder();
   if (!ctx) return { members: [], sets: [] };
 
-  const { data: rows } = await ctx.supabase.rpc("forge_member_directory");
+  const { data: rows, error } = await ctx.supabase.rpc("forge_member_directory");
   const { data: sets } = await ctx.supabase.from("forge_sets").select("id, name").order("name");
+
+  if (error) return { members: [], sets: sets ?? [] };
 
   return {
     members: ((rows ?? []) as DirectoryRow[]).map(mapMember),
@@ -79,7 +81,15 @@ export async function sendMissive(input: {
     };
   }
 
-  const { data: rows } = await ctx.supabase.rpc("forge_member_directory");
+  const { data: rows, error: directoryError } = await ctx.supabase.rpc("forge_member_directory");
+  if (directoryError) {
+    return {
+      ok: false,
+      sent: 0,
+      failed: 0,
+      error: "Could not load the member directory.",
+    };
+  }
   const directory = ((rows ?? []) as DirectoryRow[]).map(mapMember);
 
   const sender = directory.find((m) => m.userId === ctx.user.id);
@@ -130,14 +140,31 @@ export async function sendMissive(input: {
     }
   }
 
-  await ctx.supabase.rpc("forge_log_missive", {
+  if (sent === 0) {
+    return {
+      ok: false,
+      sent: 0,
+      failed,
+      error: "No emails were sent — email service may be unconfigured.",
+    };
+  }
+
+  const { error: logError } = await ctx.supabase.rpc("forge_log_missive", {
     p_subject: subject,
     p_body_text: body,
     p_recipient_ids: recipients.map((r) => r.userId),
   });
+  if (logError) console.error("forge_log_missive failed:", logError);
   revalidatePath("/forge/missives");
 
-  return { ok: failed === 0, sent, failed, error: failed > 0 ? "Some sends failed" : undefined };
+  let error = failed > 0 ? "Some sends failed" : undefined;
+  if (logError) {
+    error = error
+      ? error + " Sent, but the missive log could not be written."
+      : "Sent, but the missive log could not be written.";
+  }
+
+  return { ok: failed === 0, sent, failed, error };
 }
 
 export async function sendMissiveTest(input: {
@@ -156,7 +183,10 @@ export async function sendMissiveTest(input: {
     return { ok: false, error: "Body must be 1-20000 characters" };
   }
 
-  const { data: rows } = await ctx.supabase.rpc("forge_member_directory");
+  const { data: rows, error: directoryError } = await ctx.supabase.rpc("forge_member_directory");
+  if (directoryError) {
+    return { ok: false, error: "Could not load the member directory." };
+  }
   const directory = ((rows ?? []) as DirectoryRow[]).map(mapMember);
 
   const sender = directory.find((m) => m.userId === ctx.user.id);
