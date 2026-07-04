@@ -27,6 +27,7 @@ export const LEGALITIES = ["Rotation", "Classic", "Scrolls", "Paragon", "Banned"
 // (used to validate field-anchored suggestions). Keep the two lists in sync.
 export type DesignCard = {
   name?: string;
+  rawText?: string;
   cardType?: CardType[];
   alignment?: Alignment;
   brigades?: Brigade[];
@@ -109,4 +110,12 @@ export function validate(card: DesignCard): ValidationHint[] {
   if (app.specialAbility === "required" && !has(card.specialAbility))
     hints.push({ field: "specialAbility", message: "This type usually has a special ability." });
   return hints;
+}
+
+/**
+ * The descoped raw-text body. Falls back to the legacy napkin `specialAbility`
+ * so cards saved before the 2026-07-03 descope don't read blank. Pure.
+ */
+export function cardRawText(card: DesignCard): string {
+  return card.rawText ?? card.specialAbility ?? "";
 }
