@@ -153,6 +153,22 @@ export async function revokeSet(setId: string, userId: string): Promise<Result> 
   return { ok: true };
 }
 
+export async function bulkDeleteSets(
+  setIds: string[]
+): Promise<{ ok: true; done: number; failed: number } | { ok: false; error: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  if (setIds.length === 0) return { ok: true, done: 0, failed: 0 };
+  if (setIds.length > 100) return { ok: false, error: "Too many sets selected" };
+  let done = 0, failed = 0;
+  for (const id of setIds) {
+    const { error } = await ctx.supabase.rpc("forge_delete_set", { p_set_id: id });
+    if (error) failed++; else done++;
+  }
+  revalidatePath("/forge", "layout");
+  return { ok: true, done, failed };
+}
+
 export async function listSetGrants(setId: string): Promise<SetGrant[]> {
   const ctx = await requireForge();
   if (!ctx) return [];
