@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cardApplicability, isStatBearing, validate, BRIGADES } from "../designCard";
+import { cardApplicability, isStatBearing, validate, BRIGADES, cardRawText } from "../designCard";
 
 describe("cardApplicability", () => {
   it("Hero requires brigade + stats", () => {
@@ -47,5 +47,17 @@ describe("BRIGADES enum", () => {
   it("excludes the ambiguous Multi sentinels", () => {
     expect(BRIGADES).not.toContain("GoodMulti");
     expect(BRIGADES).not.toContain("EvilMulti");
+  });
+});
+
+describe("cardRawText", () => {
+  it("prefers rawText when present", () => {
+    expect(cardRawText({ rawText: "new body", specialAbility: "legacy" })).toBe("new body");
+  });
+  it("falls back to legacy specialAbility (pre-descope napkin cards)", () => {
+    expect(cardRawText({ specialAbility: "legacy" })).toBe("legacy");
+  });
+  it("returns empty string when neither is set", () => {
+    expect(cardRawText({})).toBe("");
   });
 });

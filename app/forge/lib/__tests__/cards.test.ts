@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/app/forge/lib/auth", () => ({ requireForge: vi.fn(), requireElder: vi.fn() }));
-vi.mock("@/app/forge/lib/art", () => ({ validateArtFile: vi.fn(), uploadForgeArt: vi.fn() }));
+vi.mock("@/app/forge/lib/art", () => ({ validateArtFile: vi.fn(), uploadForgeArt: vi.fn(), uploadForgeFinished: vi.fn() }));
 
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
-import { saveCard, getCard, listForgeCards } from "../cards";
+import { validateArtFile, uploadForgeFinished } from "@/app/forge/lib/art";
+import { saveCard, getCard, listForgeCards, uploadFinished } from "../cards";
 
 function ctx(rpcImpl?: any, queryRows?: any[]) {
   const order = vi.fn(async () => ({ data: queryRows ?? [], error: null }));
@@ -61,5 +62,34 @@ describe("getCard / listForgeCards", () => {
     (requireForge as any).mockResolvedValue(c);
     await listForgeCards();
     expect(c.isFn).toHaveBeenCalledWith("set_id", null);
+  });
+});
+
+describe("uploadFinished", () => {
+  it("rejects when caller is not an elder", async () => {
+    (requireElder as any).mockResolvedValue(null);
+    const r = await uploadFinished("c1", new FormData());
+    expect(r.ok).toBe(false);
+  });
+  it("uploads and calls forge_set_working_finished with the returned key", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    (validateArtFile as any).mockReturnValue(null);
+    (uploadForgeFinished as any).mockResolvedValue("forge-finished/abc");
+    const fd = new FormData();
+    fd.set("file", new File([new Uint8Array([1, 2, 3])], "c.png", { type: "image/png" }));
+    const r = await uploadFinished("c1", fd);
+    expect(r.ok).toBe(true);
+    expect((c.supabase.rpc as any).mock.calls[0]).toEqual([
+      "forge_set_working_finished", { p_card_id: "c1", p_key: "forge-finished/abc" },
+    ]);
+  });
+});
+
+describe("getCard maps hasFinished", () => {
+  it("hasFinished true when working_finished_key present", async () => {
+    const row = { id: "c1", title: "T", working_snapshot: {}, working_art_key: null, working_art_is_placeholder: false, working_finished_key: "forge-finished/x", status: "draft", updated_at: "t", set_id: null, published_version_id: null, approved_version_id: null };
+    (requireForge as any).mockResolvedValue(ctx(undefined, [row]));
+    expect((await getCard("c1"))?.hasFinished).toBe(true);
   });
 });

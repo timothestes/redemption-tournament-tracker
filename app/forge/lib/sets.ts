@@ -98,7 +98,7 @@ export async function removeSetElder(setId: string, userId: string): Promise<Res
   return { ok: true };
 }
 
-const CARD_COLS = "id, title, working_snapshot, working_art_key, working_art_is_placeholder, status, updated_at, set_id, published_version_id, approved_version_id";
+const CARD_COLS = "id, title, working_snapshot, working_art_key, working_art_is_placeholder, working_finished_key, status, updated_at, set_id, published_version_id, approved_version_id";
 
 export async function listSetCards(setId: string): Promise<ForgeCardFull[]> {
   const ctx = await requireForge();
@@ -110,7 +110,7 @@ export async function listSetCards(setId: string): Promise<ForgeCardFull[]> {
     .order("updated_at", { ascending: false });
   return (data ?? []).map((row: any): ForgeCardFull => ({
     id: row.id, title: row.title, snapshot: (row.working_snapshot ?? {}) as DesignCard,
-    hasArt: !!row.working_art_key, isPlaceholder: !!row.working_art_is_placeholder,
+    hasArt: !!row.working_art_key, hasFinished: !!row.working_finished_key, isPlaceholder: !!row.working_art_is_placeholder,
     status: row.status, updatedAt: row.updated_at,
     setId: row.set_id ?? null, publishedVersionId: row.published_version_id ?? null,
     approvedVersionId: row.approved_version_id ?? null,
