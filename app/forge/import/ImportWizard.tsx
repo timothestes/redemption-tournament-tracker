@@ -309,7 +309,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
           <div className="mb-2 flex flex-wrap gap-1">
             {zipSets.slice(0, 12).map(({ set, count }) => (
               <button key={set} type="button" onClick={() => onFilterChange(set)} disabled={running}
-                className={`rounded-full border px-2 py-0.5 text-xs disabled:opacity-50 ${filter === set ? "border-emerald-600 bg-emerald-600/10" : "hover:bg-muted"}`}>
+                className={`rounded-full border px-2 py-0.5 text-xs disabled:opacity-50 ${filter === set ? "border-primary bg-primary/10" : "hover:bg-muted"}`}>
                 {set} <span className="text-muted-foreground">({count})</span>
               </button>
             ))}
@@ -385,7 +385,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
           </div>
           {runError && <p className="mt-2 text-sm text-red-500">{runError}</p>}
           <button type="button" onClick={runImport} disabled={running || matched.length === 0}
-            className="mt-3 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+            className="mt-3 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
             {matched.length === 1 ? "Import 1 card" : `Import ${matched.length} cards`}
           </button>
         </fieldset>
@@ -404,7 +404,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
           )}
           {finished && doneSetId && (
             <Link href={`/forge/sets/${doneSetId}/cards`}
-              className="mt-2 block text-sm text-emerald-600 hover:underline">
+              className="mt-2 block text-sm font-medium text-primary hover:underline">
               View set →
             </Link>
           )}
@@ -414,7 +414,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
                 <span className="truncate">{it.row.name}</span>
                 <span className={
                   it.status === "failed" ? "text-red-500"
-                    : it.status === "imported" ? "text-emerald-600"
+                    : it.status === "imported" ? "text-primary"
                     : "text-muted-foreground"
                 }>
                   {it.status === "failed" ? `failed: ${it.error ?? "unknown"}` : it.status}

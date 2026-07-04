@@ -46,7 +46,7 @@ export default function ProposalDiff({
                 "Accept this proposal? It publishes a new version and overwrites the working draft."
               ) && run(() => acceptProposal(proposal.id, proposal.cardId))
             }
-            className="rounded-md bg-emerald-600 px-3 py-1 font-medium text-white disabled:opacity-50"
+            className="rounded-md bg-primary px-3 py-1 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             Accept
           </button>
@@ -86,7 +86,7 @@ export default function ProposalDiff({
               <span className="font-medium">{c.label}:</span>{" "}
               <span className="text-red-600 line-through">{c.before ?? "—"}</span>
               {" → "}
-              <span className="text-emerald-700">{c.after ?? "—"}</span>
+              <span className="text-primary">{c.after ?? "—"}</span>
             </li>
           ))}
         </ul>

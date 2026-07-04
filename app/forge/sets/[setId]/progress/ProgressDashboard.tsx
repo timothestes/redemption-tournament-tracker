@@ -7,11 +7,11 @@ import TargetsEditor from "./TargetsEditor";
 import SetEldersPanel from "./SetEldersPanel";
 
 const STATUS_ORDER = ["draft", "playtesting", "approved"];
-const STATUS_COLOR: Record<string, string> = { draft: "bg-zinc-400", playtesting: "bg-amber-500", approved: "bg-emerald-600" };
+const STATUS_COLOR: Record<string, string> = { draft: "bg-muted-foreground/40", playtesting: "bg-amber-500", approved: "bg-primary" };
 
 function cellTone(actual: number, target: number): string {
-  if (target === 0) return actual > 0 ? "bg-emerald-50 dark:bg-emerald-950" : "";
-  if (actual >= target) return "bg-emerald-200 dark:bg-emerald-900";
+  if (target === 0) return actual > 0 ? "bg-primary/10" : "";
+  if (actual >= target) return "bg-primary/25";
   if (actual === 0) return "bg-muted";
   return "bg-amber-100 dark:bg-amber-950";
 }
