@@ -76,7 +76,7 @@ export const CONFIRM_COPY = {
   releaseAll: {
     title: "Release all drafts?",
     description:
-      "Releases every draft card matching the current filters. Playtesters will immediately see and play them.",
+      "Releases every draft card matching the current filters. Playtesters will be able to see and build playtest decks with them.",
     confirmLabel: "Release all",
   },
   returnToIdeas: {

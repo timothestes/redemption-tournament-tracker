@@ -31,7 +31,7 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
 
   return (
     <div className="sticky top-16 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex max-w-6xl items-center gap-1 px-4">
+      <div className="mx-auto flex max-w-full items-center gap-1 px-4">
         <Link
           href="/forge"
           className="mr-3 flex shrink-0 items-center gap-2 py-2 text-sm font-semibold tracking-wide text-foreground"
@@ -43,11 +43,11 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
             width={293}
             height={128}
             alt=""
-            className="h-7 w-auto"
+            className="hidden h-7 w-auto sm:block"
           />
           <span>The Forge</span>
         </Link>
-        <nav className="flex items-center gap-1 overflow-x-auto">
+        <nav className="no-scrollbar flex items-center gap-1 overflow-x-auto">
           {items.map((it) => {
             const active = it.match(pathname);
             return (

@@ -44,7 +44,16 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const filtered = useMemo(() => cards.filter((c) => {
+  // Default order: alphabetical by card type (primary type), then by title.
+  // "￿" pushes untyped/incomplete cards to the end.
+  const sorted = useMemo(() => {
+    const typeKey = (c: ForgeCardFull) => c.snapshot?.cardType?.[0] ?? "￿";
+    return [...cards].sort(
+      (a, b) => typeKey(a).localeCompare(typeKey(b)) || (a.title ?? "").localeCompare(b.title ?? ""),
+    );
+  }, [cards]);
+
+  const filtered = useMemo(() => sorted.filter((c) => {
     const s = c.snapshot ?? {};
     if (q) {
       const needle = q.toLowerCase();
@@ -55,7 +64,7 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
     if (type && !(s.cardType ?? []).includes(type)) return false;
     if (brigade && !(s.brigades ?? []).includes(brigade)) return false;
     return true;
-  }), [cards, q, status, type, brigade]);
+  }), [sorted, q, status, type, brigade]);
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const ids = [...selected];
@@ -85,7 +94,7 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
   }
 
   return (
-    <div className="relative pb-20">
+    <div className="relative pb-28 sm:pb-20">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative">
           <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or text… (press /)"
