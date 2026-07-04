@@ -492,7 +492,10 @@ export default function CardSearchClient({
     setIgnoreLegalityChecksRaw(localStorage.getItem(`deck-ignore-legality-${deck.id}`) === 'true');
   }, [deck.id]);
 
-  const { result: deckCheckResult, isChecking: isDeckChecking, setResult: setDeckCheckResult } = useDeckCheck(deck, !ignoreLegalityChecks);
+  const { result: deckCheckResult, isChecking: isDeckChecking, setResult: setDeckCheckResult } = useDeckCheck(
+    deck,
+    !ignoreLegalityChecks && config.features?.serverDeckCheck !== false
+  );
 
   const { getPrice } = useCardPrices();
 
@@ -866,12 +869,14 @@ export default function CardSearchClient({
       
       // Ctrl+E / Cmd+E to export
       else if (e.key === 'e') {
+        if (config.features?.enableImportExport === false) return;
         e.preventDefault();
         handleExportDeck();
       }
-      
+
       // Ctrl+I / Cmd+I to import
       else if (e.key === 'i') {
+        if (config.features?.enableImportExport === false) return;
         e.preventDefault();
         setShowImportModal(true);
       }
@@ -2281,7 +2286,10 @@ export default function CardSearchClient({
               preloader in DeckBuilderPanel.tsx. */}
           <div className="hidden" aria-hidden="true">
             {visibleCards.map((c) => {
-              const url = getImageUrl(c.imgFile || "");
+              // Only URL-resolved cards can be preloaded; element-resolved
+              // (Forge) cards have no public URL and would just 404.
+              const r = config.resolveCardImage(c);
+              const url = r.kind === "url" ? r.url : null;
               return url ? (
                 <img
                   key={`search-preload-${c.dataLine}`}

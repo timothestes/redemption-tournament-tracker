@@ -44,6 +44,7 @@ import { getParagonNames, getParagonByName } from "../data/paragons";
 import { useCardPrices } from "../hooks/useCardPrices";
 import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { useBuilderConfig } from "../builderConfig";
 import { CardThumb } from "./CardThumb";
 import ReactMarkdown from "react-markdown";
 import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
@@ -237,6 +238,19 @@ export default function DeckBuilderPanel({
   ignoreLegalityChecks = false,
   onIgnoreLegalityChecksChange,
 }: DeckBuilderPanelProps) {
+  // Feature gates from the active builder config (all default on; the Forge
+  // turns off the tools that only make sense against the public catalog).
+  const builderConfig = useBuilderConfig();
+  const builderFeatures = builderConfig.features;
+  const canImportExport = builderFeatures?.enableImportExport !== false;
+  const canPrintExports = builderFeatures?.enablePrintExports !== false;
+  const canShop = builderFeatures?.enableShopping !== false;
+  const showDetailsTab = builderFeatures?.enableDetailsTab !== false;
+  // LoadDeckModal lists the public `decks` table, so it only makes sense when
+  // the builder runs on the default persistence (a Forge override loads from
+  // forge_decks — its deck list page is the switcher there).
+  const canLoadDeckList = !builderConfig.persistence;
+
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab ?? "main");
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(deck.name);
@@ -657,9 +671,11 @@ export default function DeckBuilderPanel({
   const maybeboardCount = maybeboardCards.length;
   const totalCards = mainDeckCount + reserveCount;
 
-  // Calculate total deck price
+  // Calculate total deck price. A null price hides every price/buy affordance,
+  // so the shopping gate simply forces null.
   const { getPrice } = useCardPrices();
   const totalDeckPrice = React.useMemo(() => {
+    if (!canShop) return null;
     let total = 0;
     let hasAnyPrice = false;
     for (const dc of deck.cards) {
@@ -673,9 +689,11 @@ export default function DeckBuilderPanel({
       }
     }
     return hasAnyPrice ? total : null;
-  }, [deck.cards, getPrice]);
+  }, [deck.cards, getPrice, canShop]);
 
-  const { budgetTotal, savings } = useBudgetPricing(deck, allCards);
+  const { budgetTotal: rawBudgetTotal, savings: rawSavings } = useBudgetPricing(deck, allCards);
+  const budgetTotal = canShop ? rawBudgetTotal : null;
+  const savings = canShop ? rawSavings : null;
 
   const handleNameSubmit = () => {
     if (editedName.trim()) {
@@ -1179,47 +1197,51 @@ export default function DeckBuilderPanel({
                   <div
                     className="absolute top-full right-0 mt-1 z-[50] bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] max-h-[70vh] overflow-y-auto"
                   >
-                  <button
-                    onClick={() => { onImport(); setShowMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
-                  >
-                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Import
-                  </button>
-                  <button
-                    onClick={() => { onExport(); setShowMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
-                  >
-                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                    </svg>
-                    Copy to Clipboard
-                  </button>
-                  {onDownload && (
-                    <button
-                      onClick={() => { onDownload(); setShowMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
-                    >
-                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download .txt
-                    </button>
+                  {canImportExport && (
+                    <>
+                      <button
+                        onClick={() => { onImport(); setShowMenu(false); }}
+                        className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                      >
+                        <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Import
+                      </button>
+                      <button
+                        onClick={() => { onExport(); setShowMenu(false); }}
+                        className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                      >
+                        <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                        Copy to Clipboard
+                      </button>
+                      {onDownload && (
+                        <button
+                          onClick={() => { onDownload(); setShowMenu(false); }}
+                          className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                        >
+                          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Download .txt
+                        </button>
+                      )}
+                      {onDownloadBySet && (
+                        <button
+                          onClick={() => { onDownloadBySet(); setShowMenu(false); }}
+                          className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                        >
+                          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Download .txt (by set)
+                        </button>
+                      )}
+                      <div className="border-t border-border my-1" />
+                    </>
                   )}
-                  {onDownloadBySet && (
-                    <button
-                      onClick={() => { onDownloadBySet(); setShowMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
-                    >
-                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download .txt (by set)
-                    </button>
-                  )}
-                  <div className="border-t border-border my-1" />
                   {canShare && onDuplicate && isAuthenticated && deck.id && (
                     <button
                       onClick={async () => {
@@ -1240,7 +1262,7 @@ export default function DeckBuilderPanel({
                       Duplicate
                     </button>
                   )}
-                  {onLoadDeck && isAuthenticated && (
+                  {canLoadDeckList && onLoadDeck && isAuthenticated && (
                     <button
                       onClick={() => { setShowLoadDeckModal(true); setShowMenu(false); }}
                       className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
@@ -1284,25 +1306,29 @@ export default function DeckBuilderPanel({
                       Share…
                     </button>
                   )}
-                  <div className="border-t border-border my-1" />
-                  <button
-                    onClick={() => { setShowGeneratePDFModal(true); setShowMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
-                  >
-                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    Generate PDF
-                  </button>
-                  <button
-                    onClick={() => { setShowGenerateImageModal(true); setShowMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
-                  >
-                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Generate Image
-                  </button>
+                  {canPrintExports && (
+                    <>
+                      <div className="border-t border-border my-1" />
+                      <button
+                        onClick={() => { setShowGeneratePDFModal(true); setShowMenu(false); }}
+                        className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                      >
+                        <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        Generate PDF
+                      </button>
+                      <button
+                        onClick={() => { setShowGenerateImageModal(true); setShowMenu(false); }}
+                        className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                      >
+                        <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Generate Image
+                      </button>
+                    </>
+                  )}
                   <div className="border-t border-border my-1" />
                   {totalDeckPrice !== null && (
                     <button
@@ -1314,7 +1340,7 @@ export default function DeckBuilderPanel({
                       Buy on YTG
                     </button>
                   )}
-                  {isAuthenticated && (
+                  {canShop && isAuthenticated && (
                     <button
                       onClick={() => { setShowCollectionCheckModal(true); setShowMenu(false); }}
                       className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
@@ -1675,6 +1701,8 @@ export default function DeckBuilderPanel({
             {showMenu && (
               <div className="absolute top-full mt-1 right-0 bg-popover border border-border rounded-lg shadow-lg py-1 z-50 min-w-[160px] max-h-[70vh] overflow-y-auto">
               {/* Import/Export Section */}
+              {canImportExport && (
+              <>
               <button
                 onClick={() => {
                   onImport();
@@ -1731,9 +1759,10 @@ export default function DeckBuilderPanel({
                   Download .txt (by set)
                 </button>
               )}
-              
               <div className="border-t border-border my-1"></div>
-              
+              </>
+              )}
+
               {/* Duplicate/Load Section */}
               {canShare && onDuplicate && isAuthenticated && deck.id && (
                 <button
@@ -1759,7 +1788,7 @@ export default function DeckBuilderPanel({
                   Duplicate
                 </button>
               )}
-              {onLoadDeck && isAuthenticated && (
+              {canLoadDeckList && onLoadDeck && isAuthenticated && (
                 <button
                   onClick={() => {
                     setShowLoadDeckModal(true);
@@ -1813,6 +1842,8 @@ export default function DeckBuilderPanel({
               <div className="border-t border-border my-1"></div>
 
               {/* Generate Section */}
+              {canPrintExports && (
+              <>
               <button
                 onClick={() => {
                   setShowGeneratePDFModal(true);
@@ -1838,6 +1869,8 @@ export default function DeckBuilderPanel({
                 Generate Image
               </button>
               <div className="border-t border-border my-1"></div>
+              </>
+              )}
               {totalDeckPrice !== null && (
                 <button
                   onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); setShowMenu(false); }}
@@ -1848,7 +1881,7 @@ export default function DeckBuilderPanel({
                   Buy on YTG
                 </button>
               )}
-              {isAuthenticated && (
+              {canShop && isAuthenticated && (
                 <button
                   onClick={() => { setShowCollectionCheckModal(true); setShowMenu(false); }}
                   className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
@@ -2082,7 +2115,9 @@ export default function DeckBuilderPanel({
           })()}
         </button>
 
-        {/* Details Tab (Cover Cards + Description) */}
+        {/* Details Tab (Cover Cards + Description) — hidden when the backend
+            has nowhere to persist cover/tags/description (the Forge). */}
+        {showDetailsTab && (
         <button
           ref={(el) => { tabRefs.current.cover = el; }}
           onClick={() => handleTabChange("cover")}
@@ -2097,6 +2132,7 @@ export default function DeckBuilderPanel({
         >
           Details
         </button>
+        )}
       </div>
       )}
 
@@ -2630,6 +2666,7 @@ export default function DeckBuilderPanel({
                 <p className="text-muted-foreground text-xs mt-2 mb-4">
                   Search for cards and add them to your deck
                 </p>
+                {canImportExport && (
                 <button
                   onClick={() => {
                     onImport();
@@ -2649,6 +2686,7 @@ export default function DeckBuilderPanel({
                   </svg>
                   Import or Paste from Clipboard
                 </button>
+                )}
               </div>
             )}
           </Droppable>
@@ -3626,10 +3664,12 @@ export default function DeckBuilderPanel({
         />
       )}
 
-      {/* Hidden image preloader for reserve cards */}
+      {/* Hidden image preloader for reserve cards. Only URL-resolved cards can
+          be preloaded; element-resolved (Forge) cards have no public URL. */}
       <div className="hidden" aria-hidden="true">
         {reserveCards.map((deckCard) => {
-          const imageUrl = getImageUrl(deckCard.card.imgFile || "");
+          const resolved = builderConfig.resolveCardImage(deckCard.card);
+          const imageUrl = resolved.kind === "url" ? getImageUrl(deckCard.card.imgFile || "") : null;
           return imageUrl ? (
             <img
               key={`preload-${deckCard.card.name}-${deckCard.card.set}`}

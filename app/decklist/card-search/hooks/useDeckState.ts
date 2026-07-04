@@ -185,7 +185,7 @@ export function useDeckState(
           visibility: isOwner ? (cloudDeck.visibility ?? "private") : "private",
           previewCard1: cloudDeck.preview_card_1 ?? null,
           previewCard2: cloudDeck.preview_card_2 ?? null,
-          cards: cloudDeck.cards.map(dbCardToDeckCard),
+          cards: cloudDeck.cards.map((c: any) => dbCardToDeckCard(c, persistenceRef.current.resolveCard)),
           createdAt: new Date(cloudDeck.created_at),
           updatedAt: new Date(cloudDeck.updated_at),
         };
@@ -665,7 +665,7 @@ export function useDeckState(
         }
 
         const sourceName = result.deck.name;
-        const sourceCards = result.deck.cards.map(dbCardToDeckCard);
+        const sourceCards = result.deck.cards.map((c: any) => dbCardToDeckCard(c, persistenceRef.current.resolveCard));
         const { cards, removed, added } = buildReplacedHalf(deck.cards, sourceCards, alignment);
 
         if (added === 0) {
@@ -721,10 +721,24 @@ export function useDeckState(
 
 /**
  * Reconstruct a full in-memory DeckCard from a database card row, using the card
- * catalog lookup so alignment and other fields are populated. Falls back to a
- * minimal card object if the card is not found in the catalog.
+ * catalog lookup so alignment and other fields are populated. An injected
+ * `resolveCard` (from the persistence seam) runs first so non-catalog cards —
+ * the Forge's — rehydrate with full data instead of the "Unknown" stub. Falls
+ * back to a minimal card object if the card is not found anywhere.
  */
-function dbCardToDeckCard(dbCard: any): DeckCard {
+function dbCardToDeckCard(
+  dbCard: any,
+  resolveCard?: DeckBuilderPersistence["resolveCard"]
+): DeckCard {
+  const resolved = resolveCard?.(dbCard);
+  if (resolved) {
+    return {
+      card: resolved,
+      quantity: dbCard.quantity,
+      zone: dbCard.zone as DeckZone,
+    };
+  }
+
   const key = `${dbCard.card_name}|${dbCard.card_set}|${sanitizeImgFile(dbCard.card_img_file)}`;
   const fullCard = CARD_BY_FULL_KEY.get(key);
 

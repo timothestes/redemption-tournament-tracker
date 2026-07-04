@@ -21,7 +21,8 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
       : [
           { href: "/forge/ideas", label: "Ideas", match: (p) => p.startsWith("/forge/ideas") },
           { href: "/forge/sets", label: "Sets", match: (p) => p.startsWith("/forge/sets") },
-          { href: "/forge/play", label: "Play", match: (p) => p.startsWith("/forge/play") },
+          { href: "/forge/play", label: "Play", match: (p) => p.startsWith("/forge/play") && !p.startsWith("/forge/play/decks") },
+          { href: "/forge/play/decks", label: "Decks", match: (p) => p.startsWith("/forge/play/decks") },
           { href: "/forge/missives", label: "Missives", match: (p) => p.startsWith("/forge/missives") },
           ...(role === "superadmin"
             ? [{ href: "/forge/admin", label: "Admin", match: (p: string) => p.startsWith("/forge/admin") }]
