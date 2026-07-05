@@ -20,8 +20,8 @@ export default async function ForgePlayPage() {
           <div className="text-sm text-muted-foreground">Host or join a private playtest game.</div>
         </Link>
         <Link href="/forge/play/decks" className="rounded-lg border p-4 hover:bg-muted/50">
-          <div className="font-medium">Your decks</div>
-          <div className="text-sm text-muted-foreground">Build and manage playtest decks.</div>
+          <div className="font-medium">Decks</div>
+          <div className="text-sm text-muted-foreground">Build playtest decks and browse what the Forge has shared.</div>
         </Link>
       </section>
       <h2 className="mt-8 text-sm font-medium">Sets shared with you</h2>

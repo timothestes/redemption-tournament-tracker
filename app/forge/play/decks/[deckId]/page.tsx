@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { requireForge } from "@/app/forge/lib/auth";
 import { getForgeDeck } from "@/app/forge/lib/forgeDecks";
@@ -22,6 +22,9 @@ export default async function ForgeDeckBuilderPage({ params }: { params: Promise
   if (!isNew) {
     const deck = await getForgeDeck(deckId);
     if (!deck) notFound();
+    // Shared decks are readable but only the owner may edit — send everyone
+    // else to the read-only view (a save here would silently no-op under RLS).
+    if (deck.ownerId !== ctx.user.id) redirect(`/forge/play/decks/${deckId}/view`);
     deckName = deck.name;
   }
 

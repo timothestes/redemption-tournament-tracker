@@ -16,9 +16,9 @@ Forge membership.
 
 - No "public"/"unlisted" tiers. The audience is always exactly Forge members,
   so sharing is a single boolean: **Private** or **Shared with the Forge**.
-- No copy-to-my-decks, tags, cover cards, prices, goldfish, or PDF/image
-  export on the Forge preview. Those are public-side features; the Forge
-  preview stays minimal (view + copy link + owner shortcuts).
+- No tags, cover cards, prices, goldfish, or PDF/image export on the Forge
+  preview. Those are public-side features; the Forge preview stays minimal
+  (view + copy link + copy-to-my-decks + owner shortcuts).
 - No OG/social metadata. The page 404s for non-members; scrapers see nothing.
 
 ## How the public side works (reference)
@@ -62,6 +62,11 @@ never flip or edit someone else's deck. Anon still has no policy → 0 rows.
   Returns null → caller 404s, keeping the area secret.
 - `getForgeDeck(id)` — gains `ownerId` in its return so the builder page can
   detect non-owners (reads are no longer owner-only under the new policy).
+- `copyForgeDeck(id)` — copies any readable deck (own or shared) into the
+  caller's collection as `"<name> (Copy)"`, entries verbatim, starting
+  private. Mirrors the public page's `copyPublicDeckAction`. The view page
+  shows "Copy to my decks" for non-owners and routes to the builder on the
+  new copy.
 
 ## Entry resolution (`app/forge/lib/deckView.ts`)
 
