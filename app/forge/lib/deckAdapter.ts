@@ -1,7 +1,8 @@
 // Pure adapter: a Forge approved card (DesignCard) → the deckbuilder's Card shape.
 // No "use client"/"use server" — importable on both sides. Maps enum values to the
-// human-readable strings validateDeck/deckcheck expect, and stamps a collision-proof
-// `forge:{cardId}` dataLine identity.
+// canonical public `type` string (GE/EE stay abbreviated, matching the public card
+// index) so forge and public cards group/validate identically, and stamps a
+// collision-proof `forge:{cardId}` dataLine identity.
 import type { Card } from "@/app/decklist/card-search/utils";
 import type { DesignCard, CardType, Brigade } from "@/app/forge/lib/designCard";
 
@@ -10,8 +11,13 @@ export function forgeDataLine(cardId: string): string { return FORGE_DATALINE_PR
 export function isForgeDataLine(dataLine: string): boolean { return dataLine.startsWith(FORGE_DATALINE_PREFIX); }
 export function cardIdFromDataLine(dataLine: string): string { return dataLine.slice(FORGE_DATALINE_PREFIX.length); }
 
+// DesignCard type enum → the public card index's canonical `type` value. The public
+// data abbreviates only GE/EE (every other type is spelled out), so we match that
+// exactly — otherwise views that group on the raw type string split forge "Good
+// Enhancement" from public "GE" into two buckets. Deckbuilder/deck-view UIs prettify
+// "GE"/"EE" back to full names for their section headers.
 export const TYPE_DISPLAY: Record<CardType, string> = {
-  Hero: "Hero", EvilCharacter: "Evil Character", GE: "Good Enhancement", EE: "Evil Enhancement",
+  Hero: "Hero", EvilCharacter: "Evil Character", GE: "GE", EE: "EE",
   LostSoul: "Lost Soul", Artifact: "Artifact", Dominant: "Dominant", Fortress: "Fortress",
   Site: "Site", City: "City", Curse: "Curse", Covenant: "Covenant",
 };
@@ -45,7 +51,10 @@ export function designCardToCard(data: DesignCard, cardId: string, setName: stri
     rarity: data.rarity ?? "",
     reference: data.reference ?? "",
     alignment: alignmentDisplay(data.alignment),
-    legality: data.legality ?? "",
+    // Forge cards are designed for the current (Rotation) environment, so default an unset
+    // legality to "Rotation". That makes shared cards visible under the deckbuilder's default
+    // legality filter; a designer can still explicitly pick another legality in the card editor.
+    legality: data.legality ?? "Rotation",
     testament: "",
     isGospel: false,
   };
