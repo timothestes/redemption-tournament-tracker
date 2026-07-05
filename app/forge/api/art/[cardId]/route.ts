@@ -47,9 +47,9 @@ export async function GET(
     }
   }
 
-  // `t` is a cache-buster derived from forge_cards.updated_at (bumped on every image/
-  // snapshot write), so a `t`-stamped response can be cached by the member's OWN browser
-  // indefinitely. `private` forbids shared/CDN caches; auth + RLS above are unchanged.
+  // `t` is a cache-buster (forge_cards.updated_at for the working view; the frozen
+  // versionId in play mode), so a `t`-stamped response can be cached by the member's OWN
+  // browser indefinitely. `private` forbids shared/CDN caches; auth + RLS are unchanged.
   const cacheable = !download && url.searchParams.get("t") !== null;
   const headers = new Headers({
     "Content-Type": result.blob.contentType,

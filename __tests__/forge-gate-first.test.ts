@@ -22,7 +22,11 @@ function listForgeRouteFiles(): string[] {
 
 const GATE = /require(Forge|Elder|ForgeSuperadmin)\s*\(/;
 // Pure redirect with no data exposure — intentionally has no gate.
-const ALLOW_NO_GATE = new Set(["app/forge/art/page.tsx", "app/forge/ideas/[cardId]/page.tsx"]);
+const ALLOW_NO_GATE = new Set([
+  "app/forge/art/page.tsx",
+  "app/forge/ideas/[cardId]/page.tsx",
+  "app/forge/play/games/page.tsx", // bare redirect to /forge/play (lobby moved)
+]);
 // Routes whose gate lives elsewhere still must match their specific gate call.
 const ALT_GATE: Record<string, RegExp> = {
   // Member role check + RLS run inside the forge_art_key RPC (migration 066);
