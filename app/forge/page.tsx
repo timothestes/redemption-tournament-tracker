@@ -20,6 +20,16 @@ export default async function ForgeHomePage() {
 
       {isPlaytester ? (
         <>
+          <section className="grid gap-3 sm:grid-cols-2">
+            <Link href="/forge/play/decks" className="rounded-lg border p-4 hover:bg-muted/50">
+              <div className="font-medium">Build a deck</div>
+              <div className="text-sm text-muted-foreground">Mix the cards shared with you and the full pool.</div>
+            </Link>
+            <Link href="/forge/play" className="rounded-lg border p-4 hover:bg-muted/50">
+              <div className="font-medium">Find a game</div>
+              <div className="text-sm text-muted-foreground">Host or join a private playtest game.</div>
+            </Link>
+          </section>
           <section>
             <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Your sets</h2>
             {sets.length === 0 ? (
@@ -36,16 +46,6 @@ export default async function ForgeHomePage() {
                 ))}
               </ul>
             )}
-          </section>
-          <section className="grid gap-3 sm:grid-cols-2">
-            <Link href="/forge/play/decks" className="rounded-lg border p-4 hover:bg-muted/50">
-              <div className="font-medium">Build a deck</div>
-              <div className="text-sm text-muted-foreground">Mix the cards shared with you and the full pool.</div>
-            </Link>
-            <Link href="/forge/play/games" className="rounded-lg border p-4 hover:bg-muted/50">
-              <div className="font-medium">Find a game</div>
-              <div className="text-sm text-muted-foreground">Host or join a private playtest game.</div>
-            </Link>
           </section>
         </>
       ) : (

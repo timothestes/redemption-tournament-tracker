@@ -85,6 +85,7 @@ export async function loadForgeDeckGoldfish(deckId: string): Promise<DeckDataFor
     format: deck.format || "Type 1",
     paragon: deck.paragon ?? null,
     isOwner: true,
+    isForge: true,
     cards,
   };
 }

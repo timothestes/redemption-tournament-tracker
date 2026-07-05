@@ -128,6 +128,18 @@ export default function CardDetailsFields({
             className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
         </label>
       )}
+
+      {/* Reference — scripture citation printed on the card; optional for every type */}
+      {app.reference !== "na" && (
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">Reference</span>
+          <input
+            value={snapshot.reference ?? ""}
+            onChange={(e) => update({ reference: e.target.value || undefined })}
+            placeholder="e.g. Revelation 19:15"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+        </label>
+      )}
     </fieldset>
   );
 }

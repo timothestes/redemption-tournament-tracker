@@ -124,6 +124,9 @@ interface TurnIndicatorProps {
   winnerName?: string;
   onPlayAgain?: () => void;
   onBackToLobby?: () => void;
+  /** Destination for the exit/leave-to-lobby navigations. Defaults to the
+   *  public play lobby; Forge games pass the Forge play lobby instead. */
+  lobbyPath?: string;
   myScore?: number;
   opponentScore?: number;
   opponentConnectionStatus?: 'connected' | 'reconnecting' | 'disconnected';
@@ -167,6 +170,7 @@ export default function TurnIndicator({
   winnerName,
   onPlayAgain,
   onBackToLobby,
+  lobbyPath = '/play',
   myScore = 0,
   opponentScore = 0,
   opponentConnectionStatus = 'connected',
@@ -318,7 +322,7 @@ export default function TurnIndicator({
       >
       {/* Exit to lobby */}
       <button
-        onClick={() => isFinished ? window.location.href = '/play' : setShowLeaveConfirm(true)}
+        onClick={() => isFinished ? window.location.href = lobbyPath : setShowLeaveConfirm(true)}
         title="Back to lobby"
         style={{
           display: 'flex',
@@ -1078,7 +1082,7 @@ export default function TurnIndicator({
                 onClick={() => {
                   setShowLeaveConfirm(false);
                   onConcede?.();
-                  window.location.href = '/play';
+                  window.location.href = lobbyPath;
                 }}
                 style={{
                   flex: 1,

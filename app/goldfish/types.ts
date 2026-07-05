@@ -46,6 +46,9 @@ export interface GameState {
   deckId: string;
   deckName: string;
   isOwner: boolean;
+  /** True when the deck came from the Forge — routes the back button to the
+   *  Forge deck builder rather than the public decklist. */
+  isForge: boolean;
   format: 'T1' | 'T2' | 'Paragon';
   paragonName: string | null;
   turn: number;

@@ -61,7 +61,7 @@ function LobbyInner({ decks, displayName, userId }: Props) {
     <div className="mx-auto max-w-3xl space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-semibold">Playtest games</h1>
-        <p className="text-sm text-muted-foreground">Private games with your Forge decks. Only members you share a code with (or listed below) can play.</p>
+        <p className="text-sm text-muted-foreground">Private games with your Forge decks.</p>
       </div>
       {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">{error}</div>}
       <section className="space-y-2">

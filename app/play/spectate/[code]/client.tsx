@@ -9,7 +9,11 @@ import { useSpectatorGameState } from '@/app/play/hooks/useGameState';
 import { SpectatorPregameView, SpectatorPregameCeremonyOverlay, GameCodeHeader } from '@/app/play/components/PregameScreen';
 import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
 import { EmoteOverlay } from '@/app/shared/components/EmoteOverlay';
-import { useSpacetimeDB } from 'spacetimedb/react';
+import { useSpacetimeDB, useTable } from 'spacetimedb/react';
+import { tables } from '@/lib/spacetimedb/module_bindings';
+import type { ForgeGame } from '@/lib/spacetimedb/module_bindings/types';
+import { authorizeForgeSeat, getForgePlayResolver } from '@/app/forge/lib/playDecks';
+import type { ForgeResolverMap } from '@/app/play/utils/forgeResolver';
 import { showGameToast } from '@/app/shared/components/GameToast';
 import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerImagePreloader';
 import { buildPrioritizedImageUrls } from '@/app/play/lib/multiplayerImageUrls';
@@ -88,6 +92,9 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   const [lifecycle, setLifecycle] = useState<LifecycleState>('joining');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [gameId, setGameId] = useState<bigint | null>(null);
+  const [phase1Applied, setPhase1Applied] = useState(false);
+  const [joined, setJoined] = useState(false);
+  const [forgeResolver, setForgeResolver] = useState<ForgeResolverMap | null>(null);
   const didSubscribe = useRef(false);
   const didCallReducer = useRef(false);
   const wasWatching = useRef(false);
@@ -101,31 +108,17 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     if ((!isConnected && !isActive) || !conn || didSubscribe.current) return;
     didSubscribe.current = true;
     try {
-      conn.subscriptionBuilder().subscribe([
-        `SELECT * FROM game WHERE code = '${code}'`,
-        `SELECT * FROM card_counter`,
-      ]);
+      conn.subscriptionBuilder()
+        .onApplied(() => setPhase1Applied(true))
+        .subscribe([
+          `SELECT * FROM game WHERE code = '${code}'`,
+          `SELECT * FROM card_counter`,
+          `SELECT * FROM forge_game`,
+        ]);
     } catch (e) {
       console.error('Failed to subscribe (spectator phase 1):', e);
     }
   }, [isConnected, isActive, conn, code]);
-
-  // Once connected, call joinAsSpectator once
-  useEffect(() => {
-    if ((!isConnected && !isActive) || !conn || didCallReducer.current) return;
-    didCallReducer.current = true;
-
-    // joinAsSpectator returns a Promise that rejects asynchronously on
-    // server-side SenderError. A synchronous try/catch won't catch those
-    // rejections — attach .catch() instead.
-    conn.reducers.joinAsSpectator({
-      code,
-      displayName,
-    }).catch((e: unknown) => {
-      setErrorMessage(e instanceof Error ? e.message : 'Failed to join as spectator');
-      setLifecycle('error');
-    });
-  }, [isConnected, isActive, conn, code, displayName]);
 
   // Leave as spectator on unmount
   useEffect(() => {
@@ -138,7 +131,13 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
 
   // Derive gameId and lifecycle from live game data
   const resolvedGameId = gameId ?? BigInt(0);
-  const gameState = useSpectatorGameState(resolvedGameId);
+  const gameState = useSpectatorGameState(resolvedGameId, forgeResolver);
+
+  // Forge marker rows — fed by the phase-1 `forge_game` subscription above.
+  // A matching row means this is a private Forge playtest game whose
+  // spectators must be authorized members.
+  const [allForgeGames] = useTable(tables.ForgeGame) as [ForgeGame[], boolean];
+  const isForgeGame = gameId !== null && allForgeGames.some((f) => f.gameId === gameId);
 
   // Resolve gameId by scanning the unfiltered `allGames` subscription — the
   // filtered `game` field is keyed by gameId, which we don't have yet.
@@ -154,11 +153,78 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
       setGameId(game.id);
     }
 
+    // Only show the spectate view once the server has accepted our join —
+    // subscription data alone must never grant a working view (a rejected
+    // joinAsSpectator, e.g. a non-member on a Forge game, stays on 'error').
+    if (!joined) return;
+
     // Spectators stay in 'watching' for the entire game including after
     // it finishes — the canvas keeps rendering the final board state so
     // viewers can review what happened.
-    setLifecycle('watching');
-  }, [gameState.allGames, code, gameId]);
+    setLifecycle((prev) => (prev === 'error' ? prev : 'watching'));
+  }, [gameState.allGames, code, gameId, joined]);
+
+  // Join once the initial game subscription has applied. Forge playtest
+  // games are members-only: mint a seat authorization for our connection
+  // identity first (requireForge server action), and treat failure as
+  // terminal. Non-forge games join directly; a bad code falls through to
+  // the reducer, which rejects with 'No game found with that code'.
+  useEffect(() => {
+    if (!conn || !phase1Applied || didCallReducer.current) return;
+    const allGames = gameState.allGames ?? [];
+    const game =
+      allGames.find((g: any) => g.code === code && g.status !== 'finished') ??
+      allGames.find((g: any) => g.code === code);
+    const gameIsForge = game ? allForgeGames.some((f) => f.gameId === game.id) : false;
+    if (gameIsForge && !myIdentityHex) return; // wait for our identity, then re-run
+    didCallReducer.current = true;
+
+    const fail = (message: string) => {
+      setErrorMessage(message);
+      setLifecycle('error');
+    };
+    // joinAsSpectator returns a Promise that rejects asynchronously on
+    // server-side SenderError. A synchronous try/catch won't catch those
+    // rejections — attach .catch() instead.
+    const join = () =>
+      conn.reducers.joinAsSpectator({ code, displayName })
+        .then(() => setJoined(true))
+        .catch((e: unknown) => {
+          fail(e instanceof Error ? e.message : 'Failed to join as spectator');
+        });
+
+    if (gameIsForge) {
+      void (async () => {
+        const auth = await authorizeForgeSeat({ code, identityHex: myIdentityHex as string })
+          .catch(() => ({ ok: false as const, error: 'Could not authorize spectating — try again.' }));
+        if (auth.ok === false) {
+          fail(auth.error || 'Only Forge playtesters can spectate this game.');
+          return;
+        }
+        join();
+      })();
+    } else {
+      join();
+    }
+  }, [conn, phase1Applied, gameState.allGames, allForgeGames, myIdentityHex, code, displayName]);
+
+  // Forge resolver — loads the viewer's RLS-granted card text/art map so a
+  // member spectator sees granted card faces. Fails closed to an empty map
+  // (opaque cards); non-members never reach the board at all.
+  useEffect(() => {
+    if (!isForgeGame || forgeResolver !== null) return;
+    let cancelled = false;
+    getForgePlayResolver()
+      .then((entries) => {
+        if (!cancelled) setForgeResolver(new Map(entries.map((e) => [e.cardId, e])));
+      })
+      .catch(() => {
+        if (!cancelled) setForgeResolver(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isForgeGame, forgeResolver]);
 
   // Detect kick: once we're watching, if our Spectator row disappears, redirect.
   useEffect(() => {
@@ -199,8 +265,9 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
       gameState.myCards,
       gameState.opponentCards,
       gameState.sharedCards ?? {},
+      forgeResolver,
     );
-  }, [gameState.myCards, gameState.opponentCards, gameState.sharedCards]);
+  }, [gameState.myCards, gameState.opponentCards, gameState.sharedCards, forgeResolver]);
 
   const { getImage } = useMultiplayerImagePreloader(allImageUrls);
 
@@ -457,6 +524,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                   gameId={gameId}
                   viewerKind="spectator"
                   getImage={getImage}
+                  forgeResolver={forgeResolver}
                 />
                 {status === 'pregame' && (
                   <SpectatorPregameCeremonyOverlay

@@ -33,6 +33,7 @@ function makeState(hand: GameCard[] = [], territory: GameCard[] = []): GameState
     deckId: 'd',
     deckName: 'n',
     isOwner: true,
+    isForge: false,
     format: 'T1',
     paragonName: null,
     turn: 1,

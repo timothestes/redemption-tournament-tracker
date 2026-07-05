@@ -39,6 +39,7 @@ function makeState(zoneOverrides: Partial<Record<ZoneId, GameCard[]>>, format: '
     deckId: 'd',
     deckName: 'T',
     isOwner: true,
+    isForge: false,
     format,
     paragonName: null,
     turn: 1,

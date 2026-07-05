@@ -1625,10 +1625,6 @@ export const join_as_spectator = spacetimedb.reducer(
     }
     if (!game) throw new SenderError('No game found with that code');
 
-    // Forge playtest games never accept spectators (defense-in-depth — they
-    // are also always private). Same error as a nonexistent game.
-    if (isForgeGame(ctx, game.id)) throw new SenderError('No game found with that code');
-
     // Ban check
     for (const ban of ctx.db.SpectatorBan.spectator_ban_game_id.filter(game.id)) {
       if (ban.identity.toHexString() === ctx.sender.toHexString()) {
@@ -1648,8 +1644,20 @@ export const join_as_spectator = spacetimedb.reducer(
       }
     }
 
-    // Private games block new spectators (existing ones already returned above)
-    if (!game.isPublic) throw new SenderError('This game is private');
+    if (isForgeGame(ctx, game.id)) {
+      // Forge playtest games: spectating is members-only. The spectate page
+      // mints a seat authorization for the viewer's identity via the
+      // requireForge server action before calling this reducer; absent or
+      // stale auth reads the same as a nonexistent game (no oracle).
+      try {
+        consumeForgeSeatAuth(ctx, code);
+      } catch {
+        throw new SenderError('No game found with that code');
+      }
+    } else if (!game.isPublic) {
+      // Private games block new spectators (existing ones already returned above)
+      throw new SenderError('This game is private');
+    }
 
     ctx.db.Spectator.insert({
       id: 0n,

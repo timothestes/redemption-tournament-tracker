@@ -1021,7 +1021,7 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
  * possible) and returns a superset of the core data fields. Action methods are
  * all no-ops — spectators cannot mutate game state.
  */
-export function useSpectatorGameState(gameId: bigint | null) {
+export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: ForgeResolverMap | null) {
   const effectiveGameId = gameId ?? 0n;
 
   // Connection — needed for the sendChat reducer call
@@ -1134,8 +1134,9 @@ export function useSpectatorGameState(gameId: bigint | null) {
     return map;
   }, [allCounters, gameCards]);
 
-  // Forge games reject spectators — no resolver is ever needed here.
-  const adaptedCardsById = useStableAdaptedCards(gameCards, counters, seat1Player?.id, undefined);
+  // Forge games admit member-authorized spectators; the resolver (when the
+  // viewer is a Forge member) supplies granted card names/text/art.
+  const adaptedCardsById = useStableAdaptedCards(gameCards, counters, seat1Player?.id, forgeResolver);
 
   const chatMessages = useMemo(
     () =>
