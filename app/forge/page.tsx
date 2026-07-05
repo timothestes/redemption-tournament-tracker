@@ -12,7 +12,7 @@ export default async function ForgeHomePage() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 p-6">
-      <h1 className="text-2xl jayden-gradient-text" style={{ fontFamily: "Cinzel, serif" }}>The Forge</h1>
+      <h1 className="text-2xl" style={{ fontFamily: "Cinzel, serif" }}>The Forge</h1>
 
       {isPlaytester ? (
         <section className="space-y-3">
