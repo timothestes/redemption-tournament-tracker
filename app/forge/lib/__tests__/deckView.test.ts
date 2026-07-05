@@ -30,7 +30,7 @@ const granted = (cardId: string, name: string, overrides: Partial<GrantedForgeCa
     strength: 5,
     toughness: 5,
     reference: "",
-    flavorText: "",
+    scripture: "",
     legality: "",
     rarity: "",
     alignment: "Good",

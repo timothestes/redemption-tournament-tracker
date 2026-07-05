@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  CARD_TYPES, ALIGNMENTS, BRIGADES, CLASSES,
-  cardApplicability, type DesignCard, type CardType, type Brigade,
+  CARD_TYPES, ALIGNMENTS, BRIGADES, CLASSES, ICONS,
+  type DesignCard, type CardType, type Brigade,
 } from "@/app/forge/lib/designCard";
 import { BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
 
@@ -10,6 +10,7 @@ import { BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
 const LIGHT_BRIGADES = new Set<Brigade>(["White", "Silver", "GoodGold", "PaleGreen"]);
 
 type ClassName = (typeof CLASSES)[number];
+type IconName = (typeof ICONS)[number];
 
 function toggle<T>(arr: T[] | undefined, v: T): T[] {
   const a = arr ?? [];
@@ -18,13 +19,13 @@ function toggle<T>(arr: T[] | undefined, v: T): T[] {
 
 // Structured, deck-relevant fields. The freeform text box stays the primary way to
 // write a card; these give the deckbuilder/validator machine-readable data (type,
-// brigade, stats, class, identifiers, alignment). Fields appear only when they apply
-// to the chosen card type (per the applicability matrix in designCard.ts).
+// brigade, stats, class, icons, identifiers, alignment, scripture). Every field is
+// always editable so any card — including a brand-new idea with no type yet — can be
+// filled out completely.
 export default function CardDetailsFields({
   snapshot, update,
 }: { snapshot: DesignCard; update: (patch: Partial<DesignCard>) => void }) {
   const types = snapshot.cardType ?? [];
-  const app = cardApplicability(types);
 
   return (
     <fieldset className="space-y-4 rounded-lg border bg-card p-4">
@@ -58,88 +59,104 @@ export default function CardDetailsFields({
         </select>
       </label>
 
-      {/* Brigade — only when the type uses brigades */}
-      {app.brigades !== "na" && (
-        <div>
-          <span className="mb-1 block text-sm font-medium">
-            Brigade{app.brigades === "required" ? "" : " (optional)"}
-          </span>
-          <div className="flex flex-wrap gap-2">
-            {BRIGADES.map((b) => {
-              const selected = (snapshot.brigades ?? []).includes(b);
-              return (
-                <button key={b} type="button"
-                  onClick={() => update({ brigades: toggle<Brigade>(snapshot.brigades, b) })}
-                  style={selected ? { backgroundColor: BRIGADE_HEX[b] } : undefined}
-                  className={`rounded-full border px-3 py-1 text-xs ${selected ? `border-transparent ${LIGHT_BRIGADES.has(b) ? "text-gray-900" : "text-white"}` : "text-foreground"}`}>
-                  {b}
-                </button>
-              );
-            })}
-          </div>
+      {/* Brigade */}
+      <div>
+        <span className="mb-1 block text-sm font-medium">Brigade</span>
+        <div className="flex flex-wrap gap-2">
+          {BRIGADES.map((b) => {
+            const selected = (snapshot.brigades ?? []).includes(b);
+            return (
+              <button key={b} type="button"
+                onClick={() => update({ brigades: toggle<Brigade>(snapshot.brigades, b) })}
+                style={selected ? { backgroundColor: BRIGADE_HEX[b] } : undefined}
+                className={`rounded-full border px-3 py-1 text-xs ${selected ? `border-transparent ${LIGHT_BRIGADES.has(b) ? "text-gray-900" : "text-white"}` : "text-foreground"}`}>
+                {b}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </div>
 
-      {/* Strength / Toughness — only for stat-bearing types */}
-      {app.stats !== "na" && (
-        <div className="flex gap-3">
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">Strength</span>
-            <input type="number" value={snapshot.strength ?? ""}
-              onChange={(e) => update({ strength: e.target.value === "" ? null : Number(e.target.value) })}
-              className="w-24 rounded-md border bg-background px-3 py-2 text-sm" />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">Toughness</span>
-            <input type="number" value={snapshot.toughness ?? ""}
-              onChange={(e) => update({ toughness: e.target.value === "" ? null : Number(e.target.value) })}
-              className="w-24 rounded-md border bg-background px-3 py-2 text-sm" />
-          </label>
-        </div>
-      )}
-
-      {/* Class — only when the type uses classes (Hero / Evil Character) */}
-      {app.class !== "na" && (
-        <div>
-          <span className="mb-1 block text-sm font-medium">Class</span>
-          <div className="flex flex-wrap gap-2">
-            {CLASSES.map((c) => {
-              const selected = (snapshot.class ?? []).includes(c);
-              return (
-                <button key={c} type="button"
-                  onClick={() => update({ class: toggle<ClassName>(snapshot.class, c) })}
-                  className={`rounded-full border px-3 py-1 text-xs ${selected ? "border-transparent bg-emerald-600 text-white" : "text-foreground"}`}>
-                  {c}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Identifier(s) — only when the type uses them */}
-      {app.identifiers !== "na" && (
+      {/* Strength / Toughness */}
+      <div className="flex gap-3">
         <label className="block">
-          <span className="mb-1 block text-sm font-medium">Identifier(s)</span>
-          <input
-            value={(snapshot.identifiers ?? []).join(", ")}
-            onChange={(e) => update({ identifiers: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
-            placeholder="Comma-separated, e.g. Genesis, Patriarch"
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+          <span className="mb-1 block text-sm font-medium">Strength</span>
+          <input type="number" value={snapshot.strength ?? ""}
+            onChange={(e) => update({ strength: e.target.value === "" ? null : Number(e.target.value) })}
+            className="w-24 rounded-md border bg-background px-3 py-2 text-sm" />
         </label>
-      )}
-
-      {/* Reference — scripture citation printed on the card; optional for every type */}
-      {app.reference !== "na" && (
         <label className="block">
-          <span className="mb-1 block text-sm font-medium">Reference</span>
-          <input
-            value={snapshot.reference ?? ""}
-            onChange={(e) => update({ reference: e.target.value || undefined })}
-            placeholder="e.g. Revelation 19:15"
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+          <span className="mb-1 block text-sm font-medium">Toughness</span>
+          <input type="number" value={snapshot.toughness ?? ""}
+            onChange={(e) => update({ toughness: e.target.value === "" ? null : Number(e.target.value) })}
+            className="w-24 rounded-md border bg-background px-3 py-2 text-sm" />
         </label>
-      )}
+      </div>
+
+      {/* Class */}
+      <div>
+        <span className="mb-1 block text-sm font-medium">Class</span>
+        <div className="flex flex-wrap gap-2">
+          {CLASSES.map((c) => {
+            const selected = (snapshot.class ?? []).includes(c);
+            return (
+              <button key={c} type="button"
+                onClick={() => update({ class: toggle<ClassName>(snapshot.class, c) })}
+                className={`rounded-full border px-3 py-1 text-xs ${selected ? "border-transparent bg-emerald-600 text-white" : "text-foreground"}`}>
+                {c}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Icons — Territory / Star / Cloud */}
+      <div>
+        <span className="mb-1 block text-sm font-medium">Icons</span>
+        <div className="flex flex-wrap gap-2">
+          {ICONS.map((ic) => {
+            const selected = (snapshot.icons ?? []).includes(ic);
+            return (
+              <button key={ic} type="button"
+                onClick={() => update({ icons: toggle<IconName>(snapshot.icons, ic) })}
+                className={`rounded-full border px-3 py-1 text-xs ${selected ? "border-transparent bg-emerald-600 text-white" : "text-foreground"}`}>
+                {ic}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Identifier(s) */}
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium">Identifier(s)</span>
+        <input
+          value={(snapshot.identifiers ?? []).join(", ")}
+          onChange={(e) => update({ identifiers: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+          placeholder="Comma-separated, e.g. Genesis, Patriarch"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+      </label>
+
+      {/* Reference — scripture citation printed on the card */}
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium">Reference</span>
+        <input
+          value={snapshot.reference ?? ""}
+          onChange={(e) => update({ reference: e.target.value || undefined })}
+          placeholder="e.g. Revelation 19:15"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+        <span className="mt-1 block text-xs text-muted-foreground">The scripture reference printed on the card.</span>
+      </label>
+
+      {/* Scripture — the verse text printed on the card */}
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium">Scripture</span>
+        <textarea
+          value={snapshot.scripture ?? ""}
+          onChange={(e) => update({ scripture: e.target.value || undefined })}
+          placeholder="The scripture text printed on the card."
+          className="h-20 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+      </label>
     </fieldset>
   );
 }

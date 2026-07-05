@@ -120,8 +120,8 @@ export default function FullModeForm({
         </label>
       )}
 
-      <label className="block"><span className="mb-1 block font-medium">Flavor text</span>
-        <textarea value={snapshot.flavorText ?? ""} onChange={(e) => update({ flavorText: e.target.value })}
+      <label className="block"><span className="mb-1 block font-medium">Scripture</span>
+        <textarea value={snapshot.scripture ?? ""} onChange={(e) => update({ scripture: e.target.value })}
           className="h-20 w-full rounded-md border bg-background px-3 py-2" /></label>
 
       <label className="block"><span className="mb-1 block font-medium">Artist</span>

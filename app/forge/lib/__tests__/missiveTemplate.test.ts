@@ -43,7 +43,7 @@ describe("wrapForgeMissive", () => {
     expect(out).toContain("THE FORGE");
     expect(out).toContain("Tim");
     expect(out).toContain("tim@example.com");
-    expect(out).toContain("Keep it in the Forge");
+    expect(out).toContain("confidential playtest material");
     expect(out).toContain("DM");
     expect(out).toContain("Discord");
   });

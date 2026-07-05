@@ -34,7 +34,7 @@ const grantedCard = (cardId: string, name: string): GrantedForgeCard => ({
     strength: null,
     toughness: null,
     reference: "",
-    flavorText: "",
+    scripture: "",
     legality: "",
     rarity: "",
     alignment: "Neutral",

@@ -24,6 +24,9 @@ export default function ForgeCardGrid({
       {leading}
       {cards.map((c) => {
         const t = Date.parse(c.updatedAt) || 0;
+        // Shelved cards recede: desaturate + dim the face so they read as inactive
+        // at a glance. Title + dashed status badge stay legible.
+        const shelved = c.status === "archived";
         const inner = (
           <>
             <ForgeCardFace
@@ -31,6 +34,7 @@ export default function ForgeCardGrid({
               rawText={cardRawText(c.snapshot)}
               finishedUrl={c.hasFinished ? `/forge/api/art/${c.id}?kind=finished&t=${t}` : null}
               artUrl={c.hasArt ? `/forge/api/art/${c.id}?t=${t}` : null}
+              className={shelved ? "opacity-60 grayscale" : undefined}
             />
             <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
               <p className="min-w-[6rem] flex-1 truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>

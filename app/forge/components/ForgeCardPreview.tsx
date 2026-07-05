@@ -96,7 +96,7 @@ export default function ForgeCardPreview({
       </div>
       {/* 8. scripture + reference — dark panel, light italic text */}
       <div style={{ ...abs(G.scripture), zIndex: 5, overflow: "hidden", boxSizing: "border-box", background: "rgba(0,0,0,0.82)", borderRadius: "2.5%", padding: "1.4cqw 3cqw", color: "#e8e8e8", fontStyle: "italic", fontSize: "3.2cqw", lineHeight: 1.15, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-        <span style={{ overflow: "hidden" }}>{card.flavorText || ""}</span>
+        <span style={{ overflow: "hidden" }}>{card.scripture || ""}</span>
         <span style={{ textAlign: "right", fontStyle: "normal", fontWeight: 700 }}>{card.reference || ""}</span>
       </div>
       {/* 9. footer */}

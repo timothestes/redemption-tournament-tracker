@@ -23,8 +23,9 @@ export const ICONS = ["Territory", "Star", "Cloud"] as const;
 export const LEGALITIES = ["Rotation", "Classic", "Scrolls", "Paragon", "Banned"] as const;
 
 // NOTE: the property keys below are mirrored by the SQL allowlist
-// `_forge_is_card_field` in supabase/migrations/053_forge_review_layer.sql
-// (used to validate field-anchored suggestions). Keep the two lists in sync.
+// `_forge_is_card_field` (used to validate field-anchored suggestions); its
+// current definition is in supabase/migrations/067_forge_scripture_field.sql.
+// Keep the two lists in sync.
 export type DesignCard = {
   name?: string;
   rawText?: string;
@@ -33,8 +34,6 @@ export type DesignCard = {
   brigades?: Brigade[];
   strength?: number | null;
   toughness?: number | null;
-  strengthModifier?: string;
-  toughnessModifier?: string;
   class?: (typeof CLASSES)[number][];
   icons?: (typeof ICONS)[number][];
   identifiers?: string[];
@@ -42,18 +41,18 @@ export type DesignCard = {
   reference?: string;
   legality?: (typeof LEGALITIES)[number];
   rarity?: string;
-  flavorText?: string;
+  scripture?: string;
   artistCredit?: string;
   cardFrame?: string;
 };
 
 export type Applicability = "required" | "optional" | "na";
 export type FieldKey =
-  | "brigades" | "stats" | "strengthModifier" | "class" | "icons"
+  | "brigades" | "stats" | "class" | "icons"
   | "identifiers" | "specialAbility" | "reference";
 
 const NA: Record<FieldKey, Applicability> = {
-  brigades: "na", stats: "na", strengthModifier: "na", class: "na",
+  brigades: "na", stats: "na", class: "na",
   icons: "na", identifiers: "na", specialAbility: "na", reference: "na",
 };
 
@@ -62,8 +61,8 @@ const NA: Record<FieldKey, Applicability> = {
 const MATRIX: Record<CardType, Partial<Record<FieldKey, Applicability>>> = {
   Hero:          { brigades: "required", stats: "required", class: "optional", icons: "optional", identifiers: "optional", specialAbility: "optional", reference: "optional" },
   EvilCharacter: { brigades: "required", stats: "required", class: "optional", icons: "optional", identifiers: "optional", specialAbility: "optional", reference: "optional" },
-  GE:            { brigades: "required", strengthModifier: "optional", specialAbility: "required", reference: "optional" },
-  EE:            { brigades: "required", strengthModifier: "optional", specialAbility: "required", reference: "optional" },
+  GE:            { brigades: "required", specialAbility: "required", reference: "optional" },
+  EE:            { brigades: "required", specialAbility: "required", reference: "optional" },
   LostSoul:      { specialAbility: "optional", reference: "optional", identifiers: "optional" },
   Artifact:      { specialAbility: "required", identifiers: "optional", reference: "optional" },
   Dominant:      { specialAbility: "required", identifiers: "optional", reference: "optional" },

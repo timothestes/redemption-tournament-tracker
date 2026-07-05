@@ -15,10 +15,9 @@ export type FieldChange = {
 // Display order + friendly labels for the diffable DesignCard fields.
 export const FIELD_LABELS: Record<string, string> = {
   name: "Name", cardType: "Type", alignment: "Alignment", brigades: "Brigade",
-  strength: "Strength", toughness: "Toughness", strengthModifier: "Strength modifier",
-  toughnessModifier: "Toughness modifier", class: "Class", icons: "Icons",
+  strength: "Strength", toughness: "Toughness", class: "Class", icons: "Icons",
   identifiers: "Identifiers", specialAbility: "Special ability", reference: "Reference",
-  legality: "Legality", rarity: "Rarity", flavorText: "Flavor text",
+  legality: "Legality", rarity: "Rarity", scripture: "Scripture",
   artistCredit: "Artist", cardFrame: "Card frame",
 };
 

@@ -40,7 +40,7 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
           style={{ fontFamily: "Cinzel, serif" }}
         >
           <Anvil className="hidden h-5 w-5 sm:block" aria-hidden="true" />
-          <span>The Forge</span>
+          <span className="jayden-gradient-text">The Forge</span>
         </Link>
         <nav className="no-scrollbar flex items-center gap-1 overflow-x-auto">
           {items.map((it) => {

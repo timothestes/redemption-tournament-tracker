@@ -86,7 +86,7 @@ export function wrapForgeMissive(opts: {
             <tr>
               <td style="padding:0 30px 28px;">
                 <div style="background:#201409;border:1px solid #7c2d12;border-left:4px solid #ea580c;border-radius:6px;padding:16px 18px;font-size:14px;line-height:1.65;color:#e9e4de;font-family:${bodyFont};">
-                  <span style="color:#fbbf24;font-weight:bold;">Keep it in the Forge.</span> Everything in this announcement — card designs, names, mechanics, set details, images, and timelines — is confidential playtest material. Do not share, screenshot, forward, or discuss it outside playtesting. You are reading this because the elders trust you with unfinished work; Guard it!
+                  Everything in this announcement — card designs, names, mechanics, set details, images, and timelines — is confidential playtest material. Do not share, screenshot, forward, or discuss it outside of playtesting. You are reading this because the elders trust you with unfinished work; Guard it!
                 </div>
               </td>
             </tr>

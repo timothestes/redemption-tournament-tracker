@@ -31,7 +31,7 @@ describe("summarizeDiff", () => {
   it("summarizes none, few, and many changes", () => {
     expect(summarizeDiff([])).toBe("No field changes.");
     expect(summarizeDiff(diffCards({}, { name: "X" }))).toBe("Changed Name.");
-    const many = diffCards({}, { name: "a", reference: "b", rarity: "c", flavorText: "d" });
+    const many = diffCards({}, { name: "a", reference: "b", rarity: "c", scripture: "d" });
     expect(summarizeDiff(many)).toMatch(/\+1 more\.$/);
   });
 });
