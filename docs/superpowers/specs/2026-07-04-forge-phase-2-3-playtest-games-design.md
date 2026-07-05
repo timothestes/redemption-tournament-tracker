@@ -24,10 +24,11 @@ real-time 1v1 game on the existing `/play` engine against another forge member, 
 Spectator support for forge games; republish notifications (Phase 2.4); public-pool promotion
 (2.5); deck-swap rematch (v1 rematches with the same forge deck); pregame deck-change and
 mid-game deck-reload inside forge games (blocked server-side in v1); brigade/type-aware server
-logic for forge cards (raw-text cards have no structured fields post-descope; sandbox
-philosophy — players drag manually; Lost-Soul auto-routing will not recognize forge souls —
-expected, not a bug); resolver-aware game-log rendering (forge cards show blank names in the
-action log — cosmetic follow-up); retrofitting identity gating onto public games.
+*ability* logic for forge cards (raw-text cards have no structured fields post-descope; sandbox
+philosophy — players drag manually; brigade-keyed reducers like `matthew_draw_brigades` still
+no-op for forge cards since brigade stays empty); resolver-aware game-log rendering (forge cards
+show blank names in the action log — cosmetic follow-up); retrofitting identity gating onto
+public games.
 
 ## Key facts this design rests on (verified in code 2026-07-04)
 
@@ -127,8 +128,10 @@ statement):
   — fail-closed), and serializes to the `GameCardData[]` shape:
   - public entries → full text, identical enrichment to `loadDeckForGame` (via `findCard`);
   - forge entries → **stub**: `{ cardName: '', cardSet: 'Forge', cardImgFile: 'forge:<uuid>',
-    cardType: '', brigade: '', strength: '', toughness: '', alignment: '', identifier: '',
-    reference: '', specialAbility: '', isReserve: zone === 'reserve' }`.
+    cardType: '<type display, LS for lost souls>', brigade: '', strength: '', toughness: '',
+    alignment: '', identifier: '', reference: '', specialAbility: '', isReserve: zone === 'reserve' }`.
+    Type strings are a deliberate, user-approved metadata relaxation (2026-07-04) so server-side
+    lost-soul auto-routing works; names/text/art remain empty.
 - **Paragon validation:** `Player.paragon` and `Game.rematchParagon0/1` are world-readable
   strings — the action validates the deck's paragon against the public paragon list and emits
   `''` otherwise, so a forge card name can never ride the paragon field.
@@ -213,7 +216,7 @@ World-readable STDB surface for a forge game (all opaque or already-public-shape
 | `Game.rematchParagon0/1`, `Player.paragon` | paragon name | validated against public paragon list, else `''` |
 | `forge_game` row | game id | opaque |
 | `Player` rows | displayName, supabaseUserId (public today for all games), forge deck UUID, `pendingDeckData` stubs | UUID-only |
-| `CardInstance` rows | zones/positions + `forge:<uuid>` + `cardSet:'Forge'` | UUID-only |
+| `CardInstance` rows | zones/positions + `forge:<uuid>` + `cardSet:'Forge'` + type string (approved metadata relaxation) | UUID-only |
 | `GameAction` log | payloads built from row fields (verified row-sourced across all `logAction` call sites; empty for forge cards; tokens/Paragon souls come from public registries) | UUID/empty |
 | `ChatMessage` / card `notes` | member-typed text | NDA'd members; same trust as today |
 

@@ -9,6 +9,7 @@ import { listGrantedForgeCards } from "@/app/forge/lib/deckPool";
 import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
 import { buildForgePlayDeck, buildForgeGoldfishCards, sanitizeParagon } from "@/app/forge/lib/playSerialize";
 import { cardRawText } from "@/app/forge/lib/designCard";
+import { TYPE_DISPLAY } from "@/app/forge/lib/deckAdapter";
 import { stdbHttpBase } from "@/app/forge/lib/stdbHttp";
 import type { GameCardData } from "@/app/play/actions";
 import type { DeckDataForGoldfish } from "@/app/shared/types/gameCard";
@@ -22,9 +23,8 @@ export async function loadForgeDeckForGame(deckId: string): Promise<ForgePlayDec
   if (!ctx) return { ok: false, error: "Deck not found." };
   const deck = await getForgeDeck(deckId);
   if (!deck) return { ok: false, error: "Deck not found." };
-  const granted = await listGrantedForgeCards();
-  const grantedIds = new Set(granted.map((g) => g.cardId));
-  const { deckData, dropped } = buildForgePlayDeck(deck.entries, (id) => grantedIds.has(id));
+  const byId = await grantedResolverMap();
+  const { deckData, dropped } = buildForgePlayDeck(deck.entries, (id) => byId.get(id));
   if (deckData.length === 0) {
     return { ok: false, error: "This deck has no playable cards — its Forge cards may no longer be shared with you." };
   }
@@ -38,10 +38,12 @@ export async function loadForgeDeckForGame(deckId: string): Promise<ForgePlayDec
 
 export type ForgePlayResolverEntry = {
   cardId: string; name: string; rawText: string;
-  hasFinished: boolean; hasArt: boolean; versionId: string;
+  hasFinished: boolean; hasArt: boolean; versionId: string; typeDisplay: string;
 };
 
 function toResolverEntry(g: GrantedForgeCard): ForgePlayResolverEntry {
+  const joined = (g.data.cardType ?? []).map((t) => TYPE_DISPLAY[t] ?? t).join("/");
+  const typeDisplay = joined || ((g.data.name ?? "").toLowerCase().includes("lost soul") ? "Lost Soul" : joined);
   return {
     cardId: g.cardId,
     name: g.data.name || "Playtest card",
@@ -49,14 +51,22 @@ function toResolverEntry(g: GrantedForgeCard): ForgePlayResolverEntry {
     hasFinished: g.hasApprovedFinished,
     hasArt: g.hasApprovedArt,
     versionId: g.versionId,
+    typeDisplay,
   };
+}
+
+// Shared by every loader that needs granted forge cards keyed by id — one
+// listGrantedForgeCards() call, one resolver-entry shape.
+async function grantedResolverMap(): Promise<Map<string, ForgePlayResolverEntry>> {
+  const granted = await listGrantedForgeCards();
+  return new Map(granted.map((g) => [g.cardId, toResolverEntry(g)]));
 }
 
 export async function getForgePlayResolver(): Promise<ForgePlayResolverEntry[]> {
   const ctx = await requireForge();
   if (!ctx) return [];
-  const granted = await listGrantedForgeCards();
-  return granted.map(toResolverEntry);
+  const byId = await grantedResolverMap();
+  return [...byId.values()];
 }
 
 // Owner goldfish loader. Returns null (caller 404s) unless the caller is a
@@ -66,8 +76,7 @@ export async function loadForgeDeckGoldfish(deckId: string): Promise<DeckDataFor
   if (!ctx) return null;
   const deck = await getForgeDeck(deckId);
   if (!deck) return null;
-  const granted = await listGrantedForgeCards();
-  const byId = new Map(granted.map((g) => [g.cardId, toResolverEntry(g)]));
+  const byId = await grantedResolverMap();
   const cards = buildForgeGoldfishCards(deck.entries, (id) => byId.get(id));
   if (cards.length === 0) return null;
   return {

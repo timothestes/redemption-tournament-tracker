@@ -1,6 +1,8 @@
 // Pure serializer for forge play decks. LEAK SPINE: forge entries become
 // opaque stubs — the UUID rides cardImgFile as `forge:<uuid>`; every text
-// field stays ''. Public entries get the same enrichment loadDeckForGame uses.
+// field stays '' except cardType, a deliberate user-approved metadata
+// relaxation (2026-07-04) so server-side lost-soul auto-routing works.
+// Public entries get the same enrichment loadDeckForGame uses.
 import { findCard } from "@/lib/cards/lookup";
 import { getParagonByName } from "@/app/decklist/card-search/data/paragons";
 import { forgeProxyUrl } from "@/app/play/utils/forgeResolver";
@@ -11,7 +13,7 @@ import type { DeckDataForGoldfish } from "@/app/shared/types/gameCard";
 
 export function buildForgePlayDeck(
   entries: ForgeDeckEntry[],
-  isGranted: (cardId: string) => boolean,
+  resolve: (cardId: string) => ForgePlayResolverEntry | undefined,
 ): { deckData: GameCardData[]; dropped: number } {
   const deckData: GameCardData[] = [];
   let dropped = 0;
@@ -19,11 +21,16 @@ export function buildForgePlayDeck(
     if (e.zone !== "main" && e.zone !== "reserve") continue; // game sees main + reserve only
     const isReserve = e.zone === "reserve";
     if (e.source === "forge") {
-      if (!isGranted(e.cardId)) { dropped += e.qty; continue; }
+      const r = resolve(e.cardId);
+      if (!r) { dropped += e.qty; continue; } // fail-closed: no longer granted
+      const isLS = r.typeDisplay.toLowerCase().includes("lost soul");
+      // 'LS' is the STDB module's server-side auto-route contract (index.ts:295) —
+      // forge stubs have empty names, so the name fallback never fires for them.
       for (let i = 0; i < e.qty; i++) {
         deckData.push({
           cardName: "", cardSet: "Forge", cardImgFile: `forge:${e.cardId}`,
-          cardType: "", brigade: "", strength: "", toughness: "", alignment: "",
+          cardType: isLS ? "LS" : r.typeDisplay,
+          brigade: "", strength: "", toughness: "", alignment: "",
           identifier: "", reference: "", specialAbility: "", isReserve,
         });
       }
@@ -63,7 +70,7 @@ export function buildForgeGoldfishCards(
         card_name: r.name,
         card_set: "Forge",
         card_img_file: forgeProxyUrl(r), // '' when no image; leading-/ proxy URL otherwise
-        card_type: "", card_brigade: "", card_strength: "", card_toughness: "",
+        card_type: r.typeDisplay, card_brigade: "", card_strength: "", card_toughness: "",
         card_special_ability: r.rawText,
         card_identifier: "", card_reference: "", card_alignment: "",
         quantity: e.qty,

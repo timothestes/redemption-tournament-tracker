@@ -5,30 +5,42 @@ import type { ForgePlayResolverEntry } from "../playDecks";
 
 const FORGE_ID = "11111111-2222-3333-4444-555555555555";
 
+const resolverEntry = (overrides: Partial<ForgePlayResolverEntry> = {}): ForgePlayResolverEntry => ({
+  cardId: FORGE_ID,
+  name: "Playtest Hero",
+  rawText: "Some raw ability text.",
+  hasFinished: false,
+  hasArt: true,
+  versionId: "v1",
+  typeDisplay: "",
+  ...overrides,
+});
+
 describe("buildForgePlayDeck", () => {
   it("serializes forge entries as opaque stubs with zero text fields", () => {
     const entries: ForgeDeckEntry[] = [
       { source: "forge", cardId: FORGE_ID, qty: 2, zone: "main" },
     ];
-    const { deckData, dropped } = buildForgePlayDeck(entries, () => true);
+    const { deckData, dropped } = buildForgePlayDeck(entries, () => resolverEntry());
     expect(dropped).toBe(0);
     expect(deckData).toHaveLength(2);
     for (const c of deckData) {
       expect(c.cardImgFile).toBe(`forge:${FORGE_ID}`);
       expect(c.cardSet).toBe("Forge");
       expect(c.isReserve).toBe(false);
-      // THE LEAK ASSERTION: every other field is empty.
-      for (const key of ["cardName","cardType","brigade","strength","toughness","alignment","identifier","reference","specialAbility"] as const) {
+      // THE LEAK ASSERTION: every other text field is empty — cardType now
+      // deliberately carries the type/'LS' contract (see tests below).
+      for (const key of ["cardName","brigade","strength","toughness","alignment","identifier","reference","specialAbility"] as const) {
         expect(c[key]).toBe("");
       }
     }
   });
 
-  it("drops ungranted forge entries (fail-closed) and counts them", () => {
+  it("drops unresolved (ungranted/revoked) forge entries (fail-closed) and counts them", () => {
     const entries: ForgeDeckEntry[] = [
       { source: "forge", cardId: FORGE_ID, qty: 3, zone: "main" },
     ];
-    const { deckData, dropped } = buildForgePlayDeck(entries, () => false);
+    const { deckData, dropped } = buildForgePlayDeck(entries, () => undefined);
     expect(deckData).toHaveLength(0);
     expect(dropped).toBe(3);
   });
@@ -38,7 +50,7 @@ describe("buildForgePlayDeck", () => {
       { source: "forge", cardId: FORGE_ID, qty: 1, zone: "reserve" },
       { source: "forge", cardId: FORGE_ID, qty: 1, zone: "maybeboard" as any },
     ];
-    const { deckData } = buildForgePlayDeck(entries, () => true);
+    const { deckData } = buildForgePlayDeck(entries, () => resolverEntry());
     expect(deckData).toHaveLength(1);
     expect(deckData[0].isReserve).toBe(true);
   });
@@ -48,10 +60,37 @@ describe("buildForgePlayDeck", () => {
     const entries: ForgeDeckEntry[] = [
       { source: "public", name: "Son of God", set: "Promo", qty: 1, zone: "main" },
     ];
-    const { deckData } = buildForgePlayDeck(entries, () => true);
+    const { deckData } = buildForgePlayDeck(entries, () => resolverEntry());
     expect(deckData).toHaveLength(1);
     expect(deckData[0].cardName).toBe("Son of God");
     expect(deckData[0].cardImgFile).not.toContain("forge:");
+  });
+
+  it("routes a Lost Soul type display to the 'LS' server auto-route contract", () => {
+    const entries: ForgeDeckEntry[] = [
+      { source: "forge", cardId: FORGE_ID, qty: 1, zone: "main" },
+    ];
+    const { deckData } = buildForgePlayDeck(entries, () => resolverEntry({ typeDisplay: "Lost Soul" }));
+    expect(deckData[0].cardType).toBe("LS");
+    // Name/rawText must never leak into any stub field, even for lost souls.
+    expect(deckData[0].cardName).toBe("");
+    expect(deckData[0].specialAbility).toBe("");
+  });
+
+  it("passes a non-lost-soul type display through verbatim", () => {
+    const entries: ForgeDeckEntry[] = [
+      { source: "forge", cardId: FORGE_ID, qty: 1, zone: "main" },
+    ];
+    const { deckData } = buildForgePlayDeck(entries, () => resolverEntry({ typeDisplay: "Hero" }));
+    expect(deckData[0].cardType).toBe("Hero");
+  });
+
+  it("routes a multi-type card containing Lost Soul to 'LS'", () => {
+    const entries: ForgeDeckEntry[] = [
+      { source: "forge", cardId: FORGE_ID, qty: 1, zone: "main" },
+    ];
+    const { deckData } = buildForgePlayDeck(entries, () => resolverEntry({ typeDisplay: "Lost Soul/Site" }));
+    expect(deckData[0].cardType).toBe("LS");
   });
 });
 
@@ -63,16 +102,6 @@ describe("sanitizeParagon", () => {
 });
 
 describe("buildForgeGoldfishCards", () => {
-  const resolverEntry = (overrides: Partial<ForgePlayResolverEntry> = {}): ForgePlayResolverEntry => ({
-    cardId: FORGE_ID,
-    name: "Playtest Hero",
-    rawText: "Some raw ability text.",
-    hasFinished: false,
-    hasArt: true,
-    versionId: "v1",
-    ...overrides,
-  });
-
   it("resolves a granted forge entry with name/text from the resolver, preserving quantity", () => {
     const entries: ForgeDeckEntry[] = [
       { source: "forge", cardId: FORGE_ID, qty: 3, zone: "main" },
@@ -87,6 +116,14 @@ describe("buildForgeGoldfishCards", () => {
     expect(c.card_img_file.startsWith("/forge/api/art/")).toBe(true);
     expect(c.quantity).toBe(3);
     expect(c.is_reserve).toBe(false);
+  });
+
+  it("emits the resolver's type display string in card_type (LostSoul, not 'LS')", () => {
+    const entries: ForgeDeckEntry[] = [
+      { source: "forge", cardId: FORGE_ID, qty: 1, zone: "main" },
+    ];
+    const cards = buildForgeGoldfishCards(entries, () => resolverEntry({ typeDisplay: "Lost Soul" }));
+    expect(cards[0].card_type).toBe("Lost Soul");
   });
 
   it("drops unresolved (revoked) forge entries entirely", () => {
