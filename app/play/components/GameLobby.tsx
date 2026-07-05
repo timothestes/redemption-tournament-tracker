@@ -14,7 +14,8 @@ import { SpacetimeProvider } from '../lib/spacetimedb-provider';
 import { DeckPickerModal } from './DeckPickerModal';
 import { LobbyList } from './LobbyList';
 import UsernameModal from '@/app/decklist/my-decks/UsernameModal';
-import { loadDeckForGame } from '../actions';
+import { loadDeckForGame, getInviteGameInfo } from '../actions';
+import type { InviteGameInfo } from '../actions';
 import type { DeckOption } from './DeckPickerCard';
 
 interface GameLobbyProps {
@@ -84,6 +85,18 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
 
   // Spectate toggle
   const [isSpectate, setIsSpectate] = useState(false);
+
+  // Invite-link mode: classify the code so Forge playtest games don't show
+  // dead-end Join/Spectate buttons (null = still resolving).
+  const [inviteInfo, setInviteInfo] = useState<InviteGameInfo | null>(null);
+  useEffect(() => {
+    if (!joinCode) return;
+    let cancelled = false;
+    getInviteGameInfo(joinCode)
+      .then((info) => { if (!cancelled) setInviteInfo(info); })
+      .catch(() => { if (!cancelled) setInviteInfo({ isForge: false, isForgeMember: false }); });
+    return () => { cancelled = true; };
+  }, [joinCode]);
 
   // Username gate — require a username before creating/joining games
   const [hasUsername, setHasUsername] = useState(initialHasUsername);
@@ -351,31 +364,59 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
           <p className="text-sm text-muted-foreground text-center">
             You&apos;ve been invited to game <span className="font-mono font-bold text-foreground">{joinCode}</span>
           </p>
-          <div className="flex gap-2">
-            <Button
-              size="lg"
-              onClick={() => handleJoinGame()}
-              disabled={isJoining || !selectedDeck}
-              className="flex-1 h-12 text-base"
-            >
-              {isJoining ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Joining...
-                </>
-              ) : (
-                'Join as Player'
-              )}
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => router.push(`/play/spectate/${joinCode}`)}
-              className="flex-1 h-12 text-base"
-            >
-              Watch as Spectator
-            </Button>
-          </div>
+          {inviteInfo === null ? (
+            <div className="flex justify-center py-3">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : inviteInfo.isForge ? (
+            inviteInfo.isForgeMember ? (
+              <div className="flex flex-col gap-2">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => router.push(`/play/spectate/${joinCode}`)}
+                  className="h-12 text-base"
+                >
+                  Watch as Spectator
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Private playtest game — to take a seat, join from{' '}
+                  <Link href="/forge/play/games" className="underline hover:text-foreground">
+                    the Forge
+                  </Link>{' '}
+                  with a playtest deck.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center">This game is private.</p>
+            )
+          ) : (
+            <div className="flex gap-2">
+              <Button
+                size="lg"
+                onClick={() => handleJoinGame()}
+                disabled={isJoining || !selectedDeck}
+                className="flex-1 h-12 text-base"
+              >
+                {isJoining ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Joining...
+                  </>
+                ) : (
+                  'Join as Player'
+                )}
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => router.push(`/play/spectate/${joinCode}`)}
+                className="flex-1 h-12 text-base"
+              >
+                Watch as Spectator
+              </Button>
+            </div>
+          )}
           <a
             href="/play"
             className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors text-center"

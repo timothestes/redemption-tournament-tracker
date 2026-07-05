@@ -2,6 +2,8 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { findCard } from '@/lib/cards/lookup';
+import { requireForge } from '@/app/forge/lib/auth';
+import { stdbHttpBase } from '@/app/forge/lib/stdbHttp';
 import type { DeckOption } from './components/DeckPickerCard';
 
 export interface GameCardData {
@@ -108,6 +110,57 @@ export async function loadDeckForGame(deckId: string): Promise<LoadDeckResult> {
   }
 
   return { deck, deckData };
+}
+
+export interface InviteGameInfo {
+  /** The invite code's active game is a private Forge playtest game. */
+  isForge: boolean;
+  /** The viewer is a Forge member (only computed when isForge is true). */
+  isForgeMember: boolean;
+}
+
+/**
+ * Classify an invite code for the /play?join= lobby so it can hide the
+ * Join/Spectate buttons on Forge playtest games (public join and non-member
+ * spectate are both server-rejected — the buttons would only dead-end).
+ * Forge-ness is read from the PUBLIC forge_game marker table via the STDB
+ * HTTP SQL endpoint; membership via requireForge. Fails open to the normal
+ * button UI — the reducers stay authoritative either way.
+ */
+export async function getInviteGameInfo(code: string): Promise<InviteGameInfo> {
+  const notForge: InviteGameInfo = { isForge: false, isForgeMember: false };
+  const clean = (code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{4}$/.test(clean)) return notForge;
+
+  const token = process.env.SPACETIMEDB_SERVER_TOKEN;
+  const host = process.env.NEXT_PUBLIC_SPACETIMEDB_HOST;
+  const db = process.env.NEXT_PUBLIC_SPACETIMEDB_DB_NAME || 'redemption-multiplayer';
+  if (!token || !host) return notForge;
+
+  const sql = async (query: string): Promise<any[][]> => {
+    const res = await fetch(`${stdbHttpBase(host)}/v1/database/${db}/sql`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: query,
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`stdb sql ${res.status}`);
+    const results = await res.json();
+    return results?.[0]?.rows ?? [];
+  };
+
+  try {
+    const games = await sql(`SELECT id, status FROM game WHERE code = '${clean}'`);
+    if (games.length === 0) return notForge;
+    // Prefer the active game; codes can be reused after a game finishes.
+    const active = games.find((r) => r[1] !== 'finished') ?? games[games.length - 1];
+    const marker = await sql(`SELECT game_id FROM forge_game WHERE game_id = ${active[0]}`);
+    if (marker.length === 0) return notForge;
+    return { isForge: true, isForgeMember: (await requireForge()) !== null };
+  } catch (e) {
+    console.error('[play] getInviteGameInfo failed', e);
+    return notForge;
+  }
 }
 
 /**
