@@ -17,6 +17,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
+import PrivateBadge from "@/app/forge/components/PrivateBadge";
 
 const inputClass = "rounded-md border border-input bg-background px-2 py-1 text-sm";
 
@@ -207,14 +208,20 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
                   onClick={() => toggle(s.id)}
                   className="flex flex-1 items-center justify-between p-2 text-left hover:bg-muted/50"
                 >
-                  <span className="font-medium">{s.name}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium">{s.name}</span>
+                    {s.isPrivate && <PrivateBadge />}
+                  </span>
                   <span className="text-sm text-muted-foreground">
                     {s.total}{s.targetTotal ? ` / ${s.targetTotal}` : ""} cards
                   </span>
                 </button>
               ) : (
                 <Link href={`/forge/sets/${s.id}/cards`} className="flex flex-1 items-center justify-between p-2 hover:bg-muted/50">
-                  <span className="font-medium">{s.name}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium">{s.name}</span>
+                    {s.isPrivate && <PrivateBadge />}
+                  </span>
                   <span className="text-sm text-muted-foreground">
                     {s.total}{s.targetTotal ? ` / ${s.targetTotal}` : ""} cards
                   </span>
