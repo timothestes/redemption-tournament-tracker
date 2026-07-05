@@ -38,7 +38,11 @@ const FORGE_OWNER_IDENTITY_HEX = 'c200ef2bfc5cef33a94336bbe1a899210d380990823cc5
 const FORGE_AUTH_TTL_MICROS = 600_000_000n; // 10 minutes
 
 function isForgeGame(ctx: any, gameId: bigint): boolean {
-  return ctx.db.ForgeGame.gameId.find(gameId) !== undefined;
+  // NOTE: the server SDK's index .find() returns `null` (not `undefined`) on a
+  // miss, so `!== undefined` was ALWAYS true — treating every public game as a
+  // Forge game and breaking join_game/set_game_public for normal play. Use a
+  // null-safe existence check, matching the truthiness checks used elsewhere.
+  return ctx.db.ForgeGame.gameId.find(gameId) != null;
 }
 
 function forgeServerIdentityHex(ctx: any): string {
