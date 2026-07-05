@@ -348,7 +348,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ---- Game state ----
   // Both hooks must always be called (rules of hooks). Pass null to the unused
   // one — its subscriptions will match zero rows when effectiveGameId === 0n.
-  const playerGameState = useGameState(viewerKind === 'spectator' ? 0n : gameId);
+  const playerGameState = useGameState(viewerKind === 'spectator' ? 0n : gameId, forgeResolver);
   const spectatorGameState = useSpectatorGameState(viewerKind === 'spectator' ? gameId : null);
   const gameState = viewerKind === 'spectator' ? spectatorGameState : playerGameState;
   const {
