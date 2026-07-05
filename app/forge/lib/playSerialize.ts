@@ -3,8 +3,11 @@
 // field stays ''. Public entries get the same enrichment loadDeckForGame uses.
 import { findCard } from "@/lib/cards/lookup";
 import { getParagonByName } from "@/app/decklist/card-search/data/paragons";
+import { forgeProxyUrl } from "@/app/play/utils/forgeResolver";
 import type { ForgeDeckEntry } from "./deckTypes";
 import type { GameCardData } from "@/app/play/actions";
+import type { ForgePlayResolverEntry } from "./playDecks"; // TYPE-ONLY import
+import type { DeckDataForGoldfish } from "@/app/shared/types/gameCard";
 
 export function buildForgePlayDeck(
   entries: ForgeDeckEntry[],
@@ -40,6 +43,52 @@ export function buildForgePlayDeck(
     }
   }
   return { deckData, dropped };
+}
+
+// Owner-facing goldfish serialization: unlike buildForgePlayDeck (opaque stubs
+// for world-readable STDB rows), this resolves forge cards server-side for the
+// member's own page. Unresolved (revoked) forge entries drop fail-closed.
+export function buildForgeGoldfishCards(
+  entries: ForgeDeckEntry[],
+  resolve: (cardId: string) => ForgePlayResolverEntry | undefined,
+): DeckDataForGoldfish["cards"] {
+  const cards: DeckDataForGoldfish["cards"] = [];
+  for (const e of entries) {
+    if (e.zone !== "main" && e.zone !== "reserve") continue;
+    const is_reserve = e.zone === "reserve";
+    if (e.source === "forge") {
+      const r = resolve(e.cardId);
+      if (!r) continue; // fail-closed: no longer granted
+      cards.push({
+        card_name: r.name,
+        card_set: "Forge",
+        card_img_file: forgeProxyUrl(r), // '' when no image; leading-/ proxy URL otherwise
+        card_type: "", card_brigade: "", card_strength: "", card_toughness: "",
+        card_special_ability: r.rawText,
+        card_identifier: "", card_reference: "", card_alignment: "",
+        quantity: e.qty,
+        is_reserve,
+      });
+    } else {
+      const enriched = findCard(e.name, e.set);
+      cards.push({
+        card_name: e.name,
+        card_set: e.set,
+        card_img_file: enriched?.imgFile || "",
+        card_type: enriched?.type || "",
+        card_brigade: enriched?.brigade || "",
+        card_strength: enriched?.strength || "",
+        card_toughness: enriched?.toughness || "",
+        card_special_ability: enriched?.specialAbility || "",
+        card_identifier: enriched?.identifier || "",
+        card_reference: enriched?.reference || "",
+        card_alignment: enriched?.alignment || "",
+        quantity: e.qty,
+        is_reserve,
+      });
+    }
+  }
+  return cards;
 }
 
 // Player.paragon / Game.rematchParagon* are world-readable STDB strings —

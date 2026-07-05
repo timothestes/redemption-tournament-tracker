@@ -6,10 +6,12 @@
 import { requireForge } from "@/app/forge/lib/auth";
 import { getForgeDeck } from "@/app/forge/lib/forgeDecks";
 import { listGrantedForgeCards } from "@/app/forge/lib/deckPool";
-import { buildForgePlayDeck, sanitizeParagon } from "@/app/forge/lib/playSerialize";
+import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
+import { buildForgePlayDeck, buildForgeGoldfishCards, sanitizeParagon } from "@/app/forge/lib/playSerialize";
 import { cardRawText } from "@/app/forge/lib/designCard";
 import { stdbHttpBase } from "@/app/forge/lib/stdbHttp";
 import type { GameCardData } from "@/app/play/actions";
+import type { DeckDataForGoldfish } from "@/app/shared/types/gameCard";
 
 export type ForgePlayDeckResult =
   | { ok: true; deck: { id: string; name: string; format: string | null; paragon: string }; deckData: GameCardData[]; dropped: number }
@@ -39,18 +41,43 @@ export type ForgePlayResolverEntry = {
   hasFinished: boolean; hasArt: boolean; versionId: string;
 };
 
-export async function getForgePlayResolver(): Promise<ForgePlayResolverEntry[]> {
-  const ctx = await requireForge();
-  if (!ctx) return [];
-  const granted = await listGrantedForgeCards();
-  return granted.map((g) => ({
+function toResolverEntry(g: GrantedForgeCard): ForgePlayResolverEntry {
+  return {
     cardId: g.cardId,
     name: g.data.name || "Playtest card",
     rawText: cardRawText(g.data),
     hasFinished: g.hasApprovedFinished,
     hasArt: g.hasApprovedArt,
     versionId: g.versionId,
-  }));
+  };
+}
+
+export async function getForgePlayResolver(): Promise<ForgePlayResolverEntry[]> {
+  const ctx = await requireForge();
+  if (!ctx) return [];
+  const granted = await listGrantedForgeCards();
+  return granted.map(toResolverEntry);
+}
+
+// Owner goldfish loader. Returns null (caller 404s) unless the caller is a
+// forge member AND the deck resolves under their RLS (owner-scoped read).
+export async function loadForgeDeckGoldfish(deckId: string): Promise<DeckDataForGoldfish | null> {
+  const ctx = await requireForge();
+  if (!ctx) return null;
+  const deck = await getForgeDeck(deckId);
+  if (!deck) return null;
+  const granted = await listGrantedForgeCards();
+  const byId = new Map(granted.map((g) => [g.cardId, toResolverEntry(g)]));
+  const cards = buildForgeGoldfishCards(deck.entries, (id) => byId.get(id));
+  if (cards.length === 0) return null;
+  return {
+    id: deck.id,
+    name: deck.name,
+    format: deck.format || "Type 1",
+    paragon: deck.paragon ?? null,
+    isOwner: true,
+    cards,
+  };
 }
 
 export async function authorizeForgeSeat(
