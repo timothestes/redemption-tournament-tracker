@@ -30,6 +30,7 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
   // Per-type counts shown in the preview. Recomputed from `total` only when the
   // total changes (via the seed key), so manual per-type nudges aren't clobbered.
   const [perType, setPerType] = useState<Record<string, number>>(() => seedPerType(100));
+  const [isPrivate, setIsPrivate] = useState(false);
 
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -116,6 +117,7 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
     setName("");
     setError(null);
     seedTotal(100);
+    setIsPrivate(false);
     setOpen(true);
   }
 
@@ -123,7 +125,7 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
     if (!name.trim()) return;
     setBusy(true);
     setError(null);
-    const r = await createSet(name.trim());
+    const r = await createSet(name.trim(), isPrivate);
     if (r.ok === false) {
       setBusy(false);
       setError(r.error);
@@ -339,6 +341,21 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
                 aria-label="Set name"
                 className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
               />
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-input"
+              />
+              <span>
+                <span className="font-medium">Private set</span>
+                <span className="block text-xs text-muted-foreground">
+                  Only you and designers you add can see this set. Hidden from other elders.
+                </span>
+              </span>
             </label>
 
             <label className="flex items-center gap-2 text-sm">
