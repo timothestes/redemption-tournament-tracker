@@ -4,7 +4,8 @@
 // (CardSearchClient) behave as the Forge builder: a mixed forge+public pool,
 // forge-aware image rendering (composite preview, NEVER next/image — this file
 // lives under app/forge/** where next/image is banned), forge_decks persistence,
-// and the public-only features hard-disabled.
+// and the public-only features hard-disabled (text import/export stays on —
+// forge cards round-trip by name through the pool).
 //
 // Forge identity round-trip: a forge card's `forge:<id>` dataLine is dropped at
 // the save boundary (DeckCardData carries no dataLine), so we stamp the dataLine
@@ -30,7 +31,7 @@ import {
 } from "@/app/forge/lib/deckAdapter";
 import type { ForgeDeckEntry } from "@/app/forge/lib/deckTypes";
 import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
-import { saveForgeDeck, getForgeDeck } from "@/app/forge/lib/forgeDecks";
+import { saveForgeDeck, getForgeDeck, listForgeDecks } from "@/app/forge/lib/forgeDecks";
 import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 
 export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilderConfig {
@@ -190,17 +191,29 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
     return forgeById.get(cardIdFromDataLine(img)) ?? null;
   };
 
+  // Load Deck modal source: the member's forge_decks, mapped to the modal's shape.
+  const listDecks: NonNullable<DeckBuilderPersistence["listDecks"]> = async () => {
+    const summaries = await listForgeDecks();
+    return summaries.map((s) => ({
+      id: s.id,
+      name: s.name,
+      format: s.format,
+      card_count: s.cardCount,
+      updated_at: s.updatedAt,
+    }));
+  };
+
   return {
     pool,
     resolveCardImage,
     renderThumb,
-    persistence: { save, loadById, resolveCard },
+    persistence: { save, loadById, resolveCard, listDecks },
     features: {
       localStoragePersist: false,
       syncFiltersToUrl: false,
       enableSharing: false,
       enableDeckDelete: false,
-      enableImportExport: false,
+      enableImportExport: true,
       enablePrintExports: false,
       enableShopping: false,
       enableDetailsTab: false,
