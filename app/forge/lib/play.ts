@@ -6,7 +6,7 @@
 import { requireForge } from "@/app/forge/lib/auth";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 
-export type RevealCard = { cardId: string; data: DesignCard; hasApprovedArt: boolean; hasApprovedFinished: boolean };
+export type RevealCard = { cardId: string; data: DesignCard; hasApprovedArt: boolean; hasApprovedFinished: boolean; versionId: string };
 
 // NOTE: still named listSetApprovedCards for caller stability, but it now reveals
 // playtesting cards too (see migration 057). The revealed version is the approved
@@ -39,5 +39,6 @@ export async function listSetApprovedCards(setId: string): Promise<RevealCard[]>
     data: (v.data ?? {}) as DesignCard,
     hasApprovedArt: !!(v.art_original_key ?? v.art_key) && !v.art_is_placeholder,
     hasApprovedFinished: !!v.finished_key,
+    versionId: v.id as string,
   }));
 }

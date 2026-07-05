@@ -76,6 +76,7 @@ import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
 import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { cardInstanceToGameCard } from '../utils/cardAdapter';
+import type { ForgeResolverMap } from '../utils/forgeResolver';
 import type { UndoStack, Captured } from '../hooks/useUndoStack';
 import { makeReverseAction, makeBatchReverseAction, reverseIsSafe } from '../hooks/useUndoStack';
 
@@ -310,13 +311,15 @@ interface MultiplayerCanvasProps {
   getImage: (url: string) => HTMLImageElement | null;
   /** 'spectator' when mounted from /play/spectate/[code]. Defaults to 'player'. */
   viewerKind?: 'player' | 'spectator';
+  /** Forge card resolver (granted name/text/art) for private Forge playtest games. */
+  forgeResolver?: ForgeResolverMap | null;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep, viewerKind = 'player' }: MultiplayerCanvasProps) {
+export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep, viewerKind = 'player', forgeResolver }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible, isPreviewFlipped } = useCardPreview();
   // Spectators may NEVER drag cards — even visually. Every `isDraggable` site
   // ANDs against this flag.
@@ -345,7 +348,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ---- Game state ----
   // Both hooks must always be called (rules of hooks). Pass null to the unused
   // one — its subscriptions will match zero rows when effectiveGameId === 0n.
-  const playerGameState = useGameState(viewerKind === 'spectator' ? 0n : gameId);
+  const playerGameState = useGameState(viewerKind === 'spectator' ? 0n : gameId, forgeResolver);
   const spectatorGameState = useSpectatorGameState(viewerKind === 'spectator' ? gameId : null);
   const gameState = viewerKind === 'spectator' ? spectatorGameState : playerGameState;
   const {
@@ -401,9 +404,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         if (cached && cached.ownerId === owner) return cached;
       }
       const cardCounters = counters.get(card.id) ?? [];
-      return cardInstanceToGameCard(card, cardCounters, owner);
+      return cardInstanceToGameCard(card, cardCounters, owner, forgeResolver);
     },
-    [adaptedCardsById, counters],
+    [adaptedCardsById, counters, forgeResolver],
   );
 
   // Undo-aware wrappers for moveCard / moveCardsBatch used in drag handlers.
@@ -3231,7 +3234,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         if (isWeapon(cardMeta) && myTerritoryZone) {
           const myTerritoryRaw = myCards['territory'] ?? [];
           const myTerritoryCards = myTerritoryRaw.map((c) => {
-            const adapted = cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1');
+            const adapted = cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1', forgeResolver);
             if (adapted.posX !== undefined && adapted.posY !== undefined) {
               const { x, y } = toScreenPos(adapted.posX, adapted.posY, myTerritoryZone, 'my');
               return { ...adapted, posX: x, posY: y };
@@ -3301,7 +3304,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           // taken from their auto-arrange slot (not their stored posX/posY).
           const lobCandidates = lobHosts.map((c, i) => {
             const slot = slotPositions[i];
-            const adapted = cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1');
+            const adapted = cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1', forgeResolver);
             return {
               ...adapted,
               posX: slot?.x,
@@ -3705,6 +3708,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       hasOpponent,
       gameState,
       counters,
+      forgeResolver,
     ],
   );
 

@@ -30,6 +30,16 @@ export interface RenderThumbOpts {
   onClick?: () => void;
 }
 
+/** Minimal deck summary the Load Deck modal renders. `DeckData` (public) and
+ *  the Forge's mapped `ForgeDeckSummary` both satisfy it. */
+export type DeckListItem = {
+  id: string;
+  name: string;
+  format?: string;
+  card_count?: number;
+  updated_at?: string;
+};
+
 /**
  * Where the builder loads/saves decks. The public default (the `decks` table via
  * `saveDeckAction`/`loadDeckByIdAction`) lives in `useDeckState` so this module
@@ -50,6 +60,15 @@ export interface DeckBuilderPersistence {
     card_set: string;
     card_img_file?: string | null;
   }) => Card | null;
+  /** List the caller's decks for the Load Deck modal. Omitted → the modal uses
+   *  the public default (`loadUserDecksAction` over the `decks` table). With a
+   *  custom persistence, Load Deck stays hidden unless this is provided (the
+   *  Forge lists `forge_decks`). */
+  listDecks?: () => Promise<DeckListItem[]>;
+  /** Delete the deck from this backend. Omitted → the builder uses the public
+   *  default (`deleteDeckAction` over the `decks` table). The Forge deletes from
+   *  `forge_decks`; on success the builder fires `onDeckDeleted`. */
+  delete?: (deckId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 /** Feature toggles. Public has everything on; the Forge hard-disables several.
@@ -64,12 +83,14 @@ export interface DeckBuilderFeatures {
   /** Share/visibility + duplicate controls (write to the public `decks` table /
    *  create public links). Off for the Forge — secret content must never go public. */
   enableSharing?: boolean;
-  /** Delete control (calls the public `deleteDeckAction`). Off for the Forge,
-   *  whose decks live in `forge_decks`; deletion happens from the Forge deck list. */
+  /** Delete control (the "Delete Deck" menu item). Uses `persistence.delete` when
+   *  provided (the Forge deletes from `forge_decks`), else the public
+   *  `deleteDeckAction` over the `decks` table. */
   enableDeckDelete?: boolean;
   /** Deck text import/export (menu items, Ctrl+I/E, empty-state import button).
-   *  Off for the Forge — the text format has no forge-UUID notion, so exported
-   *  lists can't round-trip and would leak private card names. */
+   *  On for the Forge too: forge cards sit in the pool under their real names,
+   *  so exported lists round-trip (import re-resolves them to `forge:<id>`
+   *  pool entries). Exports do put forge card names in plain text — accepted. */
   enableImportExport?: boolean;
   /** PDF + deck-image generation (external service builds from public image
    *  URLs). Off for the Forge — forge cards have no public URL and render blank. */
@@ -111,6 +132,13 @@ export interface DeckBuilderConfig {
   persistence?: DeckBuilderPersistence;
   /** Feature toggles. Omit for all-public-defaults. */
   features?: DeckBuilderFeatures;
+  /** Called after the Load Deck modal successfully loads a deck in place. The
+   *  Forge rewrites /forge/play/decks/<id> via history.replaceState (its deck
+   *  id lives in the URL; the public builder's does not). */
+  onDeckLoaded?: (deckId: string) => void;
+  /** Called after `persistence.delete` succeeds. The Forge navigates back to its
+   *  deck list (the builder route no longer points at a live deck). */
+  onDeckDeleted?: (deckId: string) => void;
 }
 
 /** Public default: the builder behaves exactly as it does today. */

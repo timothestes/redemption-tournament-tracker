@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import ForgeCardGrid from "@/app/forge/components/ForgeCardGrid";
+import AddCardTile from "./AddCardTile";
 import { bulkLifecycle, type BulkResult } from "@/app/forge/lib/lifecycle";
 import {
   STATUS_LABEL, ACTION_LABEL, BULK_DONE_VERB, CONFIRM_COPY, isEligible, type LifecycleAction,
@@ -17,7 +18,7 @@ const SET_STATUSES = ["draft", "playtesting", "approved", "archived"] as const;
 const BULK_ACTIONS: LifecycleAction[] = ["release", "markFinal", "shelve", "restore", "returnToIdeas", "delete"];
 const selectClass = "rounded-md border bg-background px-2 py-1.5 text-sm";
 
-export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
+export default function SetCardsBrowser({ cards, setId, canCreate }: { cards: ForgeCardFull[]; setId: string; canCreate: boolean }) {
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
@@ -153,7 +154,12 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
         </div>
       )}
 
-      <ForgeCardGrid cards={filtered} showStatus selection={{ active: selecting, selected, onToggle: toggle }} />
+      <ForgeCardGrid
+        cards={filtered}
+        showStatus
+        selection={{ active: selecting, selected, onToggle: toggle }}
+        leading={canCreate && !selecting ? <AddCardTile setId={setId} /> : undefined}
+      />
 
       {selecting && selected.size > 0 && (
         <div className="fixed inset-x-0 bottom-4 z-40 mx-auto flex w-fit max-w-[95vw] flex-wrap items-center justify-center gap-2 rounded-lg border bg-background/95 p-2 shadow-lg backdrop-blur">

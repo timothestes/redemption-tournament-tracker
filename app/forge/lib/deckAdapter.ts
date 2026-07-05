@@ -10,7 +10,7 @@ export function forgeDataLine(cardId: string): string { return FORGE_DATALINE_PR
 export function isForgeDataLine(dataLine: string): boolean { return dataLine.startsWith(FORGE_DATALINE_PREFIX); }
 export function cardIdFromDataLine(dataLine: string): string { return dataLine.slice(FORGE_DATALINE_PREFIX.length); }
 
-const TYPE_DISPLAY: Record<CardType, string> = {
+export const TYPE_DISPLAY: Record<CardType, string> = {
   Hero: "Hero", EvilCharacter: "Evil Character", GE: "Good Enhancement", EE: "Evil Enhancement",
   LostSoul: "Lost Soul", Artifact: "Artifact", Dominant: "Dominant", Fortress: "Fortress",
   Site: "Site", City: "City", Curse: "Curse", Covenant: "Covenant",

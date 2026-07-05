@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadUserDecksAction, DeckData } from "../../actions";
+import { loadUserDecksAction } from "../../actions";
+import type { DeckListItem } from "../builderConfig";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,8 @@ interface LoadDeckModalProps {
   subtitle?: string;
   /** When set, only decks of the same normalized type (T1/T2/Paragon) are shown. */
   matchFormat?: string;
+  /** Override the deck list source (defaults to the public `loadUserDecksAction`). */
+  listDecks?: () => Promise<DeckListItem[]>;
 }
 
 export default function LoadDeckModal({
@@ -47,8 +50,9 @@ export default function LoadDeckModal({
   title = "Load Deck",
   subtitle = "Select a deck to load into the builder",
   matchFormat,
+  listDecks,
 }: LoadDeckModalProps) {
-  const [decks, setDecks] = useState<DeckData[]>([]);
+  const [decks, setDecks] = useState<DeckListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,14 +62,22 @@ export default function LoadDeckModal({
     async function loadDecks() {
       try {
         setLoading(true);
-        const result = await loadUserDecksAction();
-        if (result.success && result.decks) {
-          const sorted = [...result.decks].sort((a, b) =>
-            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        if (listDecks) {
+          const items = await listDecks();
+          const sorted = [...items].sort((a, b) =>
+            new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime()
           );
           setDecks(sorted);
         } else {
-          setError(result.error || "Failed to load decks");
+          const result = await loadUserDecksAction();
+          if (result.success && result.decks) {
+            const sorted = [...result.decks].sort((a, b) =>
+              new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime()
+            );
+            setDecks(sorted as DeckListItem[]);
+          } else {
+            setError(result.error || "Failed to load decks");
+          }
         }
       } catch (err) {
         setError("Failed to load decks");
@@ -76,7 +88,7 @@ export default function LoadDeckModal({
     }
 
     loadDecks();
-  }, []);
+  }, [listDecks]);
 
   const filteredDecks = decks.filter(deck =>
     deck.name.toLowerCase().includes(searchQuery.toLowerCase()) &&

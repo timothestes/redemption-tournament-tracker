@@ -42,10 +42,10 @@ export default async function ForgeHomePage() {
               <div className="font-medium">Build a deck</div>
               <div className="text-sm text-muted-foreground">Mix the cards shared with you and the full pool.</div>
             </Link>
-            <div className="rounded-lg border border-dashed p-4 opacity-60" aria-disabled="true">
+            <Link href="/forge/play/games" className="rounded-lg border p-4 hover:bg-muted/50">
               <div className="font-medium">Find a game</div>
-              <div className="text-sm text-muted-foreground">Coming soon.</div>
-            </div>
+              <div className="text-sm text-muted-foreground">Host or join a private playtest game.</div>
+            </Link>
           </section>
         </>
       ) : (

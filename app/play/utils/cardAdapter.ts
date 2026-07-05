@@ -3,6 +3,7 @@
 import { useMemo, useRef } from 'react';
 import type { GameCard, Counter } from '@/app/goldfish/types';
 import type { CardInstance, CardCounter } from '@/lib/spacetimedb/module_bindings/types';
+import { forgeCardIdFromImgFile, forgeProxyUrl, type ForgeResolverMap } from './forgeResolver';
 
 const EMPTY_COUNTERS: readonly CardCounter[] = [];
 const EMPTY_GAME_COUNTERS: readonly Counter[] = [];
@@ -16,17 +17,20 @@ export function cardInstanceToGameCard(
   card: CardInstance,
   counters: readonly CardCounter[],
   owner: 'player1' | 'player2',
+  forgeResolver?: ForgeResolverMap | null,
 ): GameCard {
+  const forgeId = forgeCardIdFromImgFile(card.cardImgFile);
+  const resolved = forgeId ? forgeResolver?.get(forgeId) : undefined;
   return {
     instanceId: String(card.id),
-    cardName: card.cardName,
+    cardName: resolved ? resolved.name : card.cardName,
     cardSet: card.cardSet,
-    cardImgFile: card.cardImgFile,
+    cardImgFile: resolved ? (forgeProxyUrl(resolved) || card.cardImgFile) : card.cardImgFile,
     type: card.cardType,
     brigade: card.brigade,
     strength: card.strength,
     toughness: card.toughness,
-    specialAbility: card.specialAbility,
+    specialAbility: resolved ? resolved.rawText : card.specialAbility,
     identifier: card.identifier,
     reference: card.reference,
     alignment: card.alignment,
@@ -123,6 +127,7 @@ export function useStableAdaptedCards(
   cards: readonly CardInstance[],
   counters: Map<bigint, CardCounter[]>,
   opponentPlayerId: bigint | undefined,
+  forgeResolver?: ForgeResolverMap | null,
 ): Map<bigint, GameCard> {
   const cacheRef = useRef<Map<bigint, GameCard>>(new Map());
 
@@ -137,7 +142,7 @@ export function useStableAdaptedCards(
           ? 'player2'
           : 'player1';
       const cached = prev.get(card.id);
-      const fresh = cardInstanceToGameCard(card, cardCounters, owner);
+      const fresh = cardInstanceToGameCard(card, cardCounters, owner, forgeResolver);
       next.set(
         card.id,
         cached && gameCardEquals(cached, fresh) ? cached : fresh,
@@ -146,5 +151,5 @@ export function useStableAdaptedCards(
 
     cacheRef.current = next;
     return next;
-  }, [cards, counters, opponentPlayerId]);
+  }, [cards, counters, opponentPlayerId, forgeResolver]);
 }

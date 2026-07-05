@@ -1,8 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { makeForgeBuilderConfig } from "../forgeBuilderConfig";
+import { generateDeckText, parseDeckText } from "@/app/decklist/card-search/utils/deckImportExport";
 import type { Card } from "@/app/decklist/card-search/utils";
 import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
 import type { DesignCard } from "@/app/forge/lib/designCard";
+
+// The config only *references* the server actions; none of these tests hit a
+// server, so mock the whole module (listDecks mapping is asserted below).
+vi.mock("@/app/forge/lib/forgeDecks", () => ({
+  saveForgeDeck: vi.fn(),
+  getForgeDeck: vi.fn(),
+  listForgeDecks: vi.fn(async () => [
+    { id: "d1", name: "Alpha", format: "Type 1", cardCount: 50, updatedAt: "2026-07-01T00:00:00.000Z" },
+  ]),
+}));
 
 const card = (imgFile: string): Card => ({ imgFile, dataLine: "", name: "x", set: "x" } as unknown as Card);
 
@@ -12,6 +23,7 @@ const grantedCard = (cardId: string, name: string): GrantedForgeCard => ({
   setName: "Test Set",
   hasApprovedArt: false,
   hasApprovedFinished: false,
+  versionId: "version-1",
   data: {
     name,
     cardType: ["LostSoul"],
@@ -32,13 +44,13 @@ const grantedCard = (cardId: string, name: string): GrantedForgeCard => ({
 describe("makeForgeBuilderConfig", () => {
   const config = makeForgeBuilderConfig([]);
 
-  it("hard-disables every public-only feature", () => {
+  it("feature gates: public-only features off, import/export on", () => {
     expect(config.features).toEqual({
       localStoragePersist: false,
       syncFiltersToUrl: false,
       enableSharing: false,
       enableDeckDelete: false,
-      enableImportExport: false,
+      enableImportExport: true,
       enablePrintExports: false,
       enableShopping: false,
       enableDetailsTab: false,
@@ -86,5 +98,35 @@ describe("makeForgeBuilderConfig", () => {
     expect(
       cfg.persistence?.resolveCard?.({ card_name: "B", card_set: "Forge", card_img_file: "forge:dead" })
     ).toBeNull();
+  });
+});
+
+describe("forge persistence.listDecks", () => {
+  it("maps ForgeDeckSummary to the modal's DeckListItem shape", async () => {
+    const config = makeForgeBuilderConfig([]);
+    const items = await config.persistence!.listDecks!();
+    expect(items).toEqual([
+      { id: "d1", name: "Alpha", format: "Type 1", card_count: 50, updated_at: "2026-07-01T00:00:00.000Z" },
+    ]);
+  });
+});
+
+describe("forge text export/import round-trip", () => {
+  it("a forge card survives generateDeckText → parseDeckText against the pool", () => {
+    const config = makeForgeBuilderConfig([grantedCard("abc-123", "My Forge Hero")]);
+    const forgeCard = config.pool[0];
+    const deck = {
+      name: "T",
+      cards: [{ card: forgeCard, quantity: 2, zone: "main" as const }],
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    };
+    const text = generateDeckText(deck);
+    expect(text).toBe("2\tMy Forge Hero");
+    const result = parseDeckText(text, config.pool);
+    expect(result.errors).toEqual([]);
+    expect(result.deck!.cards[0].card.imgFile).toBe("forge:abc-123");
+    expect(result.deck!.cards[0].quantity).toBe(2);
+    expect(result.deck!.cards[0].zone).toBe("main");
   });
 });

@@ -13,9 +13,11 @@ import type {
   Spectator,
   DisconnectTimeout,
   Emote,
+  ForgeGame,
 } from '@/lib/spacetimedb/module_bindings/types';
 import type { GameCard } from '@/app/goldfish/types';
 import { useStableAdaptedCards } from '../utils/cardAdapter';
+import type { ForgeResolverMap } from '../utils/forgeResolver';
 
 // ---------------------------------------------------------------------------
 // Row types inferred from the generated type objects
@@ -29,6 +31,7 @@ type GameActionRow = GameAction;
 type SpectatorRow = Spectator;
 type DisconnectTimeoutRow = DisconnectTimeout;
 type EmoteRow = Emote;
+type ForgeGameRow = ForgeGame;
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -67,6 +70,8 @@ export interface GameState {
   incomingSearchRequest: any | null;
   approvedSearchRequest: any | null;
   emotes: EmoteRow[];
+  /** True when this game has a matching ForgeGame row (private Forge playtest game). */
+  isForgeGame: boolean;
 
   // Loading state
   isLoading: boolean;
@@ -163,7 +168,7 @@ export interface GameState {
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useGameState(gameId: bigint): GameState {
+export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | null): GameState {
   // Connection + identity from SpacetimeDB provider
   const spacetimeCtx = useSpacetimeDB() as any;
   const conn = spacetimeCtx?.getConnection?.() ?? null;
@@ -209,10 +214,15 @@ export function useGameState(gameId: bigint): GameState {
   const [allEmotes] = useTable(
     tables.Emote.where(e => e.gameId.eq(gameId)),
   ) as [EmoteRow[], boolean];
+  const [forgeGameRows] = useTable(
+    tables.ForgeGame.where(r => r.gameId.eq(gameId)),
+  ) as [ForgeGameRow[], boolean];
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
   // Only require core tables (game, player, cards) — chat/actions/spectators can load async
   const isLoading = !(gamesLoading && playersLoading && cardsLoading);
+
+  const isForgeGame = forgeGameRows.length > 0;
 
   // ---------------------------------------------------------------------------
   // Derived state
@@ -314,6 +324,7 @@ export function useGameState(gameId: bigint): GameState {
     gameCards,
     counters,
     opponentPlayer?.id,
+    forgeResolver,
   );
 
   // Chat messages for this game, sorted by sentAt
@@ -992,6 +1003,7 @@ export function useGameState(gameId: bigint): GameState {
     shuffleOpponentDeck,
     reorderHand,
     reorderLob,
+    isForgeGame,
   };
 }
 
@@ -1122,7 +1134,8 @@ export function useSpectatorGameState(gameId: bigint | null) {
     return map;
   }, [allCounters, gameCards]);
 
-  const adaptedCardsById = useStableAdaptedCards(gameCards, counters, seat1Player?.id);
+  // Forge games reject spectators — no resolver is ever needed here.
+  const adaptedCardsById = useStableAdaptedCards(gameCards, counters, seat1Player?.id, undefined);
 
   const chatMessages = useMemo(
     () =>

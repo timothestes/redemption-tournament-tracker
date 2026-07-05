@@ -14,7 +14,6 @@ import PauseConsentToast from '@/app/play/components/PauseConsentToast';
 import SpectatorHandRequestBanner from '@/app/play/components/SpectatorHandRequestBanner';
 import RightPanel from '@/app/play/components/RightPanel';
 import { CardPreviewProvider, useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
-import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import TopNav from '@/components/top-nav';
 import { GameToolbar } from '@/app/shared/components/GameToolbar';
 import { EmoteOverlay } from '@/app/shared/components/EmoteOverlay';
@@ -42,6 +41,8 @@ import { useGameTimer } from '../hooks/useGameTimer';
 import { useChatScale } from '@/app/shared/hooks/useChatScale';
 import { normalizeDeckFormat } from '@/lib/deck-format';
 import { finishedGameToReuseOnCreate } from '@/app/play/lib/gameEntryDecision';
+import { loadForgeDeckForGame, getForgePlayResolver, authorizeForgeSeat } from '@/app/forge/lib/playDecks';
+import { mergeForgeDeckData, resolveCardImageUrl, type ForgeResolverMap } from '@/app/play/utils/forgeResolver';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -64,6 +65,7 @@ interface GameParams {
   paragon?: string | null;
   isPublic?: boolean;
   lobbyMessage?: string;
+  isForge?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -234,18 +236,41 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // call + goldfish practice-while-waiting.
   const [deckData, setDeckData] = useState<string | null>(null);
   const [deckLoadError, setDeckLoadError] = useState<string | null>(null);
+
+  // Forge state — declared before `gameState`/`isForge` so the deck-load
+  // effect below (which branches on gameParams.isForge) and useGameState
+  // (which accepts the resolver) both have it available.
+  const [forgeResolver, setForgeResolver] = useState<ForgeResolverMap | null>(null);
+  const [forgeDeckMeta, setForgeDeckMeta] = useState<{ paragon: string; format: string } | null>(null);
+
   useEffect(() => {
     if (!gameParams || deckData !== null) return;
     let cancelled = false;
-    loadDeckForGame(gameParams.deckId)
-      .then((result) => {
-        if (cancelled) return;
-        setDeckData(JSON.stringify(result.deckData));
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setDeckLoadError(err instanceof Error ? err.message : 'Failed to load deck.');
-      });
+    if (gameParams.isForge) {
+      loadForgeDeckForGame(gameParams.deckId)
+        .then((r) => {
+          if (cancelled) return;
+          if (r.ok === false) { setDeckLoadError(r.error); return; }
+          // The sanitized paragon/format from the server action are authoritative
+          // for the reducer args (never gameParams.paragon on the forge path).
+          setForgeDeckMeta({ paragon: r.deck.paragon, format: r.deck.format || 'Type 1' });
+          setDeckData(JSON.stringify(r.deckData));
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setDeckLoadError(err instanceof Error ? err.message : 'Failed to load deck.');
+        });
+    } else {
+      loadDeckForGame(gameParams.deckId)
+        .then((result) => {
+          if (cancelled) return;
+          setDeckData(JSON.stringify(result.deckData));
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setDeckLoadError(err instanceof Error ? err.message : 'Failed to load deck.');
+        });
+    }
     return () => { cancelled = true; };
   }, [gameParams, deckData]);
 
@@ -257,7 +282,23 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // Must be declared before the reducer effect so isGamesReady is available
   // in the dependency array (which is evaluated during render).
-  const gameState = useGameState(gameId ?? BigInt(0));
+  const gameState = useGameState(gameId ?? BigInt(0), forgeResolver);
+
+  const isForge = gameParams?.isForge === true || gameState.isForgeGame;
+
+  // Forge resolver fetch — loads the viewer's RLS-granted card text/art map
+  // once we know this is a forge game. Fetched once and cached in state.
+  useEffect(() => {
+    if (!isForge || forgeResolver !== null) return;
+    let cancelled = false;
+    getForgePlayResolver()
+      .then((entries) => {
+        if (cancelled) return;
+        setForgeResolver(new Map(entries.map((e) => [e.cardId, e])));
+      })
+      .catch(() => { if (!cancelled) setForgeResolver(new Map()); });
+    return () => { cancelled = true; };
+  }, [isForge, forgeResolver]);
 
   // ---- Image preload — hoisted from MultiplayerCanvas so the cache survives
   // the canvas remounts that happen at every lifecycle transition.
@@ -274,7 +315,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       const seen = new Set<string>();
       for (const card of cards) {
         if (!card.cardImgFile) continue;
-        const url = getCardImageUrl(card.cardImgFile);
+        const url = resolveCardImageUrl(card.cardImgFile, forgeResolver);
         if (!url || seen.has(url)) continue;
         seen.add(url);
         out.push(url);
@@ -283,10 +324,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     } catch {
       return [];
     }
-  }, [deckData]);
+  }, [deckData, forgeResolver]);
 
   const allImageUrls = useMemo(() => {
-    const visible = buildPrioritizedImageUrls(gameState.myCards, gameState.opponentCards, gameState.sharedCards);
+    const visible = buildPrioritizedImageUrls(gameState.myCards, gameState.opponentCards, gameState.sharedCards, forgeResolver);
     if (myDeckImageUrls.length === 0) return visible;
     // Dedup — visible (higher priority) wins.
     const seen = new Set(visible);
@@ -297,11 +338,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       out.push(url);
     }
     return out;
-  }, [gameState.myCards, gameState.opponentCards, gameState.sharedCards, myDeckImageUrls]);
+  }, [gameState.myCards, gameState.opponentCards, gameState.sharedCards, myDeckImageUrls, forgeResolver]);
 
   const criticalImageUrls = useMemo(
-    () => buildCriticalImageUrls(gameState.myCards, gameState.opponentCards, gameState.sharedCards),
-    [gameState.myCards, gameState.opponentCards, gameState.sharedCards],
+    () => buildCriticalImageUrls(gameState.myCards, gameState.opponentCards, gameState.sharedCards, forgeResolver),
+    [gameState.myCards, gameState.opponentCards, gameState.sharedCards, forgeResolver],
   );
   const { getImage, areUrlsLoaded, progress: imageLoadProgress } = useMultiplayerImagePreloader(allImageUrls);
   const criticalReady = criticalImageUrls.length > 0 && areUrlsLoaded(criticalImageUrls);
@@ -509,6 +550,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     // Wait for the post-navigation deck load to complete before calling the
     // reducer. The cave loading screen is already visible to the user.
     if (deckData === null) return;
+
+    // Forge games authorize the seat by connected identity before calling the
+    // reducer. Don't mark didCallReducer yet — this effect must re-run once
+    // the SpacetimeDB connection resolves our identity (gameState.identityHex
+    // is in the deps array below), otherwise we'd get stuck without ever
+    // dispatching create/join.
+    if (gameParams.isForge && !gameState.identityHex) return;
+
     didCallReducer.current = true;
 
     // Reconnect scenario: if the game already exists and we already have a
@@ -545,6 +594,61 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       console.log('[game-debug] create replayed after finish — reusing finished game:', String(reuseFinishedId));
       setGameId(reuseFinishedId);
       return; // lifecycle sync effect shows the ended state
+    }
+
+    if (gameParams.isForge) {
+      const identityHex = gameState.identityHex as string;
+      setLifecycle(gameParams.role === 'create' ? 'creating' : 'joining');
+      void (async () => {
+        const auth = await authorizeForgeSeat({ code, identityHex });
+        if (auth.ok === false) {
+          setErrorMessage(auth.error);
+          setLifecycle('error');
+          return;
+        }
+        const args = {
+          code,
+          deckId: gameParams.deckId,
+          displayName: gameParams.displayName,
+          paragon: forgeDeckMeta?.paragon ?? '',          // sanitized server-side; NEVER gameParams.paragon here
+          format: forgeDeckMeta?.format ?? gameParams.format ?? 'Type 1',
+          supabaseUserId: gameParams.supabaseUserId,
+          deckData,
+        };
+        try {
+          if (gameParams.role === 'create') {
+            conn.reducers.createForgeGame(args);
+            setLifecycle('waiting');
+          } else {
+            // Pre-flight: reject obvious format mismatch before calling the reducer,
+            // mirroring the public join path — the server performs the authoritative
+            // check (see spacetimedb/src/index.ts).
+            const hostGame = (gameState.allGames || []).find(
+              (g: any) => g.code === code && g.status === 'waiting'
+            );
+            if (hostGame) {
+              const joinerFormat = normalizeDeckFormat(args.format);
+              const hostFormat = normalizeDeckFormat(hostGame.format);
+              if (joinerFormat !== hostFormat) {
+                setFormatMismatch({ host: hostFormat, joiner: joinerFormat });
+                setErrorMessage(
+                  `This game is ${hostFormat}. Your selected deck is ${joinerFormat} — pick a ${hostFormat} deck to join.`
+                );
+                setLifecycle('error');
+                return;
+              }
+            }
+            conn.reducers.joinForgeGame(args)?.catch?.((e: unknown) => {
+              setErrorMessage(e instanceof Error ? e.message : 'Could not join the game.');
+              setLifecycle('error');
+            });
+          }
+        } catch (e) {
+          setErrorMessage(e instanceof Error ? e.message : 'Could not start the game.');
+          setLifecycle('error');
+        }
+      })();
+      return;
     }
 
     try {
@@ -614,7 +718,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to initialize game');
       setLifecycle('error');
     }
-  }, [gameState.isGamesReady, gameState.isPlayersReady, conn, code, gameParams, deckData]);
+  }, [gameState.isGamesReady, gameState.isPlayersReady, conn, code, gameParams, deckData, gameState.identityHex, forgeDeckMeta]);
 
   // Also get raw game list to find our game by code before we know the ID
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -779,7 +883,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       const cards = JSON.parse(deckData) as GameCardData[];
       if (cards.length === 0) return null;
       return convertToGoldfishDeck(
-        cards,
+        mergeForgeDeckData(cards, forgeResolver),
         gameParams.deckId,
         gameParams.deckName || 'Practice Deck',
         gameParams.format || 'Type 1',
@@ -788,7 +892,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     } catch {
       return null;
     }
-  }, [gameParams, deckData]);
+  }, [gameParams, deckData, forgeResolver]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -998,7 +1102,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             <WaitingRoomGoldfish
               deck={goldfishDeck}
               username={gameParams?.displayName}
-              onLoadDeck={() => setShowPracticeDeckPicker(true)}
+              onLoadDeck={isForge ? undefined : () => setShowPracticeDeckPicker(true)}
             />
           </div>
 
@@ -1131,10 +1235,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         onUpdateMessage={gameId && conn ? (message: string) => {
           conn.reducers.updateLobbyMessage({ gameId, message });
         } : undefined}
-        onTogglePublic={gameId && conn ? (isPublic: boolean) => {
+        onTogglePublic={isForge ? undefined : gameId && conn ? (isPublic: boolean) => {
           conn.reducers.setGamePublic({ gameId, isPublic });
         } : undefined}
         canReady={canReady}
+        isForge={isForge}
       />
     );
   }
@@ -1198,7 +1303,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={isForge ? undefined : () => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
             {/* Suppress the load gate during the pregame ceremony — its 30s
@@ -1253,7 +1358,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={isForge ? undefined : () => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
             )}
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
@@ -1315,7 +1420,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={isForge ? undefined : () => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
               {/* Bottom toolbar — stays active for draw/shuffle, end turn disabled */}
               <GameToolbar
                 actions={{
@@ -1369,6 +1474,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 gameState={gameState}
                 playAgainTriggered={playAgainTriggered}
                 onPlayAgainHandled={() => setPlayAgainTriggered(false)}
+                isForge={isForge}
+                myDeckId={gameParams?.deckId}
               />
             </div>
           </div>
@@ -1492,6 +1599,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               opponentPlayer={gameState.opponentPlayer}
               gameActions={gameState.gameActions}
               gameState={gameState}
+              isForge={isForge}
+              myDeckId={gameParams?.deckId}
             />
           </div>
         </div>
@@ -1535,7 +1644,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} />
+            <MultiplayerCanvas gameId={gameId} onLoadDeck={isForge ? undefined : () => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
           )}
           <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
           {/* Quick action toolbar — floating above hand area */}

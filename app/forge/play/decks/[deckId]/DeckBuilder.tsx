@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import CardSearchClient from "@/app/decklist/card-search/client";
 import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
 import { makeForgeBuilderConfig } from "./forgeBuilderConfig";
@@ -19,7 +20,19 @@ export default function DeckBuilder({
   isNew: boolean;
   granted: GrantedForgeCard[];
 }) {
-  const config = useMemo(() => makeForgeBuilderConfig(granted), [granted]);
+  const router = useRouter();
+  const config = useMemo(
+    () => ({
+      ...makeForgeBuilderConfig(granted),
+      // Load Deck loads in place; keep /forge/play/decks/<id> honest so
+      // refresh and back land on the deck actually shown.
+      onDeckLoaded: (id: string) => window.history.replaceState(null, "", `/forge/play/decks/${id}`),
+      // After delete the builder route no longer points at a live deck — send
+      // the user back to their deck list.
+      onDeckDeleted: () => router.push("/forge/play/decks"),
+    }),
+    [granted, router]
+  );
   return (
     <CardSearchClient
       config={config}

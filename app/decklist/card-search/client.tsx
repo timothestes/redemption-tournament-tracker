@@ -1485,6 +1485,13 @@ export default function CardSearchClient({
     downloadDeckAsFileBySet(deck);
   }
 
+  // Load a deck picked from the Load Deck modal; on success let the active
+  // config sync external state (the Forge rewrites /forge/play/decks/<id>).
+  async function handleLoadDeckById(deckId: string) {
+    const ok = await loadDeckFromCloud(deckId);
+    if (ok) config.onDeckLoaded?.(deckId);
+  }
+
   // Import deck from text
   async function handleImportDeck(text: string) {
     const result = parseDeckText(text, cards);
@@ -1595,6 +1602,23 @@ export default function CardSearchClient({
     if (!user) {
       setNotification({ message: 'Please sign in to delete decks.', type: 'error' });
       setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+
+    // Host-provided delete backend (the Forge removes from forge_decks and then
+    // navigates to its own deck list via onDeckDeleted). Falls through to the
+    // public deleteDeckAction when no seam is provided.
+    const deleteFromHost = config.persistence?.delete;
+    if (deleteFromHost) {
+      const res = await deleteFromHost(deck.id);
+      if (res.success) {
+        clearUnsavedChanges();
+        clearDeck();
+        config.onDeckDeleted?.(deck.id);
+      } else {
+        setNotification({ message: res.error || 'Failed to delete deck', type: 'error' });
+        setTimeout(() => setNotification(null), 3000);
+      }
       return;
     }
 
@@ -2741,7 +2765,7 @@ export default function CardSearchClient({
               // Just need to provide the callback for re-rendering
             }}
             onNewDeck={handleNewDeck}
-            onLoadDeck={loadDeckFromCloud}
+            onLoadDeck={handleLoadDeckById}
             onReplaceGood={(sourceDeckId) => handleReplaceHalf("good", sourceDeckId)}
             onReplaceEvil={(sourceDeckId) => handleReplaceHalf("evil", sourceDeckId)}
             defaultTab={activeDeckTab}
@@ -2842,7 +2866,7 @@ export default function CardSearchClient({
               canDelete={config.features?.enableDeckDelete !== false}
               onDuplicate={() => {}}
               onNewDeck={handleNewDeck}
-              onLoadDeck={loadDeckFromCloud}
+              onLoadDeck={handleLoadDeckById}
               onReplaceGood={(sourceDeckId) => handleReplaceHalf("good", sourceDeckId)}
               onReplaceEvil={(sourceDeckId) => handleReplaceHalf("evil", sourceDeckId)}
               defaultTab={activeDeckTab}

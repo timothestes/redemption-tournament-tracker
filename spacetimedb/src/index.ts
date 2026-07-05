@@ -28,6 +28,53 @@ const AUTO_REVEAL_HAND_MICROS = 10_000_000n; // 10 seconds
 const HAND_LIMIT = 16;
 
 // ---------------------------------------------------------------------------
+// Forge playtest games (Phase 2.3)
+// ---------------------------------------------------------------------------
+// Publisher/owner identity — the unstealable recovery principal for
+// set_forge_server_identity. Identity hexes are public info (only tokens are
+// secrets), so baking it into the open-source module is safe.
+const FORGE_OWNER_IDENTITY_HEX = 'c200ef2bfc5cef33a94336bbe1a899210d380990823cc5d2a47256b3556f4d12';
+
+const FORGE_AUTH_TTL_MICROS = 600_000_000n; // 10 minutes
+
+function isForgeGame(ctx: any, gameId: bigint): boolean {
+  return ctx.db.ForgeGame.gameId.find(gameId) !== undefined;
+}
+
+function forgeServerIdentityHex(ctx: any): string {
+  const cfg = ctx.db.ForgeConfig.id.find(0n);
+  return cfg ? cfg.serverIdentityHex : '';
+}
+
+// Single-use: consumes a fresh seat authorization for (ctx.sender, code).
+// Throws when absent or stale. Opportunistically sweeps expired rows.
+function consumeForgeSeatAuth(ctx: any, code: string) {
+  const senderHex = ctx.sender.toHexString();
+  const now = ctx.timestamp.microsSinceUnixEpoch;
+  let match: any = null;
+  for (const row of [...ctx.db.ForgeSeatAuth.seat_auth_code.filter(code)]) {
+    if (now - row.authorizedAtMicros > FORGE_AUTH_TTL_MICROS) {
+      ctx.db.ForgeSeatAuth.id.delete(row.id);
+      continue;
+    }
+    if (row.identityHex === senderHex) match = row;
+  }
+  if (!match) throw new SenderError('Not authorized for this playtest game');
+  ctx.db.ForgeSeatAuth.id.delete(match.id);
+}
+
+// Shared deckData sanity check for the forge entry paths (mirrors
+// pregame_change_deck's validation).
+function assertValidDeckData(deckData: string) {
+  try {
+    const parsed = JSON.parse(deckData);
+    if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('not array or empty');
+  } catch {
+    throw new SenderError('Invalid deck data');
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helper: logAction
 // ---------------------------------------------------------------------------
 function logAction(
@@ -527,230 +574,305 @@ function refillSoulDeck(ctx: any, gameId: bigint) {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers: createGameCore / joinGameCore
+// (shared bodies for public create_game/join_game and forge
+// create_forge_game/join_forge_game — see "Forge playtest reducers" below)
+// ---------------------------------------------------------------------------
+function createGameCore(
+  ctx: any,
+  args: { code: string; deckId: string; displayName: string; paragon: string;
+          format: string; supabaseUserId: string; deckData: string;
+          isPublic: boolean; lobbyMessage: string },
+  isForge: boolean,
+) {
+  const { code, deckId, displayName, paragon, format, supabaseUserId, deckData, isPublic, lobbyMessage } = args;
+  // Validate code is not already in use by an active game
+  for (const g of ctx.db.Game.game_code.filter(code)) {
+    if (g.status !== 'finished') {
+      throw new SenderError('Game code already in use');
+    }
+  }
+
+  // Insert game row
+  const game = ctx.db.Game.insert({
+    id: 0n,
+    code,
+    status: 'waiting',
+    currentTurn: 0n,
+    currentPhase: 'draw',
+    turnNumber: 0n,
+    format,
+    rngCounter: 1n,
+    lastDiceRoll: '',
+    createdAt: ctx.timestamp,
+    createdBy: ctx.sender,
+    isPublic: isForge ? false : args.isPublic,
+    lobbyMessage,
+    createdByName: displayName,
+    pregamePhase: '',
+    pregameReady0: false,
+    pregameReady1: false,
+    rollWinner: '',
+    rollResult0: 0n,
+    rollResult1: 0n,
+    rematchRequestedBy: '',
+    rematchDeckId0: '',
+    rematchDeckData0: '',
+    rematchDeckId1: '',
+    rematchDeckData1: '',
+    rematchParagon0: '',
+    rematchParagon1: '',
+    rematchResponse: '',
+    rematchCode: '',
+    disconnectTimeoutFired: false,
+    choosingDeadlineMicros: 0n,
+    playingStartedAtMicros: 0n,
+    pauseRequestedBy: '',
+    pauseRequestType: '',
+    pauseStartedAtMicros: 0n,
+    totalPausedMicros: 0n,
+  });
+  if (isForge) ctx.db.ForgeGame.insert({ gameId: game.id });
+
+  // Insert player row with pending deck data (cards loaded later during pregame)
+  const player = ctx.db.Player.insert({
+    id: 0n,
+    gameId: game.id,
+    identity: ctx.sender,
+    seat: 0n,
+    deckId,
+    displayName,
+    paragon,
+    supabaseUserId,
+    isConnected: true,
+    autoRouteLostSouls: true,
+    handRevealed: false,
+    handRevealSnapshot: '',
+    reserveRevealed: false,
+    pendingDeckData: deckData,
+    revealedCards: '',
+    shareHandWithSpectators: false,
+  });
+
+  logAction(ctx, game.id, player.id, 'GAME_CREATED', JSON.stringify({ code }), 0n, 'draw');
+}
+
+function joinGameCore(
+  ctx: any,
+  args: { code: string; deckId: string; displayName: string; paragon: string;
+          format: string; supabaseUserId: string; deckData: string },
+  isForge: boolean,
+) {
+  const { code, deckId, displayName, paragon, format, supabaseUserId, deckData } = args;
+  // Find game by code
+  let game: any = null;
+  for (const g of ctx.db.Game.game_code.filter(code)) {
+    if (g.status === 'waiting') {
+      game = g;
+      break;
+    }
+  }
+  if (!game) {
+    throw new SenderError('No waiting game found with that code');
+  }
+
+  // Forge games are joinable only via join_forge_game (allowlist path),
+  // and forge joins must not land on public games. Same error as a
+  // nonexistent game — no oracle.
+  if (isForgeGame(ctx, game.id) !== isForge) {
+    throw new SenderError('No waiting game found with that code');
+  }
+
+  // Reject join if the creator has disconnected — the game is effectively dead
+  const creator = [...ctx.db.Player.player_game_id.filter(game.id)]
+    .find((p: any) => p.seat === 0n);
+  if (creator && !creator.isConnected) {
+    ctx.db.Game.id.update({ ...game, status: 'finished' });
+    throw new SenderError('No waiting game found with that code');
+  }
+
+  // Prevent a player from joining their own game
+  if (creator && creator.supabaseUserId === supabaseUserId) {
+    throw new SenderError('You cannot join your own game');
+  }
+
+  // Reject format mismatch (T1 can't join a Paragon game, etc.)
+  const joinerFormat = normalizeFormat(format);
+  const gameFormat = normalizeFormat(game.format);
+  if (joinerFormat !== gameFormat) {
+    throw new SenderError(
+      `Deck format (${joinerFormat}) does not match game format (${gameFormat})`
+    );
+  }
+
+  // Insert player (seat=1) with pending deck data (cards loaded later during pregame)
+  const player = ctx.db.Player.insert({
+    id: 0n,
+    gameId: game.id,
+    identity: ctx.sender,
+    seat: 1n,
+    deckId,
+    displayName,
+    paragon,
+    supabaseUserId,
+    isConnected: true,
+    autoRouteLostSouls: true,
+    handRevealed: false,
+    handRevealSnapshot: '',
+    reserveRevealed: false,
+    pendingDeckData: deckData,
+    revealedCards: '',
+    shareHandWithSpectators: false,
+  });
+
+  // Log join
+  logAction(ctx, game.id, player.id, 'PLAYER_JOINED', '', 0n, 'pregame');
+
+  // Load decks for both players
+  const allPlayers: any[] = [...ctx.db.Player.player_game_id.filter(game.id)];
+  for (const p of allPlayers) {
+    if (!p.pendingDeckData || p.pendingDeckData === '') {
+      throw new SenderError('Player ' + p.displayName + ' has no deck data');
+    }
+  }
+
+  // Insert cards, shuffle, and draw opening hand for both players
+  for (const p of allPlayers) {
+    const currentGame = ctx.db.Game.id.find(game.id);
+    if (!currentGame) throw new SenderError('Game not found');
+    insertCardsShuffleDraw(ctx, currentGame, p, p.pendingDeckData);
+    const latestPlayer = ctx.db.Player.id.find(p.id);
+    if (latestPlayer) {
+      ctx.db.Player.id.update({ ...latestPlayer, pendingDeckData: '' });
+    }
+  }
+
+  // Paragon: populate the shared soul deck + 3 LoB souls at the same
+  // moment player hands are dealt (idempotent).
+  const gameForSoulInit = ctx.db.Game.id.find(game.id);
+  if (gameForSoulInit && normalizeFormat(gameForSoulInit.format) === 'Paragon') {
+    initializeSoulDeck(ctx, gameForSoulInit);
+  }
+
+  // Roll dice to determine who chooses first player
+  const gameAfterCards = ctx.db.Game.id.find(game.id);
+  if (!gameAfterCards) throw new SenderError('Game not found');
+  const seed = makeSeed(
+    ctx.timestamp.microsSinceUnixEpoch,
+    game.id,
+    0n,
+    gameAfterCards.rngCounter
+  );
+  const rng = xorshift64(seed);
+
+  let r0: number, r1: number;
+  do {
+    r0 = Number(rng.next() % 20n) + 1;
+    r1 = Number(rng.next() % 20n) + 1;
+  } while (r0 === r1);
+
+  const winner = r0 > r1 ? '0' : '1';
+
+  const gameBeforeUpdate = ctx.db.Game.id.find(game.id);
+  if (!gameBeforeUpdate) throw new SenderError('Game not found');
+  const CHOOSE_DEADLINE_MICROS = 30_000_000n; // 30 seconds from now
+  ctx.db.Game.id.update({
+    ...gameBeforeUpdate,
+    status: 'pregame',
+    pregamePhase: 'rolling',
+    rollResult0: BigInt(r0),
+    rollResult1: BigInt(r1),
+    rollWinner: winner,
+    rngCounter: gameBeforeUpdate.rngCounter + 1n,
+    choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
+  });
+
+  const winnerSeat = winner === '0' ? 0n : 1n;
+  let winnerPlayerId = player.id;
+  for (const p of [...ctx.db.Player.player_game_id.filter(game.id)]) {
+    if (p.seat === winnerSeat) { winnerPlayerId = p.id; break; }
+  }
+  logAction(ctx, game.id, winnerPlayerId, 'PREGAME_ROLL',
+    JSON.stringify({ result0: r0, result1: r1, winner }),
+    0n, 'pregame');
+}
+
+// ---------------------------------------------------------------------------
 // Reducer: create_game
 // ---------------------------------------------------------------------------
 export const create_game = spacetimedb.reducer(
-  {
-    code: t.string(),
-    deckId: t.string(),
-    displayName: t.string(),
-    paragon: t.string(),
-    format: t.string(),
-    supabaseUserId: t.string(),
-    deckData: t.string(),
-    isPublic: t.bool(),
-    lobbyMessage: t.string(),
-  },
-  (ctx, { code, deckId, displayName, paragon, format, supabaseUserId, deckData, isPublic, lobbyMessage }) => {
-    // Validate code is not already in use by an active game
-    for (const g of ctx.db.Game.game_code.filter(code)) {
-      if (g.status !== 'finished') {
-        throw new SenderError('Game code already in use');
-      }
-    }
-
-    // Insert game row
-    const game = ctx.db.Game.insert({
-      id: 0n,
-      code,
-      status: 'waiting',
-      currentTurn: 0n,
-      currentPhase: 'draw',
-      turnNumber: 0n,
-      format,
-      rngCounter: 1n,
-      lastDiceRoll: '',
-      createdAt: ctx.timestamp,
-      createdBy: ctx.sender,
-      isPublic,
-      lobbyMessage,
-      createdByName: displayName,
-      pregamePhase: '',
-      pregameReady0: false,
-      pregameReady1: false,
-      rollWinner: '',
-      rollResult0: 0n,
-      rollResult1: 0n,
-      rematchRequestedBy: '',
-      rematchDeckId0: '',
-      rematchDeckData0: '',
-      rematchDeckId1: '',
-      rematchDeckData1: '',
-      rematchParagon0: '',
-      rematchParagon1: '',
-      rematchResponse: '',
-      rematchCode: '',
-      disconnectTimeoutFired: false,
-      choosingDeadlineMicros: 0n,
-      playingStartedAtMicros: 0n,
-      pauseRequestedBy: '',
-      pauseRequestType: '',
-      pauseStartedAtMicros: 0n,
-      totalPausedMicros: 0n,
-    });
-
-    // Insert player row with pending deck data (cards loaded later during pregame)
-    const player = ctx.db.Player.insert({
-      id: 0n,
-      gameId: game.id,
-      identity: ctx.sender,
-      seat: 0n,
-      deckId,
-      displayName,
-      paragon,
-      supabaseUserId,
-      isConnected: true,
-      autoRouteLostSouls: true,
-      handRevealed: false,
-      handRevealSnapshot: '',
-      reserveRevealed: false,
-      pendingDeckData: deckData,
-      revealedCards: '',
-      shareHandWithSpectators: false,
-    });
-
-    logAction(ctx, game.id, player.id, 'GAME_CREATED', JSON.stringify({ code }), 0n, 'draw');
-  }
+  { code: t.string(), deckId: t.string(), displayName: t.string(), paragon: t.string(),
+    format: t.string(), supabaseUserId: t.string(), deckData: t.string(),
+    isPublic: t.bool(), lobbyMessage: t.string() },
+  (ctx, args) => { createGameCore(ctx, args, false); }
 );
 
 // ---------------------------------------------------------------------------
 // Reducer: join_game
 // ---------------------------------------------------------------------------
 export const join_game = spacetimedb.reducer(
-  {
-    code: t.string(),
-    deckId: t.string(),
-    displayName: t.string(),
-    paragon: t.string(),
-    format: t.string(),
-    supabaseUserId: t.string(),
-    deckData: t.string(),
-  },
-  (ctx, { code, deckId, displayName, paragon, format, supabaseUserId, deckData }) => {
-    // Find game by code
-    let game: any = null;
-    for (const g of ctx.db.Game.game_code.filter(code)) {
-      if (g.status === 'waiting') {
-        game = g;
-        break;
+  { code: t.string(), deckId: t.string(), displayName: t.string(), paragon: t.string(),
+    format: t.string(), supabaseUserId: t.string(), deckData: t.string() },
+  (ctx, args) => { joinGameCore(ctx, args, false); }
+);
+
+// ---------------------------------------------------------------------------
+// Forge playtest reducers
+// ---------------------------------------------------------------------------
+export const set_forge_server_identity = spacetimedb.reducer(
+  { identityHex: t.string() },
+  (ctx, { identityHex }) => {
+    const senderHex = ctx.sender.toHexString();
+    const cfg = ctx.db.ForgeConfig.id.find(0n);
+    if (cfg) {
+      if (senderHex !== cfg.serverIdentityHex && senderHex !== FORGE_OWNER_IDENTITY_HEX) {
+        throw new SenderError('Not authorized');
+      }
+      ctx.db.ForgeConfig.id.update({ ...cfg, serverIdentityHex: identityHex });
+    } else {
+      // First-set-wins: the deploy procedure calls this immediately after any
+      // publish that reset the DB; the owner override above makes a lost race
+      // recoverable without a republish.
+      ctx.db.ForgeConfig.insert({ id: 0n, serverIdentityHex: identityHex });
+    }
+  }
+);
+
+export const forge_authorize_seat = spacetimedb.reducer(
+  { code: t.string(), identityHex: t.string() },
+  (ctx, { code, identityHex }) => {
+    const server = forgeServerIdentityHex(ctx);
+    if (!server || ctx.sender.toHexString() !== server) {
+      throw new SenderError('Not authorized');
+    }
+    const now = ctx.timestamp.microsSinceUnixEpoch;
+    // Upsert: replace any existing row for this identity, sweep stale rows.
+    for (const row of [...ctx.db.ForgeSeatAuth.seat_auth_code.filter(code)]) {
+      if (row.identityHex === identityHex || now - row.authorizedAtMicros > FORGE_AUTH_TTL_MICROS) {
+        ctx.db.ForgeSeatAuth.id.delete(row.id);
       }
     }
-    if (!game) {
-      throw new SenderError('No waiting game found with that code');
-    }
+    ctx.db.ForgeSeatAuth.insert({ id: 0n, code, identityHex, authorizedAtMicros: now });
+  }
+);
 
-    // Reject join if the creator has disconnected — the game is effectively dead
-    const creator = [...ctx.db.Player.player_game_id.filter(game.id)]
-      .find((p: any) => p.seat === 0n);
-    if (creator && !creator.isConnected) {
-      ctx.db.Game.id.update({ ...game, status: 'finished' });
-      throw new SenderError('No waiting game found with that code');
-    }
+export const create_forge_game = spacetimedb.reducer(
+  { code: t.string(), deckId: t.string(), displayName: t.string(), paragon: t.string(),
+    format: t.string(), supabaseUserId: t.string(), deckData: t.string() },
+  (ctx, args) => {
+    consumeForgeSeatAuth(ctx, args.code);
+    assertValidDeckData(args.deckData);
+    createGameCore(ctx, { ...args, isPublic: false, lobbyMessage: '' }, true);
+  }
+);
 
-    // Prevent a player from joining their own game
-    if (creator && creator.supabaseUserId === supabaseUserId) {
-      throw new SenderError('You cannot join your own game');
-    }
-
-    // Reject format mismatch (T1 can't join a Paragon game, etc.)
-    const joinerFormat = normalizeFormat(format);
-    const gameFormat = normalizeFormat(game.format);
-    if (joinerFormat !== gameFormat) {
-      throw new SenderError(
-        `Deck format (${joinerFormat}) does not match game format (${gameFormat})`
-      );
-    }
-
-    // Insert player (seat=1) with pending deck data (cards loaded later during pregame)
-    const player = ctx.db.Player.insert({
-      id: 0n,
-      gameId: game.id,
-      identity: ctx.sender,
-      seat: 1n,
-      deckId,
-      displayName,
-      paragon,
-      supabaseUserId,
-      isConnected: true,
-      autoRouteLostSouls: true,
-      handRevealed: false,
-      handRevealSnapshot: '',
-      reserveRevealed: false,
-      pendingDeckData: deckData,
-      revealedCards: '',
-      shareHandWithSpectators: false,
-    });
-
-    // Log join
-    logAction(ctx, game.id, player.id, 'PLAYER_JOINED', '', 0n, 'pregame');
-
-    // Load decks for both players
-    const allPlayers: any[] = [...ctx.db.Player.player_game_id.filter(game.id)];
-    for (const p of allPlayers) {
-      if (!p.pendingDeckData || p.pendingDeckData === '') {
-        throw new SenderError('Player ' + p.displayName + ' has no deck data');
-      }
-    }
-
-    // Insert cards, shuffle, and draw opening hand for both players
-    for (const p of allPlayers) {
-      const currentGame = ctx.db.Game.id.find(game.id);
-      if (!currentGame) throw new SenderError('Game not found');
-      insertCardsShuffleDraw(ctx, currentGame, p, p.pendingDeckData);
-      const latestPlayer = ctx.db.Player.id.find(p.id);
-      if (latestPlayer) {
-        ctx.db.Player.id.update({ ...latestPlayer, pendingDeckData: '' });
-      }
-    }
-
-    // Paragon: populate the shared soul deck + 3 LoB souls at the same
-    // moment player hands are dealt (idempotent).
-    const gameForSoulInit = ctx.db.Game.id.find(game.id);
-    if (gameForSoulInit && normalizeFormat(gameForSoulInit.format) === 'Paragon') {
-      initializeSoulDeck(ctx, gameForSoulInit);
-    }
-
-    // Roll dice to determine who chooses first player
-    const gameAfterCards = ctx.db.Game.id.find(game.id);
-    if (!gameAfterCards) throw new SenderError('Game not found');
-    const seed = makeSeed(
-      ctx.timestamp.microsSinceUnixEpoch,
-      game.id,
-      0n,
-      gameAfterCards.rngCounter
-    );
-    const rng = xorshift64(seed);
-
-    let r0: number, r1: number;
-    do {
-      r0 = Number(rng.next() % 20n) + 1;
-      r1 = Number(rng.next() % 20n) + 1;
-    } while (r0 === r1);
-
-    const winner = r0 > r1 ? '0' : '1';
-
-    const gameBeforeUpdate = ctx.db.Game.id.find(game.id);
-    if (!gameBeforeUpdate) throw new SenderError('Game not found');
-    const CHOOSE_DEADLINE_MICROS = 30_000_000n; // 30 seconds from now
-    ctx.db.Game.id.update({
-      ...gameBeforeUpdate,
-      status: 'pregame',
-      pregamePhase: 'rolling',
-      rollResult0: BigInt(r0),
-      rollResult1: BigInt(r1),
-      rollWinner: winner,
-      rngCounter: gameBeforeUpdate.rngCounter + 1n,
-      choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
-    });
-
-    const winnerSeat = winner === '0' ? 0n : 1n;
-    let winnerPlayerId = player.id;
-    for (const p of [...ctx.db.Player.player_game_id.filter(game.id)]) {
-      if (p.seat === winnerSeat) { winnerPlayerId = p.id; break; }
-    }
-    logAction(ctx, game.id, winnerPlayerId, 'PREGAME_ROLL',
-      JSON.stringify({ result0: r0, result1: r1, winner }),
-      0n, 'pregame');
+export const join_forge_game = spacetimedb.reducer(
+  { code: t.string(), deckId: t.string(), displayName: t.string(), paragon: t.string(),
+    format: t.string(), supabaseUserId: t.string(), deckData: t.string() },
+  (ctx, args) => {
+    consumeForgeSeatAuth(ctx, args.code);
+    assertValidDeckData(args.deckData);
+    joinGameCore(ctx, args, true);
   }
 );
 
@@ -1079,6 +1201,7 @@ export const pregame_change_deck = spacetimedb.reducer(
   (ctx, { gameId, deckId, deckData }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+    if (isForgeGame(ctx, gameId)) throw new SenderError('Deck change is disabled in playtest games');
     // Allow swap while waiting for opponent (status='waiting') OR during the
     // pregame deck-select phase. Both states are pre-shuffle, so swapping
     // pendingDeckData is safe.
@@ -1502,6 +1625,10 @@ export const join_as_spectator = spacetimedb.reducer(
     }
     if (!game) throw new SenderError('No game found with that code');
 
+    // Forge playtest games never accept spectators (defense-in-depth — they
+    // are also always private). Same error as a nonexistent game.
+    if (isForgeGame(ctx, game.id)) throw new SenderError('No game found with that code');
+
     // Ban check
     for (const ban of ctx.db.SpectatorBan.spectator_ban_game_id.filter(game.id)) {
       if (ban.identity.toHexString() === ctx.sender.toHexString()) {
@@ -1706,6 +1833,7 @@ export const set_game_public = spacetimedb.reducer(
   (ctx, { gameId, isPublic }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+    if (isForgeGame(ctx, gameId)) throw new SenderError('Playtest games are always private');
     if (game.status !== 'waiting') throw new SenderError('Game is not in waiting state');
     if (game.createdBy.toHexString() !== ctx.sender.toHexString()) {
       throw new SenderError('Only the game creator can change game visibility');
@@ -5312,6 +5440,7 @@ export const reload_deck = spacetimedb.reducer(
   (ctx, { gameId, deckId, deckData, paragon }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+    if (isForgeGame(ctx, gameId)) throw new SenderError('Deck reload is disabled in playtest games');
     if (game.status !== 'playing' && game.status !== 'finished') throw new SenderError('Game is not in progress');
 
     const player = findPlayerBySender(ctx, gameId);
