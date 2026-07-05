@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Anvil } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import AcceptForm from "./AcceptForm";
 
@@ -23,5 +24,15 @@ export default async function InviteRedemptionPage({
   }
 
   // Redemption happens only after the NDA is accepted, inside the form.
-  return <AcceptForm token={token} />;
+  return (
+    <div>
+      <header className="flex items-center justify-center gap-2 border-b py-4">
+        <Anvil className="h-5 w-5" aria-hidden="true" />
+        <span className="text-lg" style={{ fontFamily: "Cinzel, serif" }}>
+          The Forge
+        </span>
+      </header>
+      <AcceptForm token={token} />
+    </div>
+  );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { sendMissive, sendMissiveTest } from "@/app/forge/lib/missives";
 
 // Inlined (not imported from lib/missives) so this client component never pulls the
@@ -83,38 +85,18 @@ export default function AnnouncementComposer({
         <h2 className="text-lg font-medium">Compose an announcement</h2>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="rounded-md border px-2.5 py-1 text-xs"
-            onClick={selectAll}
-            disabled={pending}
-          >
+          <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={selectAll} disabled={pending}>
             All
-          </button>
-          <button
-            type="button"
-            className="rounded-md border px-2.5 py-1 text-xs"
-            onClick={selectElders}
-            disabled={pending}
-          >
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={selectElders} disabled={pending}>
             Elders
-          </button>
-          <button
-            type="button"
-            className="rounded-md border px-2.5 py-1 text-xs"
-            onClick={selectPlaytesters}
-            disabled={pending}
-          >
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={selectPlaytesters} disabled={pending}>
             Playtesters
-          </button>
-          <button
-            type="button"
-            className="rounded-md border px-2.5 py-1 text-xs"
-            onClick={selectNone}
-            disabled={pending}
-          >
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={selectNone} disabled={pending}>
             None
-          </button>
+          </Button>
           {sets.length > 0 && (
             <label className="text-xs">
               Everyone on set…
@@ -142,11 +124,15 @@ export default function AnnouncementComposer({
 
         <div className="mt-2 max-h-64 overflow-y-auto rounded-md border">
           {members.map((m) => (
-            <label key={m.userId} className="flex items-center gap-2 border-b px-2 py-1.5 text-sm last:border-b-0">
-              <input
-                type="checkbox"
+            <label
+              key={m.userId}
+              htmlFor={`recipient-${m.userId}`}
+              className="flex cursor-pointer items-center gap-2 border-b px-2 py-1.5 text-sm last:border-b-0"
+            >
+              <Checkbox
+                id={`recipient-${m.userId}`}
                 checked={selected.has(m.userId)}
-                onChange={() => toggleMember(m.userId)}
+                onCheckedChange={() => toggleMember(m.userId)}
                 disabled={pending}
               />
               <span>{m.displayName ?? "(no name)"}</span>
@@ -187,22 +173,18 @@ export default function AnnouncementComposer({
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
+          <Button
             type="button"
-            className="rounded-md border px-3 py-1.5 text-sm"
+            variant="outline"
+            size="sm"
             onClick={handleTestSend}
             disabled={pending || subject.trim().length === 0 || body.trim().length === 0}
           >
             Send test to me
-          </button>
-          <button
-            type="button"
-            className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
-            onClick={handleSend}
-            disabled={!canSend}
-          >
+          </Button>
+          <Button type="button" size="sm" onClick={handleSend} disabled={!canSend}>
             Send to {selected.size} member{selected.size === 1 ? "" : "s"}
-          </button>
+          </Button>
         </div>
 
         {msg && (

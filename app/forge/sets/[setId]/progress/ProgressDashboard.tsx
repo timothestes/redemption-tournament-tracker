@@ -56,14 +56,18 @@ export default function ProgressDashboard({
         </div>
       </div>
 
-      {/* status breakdown bar */}
+      {/* status breakdown bar — scaled to the target so the unfilled remainder reads as
+          "left to build". Falls back to a composition view when no target is set. */}
       {live > 0 && (
         <div>
-          <div className="flex h-3 overflow-hidden rounded-full border">
-            {STATUS_ORDER.map((s) => {
-              const n = model.byStatus[s] ?? 0;
-              return n > 0 ? <div key={s} className={STATUS_COLOR[s]} style={{ width: `${(n / live) * 100}%` }} /> : null;
-            })}
+          <div className="flex h-3 overflow-hidden rounded-full border bg-muted">
+            {(() => {
+              const denom = model.headline.target > 0 ? Math.max(model.headline.target, live) : live;
+              return STATUS_ORDER.map((s) => {
+                const n = model.byStatus[s] ?? 0;
+                return n > 0 ? <div key={s} className={STATUS_COLOR[s]} style={{ width: `${(n / denom) * 100}%` }} /> : null;
+              });
+            })()}
           </div>
           <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
             {STATUS_ORDER.map((s) => <span key={s}>{STATUS_LABEL[s] ?? s}: {model.byStatus[s] ?? 0}</span>)}
