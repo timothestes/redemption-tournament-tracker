@@ -34,7 +34,7 @@ export default function ForgeCardGrid({
               rawText={cardRawText(c.snapshot)}
               finishedUrl={c.hasFinished ? `/forge/api/art/${c.id}?kind=finished&t=${t}` : null}
               artUrl={c.hasArt ? `/forge/api/art/${c.id}?t=${t}` : null}
-              className={shelved ? "opacity-60 grayscale" : undefined}
+              className={shelved ? "opacity-60 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0" : undefined}
             />
             <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
               <p className="min-w-[6rem] flex-1 truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>
@@ -54,7 +54,7 @@ export default function ForgeCardGrid({
               type="button"
               onClick={() => selection.onToggle(c.id)}
               aria-pressed={isSel}
-              className="relative block text-left transition hover:opacity-90"
+              className="group relative block text-left transition hover:opacity-90"
             >
               <span
                 aria-hidden
@@ -72,7 +72,7 @@ export default function ForgeCardGrid({
           );
         }
         return (
-          <Link key={c.id} href={`/forge/cards/${c.id}`} className="block transition hover:opacity-90">
+          <Link key={c.id} href={`/forge/cards/${c.id}`} className="group block transition hover:opacity-90">
             {inner}
           </Link>
         );
