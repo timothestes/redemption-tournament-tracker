@@ -46,7 +46,7 @@ export default function DeckList({ decks }: { decks: ForgeDeckSummary[] }) {
       {decks.length === 0 ? (
         <p className="mt-8 text-sm text-muted-foreground">No decks yet. Start one above.</p>
       ) : (
-        <ul className="mt-6 divide-y rounded-lg border">
+        <ul className="mt-6 divide-y rounded-lg border [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
           {decks.map((d) => (
             <li key={d.id} className="flex items-center justify-between p-4">
               <Link href={`/forge/play/decks/${d.id}`} className="min-w-0 flex-1 hover:underline">

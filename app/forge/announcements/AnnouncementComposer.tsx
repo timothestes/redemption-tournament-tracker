@@ -122,7 +122,7 @@ export default function AnnouncementComposer({
           )}
         </div>
 
-        <div className="mt-2 max-h-64 overflow-y-auto rounded-md border">
+        <div className="mt-2 max-h-64 overflow-y-auto rounded-md border [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
           {members.map((m) => (
             <label
               key={m.userId}

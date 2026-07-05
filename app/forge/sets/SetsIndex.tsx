@@ -187,7 +187,7 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
           <p className="text-sm text-muted-foreground">No sets yet. Create one to gather cards toward print.</p>
         </div>
       ) : (
-        <ul className="divide-y rounded-md border">
+        <ul className="divide-y rounded-md border [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
           {sets.map((s) => (
             <li key={s.id} className="flex items-center gap-2 p-1">
               {selecting && (

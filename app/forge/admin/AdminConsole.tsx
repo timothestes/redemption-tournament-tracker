@@ -62,7 +62,7 @@ export default function AdminConsole({
   }
 
   return (
-    <div className="mt-6 space-y-8">
+    <div className="mt-6 space-y-8 [.jayden_&]:rounded-lg [.jayden_&]:border [.jayden_&]:border-primary/20 [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:p-6">
       <section>
         <h2 className="text-lg font-medium">Invite a member</h2>
         <form onSubmit={submitInvite} className="mt-2 flex flex-wrap items-end gap-3">

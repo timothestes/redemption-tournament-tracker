@@ -81,11 +81,11 @@ function LobbyInner({ decks, displayName, userId }: Props) {
         )}
       </section>
       <section className="grid gap-3 sm:grid-cols-2">
-        <button onClick={handleCreate} disabled={!selected} className="rounded-lg border p-4 text-left hover:bg-muted/50 disabled:opacity-50">
+        <button onClick={handleCreate} disabled={!selected} className="rounded-lg border p-4 text-left hover:bg-muted/50 disabled:opacity-50 [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
           <div className="font-medium">Host a game</div>
           <div className="text-sm text-muted-foreground">Get a code to share with another playtester.</div>
         </button>
-        <div className="rounded-lg border p-4">
+        <div className="rounded-lg border p-4 [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
           <div className="font-medium">Join by code</div>
           <div className="mt-2 flex gap-2">
             <input
@@ -104,7 +104,7 @@ function LobbyInner({ decks, displayName, userId }: Props) {
         {openGames.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nobody is waiting right now.</p>
         ) : (
-          <ul className="divide-y rounded-lg border">
+          <ul className="divide-y rounded-lg border [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
             {openGames.map((g) => (
               <li key={String(g.id)} className="flex items-center justify-between gap-2 p-3">
                 <div>
