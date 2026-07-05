@@ -26,7 +26,7 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
           { href: "/forge/play", label: "Play", match: (p) => p.startsWith("/forge/play") && !p.startsWith("/forge/play/decks") },
           { href: "/forge/play/decks", label: "Decks", match: (p) => p.startsWith("/forge/play/decks") },
           { href: "/forge/announcements", label: "Announcements", match: (p) => p.startsWith("/forge/announcements") },
-          ...(role === "superadmin"
+          ...(role === "superadmin" || role === "elder"
             ? [{ href: "/forge/admin", label: "Admin", match: (p: string) => p.startsWith("/forge/admin") }]
             : []),
         ];

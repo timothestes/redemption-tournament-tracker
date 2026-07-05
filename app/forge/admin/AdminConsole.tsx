@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ForgeRole } from "@/app/forge/lib/auth";
 import { mintInvite, changeRole, removeMember } from "@/app/forge/lib/members";
+import { Checkbox } from "@/components/ui/checkbox";
 import SetAccessMatrix from "./SetAccessMatrix";
 
 type Member = { user_id: string; role: ForgeRole; display_name: string | null; created_at: string };
@@ -50,6 +51,10 @@ export default function AdminConsole({
     });
   }
 
+  function toggleInviteSet(id: string) {
+    setInviteSetIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
   async function submitInvite(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
@@ -89,19 +94,21 @@ export default function AdminConsole({
             />
           </label>
           {inviteRole === "playtester" && sets.length > 0 && (
-            <label className="text-sm">
-              Sets (grants access)
-              <select
-                multiple
-                className="mt-1 block min-w-40 rounded-md border bg-background px-2 py-1.5 text-sm"
-                value={inviteSetIds}
-                onChange={(e) => setInviteSetIds(Array.from(e.target.selectedOptions, (o) => o.value))}
-              >
+            <div className="text-sm">
+              <span className="block">Sets (grants access)</span>
+              <div className="mt-1 flex max-w-sm flex-wrap items-center gap-x-4 gap-y-2 rounded-md border bg-background px-3 py-2">
                 {sets.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <label key={s.id} className="flex cursor-pointer select-none items-center gap-2">
+                    <Checkbox
+                      checked={inviteSetIds.includes(s.id)}
+                      onCheckedChange={() => toggleInviteSet(s.id)}
+                      aria-label={`Grant access to ${s.name}`}
+                    />
+                    <span>{s.name}</span>
+                  </label>
                 ))}
-              </select>
-            </label>
+              </div>
+            </div>
           )}
           <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" disabled={pending}>
             Send invite

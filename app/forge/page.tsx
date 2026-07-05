@@ -44,7 +44,7 @@ export default async function ForgeHomePage() {
                 <div className="text-sm font-medium">Build a deck</div>
                 <div className="text-xs text-muted-foreground">Test new cards.</div>
               </Link>
-              {ctx.role === "superadmin" && (
+              {(ctx.role === "superadmin" || ctx.role === "elder") && (
                 <Link href="/forge/admin" className="rounded-lg border p-3 hover:bg-muted/50 [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20 [.jayden_&]:hover:border-primary/60">
                   <div className="text-sm font-medium">Admin</div>
                   <div className="text-xs text-muted-foreground">Invites &amp; roles.</div>

@@ -121,7 +121,19 @@ export default function SetCardsBrowser({ cards, setId, canCreate }: { cards: Fo
           {BRIGADES.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
         <span className="text-xs text-muted-foreground">{filtered.length} of {cards.length}</span>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+          {selecting && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{selected.size} selected</span>
+              <button type="button" className="hover:text-foreground hover:underline"
+                onClick={() => setSelected(new Set(filtered.map((c) => c.id)))}>
+                Select all ({filtered.length})
+              </button>
+              <button type="button" className="hover:text-foreground hover:underline" onClick={() => setSelected(new Set())}>
+                Clear
+              </button>
+            </div>
+          )}
           {!selecting && draftIds.length > 0 && (
             <Button size="sm" className="h-8" disabled={busy !== null} onClick={() => setConfirming("releaseAll")}>
               {busy === "release" ? "Working…" : `Release all to playtest (${draftIds.length})`}
@@ -136,22 +148,8 @@ export default function SetCardsBrowser({ cards, setId, canCreate }: { cards: Fo
         </div>
       </div>
 
-      {!selecting && summary && (
+      {summary && (
         <div aria-live="polite" className="mb-3 text-xs text-foreground">{summary}</div>
-      )}
-
-      {selecting && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{selected.size} selected</span>
-          <button type="button" className="hover:text-foreground hover:underline"
-            onClick={() => setSelected(new Set(filtered.map((c) => c.id)))}>
-            Select all ({filtered.length})
-          </button>
-          <button type="button" className="hover:text-foreground hover:underline" onClick={() => setSelected(new Set())}>
-            Clear
-          </button>
-          {summary && <span aria-live="polite" className="text-foreground">{summary}</span>}
-        </div>
       )}
 
       <ForgeCardGrid
