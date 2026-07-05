@@ -11,6 +11,7 @@ import {
   deleteComment,
   type CommentRow,
 } from "@/app/forge/lib/comments";
+import { timeAgo } from "@/app/forge/lib/relativeTime";
 
 function valueText(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -66,6 +67,11 @@ export default function CommentThread({
 
   const Comment = ({ c, isReply }: { c: CommentRow; isReply?: boolean }) => (
     <div className={`rounded-md border p-2 text-sm ${isReply ? "ml-4" : ""} ${c.resolved ? "opacity-60" : ""}`}>
+      <p className="mb-1 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">{c.authorName ?? "Forge member"}</span>
+        {" · "}
+        {timeAgo(c.createdAt)}
+      </p>
       {c.field && (
         <p className="text-xs text-muted-foreground">
           Suggestion · <span className="font-medium">{FIELD_LABELS[c.field] ?? c.field}</span>

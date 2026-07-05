@@ -14,6 +14,7 @@ export type CommentRow = {
   resolved: boolean;
   createdBy: string;
   createdAt: string;
+  authorName: string | null;
 };
 
 const COLS =
@@ -31,6 +32,7 @@ function toComment(row: any): CommentRow {
     resolved: !!row.resolved,
     createdBy: row.created_by,
     createdAt: row.created_at,
+    authorName: null,
   };
 }
 
@@ -42,7 +44,17 @@ export async function listComments(cardId: string): Promise<CommentRow[]> {
     .select(COLS)
     .eq("card_id", cardId)
     .order("created_at", { ascending: true });
-  return (data ?? []).map(toComment);
+  const rows = (data ?? []).map(toComment);
+  if (rows.length === 0) return rows;
+
+  // Resolve author UUIDs -> display names (member-readable). Same pattern as sets.ts.
+  const ids = [...new Set(rows.map((r) => r.createdBy))];
+  const { data: members } = await ctx.supabase
+    .from("playtest_members")
+    .select("user_id, display_name")
+    .in("user_id", ids);
+  const names = new Map((members ?? []).map((m: any) => [m.user_id, m.display_name]));
+  return rows.map((r) => ({ ...r, authorName: names.get(r.createdBy) ?? "Forge member" }));
 }
 
 export async function addComment(input: {
