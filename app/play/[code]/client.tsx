@@ -1235,7 +1235,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         onUpdateMessage={gameId && conn ? (message: string) => {
           conn.reducers.updateLobbyMessage({ gameId, message });
         } : undefined}
-        onTogglePublic={gameId && conn ? (isPublic: boolean) => {
+        onTogglePublic={isForge ? undefined : gameId && conn ? (isPublic: boolean) => {
           conn.reducers.setGamePublic({ gameId, isPublic });
         } : undefined}
         canReady={canReady}
