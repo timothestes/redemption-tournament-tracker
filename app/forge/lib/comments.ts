@@ -36,6 +36,21 @@ function toComment(row: any): CommentRow {
   };
 }
 
+// Resolve author UUIDs -> display names (member-readable). Same pattern as sets.ts.
+async function resolveAuthorNames(
+  ctx: NonNullable<Awaited<ReturnType<typeof requireForge>>>,
+  rows: CommentRow[]
+): Promise<CommentRow[]> {
+  if (rows.length === 0) return rows;
+  const ids = [...new Set(rows.map((r) => r.createdBy))];
+  const { data: members } = await ctx.supabase
+    .from("playtest_members")
+    .select("user_id, display_name")
+    .in("user_id", ids);
+  const names = new Map((members ?? []).map((m: any) => [m.user_id, m.display_name]));
+  return rows.map((r) => ({ ...r, authorName: names.get(r.createdBy) ?? "Forge member" }));
+}
+
 export async function listComments(cardId: string): Promise<CommentRow[]> {
   const ctx = await requireForge();
   if (!ctx) return [];
@@ -45,16 +60,22 @@ export async function listComments(cardId: string): Promise<CommentRow[]> {
     .eq("card_id", cardId)
     .order("created_at", { ascending: true });
   const rows = (data ?? []).map(toComment);
-  if (rows.length === 0) return rows;
+  return resolveAuthorNames(ctx, rows);
+}
 
-  // Resolve author UUIDs -> display names (member-readable). Same pattern as sets.ts.
-  const ids = [...new Set(rows.map((r) => r.createdBy))];
-  const { data: members } = await ctx.supabase
-    .from("playtest_members")
-    .select("user_id, display_name")
-    .in("user_id", ids);
-  const names = new Map((members ?? []).map((m: any) => [m.user_id, m.display_name]));
-  return rows.map((r) => ({ ...r, authorName: names.get(r.createdBy) ?? "Forge member" }));
+// Card-level thread only (proposal_id IS NULL) with author names. Used by the
+// playtester reveal modal; runs under the caller's session so RLS applies.
+export async function listCardComments(cardId: string): Promise<CommentRow[]> {
+  const ctx = await requireForge();
+  if (!ctx) return [];
+  const { data } = await ctx.supabase
+    .from("card_comments")
+    .select(COLS)
+    .eq("card_id", cardId)
+    .is("proposal_id", null)
+    .order("created_at", { ascending: true });
+  const rows = (data ?? []).map(toComment);
+  return resolveAuthorNames(ctx, rows);
 }
 
 export async function addComment(input: {
@@ -115,7 +136,9 @@ export async function deleteComment(
   commentId: string,
   cardId: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const ctx = await requireElder();
+  // Any Forge member may call; forge_delete_comment restricts to author or set-elder/super,
+  // so a playtester can only delete a comment they authored.
+  const ctx = await requireForge();
   if (!ctx) return { ok: false, error: "Not authorized" };
   const { error } = await ctx.supabase.rpc("forge_delete_comment", {
     p_comment_id: commentId,
