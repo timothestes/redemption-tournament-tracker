@@ -34,7 +34,7 @@ export default function ForgeCardFace({
 
   return (
     <div
-      className={`overflow-hidden rounded-[4%] border bg-muted/30 ${className ?? ""}`}
+      className={`overflow-hidden rounded-[4%] border bg-muted/30 [.jayden_&]:bg-card/90 [.jayden_&]:border-primary/20 ${className ?? ""}`}
       style={{ ...box, display: "flex", flexDirection: "column", overflow: "hidden" }}
     >
       {artUrl && <Img src={artUrl} style={{ width: "100%", height: "48%", objectFit: "cover" }} />}

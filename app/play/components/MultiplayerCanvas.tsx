@@ -7154,7 +7154,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               zIndex: 1100,
             }}
           >
-            {[...modalDrag.additionalCards.slice(0, 2)].reverse().map((extra, i) => (
+            {[...modalDrag.additionalCards.slice(0, 2)].reverse().filter(e => e.imageUrl).map((extra, i) => (
               <img
                 key={extra.card.instanceId}
                 src={extra.imageUrl}
@@ -7237,7 +7237,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               zIndex: 1100,
             }}
           >
-            {[...opponentModalDrag.additionalCards.slice(0, 2)].reverse().map((extra, i) => (
+            {[...opponentModalDrag.additionalCards.slice(0, 2)].reverse().filter(e => e.imageUrl).map((extra, i) => (
               <img
                 key={i}
                 src={extra.imageUrl}

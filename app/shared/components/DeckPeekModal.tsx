@@ -587,7 +587,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                     const isHoveredCard = hoveredCardId === card.instanceId && !isSelected;
                     const glowStyle = isHoveredCard ? getHoverGlowStyle(hoverProgress) : undefined;
                     const selectedShadow = isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none';
-                    return card.cardImgFile ? (
+                    return imageUrl ? (
                       <img
                         src={imageUrl}
                         alt={card.cardName}
