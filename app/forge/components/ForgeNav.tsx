@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Anvil } from "lucide-react";
 
 // Inlined (not imported from lib/auth) so this client component never pulls the
 // server-only supabase client into the browser bundle.
@@ -37,14 +38,7 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
           className="mr-3 flex shrink-0 items-center gap-2 py-2 text-sm font-semibold tracking-wide text-foreground"
           style={{ fontFamily: "Cinzel, serif" }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/forge/forge-anvil.webp"
-            width={293}
-            height={128}
-            alt=""
-            className="hidden h-7 w-auto sm:block"
-          />
+          <Anvil className="hidden h-5 w-5 sm:block" aria-hidden="true" />
           <span>The Forge</span>
         </Link>
         <nav className="no-scrollbar flex items-center gap-1 overflow-x-auto">
