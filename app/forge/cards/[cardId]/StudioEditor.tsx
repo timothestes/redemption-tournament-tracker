@@ -2,10 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Download } from "lucide-react";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
-import { Button } from "@/components/ui/button";
+import FilePicker from "@/app/forge/components/FilePicker";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
+import { cn } from "@/lib/utils";
 import { saveCard, uploadArt, uploadFinished, setPlaceholder, type ForgeCardFull } from "@/app/forge/lib/cards";
 import { createProposal } from "@/app/forge/lib/proposals";
 import { cardRawText, type DesignCard } from "@/app/forge/lib/designCard";
@@ -36,6 +40,9 @@ export default function StudioEditor({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstRender = useRef(true);
   const fieldsDirty = useRef(false);
+  const latest = useRef(snapshot);       // most recent edit (for flush-on-leave)
+  const lastSaved = useRef(snapshot);    // last snapshot the server accepted
+  const savedRef = useRef(saved);
   const [pendingFinished, setPendingFinished] = useState<File | null>(null);
   const [uploading, setUploading] = useState<"art" | "finished" | null>(null);
   const router = useRouter();
@@ -47,15 +54,36 @@ export default function StudioEditor({
 
   // Debounced autosave — fires only after the user edits (skips mount).
   useEffect(() => {
+    latest.current = snapshot;
     if (firstRender.current) { firstRender.current = false; return; }
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       setSaved("saving");
       const r = await saveCard(card.id, snapshot);
+      if (r.ok) lastSaved.current = snapshot;
       setSaved(r.ok ? "saved" : "error");
     }, 700);
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [snapshot, card.id]);
+
+  useEffect(() => { savedRef.current = saved; }, [saved]);
+
+  // Clicking a nav link within the debounce window unmounts this editor before the
+  // timer fires — flush the pending edit so it isn't silently dropped. A hard
+  // unload (close tab, reload) gets the browser's leave prompt instead.
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (latest.current !== lastSaved.current || savedRef.current === "saving") {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      if (latest.current !== lastSaved.current) void saveCard(card.id, latest.current);
+    };
+  }, [card.id]);
 
   const update = (patch: Partial<DesignCard>) => {
     fieldsDirty.current = true;
@@ -113,7 +141,7 @@ export default function StudioEditor({
                   { label: card.title?.trim() || "Untitled" },
                 ]
           } />
-          <span className="text-xs text-muted-foreground">
+          <span className={`text-xs ${saved === "error" ? "text-destructive" : "text-muted-foreground"}`}>
             {saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Save failed" : ""}
           </span>
         </div>
@@ -165,12 +193,11 @@ export default function StudioEditor({
               Artwork (illustration)
               {uploading === "art" && <span className="ml-2 text-xs text-muted-foreground">Uploading…</span>}
             </legend>
-            <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading !== null}
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f, "art"); e.target.value = ""; }}
-              className="block w-full text-xs" />
+            <FilePicker label="Choose image…" accept="image/jpeg,image/png,image/webp"
+              disabled={uploading !== null} onFile={(f) => onUpload(f, "art")} />
             <label className="mt-3 flex items-start gap-2">
-              <input type="checkbox" className="mt-0.5" checked={!!card.isPlaceholder}
-                onChange={async () => { await setPlaceholder(card.id, !card.isPlaceholder); router.refresh(); }} />
+              <Checkbox className="mt-0.5" checked={!!card.isPlaceholder}
+                onCheckedChange={async () => { await setPlaceholder(card.id, !card.isPlaceholder); router.refresh(); }} />
               <span>
                 <span className="font-medium">Temporary / placeholder art</span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -180,7 +207,8 @@ export default function StudioEditor({
             </label>
             {card.hasArt && (
               <a href={`/forge/api/art/${card.id}?download=1`}
-                className="mt-2 inline-block font-medium text-foreground underline-offset-2 hover:text-primary hover:underline">
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>
+                <Download className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 Download original
               </a>
             )}
@@ -192,24 +220,20 @@ export default function StudioEditor({
               Finished card (full composed image)
               {uploading === "finished" && <span className="ml-2 text-xs text-muted-foreground">Uploading…</span>}
             </legend>
-            <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading !== null}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                  // Replacing an existing finished image without touching any field this session
-                  // usually means the printed ability text changed — confirm before overwriting.
-                  if (card.hasFinished && !fieldsDirty.current) setPendingFinished(f);
-                  else onUpload(f, "finished");
-                }
-                e.target.value = "";
-              }}
-              className="block w-full text-xs" />
+            <FilePicker label="Choose image…" accept="image/jpeg,image/png,image/webp" disabled={uploading !== null}
+              onFile={(f) => {
+                // Replacing an existing finished image without touching any field this session
+                // usually means the printed ability text changed — confirm before overwriting.
+                if (card.hasFinished && !fieldsDirty.current) setPendingFinished(f);
+                else onUpload(f, "finished");
+              }} />
             <p className="mt-2 text-xs text-muted-foreground">
               A finished card image made elsewhere. When present, it’s shown everywhere instead of the artwork.
             </p>
             {card.hasFinished && (
               <a href={`/forge/api/art/${card.id}?kind=finished&download=1`}
-                className="mt-2 inline-block font-medium text-foreground underline-offset-2 hover:text-primary hover:underline">
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>
+                <Download className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 Download finished card
               </a>
             )}

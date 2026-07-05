@@ -22,7 +22,7 @@ export default async function ForgeWelcomePage() {
         Welcome to The Forge
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        You're in as <span className="font-medium">{ctx.role}</span>. Set up your profile.
+        Your invite is accepted. Pick a display name so other members recognize you.
       </p>
       <OnboardingForm />
     </main>

@@ -44,12 +44,12 @@ const grantedCard = (cardId: string, name: string): GrantedForgeCard => ({
 describe("makeForgeBuilderConfig", () => {
   const config = makeForgeBuilderConfig([]);
 
-  it("feature gates: public-only features off, import/export on", () => {
+  it("feature gates: public-only features off, delete + import/export on", () => {
     expect(config.features).toEqual({
       localStoragePersist: false,
       syncFiltersToUrl: false,
       enableSharing: false,
-      enableDeckDelete: false,
+      enableDeckDelete: true,
       enableImportExport: true,
       enablePrintExports: false,
       enableShopping: false,

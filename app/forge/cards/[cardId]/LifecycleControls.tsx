@@ -2,11 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { MoreHorizontal } from "lucide-react";
 import { shareToSet, sendToPrivate, publish, approve, unapprove, archive, unarchive, deleteCard } from "@/app/forge/lib/lifecycle";
 import { STATUS_PATH, STATUS_LABEL, ACTION_LABEL, releaseLabel, CONFIRM_COPY } from "@/app/forge/lib/lifecycleCopy";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 
 export default function LifecycleControls({ card, sets }: { card: ForgeCardFull; sets: ForgeSetSummary[] }) {
@@ -45,7 +53,7 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
             ))}
             {card.status === "archived" && <li className="font-semibold text-foreground">· {STATUS_LABEL.archived}</li>}
           </ol>
-          <div className="ml-auto flex flex-wrap gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             {(card.status === "draft" || card.status === "playtesting") && (
               <Button size="sm" className="h-7 px-3 text-xs" disabled={pending} onClick={() => run(() => publish(card.id))}>
                 {releaseLabel(card.status)}
@@ -61,21 +69,32 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
                 {ACTION_LABEL.reopen}
               </Button>
             )}
-            {card.status === "archived" ? (
+            {card.status === "archived" && (
               <Button size="sm" variant="outline" className="h-7 px-3 text-xs" disabled={pending} onClick={() => run(() => unarchive(card.id))}>
                 {ACTION_LABEL.restore}
               </Button>
-            ) : (
-              <Button size="sm" variant="outline" className="h-7 px-3 text-xs" disabled={pending} onClick={() => run(() => archive(card.id))}>
-                {ACTION_LABEL.shelve}
-              </Button>
             )}
-            <Button size="sm" variant="outline" className="h-7 px-3 text-xs" disabled={pending} onClick={() => setConfirmReturn(true)}>
-              {ACTION_LABEL.returnToIdeas}
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 border-destructive/40 px-3 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={pending} onClick={() => setConfirmDelete(true)}>
-              {ACTION_LABEL.delete}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-7 w-7 p-0" disabled={pending} aria-label="More actions">
+                  <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {card.status !== "archived" && (
+                  <DropdownMenuItem onSelect={() => run(() => archive(card.id))}>
+                    {ACTION_LABEL.shelve}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={() => setConfirmReturn(true)}>
+                  {ACTION_LABEL.returnToIdeas}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setConfirmDelete(true)}>
+                  {ACTION_LABEL.delete}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </>
       ) : (

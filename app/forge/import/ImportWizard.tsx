@@ -16,6 +16,8 @@ import {
 } from "@/app/forge/lib/lackey";
 import { createSet, type ForgeSetSummary } from "@/app/forge/lib/sets";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import FilePicker from "@/app/forge/components/FilePicker";
 import {
   Dialog,
   DialogContent,
@@ -303,15 +305,13 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
       {/* 1 — zip */}
       <fieldset className="rounded-md border p-3">
         <legend className="px-1 text-sm font-medium">1 · Lackey zip</legend>
-        <input type="file" accept=".zip,application/zip" aria-label="Lackey zip file"
-          className="block w-full text-xs disabled:opacity-50" disabled={running}
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickZip(f); e.target.value = ""; }} />
+        <FilePicker label="Choose zip…" accept=".zip,application/zip" disabled={running} onFile={onPickZip} />
         {zipName && !zipError && rows && (
           <p className="mt-2 text-xs text-muted-foreground">
             {zipName} — {rows.length} cards across {zipSets.length} sets.
           </p>
         )}
-        {zipError && <p className="mt-2 text-xs text-red-500">{zipError}</p>}
+        {zipError && <p className="mt-2 text-xs text-destructive">{zipError}</p>}
       </fieldset>
 
       {/* 2 — filter */}
@@ -321,7 +321,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
           <input value={filter} onChange={(e) => onFilterChange(e.target.value)} disabled={running}
             aria-label="Set filter" placeholder="Set code, e.g. EoT — or /regex/"
             className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50" />
-          {invalidRegex && <p className="mt-1 text-xs text-red-500">Invalid regular expression.</p>}
+          {invalidRegex && <p className="mt-1 text-xs text-destructive">Invalid regular expression.</p>}
           <p className="mt-2 text-sm">
             {matched.length === 1 ? "1 card matches" : `${matched.length} cards match`}
             {matched.length > 0 && (
@@ -383,7 +383,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
                   {sets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
                 <label className="mt-2 flex items-start gap-2 text-sm">
-                  <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)}
+                  <Checkbox checked={overwrite} onCheckedChange={(v) => setOverwrite(v === true)}
                     className="mt-0.5" />
                   <span>
                     <span className="font-medium">Overwrite existing cards</span>
@@ -397,12 +397,12 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
               </>
             )}
           </div>
-          {runError && <p className="mt-2 text-sm text-red-500">{runError}</p>}
-          <button type="button" onClick={() => (mode === "new" ? setNewSetDialogOpen(true) : runImport())}
-            disabled={running || matched.length === 0}
-            className="mt-3 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          {runError && <p className="mt-2 text-sm text-destructive">{runError}</p>}
+          <Button type="button" className="mt-3"
+            onClick={() => (mode === "new" ? setNewSetDialogOpen(true) : runImport())}
+            disabled={running || matched.length === 0}>
             {matched.length === 1 ? "Import 1 card" : `Import ${matched.length} cards`}
-          </button>
+          </Button>
         </fieldset>
       )}
 
@@ -441,8 +441,9 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
             )}
           </p>
           {finished && counts.failed > 0 && (
-            <button type="button" onClick={retryFailed}
-              className="mt-2 rounded-md border px-3 py-1 text-xs">Retry failed</button>
+            <Button type="button" variant="outline" size="sm" className="mt-2 h-7 px-3 text-xs" onClick={retryFailed}>
+              Retry failed
+            </Button>
           )}
           {finished && doneSetId && (
             <Link href={`/forge/sets/${doneSetId}/cards`}
@@ -455,7 +456,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
               <li key={i} className="flex items-center justify-between gap-2">
                 <span className="truncate">{it.row.name}</span>
                 <span className={
-                  it.status === "failed" ? "text-red-500"
+                  it.status === "failed" ? "text-destructive"
                     : it.status === "imported" || it.status === "updated" ? "text-primary"
                     : "text-muted-foreground"
                 }>
