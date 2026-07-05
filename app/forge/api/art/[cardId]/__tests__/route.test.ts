@@ -1,62 +1,103 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock the auth gate so we can force the unauthenticated branch hermetically.
-vi.mock("@/app/forge/lib/auth", () => ({
-  requireForge: vi.fn(),
-  notFoundResponse: () => new Response("Not Found", { status: 404 }),
-}));
-// Blob read must never be reached on the unauth path; stub it so an accidental
+// The route builds its own Supabase client; mock the factory so each test can
+// shape auth + RPC results hermetically.
+vi.mock("@/utils/supabase/server", () => ({ createClient: vi.fn() }));
+// Blob read must never be reached on denied paths; stub it so an accidental
 // call would be obvious (and to avoid importing the real @vercel/blob).
 vi.mock("@/app/forge/lib/art", () => ({ readForgeArt: vi.fn() }));
 
 import { GET } from "@/app/forge/api/art/[cardId]/route";
-import { requireForge } from "@/app/forge/lib/auth";
+import { createClient } from "@/utils/supabase/server";
 import { readForgeArt } from "@/app/forge/lib/art";
 
-function memberCtx(workingArtKey: string | null) {
-  const maybeSingle = vi.fn().mockResolvedValue({
-    data: workingArtKey === null ? null : { working_art_key: workingArtKey },
+/**
+ * One `forge_art_key` RPC now does the member gate + version resolution + key
+ * lookup server-side (SECURITY INVOKER, RLS-checked — migration 066). The
+ * route only distinguishes: session valid? key returned? blob readable?
+ */
+function mockSupabase(opts: { user?: boolean; artKey?: string | null; rpcError?: boolean }) {
+  const rpc = vi.fn((fn: string) => {
+    if (fn === "forge_art_key") {
+      return Promise.resolve(
+        opts.rpcError
+          ? { data: null, error: { message: "boom" } }
+          : { data: opts.artKey ?? null, error: null },
+      );
+    }
+    // forge_log_art_download audit
+    return Promise.resolve({ data: null, error: null });
   });
-  const eq = vi.fn(() => ({ maybeSingle }));
-  const select = vi.fn(() => ({ eq }));
-  const from = vi.fn(() => ({ select }));
-  const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
-  return { supabase: { from, rpc }, user: { id: "u1", email: "e@x" }, role: "elder" };
+  const getUser = vi.fn().mockResolvedValue(
+    opts.user === false
+      ? { data: { user: null }, error: { message: "no session" } }
+      : { data: { user: { id: "u1" } }, error: null },
+  );
+  const client = { auth: { getUser }, rpc };
+  (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(client);
+  return client;
 }
 
-// Dispatches forge_cards (approved_version_id) then card_versions (art keys) for ?v=approved.
-function approvedCtx(opts: {
-  approvedVersionId: string | null;
-  version?: { art_original_key: string | null; art_key: string | null; art_is_placeholder: boolean } | null;
-}) {
-  const from = vi.fn((table: string) => {
-    if (table === "forge_cards") {
-      const maybeSingle = vi.fn().mockResolvedValue({
-        data: opts.approvedVersionId === null ? null : { approved_version_id: opts.approvedVersionId },
-      });
-      return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })) };
-    }
-    // card_versions
-    const maybeSingle = vi.fn().mockResolvedValue({ data: opts.version ?? null });
-    return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })) };
-  });
-  const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
-  return { supabase: { from, rpc }, user: { id: "u1", email: "e@x" }, role: "playtester" };
-}
+const okBlob = () => ({
+  statusCode: 200,
+  stream: new ReadableStream(),
+  blob: { contentType: "image/png" },
+});
 
 describe("GET /forge/api/art/[cardId]", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns 404 when the caller is not a Forge member", async () => {
-    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+  it("returns 404 when the caller has no session, even if a key would resolve", async () => {
+    mockSupabase({ user: false, artKey: "forge-art/x" });
     const req = new Request("http://localhost/forge/api/art/abc") as never;
     const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
     expect(res.status).toBe(404);
     expect(readForgeArt).not.toHaveBeenCalled();
   });
 
+  it("returns 404 when the RPC yields no key (non-member, unknown card, placeholder…)", async () => {
+    mockSupabase({ artKey: null });
+    const req = new Request("http://localhost/forge/api/art/abc") as never;
+    const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
+    expect(res.status).toBe(404);
+    expect(readForgeArt).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the RPC errors (e.g. malformed card id)", async () => {
+    mockSupabase({ rpcError: true });
+    const req = new Request("http://localhost/forge/api/art/not-a-uuid") as never;
+    const res = await GET(req, { params: Promise.resolve({ cardId: "not-a-uuid" }) });
+    expect(res.status).toBe(404);
+    expect(readForgeArt).not.toHaveBeenCalled();
+  });
+
+  it("maps query params onto the RPC (approved + finished)", async () => {
+    const client = mockSupabase({ artKey: "forge-finished/k" });
+    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue(okBlob());
+    const req = new Request("http://localhost/forge/api/art/abc?v=approved&kind=finished") as never;
+    await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
+    expect(client.rpc).toHaveBeenCalledWith("forge_art_key", {
+      p_card_id: "abc",
+      p_approved: true,
+      p_kind: "finished",
+    });
+    expect(readForgeArt).toHaveBeenCalledWith("forge-finished/k");
+  });
+
+  it("defaults to the working art view when no params are given", async () => {
+    const client = mockSupabase({ artKey: "forge-art/w" });
+    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue(okBlob());
+    const req = new Request("http://localhost/forge/api/art/abc") as never;
+    await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
+    expect(client.rpc).toHaveBeenCalledWith("forge_art_key", {
+      p_card_id: "abc",
+      p_approved: false,
+      p_kind: "art",
+    });
+  });
+
   it("returns 404 when the blob read returns null (dangling key)", async () => {
-    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(memberCtx("forge-art/x"));
+    mockSupabase({ artKey: "forge-art/x" });
     (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     const req = new Request("http://localhost/forge/api/art/abc") as never;
     const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
@@ -64,7 +105,7 @@ describe("GET /forge/api/art/[cardId]", () => {
   });
 
   it("returns 404 when the blob read throws", async () => {
-    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(memberCtx("forge-art/x"));
+    mockSupabase({ artKey: "forge-art/x" });
     (readForgeArt as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("blob down"));
     const req = new Request("http://localhost/forge/api/art/abc") as never;
     const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
@@ -72,12 +113,8 @@ describe("GET /forge/api/art/[cardId]", () => {
   });
 
   it("streams the art with private no-store cache when present", async () => {
-    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(memberCtx("forge-art/x"));
-    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue({
-      statusCode: 200,
-      stream: new ReadableStream(),
-      blob: { contentType: "image/png" },
-    });
+    mockSupabase({ artKey: "forge-art/x" });
+    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue(okBlob());
     const req = new Request("http://localhost/forge/api/art/abc") as never;
     const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
     expect(res.status).toBe(200);
@@ -85,51 +122,22 @@ describe("GET /forge/api/art/[cardId]", () => {
     expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 
+  it("serves an immutable private cache header when a t cache-buster is present", async () => {
+    mockSupabase({ artKey: "forge-art/x" });
+    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue(okBlob());
+    const req = new Request("http://localhost/forge/api/art/abc?v=approved&t=v1") as never;
+    const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
+    expect(res.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+  });
+
   it("sets attachment disposition and logs the audit on ?download=1", async () => {
-    const ctx = memberCtx("forge-art/x");
-    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(ctx);
-    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue({
-      statusCode: 200,
-      stream: new ReadableStream(),
-      blob: { contentType: "image/png" },
-    });
+    const client = mockSupabase({ artKey: "forge-art/x" });
+    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue(okBlob());
     const req = new Request("http://localhost/forge/api/art/abc?download=1") as never;
     const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
     expect(res.headers.get("content-disposition")).toContain("attachment");
-    expect(ctx.supabase.rpc).toHaveBeenCalledWith("forge_log_art_download", { p_card_id: "abc" });
-  });
-
-  it("404 when ?v=approved but the card has no approved version", async () => {
-    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(approvedCtx({ approvedVersionId: null }));
-    const req = new Request("http://localhost/forge/api/art/abc?v=approved") as never;
-    const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
-    expect(res.status).toBe(404);
-    expect(readForgeArt).not.toHaveBeenCalled();
-  });
-
-  it("404 when the approved version's art is a placeholder", async () => {
-    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(approvedCtx({
-      approvedVersionId: "v1",
-      version: { art_original_key: null, art_key: null, art_is_placeholder: true },
-    }));
-    const req = new Request("http://localhost/forge/api/art/abc?v=approved") as never;
-    const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
-    expect(res.status).toBe(404);
-    expect(readForgeArt).not.toHaveBeenCalled();
-  });
-
-  it("streams the approved version's original art for ?v=approved", async () => {
-    (requireForge as ReturnType<typeof vi.fn>).mockResolvedValue(approvedCtx({
-      approvedVersionId: "v1",
-      version: { art_original_key: "forge-art/orig", art_key: "forge-art/disp", art_is_placeholder: false },
-    }));
-    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue({
-      statusCode: 200, stream: new ReadableStream(), blob: { contentType: "image/webp" },
-    });
-    const req = new Request("http://localhost/forge/api/art/abc?v=approved") as never;
-    const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
-    expect(res.status).toBe(200);
-    expect(readForgeArt).toHaveBeenCalledWith("forge-art/orig"); // original preferred over display key
-    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(client.rpc).toHaveBeenCalledWith("forge_log_art_download", { p_card_id: "abc" });
+    // download responses must never be cached
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 });

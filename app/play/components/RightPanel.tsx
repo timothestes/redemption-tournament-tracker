@@ -174,7 +174,9 @@ export default function RightPanel({
               }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={getCardImageUrl(previewCard.cardImgFile)}
+                  // Unresolved forge refs ("forge:<uuid>") resolve to '' — show the
+                  // card back instead of an empty src (React warns + refetches page).
+                  src={getCardImageUrl(previewCard.cardImgFile) || '/gameplay/cardback.webp'}
                   alt={previewCard.cardName}
                   style={{
                     display: 'block',
