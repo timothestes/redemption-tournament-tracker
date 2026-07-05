@@ -124,3 +124,25 @@ export async function deleteComment(
   revalidatePath(`/forge/cards/${cardId}`);
   return { ok: true };
 }
+
+// Per-card count of unresolved, card-level comments (proposal_id IS NULL) for a set
+// of card ids. Card-level only so the badge matches what the card-level thread shows.
+// Runs under the caller's RLS; only integer counts cross to the client, never bodies.
+export async function listUnresolvedCommentCounts(
+  cardIds: string[]
+): Promise<Record<string, number>> {
+  const ctx = await requireForge();
+  if (!ctx || cardIds.length === 0) return {};
+  const { data } = await ctx.supabase
+    .from("card_comments")
+    .select("card_id")
+    .in("card_id", cardIds)
+    .eq("resolved", false)
+    .is("proposal_id", null);
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const id = (row as any).card_id as string;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return counts;
+}

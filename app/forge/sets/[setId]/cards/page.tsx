@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireForge } from "@/app/forge/lib/auth";
 import { listSetCards, canDesignSet } from "@/app/forge/lib/sets";
+import { listUnresolvedCommentCounts } from "@/app/forge/lib/comments";
 import SetCardsBrowser from "./SetCardsBrowser";
 import AddCardTile from "./AddCardTile";
 
@@ -31,5 +32,6 @@ export default async function SetCardsPage({ params }: { params: Promise<{ setId
       </div>
     );
   }
-  return <SetCardsBrowser cards={cards} setId={setId} canCreate={canCreate} />;
+  const commentCounts = await listUnresolvedCommentCounts(cards.map((c) => c.id));
+  return <SetCardsBrowser cards={cards} setId={setId} canCreate={canCreate} commentCounts={commentCounts} />;
 }

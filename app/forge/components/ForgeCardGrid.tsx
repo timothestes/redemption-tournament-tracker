@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import { cardRawText } from "@/app/forge/lib/designCard";
 import { STATUS_LABEL, STATUS_BADGE_CLASS } from "@/app/forge/lib/lifecycleCopy";
@@ -12,12 +13,13 @@ export type GridSelection = {
 };
 
 export default function ForgeCardGrid({
-  cards, showStatus = false, selection, leading,
+  cards, showStatus = false, selection, leading, commentCounts,
 }: {
   cards: ForgeCardFull[];
   showStatus?: boolean;
   selection?: GridSelection;
   leading?: ReactNode;
+  commentCounts?: Record<string, number>;
 }) {
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -27,15 +29,27 @@ export default function ForgeCardGrid({
         // Shelved cards recede: desaturate + dim the face so they read as inactive
         // at a glance. Title + dashed status badge stay legible.
         const shelved = c.status === "archived";
+        const count = commentCounts?.[c.id] ?? 0;
         const inner = (
           <>
-            <ForgeCardFace
-              name={c.snapshot.name ?? null}
-              rawText={cardRawText(c.snapshot)}
-              finishedUrl={c.hasFinished ? `/forge/api/art/${c.id}?kind=finished&t=${t}` : null}
-              artUrl={c.hasArt ? `/forge/api/art/${c.id}?t=${t}` : null}
-              className={shelved ? "opacity-60 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0" : undefined}
-            />
+            <div className="relative">
+              <ForgeCardFace
+                name={c.snapshot.name ?? null}
+                rawText={cardRawText(c.snapshot)}
+                finishedUrl={c.hasFinished ? `/forge/api/art/${c.id}?kind=finished&t=${t}` : null}
+                artUrl={c.hasArt ? `/forge/api/art/${c.id}?t=${t}` : null}
+                className={shelved ? "opacity-60 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0" : undefined}
+              />
+              {count > 0 && (
+                <span
+                  className="absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-full border bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur-sm"
+                  title={`${count} unresolved comment${count === 1 ? "" : "s"}`}
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  {count}
+                </span>
+              )}
+            </div>
             <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
               <p className="min-w-[6rem] flex-1 truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>
               {showStatus && (

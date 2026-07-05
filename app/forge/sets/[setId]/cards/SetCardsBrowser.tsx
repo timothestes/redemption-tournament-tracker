@@ -18,7 +18,7 @@ const SET_STATUSES = ["draft", "playtesting", "approved", "archived"] as const;
 const BULK_ACTIONS: LifecycleAction[] = ["release", "markFinal", "shelve", "restore", "returnToIdeas", "delete"];
 const selectClass = "rounded-md border bg-background px-2 py-1.5 text-sm";
 
-export default function SetCardsBrowser({ cards, setId, canCreate }: { cards: ForgeCardFull[]; setId: string; canCreate: boolean }) {
+export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts }: { cards: ForgeCardFull[]; setId: string; canCreate: boolean; commentCounts?: Record<string, number> }) {
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
@@ -45,12 +45,21 @@ export default function SetCardsBrowser({ cards, setId, canCreate }: { cards: Fo
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Default order: alphabetical by card type (primary type), then by title.
-  // "￿" pushes untyped/incomplete cards to the end.
+  // Default order: by card type, then brigade, then title. Type and brigade use
+  // the canonical model order (CARD_TYPES / BRIGADES); cards missing a primary
+  // type or brigade sort last within their group.
   const sorted = useMemo(() => {
-    const typeKey = (c: ForgeCardFull) => c.snapshot?.cardType?.[0] ?? "￿";
+    const rank = (value: string | undefined, order: readonly string[]) => {
+      const i = value ? order.indexOf(value) : -1;
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    const typeRank = (c: ForgeCardFull) => rank(c.snapshot?.cardType?.[0], CARD_TYPES);
+    const brigadeRank = (c: ForgeCardFull) => rank(c.snapshot?.brigades?.[0], BRIGADES);
     return [...cards].sort(
-      (a, b) => typeKey(a).localeCompare(typeKey(b)) || (a.title ?? "").localeCompare(b.title ?? ""),
+      (a, b) =>
+        typeRank(a) - typeRank(b) ||
+        brigadeRank(a) - brigadeRank(b) ||
+        (a.title ?? "").localeCompare(b.title ?? ""),
     );
   }, [cards]);
 
@@ -155,6 +164,7 @@ export default function SetCardsBrowser({ cards, setId, canCreate }: { cards: Fo
       <ForgeCardGrid
         cards={filtered}
         showStatus
+        commentCounts={commentCounts}
         selection={{ active: selecting, selected, onToggle: toggle }}
         leading={canCreate ? <AddCardTile setId={setId} disabled={selecting} /> : undefined}
       />
