@@ -39,11 +39,13 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
   const forgeData = new Map<string, DesignCard>();
   const forgeById = new Map<string, Card>();
   const forgeArtIds = new Set<string>();
+  const forgeFinishedIds = new Set<string>();
   const forgeCards: Card[] = granted.map((g) => {
     const card: Card = { ...designCardToCard(g.data, g.cardId, g.setName), imgFile: forgeDataLine(g.cardId) };
     forgeData.set(g.cardId, g.data);
     forgeById.set(g.cardId, card);
     if (g.hasApprovedArt) forgeArtIds.add(g.cardId);
+    if (g.hasApprovedFinished) forgeFinishedIds.add(g.cardId);
     return card;
   });
 
@@ -57,10 +59,39 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
     if (isForgeDataLine(card.imgFile)) {
       const id = cardIdFromDataLine(card.imgFile);
       const data = forgeData.get(id);
+      // Uploaded finished card image wins (same priority as the reveal grid's
+      // ForgeCardFace); the CSS composite is the fallback for cards without one.
+      // Plain <img> — next/image is banned under app/forge/**.
+      if (data && forgeFinishedIds.has(id)) {
+        return {
+          kind: "element",
+          node: (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/forge/api/art/${id}?v=approved&kind=finished`}
+              alt={data.name ?? "Forge card"}
+              loading="lazy"
+              decoding="async"
+              className="w-full rounded-md"
+              style={{ aspectRatio: "750 / 1050", objectFit: "contain" }}
+            />
+          ),
+        };
+      }
       const artUrl = data && forgeArtIds.has(id) ? `/forge/api/art/${id}?v=approved` : null;
       return {
         kind: "element",
-        node: data ? <ForgeCardPreview card={data} artUrl={artUrl} className="w-full rounded-md" /> : null,
+        node: data ? (
+          <ForgeCardPreview card={data} artUrl={artUrl} className="w-full rounded-md" />
+        ) : (
+          // Dangling ref: the card was deleted, unreleased, or its set is no
+          // longer shared with this member. Render an explicit tile instead of
+          // a blank so the ghost entry is visible and removable.
+          <div className="flex aspect-[2.5/3.5] w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed bg-muted p-2 text-center">
+            <span className="text-xs font-medium text-muted-foreground">Forge card</span>
+            <span className="text-[10px] text-muted-foreground">No longer available to you</span>
+          </div>
+        ),
       };
     }
     return { kind: "url", url: getPublicImageUrl(card.imgFile) };
@@ -108,7 +139,9 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
       if (e.source === "forge") {
         const c = forgeById.get(e.cardId);
         return {
-          card_name: c?.name ?? "Forge card",
+          // Unresolvable refs get a unique per-card name: identical names would
+          // collide as React keys and cross-wire the quantity steppers.
+          card_name: c?.name ?? `Unavailable Forge card (${e.cardId.slice(0, 8)})`,
           card_set: c?.set ?? "Forge",
           card_img_file: forgeDataLine(e.cardId),
           quantity: e.qty,
@@ -147,16 +180,32 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
     };
   };
 
+  // Rehydrate loaded forge rows from the granted pool so they keep full card
+  // data (type/brigade/alignment) instead of degrading to `type: "Unknown"`,
+  // which silently broke validation (Lost Souls / Dominants uncounted). Null
+  // for public rows and dangling refs → default catalog lookup / stub.
+  const resolveCard: NonNullable<DeckBuilderPersistence["resolveCard"]> = (dbCard) => {
+    const img = dbCard.card_img_file ?? "";
+    if (!isForgeDataLine(img)) return null;
+    return forgeById.get(cardIdFromDataLine(img)) ?? null;
+  };
+
   return {
     pool,
     resolveCardImage,
     renderThumb,
-    persistence: { save, loadById },
+    persistence: { save, loadById, resolveCard },
     features: {
       localStoragePersist: false,
       syncFiltersToUrl: false,
       enableSharing: false,
       enableDeckDelete: false,
+      enableImportExport: false,
+      enablePrintExports: false,
+      enableShopping: false,
+      enableDetailsTab: false,
+      serverDeckCheck: false,
+      enableLegalityChecks: false,
     },
   };
 }

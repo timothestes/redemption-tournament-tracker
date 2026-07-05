@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { createSet, saveSetTargets, bulkDeleteSets, type ForgeSetSummary } from "@/app/forge/lib/sets";
 import { defaultTargets } from "@/app/forge/lib/progress";
 import { CARD_TYPES } from "@/app/forge/lib/designCard";
@@ -34,6 +35,53 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [summary, setSummary] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportSel, setExportSel] = useState<ReadonlySet<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const toggleExport = (id: string) =>
+    setExportSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
+  function openExport() {
+    setExportSel(new Set());
+    setExportError(null);
+    setExportOpen(true);
+  }
+
+  async function runExport() {
+    if (exportSel.size === 0 || exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const res = await fetch(`/forge/api/export?ids=${[...exportSel].join(",")}`);
+      if (!res.ok) {
+        setExportError(res.status === 404 ? "Nothing to export in the selected sets." : "Export failed.");
+        return;
+      }
+      const blob = await res.blob();
+      const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1]
+        ?? "forge-export.zip";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setExportOpen(false);
+    } catch {
+      setExportError("Export failed.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -99,15 +147,24 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
 
   return (
     <div className="mx-auto max-w-3xl p-4">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Sets</h1>
         {canCreate && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link href="/forge/import" className="rounded-md border px-3 py-1 text-sm hover:bg-muted">
               Import a set
             </Link>
+            {sets.length > 0 && (
+              <button
+                type="button"
+                onClick={openExport}
+                className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
+              >
+                Export a set
+              </button>
+            )}
             <form onSubmit={openCreate} className="flex gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New set name…" className="rounded-md border bg-background px-3 py-1.5 text-sm" />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New set name…" className="w-36 min-w-0 flex-1 rounded-md border bg-background px-3 py-1.5 text-sm sm:w-48 sm:flex-none" />
               <Button type="submit" variant="success" size="sm">Create</Button>
             </form>
             <Button
@@ -197,6 +254,68 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
           ))}
         </ul>
       </ConfirmationDialog>
+
+      <Dialog open={exportOpen} onOpenChange={(o) => !exporting && setExportOpen(o)}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Export sets as a Lackey zip</DialogTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Downloads <code>carddata.txt</code> + card images for the selected sets — re-importable
+              here, or merge into a LackeyCCG plugin to playtest.
+            </p>
+          </DialogHeader>
+
+          <DialogBody className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={exportSel.size === sets.length && sets.length > 0}
+                onChange={(e) =>
+                  setExportSel(e.target.checked ? new Set(sets.map((s) => s.id)) : new Set())
+                }
+                className="h-4 w-4 rounded border-input"
+              />
+              Select all
+            </label>
+            <ul className="max-h-72 divide-y overflow-y-auto rounded-md border">
+              {sets.map((s) => (
+                <li key={s.id}>
+                  <label className="flex cursor-pointer items-center justify-between gap-2 p-2 text-sm hover:bg-muted/50">
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={exportSel.has(s.id)}
+                        onChange={() => toggleExport(s.id)}
+                        aria-label={`Select ${s.name}`}
+                        className="h-4 w-4 rounded border-input"
+                      />
+                      <span className="font-medium">{s.name}</span>
+                    </span>
+                    <span className="text-muted-foreground">{s.total} cards</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            {exportError && <p className="text-sm text-destructive">{exportError}</p>}
+          </DialogBody>
+
+          <DialogFooter className="justify-end">
+            <Button variant="cancel" disabled={exporting} onClick={() => setExportOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={exporting || exportSel.size === 0} onClick={runExport}>
+              {exporting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  Preparing…
+                </span>
+              ) : (
+                `Export ${exportSel.size || ""} ${exportSel.size === 1 ? "set" : "sets"}`.trim()
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
         <DialogContent size="md">

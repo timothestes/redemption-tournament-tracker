@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import ForgeCardGrid from "@/app/forge/components/ForgeCardGrid";
 import { bulkLifecycle, type BulkResult } from "@/app/forge/lib/lifecycle";
 import {
@@ -18,6 +19,7 @@ const selectClass = "rounded-md border bg-background px-2 py-1.5 text-sm";
 
 export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
   const router = useRouter();
+  const searchRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState<CardType | "">("");
@@ -26,9 +28,32 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState<LifecycleAction | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<"returnToIdeas" | "delete" | null>(null);
+  const [confirming, setConfirming] = useState<"returnToIdeas" | "delete" | "releaseAll" | null>(null);
 
-  const filtered = useMemo(() => cards.filter((c) => {
+  // Press "/" (when not already typing in a field) to reset the search and jump to it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      e.preventDefault();
+      setQ("");
+      searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Default order: alphabetical by card type (primary type), then by title.
+  // "￿" pushes untyped/incomplete cards to the end.
+  const sorted = useMemo(() => {
+    const typeKey = (c: ForgeCardFull) => c.snapshot?.cardType?.[0] ?? "￿";
+    return [...cards].sort(
+      (a, b) => typeKey(a).localeCompare(typeKey(b)) || (a.title ?? "").localeCompare(b.title ?? ""),
+    );
+  }, [cards]);
+
+  const filtered = useMemo(() => sorted.filter((c) => {
     const s = c.snapshot ?? {};
     if (q) {
       const needle = q.toLowerCase();
@@ -39,10 +64,13 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
     if (type && !(s.cardType ?? []).includes(type)) return false;
     if (brigade && !(s.brigades ?? []).includes(brigade)) return false;
     return true;
-  }), [cards, q, status, type, brigade]);
+  }), [sorted, q, status, type, brigade]);
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const ids = [...selected];
+  // "Release all" only sweeps drafts — re-releasing a playtesting card mints a
+  // new frozen version, which stays a deliberate per-card (or selection) act.
+  const draftIds = useMemo(() => filtered.filter((c) => c.status === "draft").map((c) => c.id), [filtered]);
   // How many selected cards each action would actually touch — shown on the button.
   const eligibleCount = (a: LifecycleAction) =>
     ids.filter((id) => { const c = byId.get(id); return c && isEligible(a, c.status); }).length;
@@ -54,10 +82,10 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
       return next;
     });
 
-  async function runBulk(action: LifecycleAction) {
+  async function runBulk(action: LifecycleAction, targetIds: string[]) {
     setBusy(action);
     setSummary(null);
-    const r: BulkResult = await bulkLifecycle(action, ids);
+    const r: BulkResult = await bulkLifecycle(action, targetIds);
     setBusy(null);
     if (r.ok === false) { setSummary(r.error); return; }
     setSummary(`${BULK_DONE_VERB[action]} ${r.done} · ${r.skipped} skipped · ${r.failed} failed`);
@@ -66,10 +94,19 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
   }
 
   return (
-    <div className="relative pb-20">
+    <div className="relative pb-28 sm:pb-20">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or text…"
-          className="rounded-md border bg-background px-3 py-1.5 text-sm" />
+        <div className="relative">
+          <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or text… (press /)"
+            className="rounded-md border bg-background px-3 py-1.5 pr-8 text-sm" />
+          {q && (
+            <button type="button" aria-label="Clear search"
+              onClick={() => { setQ(""); searchRef.current?.focus(); }}
+              className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectClass} aria-label="Filter by status">
           <option value="">All statuses</option>
           {SET_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
@@ -83,13 +120,24 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
           {BRIGADES.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
         <span className="text-xs text-muted-foreground">{filtered.length} of {cards.length}</span>
-        <Button
-          size="sm" variant={selecting ? "secondary" : "outline"} className="ml-auto h-8"
-          onClick={() => { setSelecting(!selecting); setSelected(new Set()); setSummary(null); }}
-        >
-          {selecting ? "Done selecting" : "Select"}
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          {!selecting && draftIds.length > 0 && (
+            <Button size="sm" className="h-8" disabled={busy !== null} onClick={() => setConfirming("releaseAll")}>
+              {busy === "release" ? "Working…" : `Release all to playtest (${draftIds.length})`}
+            </Button>
+          )}
+          <Button
+            size="sm" variant={selecting ? "secondary" : "outline"} className="h-8"
+            onClick={() => { setSelecting(!selecting); setSelected(new Set()); setSummary(null); }}
+          >
+            {selecting ? "Done selecting" : "Select"}
+          </Button>
+        </div>
       </div>
+
+      {!selecting && summary && (
+        <div aria-live="polite" className="mb-3 text-xs text-foreground">{summary}</div>
+      )}
 
       {selecting && (
         <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -120,7 +168,7 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
                 variant={a === "release" ? "default" : "outline"}
                 className={`h-8 text-xs ${danger ? "border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" : ""}`}
                 disabled={busy !== null || n === 0}
-                onClick={() => (a === "delete" || a === "returnToIdeas") ? setConfirming(a) : runBulk(a)}
+                onClick={() => (a === "delete" || a === "returnToIdeas") ? setConfirming(a) : runBulk(a, ids)}
               >
                 {label}
               </Button>
@@ -132,11 +180,18 @@ export default function SetCardsBrowser({ cards }: { cards: ForgeCardFull[] }) {
       <ConfirmationDialog
         open={confirming !== null}
         onOpenChange={(o) => { if (!o) setConfirming(null); }}
-        onConfirm={() => { const a = confirming; setConfirming(null); if (a) runBulk(a); }}
+        onConfirm={() => {
+          const a = confirming;
+          setConfirming(null);
+          if (a === "releaseAll") runBulk("release", draftIds);
+          else if (a) runBulk(a, ids);
+        }}
         variant={confirming === "delete" ? "destructive" : "warning"}
-        title={confirming === "delete" ? CONFIRM_COPY.delete.title : CONFIRM_COPY.returnToIdeas.title}
-        description={`${confirming === "delete" ? CONFIRM_COPY.delete.description : CONFIRM_COPY.returnToIdeas.description} (${eligibleCount(confirming ?? "delete")} cards)`}
-        confirmLabel={confirming === "delete" ? CONFIRM_COPY.delete.confirmLabel : CONFIRM_COPY.returnToIdeas.confirmLabel}
+        title={CONFIRM_COPY[confirming ?? "delete"].title}
+        description={`${CONFIRM_COPY[confirming ?? "delete"].description} (${
+          confirming === "releaseAll" ? draftIds.length : eligibleCount(confirming ?? "delete")
+        } cards)`}
+        confirmLabel={CONFIRM_COPY[confirming ?? "delete"].confirmLabel}
       />
     </div>
   );

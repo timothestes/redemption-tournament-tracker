@@ -1,7 +1,7 @@
 // Pure LackeyCCG plugin-format helpers for the Forge set importer.
 // CLIENT-SAFE: no server-only imports. Column conventions mirror scripts/parse-carddata.js.
 
-import type { Brigade, CardType, DesignCard } from "./designCard";
+import { cardRawText, type Brigade, type CardType, type DesignCard } from "./designCard";
 
 export interface LackeyRow {
   name: string; set: string; imageFile: string; officialSet: string;
@@ -187,4 +187,88 @@ export function lackeyRowToDesignCard(row: LackeyRow): DesignCard {
   if (reference) card.reference = reference;
 
   return card;
+}
+
+// ---------------------------------------------------------------------------
+// Export: the inverse of lackeyRowToDesignCard — DesignCard → carddata.txt row.
+// The column order matches the canonical Lackey export so `parseCarddata` (which
+// matches columns by header name) round-trips it exactly.
+// ---------------------------------------------------------------------------
+
+export const CARDDATA_HEADER = [
+  "Name", "Set", "ImageFile", "OfficialSet", "Type", "Brigade",
+  "Strength", "Toughness", "Class", "Identifier", "SpecialAbility",
+  "Rarity", "Reference", "Sound", "Alignment", "Legality",
+] as const;
+
+// Inverse of TYPE_MAP / BRIGADE_MAP — each value lowercases back to a valid key,
+// so a serialized row re-imports to the same DesignCard.
+const TYPE_TO_LACKEY: Record<CardType, string> = {
+  Hero: "Hero", EvilCharacter: "Evil Character", GE: "GE", EE: "EE",
+  LostSoul: "Lost Soul", Artifact: "Artifact", Dominant: "Dominant",
+  Fortress: "Fortress", Site: "Site", City: "City", Curse: "Curse", Covenant: "Covenant",
+};
+
+const BRIGADE_TO_LACKEY: Record<Brigade, string> = {
+  Blue: "Blue", Clay: "Clay", GoodGold: "Good Gold", Green: "Green",
+  Purple: "Purple", Silver: "Silver", White: "White", Black: "Black",
+  Brown: "Brown", Crimson: "Crimson", Gray: "Gray", Orange: "Orange", PaleGreen: "Pale Green",
+};
+
+const ALIGNMENT_TO_LACKEY: Record<NonNullable<DesignCard["alignment"]>, string> = {
+  Good: "Good", Evil: "Evil", Neutral: "Neutral", Good_Evil: "Good/Evil",
+};
+
+// Tabs and newlines are the carddata delimiters — never let card text contain them.
+function tsvSafe(value: string): string {
+  return value.replace(/[\t\r\n]+/g, " ").trim();
+}
+
+function statCell(v: number | null | undefined): string {
+  return v === null || v === undefined ? "" : String(v);
+}
+
+/** A filesystem/zip-safe image base name for a card title. Column value AND stored
+ *  filename use this identical slug, so `findImageEntry` matches on re-import. Pure. */
+export function imageFileSlug(title: string): string {
+  return title.replace(/[\t\r\n\/\\:*?"<>|]+/g, " ").trim().replace(/\s+/g, "-")
+    .replace(/^-+|-+$/g, "") || "card";
+}
+
+export interface LackeyRowContext { name: string; set: string; officialSet: string; imageFile: string }
+
+/** DesignCard → a carddata.txt row (cells aligned to CARDDATA_HEADER). Pure. */
+export function designCardToLackeyRow(card: DesignCard, ctx: LackeyRowContext): string[] {
+  const type = (card.cardType ?? []).map((t) => TYPE_TO_LACKEY[t]).filter(Boolean).join("/");
+  const brigade = (card.brigades ?? []).map((b) => BRIGADE_TO_LACKEY[b]).filter(Boolean).join("/");
+  // The importer folds both Class (Warrior/Weapon) and icons (Territory/Star/Cloud)
+  // out of the single Class column, so recombine them here.
+  const classCell = [...(card.class ?? []), ...(card.icons ?? [])].join("/");
+  const identifier = (card.identifiers ?? []).join(", ");
+  const alignment = card.alignment ? ALIGNMENT_TO_LACKEY[card.alignment] : "";
+
+  const cell: Record<(typeof CARDDATA_HEADER)[number], string> = {
+    Name: tsvSafe(ctx.name),
+    Set: tsvSafe(ctx.set),
+    ImageFile: tsvSafe(ctx.imageFile),
+    OfficialSet: tsvSafe(ctx.officialSet),
+    Type: type,
+    Brigade: brigade,
+    Strength: statCell(card.strength),
+    Toughness: statCell(card.toughness),
+    Class: classCell,
+    Identifier: tsvSafe(identifier),
+    SpecialAbility: tsvSafe(cardRawText(card)),
+    Rarity: tsvSafe(card.rarity ?? ""),
+    Reference: tsvSafe(card.reference ?? ""),
+    Sound: "",
+    Alignment: alignment,
+    Legality: card.legality ?? "",
+  };
+  return CARDDATA_HEADER.map((h) => cell[h]);
+}
+
+/** Header line + one tab-joined line per row, newline-terminated. Pure. */
+export function serializeCarddata(rows: string[][]): string {
+  return [CARDDATA_HEADER.join("\t"), ...rows.map((r) => r.join("\t"))].join("\n") + "\n";
 }

@@ -12,6 +12,17 @@ export const STATUS_LABEL: Record<string, string> = {
 
 export const STATUS_PATH = ["draft", "playtesting", "approved"] as const;
 
+// Tinted pill classes per status — a quiet ramp along the lifecycle:
+// neutral draft → amber in-playtest → green final; violet for pre-set ideas,
+// dashed outline for shelved.
+export const STATUS_BADGE_CLASS: Record<string, string> = {
+  private_idea: "border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  draft: "border-border bg-muted/60 text-muted-foreground",
+  playtesting: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  approved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  archived: "border-dashed text-muted-foreground",
+};
+
 export type LifecycleAction =
   | "release"
   | "markFinal"
@@ -62,6 +73,12 @@ export function isEligible(action: LifecycleAction, status: string): boolean {
 }
 
 export const CONFIRM_COPY = {
+  releaseAll: {
+    title: "Release all drafts?",
+    description:
+      "Releases every draft card matching the current filters. Playtesters will be able to see and build playtest decks with them.",
+    confirmLabel: "Release all",
+  },
   returnToIdeas: {
     title: "Return to ideas?",
     description:

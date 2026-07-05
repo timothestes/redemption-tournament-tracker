@@ -11,10 +11,11 @@ const STATUS_ORDER = ["draft", "playtesting", "approved"];
 const STATUS_COLOR: Record<string, string> = { draft: "bg-muted-foreground/40", playtesting: "bg-amber-500", approved: "bg-primary" };
 
 function cellTone(actual: number, target: number): string {
-  if (target === 0) return actual > 0 ? "bg-primary/10" : "";
-  if (actual >= target) return "bg-primary/25";
+  // Dark mode gets stronger tints — the /10–/25 washes are near-invisible over the near-black background.
+  if (target === 0) return actual > 0 ? "bg-primary/10 dark:bg-primary/25" : "";
+  if (actual >= target) return "bg-primary/25 dark:bg-primary/40";
   if (actual === 0) return "bg-muted";
-  return "bg-amber-100 dark:bg-amber-950";
+  return "bg-amber-100 dark:bg-amber-500/25";
 }
 
 export default function ProgressDashboard({

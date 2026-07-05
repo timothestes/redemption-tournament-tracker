@@ -1,7 +1,7 @@
 import Link from "next/link";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import { cardRawText } from "@/app/forge/lib/designCard";
-import { STATUS_LABEL } from "@/app/forge/lib/lifecycleCopy";
+import { STATUS_LABEL, STATUS_BADGE_CLASS } from "@/app/forge/lib/lifecycleCopy";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
 
 export type GridSelection = {
@@ -18,7 +18,7 @@ export default function ForgeCardGrid({
   selection?: GridSelection;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
       {cards.map((c) => {
         const t = Date.parse(c.updatedAt) || 0;
         const inner = (
@@ -29,10 +29,10 @@ export default function ForgeCardGrid({
               finishedUrl={c.hasFinished ? `/forge/api/art/${c.id}?kind=finished&t=${t}` : null}
               artUrl={c.hasArt ? `/forge/api/art/${c.id}?t=${t}` : null}
             />
-            <div className="mt-1 flex items-center justify-between gap-2">
-              <p className="truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+              <p className="min-w-[6rem] flex-1 truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>
               {showStatus && (
-                <span className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] ${STATUS_BADGE_CLASS[c.status] ?? "text-muted-foreground"}`}>
                   {STATUS_LABEL[c.status] ?? c.status}
                 </span>
               )}
@@ -51,14 +51,14 @@ export default function ForgeCardGrid({
             >
               <span
                 aria-hidden
-                className={`absolute left-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded border text-xs ${
-                  isSel ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background"
+                className={`absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md border-2 text-sm font-bold shadow-md ${
+                  isSel ? "border-primary bg-primary text-primary-foreground" : "border-gray-400 bg-white text-transparent"
                 }`}
               >
                 {isSel ? "✓" : ""}
               </span>
               {isSel && (
-                <span aria-hidden className="pointer-events-none absolute -inset-1 rounded-lg border-2 border-primary/60" />
+                <span aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-lg border border-primary/40" />
               )}
               {inner}
             </button>

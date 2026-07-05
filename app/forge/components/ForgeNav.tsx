@@ -21,7 +21,8 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
       : [
           { href: "/forge/ideas", label: "Ideas", match: (p) => p.startsWith("/forge/ideas") },
           { href: "/forge/sets", label: "Sets", match: (p) => p.startsWith("/forge/sets") },
-          { href: "/forge/play", label: "Play", match: (p) => p.startsWith("/forge/play") },
+          { href: "/forge/play", label: "Play", match: (p) => p.startsWith("/forge/play") && !p.startsWith("/forge/play/decks") },
+          { href: "/forge/play/decks", label: "Decks", match: (p) => p.startsWith("/forge/play/decks") },
           { href: "/forge/announcements", label: "Announcements", match: (p) => p.startsWith("/forge/announcements") },
           ...(role === "superadmin"
             ? [{ href: "/forge/admin", label: "Admin", match: (p: string) => p.startsWith("/forge/admin") }]
@@ -30,15 +31,23 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
 
   return (
     <div className="sticky top-16 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex max-w-6xl items-center gap-1 px-4">
+      <div className="mx-auto flex max-w-full items-center gap-1 px-4">
         <Link
           href="/forge"
-          className="mr-3 shrink-0 py-3 text-sm font-semibold tracking-wide text-foreground"
+          className="mr-3 flex shrink-0 items-center gap-2 py-2 text-sm font-semibold tracking-wide text-foreground"
           style={{ fontFamily: "Cinzel, serif" }}
         >
-          The Forge
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/forge/forge-anvil.webp"
+            width={293}
+            height={128}
+            alt=""
+            className="hidden h-7 w-auto sm:block"
+          />
+          <span>The Forge</span>
         </Link>
-        <nav className="flex items-center gap-1 overflow-x-auto">
+        <nav className="no-scrollbar flex items-center gap-1 overflow-x-auto">
           {items.map((it) => {
             const active = it.match(pathname);
             return (

@@ -23,7 +23,20 @@ export const CardThumb = React.forwardRef<HTMLImageElement, CardThumbProps>(
   function CardThumb({ card, ...imgProps }, ref) {
     const { resolveCardImage } = useBuilderConfig();
     const r = resolveCardImage(card);
-    if (r.kind === "element") return <>{r.node}</>;
+    if (r.kind === "element") {
+      // Skeleton wrappers (e.g. DeckCardList's `animate-pulse` tile) rely on the
+      // img's onLoad to stop pulsing — element resolutions never fire it, which
+      // left Forge tiles fading forever. Strip the class on mount instead; the
+      // display:contents wrapper adds no layout of its own.
+      return (
+        <div
+          style={{ display: "contents" }}
+          ref={(el) => el?.parentElement?.classList.remove("animate-pulse")}
+        >
+          {r.node}
+        </div>
+      );
+    }
     return <img ref={ref} src={r.url} {...imgProps} />;
   },
 );

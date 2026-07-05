@@ -40,6 +40,16 @@ export interface RenderThumbOpts {
 export interface DeckBuilderPersistence {
   save: typeof saveDeckAction;
   loadById: typeof loadDeckByIdAction;
+  /** Resolve a loaded db card row to a full `Card` before the public-catalog
+   *  lookup runs. The Forge maps `forge:<id>` rows back to the granted pool so
+   *  reloaded forge cards keep their type/brigade/alignment (otherwise they
+   *  degrade to `type: "Unknown"` and validation miscounts them). Return null
+   *  to fall through to the default catalog lookup. */
+  resolveCard?: (dbCard: {
+    card_name: string;
+    card_set: string;
+    card_img_file?: string | null;
+  }) => Card | null;
 }
 
 /** Feature toggles. Public has everything on; the Forge hard-disables several.
@@ -57,6 +67,27 @@ export interface DeckBuilderFeatures {
   /** Delete control (calls the public `deleteDeckAction`). Off for the Forge,
    *  whose decks live in `forge_decks`; deletion happens from the Forge deck list. */
   enableDeckDelete?: boolean;
+  /** Deck text import/export (menu items, Ctrl+I/E, empty-state import button).
+   *  Off for the Forge — the text format has no forge-UUID notion, so exported
+   *  lists can't round-trip and would leak private card names. */
+  enableImportExport?: boolean;
+  /** PDF + deck-image generation (external service builds from public image
+   *  URLs). Off for the Forge — forge cards have no public URL and render blank. */
+  enablePrintExports?: boolean;
+  /** Buy-on-YTG + collection check + price buttons. Off for the Forge — the
+   *  shop/collection have no notion of forge cards, so results mislead. */
+  enableShopping?: boolean;
+  /** The Details tab (cover cards / tags / description). Off for the Forge —
+   *  `forge_decks` has no columns for these, so edits would silently vanish. */
+  enableDetailsTab?: boolean;
+  /** Live server deckcheck (`/api/deckcheck`). Off for the Forge — the checker
+   *  can't know forge cards and flags each one as not-found; the client-side
+   *  validateDeck covers structural rules. */
+  serverDeckCheck?: boolean;
+  /** Client-side legality checks (validateDeck badge/checklist + the "Ignore
+   *  Legality Checks" toggle). Off for the Forge — playtest decks are
+   *  work-in-progress by nature, so legality noise is unwanted. */
+  enableLegalityChecks?: boolean;
 }
 
 /**
@@ -108,6 +139,12 @@ export const PUBLIC_BUILDER_CONFIG: DeckBuilderConfig = {
     syncFiltersToUrl: true,
     enableSharing: true,
     enableDeckDelete: true,
+    enableImportExport: true,
+    enablePrintExports: true,
+    enableShopping: true,
+    enableDetailsTab: true,
+    serverDeckCheck: true,
+    enableLegalityChecks: true,
   },
 };
 
