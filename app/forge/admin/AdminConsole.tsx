@@ -32,7 +32,9 @@ export default function AdminConsole({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [sending, startSending] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null);
   const [inviteRole, setInviteRole] = useState<ForgeRole>(grantable(callerRole)[0] ?? "playtester");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
@@ -55,15 +57,20 @@ export default function AdminConsole({
     setInviteSetIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  async function submitInvite(e: React.FormEvent) {
+  function submitInvite(e: React.FormEvent) {
     e.preventDefault();
-    setMsg(null);
+    setInviteMsg(null);
     setInviteUrl(null);
-    const r = await mintInvite({ role: inviteRole, email: inviteEmail || null, setIds: inviteSetIds });
-    if (r.ok === false) return setMsg(r.error);
-    setInviteUrl(r.url);
-    setMsg(inviteEmail ? "Invite emailed." : "Invite link created.");
-    router.refresh();
+    startSending(async () => {
+      const r = await mintInvite({ role: inviteRole, email: inviteEmail || null, setIds: inviteSetIds });
+      if (r.ok === false) {
+        setInviteMsg(r.error);
+        return;
+      }
+      setInviteUrl(r.url);
+      setInviteMsg(inviteEmail ? "Invite emailed." : "Invite link created.");
+      router.refresh();
+    });
   }
 
   return (
@@ -110,8 +117,11 @@ export default function AdminConsole({
               </div>
             </div>
           )}
-          <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" disabled={pending}>
-            Send invite
+          <button
+            className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={sending}
+          >
+            {sending ? "Sending…" : "Send invite"}
           </button>
         </form>
         {inviteUrl && (
@@ -119,6 +129,21 @@ export default function AdminConsole({
             Link: <code>{inviteUrl}</code>
           </p>
         )}
+        {inviteMsg && <p aria-live="polite" className="mt-2 text-sm">{inviteMsg}</p>}
+      </section>
+
+      <section>
+        <h2 className="text-lg font-medium">Pending invites</h2>
+        <ul className="mt-2 space-y-1 text-sm">
+          {invites.filter((i) => !i.used_at).map((i) => (
+            <li key={i.id} className="text-muted-foreground">
+              {i.role} · {i.email ?? "link-only"} · expires {new Date(i.expires_at).toLocaleDateString()}
+            </li>
+          ))}
+          {invites.filter((i) => !i.used_at).length === 0 && (
+            <li className="text-muted-foreground">None.</li>
+          )}
+        </ul>
       </section>
 
       <section>
@@ -167,25 +192,10 @@ export default function AdminConsole({
             })}
           </tbody>
         </table>
+        {msg && <p aria-live="polite" className="mt-3 text-sm">{msg}</p>}
       </section>
 
       <SetAccessMatrix playtesters={playtesters} sets={sets} grants={grants} />
-
-      <section>
-        <h2 className="text-lg font-medium">Pending invites</h2>
-        <ul className="mt-2 space-y-1 text-sm">
-          {invites.filter((i) => !i.used_at).map((i) => (
-            <li key={i.id} className="text-muted-foreground">
-              {i.role} · {i.email ?? "link-only"} · expires {new Date(i.expires_at).toLocaleDateString()}
-            </li>
-          ))}
-          {invites.filter((i) => !i.used_at).length === 0 && (
-            <li className="text-muted-foreground">None.</li>
-          )}
-        </ul>
-      </section>
-
-      {msg && <p aria-live="polite" className="text-sm">{msg}</p>}
     </div>
   );
 }

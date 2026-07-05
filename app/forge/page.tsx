@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireForge } from "./lib/auth";
+import { LifecycleFlow } from "./components/LifecycleFlow";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ export default async function ForgeHomePage() {
         </section>
       ) : (
         <>
+          <LifecycleFlow />
+
           <section className="space-y-3">
             <Link href="/forge/ideas" className="block rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:bg-muted/50 hover:shadow [.jayden_&]:bg-gradient-to-br [.jayden_&]:from-[hsla(0,80%,25%,0.15)] [.jayden_&]:via-[hsla(270,60%,20%,0.1)] [.jayden_&]:to-[hsla(230,80%,30%,0.15)] [.jayden_&]:border-primary/30">
               <div className="font-medium">New idea</div>
