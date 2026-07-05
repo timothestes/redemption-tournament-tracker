@@ -200,6 +200,7 @@ export function useDeckState(
           lastSavedAt: new Date(cloudDeck.updated_at),
           error: null,
         });
+        return true;
       } else {
         setIsInitializing(false);
         setSyncStatus({
@@ -207,6 +208,7 @@ export function useDeckState(
           lastSavedAt: null,
           error: result.error || "Failed to load deck",
         });
+        return false;
       }
     } catch (error) {
       console.error("Error loading deck from cloud:", error);
@@ -216,6 +218,7 @@ export function useDeckState(
         lastSavedAt: null,
         error: "Failed to load deck",
       });
+      return false;
     }
   }, []);
 

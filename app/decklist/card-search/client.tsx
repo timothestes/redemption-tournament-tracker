@@ -1485,6 +1485,13 @@ export default function CardSearchClient({
     downloadDeckAsFileBySet(deck);
   }
 
+  // Load a deck picked from the Load Deck modal; on success let the active
+  // config sync external state (the Forge rewrites /forge/play/decks/<id>).
+  async function handleLoadDeckById(deckId: string) {
+    const ok = await loadDeckFromCloud(deckId);
+    if (ok) config.onDeckLoaded?.(deckId);
+  }
+
   // Import deck from text
   async function handleImportDeck(text: string) {
     const result = parseDeckText(text, cards);
@@ -2741,7 +2748,7 @@ export default function CardSearchClient({
               // Just need to provide the callback for re-rendering
             }}
             onNewDeck={handleNewDeck}
-            onLoadDeck={loadDeckFromCloud}
+            onLoadDeck={handleLoadDeckById}
             onReplaceGood={(sourceDeckId) => handleReplaceHalf("good", sourceDeckId)}
             onReplaceEvil={(sourceDeckId) => handleReplaceHalf("evil", sourceDeckId)}
             defaultTab={activeDeckTab}
@@ -2842,7 +2849,7 @@ export default function CardSearchClient({
               canDelete={config.features?.enableDeckDelete !== false}
               onDuplicate={() => {}}
               onNewDeck={handleNewDeck}
-              onLoadDeck={loadDeckFromCloud}
+              onLoadDeck={handleLoadDeckById}
               onReplaceGood={(sourceDeckId) => handleReplaceHalf("good", sourceDeckId)}
               onReplaceEvil={(sourceDeckId) => handleReplaceHalf("evil", sourceDeckId)}
               defaultTab={activeDeckTab}
