@@ -67,6 +67,10 @@ interface PregameScreenProps {
   // server-anchored choose-first countdown can't start while a slow-wifi
   // player is still downloading card images.
   canReady: boolean;
+  // True for Forge playtest games — the deck was authorized at join time and
+  // the server hard-rejects mid-pregame deck changes, so the "Change deck"
+  // control is hidden.
+  isForge?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +90,7 @@ export default function PregameScreen({
   onUpdateMessage,
   onTogglePublic,
   canReady,
+  isForge,
 }: PregameScreenProps) {
   const { game, myPlayer, opponentPlayer } = gameState;
 
@@ -163,6 +168,7 @@ export default function PregameScreen({
             gameState={gameState}
             showDice={phase === 'rolling' || phase === 'choosing' || phase === 'revealing'}
             canReady={canReady}
+            isForge={isForge}
           />
 
           {/* Action area — contextual */}
@@ -290,6 +296,7 @@ function PlayerCards({
   gameState,
   showDice,
   canReady,
+  isForge,
 }: {
   isWaiting: boolean;
   phase: string;
@@ -306,6 +313,7 @@ function PlayerCards({
   gameState: GameState;
   showDice: boolean;
   canReady: boolean;
+  isForge?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isChangingDeck, setIsChangingDeck] = useState(false);
@@ -370,7 +378,7 @@ function PlayerCards({
           {/* Ready button in deck_select */}
           {isDeckSelect && (
             <div className="mt-2 flex flex-col gap-1.5">
-              {!myReady && (
+              {!myReady && !isForge && (
                 <button
                   onClick={() => setPickerOpen(true)}
                   disabled={isChangingDeck}

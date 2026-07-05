@@ -5,6 +5,7 @@ import { useToastKeyboardNav, toastFocusShadow } from '@/app/shared/components/t
 import { DeckPickerModal } from './DeckPickerModal';
 import type { DeckOption } from './DeckPickerCard';
 import { loadDeckForGame } from '../actions';
+import { loadForgeDeckForGame } from '@/app/forge/lib/playDecks';
 import type { GameState } from '../hooks/useGameState';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 
@@ -20,6 +21,10 @@ interface GameOverOverlayProps {
   gameState: GameState;
   playAgainTriggered?: boolean;
   onPlayAgainHandled?: () => void;
+  // Forge playtest games skip the deck picker for rematches — the same
+  // authorized deck is reused automatically (see handleForgeRematch below).
+  isForge?: boolean;
+  myDeckId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +65,8 @@ export default function GameOverOverlay({
   gameState,
   playAgainTriggered,
   onPlayAgainHandled,
+  isForge,
+  myDeckId,
 }: GameOverOverlayProps) {
   const { isLoupeVisible } = useCardPreview();
   const { label, winnerName } = deriveEndReason(gameActions, myPlayer);
@@ -89,14 +96,19 @@ export default function GameOverOverlay({
     return () => clearTimeout(timer);
   }, [isOpponentLeft]);
 
-  // Open deck picker when Play Again is triggered from TurnIndicator
+  // Open deck picker when Play Again is triggered from TurnIndicator. Forge
+  // games skip the picker entirely — the same authorized deck is reused.
   useEffect(() => {
     if (playAgainTriggered && !rematchRequestedBy) {
-      setPickerMode('request');
-      setPickerOpen(true);
+      if (isForge) {
+        void handleForgeRematch('request');
+      } else {
+        setPickerMode('request');
+        setPickerOpen(true);
+      }
       onPlayAgainHandled?.();
     }
-  }, [playAgainTriggered, rematchRequestedBy, onPlayAgainHandled]);
+  }, [playAgainTriggered, rematchRequestedBy, onPlayAgainHandled, isForge]);
 
   // Deck picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -106,6 +118,25 @@ export default function GameOverOverlay({
   // When rematch is accepted, the server resets the game in-place.
   // The game status changes from 'finished' to 'pregame/rolling' automatically
   // via SpacetimeDB subscription — no navigation needed.
+
+  // Forge rematch handler — reuses the same authorized deck (myDeckId) instead
+  // of opening the deck picker. Forge decks are authorized once per seat at
+  // create/join time; request_rematch/respond_rematch don't re-check that
+  // authorization, so this is the only place enforcing "same deck" for forge
+  // rematches.
+  const handleForgeRematch = async (mode: 'request' | 'respond') => {
+    if (!myDeckId) return;
+    setIsLoading(true);
+    try {
+      const r = await loadForgeDeckForGame(myDeckId);
+      if (r.ok === false) { console.error('Forge rematch deck load failed:', r.error); return; }
+      const deckData = JSON.stringify(r.deckData);
+      if (mode === 'request') gameState.requestRematch(myDeckId, deckData, r.deck.paragon, r.deck.format || 'Type 1');
+      else gameState.respondRematch(true, myDeckId, deckData, r.deck.paragon, r.deck.format || 'Type 1');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Deck selected handler
   const handleDeckSelected = async (deck: DeckOption) => {
@@ -146,8 +177,12 @@ export default function GameOverOverlay({
           isLoupeVisible={isLoupeVisible}
           onPlayAgain={() => {
             setModalDismissed(true);
-            setPickerMode('request');
-            setPickerOpen(true);
+            if (isForge) {
+              void handleForgeRematch('request');
+            } else {
+              setPickerMode('request');
+              setPickerOpen(true);
+            }
           }}
           onDismiss={() => setModalDismissed(true)}
         />
@@ -197,8 +232,12 @@ export default function GameOverOverlay({
           oppName={oppName}
           isLoading={isLoading}
           onAccept={() => {
-            setPickerMode('respond');
-            setPickerOpen(true);
+            if (isForge) {
+              void handleForgeRematch('respond');
+            } else {
+              setPickerMode('respond');
+              setPickerOpen(true);
+            }
           }}
           onDecline={() => gameState.respondRematch(false, '', '', '', '')}
         />
