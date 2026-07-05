@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { setProfile } from "@/app/forge/lib/members";
+import { Button } from "@/components/ui/button";
+import FilePicker from "@/app/forge/components/FilePicker";
 
 export default function OnboardingForm() {
   const router = useRouter();
@@ -45,24 +47,17 @@ export default function OnboardingForm() {
           required
         />
       </label>
-      <label className="block text-sm font-medium">
+      <div className="text-sm font-medium">
         Avatar (optional)
-        <input
-          type="file"
-          accept="image/*"
-          className="mt-1 block w-full text-sm"
-          onChange={(e) => e.target.files?.[0] && handleAvatar(e.target.files[0])}
-        />
-      </label>
+        <div className="mt-1">
+          <FilePicker label="Choose image…" accept="image/*" onFile={handleAvatar} />
+        </div>
+      </div>
       {avatarUrl && <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full object-cover" />}
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      <button
-        type="submit"
-        disabled={busy || !displayName.trim()}
-        className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
-      >
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      <Button type="submit" disabled={busy || !displayName.trim()}>
         {busy ? "Saving…" : "Enter the Forge"}
-      </button>
+      </Button>
     </form>
   );
 }

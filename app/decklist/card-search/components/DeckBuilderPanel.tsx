@@ -23,7 +23,6 @@ import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
 import FullDeckView from "./FullDeckView";
 import DragGhost from "./DragGhost";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { Switch } from "@headlessui/react";
 import { Card, normalizeBrigadeField } from "../utils";
 import { validateDeck } from "../utils/deckValidation";
@@ -322,7 +321,13 @@ export default function DeckBuilderPanel({
   // and the stepper/tap controls cover every action drag would. Sensors must be
   // created unconditionally (hooks rules); we drop them from DndContext below
   // when on mobile so no drag can ever activate.
-  const isMobile = useMediaQuery("(max-width: 767px)");
+  // Resolved ONCE at mount (never reactively): it gates only the sensors prop,
+  // never markup, and DndContext spreads sensors into an internal effect dep
+  // array — flipping between the 3-sensor and empty arrays mid-life trips
+  // React's "dependency array changed size" warning.
+  const [isMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
   const dndSensors = useSensors(
     // Mouse/pen: 10px movement before drag activates — gives twitchy hands
     // and precision trackpads more room before a click becomes a drag.

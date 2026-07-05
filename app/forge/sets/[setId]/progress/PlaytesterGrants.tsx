@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { grantSet, revokeSet, type SetGrant } from "@/app/forge/lib/sets";
 
 export default function PlaytesterGrants({
@@ -61,13 +62,13 @@ export default function PlaytesterGrants({
               ))}
             </select>
           </label>
-          <button
-            className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
+          <Button
+            size="sm"
             disabled={pending || !pick}
             onClick={() => run(() => grantSet(setId, pick), "Access granted")}
           >
             Grant
-          </button>
+          </Button>
         </div>
       )}
       {msg && <p aria-live="polite" className="mt-2 text-sm">{msg}</p>}

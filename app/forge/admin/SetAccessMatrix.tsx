@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { grantSet, revokeSet } from "@/app/forge/lib/sets";
 import { grantKey, buildGrantKeySet } from "@/app/forge/lib/setAccess";
 
@@ -85,12 +86,11 @@ export default function SetAccessMatrix({
                     const key = grantKey(p.userId, s.id);
                     return (
                       <td key={s.id} className="px-3 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 cursor-pointer align-middle disabled:cursor-wait disabled:opacity-50"
+                        <Checkbox
+                          className="align-middle disabled:cursor-wait"
                           checked={granted.has(key)}
                           disabled={pending.has(key)}
-                          onChange={() => toggle(p.userId, s.id)}
+                          onCheckedChange={() => toggle(p.userId, s.id)}
                           aria-label={`Grant ${p.displayName ?? "playtester"} access to ${s.name}`}
                         />
                       </td>

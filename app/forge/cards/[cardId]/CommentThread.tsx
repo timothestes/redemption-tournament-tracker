@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { coerceFieldValue, FIELD_LABELS, DIFF_FIELDS } from "@/app/forge/lib/cardDiff";
 import {
   addComment,
@@ -99,7 +100,9 @@ export default function CommentThread({
             placeholder="Reply…"
             className="flex-1 rounded-md border bg-background px-2 py-1 text-sm"
           />
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             disabled={pending || !replyBody.trim()}
             onClick={() =>
               run(
@@ -110,10 +113,9 @@ export default function CommentThread({
                 }
               )
             }
-            className="rounded-md border px-2 py-1 text-sm disabled:opacity-50"
           >
             Send
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -146,13 +148,9 @@ export default function CommentThread({
               className="flex-1 rounded-md border bg-background px-2 py-1"
             />
           )}
-          <button
-            disabled={pending || !body.trim()}
-            onClick={submitTop}
-            className="ml-auto rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
+          <Button size="sm" className="ml-auto" disabled={pending || !body.trim()} onClick={submitTop}>
             Post
-          </button>
+          </Button>
         </div>
       </div>
 
