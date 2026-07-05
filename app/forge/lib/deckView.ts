@@ -122,13 +122,22 @@ export function resolveDeckEntries(
   });
 }
 
+export type DeckGroupBy = "type" | "alignment" | "none";
+
 // Group main-deck items by display group, sorted within each group by
-// alignment (Good > Evil > Neutral) → brigade → name; groups alphabetical.
-export function groupMainItems(items: ResolvedDeckItem[]): [string, ResolvedDeckItem[]][] {
+// alignment (Good > Evil > Neutral) → brigade → name. Type groups sort
+// alphabetically; alignment groups follow the Good > Evil > Neutral order.
+export function groupMainItems(
+  items: ResolvedDeckItem[],
+  groupBy: DeckGroupBy = "type",
+): [string, ResolvedDeckItem[]][] {
   const alignmentOrder = ["Good", "Evil", "Neutral"];
   const grouped = new Map<string, ResolvedDeckItem[]>();
   for (const item of items) {
-    const key = getGroupKey(item.type);
+    const key =
+      groupBy === "alignment" ? (item.alignment || "Neutral")
+      : groupBy === "none" ? "All Cards"
+      : getGroupKey(item.type);
     const bucket = grouped.get(key);
     if (bucket) bucket.push(item);
     else grouped.set(key, [item]);
@@ -144,7 +153,48 @@ export function groupMainItems(items: ResolvedDeckItem[]): [string, ResolvedDeck
       return a.name.localeCompare(b.name);
     });
   }
-  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
+  return [...grouped.entries()].sort(([a], [b]) => {
+    if (groupBy === "alignment") {
+      const aIdx = alignmentOrder.indexOf(a);
+      const bIdx = alignmentOrder.indexOf(b);
+      const diff = (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+      if (diff !== 0) return diff;
+    }
+    return a.localeCompare(b);
+  });
+}
+
+// Split a group into balanced columns of at most ~maxPerColumn physical cards
+// (quantities expanded) for the stacked view — same algorithm as the public
+// deck page's splitGroup.
+export function splitStack(items: ResolvedDeckItem[], maxPerColumn = 17): ResolvedDeckItem[][] {
+  const totalCards = items.reduce((sum, i) => sum + i.qty, 0);
+  if (totalCards <= maxPerColumn) return [items];
+
+  const numColumns = Math.ceil(totalCards / maxPerColumn);
+  const targetPerColumn = Math.ceil(totalCards / numColumns);
+
+  const columns: ResolvedDeckItem[][] = [];
+  let currentColumn: ResolvedDeckItem[] = [];
+  let currentCount = 0;
+
+  for (const item of items) {
+    if (currentCount + item.qty > targetPerColumn && currentColumn.length > 0) {
+      const distWithout = Math.abs(currentCount - targetPerColumn);
+      const distWith = Math.abs(currentCount + item.qty - targetPerColumn);
+      if (distWith > distWithout) {
+        columns.push(currentColumn);
+        currentColumn = [item];
+        currentCount = item.qty;
+        continue;
+      }
+    }
+    currentColumn.push(item);
+    currentCount += item.qty;
+  }
+
+  if (currentColumn.length > 0) columns.push(currentColumn);
+  return columns;
 }
 
 // Reserve/maybeboard: flat, sorted by display type then name (public page semantics).

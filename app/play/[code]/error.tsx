@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { resolveLobbyPath } from '@/app/play/lib/lobbyPath';
 
 export default function GameError({
   error,
@@ -49,6 +50,7 @@ export default function GameError({
         )}
         <a
           href="/play"
+          onClick={(e) => { e.preventDefault(); window.location.href = resolveLobbyPath(); }}
           className="mt-6 inline-block rounded-md border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
         >
           Back to Lobby

@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
+import { resolveLobbyPath } from '@/app/play/lib/lobbyPath';
 import type { DbConnection, ErrorContext } from '@/lib/spacetimedb/module_bindings';
 import type { Identity } from 'spacetimedb';
 import type { ConnectionHealthKind } from '@/app/play/lib/connectionResetDecision';
@@ -284,6 +285,7 @@ function FatalConnectionScreen({ onRetry }: { onRetry: () => void }) {
           </button>
           <a
             href="/play"
+            onClick={(e) => { e.preventDefault(); window.location.href = resolveLobbyPath(); }}
             className="rounded-md border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
           >
             Back to lobby

@@ -16,8 +16,8 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
   const items: NavItem[] =
     role === "playtester"
       ? [
-          { href: "/forge/play", label: "Sets", match: (p) => p === "/forge/play" || (/^\/forge\/play\/[^/]+$/.test(p) && !p.startsWith("/forge/play/decks") && !p.startsWith("/forge/play/games")) },
-          { href: "/forge/play/games", label: "Play", match: (p) => p.startsWith("/forge/play/games") },
+          { href: "/forge/play", label: "Play", match: (p) => p === "/forge/play" || p.startsWith("/forge/play/games") },
+          { href: "/forge/play/sets", label: "Sets", match: (p) => p.startsWith("/forge/play/sets") || (/^\/forge\/play\/[^/]+$/.test(p) && !p.startsWith("/forge/play/decks") && !p.startsWith("/forge/play/games")) },
           { href: "/forge/play/decks", label: "Decks", match: (p) => p.startsWith("/forge/play/decks") },
         ]
       : [

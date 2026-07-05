@@ -3,6 +3,7 @@ import {
   resolveDeckEntries,
   groupMainItems,
   sortSideItems,
+  splitStack,
   countItems,
   getGroupKey,
   getGroupDisplayName,
@@ -106,6 +107,33 @@ describe("grouping and sorting", () => {
     expect(heroes.map((i) => i.name)).toEqual(["Guard", "Mixed"]); // Good before Evil
   });
 
+  it("groups by alignment in Good > Evil > Neutral order, blank alignment → Neutral", () => {
+    const catalog = [
+      publicCard("Demon", "I", "EC", "Evil", "Brown"),
+      publicCard("Guard", "I", "Hero", "Good", "Silver"),
+      publicCard("Wall", "I", "Fort", "", ""),
+    ];
+    const entries: ForgeDeckEntry[] = catalog.map((c) => ({
+      source: "public" as const, name: c.name, set: c.set, qty: 1, zone: "main" as const,
+    }));
+    const groups = groupMainItems(resolveDeckEntries([], entries, catalog), "alignment");
+    expect(groups.map(([g]) => g)).toEqual(["Good", "Evil", "Neutral"]);
+    expect(groups.find(([g]) => g === "Neutral")![1].map((i) => i.name)).toEqual(["Wall"]);
+  });
+
+  it("puts everything in one sorted group when grouping is off", () => {
+    const catalog = [
+      publicCard("Demon", "I", "EC", "Evil", "Brown"),
+      publicCard("Guard", "I", "Hero", "Good", "Silver"),
+    ];
+    const entries: ForgeDeckEntry[] = catalog.map((c) => ({
+      source: "public" as const, name: c.name, set: c.set, qty: 1, zone: "main" as const,
+    }));
+    const groups = groupMainItems(resolveDeckEntries([], entries, catalog), "none");
+    expect(groups.map(([g]) => g)).toEqual(["All Cards"]);
+    expect(groups[0][1].map((i) => i.name)).toEqual(["Guard", "Demon"]); // Good before Evil
+  });
+
   it("sorts side items by display type then name and counts quantities", () => {
     const catalog = [
       publicCard("Bravery", "I", "GE"),
@@ -118,5 +146,28 @@ describe("grouping and sorting", () => {
     const items = sortSideItems(resolveDeckEntries([], entries, catalog));
     expect(items.map((i) => i.name)).toEqual(["Axe", "Bravery"]); // Evil Enh. < Good Enh.
     expect(countItems(items)).toBe(3);
+  });
+});
+
+describe("splitStack", () => {
+  const item = (name: string, qty: number) => {
+    const catalog = [publicCard(name, "I", "Hero", "Good", "Silver")];
+    const entries: ForgeDeckEntry[] = [{ source: "public", name, set: "I", qty, zone: "main" }];
+    return resolveDeckEntries([], entries, catalog)[0];
+  };
+
+  it("keeps a group at or under the column cap in one column", () => {
+    const items = [item("A", 10), item("B", 7)];
+    expect(splitStack(items)).toEqual([items]);
+  });
+
+  it("splits by physical card count (quantities expanded), not unique cards", () => {
+    const items = [item("A", 10), item("B", 10), item("C", 10)];
+    const columns = splitStack(items);
+    expect(columns.length).toBe(2);
+    expect(columns.flat()).toEqual(items);
+    // Balanced: neither column exceeds ~half the 30 cards by more than one item.
+    const counts = columns.map((col) => col.reduce((n, i) => n + i.qty, 0));
+    expect(Math.max(...counts)).toBeLessThanOrEqual(20);
   });
 });

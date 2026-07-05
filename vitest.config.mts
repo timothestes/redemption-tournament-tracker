@@ -12,6 +12,8 @@ export default defineConfig({
   },
   test: {
     include: ["**/__tests__/**/*.test.ts", "**/*.test.ts"],
-    exclude: ["node_modules"],
+    // .claude/worktrees holds other branches' checkouts; their test files would
+    // resolve `@/` to THIS tree's source and test the wrong code.
+    exclude: ["node_modules", ".claude/**"],
   },
 });

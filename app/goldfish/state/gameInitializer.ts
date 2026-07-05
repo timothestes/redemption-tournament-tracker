@@ -203,6 +203,7 @@ export function buildInitialGameState(
     deckId: deck.id || '',
     deckName: deck.name,
     isOwner: deck.isOwner ?? false,
+    isForge: deck.isForge ?? false,
     format,
     paragonName: deck.paragon || null,
     turn: 1,

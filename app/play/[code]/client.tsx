@@ -286,6 +286,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   const isForge = gameParams?.isForge === true || gameState.isForgeGame;
 
+  // Where "Back to lobby" / exit / stale-game redirects land. Forge games
+  // return to the Forge play lobby; everyone else to the public play lobby.
+  const lobbyPath = isForge ? '/forge/play' : '/play';
+
   // Forge resolver fetch — loads the viewer's RLS-granted card text/art map
   // once we know this is a forge game. Fetched once and cached in state.
   useEffect(() => {
@@ -904,8 +908,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   useEffect(() => {
     if (!isGameNotFound) return;
     sessionStorage.setItem('lobby_error', `Game "${code}" is no longer available.`);
-    router.replace('/play');
-  }, [isGameNotFound, code, router]);
+    router.replace(lobbyPath);
+  }, [isGameNotFound, code, router, lobbyPath]);
 
   // Auto-redirect back to the invite-style lobby on format mismatch so the user
   // can swap to a matching-format deck without clicking through the error screen.
@@ -919,8 +923,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     );
     // Clear the stale join params so the page can't auto-rejoin with the same deck.
     sessionStorage.removeItem(`${SESSION_KEY_PREFIX}${code}`);
-    router.replace(`/play?join=${code}`);
-  }, [lifecycle, formatMismatch, code, router]);
+    router.replace(isForge ? lobbyPath : `/play?join=${code}`);
+  }, [lifecycle, formatMismatch, code, router, isForge, lobbyPath]);
 
   if (isLeaving) {
     return (
@@ -973,7 +977,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               {errorMessage ?? 'An unexpected error occurred.'}
             </p>
             <a
-              href="/play"
+              href={lobbyPath}
               className="mt-6 inline-block rounded border border-[#c4955a]/45 bg-[#c4955a]/15 px-5 py-2.5 font-cinzel text-xs font-bold uppercase tracking-wider text-amber-200/90 hover:bg-[#c4955a]/25 transition-colors"
             >
               Back to Lobby
@@ -1001,7 +1005,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           <p className="text-lg font-semibold font-cinzel mb-2">{title}</p>
           <p className="text-sm text-muted-foreground">{body}</p>
           <a
-            href="/play"
+            href={lobbyPath}
             className="mt-6 inline-block rounded-md border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
           >
             Back to Lobby
@@ -1250,7 +1254,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   function handleReturnToLobby() {
     setIsLeaving(true);
     gameState.leaveGame();
-    router.push('/play');
+    router.push(lobbyPath);
   }
 
   // ---------------------------------------------------------------------------
@@ -1284,6 +1288,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ flexShrink: 0, height: 48 }}>
             <TurnIndicator
+              lobbyPath={lobbyPath}
               game={gameState.game}
               myPlayer={gameState.myPlayer}
               opponentPlayer={gameState.opponentPlayer}
@@ -1339,6 +1344,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ flexShrink: 0, height: 48 }}>
             <TurnIndicator
+              lobbyPath={lobbyPath}
               game={gameState.game}
               myPlayer={gameState.myPlayer}
               opponentPlayer={gameState.opponentPlayer}
@@ -1397,6 +1403,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ flexShrink: 0, height: 48 }}>
               <TurnIndicator
+                lobbyPath={lobbyPath}
                 game={gameState.game}
                 myPlayer={gameState.myPlayer}
                 opponentPlayer={gameState.opponentPlayer}
@@ -1570,6 +1577,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ flexShrink: 0, height: 48 }}>
             <TurnIndicator
+              lobbyPath={lobbyPath}
               game={gameState.game}
               myPlayer={gameState.myPlayer}
               opponentPlayer={gameState.opponentPlayer}
@@ -1618,6 +1626,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flexShrink: 0, height: 48 }}>
           <TurnIndicator
+            lobbyPath={lobbyPath}
             game={gameState.game}
             myPlayer={gameState.myPlayer}
             opponentPlayer={gameState.opponentPlayer}

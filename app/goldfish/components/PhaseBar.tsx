@@ -71,7 +71,9 @@ export function PhaseBar({ hideBackButton = false }: { hideBackButton?: boolean 
       router.push('/decklist/community');
       return;
     }
-    if (state.isOwner) {
+    if (state.isForge) {
+      router.push(`/forge/play/decks/${state.deckId}`);
+    } else if (state.isOwner) {
       router.push(`/decklist/card-search?deckId=${state.deckId}`);
     } else {
       router.push(`/decklist/${state.deckId}`);

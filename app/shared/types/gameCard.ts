@@ -168,6 +168,10 @@ export interface DeckDataForGoldfish {
   format: string;
   paragon?: string | null;
   isOwner?: boolean;
+  /** True when this deck was loaded from the Forge (private card design area).
+   *  Routes the goldfish back button to the Forge deck builder instead of the
+   *  public decklist. */
+  isForge?: boolean;
   cards: {
     card_name: string;
     card_set: string;

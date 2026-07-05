@@ -22,7 +22,17 @@ function listForgeRouteFiles(): string[] {
 
 const GATE = /require(Forge|Elder|ForgeSuperadmin)\s*\(/;
 // Pure redirect with no data exposure — intentionally has no gate.
-const ALLOW_NO_GATE = new Set(["app/forge/art/page.tsx", "app/forge/ideas/[cardId]/page.tsx"]);
+const ALLOW_NO_GATE = new Set([
+  "app/forge/art/page.tsx",
+  "app/forge/ideas/[cardId]/page.tsx",
+  "app/forge/play/games/page.tsx", // bare redirect to /forge/play (lobby moved)
+]);
+// Routes whose gate lives elsewhere still must match their specific gate call.
+const ALT_GATE: Record<string, RegExp> = {
+  // Member role check + RLS run inside the forge_art_key RPC (migration 066);
+  // a null key 404s. Collapsed from requireForge to save per-image round trips.
+  "app/forge/api/art/[cardId]/route.ts": /rpc\(\s*["']forge_art_key["']/,
+};
 
 describe("forge gate-first guardrail", () => {
   const files = listForgeRouteFiles().filter((f) => !ALLOW_NO_GATE.has(f));
@@ -34,7 +44,8 @@ describe("forge gate-first guardrail", () => {
   for (const f of files) {
     it(`${f} calls a Forge gate`, () => {
       const src = readFileSync(join(process.cwd(), f), "utf8");
-      expect(GATE.test(src), `${f} must call requireForge/requireElder/requireForgeSuperadmin`).toBe(true);
+      const gate = ALT_GATE[f] ?? GATE;
+      expect(gate.test(src), `${f} must call its Forge gate (${gate})`).toBe(true);
     });
   }
 });

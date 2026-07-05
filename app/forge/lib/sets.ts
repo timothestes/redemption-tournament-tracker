@@ -188,3 +188,12 @@ export async function listSetGrants(setId: string): Promise<SetGrant[]> {
   const { data: members } = await ctx.supabase.from("playtest_members").select("user_id, display_name").in("user_id", ids);
   return (members ?? []).map((m: any) => ({ userId: m.user_id, displayName: m.display_name ?? null }));
 }
+
+// All grant rows the caller may see (RLS: set-elder scopes to their sets, superadmin
+// sees all). Used by the admin Set Access matrix. Returns opaque (setId, userId) pairs.
+export async function listAllSetGrants(): Promise<{ setId: string; userId: string }[]> {
+  const ctx = await requireForge();
+  if (!ctx) return [];
+  const { data } = await ctx.supabase.from("forge_set_grants").select("set_id, user_id");
+  return (data ?? []).map((r: any) => ({ setId: r.set_id, userId: r.user_id }));
+}
