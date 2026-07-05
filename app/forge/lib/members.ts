@@ -2,7 +2,7 @@
 
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
-import { requireElder, requireForgeSuperadmin, requireForge, type ForgeRole } from "@/app/forge/lib/auth";
+import { requireElder, requireForge, type ForgeRole } from "@/app/forge/lib/auth";
 import { hashToken } from "@/app/forge/lib/token";
 import { sendEmail, wrapEmailInTemplate } from "@/utils/email";
 import { createClient } from "@/utils/supabase/server";
@@ -20,12 +20,9 @@ export async function mintInvite(input: {
   expiresInDays?: number;
   setIds?: string[];
 }): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  // Elder gate first; an elder invite additionally needs superadmin.
+  // Elder+ gate; forge_role_outranks (DB) caps which role the caller may grant.
   const ctx = await requireElder();
   if (!ctx) return { ok: false, error: "Not authorized" };
-  if (input.role === "elder" && !(await requireForgeSuperadmin())) {
-    return { ok: false, error: "Only a superadmin can invite an elder" };
-  }
   if (input.role === "superadmin") return { ok: false, error: "Superadmin is not invitable" };
 
   const raw = randomBytes(32).toString("base64url");

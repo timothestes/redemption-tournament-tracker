@@ -13,7 +13,7 @@ type Invite = { id: string; role: ForgeRole; email: string | null; expires_at: s
 // Roles this caller may grant/manage (mirrors forge_role_outranks server-side).
 function grantable(caller: ForgeRole): ForgeRole[] {
   if (caller === "superadmin") return ["elder", "playtester"];
-  if (caller === "elder") return ["playtester"];
+  if (caller === "elder") return ["elder", "playtester"];
   return [];
 }
 
