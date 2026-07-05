@@ -19,7 +19,15 @@ export default function DeckBuilder({
   isNew: boolean;
   granted: GrantedForgeCard[];
 }) {
-  const config = useMemo(() => makeForgeBuilderConfig(granted), [granted]);
+  const config = useMemo(
+    () => ({
+      ...makeForgeBuilderConfig(granted),
+      // Load Deck loads in place; keep /forge/play/decks/<id> honest so
+      // refresh and back land on the deck actually shown.
+      onDeckLoaded: (id: string) => window.history.replaceState(null, "", `/forge/play/decks/${id}`),
+    }),
+    [granted]
+  );
   return (
     <CardSearchClient
       config={config}
