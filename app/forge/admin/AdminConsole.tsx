@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ForgeRole } from "@/app/forge/lib/auth";
 import { mintInvite, changeRole, removeMember } from "@/app/forge/lib/members";
+import SetAccessMatrix from "./SetAccessMatrix";
 
 type Member = { user_id: string; role: ForgeRole; display_name: string | null; created_at: string };
 type Invite = { id: string; role: ForgeRole; email: string | null; expires_at: string; used_at: string | null };
@@ -20,11 +21,13 @@ export default function AdminConsole({
   members,
   invites,
   sets,
+  grants,
 }: {
   callerRole: ForgeRole;
   members: Member[];
   invites: Invite[];
   sets: { id: string; name: string }[];
+  grants: { setId: string; userId: string }[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -34,6 +37,9 @@ export default function AdminConsole({
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [inviteSetIds, setInviteSetIds] = useState<string[]>([]);
   const canManage = new Set(grantable(callerRole));
+  const playtesters = members
+    .filter((m) => m.role === "playtester")
+    .map((m) => ({ userId: m.user_id, displayName: m.display_name }));
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>, okMsg: string) {
     setMsg(null);
@@ -155,6 +161,8 @@ export default function AdminConsole({
           </tbody>
         </table>
       </section>
+
+      <SetAccessMatrix playtesters={playtesters} sets={sets} grants={grants} />
 
       <section>
         <h2 className="text-lg font-medium">Pending invites</h2>
