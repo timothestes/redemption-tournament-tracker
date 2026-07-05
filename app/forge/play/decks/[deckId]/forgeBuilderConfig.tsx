@@ -31,7 +31,7 @@ import {
 } from "@/app/forge/lib/deckAdapter";
 import type { ForgeDeckEntry } from "@/app/forge/lib/deckTypes";
 import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
-import { saveForgeDeck, getForgeDeck, listForgeDecks } from "@/app/forge/lib/forgeDecks";
+import { saveForgeDeck, getForgeDeck, listForgeDecks, deleteForgeDeck } from "@/app/forge/lib/forgeDecks";
 import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 
 export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilderConfig {
@@ -203,16 +203,22 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
     }));
   };
 
+  // Delete seam: remove from forge_decks; the builder fires onDeckDeleted on success.
+  const deleteDeck: NonNullable<DeckBuilderPersistence["delete"]> = async (deckId: string) => {
+    const res = await deleteForgeDeck(deckId);
+    return res.ok ? { success: true } : { success: false, error: res.error };
+  };
+
   return {
     pool,
     resolveCardImage,
     renderThumb,
-    persistence: { save, loadById, resolveCard, listDecks },
+    persistence: { save, loadById, resolveCard, listDecks, delete: deleteDeck },
     features: {
       localStoragePersist: false,
       syncFiltersToUrl: false,
       enableSharing: false,
-      enableDeckDelete: false,
+      enableDeckDelete: true,
       enableImportExport: true,
       enablePrintExports: false,
       enableShopping: false,

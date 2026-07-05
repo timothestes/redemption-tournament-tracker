@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import { cardRawText } from "@/app/forge/lib/designCard";
@@ -11,14 +12,16 @@ export type GridSelection = {
 };
 
 export default function ForgeCardGrid({
-  cards, showStatus = false, selection,
+  cards, showStatus = false, selection, leading,
 }: {
   cards: ForgeCardFull[];
   showStatus?: boolean;
   selection?: GridSelection;
+  leading?: ReactNode;
 }) {
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      {leading}
       {cards.map((c) => {
         const t = Date.parse(c.updatedAt) || 0;
         const inner = (

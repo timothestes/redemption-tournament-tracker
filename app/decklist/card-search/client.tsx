@@ -1605,6 +1605,23 @@ export default function CardSearchClient({
       return;
     }
 
+    // Host-provided delete backend (the Forge removes from forge_decks and then
+    // navigates to its own deck list via onDeckDeleted). Falls through to the
+    // public deleteDeckAction when no seam is provided.
+    const deleteFromHost = config.persistence?.delete;
+    if (deleteFromHost) {
+      const res = await deleteFromHost(deck.id);
+      if (res.success) {
+        clearUnsavedChanges();
+        clearDeck();
+        config.onDeckDeleted?.(deck.id);
+      } else {
+        setNotification({ message: res.error || 'Failed to delete deck', type: 'error' });
+        setTimeout(() => setNotification(null), 3000);
+      }
+      return;
+    }
+
     const result = await deleteDeckAction(deck.id);
     if (result.success) {
       clearUnsavedChanges();

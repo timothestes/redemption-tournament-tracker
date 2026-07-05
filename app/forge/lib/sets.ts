@@ -47,6 +47,16 @@ export async function listSets(): Promise<ForgeSetSummary[]> {
   }));
 }
 
+// True when the caller may create/design cards in this set (set elder or superadmin).
+// Used to gate the "New card in this set" tile — mirrors forge_share_card_to_set's authz.
+export async function canDesignSet(setId: string): Promise<boolean> {
+  const ctx = await requireForge();
+  if (!ctx) return false;
+  if (ctx.role === "superadmin") return true;
+  const { data } = await ctx.supabase.rpc("is_forge_set_elder", { p_set_id: setId });
+  return data === true;
+}
+
 export async function getSet(setId: string): Promise<ForgeSetDetail | null> {
   const ctx = await requireForge();
   if (!ctx) return null;

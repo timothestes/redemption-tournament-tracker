@@ -112,15 +112,15 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
     [perType],
   );
 
-  function openCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
+  function openCreate() {
+    setName("");
     setError(null);
     seedTotal(100);
     setOpen(true);
   }
 
   async function confirmCreate() {
+    if (!name.trim()) return;
     setBusy(true);
     setError(null);
     const r = await createSet(name.trim());
@@ -135,13 +135,14 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
       if ((perType[t] ?? 0) > 0) cells[t] = { none: perType[t] };
     }
     const seed = await saveSetTargets(r.id, { total: total || undefined, cells });
-    setBusy(false);
     if (!seed.ok) {
       // Set exists; don't strand the user — send them in, but tell them targets failed.
+      setBusy(false);
       setError("Set created but targets failed to save — set them from the Progress tab.");
       router.push(`/forge/sets/${r.id}/progress`);
       return;
     }
+    // Keep `busy` true through navigation so the spinner shows until the next page loads.
     router.push(`/forge/sets/${r.id}/cards`);
   }
 
@@ -163,10 +164,7 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
                 Export a set
               </button>
             )}
-            <form onSubmit={openCreate} className="flex gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New set name…" className="w-36 min-w-0 flex-1 rounded-md border bg-background px-3 py-1.5 text-sm sm:w-48 sm:flex-none" />
-              <Button type="submit" variant="success" size="sm">Create</Button>
-            </form>
+            <Button type="button" variant="success" size="sm" onClick={openCreate}>Create</Button>
             <Button
               size="sm"
               variant={selecting ? "secondary" : "outline"}
@@ -320,13 +318,29 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
       <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
         <DialogContent size="md">
           <DialogHeader>
-            <DialogTitle>New set: {name.trim()}</DialogTitle>
+            <DialogTitle>New set</DialogTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Seed starting targets — you can refine them anytime from the Progress tab.
+              Name the set and seed starting targets — you can refine them anytime from the Progress tab.
             </p>
           </DialogHeader>
 
           <DialogBody className="space-y-4">
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium">Set name</span>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && name.trim() && !busy) confirmCreate();
+                }}
+                placeholder="New set name…"
+                autoFocus
+                aria-label="Set name"
+                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              />
+            </label>
+
             <label className="flex items-center gap-2 text-sm">
               <span className="font-medium">How many cards total?</span>
               <input
@@ -367,8 +381,15 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
             <Button variant="cancel" disabled={busy} onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button variant="success" disabled={busy} onClick={confirmCreate}>
-              {busy ? "Creating…" : "Create set"}
+            <Button variant="success" disabled={busy || !name.trim()} onClick={confirmCreate}>
+              {busy ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  Creating…
+                </span>
+              ) : (
+                "Create set"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

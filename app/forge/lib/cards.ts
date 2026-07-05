@@ -16,6 +16,23 @@ export async function createCard(
   return { ok: true, id: data };
 }
 
+// Create a card already placed in a set (the "New card in this set" tile). The RPC
+// enforces set-elder; requireForge is enough here since the RPC is the real gate.
+export async function createCardInSet(
+  setId: string,
+  title: string
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const ctx = await requireForge();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { data, error } = await ctx.supabase.rpc("forge_create_card_in_set", {
+    p_title: title,
+    p_set_id: setId,
+  });
+  if (error || typeof data !== "string") return { ok: false, error: "Could not create card" };
+  revalidatePath(`/forge/sets/${setId}/cards`);
+  return { ok: true, id: data };
+}
+
 export async function uploadArt(
   cardId: string,
   formData: FormData
