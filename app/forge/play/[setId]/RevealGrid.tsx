@@ -31,12 +31,21 @@ export default function RevealGrid({ items }: { items: RevealItem[] }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Default order: alphabetical by card type (primary type), then by name.
-  // "￿" pushes untyped cards to the end.
+  // Default order: by card type, then brigade, then name. Type and brigade use
+  // the canonical model order (CARD_TYPES / BRIGADES); cards missing a primary
+  // type or brigade sort last within their group.
   const sorted = useMemo(() => {
-    const typeKey = (it: RevealItem) => it.data.cardType?.[0] ?? "￿";
+    const rank = (value: string | undefined, order: readonly string[]) => {
+      const i = value ? order.indexOf(value) : -1;
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    const typeRank = (it: RevealItem) => rank(it.data.cardType?.[0], CARD_TYPES);
+    const brigadeRank = (it: RevealItem) => rank(it.data.brigades?.[0], BRIGADES);
     return [...items].sort(
-      (a, b) => typeKey(a).localeCompare(typeKey(b)) || (a.data.name ?? "").localeCompare(b.data.name ?? ""),
+      (a, b) =>
+        typeRank(a) - typeRank(b) ||
+        brigadeRank(a) - brigadeRank(b) ||
+        (a.data.name ?? "").localeCompare(b.data.name ?? ""),
     );
   }, [items]);
 
