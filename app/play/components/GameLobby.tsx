@@ -256,9 +256,17 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
   const isParagon =
     selectedDeck?.format?.toLowerCase().includes('paragon') && selectedDeck?.paragon;
 
+  // In invite-link mode the top deck picker only applies to a normal (non-Forge)
+  // "Join as Player". Forge invites pick their playtest deck on /forge/play, so
+  // hide it for Forge games — and while we're still classifying the code, to
+  // avoid a flash of the wrong picker.
+  const showDeckSection = !joinCode || (inviteInfo !== null && !inviteInfo.isForge);
+
   return (
     <div className="flex flex-col gap-5">
-      {/* Deck selection — matches community/my-decks card preview style */}
+      {/* Deck selection — hidden for Forge invites; the Forge lobby has its own
+          playtest-deck picker. Matches community/my-decks card preview style. */}
+      {showDeckSection && (
       <section className="rounded-lg border border-border overflow-hidden bg-gradient-to-br from-card to-muted/40 [.jayden_&]:border-primary/30 [.jayden_&]:from-[hsla(0,80%,25%,0.15)] [.jayden_&]:via-[hsla(270,60%,20%,0.1)] [.jayden_&]:to-[hsla(230,80%,30%,0.15)]">
         {selectedDeck ? (
           <>
@@ -349,14 +357,17 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
           </div>
         )}
       </section>
+      )}
 
       {/* Deck Picker Modal */}
-      <DeckPickerModal
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        onSelect={handleSelectDeck}
-        selectedDeckId={selectedDeck?.id}
-      />
+      {showDeckSection && (
+        <DeckPickerModal
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onSelect={handleSelectDeck}
+          selectedDeckId={selectedDeck?.id}
+        />
+      )}
 
       {/* Actions — invite link mode shows join/spectate choice, normal mode shows create/join + lobby */}
       {joinCode ? (
@@ -371,20 +382,28 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
           ) : inviteInfo.isForge ? (
             inviteInfo.isForgeMember ? (
               <div className="flex flex-col gap-2">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => router.push(`/play/spectate/${joinCode}`)}
-                  className="h-12 text-base"
-                >
-                  Watch as Spectator
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="lg"
+                    onClick={() => router.push(`/forge/play?join=${joinCode}`)}
+                    className="flex-1 h-12 text-base"
+                  >
+                    Join as Player
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => router.push(`/play/spectate/${joinCode}`)}
+                    className="flex-1 h-12 text-base"
+                  >
+                    Watch as Spectator
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground text-center">
-                  Private playtest game — to take a seat, join from{' '}
-                  <Link href="/forge/play/games" className="underline hover:text-foreground">
-                    the Forge
-                  </Link>{' '}
-                  with a playtest deck.
+                  Playtest game — joining uses one of your{' '}
+                  <Link href="/forge/play/decks" className="underline hover:text-foreground">
+                    Forge decks
+                  </Link>.
                 </p>
               </div>
             ) : (

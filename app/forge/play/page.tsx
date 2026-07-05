@@ -6,7 +6,11 @@ import ForgeGameLobby from "./games/ForgeGameLobby";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function ForgePlayPage() {
+export default async function ForgePlayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ join?: string }>;
+}) {
   const ctx = await requireForge();
   if (!ctx) notFound();
   const decks = await listForgeDecks();
@@ -16,5 +20,14 @@ export default async function ForgePlayPage() {
     .eq("user_id", ctx.user.id)
     .maybeSingle();
   const displayName = member?.display_name || ctx.user.email?.split("@")[0] || "Playtester";
-  return <ForgeGameLobby decks={decks} displayName={displayName} userId={ctx.user.id} />;
+  const { join } = await searchParams;
+  const initialJoinCode = (join || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+  return (
+    <ForgeGameLobby
+      decks={decks}
+      displayName={displayName}
+      userId={ctx.user.id}
+      initialJoinCode={initialJoinCode}
+    />
+  );
 }

@@ -76,15 +76,13 @@ import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
 import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { cardInstanceToGameCard } from '../utils/cardAdapter';
-import type { ForgeResolverMap } from '../utils/forgeResolver';
+import { resolveCardImageUrl, type ForgeResolverMap } from '../utils/forgeResolver';
 import type { UndoStack, Captured } from '../hooks/useUndoStack';
 import { makeReverseAction, makeBatchReverseAction, reverseIsSafe } from '../hooks/useUndoStack';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
 /** Sidebar zones that display as a pile with a count badge (not individual cards). */
 const SIDEBAR_PILE_ZONES = ['deck', 'discard', 'reserve', 'banish', 'land-of-redemption'] as const;
@@ -102,16 +100,6 @@ type DropZoneKey = string;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
-}
-
-function getCardImageUrl(imgFile: string): string {
-  if (!imgFile) return '';
-  if (imgFile.startsWith('/')) return imgFile;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
-}
 
 // `cardInstanceToGameCard` is imported from `../utils/cardAdapter` — keep the
 // adapter colocated with the reference-stable cache hook used by useGameState.
@@ -614,17 +602,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Dep is narrowed to the LOB arrays so unrelated card mutations don't
   // re-run this work.
   const lobSoulsForCinematic = useMemo(() => {
-    const out: { instanceId: string; cardName: string; cardImgFile: string }[] = [];
+    const out: { instanceId: string; cardName: string; imageUrl: string }[] = [];
+    // Resolve through the Forge-aware resolver so `forge:<uuid>` refs become the
+    // cookie-authed proxy URL (matching the canvas preloader's cache key).
+    // getCardImageUrl alone returns '' for Forge refs → blank card + empty-src warning.
     for (const c of (myCards['land-of-bondage'] ?? [])) {
       if (!isLostSoulCard(c)) continue;
-      out.push({ instanceId: String(c.id), cardName: c.cardName, cardImgFile: c.cardImgFile });
+      out.push({ instanceId: String(c.id), cardName: c.cardName, imageUrl: resolveCardImageUrl(c.cardImgFile, forgeResolver) });
     }
     for (const c of (opponentCards['land-of-bondage'] ?? [])) {
       if (!isLostSoulCard(c)) continue;
-      out.push({ instanceId: String(c.id), cardName: c.cardName, cardImgFile: c.cardImgFile });
+      out.push({ instanceId: String(c.id), cardName: c.cardName, imageUrl: resolveCardImageUrl(c.cardImgFile, forgeResolver) });
     }
     return out;
-  }, [myCards['land-of-bondage'], opponentCards['land-of-bondage']]);
+  }, [myCards['land-of-bondage'], opponentCards['land-of-bondage'], forgeResolver]);
   // Gate detection until the subscription has applied AND we know who the
   // local player is — otherwise the initial SpacetimeDB push of pre-existing
   // LOB souls would register as "new arrivals" on game load / reconnect.
@@ -4418,7 +4409,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ---- Helper: get image for a CardInstance ----
   const getCardImage = (card: CardInstance): HTMLImageElement | undefined => {
     if (!card.cardImgFile || card.isFlipped) return undefined;
-    const url = getCardImageUrl(card.cardImgFile);
+    // Route through the shared resolver so `forge:<uuid>` refs become the
+    // cookie-authed proxy URL (matching the preloader's cache key). Falls
+    // through to the public CDN URL for official cards.
+    const url = resolveCardImageUrl(card.cardImgFile, forgeResolver);
+    if (!url) return undefined;
     return getImage(url) ?? undefined;
   };
 

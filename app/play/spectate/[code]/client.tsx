@@ -139,6 +139,9 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   const [allForgeGames] = useTable(tables.ForgeGame) as [ForgeGame[], boolean];
   const isForgeGame = gameId !== null && allForgeGames.some((f) => f.gameId === gameId);
 
+  // Board backdrop — Forge playtest games get a distinct background.
+  const gameBackground = `url(/gameplay/${isForgeGame ? 'forge_background' : 'cave_background'}.png)`;
+
   // Resolve gameId by scanning the unfiltered `allGames` subscription — the
   // filtered `game` field is keyed by gameId, which we don't have yet.
   // Prefer non-finished rows in case the code was reused.
@@ -361,7 +364,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black">
           <div
             className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
-            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+            style={{ backgroundImage: gameBackground, backgroundPosition: 'center 70%' }}
           />
           <div
             className="absolute inset-0 pointer-events-none"
@@ -398,7 +401,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black px-4">
           <div
             className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
-            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+            style={{ backgroundImage: gameBackground, backgroundPosition: 'center 70%' }}
           />
           <div
             className="absolute inset-0 pointer-events-none"
@@ -459,7 +462,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
         display: 'flex',
         width: '100vw',
         height: '100dvh',
-        backgroundImage: 'url(/gameplay/cave_background.png)',
+        backgroundImage: gameBackground,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}

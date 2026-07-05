@@ -5,7 +5,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export interface SoulCinematicCard {
   instanceId: string;
   cardName: string;
-  cardImgFile: string;
+  /**
+   * Fully-resolved image URL, ready to drop into `<img src>`. The caller
+   * resolves it (e.g. `resolveCardImageUrl` for Forge refs, `getCardImageUrl`
+   * for official cards) so this shared hook stays image-source agnostic.
+   * Empty string when no image is available (unresolved Forge card, etc.).
+   */
+  imageUrl: string;
 }
 
 export interface SoulCinematicBatch {

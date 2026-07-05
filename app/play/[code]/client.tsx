@@ -286,6 +286,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   const isForge = gameParams?.isForge === true || gameState.isForgeGame;
 
+  // Board backdrop — Forge playtest games get a distinct background.
+  const gameBackground = `url(/gameplay/${isForge ? 'forge_background' : 'cave_background'}.png)`;
+
   // Where "Back to lobby" / exit / stale-game redirects land. Forge games
   // return to the Forge play lobby; everyone else to the public play lobby.
   const lobbyPath = isForge ? '/forge/play' : '/play';
@@ -931,7 +934,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black">
         <div
           className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
-          style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+          style={{ backgroundImage: gameBackground, backgroundPosition: 'center 70%' }}
         />
         <div
           className="absolute inset-0 pointer-events-none"
@@ -958,7 +961,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
           <div
             className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
-            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+            style={{ backgroundImage: gameBackground, backgroundPosition: 'center 70%' }}
           />
           <div
             className="absolute inset-0 pointer-events-none"
@@ -1024,7 +1027,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         {/* Cave background */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-40"
-          style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+          style={{ backgroundImage: gameBackground, backgroundPosition: 'center 70%' }}
         />
         {/* Vignette */}
         <div
@@ -1284,7 +1287,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // can see their dealt hand while deciding who goes first.
   if (isCeremonyPhase) {
     return (
-      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: gameBackground, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ flexShrink: 0, height: 48 }}>
             <TurnIndicator
@@ -1340,7 +1343,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // toolbar) so there's no flash of the lobby screen.
   if (isAwaitingGameStart) {
     return (
-      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: gameBackground, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ flexShrink: 0, height: 48 }}>
             <TurnIndicator
@@ -1399,7 +1402,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     // Show the overlay over the frozen canvas — always render canvas if gameId is known
     if (gameId !== null) {
       return (
-        <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: gameBackground, backgroundSize: 'cover', backgroundPosition: 'center' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ flexShrink: 0, height: 48 }}>
               <TurnIndicator
@@ -1573,7 +1576,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
     // Fallback — canvas not ready
     return (
-      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: gameBackground, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ flexShrink: 0, height: 48 }}>
             <TurnIndicator
@@ -1621,7 +1624,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // lifecycle === 'playing' — two-column layout: canvas + right panel (preview + chat)
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+    <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: gameBackground, backgroundSize: 'cover', backgroundPosition: 'center' }}>
       {/* Turn bar + Canvas + Toolbar */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flexShrink: 0, height: 48 }}>

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { simplifyLostSoulName } from '@/lib/cards/cardAbilities';
-import { getCardImageUrl } from '../utils/cardImageUrl';
 import type { SoulCinematicCard } from '../hooks/useLostSoulCinematic';
 
 const MAX_SHOWN_CARDS = 3;
@@ -58,7 +57,7 @@ export function LostSoulCinematic({ souls }: Props) {
               >
                 <div className="lsc-card" style={{ animationDelay: `${i * 40}ms` }}>
                   <SoulImage
-                    src={getCardImageUrl(soul.cardImgFile)}
+                    src={soul.imageUrl}
                     placeholderName={simplifyLostSoulName(soul.cardName)}
                   />
                   <ChainSvg instanceId={soul.instanceId} />
@@ -181,15 +180,20 @@ function SoulImage({ src, placeholderName }: { src: string; placeholderName: str
 
   return (
     <>
-      <img
-        ref={imgRef}
-        src={src}
-        alt=""
-        draggable={false}
-        className={loaded ? 'lsc-card-img lsc-card-img-ready' : 'lsc-card-img'}
-        onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(true)}
-      />
+      {/* Skip the <img> entirely when the src is empty (e.g. an unresolved
+          Forge card) — an empty `src=""` triggers a browser refetch warning
+          and never fires onLoad, so we'd be stuck on the placeholder anyway. */}
+      {src && (
+        <img
+          ref={imgRef}
+          src={src}
+          alt=""
+          draggable={false}
+          className={loaded ? 'lsc-card-img lsc-card-img-ready' : 'lsc-card-img'}
+          onLoad={() => setLoaded(true)}
+          onError={() => setLoaded(true)}
+        />
+      )}
       {!loaded && (
         <span className="lsc-card-placeholder">{placeholderName}</span>
       )}

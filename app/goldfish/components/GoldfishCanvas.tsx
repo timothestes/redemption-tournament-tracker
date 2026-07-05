@@ -95,7 +95,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       .map(c => ({
         instanceId: c.instanceId,
         cardName: c.cardName,
-        cardImgFile: c.cardImgFile,
+        imageUrl: getCardImageUrl(c.cardImgFile),
       }));
   }, [state.zones['land-of-bondage']]);
   const { activeBatch: soulCinematic } = useLostSoulCinematic(lobSouls);

@@ -8,12 +8,12 @@ import { useSpacetimeConnection } from "@/app/play/hooks/useSpacetimeConnection"
 import { SpacetimeProvider } from "@/app/play/lib/spacetimedb-provider";
 import type { ForgeDeckSummary } from "@/app/forge/lib/deckTypes";
 
-interface Props { decks: ForgeDeckSummary[]; displayName: string; userId: string }
+interface Props { decks: ForgeDeckSummary[]; displayName: string; userId: string; initialJoinCode?: string }
 
-function LobbyInner({ decks, displayName, userId }: Props) {
+function LobbyInner({ decks, displayName, userId, initialJoinCode }: Props) {
   const router = useRouter();
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(decks[0]?.id ?? null);
-  const [joinCode, setJoinCode] = useState("");
+  const [joinCode, setJoinCode] = useState(initialJoinCode ?? "");
   const [error, setError] = useState<string | null>(null);
   const selected = decks.find((d) => d.id === selectedDeckId) ?? null;
 
@@ -63,6 +63,13 @@ function LobbyInner({ decks, displayName, userId }: Props) {
         <h1 className="text-2xl font-semibold">Playtest games</h1>
         <p className="text-sm text-muted-foreground">Private games with your Forge decks.</p>
       </div>
+      {initialJoinCode && (
+        <div className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
+          You&apos;ve been invited to game{" "}
+          <span className="font-mono font-semibold tracking-widest">{initialJoinCode}</span> — pick a
+          deck and hit <span className="font-medium">Join</span> below.
+        </div>
+      )}
       {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">{error}</div>}
       <section className="space-y-2">
         <h2 className="text-sm font-medium">Your deck</h2>

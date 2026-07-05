@@ -124,10 +124,10 @@ export default function PregameScreen({
     <>
       <TopNav />
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
-        {/* Cave background */}
+        {/* Board backdrop — Forge playtest games get a distinct background. */}
         <div
           className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
-          style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+          style={{ backgroundImage: `url(/gameplay/${isForge ? 'forge_background' : 'cave_background'}.png)`, backgroundPosition: 'center 70%' }}
         />
         <div
           className="absolute inset-0 pointer-events-none"

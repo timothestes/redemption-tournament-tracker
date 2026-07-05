@@ -158,7 +158,7 @@ export default function SetCardsBrowser({ cards, setId, canCreate }: { cards: Fo
         cards={filtered}
         showStatus
         selection={{ active: selecting, selected, onToggle: toggle }}
-        leading={canCreate && !selecting ? <AddCardTile setId={setId} /> : undefined}
+        leading={canCreate ? <AddCardTile setId={setId} disabled={selecting} /> : undefined}
       />
 
       {selecting && selected.size > 0 && (
