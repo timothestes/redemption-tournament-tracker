@@ -5,12 +5,13 @@ import { X } from "lucide-react";
 import type { DesignCard, CardType, Brigade } from "@/app/forge/lib/designCard";
 import { cardRawText, CARD_TYPES, BRIGADES } from "@/app/forge/lib/designCard";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
+import PlaytesterComments from "./PlaytesterComments";
 
 export type RevealItem = { cardId: string; data: DesignCard; artUrl: string | null; finishedUrl: string | null };
 
 const selectClass = "rounded-md border bg-background px-2 py-1.5 text-sm";
 
-export default function RevealGrid({ items }: { items: RevealItem[] }) {
+export default function RevealGrid({ items, currentUserId }: { items: RevealItem[]; currentUserId: string }) {
   const [active, setActive] = useState<RevealItem | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
@@ -102,9 +103,23 @@ export default function RevealGrid({ items }: { items: RevealItem[] }) {
         </div>
       )}
       {active && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setActive(null)}>
-          <div className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <ForgeCardFace name={active.data.name ?? null} rawText={cardRawText(active.data)} finishedUrl={active.finishedUrl} artUrl={active.artUrl} className="w-full" />
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4" onClick={() => setActive(null)}>
+          <div
+            className="my-auto flex w-full max-w-3xl flex-col gap-4 rounded-lg bg-background p-4 sm:flex-row"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto w-full max-w-sm shrink-0 sm:mx-0 sm:w-64">
+              <ForgeCardFace name={active.data.name ?? null} rawText={cardRawText(active.data)} finishedUrl={active.finishedUrl} artUrl={active.artUrl} className="w-full" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-sm font-semibold">Comments</h2>
+                <button type="button" aria-label="Close" onClick={() => setActive(null)} className="rounded p-1 text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <PlaytesterComments cardId={active.cardId} currentUserId={currentUserId} />
+            </div>
           </div>
         </div>
       )}
