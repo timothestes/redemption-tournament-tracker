@@ -160,9 +160,9 @@ grant  execute on function public.forge_set_privacy(uuid, boolean) to authentica
 
 ### 7. Migration & housekeeping
 
-- One migration file: `supabase/migrations/070_forge_private_sets.sql` containing §1–§3. Header comment documents that its `is_forge_set_elder` redefinition supersedes the uncommitted prod migration `forge_elders_access_all_sets` (DB version `20260705221747`).
+- One migration file: `supabase/migrations/071_forge_private_sets.sql` containing §1–§3 (070 is taken by a concurrent `070_forge_playtester_comments.sql`). Header comment documents that its `is_forge_set_elder` redefinition supersedes the uncommitted prod migration `forge_elders_access_all_sets` (DB version `20260705221747`).
 - Applying to prod is done by the user (or with explicit per-migration authorization) via the Supabase MCP — not autonomously.
-- **Follow-up (non-blocking):** the orphaned `068_forge_elders_access_all_sets.sql` file was never committed; its numeric slot is now taken by `068_forge_invite_email_case_insensitive.sql`. Recreating it for an honest history is optional and left as a noted follow-up; migration 070 makes the repo's function body correct regardless.
+- **Follow-up (non-blocking):** the orphaned `068_forge_elders_access_all_sets.sql` file was never committed; its numeric slot is now taken by `068_forge_invite_email_case_insensitive.sql`. Recreating it for an honest history is optional and left as a noted follow-up; migration 071 makes the repo's function body correct regardless.
 
 ## Out of scope
 

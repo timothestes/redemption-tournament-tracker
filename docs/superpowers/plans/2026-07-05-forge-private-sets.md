@@ -22,7 +22,7 @@
 
 ## File Structure
 
-- `supabase/migrations/070_forge_private_sets.sql` — **new**. Column + `is_forge_set_elder` redefine + `forge_create_set(text,boolean)` + `forge_set_privacy(uuid,boolean)`.
+- `supabase/migrations/071_forge_private_sets.sql` — **new**. Column + `is_forge_set_elder` redefine + `forge_create_set(text,boolean)` + `forge_set_privacy(uuid,boolean)`. (070 is taken by a concurrent `070_forge_playtester_comments.sql`.)
 - `__tests__/forge-anon-leak.test.ts` — **modify**. Add `forge_set_privacy` to the anon-cannot-execute probe list.
 - `app/forge/lib/sets.ts` — **modify**. `isPrivate` on set types; `listSets`/`getSet` select+map; `createSet(name, isPrivate)`; new `setSetPrivacy`.
 - `app/forge/components/PrivateBadge.tsx` — **new**. Shared lock badge (grid + set header + progress panel).
@@ -38,7 +38,7 @@
 ## Task 1: Migration + anon-leak probe
 
 **Files:**
-- Create: `supabase/migrations/070_forge_private_sets.sql`
+- Create: `supabase/migrations/071_forge_private_sets.sql`
 - Modify: `__tests__/forge-anon-leak.test.ts:78` (add one probe entry)
 
 **Interfaces:**
@@ -46,7 +46,7 @@
 
 - [ ] **Step 1: Write the migration file**
 
-Create `supabase/migrations/070_forge_private_sets.sql` with exactly:
+Create `supabase/migrations/071_forge_private_sets.sql` with exactly:
 
 ```sql
 -- Forge: private sets.
@@ -153,8 +153,8 @@ Expected: the live-only `describe` is SKIPPED without `FORGE_LEAK_TEST=1` (0 fai
 - [ ] **Step 4: Commit**
 
 ```bash
-git add supabase/migrations/070_forge_private_sets.sql __tests__/forge-anon-leak.test.ts
-git commit -m "feat(forge): migration 070 — private sets (is_private + choke-point + RPCs)"
+git add supabase/migrations/071_forge_private_sets.sql __tests__/forge-anon-leak.test.ts
+git commit -m "feat(forge): migration 071 — private sets (is_private + choke-point + RPCs)"
 ```
 
 ---
@@ -562,9 +562,9 @@ git commit -m "feat(forge): privacy toggle on the set Progress tab"
 
 This task is performed by the orchestrator with authorization to touch prod — NOT by a build subagent.
 
-- [ ] **Step 1: Apply migration 070 to prod**
+- [ ] **Step 1: Apply migration 071 to prod**
 
-Apply `supabase/migrations/070_forge_private_sets.sql` via the Supabase MCP `apply_migration` against project `dhxxsolhgvimxtusepht` (name: `forge_private_sets`).
+Apply `supabase/migrations/071_forge_private_sets.sql` via the Supabase MCP `apply_migration` against project `dhxxsolhgvimxtusepht` (name: `forge_private_sets`).
 
 - [ ] **Step 2: Verify the function bodies + grants live**
 
@@ -609,4 +609,4 @@ Summarize applied migration + all verification outcomes for the PR body. If the 
 
 **Type consistency:** ✅ `isPrivate` used identically across `ForgeSetSummary`/`ForgeSetDetail` (Task 2), `s.isPrivate`/`set.isPrivate` consumers (Tasks 3-5), and `ProgressDashboard`'s new prop (Task 5). `setSetPrivacy` signature matches its consumer in `SetPrivacyPanel`. RPC arg names (`p_set_id`, `p_is_private`, `p_name`) match between the migration (Task 1) and the lib calls (Task 2) and the anon-leak probe (Task 1).
 
-**Housekeeping note:** the orphaned `068_forge_elders_access_all_sets.sql` file is intentionally NOT recreated (its numeric slot is taken); migration 070's `create or replace` makes the repo's function body correct. Documented in the migration header and the spec.
+**Housekeeping note:** the orphaned `068_forge_elders_access_all_sets.sql` file is intentionally NOT recreated (its numeric slot is taken); migration 071's `create or replace` makes the repo's function body correct. Documented in the migration header and the spec.
