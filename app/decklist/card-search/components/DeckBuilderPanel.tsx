@@ -246,10 +246,10 @@ export default function DeckBuilderPanel({
   const canPrintExports = builderFeatures?.enablePrintExports !== false;
   const canShop = builderFeatures?.enableShopping !== false;
   const showDetailsTab = builderFeatures?.enableDetailsTab !== false;
-  // LoadDeckModal lists the public `decks` table, so it only makes sense when
-  // the builder runs on the default persistence (a Forge override loads from
-  // forge_decks — its deck list page is the switcher there).
-  const canLoadDeckList = !builderConfig.persistence;
+  // LoadDeckModal lists the public `decks` table by default, so a custom
+  // persistence hides Load Deck unless it supplies its own `listDecks`
+  // (the Forge lists forge_decks).
+  const canLoadDeckList = !builderConfig.persistence || !!builderConfig.persistence.listDecks;
 
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab ?? "main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -3583,6 +3583,7 @@ export default function DeckBuilderPanel({
         <LoadDeckModal
           onLoadDeck={onLoadDeck}
           onClose={() => setShowLoadDeckModal(false)}
+          listDecks={builderConfig.persistence?.listDecks}
         />
       )}
 
