@@ -6,6 +6,7 @@ import type { SetElder } from "@/app/forge/lib/sets";
 import { STATUS_LABEL } from "@/app/forge/lib/lifecycleCopy";
 import TargetsEditor from "./TargetsEditor";
 import SetEldersPanel from "./SetEldersPanel";
+import SetPrivacyPanel from "./SetPrivacyPanel";
 
 const STATUS_ORDER = ["draft", "playtesting", "approved"];
 const STATUS_COLOR: Record<string, string> = { draft: "bg-muted-foreground/40", playtesting: "bg-amber-500", approved: "bg-primary" };
@@ -19,10 +20,10 @@ function cellTone(actual: number, target: number): string {
 }
 
 export default function ProgressDashboard({
-  setId, model, targets, elders, addable, canEdit, hasApprovedArt,
+  setId, model, targets, elders, addable, canEdit, hasApprovedArt, isPrivate, isDesigner,
 }: {
   setId: string; model: ProgressModel; targets: TargetCounts; elders: SetElder[];
-  addable: { userId: string; displayName: string | null }[]; canEdit: boolean; hasApprovedArt: boolean;
+  addable: { userId: string; displayName: string | null }[]; canEdit: boolean; hasApprovedArt: boolean; isPrivate: boolean; isDesigner: boolean;
 }) {
   const live = model.headline.actual;
   return (
@@ -120,6 +121,7 @@ export default function ProgressDashboard({
         </div>
       )}
 
+      {isDesigner && <SetPrivacyPanel setId={setId} isPrivate={isPrivate} />}
       {canEdit && <SetEldersPanel setId={setId} elders={elders} addable={addable} />}
     </div>
   );
