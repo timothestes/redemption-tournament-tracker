@@ -20,10 +20,10 @@ function cellTone(actual: number, target: number): string {
 }
 
 export default function ProgressDashboard({
-  setId, model, targets, elders, addable, canEdit, hasApprovedArt, isPrivate,
+  setId, model, targets, elders, addable, canEdit, hasApprovedArt, isPrivate, isDesigner,
 }: {
   setId: string; model: ProgressModel; targets: TargetCounts; elders: SetElder[];
-  addable: { userId: string; displayName: string | null }[]; canEdit: boolean; hasApprovedArt: boolean; isPrivate: boolean;
+  addable: { userId: string; displayName: string | null }[]; canEdit: boolean; hasApprovedArt: boolean; isPrivate: boolean; isDesigner: boolean;
 }) {
   const live = model.headline.actual;
   return (
@@ -121,7 +121,7 @@ export default function ProgressDashboard({
         </div>
       )}
 
-      {canEdit && <SetPrivacyPanel setId={setId} isPrivate={isPrivate} />}
+      {isDesigner && <SetPrivacyPanel setId={setId} isPrivate={isPrivate} />}
       {canEdit && <SetEldersPanel setId={setId} elders={elders} addable={addable} />}
     </div>
   );

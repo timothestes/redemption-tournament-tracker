@@ -22,6 +22,7 @@ export default async function SetProgressPage({ params }: { params: Promise<{ se
   const hasApprovedArt = (await listSetApprovedArt(setId)).length > 0;
 
   const elders = await listSetElders(setId);
+  const isDesigner = ctx.role === "superadmin" || elders.some((e) => e.userId === ctx.user.id);
   let addable: { userId: string; displayName: string | null }[] = [];
   if (canEdit) {
     const { data: members } = await ctx.supabase.from("playtest_members").select("user_id, display_name, role").in("role", ["elder", "superadmin"]);
@@ -45,7 +46,7 @@ export default async function SetProgressPage({ params }: { params: Promise<{ se
 
   return (
     <>
-      <ProgressDashboard setId={setId} model={model} targets={set.targetCounts} elders={elders} addable={addable} canEdit={canEdit} hasApprovedArt={hasApprovedArt} isPrivate={set.isPrivate} />
+      <ProgressDashboard setId={setId} model={model} targets={set.targetCounts} elders={elders} addable={addable} canEdit={canEdit} hasApprovedArt={hasApprovedArt} isPrivate={set.isPrivate} isDesigner={isDesigner} />
       {canEdit && <PlaytesterGrants setId={setId} grants={grants} grantable={grantablePlaytesters} />}
     </>
   );
