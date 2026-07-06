@@ -41,6 +41,16 @@ export function getTestamentForRef(ref: string): "NT" | "OT" | null {
   return null;
 }
 
+// Derived testament code ("NT" | "OT" | "NT/OT") → the game's "N.T." / "O.T."
+// display convention. Empty in → empty out.
+export function formatTestament(code: string): string {
+  return code
+    .split("/")
+    .filter(Boolean)
+    .map((c) => (c === "NT" ? "N.T." : c === "OT" ? "O.T." : c))
+    .join(" / ");
+}
+
 export function deriveTestamentAndGospel(reference: string): { testament: string; isGospel: boolean } {
   const references: string[] = [];
   for (let refGroup of reference.split(";")) {

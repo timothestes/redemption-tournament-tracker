@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { coerceFieldValue, FIELD_LABELS, DIFF_FIELDS } from "@/app/forge/lib/cardDiff";
+import { coerceFieldValue, FIELD_LABELS, SUGGESTABLE_FIELDS } from "@/app/forge/lib/cardDiff";
 import {
   addComment,
   resolveComment,
@@ -140,7 +140,7 @@ export default function CommentThread({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <select value={field} onChange={(e) => setField(e.target.value)} className="rounded-md border bg-background px-2 py-1">
             <option value="">No field</option>
-            {DIFF_FIELDS.map((f) => (
+            {SUGGESTABLE_FIELDS.map((f) => (
               <option key={f as string} value={f as string}>
                 {FIELD_LABELS[f as string]}
               </option>

@@ -13,6 +13,12 @@ describe("diffCards", () => {
     expect(diffCards({ reference: "1 Sam 17" }, {})[0]).toMatchObject({ field: "reference", kind: "removed", after: null });
   });
 
+  it("detects a changed rawText body (the primary content field)", () => {
+    const d = diffCards({ rawText: "Old ability text." }, { rawText: "New ability text." });
+    expect(d).toHaveLength(1);
+    expect(d[0]).toMatchObject({ field: "rawText", label: "Card text", kind: "changed" });
+  });
+
   it("compares array fields by joined display value", () => {
     const same = diffCards({ brigades: ["Blue", "Green"] }, { brigades: ["Blue", "Green"] });
     expect(same).toHaveLength(0);
@@ -31,7 +37,7 @@ describe("summarizeDiff", () => {
   it("summarizes none, few, and many changes", () => {
     expect(summarizeDiff([])).toBe("No field changes.");
     expect(summarizeDiff(diffCards({}, { name: "X" }))).toBe("Changed Name.");
-    const many = diffCards({}, { name: "a", reference: "b", rarity: "c", scripture: "d" });
+    const many = diffCards({}, { name: "a", reference: "b", alignment: "Good", scripture: "d" });
     expect(summarizeDiff(many)).toMatch(/\+1 more\.$/);
   });
 });

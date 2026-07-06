@@ -5,6 +5,7 @@ import {
   type DesignCard, type CardType, type Brigade,
 } from "@/app/forge/lib/designCard";
 import { BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
+import { deriveTestamentAndGospel, formatTestament } from "@/app/decklist/card-search/data/testament";
 
 // Light-colored brigades need dark text for legible chip labels.
 const LIGHT_BRIGADES = new Set<Brigade>(["White", "Silver", "GoodGold", "PaleGreen"]);
@@ -26,6 +27,11 @@ export default function CardDetailsFields({
   snapshot, update,
 }: { snapshot: DesignCard; update: (patch: Partial<DesignCard>) => void }) {
   const types = snapshot.cardType ?? [];
+  // Testament is never stored — it's derived from the reference. Mirror what the
+  // deckbuilder's N.T./O.T. filter will see so designers get instant feedback
+  // (and catch a mistyped reference that wouldn't classify).
+  const reference = (snapshot.reference ?? "").trim();
+  const { testament, isGospel } = deriveTestamentAndGospel(reference);
 
   return (
     <fieldset className="space-y-4 rounded-lg border bg-card p-4">
@@ -146,6 +152,19 @@ export default function CardDetailsFields({
           placeholder="e.g. Revelation 19:15"
           className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
         <span className="mt-1 block text-xs text-muted-foreground">The scripture reference printed on the card.</span>
+        {reference !== "" &&
+          (testament ? (
+            <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="rounded border px-1.5 py-0.5 font-medium text-muted-foreground">{formatTestament(testament)}</span>
+              {isGospel && (
+                <span className="rounded border px-1.5 py-0.5 font-medium text-muted-foreground">Gospel</span>
+              )}
+            </span>
+          ) : (
+            <span className="mt-1.5 block text-xs text-amber-700 dark:text-amber-300">
+              Couldn&rsquo;t determine testament from this reference.
+            </span>
+          ))}
       </label>
 
       {/* Scripture — the verse text printed on the card */}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import type { IconType } from "react-icons";
 import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey } from "react-icons/hi";
-import { GiCrossedSwords } from "react-icons/gi";
+import { GiCrossedSwords, GiAnvil } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
@@ -32,7 +32,7 @@ const TopNav: React.FC = () => {
   const [isTournamentsOpen, setIsTournamentsOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const { isAdmin, isSuperuser, permissions, loading: adminLoading } = useIsAdmin();
+  const { isAdmin, isSuperuser, permissions, isForgeMember, loading: adminLoading } = useIsAdmin();
   const pathname = usePathname();
 
   // Nav is "ready" when both auth and admin checks have resolved
@@ -223,8 +223,8 @@ const TopNav: React.FC = () => {
               );
             })}
 
-            {/* Admin Dropdown - Only for admins */}
-            {isAdmin && (
+            {/* Admin Dropdown - for app admins and/or Forge members */}
+            {(isAdmin || isForgeMember) && (
               <div className="relative">
                 <button
                   onClick={toggleAdmin}
@@ -308,6 +308,18 @@ const TopNav: React.FC = () => {
                           <HiKey className="w-4 h-4" />
                           Permissions
                         </Link>
+                      )}
+                      {isForgeMember && (
+                        <div className={isAdmin ? "border-t border-border mt-1 pt-1" : undefined}>
+                          <Link
+                            href="/forge"
+                            onClick={() => setIsAdminOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                          >
+                            <GiAnvil className="w-4 h-4" />
+                            The Forge
+                          </Link>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -620,8 +632,8 @@ const TopNav: React.FC = () => {
               );
             })}
 
-            {/* Admin Dropdown - Only for admins */}
-            {isAdmin && (
+            {/* Admin Dropdown - for app admins and/or Forge members */}
+            {(isAdmin || isForgeMember) && (
               <div className="pt-2">
                 <button
                   onClick={toggleAdmin}
@@ -702,6 +714,18 @@ const TopNav: React.FC = () => {
                         <HiKey className="w-4 h-4" />
                         Permissions
                       </Link>
+                    )}
+                    {isForgeMember && (
+                      <div className={isAdmin ? "border-t border-border mt-1 pt-1" : undefined}>
+                        <Link
+                          href="/forge"
+                          onClick={closeMobileMenu}
+                          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                        >
+                          <GiAnvil className="w-4 h-4" />
+                          The Forge
+                        </Link>
+                      </div>
                     )}
                   </div>
                 )}

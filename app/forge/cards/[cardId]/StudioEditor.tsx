@@ -107,12 +107,14 @@ export default function StudioEditor({
   const [proposing, setProposing] = useState(false);
   const [proposeSummary, setProposeSummary] = useState("");
   const [proposeBusy, setProposeBusy] = useState(false);
+  const [proposeErr, setProposeErr] = useState<string | null>(null);
   const submitProposal = async () => {
     if (!proposeSummary.trim()) return;
+    setProposeErr(null);
     setProposeBusy(true);
     const r = await createProposal(card.id, snapshot, proposeSummary);
     setProposeBusy(false);
-    if (r.ok === false) { alert(r.error); return; }
+    if (r.ok === false) { setProposeErr(r.error); return; }
     setProposing(false);
     setProposeSummary("");
     router.refresh();
@@ -148,13 +150,16 @@ export default function StudioEditor({
         <LifecycleControls card={card} sets={sets} />
         {card.setId &&
           (proposing ? (
-            <div className="flex items-center gap-1 text-xs">
-              <input autoFocus value={proposeSummary} onChange={(e) => setProposeSummary(e.target.value)}
-                placeholder="Summarize your proposed change…" className="flex-1 rounded-md border bg-background px-2 py-1" />
-              <Button size="sm" className="h-7 px-3 text-xs" disabled={proposeBusy || !proposeSummary.trim()} onClick={submitProposal}>
-                Submit proposal
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setProposing(false)}>Cancel</Button>
+            <div className="flex flex-col gap-1 text-xs">
+              <div className="flex items-start gap-1">
+                <textarea autoFocus value={proposeSummary} onChange={(e) => setProposeSummary(e.target.value)}
+                  placeholder="Summarize your proposed change…" className="h-16 flex-1 rounded-md border bg-background px-2 py-1" />
+                <Button size="sm" className="h-7 px-3 text-xs" disabled={proposeBusy || !proposeSummary.trim()} onClick={submitProposal}>
+                  Submit proposal
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setProposing(false); setProposeErr(null); }}>Cancel</Button>
+              </div>
+              {proposeErr && <p className="text-destructive">{proposeErr}</p>}
             </div>
           ) : (
             <Button size="sm" variant="outline" className="h-7 self-start px-3 text-xs" onClick={() => setProposing(true)}>

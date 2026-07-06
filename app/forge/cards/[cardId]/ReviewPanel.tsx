@@ -2,6 +2,7 @@
 
 import ProposalDiff from "./ProposalDiff";
 import CommentThread from "./CommentThread";
+import { timeAgo } from "@/app/forge/lib/relativeTime";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
 import type { ProposalDiffData, ProposalRow } from "@/app/forge/lib/proposals";
 import type { CommentRow } from "@/app/forge/lib/comments";
@@ -26,8 +27,13 @@ export default function ReviewPanel({
   comments: CommentRow[];
   canReview: boolean;
 }) {
-  const artUrl = card.hasArt ? `/forge/api/art/${card.id}` : null;
+  // Cache-buster: updated_at bumps on every image/snapshot write, mirroring the studio.
+  const t = Date.parse(card.updatedAt) || 0;
+  const artUrl = card.hasArt ? `/forge/api/art/${card.id}?t=${t}` : null;
+  const finishedUrl = card.hasFinished ? `/forge/api/art/${card.id}?kind=finished&t=${t}` : null;
   const history = proposals.filter((p) => p.status !== "open");
+  // Accept notes + deny reasons are stored as proposal-anchored comments.
+  const reasonsFor = (proposalId: string) => comments.filter((c) => c.proposalId === proposalId);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 pt-0">
@@ -43,6 +49,7 @@ export default function ReviewPanel({
                 proposal={d.proposal}
                 current={d.current}
                 artUrl={artUrl}
+                finishedUrl={finishedUrl}
                 canReview={canReview}
               />
             ))}
@@ -54,12 +61,26 @@ export default function ReviewPanel({
         <section>
           <h2 className="mb-2 text-sm font-semibold">Proposal history</h2>
           <ul className="space-y-1 text-xs">
-            {history.map((p) => (
-              <li key={p.id} className="flex items-center justify-between rounded-md border px-2 py-1">
-                <span>{p.summary ?? "Proposed change"}</span>
-                <span className="text-muted-foreground">{STATUS_LABEL[p.status] ?? p.status}</span>
-              </li>
-            ))}
+            {history.map((p) => {
+              const reasons = reasonsFor(p.id);
+              return (
+                <li key={p.id} className="rounded-md border px-2 py-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{p.summary ?? "Proposed change"}</span>
+                    <span className="text-muted-foreground">{STATUS_LABEL[p.status] ?? p.status}</span>
+                  </div>
+                  {reasons.map((r) => (
+                    <p key={r.id} className={`mt-1 whitespace-pre-wrap ${p.status === "denied" ? "text-destructive" : "text-muted-foreground"}`}>
+                      <span className="font-medium text-foreground">{r.authorName ?? "Forge member"}</span>
+                      {" · "}
+                      {timeAgo(r.createdAt)}
+                      {" — "}
+                      {r.body}
+                    </p>
+                  ))}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

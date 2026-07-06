@@ -18,7 +18,7 @@ const SET_STATUSES = ["draft", "playtesting", "approved", "archived"] as const;
 const BULK_ACTIONS: LifecycleAction[] = ["release", "markFinal", "shelve", "restore", "returnToIdeas", "delete"];
 const selectClass = "rounded-md border bg-background px-2 py-1.5 text-sm";
 
-export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts }: { cards: ForgeCardFull[]; setId: string; canCreate: boolean; commentCounts?: Record<string, number> }) {
+export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts, proposalCounts }: { cards: ForgeCardFull[]; setId: string; canCreate: boolean; commentCounts?: Record<string, number>; proposalCounts?: Record<string, number> }) {
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
@@ -173,6 +173,7 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
         cards={filtered}
         showStatus
         commentCounts={commentCounts}
+        proposalCounts={proposalCounts}
         selection={{ active: selecting, selected, onToggle: toggle }}
         leading={canCreate ? <AddCardTile setId={setId} disabled={selecting} /> : undefined}
       />
