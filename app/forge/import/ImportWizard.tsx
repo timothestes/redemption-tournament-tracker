@@ -87,6 +87,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
   const [filter, setFilter] = useState("");
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [newSetName, setNewSetName] = useState("");
+  const [newSetPrivate, setNewSetPrivate] = useState(false);
   const [existingSetId, setExistingSetId] = useState(sets[0]?.id ?? "");
   const [overwrite, setOverwrite] = useState(false);
   const [newSetDialogOpen, setNewSetDialogOpen] = useState(false);
@@ -244,7 +245,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
       if (mode === "new") {
         const name = newSetName.trim();
         if (!name) { setRunError("Name the new set first."); return; }
-        const r = await createSet(name);
+        const r = await createSet(name, newSetPrivate);
         if (r.ok === false) { setRunError(r.error); return; }
         setId = r.id;
       }
@@ -411,12 +412,21 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
           <DialogHeader>
             <DialogTitle>New set for this import</DialogTitle>
           </DialogHeader>
-          <DialogBody>
+          <DialogBody className="space-y-3">
             <label className="block text-sm">
               <span className="mb-1 block font-medium">Set name</span>
               <input value={newSetName} onChange={(e) => setNewSetName(e.target.value)}
                 aria-label="New set name" placeholder="Set name"
                 className="w-full rounded-md border bg-background px-2 py-1 text-sm" />
+            </label>
+            <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm">
+              <Checkbox checked={newSetPrivate} onCheckedChange={(v) => setNewSetPrivate(v === true)} className="mt-0.5" />
+              <span>
+                <span className="font-medium">Private set</span>
+                <span className="block text-xs text-muted-foreground">
+                  Only you and designers you add can see it. Hidden from other elders.
+                </span>
+              </span>
             </label>
           </DialogBody>
           <DialogFooter className="justify-end">

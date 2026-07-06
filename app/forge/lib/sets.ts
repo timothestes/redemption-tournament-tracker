@@ -6,16 +6,16 @@ import type { TargetCounts } from "@/app/forge/lib/progress";
 import { type ForgeCardFull } from "@/app/forge/lib/cards";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 
-export type ForgeSetSummary = { id: string; name: string; slug: string; status: string; total: number; targetTotal: number; statusCounts: Record<string, number> };
-export type ForgeSetDetail = { id: string; name: string; slug: string; notes: string | null; targetCounts: TargetCounts; status: string };
+export type ForgeSetSummary = { id: string; name: string; slug: string; status: string; total: number; targetTotal: number; statusCounts: Record<string, number>; isPrivate: boolean };
+export type ForgeSetDetail = { id: string; name: string; slug: string; notes: string | null; targetCounts: TargetCounts; status: string; isPrivate: boolean };
 export type SetElder = { userId: string; displayName: string | null; role: string };
 
 type Result = { ok: true } | { ok: false; error: string };
 
-export async function createSet(name: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+export async function createSet(name: string, isPrivate = false): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const ctx = await requireElder();
   if (!ctx) return { ok: false, error: "Not authorized" };
-  const { data, error } = await ctx.supabase.rpc("forge_create_set", { p_name: name });
+  const { data, error } = await ctx.supabase.rpc("forge_create_set", { p_name: name, p_is_private: isPrivate });
   if (error || typeof data !== "string") return { ok: false, error: "Could not create set" };
   revalidatePath("/forge/sets");
   return { ok: true, id: data };
@@ -27,7 +27,7 @@ export async function listSets(): Promise<ForgeSetSummary[]> {
   // RLS restricts to sets the caller may see.
   const { data: sets } = await ctx.supabase
     .from("forge_sets")
-    .select("id, name, slug, status, target_counts")
+    .select("id, name, slug, status, target_counts, is_private")
     .order("created_at", { ascending: false });
   const { data: cards } = await ctx.supabase.from("forge_cards").select("set_id, status");
   const counts = new Map<string, number>();
@@ -44,6 +44,7 @@ export async function listSets(): Promise<ForgeSetSummary[]> {
     total: counts.get(s.id) ?? 0,
     targetTotal: (s.target_counts?.total as number) ?? 0,
     statusCounts: statusCounts.get(s.id) ?? {},
+    isPrivate: !!s.is_private,
   }));
 }
 
@@ -62,11 +63,11 @@ export async function getSet(setId: string): Promise<ForgeSetDetail | null> {
   if (!ctx) return null;
   const { data } = await ctx.supabase
     .from("forge_sets")
-    .select("id, name, slug, notes, target_counts, status")
+    .select("id, name, slug, notes, target_counts, status, is_private")
     .eq("id", setId)
     .maybeSingle();
   if (!data) return null;
-  return { id: data.id, name: data.name, slug: data.slug, notes: data.notes ?? null, targetCounts: (data.target_counts ?? {}) as TargetCounts, status: data.status };
+  return { id: data.id, name: data.name, slug: data.slug, notes: data.notes ?? null, targetCounts: (data.target_counts ?? {}) as TargetCounts, status: data.status, isPrivate: !!data.is_private };
 }
 
 export async function renameSet(setId: string, name: string): Promise<Result> {
@@ -160,6 +161,16 @@ export async function revokeSet(setId: string, userId: string): Promise<Result> 
   const { error } = await ctx.supabase.rpc("forge_revoke_set", { p_set_id: setId, p_user_id: userId });
   if (error) return { ok: false, error: "Could not revoke access" };
   revalidatePath(`/forge/sets/${setId}/progress`);
+  return { ok: true };
+}
+
+export async function setSetPrivacy(setId: string, isPrivate: boolean): Promise<Result> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const { error } = await ctx.supabase.rpc("forge_set_privacy", { p_set_id: setId, p_is_private: isPrivate });
+  if (error) return { ok: false, error: "Could not change set privacy" };
+  revalidatePath(`/forge/sets/${setId}/progress`);
+  revalidatePath("/forge/sets");
   return { ok: true };
 }
 

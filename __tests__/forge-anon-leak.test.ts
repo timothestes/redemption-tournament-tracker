@@ -76,6 +76,7 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_unarchive_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_delete_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_delete_set", { p_set_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_set_privacy", { p_set_id: "00000000-0000-0000-0000-000000000000", p_is_private: true }],
     ["_forge_can_read_card", { p_card_id: "00000000-0000-0000-0000-000000000000" }],
     ["_forge_is_card_field", { p_field: "name" }],
     ["_forge_can_read_topic", { p_topic: "forge:card:00000000-0000-0000-0000-000000000000" }],
