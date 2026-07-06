@@ -45,7 +45,7 @@ export default async function SetProgressPage({ params }: { params: Promise<{ se
 
   return (
     <>
-      <ProgressDashboard setId={setId} model={model} targets={set.targetCounts} elders={elders} addable={addable} canEdit={canEdit} hasApprovedArt={hasApprovedArt} />
+      <ProgressDashboard setId={setId} model={model} targets={set.targetCounts} elders={elders} addable={addable} canEdit={canEdit} hasApprovedArt={hasApprovedArt} isPrivate={set.isPrivate} />
       {canEdit && <PlaytesterGrants setId={setId} grants={grants} grantable={grantablePlaytesters} />}
     </>
   );
