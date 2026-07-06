@@ -1,0 +1,8 @@
+# Code owners for redemption-tournament-tracker
+#
+# When "Require review from Code Owners" is enabled on the branch ruleset,
+# every PR touching these paths must be approved by an owner listed here
+# before it can be merged. This makes the repo owner's approval mandatory.
+
+# Everything is owned by the repo owner.
+* @timothestes
