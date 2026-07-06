@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, GitPullRequest } from "lucide-react";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import { cardRawText } from "@/app/forge/lib/designCard";
 import { STATUS_LABEL, STATUS_BADGE_CLASS } from "@/app/forge/lib/lifecycleCopy";
@@ -13,13 +13,14 @@ export type GridSelection = {
 };
 
 export default function ForgeCardGrid({
-  cards, showStatus = false, selection, leading, commentCounts,
+  cards, showStatus = false, selection, leading, commentCounts, proposalCounts,
 }: {
   cards: ForgeCardFull[];
   showStatus?: boolean;
   selection?: GridSelection;
   leading?: ReactNode;
   commentCounts?: Record<string, number>;
+  proposalCounts?: Record<string, number>;
 }) {
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -30,6 +31,7 @@ export default function ForgeCardGrid({
         // at a glance. Title + dashed status badge stay legible.
         const shelved = c.status === "archived";
         const count = commentCounts?.[c.id] ?? 0;
+        const propCount = proposalCounts?.[c.id] ?? 0;
         const inner = (
           <>
             <div className="relative">
@@ -47,6 +49,15 @@ export default function ForgeCardGrid({
                 >
                   <MessageSquare className="h-3 w-3" />
                   {count}
+                </span>
+              )}
+              {propCount > 0 && (
+                <span
+                  className="absolute bottom-1 right-1 z-10 flex items-center gap-0.5 rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 shadow-sm backdrop-blur-sm dark:text-amber-400"
+                  title={`${propCount} open proposal${propCount === 1 ? "" : "s"}`}
+                >
+                  <GitPullRequest className="h-3 w-3" />
+                  {propCount}
                 </span>
               )}
             </div>

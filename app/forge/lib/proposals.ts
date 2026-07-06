@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
+import { diffCards } from "@/app/forge/lib/cardDiff";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 
 export type ProposalStatus = "open" | "accepted" | "denied" | "superseded";
@@ -45,6 +46,28 @@ export async function createProposal(
   const ctx = await requireForge();
   if (!ctx) return { ok: false, error: "Not authorized" };
   if (!summary.trim()) return { ok: false, error: "A summary is required" };
+
+  // No-op guard: a proposal must differ from the last published version. The client
+  // never loads the base version, so this is the authoritative check. Never-published
+  // cards (base = {}) still allow a first real proposal.
+  const { data: card } = await ctx.supabase
+    .from("forge_cards")
+    .select("published_version_id")
+    .eq("id", cardId)
+    .maybeSingle();
+  let base: DesignCard = {};
+  if (card?.published_version_id) {
+    const { data: ver } = await ctx.supabase
+      .from("card_versions")
+      .select("data")
+      .eq("id", card.published_version_id)
+      .maybeSingle();
+    base = (ver?.data ?? {}) as DesignCard;
+  }
+  if (diffCards(base, snapshot).length === 0) {
+    return { ok: false, error: "No changes to propose since the last published version." };
+  }
+
   const { data, error } = await ctx.supabase.rpc("forge_create_proposal", {
     p_card_id: cardId,
     p_snapshot: snapshot,
@@ -56,8 +79,7 @@ export async function createProposal(
 }
 
 export async function acceptProposal(
-  proposalId: string,
-  cardId: string
+  proposalId: string
 ): Promise<{ ok: boolean; error?: string }> {
   const ctx = await requireElder();
   if (!ctx) return { ok: false, error: "Not authorized" };
@@ -124,4 +146,25 @@ export async function getOpenProposalDiffs(cardId: string): Promise<ProposalDiff
     proposal: p,
     current: p.baseVersionId ? baseMap.get(p.baseVersionId) ?? {} : {},
   }));
+}
+
+// Per-card count of open proposals for a set of card ids — drives the grid badge.
+// Mirrors listUnresolvedCommentCounts; runs under the caller's RLS, only counts
+// cross to the client.
+export async function listOpenProposalCounts(
+  cardIds: string[]
+): Promise<Record<string, number>> {
+  const ctx = await requireForge();
+  if (!ctx || cardIds.length === 0) return {};
+  const { data } = await ctx.supabase
+    .from("card_proposals")
+    .select("card_id")
+    .in("card_id", cardIds)
+    .eq("status", "open");
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const id = (row as any).card_id as string;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return counts;
 }

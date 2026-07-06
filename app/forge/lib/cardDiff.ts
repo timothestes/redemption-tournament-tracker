@@ -12,16 +12,33 @@ export type FieldChange = {
   after: string | null;
 };
 
-// Display order + friendly labels for the diffable DesignCard fields.
+// Friendly labels for every field the diff OR a field-anchored suggestion may
+// reference. Consumed by the diff renderer and the suggestion picker/labels.
 export const FIELD_LABELS: Record<string, string> = {
-  name: "Name", cardType: "Type", alignment: "Alignment", brigades: "Brigade",
-  strength: "Strength", toughness: "Toughness", class: "Class", icons: "Icons",
-  identifiers: "Identifiers", specialAbility: "Special ability", reference: "Reference",
-  legality: "Legality", rarity: "Rarity", scripture: "Scripture",
+  name: "Name", rawText: "Card text", cardType: "Type", alignment: "Alignment",
+  brigades: "Brigade", strength: "Strength", toughness: "Toughness", class: "Class",
+  icons: "Icons", identifiers: "Identifiers", specialAbility: "Special ability",
+  reference: "Reference", legality: "Legality", rarity: "Rarity", scripture: "Scripture",
   artistCredit: "Artist", cardFrame: "Card frame",
 };
 
-export const DIFF_FIELDS = Object.keys(FIELD_LABELS) as (keyof DesignCard)[];
+// The real editing surface (StudioEditor name + rawText, CardDetailsFields for the
+// rest). Drives the Current vs Proposed diff. `rawText` is the primary body; the
+// old no-editor fields (specialAbility/legality/rarity/artistCredit/cardFrame) are
+// intentionally excluded so a body edit no longer reads "No field changes".
+export const DIFF_FIELDS: (keyof DesignCard)[] = [
+  "name", "rawText", "cardType", "alignment", "brigades", "strength", "toughness",
+  "class", "icons", "identifiers", "reference", "scripture",
+];
+
+// Fields a comment may anchor a suggestion to. Must mirror the SQL allowlist
+// `_forge_is_card_field` (migration 067) or the RPC rejects the suggestion — so it
+// excludes `rawText` (not yet in the allowlist) and keeps the legacy keys.
+export const SUGGESTABLE_FIELDS: (keyof DesignCard)[] = [
+  "name", "cardType", "alignment", "brigades", "strength", "toughness", "class",
+  "icons", "identifiers", "specialAbility", "reference", "legality", "rarity",
+  "scripture", "artistCredit", "cardFrame",
+];
 
 const ARRAY_FIELDS = new Set(["cardType", "brigades", "class", "icons", "identifiers"]);
 const NUMBER_FIELDS = new Set(["strength", "toughness"]);
