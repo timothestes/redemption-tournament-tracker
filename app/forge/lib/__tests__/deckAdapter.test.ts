@@ -43,6 +43,26 @@ describe("designCardToCard", () => {
     expect(designCardToCard(banned, "id4", "S").legality).toBe("Banned");
   });
 
+  it("derives testament/isGospel from the scripture reference (not hardcoded empty)", () => {
+    // Regression: an EoT Lost Soul with a New-Testament reference must come out
+    // as N.T. so it matches the deckbuilder's testament filter. Before the fix
+    // the adapter hardcoded testament: "" and the card never showed under N.T.
+    const nt: DesignCard = { name: 'Lost Soul "Forsaken"', cardType: ["LostSoul"], reference: "Hebrews 10:25" };
+    expect(designCardToCard(nt, "ls1", "EoT").testament).toBe("NT");
+
+    const ot: DesignCard = { name: "Aimless", cardType: ["LostSoul"], reference: "Exodus 14:3" };
+    expect(designCardToCard(ot, "ls2", "EoT").testament).toBe("OT");
+
+    // A Gospel reference sets isGospel.
+    const gospel: DesignCard = { name: "Parable", cardType: ["GE"], reference: "Matthew 13:3" };
+    const g = designCardToCard(gospel, "g1", "S");
+    expect(g.testament).toBe("NT");
+    expect(g.isGospel).toBe(true);
+
+    // No reference → empty testament (unchanged behavior).
+    expect(designCardToCard({ name: "Z", cardType: ["Hero"] }, "z1", "S").testament).toBe("");
+  });
+
   it("dataLine helpers round-trip", () => {
     const dl = forgeDataLine("uuid-9");
     expect(isForgeDataLine(dl)).toBe(true);

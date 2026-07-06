@@ -4,6 +4,7 @@
 // index) so forge and public cards group/validate identically, and stamps a
 // collision-proof `forge:{cardId}` dataLine identity.
 import type { Card } from "@/app/decklist/card-search/utils";
+import { deriveTestamentAndGospel } from "@/app/decklist/card-search/data/testament";
 import type { DesignCard, CardType, Brigade } from "@/app/forge/lib/designCard";
 
 export const FORGE_DATALINE_PREFIX = "forge:";
@@ -35,6 +36,10 @@ function alignmentDisplay(a?: string): string {
 export function designCardToCard(data: DesignCard, cardId: string, setName: string): Card {
   const types = data.cardType ?? [];
   const brigades = data.brigades ?? [];
+  // Testament/gospel aren't stored on the DesignCard — derive them from the
+  // scripture reference the same way the public card index does, so forge Lost
+  // Souls (and every other card) match the deckbuilder's N.T./O.T. filters.
+  const { testament, isGospel } = deriveTestamentAndGospel(data.reference ?? "");
   return {
     dataLine: forgeDataLine(cardId),
     name: data.name ?? "Untitled",
@@ -55,7 +60,7 @@ export function designCardToCard(data: DesignCard, cardId: string, setName: stri
     // legality to "Rotation". That makes shared cards visible under the deckbuilder's default
     // legality filter; a designer can still explicitly pick another legality in the card editor.
     legality: data.legality ?? "Rotation",
-    testament: "",
-    isGospel: false,
+    testament,
+    isGospel,
   };
 }
