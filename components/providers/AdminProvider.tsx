@@ -8,6 +8,9 @@ interface AdminState {
   isAdmin: boolean;
   isSuperuser: boolean;
   permissions: string[];
+  // Forge membership is independent of app-admin status (separate
+  // playtest_members table). True when the caller has any Forge role.
+  isForgeMember: boolean;
   loading: boolean;
 }
 
@@ -18,6 +21,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     isAdmin: false,
     isSuperuser: false,
     permissions: [],
+    isForgeMember: false,
     loading: true,
   });
   const supabase = useRef(createClient()).current;
@@ -28,14 +32,22 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         const user = await getUserSafe(supabase);
 
         if (!user) {
-          setState({ isAdmin: false, isSuperuser: false, permissions: [], loading: false });
+          setState({ isAdmin: false, isSuperuser: false, permissions: [], isForgeMember: false, loading: false });
           return;
         }
 
-        const { data: isAdminData, error: adminError } = await supabase.rpc("check_admin_role");
+        // Forge membership is checked regardless of app-admin status, since a
+        // Forge member (e.g. a playtester) need not be an app admin. Run it
+        // alongside the admin check so it adds no extra round-trip.
+        const [{ data: forgeRole }, { data: isAdminData, error: adminError }] = await Promise.all([
+          supabase.rpc("my_forge_role"),
+          supabase.rpc("check_admin_role"),
+        ]);
+        const isForgeMember =
+          forgeRole === "superadmin" || forgeRole === "elder" || forgeRole === "playtester";
 
         if (adminError || !isAdminData) {
-          setState({ isAdmin: false, isSuperuser: false, permissions: [], loading: false });
+          setState({ isAdmin: false, isSuperuser: false, permissions: [], isForgeMember, loading: false });
           return;
         }
 
@@ -48,10 +60,11 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
           isAdmin: true,
           isSuperuser: superData === true,
           permissions: permsError ? [] : (permsData || []),
+          isForgeMember,
           loading: false,
         });
       } catch {
-        setState({ isAdmin: false, isSuperuser: false, permissions: [], loading: false });
+        setState({ isAdmin: false, isSuperuser: false, permissions: [], isForgeMember: false, loading: false });
       }
     };
 
@@ -76,7 +89,7 @@ export function useAdminContext(): AdminState {
   if (!ctx) {
     // Rendered outside AdminProvider — treat as non-admin but not loading so
     // UI doesn't hang. This shouldn't happen in normal app flow.
-    return { isAdmin: false, isSuperuser: false, permissions: [], loading: false };
+    return { isAdmin: false, isSuperuser: false, permissions: [], isForgeMember: false, loading: false };
   }
   return ctx;
 }
