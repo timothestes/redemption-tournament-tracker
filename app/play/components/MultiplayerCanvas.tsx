@@ -1003,6 +1003,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [opponentLookState, setOpponentLookState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
   const [opponentRevealDismissed, setOpponentRevealDismissed] = useState(false);
   const [opponentRevealSnapshot, setOpponentRevealSnapshot] = useState<string[]>([]);
+  // Spectator-only: the seat-0 player's public reveal. Seated players see their
+  // own reveal via the interactive peekState modal, so this mirror renders only
+  // for spectators (gated at render time), giving them both seats' reveals.
+  const [myRevealDismissed, setMyRevealDismissed] = useState(false);
+  const [myRevealSnapshot, setMyRevealSnapshot] = useState<string[]>([]);
   const [handMenu, setHandMenu] = useState<{ x: number; y: number } | null>(null);
   const [opponentHandMenu, setOpponentHandMenu] = useState<{ x: number; y: number } | null>(null);
   const [reserveMenu, setReserveMenu] = useState<{ x: number; y: number } | null>(null);
@@ -2761,6 +2766,68 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       setOpponentRevealDismissed(true);
     }
   }, [opponentRevealedCardIds]);
+
+  // Seat-0 player's revealed cards — same public source (player.revealedCards),
+  // only rendered for spectators (see myRevealSnapshot render below). A seated
+  // player's own reveal shows via the interactive peekState modal instead.
+  const myRevealedCardIds = useMemo(() => {
+    const raw = gameState.myPlayer?.revealedCards;
+    if (!raw) return [];
+    try { return JSON.parse(raw) as string[]; } catch { return []; }
+  }, [gameState.myPlayer?.revealedCards]);
+
+  useEffect(() => {
+    if (myRevealedCardIds.length > 0) {
+      setMyRevealSnapshot(myRevealedCardIds);
+      setMyRevealDismissed(false);
+    } else if (myRevealSnapshot.length > 0) {
+      setMyRevealSnapshot([]);
+      setMyRevealDismissed(true);
+    }
+  }, [myRevealedCardIds]);
+
+  // Shared renderer for a read-only "public reveal" modal (Ancient of Days etc.).
+  // The revealed IDs can live in different zones depending on the source:
+  //   - shared soul-deck (Paragon reveal) → soulDeckModalGameValue
+  //   - the seat-0 player's own deck → modalGameValue (maps myCards)
+  //   - otherwise the seat-1 player's deck → opponentModalGameValue
+  // Keying off the zone (not the revealer) lets the same renderer serve a reveal
+  // from either seat, which is what makes the spectator's seat-0 view work.
+  const renderPublicRevealModal = (
+    snapshot: string[],
+    liveIds: string[],
+    displayName: string,
+    onDismiss: () => void,
+  ) => {
+    const sharedSoulIds = new Set(
+      (sharedCards['soul-deck'] ?? []).map((c) => String(c.id)),
+    );
+    const seat0Ids = new Set(
+      Object.values(myCards).flat().map((c) => String(c.id)),
+    );
+    const isSoulDeckReveal = snapshot.some((id) => sharedSoulIds.has(id));
+    const isSeat0DeckReveal = !isSoulDeckReveal && snapshot.some((id) => seat0Ids.has(id));
+    const provider = isSoulDeckReveal
+      ? soulDeckModalGameValue
+      : isSeat0DeckReveal
+        ? modalGameValue
+        : opponentModalGameValue;
+    const sourceZone: ZoneId = isSoulDeckReveal ? 'soul-deck' : 'deck';
+    return (
+      <ModalGameProvider value={provider}>
+        <DeckPeekModal
+          cardIds={snapshot}
+          title={`${displayName} Revealed ${snapshot.length}`}
+          onClose={liveIds.length > 0 ? undefined : onDismiss}
+          onStartDrag={modalStartDrag}
+          onStartMultiDrag={modalStartMultiDrag}
+          didDragRef={modalDidDragRef}
+          isDragActive={modalDrag.isDragging}
+          sourceZone={sourceZone}
+        />
+      </ModalGameProvider>
+    );
+  };
 
   // Snapshot stored on opponentPeekState — see sampleOpponentDeckCardIds.
   // Reading from the live opponent deck would refill the "top N" as cards
@@ -7106,42 +7173,27 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         )}
       </ModalGameProvider>
 
-      {/* Opponent's server-revealed cards — shown from snapshot so it persists even after revealer closes their reveal */}
-      {opponentRevealSnapshot.length > 0 && !opponentRevealDismissed && (() => {
-        // The revealed IDs can live in different zones depending on the source:
-        //   - shared soul-deck (Paragon reveal) → soulDeckModalGameValue
-        //   - the revealer's own deck (their standard reveal) → opponentModalGameValue
-        //   - MY deck (revealer used "reveal opponent's deck" e.g. Ends of the Earth)
-        //     → modalGameValue so the card lookup actually finds the cards.
-        const sharedSoulIds = new Set(
-          (sharedCards['soul-deck'] ?? []).map((c) => String(c.id)),
-        );
-        const myIds = new Set(
-          Object.values(myCards).flat().map((c) => String(c.id)),
-        );
-        const isSoulDeckReveal = opponentRevealSnapshot.some((id) => sharedSoulIds.has(id));
-        const isMyDeckReveal = !isSoulDeckReveal && opponentRevealSnapshot.some((id) => myIds.has(id));
-        const provider = isSoulDeckReveal
-          ? soulDeckModalGameValue
-          : isMyDeckReveal
-            ? modalGameValue
-            : opponentModalGameValue;
-        const sourceZone: ZoneId = isSoulDeckReveal ? 'soul-deck' : 'deck';
-        return (
-          <ModalGameProvider value={provider}>
-            <DeckPeekModal
-              cardIds={opponentRevealSnapshot}
-              title={`${gameState.opponentPlayer?.displayName ?? 'Opponent'} Revealed ${opponentRevealSnapshot.length}`}
-              onClose={opponentRevealedCardIds.length > 0 ? undefined : () => setOpponentRevealDismissed(true)}
-              onStartDrag={modalStartDrag}
-              onStartMultiDrag={modalStartMultiDrag}
-              didDragRef={modalDidDragRef}
-              isDragActive={modalDrag.isDragging}
-              sourceZone={sourceZone}
-            />
-          </ModalGameProvider>
-        );
-      })()}
+      {/* Seat-1 player's server-revealed cards — shown from snapshot so it persists
+          even after the revealer closes their reveal. Seated players see this as
+          "the opponent's reveal"; spectators see it as the seat-1 reveal. */}
+      {opponentRevealSnapshot.length > 0 && !opponentRevealDismissed &&
+        renderPublicRevealModal(
+          opponentRevealSnapshot,
+          opponentRevealedCardIds,
+          gameState.opponentPlayer?.displayName ?? 'Opponent',
+          () => setOpponentRevealDismissed(true),
+        )}
+
+      {/* Spectator-only: seat-0 player's server-revealed cards. Seated players
+          already see their own reveal via the interactive peekState modal, so
+          this mirror renders only for spectators — giving them both seats' reveals. */}
+      {isSpectator && myRevealSnapshot.length > 0 && !myRevealDismissed &&
+        renderPublicRevealModal(
+          myRevealSnapshot,
+          myRevealedCardIds,
+          gameState.myPlayer?.displayName ?? 'Player',
+          () => setMyRevealDismissed(true),
+        )}
 
       {/* Floating drag ghost (modal → canvas drag) */}
       {modalDrag.isDragging && modalDrag.imageUrl && (
