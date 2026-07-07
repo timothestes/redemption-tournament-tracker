@@ -7223,7 +7223,15 @@
 
   function syncAllPlayerProfileButtons() {
     for (var spi = 1; spi <= 10; spi++) {
+      // refreshRankCard() always rebuilds the card from scratch, recreating
+      // the delta badge fresh as "empty" -- without this paired call, any
+      // correctly-computed delta already on screen (e.g. from applyDraft's
+      // own restore) gets silently wiped back to blank whenever this runs,
+      // which happens on every page load once loadPlayerProfiles()'s fetch
+      // resolves, racing (and on a real network, often losing) against that
+      // earlier render.
       refreshRankCard(spi);
+      updateRankDeltaGeneric('rank', spi, window.previousRankings);
       var spInp = document.getElementById('rank-' + spi);
       var spBtn = document.getElementById('rank-profile-btn-' + spi);
       if (spInp && spBtn) syncPlayerProfileBtn(spInp.value, spBtn);
