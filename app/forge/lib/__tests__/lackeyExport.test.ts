@@ -75,6 +75,23 @@ describe("designCardToLackeyRow → serialize → parseCarddata round-trip", () 
     expect(back.strength).toBeUndefined();
     expect(back.toughness).toBeUndefined();
   });
+
+  it('round-trips variable "X" stats', () => {
+    const back = roundTrip({
+      cardType: ["Hero"], brigades: ["Green"], strength: "X", toughness: "X",
+    }, "The Faithful Followers");
+    expect(back.strength).toBe("X");
+    expect(back.toughness).toBe("X");
+  });
+
+  it('round-trips paired dual-side stats ("6 (0)")', () => {
+    const back = roundTrip({
+      cardType: ["GE", "EE"], strength: "6 (0)", toughness: "0 (6)", alignment: "Good_Evil",
+    }, "Spiritual Warfare");
+    expect(back.cardType).toEqual(["GE", "EE"]);
+    expect(back.strength).toBe("6 (0)");
+    expect(back.toughness).toBe("0 (6)");
+  });
 });
 
 describe("tsv safety", () => {

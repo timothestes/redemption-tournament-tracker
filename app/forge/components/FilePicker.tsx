@@ -25,6 +25,7 @@ export default function FilePicker({
         ref={inputRef}
         type="file"
         accept={accept}
+        aria-label={label}
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];

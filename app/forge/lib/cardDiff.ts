@@ -2,7 +2,7 @@
 // one-line plain-language summary, plus a value coercer for suggestions. No DB,
 // no UI. Drives the Current vs Proposed review diff.
 
-import type { DesignCard } from "@/app/forge/lib/designCard";
+import { parseStatInput, type DesignCard } from "@/app/forge/lib/designCard";
 
 export type FieldChange = {
   field: keyof DesignCard;
@@ -71,7 +71,7 @@ export function summarizeDiff(changes: FieldChange[]): string {
 // Best-effort coercion of a free-text suggestion value into the field's jsonb shape.
 export function coerceFieldValue(field: string, text: string): unknown {
   const t = text.trim();
-  if (NUMBER_FIELDS.has(field)) { const n = Number(t); return Number.isFinite(n) ? n : null; }
+  if (NUMBER_FIELDS.has(field)) return parseStatInput(t); // number, "X", or "6 (0)"
   if (ARRAY_FIELDS.has(field)) return t ? t.split(",").map((s) => s.trim()).filter(Boolean) : [];
   return t;
 }

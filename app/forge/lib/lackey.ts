@@ -1,7 +1,7 @@
 // Pure LackeyCCG plugin-format helpers for the Forge set importer.
 // CLIENT-SAFE: no server-only imports. Column conventions mirror scripts/parse-carddata.js.
 
-import { cardRawText, type Brigade, type CardType, type DesignCard } from "./designCard";
+import { cardRawText, parseStatInput, type Brigade, type CardType, type DesignCard } from "./designCard";
 
 export interface LackeyRow {
   name: string; set: string; imageFile: string; officialSet: string;
@@ -94,10 +94,14 @@ export function findImageEntry(row: LackeyRow, entryNames: string[]): string | n
   return null;
 }
 
-const TYPE_MAP: Record<string, CardType> = {
+// One token may map to multiple design types: a Dual-Alignment Enhancement IS
+// both a good and an evil enhancement (the kit has no separate dual frame).
+const TYPE_MAP: Record<string, CardType | CardType[]> = {
   "hero": "Hero", "evil character": "EvilCharacter",
   "ge": "GE", "good enhancement": "GE",
   "ee": "EE", "evil enhancement": "EE",
+  "dual-alignment enhancement": ["GE", "EE"],
+  "dual alignment enhancement": ["GE", "EE"],
   "lost soul": "LostSoul", "artifact": "Artifact",
   "dominant": "Dominant", "evil dominant": "Dominant",
   "fortress": "Fortress", "site": "Site", "city": "City",
@@ -125,11 +129,38 @@ function clean(v: string): string {
   return t === "-" ? "" : t;
 }
 
-function parseStat(v: string): number | null {
-  const t = clean(v);
-  if (!t) return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
+// Accepts numbers, "X", and paired dual-side values like "6 (0)" — see parseStatInput.
+function parseStat(v: string): number | string | null {
+  return parseStatInput(clean(v));
+}
+
+const CLASS_TOKENS = new Set(["warrior", "weapon", "territory", "star", "cloud"]);
+const ALIGNMENT_TOKENS = new Set(["good", "evil", "neutral", "good/evil"]);
+
+/** Data-quality audit: one warning per cell value that lackeyRowToDesignCard would
+ *  silently drop (unknown type/brigade/class token, non-numeric stat, unknown
+ *  alignment or legality). Empty and "-" cells are fine. Pure. */
+export function auditLackeyRow(row: LackeyRow): string[] {
+  const warnings: string[] = [];
+  for (const t of splitMulti(row.type)) {
+    if (!TYPE_MAP[t.toLowerCase()]) warnings.push(`unrecognized type "${t}"`);
+  }
+  for (const b of splitMulti(row.brigade)) {
+    if (!BRIGADE_MAP[b.toLowerCase()]) warnings.push(`unrecognized brigade "${b}"`);
+  }
+  for (const c of splitMulti(row.class)) {
+    if (!CLASS_TOKENS.has(c.toLowerCase())) warnings.push(`unrecognized class "${c}"`);
+  }
+  for (const [label, v] of [["strength", row.strength], ["toughness", row.toughness]] as const) {
+    if (clean(v) && parseStat(v) === null) warnings.push(`non-numeric ${label} "${clean(v)}"`);
+  }
+  const alignment = clean(row.alignment);
+  if (alignment && !ALIGNMENT_TOKENS.has(alignment.toLowerCase())) {
+    warnings.push(`unrecognized alignment "${alignment}"`);
+  }
+  const legality = clean(row.legality);
+  if (legality && !LEGALITIES.includes(legality)) warnings.push(`unrecognized legality "${legality}"`);
+  return warnings;
 }
 
 // Best-effort structured mapping; full fidelity lives in the finished-card image + rawText.
@@ -143,7 +174,7 @@ export function lackeyRowToDesignCard(row: LackeyRow): DesignCard {
   }
 
   const types = [...new Set(
-    splitMulti(row.type).map((t) => TYPE_MAP[t.toLowerCase()]).filter(Boolean),
+    splitMulti(row.type).flatMap((t) => TYPE_MAP[t.toLowerCase()] ?? []),
   )] as CardType[];
   if (types.length) card.cardType = types;
 
@@ -224,7 +255,7 @@ function tsvSafe(value: string): string {
   return value.replace(/[\t\r\n]+/g, " ").trim();
 }
 
-function statCell(v: number | null | undefined): string {
+function statCell(v: number | string | null | undefined): string {
   return v === null || v === undefined ? "" : String(v);
 }
 

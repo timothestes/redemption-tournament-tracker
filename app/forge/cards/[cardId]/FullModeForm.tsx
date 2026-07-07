@@ -8,6 +8,7 @@ import {
   cardApplicability, isStatBearing, type DesignCard, type CardType, type Brigade,
 } from "@/app/forge/lib/designCard";
 import { BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
+import StatInput from "./StatInput";
 
 // Light-colored brigades need dark text for legible chip labels.
 const LIGHT_BRIGADES = new Set<Brigade>(["White", "Silver", "GoodGold", "PaleGreen"]);
@@ -89,10 +90,10 @@ export default function FullModeForm({
       {isStatBearing(types) && (
         <div className="flex gap-3">
           <label className="block"><span className="mb-1 block font-medium">Strength</span>
-            <input type="number" value={snapshot.strength ?? ""} onChange={(e) => update({ strength: e.target.value === "" ? null : Number(e.target.value) })}
+            <StatInput value={snapshot.strength} onCommit={(v) => update({ strength: v })}
               className="w-24 rounded-md border bg-background px-3 py-2" /></label>
           <label className="block"><span className="mb-1 block font-medium">Toughness</span>
-            <input type="number" value={snapshot.toughness ?? ""} onChange={(e) => update({ toughness: e.target.value === "" ? null : Number(e.target.value) })}
+            <StatInput value={snapshot.toughness} onCommit={(v) => update({ toughness: v })}
               className="w-24 rounded-md border bg-background px-3 py-2" /></label>
         </div>
       )}
