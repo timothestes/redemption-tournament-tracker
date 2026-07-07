@@ -10140,40 +10140,44 @@
       ctx.fillStyle = '#0d1f1e';
       ctx.fillRect(0, 0, W, H);
 
-      var grad = ctx.createLinearGradient(0, 0, W, 280);
+      // Header band trimmed from 260 to 230 -- the 30px saved is handed to
+      // the footer below so the sponsor logo has more room to be legible.
+      var headerH = 230;
+
+      var grad = ctx.createLinearGradient(0, 0, W, 250);
       grad.addColorStop(0, 'rgba(2,46,43,0.92)');
       grad.addColorStop(0.6, 'rgba(4,78,74,0.88)');
       grad.addColorStop(1, 'rgba(10,110,105,0.82)');
       ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, W, 260);
+      ctx.fillRect(0, 0, W, headerH);
 
       if (bgImg) {
         ctx.save();
         ctx.beginPath();
-        ctx.rect(0, 0, W, 260);
+        ctx.rect(0, 0, W, headerH);
         ctx.clip();
         ctx.globalAlpha = 0.40;
         ctx.globalCompositeOperation = 'screen';
         // Cover: scale to fill width, maintain aspect ratio, center vertically
         var scale = W / bgImg.naturalWidth;
         var bh = bgImg.naturalHeight * scale;
-        var by = (260 - bh) / 2;
+        var by = (headerH - bh) / 2;
         ctx.drawImage(bgImg, 0, by, W, bh);
         ctx.restore();
       }
 
       ctx.fillStyle = '#0aada6';
-      ctx.fillRect(0, 260, W, 5);
+      ctx.fillRect(0, headerH, W, 5);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 72px Anton, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('THE THRESHING FLOOR', W / 2, 110);
+      ctx.fillText('THE THRESHING FLOOR', W / 2, 98);
 
       ctx.fillStyle = '#7dd4d0';
       ctx.font = '700 28px "Barlow Condensed", sans-serif';
       ctx.letterSpacing = '4px';
-      ctx.fillText('POWER RANKINGS', W / 2, 158);
+      ctx.fillText('POWER RANKINGS', W / 2, 140);
       ctx.letterSpacing = '0px';
 
       var epLabel = epNum ? 'Episode ' + epNum : '';
@@ -10181,14 +10185,14 @@
       if (epLabel) {
         ctx.fillStyle = 'rgba(255,255,255,0.55)';
         ctx.font = '400 22px Barlow, sans-serif';
-        ctx.fillText(epLabel, W / 2, 200);
+        ctx.fillText(epLabel, W / 2, 176);
       }
 
       ctx.fillStyle = 'rgba(125,212,208,0.6)';
       ctx.font = '400 19px Barlow, sans-serif';
-      ctx.fillText('Hendrix & Agur the Wise  ·  thethreshingfloorpodcast.com', W / 2, 238);
+      ctx.fillText('Hendrix & Agur the Wise  ·  thethreshingfloorpodcast.com', W / 2, 209);
 
-      var startY = 295;
+      var startY = 265;
       var rowH = 94;
       var padX = 54;
 
@@ -10265,23 +10269,26 @@
         }
       });
 
+      // Footer grown from 100 to 130 -- the 30px trimmed off the header
+      // above goes here, so the sponsor logo can be bigger and legible.
+      var footerH = 130;
       ctx.fillStyle = '#022e2b';
-      ctx.fillRect(0, H - 100, W, 100);
+      ctx.fillRect(0, H - footerH, W, footerH);
       ctx.fillStyle = '#0aada6';
-      ctx.fillRect(0, H - 100, W, 3);
+      ctx.fillRect(0, H - footerH, W, 3);
       ctx.fillStyle = 'rgba(125,212,208,0.6)';
       ctx.font = '500 15px "Barlow Condensed", sans-serif';
       ctx.textAlign = 'center';
       ctx.letterSpacing = '2px';
-      ctx.fillText('SPONSORED BY', W / 2, H - 66);
+      ctx.fillText('SPONSORED BY', W / 2, H - 96);
       ctx.letterSpacing = '0px';
       if (ytgImg) {
-        var logoH = 40, logoW = ytgImg.naturalWidth * (logoH / ytgImg.naturalHeight);
-        ctx.drawImage(ytgImg, (W - logoW) / 2, H - 52, logoW, logoH);
+        var logoH = 56, logoW = ytgImg.naturalWidth * (logoH / ytgImg.naturalHeight);
+        ctx.drawImage(ytgImg, (W - logoW) / 2, H - 80, logoW, logoH);
       } else {
         ctx.fillStyle = '#7dd4d0';
-        ctx.font = '700 28px "Barlow Condensed", sans-serif';
-        ctx.fillText('YOUR TURN GAMES  ·  yourturngames.biz', W / 2, H - 26);
+        ctx.font = '700 32px "Barlow Condensed", sans-serif';
+        ctx.fillText('YOUR TURN GAMES  ·  yourturngames.biz', W / 2, H - 40);
       }
 
       var link = document.createElement('a');
