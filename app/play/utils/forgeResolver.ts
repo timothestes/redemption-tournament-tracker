@@ -34,6 +34,20 @@ export function mergeForgeDeckData(cards: GameCardData[], resolver?: ForgeResolv
     if (!id) return c;
     const e = resolver.get(id);
     if (!e) return c;
-    return { ...c, cardName: e.name, specialAbility: e.rawText, cardImgFile: forgeProxyUrl(e) || c.cardImgFile };
+    // Restore the searchable fields the leak spine blanked on the STDB row, so
+    // the in-game Search Deck modal can filter forge cards by alignment/brigade/
+    // identifier/reference (not just name/type/ability).
+    return {
+      ...c,
+      cardName: e.name,
+      specialAbility: e.rawText,
+      cardImgFile: forgeProxyUrl(e) || c.cardImgFile,
+      alignment: e.alignment,
+      brigade: e.brigade,
+      strength: e.strength,
+      toughness: e.toughness,
+      identifier: e.identifier,
+      reference: e.reference,
+    };
   });
 }

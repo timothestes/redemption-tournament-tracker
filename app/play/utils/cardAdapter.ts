@@ -27,13 +27,17 @@ export function cardInstanceToGameCard(
     cardSet: card.cardSet,
     cardImgFile: resolved ? (forgeProxyUrl(resolved) || card.cardImgFile) : card.cardImgFile,
     type: card.cardType,
-    brigade: card.brigade,
-    strength: card.strength,
-    toughness: card.toughness,
+    // Forge cards blank these on the world-readable STDB row (leak spine); the
+    // viewer's granted resolver re-hydrates them so the in-game deck search can
+    // filter forge cards by brigade/alignment/identifier/reference. Unresolved
+    // (ungranted) forge cards keep the blank row values — no leak.
+    brigade: resolved ? resolved.brigade : card.brigade,
+    strength: resolved ? resolved.strength : card.strength,
+    toughness: resolved ? resolved.toughness : card.toughness,
     specialAbility: resolved ? resolved.rawText : card.specialAbility,
-    identifier: card.identifier,
-    reference: card.reference,
-    alignment: card.alignment,
+    identifier: resolved ? resolved.identifier : card.identifier,
+    reference: resolved ? resolved.reference : card.reference,
+    alignment: resolved ? resolved.alignment : card.alignment,
     isMeek: card.isMeek,
     isFlipped: card.isFlipped,
     isToken: card.isToken,

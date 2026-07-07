@@ -13,6 +13,12 @@ const resolverEntry = (overrides: Partial<ForgePlayResolverEntry> = {}): ForgePl
   hasArt: true,
   versionId: "v1",
   typeDisplay: "",
+  alignment: "",
+  brigade: "",
+  strength: "",
+  toughness: "",
+  identifier: "",
+  reference: "",
   ...overrides,
 });
 
@@ -116,6 +122,26 @@ describe("buildForgeGoldfishCards", () => {
     expect(c.card_img_file.startsWith("/forge/api/art/")).toBe(true);
     expect(c.quantity).toBe(3);
     expect(c.is_reserve).toBe(false);
+  });
+
+  it("restores searchable metadata (alignment/brigade/stats/identifier/reference) from the resolver", () => {
+    // Regression: goldfish forge cards had card_alignment: "" hardcoded, so the
+    // in-game Search Deck alignment/brigade/identifier/reference filters never
+    // matched them even though the resolver knows the values.
+    const entries: ForgeDeckEntry[] = [
+      { source: "forge", cardId: FORGE_ID, qty: 1, zone: "main" },
+    ];
+    const entry = resolverEntry({
+      alignment: "Evil", brigade: "Gray", strength: "7", toughness: "6",
+      identifier: "Demon", reference: "Revelation 8:11",
+    });
+    const c = buildForgeGoldfishCards(entries, () => entry)[0];
+    expect(c.card_alignment).toBe("Evil");
+    expect(c.card_brigade).toBe("Gray");
+    expect(c.card_strength).toBe("7");
+    expect(c.card_toughness).toBe("6");
+    expect(c.card_identifier).toBe("Demon");
+    expect(c.card_reference).toBe("Revelation 8:11");
   });
 
   it("emits the resolver's type display string in card_type (LostSoul, not 'LS')", () => {

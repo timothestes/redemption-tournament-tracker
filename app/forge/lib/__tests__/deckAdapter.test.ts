@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { designCardToCard, forgeDataLine, isForgeDataLine, cardIdFromDataLine } from "../deckAdapter";
+import { designCardToCard, designCardSearchFields, forgeDataLine, isForgeDataLine, cardIdFromDataLine } from "../deckAdapter";
 import type { DesignCard } from "../designCard";
 
 describe("designCardToCard", () => {
@@ -79,5 +79,37 @@ describe("designCardToCard", () => {
     expect(isForgeDataLine(dl)).toBe(true);
     expect(isForgeDataLine("Angel|Pa|Angel_(Pa)")).toBe(false);
     expect(cardIdFromDataLine(dl)).toBe("uuid-9");
+  });
+});
+
+describe("designCardSearchFields", () => {
+  it("derives the in-game deck-search fields from a DesignCard", () => {
+    // These are the fields the in-game Search Deck modal filters on. They must
+    // survive into play so alignment/brigade/identifier/reference searches match
+    // forge cards (regression: evil forge cards were unsearchable by alignment).
+    const d: DesignCard = {
+      name: "Wormwood", cardType: ["EvilCharacter"], alignment: "Evil",
+      brigades: ["Gray"], strength: 7, toughness: 6,
+      identifiers: ["Demon", "Fallen Angel"], reference: "Revelation 8:11",
+    };
+    const f = designCardSearchFields(d);
+    expect(f.alignment).toBe("Evil");
+    expect(f.brigade).toBe("Gray");
+    expect(f.strength).toBe("7");
+    expect(f.toughness).toBe("6");
+    expect(f.identifier).toBe("Demon, Fallen Angel");
+    expect(f.reference).toBe("Revelation 8:11");
+  });
+
+  it("maps Good_Evil/GoodGold to display strings and blanks unset fields with '' (game convention, not em-dash)", () => {
+    const f = designCardSearchFields({ name: "X", cardType: ["Hero"], alignment: "Good_Evil", brigades: ["GoodGold"] });
+    expect(f.alignment).toBe("Good/Evil");
+    expect(f.brigade).toBe("Good Gold");
+    // Public cards serialize missing stats as "" for play; forge must match so
+    // the two never diverge in the deck-search grid.
+    expect(f.strength).toBe("");
+    expect(f.toughness).toBe("");
+    expect(f.identifier).toBe("");
+    expect(f.reference).toBe("");
   });
 });
