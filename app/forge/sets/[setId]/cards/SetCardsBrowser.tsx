@@ -10,6 +10,7 @@ import {
   STATUS_LABEL, ACTION_LABEL, BULK_DONE_VERB, CONFIRM_COPY, isEligible, type LifecycleAction,
 } from "@/app/forge/lib/lifecycleCopy";
 import { cardRawText, CARD_TYPES, BRIGADES, type CardType, type Brigade } from "@/app/forge/lib/designCard";
+import { sortSetCards } from "@/app/forge/lib/cardOrder";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
 import type { ReleaseInfo } from "@/app/forge/lib/versions";
 import { Button } from "@/components/ui/button";
@@ -47,29 +48,9 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Default order: by card type alphabetically, then brigade, then title. Cards
-  // missing a primary type sort last; brigade uses the canonical BRIGADES order
-  // ascending.
-  const sorted = useMemo(() => {
-    const rank = (value: string | undefined, order: readonly string[]) => {
-      const i = value ? order.indexOf(value) : -1;
-      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
-    };
-    const brigadeRank = (c: ForgeCardFull) => rank(c.snapshot?.brigades?.[0], BRIGADES);
-    const typeAlpha = (a: ForgeCardFull, b: ForgeCardFull) => {
-      const ta = a.snapshot?.cardType?.[0], tb = b.snapshot?.cardType?.[0];
-      if (ta === tb) return 0;
-      if (!ta) return 1; // no primary type → last
-      if (!tb) return -1;
-      return ta.localeCompare(tb);
-    };
-    return [...cards].sort(
-      (a, b) =>
-        typeAlpha(a, b) ||
-        brigadeRank(a) - brigadeRank(b) ||
-        (a.title ?? "").localeCompare(b.title ?? ""),
-    );
-  }, [cards]);
+  // Default order: by card type alphabetically, then brigade, then title. Shared
+  // with the single-card detail view's prev/next arrows via sortSetCards.
+  const sorted = useMemo(() => sortSetCards(cards), [cards]);
 
   const filtered = useMemo(() => sorted.filter((c) => {
     const s = c.snapshot ?? {};
