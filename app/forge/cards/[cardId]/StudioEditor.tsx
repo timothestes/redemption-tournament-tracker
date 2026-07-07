@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download } from "lucide-react";
+import Link from "next/link";
+import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
 import FilePicker from "@/app/forge/components/FilePicker";
@@ -25,14 +26,21 @@ import CardDetailsFields from "./CardDetailsFields";
 // raw text + optional artwork + optional finished-card image. Both files remain on
 // disk (unused here) for recovery.
 
+// Prev/next arrows overlaid on the card face edges. Inside the edges (not the
+// gutter) so they never clip on mobile.
+const arrowClass =
+  "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border bg-background/70 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-background hover:text-foreground";
+
 export default function StudioEditor({
-  card, sets, currentUser, setId, setName,
+  card, sets, currentUser, setId, setName, prevId, nextId,
 }: {
   card: ForgeCardFull;
   sets: ForgeSetSummary[];
   currentUser: { userId: string; displayName: string | null };
   setId: string | null;
   setName: string | null;
+  prevId?: string | null;
+  nextId?: string | null;
 }) {
   const [snapshot, setSnapshot] = useState<DesignCard>(card.snapshot ?? {});
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -84,6 +92,23 @@ export default function StudioEditor({
       if (latest.current !== lastSaved.current) void saveCard(card.id, latest.current);
     };
   }, [card.id]);
+
+  // Arrow keys step to the prev/next card in the set — but only when focus is
+  // outside a field, so they still move the text cursor while editing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      const dest = e.key === "ArrowLeft" ? prevId : nextId;
+      if (!dest) return;
+      e.preventDefault();
+      router.push(`/forge/cards/${dest}`);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [prevId, nextId, router]);
 
   const update = (patch: Partial<DesignCard>) => {
     fieldsDirty.current = true;
@@ -176,12 +201,25 @@ export default function StudioEditor({
       <div className="grid gap-6 md:grid-cols-[minmax(0,360px)_1fr]">
         {/* Face — sticky on desktop, top on mobile */}
         <div className="md:sticky md:top-4 md:self-start">
-          <ForgeCardFace
-            name={snapshot.name ?? null}
-            rawText={cardRawText(snapshot)}
-            finishedUrl={card.hasFinished ? `/forge/api/art/${card.id}?kind=finished&t=${t}` : null}
-            artUrl={card.hasArt ? `/forge/api/art/${card.id}?t=${t}` : null}
-          />
+          <div className="relative">
+            <ForgeCardFace
+              name={snapshot.name ?? null}
+              rawText={cardRawText(snapshot)}
+              finishedUrl={card.hasFinished ? `/forge/api/art/${card.id}?kind=finished&t=${t}` : null}
+              artUrl={card.hasArt ? `/forge/api/art/${card.id}?t=${t}` : null}
+            />
+            {/* Prev/next within the set — same order as the grid, no wrap at ends. */}
+            {prevId && (
+              <Link href={`/forge/cards/${prevId}`} aria-label="Previous card in set" className={arrowClass + " left-1.5"}>
+                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+              </Link>
+            )}
+            {nextId && (
+              <Link href={`/forge/cards/${nextId}`} aria-label="Next card in set" className={arrowClass + " right-1.5"}>
+                <ChevronRight className="h-5 w-5" aria-hidden="true" />
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Form */}
