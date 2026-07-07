@@ -62,11 +62,22 @@ Pipeline:
 2. **Corner-gated margin trim.** Sample the four corner pixels (after alpha
    flattening logic below). Only when **all four corners** are near-white
    (each RGB channel ≥ ~240 after flattening transparent pixels to white) does
-   the trim step run: `.trim({ background: "#ffffff", threshold: 25 })`.
+   the trim step run.
+   - **v2 (2026-07-07): ink-bounding-box crop, not sharp `.trim()`.** Compute
+     the bounding box of "ink" pixels (min RGB channel < 180) from the raw
+     pixel buffer, expand it by a uniform 10px pad (clamped to the image), and
+     `.extract()` that region. Two v1 failures drove this: (a) sharp's trim
+     only removes rows/columns that are 100% background, so watermark text
+     ("Cactus Game Design") in the margins blocked side/top trims while the
+     clean bottom strip trimmed to zero — leaving the card flush-bottom and
+     off-center; (b) raising sharp's threshold to defeat the watermark eats
+     the red border instead (its color metric puts saturated red within ~60
+     of white). Light watermark gray (min channel ≥ ~200) is not ink, so the
+     box ignores it; the card's border/arcs are ink, so they are never cut;
+     the uniform pad restores symmetric framing.
    - Rationale: print-bleed margins are white/transparent; full-bleed card
-     images have dark frame borders at the corners. Trimming with a white
-     background cannot eat a dark border ring, and the corner gate skips the
-     step entirely for full-bleed images.
+     images have dark frame borders at the corners, and the corner gate skips
+     the step entirely for full-bleed images.
    - **Degenerate-trim guard:** if the trimmed result is smaller than 60% of
      the original along either axis, discard the trim and use the untrimmed
      image (protects near-white card faces).
