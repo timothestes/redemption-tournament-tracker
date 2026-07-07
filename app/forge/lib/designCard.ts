@@ -125,10 +125,14 @@ export function cardRawText(card: DesignCard): string {
   return card.rawText ?? card.specialAbility ?? "";
 }
 
-const PAIRED_STAT_RE = /^(x|\d+)\s*\(\s*(x|\d+)\s*\)$/i;
+// A dual-side stat carries both alignments' values. Accept either the pool's
+// canonical parens ("6 (0)") or a slash ("6/0") — the separator designers reach for
+// first — and normalize both to the canonical `N (M)`.
+const PAIRED_STAT_RE = /^(x|\d+)\s*(?:\(\s*(x|\d+)\s*\)|\/\s*(x|\d+))$/i;
 
 /** Parse a stat: "" → null, "x"/"X" → "X", numbers pass, paired dual-side values
- *  normalize to `N (M)` (e.g. "3(2)" → "3 (2)", "x(0)" → "X (0)"), junk → null. Pure. */
+ *  normalize to `N (M)` (e.g. "3(2)" → "3 (2)", "6/0" → "6 (0)", "x/0" → "X (0)"),
+ *  junk → null. Pure. */
 export function parseStatInput(raw: string): StatValue {
   const t = raw.trim();
   if (!t) return null;
@@ -136,7 +140,7 @@ export function parseStatInput(raw: string): StatValue {
   const paired = PAIRED_STAT_RE.exec(t);
   if (paired) {
     const side = (s: string) => (/^x$/i.test(s) ? "X" : s);
-    return `${side(paired[1])} (${side(paired[2])})`;
+    return `${side(paired[1])} (${side(paired[2] ?? paired[3])})`;
   }
   const n = Number(t);
   return Number.isFinite(n) ? n : null;

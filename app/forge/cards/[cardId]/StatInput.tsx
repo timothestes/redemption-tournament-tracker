@@ -21,7 +21,7 @@ export default function StatInput({
   return (
     <input
       type="text"
-      placeholder="6 · X · 6 (0)"
+      placeholder="6 · X · 6/0"
       value={draft}
       className={className}
       onChange={(e) => {
