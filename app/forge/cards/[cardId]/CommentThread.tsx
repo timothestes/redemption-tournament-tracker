@@ -29,7 +29,7 @@ export default function CommentThread({
   cardId: string;
   comments: CommentRow[];
   canApply: boolean;
-  versions?: { versionNumber: number; createdAt: string }[];
+  versions?: { versionNumber: number; createdAt: string; status: "draft" | "published" | "approved" | "superseded" }[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -168,7 +168,7 @@ export default function CommentThread({
         item.kind === "era" ? (
           <div key={`era-${item.versionNumber}`} className="flex items-center gap-2 text-[10px] text-muted-foreground" aria-hidden>
             <span className="h-px flex-1 bg-border" />
-            v{item.versionNumber} released · {new Date(item.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            v{item.versionNumber} {item.status === "draft" ? "updated" : "released"} · {new Date(item.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
             <span className="h-px flex-1 bg-border" />
           </div>
         ) : (

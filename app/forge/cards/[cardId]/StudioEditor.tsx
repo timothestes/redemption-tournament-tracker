@@ -177,9 +177,9 @@ export default function StudioEditor({
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span>Releases are visible to Forge playtesters only — they don’t change the public card database.</span>
             {!proposing && (
-              <button type="button" className="underline-offset-2 hover:text-foreground hover:underline" onClick={() => setProposing(true)}>
-                Request another elder’s review
-              </button>
+              <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={() => setProposing(true)}>
+                Propose changes
+              </Button>
             )}
           </div>
         )}
@@ -187,7 +187,7 @@ export default function StudioEditor({
           <div className="flex flex-col gap-1 text-xs">
             <div className="flex items-start gap-1">
               <textarea autoFocus value={proposeSummary} onChange={(e) => setProposeSummary(e.target.value)}
-                placeholder="What should the other elder look at?" className="h-16 flex-1 rounded-md border bg-background px-2 py-1" />
+                placeholder="Summarize this change — what and why?" className="h-16 flex-1 rounded-md border bg-background px-2 py-1" />
               <Button size="sm" className="h-7 px-3 text-xs" disabled={proposeBusy || !proposeSummary.trim()} onClick={submitProposal}>
                 Submit proposal
               </Button>

@@ -51,25 +51,20 @@ export async function createProposal(
   if (!ctx) return { ok: false, error: "Not authorized" };
   if (!summary.trim()) return { ok: false, error: "A summary is required" };
 
-  // No-op guard: a proposal must differ from the last published version. The client
-  // never loads the base version, so this is the authoritative check. Never-published
-  // cards (base = {}) still allow a first real proposal.
-  const { data: card } = await ctx.supabase
-    .from("forge_cards")
-    .select("published_version_id")
-    .eq("id", cardId)
+  // No-op guard: a proposal must differ from the card's LATEST version of any
+  // status — draft iterations included — matching the base the RPC records and
+  // the diff the reviewer will see. Cards with no versions ({} base) still
+  // allow a first real proposal.
+  const { data: latest } = await ctx.supabase
+    .from("card_versions")
+    .select("data")
+    .eq("card_id", cardId)
+    .order("version_number", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  let base: DesignCard = {};
-  if (card?.published_version_id) {
-    const { data: ver } = await ctx.supabase
-      .from("card_versions")
-      .select("data")
-      .eq("id", card.published_version_id)
-      .maybeSingle();
-    base = (ver?.data ?? {}) as DesignCard;
-  }
+  const base = (latest?.data ?? {}) as DesignCard;
   if (diffCards(base, snapshot).length === 0) {
-    return { ok: false, error: "No changes to review since the last released version." };
+    return { ok: false, error: "No changes to review since the last accepted version." };
   }
 
   const { data, error } = await ctx.supabase.rpc("forge_create_proposal", {

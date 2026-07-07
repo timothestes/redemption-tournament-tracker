@@ -1,20 +1,15 @@
 "use client";
 
-import { STATUS_BADGE_CLASS } from "@/app/forge/lib/lifecycleCopy";
 import { timeAgo } from "@/app/forge/lib/relativeTime";
 import { summarizeDiff, type FieldChange } from "@/app/forge/lib/cardDiff";
-import { EVENT_LABEL, type HistoryEvent } from "@/app/forge/lib/historyView";
+import {
+  EVENT_LABEL,
+  VERSION_STATUS_LABEL,
+  VERSION_PILL,
+  versionVerb,
+  type HistoryEvent,
+} from "@/app/forge/lib/historyView";
 
-const VERSION_STATUS_LABEL: Record<string, string> = {
-  published: "Current",
-  approved: "Final",
-  superseded: "Superseded",
-};
-const VERSION_PILL: Record<string, string> = {
-  published: STATUS_BADGE_CLASS.playtesting,
-  approved: STATUS_BADGE_CLASS.approved,
-  superseded: STATUS_BADGE_CLASS.archived,
-};
 const PROPOSAL_STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted",
   denied: "Denied",
@@ -44,7 +39,7 @@ function ChangeList({ changes }: { changes: FieldChange[] }) {
 
 export default function CardHistory({ history }: { history: HistoryEvent[] }) {
   if (history.length === 0) {
-    return <p className="text-xs text-muted-foreground">No releases yet.</p>;
+    return <p className="text-xs text-muted-foreground">No history yet.</p>;
   }
   return (
     <ul className="space-y-1 text-xs">
@@ -54,7 +49,7 @@ export default function CardHistory({ history }: { history: HistoryEvent[] }) {
           return (
             <li key={`v-${v.id}`} className="rounded-md border px-2 py-1.5">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span className="font-medium">v{v.versionNumber} released</span>
+                <span className="font-medium">v{v.versionNumber} {versionVerb(v.status)}</span>
                 <span className={`rounded-full border px-1.5 py-0.5 text-[10px] ${VERSION_PILL[v.status]}`}>
                   {VERSION_STATUS_LABEL[v.status]}
                 </span>

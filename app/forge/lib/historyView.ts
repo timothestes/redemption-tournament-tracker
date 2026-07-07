@@ -2,6 +2,7 @@
 // imported by client components and unit tests alike.
 
 import { diffCards, type FieldChange } from "@/app/forge/lib/cardDiff";
+import { STATUS_BADGE_CLASS } from "@/app/forge/lib/lifecycleCopy";
 import type { ProposalRow } from "@/app/forge/lib/proposals";
 import type { VersionRow, CardEventRow } from "@/app/forge/lib/versions";
 import type { CommentRow } from "@/app/forge/lib/comments";
@@ -19,6 +20,25 @@ export const EVENT_LABEL: Record<string, string> = {
   card_returned_to_ideas: "Returned to ideas",
 };
 
+// Version rendering maps — every value of VersionRow["status"] MUST have an
+// entry (coverage-tested); a miss renders an unlabeled pill.
+export const VERSION_STATUS_LABEL: Record<VersionRow["status"], string> = {
+  draft: "Draft",
+  published: "Current",
+  approved: "Final",
+  superseded: "Superseded",
+};
+export const VERSION_PILL: Record<VersionRow["status"], string> = {
+  draft: STATUS_BADGE_CLASS.draft,
+  published: STATUS_BADGE_CLASS.playtesting,
+  approved: STATUS_BADGE_CLASS.approved,
+  superseded: STATUS_BADGE_CLASS.archived,
+};
+// Draft iterations were never released to playtesters — say "updated".
+export function versionVerb(status: VersionRow["status"]): string {
+  return status === "draft" ? "updated" : "released";
+}
+
 // A superseded proposal closes inside forge_accept_proposal, in the same
 // transaction as the winning sibling — their closed_at values are identical
 // (transaction-stable now()). No accepted sibling at that instant means the
@@ -35,6 +55,9 @@ export function deriveSupersededBy(p: ProposalRow, all: ProposalRow[]): string |
 // the proposal at the same instant) order version above its proposal entry.
 const KIND_RANK: Record<HistoryEvent["kind"], number> = { lifecycle: 0, version: 1, proposal: 2 };
 
+// PRECONDITION: `versions` must be the FULL elder-visible list (all statuses,
+// draft included). A status-filtered list creates versionNumber gaps and the
+// n-1 diff silently falls back to {} — a giant "everything added" diff.
 export function buildHistory(
   versions: VersionRow[],
   proposals: ProposalRow[],
@@ -69,18 +92,18 @@ export function buildHistory(
 // comment written at-or-after each release, mark which version it followed.
 export type CommentEraItem =
   | { kind: "comment"; comment: CommentRow }
-  | { kind: "era"; versionNumber: number; at: string };
+  | { kind: "era"; versionNumber: number; at: string; status: VersionRow["status"] };
 
 export function buildCommentEras(
   topComments: CommentRow[],
-  versions: Pick<VersionRow, "versionNumber" | "createdAt">[]
+  versions: Pick<VersionRow, "versionNumber" | "createdAt" | "status">[]
 ): CommentEraItem[] {
   const eras = [...versions].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
   const out: CommentEraItem[] = [];
   let nextEra = 0;
   for (const c of topComments) {
     while (nextEra < eras.length && Date.parse(eras[nextEra].createdAt) <= Date.parse(c.createdAt)) {
-      out.push({ kind: "era", versionNumber: eras[nextEra].versionNumber, at: eras[nextEra].createdAt });
+      out.push({ kind: "era", versionNumber: eras[nextEra].versionNumber, at: eras[nextEra].createdAt, status: eras[nextEra].status });
       nextEra++;
     }
     out.push({ kind: "comment", comment: c });

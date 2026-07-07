@@ -180,7 +180,8 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
         releaseBadges={since ? Object.fromEntries(
           shown.flatMap((c) => {
             const rel = releases?.[c.id];
-            return rel ? [[c.id, `v${rel.versionNumber} · ${new Date(rel.releasedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`]] : [];
+            // Draft iterations count as activity but must not read as releases.
+            return rel ? [[c.id, `v${rel.versionNumber}${rel.status === "draft" ? " draft" : ""} · ${new Date(rel.releasedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`]] : [];
           })
         ) : undefined}
         selection={{ active: selecting, selected, onToggle: toggle }}

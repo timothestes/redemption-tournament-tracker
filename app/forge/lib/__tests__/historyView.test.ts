@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { deriveSupersededBy, buildHistory, buildCommentEras, EVENT_LABEL } from "../historyView";
+import {
+  deriveSupersededBy, buildHistory, buildCommentEras,
+  EVENT_LABEL, VERSION_STATUS_LABEL, VERSION_PILL, versionVerb,
+} from "../historyView";
 
 const prop = (over: any) => ({
   id: "p1", cardId: "c1", baseVersionId: null, resultingVersionId: null, summary: "s",
@@ -54,12 +57,27 @@ describe("buildHistory", () => {
     const pe = h.find((e) => e.kind === "proposal") as any;
     expect(pe.resultingVersionNumber).toBe(2);
   });
+  it("diffs across a draft→draft→published chain (never against {})", () => {
+    const v1 = ver({ id: "v1", versionNumber: 1, status: "draft", data: { name: "A" }, createdAt: "2026-07-01T00:00:00Z" });
+    const v2 = ver({ id: "v2", versionNumber: 2, status: "draft", data: { name: "B" }, createdAt: "2026-07-02T00:00:00Z" });
+    const v3 = ver({ id: "v3", versionNumber: 3, status: "published", data: { name: "C" }, createdAt: "2026-07-03T00:00:00Z" });
+    const h = buildHistory([v3, v2, v1], [], [], []) as any[];
+    const byId = Object.fromEntries(h.map((e) => [e.version.id, e.changes]));
+    expect(byId.v3).toEqual([expect.objectContaining({ field: "name", before: "B", after: "C" })]);
+    expect(byId.v2).toEqual([expect.objectContaining({ field: "name", before: "A", after: "B" })]);
+  });
+  it("resolves resultingVersionNumber for a draft version row", () => {
+    const v1 = ver({ id: "v1", versionNumber: 1, status: "draft", createdAt: "2026-07-01T00:00:00Z" });
+    const accepted = prop({ id: "p1", status: "accepted", closedAt: "2026-07-01T00:00:00Z", resultingVersionId: "v1" });
+    const pe = buildHistory([v1], [accepted], [], []).find((e) => e.kind === "proposal") as any;
+    expect(pe.resultingVersionNumber).toBe(1);
+  });
 });
 
 describe("buildCommentEras", () => {
   it("inserts an era marker before the first comment written after each release", () => {
-    const v1 = { versionNumber: 1, createdAt: "2026-07-01T00:00:00Z" };
-    const v2 = { versionNumber: 2, createdAt: "2026-07-03T00:00:00Z" };
+    const v1 = { versionNumber: 1, createdAt: "2026-07-01T00:00:00Z", status: "published" as const };
+    const v2 = { versionNumber: 2, createdAt: "2026-07-03T00:00:00Z", status: "published" as const };
     const c1 = comment({ id: "m1", createdAt: "2026-07-02T00:00:00Z" });
     const c2 = comment({ id: "m2", createdAt: "2026-07-04T00:00:00Z" });
     expect(buildCommentEras([c1, c2], [v2, v1]).map((x) => x.kind === "era" ? `v${x.versionNumber}` : x.comment.id))
@@ -69,6 +87,12 @@ describe("buildCommentEras", () => {
     const c1 = comment({ id: "m1" });
     expect(buildCommentEras([c1], [])).toEqual([{ kind: "comment", comment: c1 }]);
   });
+  it("carries the version status onto era items (draft iterations divide too)", () => {
+    const v1 = { versionNumber: 1, createdAt: "2026-07-01T00:00:00Z", status: "draft" as const };
+    const c1 = comment({ id: "m1", createdAt: "2026-07-02T00:00:00Z" });
+    const era = buildCommentEras([c1], [v1])[0] as any;
+    expect(era).toEqual({ kind: "era", versionNumber: 1, at: "2026-07-01T00:00:00Z", status: "draft" });
+  });
 });
 
 describe("EVENT_LABEL", () => {
@@ -76,5 +100,20 @@ describe("EVENT_LABEL", () => {
     for (const a of ["card_approved", "card_unapproved", "card_archived", "card_unarchived", "card_returned_to_ideas"]) {
       expect(EVENT_LABEL[a]).toBeTruthy();
     }
+  });
+});
+
+describe("version rendering maps", () => {
+  it("cover every version status (a miss renders an unlabeled pill)", () => {
+    for (const s of ["draft", "published", "approved", "superseded"] as const) {
+      expect(VERSION_STATUS_LABEL[s]).toBeTruthy();
+      expect(VERSION_PILL[s]).toBeTruthy();
+    }
+  });
+  it("uses 'updated' for draft iterations and 'released' otherwise", () => {
+    expect(versionVerb("draft")).toBe("updated");
+    expect(versionVerb("published")).toBe("released");
+    expect(versionVerb("approved")).toBe("released");
+    expect(versionVerb("superseded")).toBe("released");
   });
 });

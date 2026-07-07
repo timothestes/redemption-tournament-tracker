@@ -170,7 +170,7 @@ export default function ProposalDiff({
             <DialogTitle>Accept proposal</DialogTitle>
             <DialogDescription>
               {isDraft
-                ? "Applies this change to the card’s working draft. The card stays in Draft — nothing is released to playtesters."
+                ? "Applies this change to the working draft and records it as a new draft version in the card’s history. The card stays in Draft — nothing is visible to playtesters."
                 : "Releases a new version to playtesters (not the public card database) and replaces the working draft with this proposal. The card stays in playtest — use Mark final when it’s done."}
             </DialogDescription>
           </DialogHeader>

@@ -66,7 +66,7 @@ export default function ReviewPanel({
           cardId={card.id}
           comments={comments}
           canApply={canReview}
-          versions={versions.map((v) => ({ versionNumber: v.versionNumber, createdAt: v.createdAt }))}
+          versions={versions.map((v) => ({ versionNumber: v.versionNumber, createdAt: v.createdAt, status: v.status }))}
         />
       </section>
     </div>

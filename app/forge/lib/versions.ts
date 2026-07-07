@@ -6,7 +6,9 @@ import type { DesignCard } from "@/app/forge/lib/designCard";
 export type VersionRow = {
   id: string;
   versionNumber: number;
-  status: "published" | "approved" | "superseded";
+  // 'draft' = elder-only iteration record (never shown to playtesters — the
+  // 057 RLS whitelist only exposes published/approved rows to them).
+  status: "draft" | "published" | "approved" | "superseded";
   data: DesignCard;
   note: string | null;
   createdBy: string;
@@ -22,7 +24,7 @@ export type CardEventRow = {
   at: string;
 };
 
-export type ReleaseInfo = { versionNumber: number; releasedAt: string };
+export type ReleaseInfo = { versionNumber: number; releasedAt: string; status: VersionRow["status"] };
 
 // The lifecycle actions written by migration 072 (see forge_audit inserts).
 const CARD_EVENT_ACTIONS = [
@@ -46,8 +48,9 @@ async function nameMap(
   return new Map((data ?? []).map((m: any) => [m.user_id, m.display_name]));
 }
 
-// Full release history for a card, newest first. Elder/owner RLS applies;
-// playtesters see only approved rows (and never reach the studio anyway).
+// Full version history for a card (draft iterations included), newest first.
+// Elder/owner RLS sees all rows; playtesters see only published/approved rows
+// (and never reach the studio anyway).
 export async function listVersions(cardId: string): Promise<VersionRow[]> {
   const ctx = await requireForge();
   if (!ctx) return [];
@@ -92,7 +95,8 @@ export async function listCardEvents(cardId: string): Promise<CardEventRow[]> {
   }));
 }
 
-// Latest release per card for a set's grid — mirrors listOpenProposalCounts:
+// Latest version per card (draft iterations included — the set page is an
+// elder surface and iteration IS activity) — mirrors listOpenProposalCounts:
 // takes cardIds, runs under the caller's RLS, returns a compact record.
 export async function listSetActivity(
   cardIds: string[]
@@ -101,13 +105,13 @@ export async function listSetActivity(
   if (!ctx || cardIds.length === 0) return {};
   const { data } = await ctx.supabase
     .from("card_versions")
-    .select("card_id, version_number, created_at")
+    .select("card_id, version_number, status, created_at")
     .in("card_id", cardIds)
     .order("created_at", { ascending: false });
   const out: Record<string, ReleaseInfo> = {};
   for (const r of data ?? []) {
     const id = (r as any).card_id as string;
-    if (!out[id]) out[id] = { versionNumber: (r as any).version_number, releasedAt: (r as any).created_at };
+    if (!out[id]) out[id] = { versionNumber: (r as any).version_number, releasedAt: (r as any).created_at, status: (r as any).status };
   }
   return out;
 }

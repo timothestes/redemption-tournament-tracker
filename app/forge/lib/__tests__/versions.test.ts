@@ -41,6 +41,19 @@ describe("listVersions", () => {
       note: "buffed", createdBy: "u9", createdAt: "2026-07-02T00:00:00Z", authorName: "Tim",
     }]);
   });
+  it("maps draft iteration rows intact", async () => {
+    (requireForge as any).mockResolvedValue(ctxWith({
+      card_versions: [{
+        id: "v1", card_id: "c1", version_number: 1, status: "draft",
+        data: { name: "WIP" }, note: null, created_by: "u9",
+        created_at: "2026-07-01T00:00:00Z",
+      }],
+      playtest_members: [{ user_id: "u9", display_name: "Tim" }],
+    }));
+    const rows = await listVersions("c1");
+    expect(rows[0].status).toBe("draft");
+    expect(rows[0].data).toEqual({ name: "WIP" });
+  });
 });
 
 describe("listCardEvents", () => {
@@ -60,17 +73,17 @@ describe("listSetActivity", () => {
     (requireForge as any).mockResolvedValue(ctxWith({}));
     expect(await listSetActivity([])).toEqual({});
   });
-  it("keeps only the latest release per card", async () => {
+  it("keeps only the latest version per card, draft iterations included", async () => {
     (requireForge as any).mockResolvedValue(ctxWith({
       card_versions: [
-        { card_id: "c1", version_number: 3, created_at: "2026-07-05T00:00:00Z" },
-        { card_id: "c1", version_number: 2, created_at: "2026-07-01T00:00:00Z" },
-        { card_id: "c2", version_number: 1, created_at: "2026-06-20T00:00:00Z" },
+        { card_id: "c1", version_number: 3, status: "draft", created_at: "2026-07-05T00:00:00Z" },
+        { card_id: "c1", version_number: 2, status: "published", created_at: "2026-07-01T00:00:00Z" },
+        { card_id: "c2", version_number: 1, status: "published", created_at: "2026-06-20T00:00:00Z" },
       ],
     }));
     expect(await listSetActivity(["c1", "c2"])).toEqual({
-      c1: { versionNumber: 3, releasedAt: "2026-07-05T00:00:00Z" },
-      c2: { versionNumber: 1, releasedAt: "2026-06-20T00:00:00Z" },
+      c1: { versionNumber: 3, releasedAt: "2026-07-05T00:00:00Z", status: "draft" },
+      c2: { versionNumber: 1, releasedAt: "2026-06-20T00:00:00Z", status: "published" },
     });
   });
 });
