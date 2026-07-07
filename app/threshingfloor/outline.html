@@ -9722,18 +9722,22 @@
           if (val) {
             loaded[val] = i;
             var input = document.getElementById(prefix + '-' + i);
-            if (input) {
-              input.value = val;
-              if (type === 'rankings') {
-                refreshRankCard(i);
-                updateRankDeltaGeneric('rank', i, window.previousRankings);
-              } else {
-                updateRankDeltaGeneric('meta-rank', i, window.previousMetaRankings);
-              }
-            }
+            if (input) input.value = val;
           }
         }
+        // Assign the freshly recalled map *before* computing deltas below --
+        // otherwise every row would be scored against whatever baseline was
+        // set before this recall (usually none), leaving unmoved rows with
+        // no delta at all instead of the correct "no movement" indicator.
         window[prevKey] = loaded;
+        for (var j = 1; j <= 10; j++) {
+          if (type === 'rankings') {
+            refreshRankCard(j);
+            updateRankDeltaGeneric('rank', j, window.previousRankings);
+          } else {
+            updateRankDeltaGeneric('meta-rank', j, window.previousMetaRankings);
+          }
+        }
         status.textContent = 'Recalled from last saved episode.';
       })
       .catch(function() { status.textContent = 'Could not load saved data.'; });
