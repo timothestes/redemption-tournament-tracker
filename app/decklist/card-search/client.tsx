@@ -1446,10 +1446,12 @@ export default function CardSearchClient({
       const s = val ?? '';
       return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const header = columns.join(',');
-    const rows = sortedFiltered.map(card =>
-      columns.map(col => escape(String(card[col] ?? ''))).join(',')
-    );
+    const header = [...columns, 'ytg_price'].join(',');
+    const rows = sortedFiltered.map(card => {
+      const priceInfo = getPrice(`${card.name}|${card.set}|${card.imgFile}`);
+      const ytgPrice = priceInfo ? priceInfo.price.toFixed(2) : '';
+      return [...columns.map(col => escape(String(card[col] ?? ''))), escape(ytgPrice)].join(',');
+    });
     const csv = '﻿' + [header, ...rows].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
