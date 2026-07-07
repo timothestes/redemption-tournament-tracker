@@ -9,7 +9,6 @@ import { FormatBadge } from "../components/FormatBadge";
 import { PlacementBadge } from "../components/PlacementBadge";
 import { SectionTitle } from "../components/SectionTitle";
 import { EmptyState } from "../components/EmptyState";
-import StateMap from "../components/StateMap.loader";
 import { PromoCardsModal } from "../components/PromoCardsModal";
 import { FantasyDraftModal } from "../components/FantasyDraftModal";
 import { promosForYear } from "@/lib/nationals/promos";
@@ -300,13 +299,6 @@ export function TournamentDetailView({
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card p-5">
-        {/* State outline */}
-        {tournament.location && (
-          <div className="flex justify-center mb-2">
-            <StateMap location={tournament.location} className="w-32 h-24 text-primary" />
-          </div>
-        )}
-
         {/* Year nav row */}
         <div className="flex items-center justify-between mb-3">
           <div>
