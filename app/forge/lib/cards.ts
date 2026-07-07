@@ -45,8 +45,13 @@ export async function uploadArt(
   const invalid = validateArtFile(file);
   if (invalid) return { ok: false, error: invalid };
 
-  const key = await uploadForgeArt(file);
-  // No image processing in 1a.3: the uploaded file IS the original.
+  let key: string;
+  try {
+    key = await uploadForgeArt(file);
+  } catch {
+    return { ok: false, error: "Could not read image file." };
+  }
+  // Art is normalized at upload (trim/resize/JPEG); original_key mirrors the stored key.
   const { error } = await ctx.supabase.rpc("forge_set_working_art", {
     p_card_id: cardId,
     p_key: key,
@@ -69,7 +74,12 @@ export async function uploadFinished(
   const invalid = validateArtFile(file);
   if (invalid) return { ok: false, error: invalid };
 
-  const key = await uploadForgeFinished(file);
+  let key: string;
+  try {
+    key = await uploadForgeFinished(file);
+  } catch {
+    return { ok: false, error: "Could not read image file." };
+  }
   const { error } = await ctx.supabase.rpc("forge_set_working_finished", {
     p_card_id: cardId,
     p_key: key,

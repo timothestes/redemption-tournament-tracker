@@ -1,7 +1,7 @@
 "use client";
 
 import type { DesignCard } from "@/app/forge/lib/designCard";
-import { isStatBearing } from "@/app/forge/lib/designCard";
+import { isStatBearing, cardRawText } from "@/app/forge/lib/designCard";
 import { washPath, statBoxPath, iconPath, isPreviewApproximate, BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
 
 // Slot geometry as % of the 750×1050 canvas. STARTING VALUES — tune visually
@@ -92,7 +92,7 @@ export default function ForgeCardPreview({
       )}
       {/* 7. ability — light panel so dark text stays readable on any wash */}
       <div style={{ ...abs(G.ability), zIndex: 5, overflow: "hidden", boxSizing: "border-box", background: "rgba(245,241,233,0.96)", borderRadius: "2.5%", padding: "1.4cqw 3cqw", color: "#111", fontWeight: 700, textAlign: "center", fontSize: "4cqw", lineHeight: 1.15, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {card.specialAbility || ""}
+        {cardRawText(card)}
       </div>
       {/* 8. scripture + reference — dark panel, light italic text */}
       <div style={{ ...abs(G.scripture), zIndex: 5, overflow: "hidden", boxSizing: "border-box", background: "rgba(0,0,0,0.82)", borderRadius: "2.5%", padding: "1.4cqw 3cqw", color: "#e8e8e8", fontStyle: "italic", fontSize: "3.2cqw", lineHeight: 1.15, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>

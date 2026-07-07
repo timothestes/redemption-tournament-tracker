@@ -139,7 +139,7 @@ export function lackeyRowToDesignCard(row: LackeyRow): DesignCard {
   const rawText = clean(row.specialAbility);
   if (rawText) {
     card.rawText = rawText;        // what the studio textarea edits
-    card.specialAbility = rawText; // what the Phase-2.2 deckbuilder reads
+    card.specialAbility = rawText; // legacy fallback field, kept in sync for older readers
   }
 
   const types = [...new Set(

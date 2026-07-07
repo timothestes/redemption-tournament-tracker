@@ -5,7 +5,7 @@
 // collision-proof `forge:{cardId}` dataLine identity.
 import type { Card } from "@/app/decklist/card-search/utils";
 import { deriveTestamentAndGospel } from "@/app/decklist/card-search/data/testament";
-import type { DesignCard, CardType, Brigade } from "@/app/forge/lib/designCard";
+import { cardRawText, type DesignCard, type CardType, type Brigade } from "@/app/forge/lib/designCard";
 
 export const FORGE_DATALINE_PREFIX = "forge:";
 export function forgeDataLine(cardId: string): string { return FORGE_DATALINE_PREFIX + cardId; }
@@ -52,7 +52,9 @@ export function designCardToCard(data: DesignCard, cardId: string, setName: stri
     toughness: data.toughness != null ? String(data.toughness) : "—",
     class: (data.class ?? []).join("/"),
     identifier: (data.identifiers ?? []).join(", "),
-    specialAbility: data.specialAbility || data.rawText || "",
+    // rawText-first (via cardRawText) — the studio edits rawText; a stale legacy
+    // specialAbility must not shadow it (Heavenly Temple bug, 2026-07-06).
+    specialAbility: cardRawText(data),
     rarity: data.rarity ?? "",
     reference: data.reference ?? "",
     alignment: alignmentDisplay(data.alignment),
