@@ -130,3 +130,24 @@ Two clicks answers "what changed since July 1?"; the studio timeline is the dril
 - Lifecycle events before 072 are permanently absent; the timeline shows them only from deploy day.
 - Release-note comments created before 072 remain ordinary comments (no backfill).
 - `tsconfig` has `strict: false` — use `=== false` result-narrowing in new server-action call sites (established project gotcha).
+
+## Addendum (2026-07-07): draft iterations are versions; accept never force-releases
+
+Post-ship correction after owner feedback (drafts iterate heavily pre-release;
+proposing is the team's normal verb — design converged by two reviewer agents,
+implemented in migrations 073–076):
+
+- `version_status` gains `'draft'` (074). Accepting a proposal on a **Draft**
+  card mints a `draft` version row — an elder-only iteration record (invisible
+  to playtesters via 057's status whitelist), first-class in the History
+  timeline ("vN updated", Draft pill, diffs, "Accepted → vN"). The card stays
+  in Draft; nothing is released. Playtesting accepts unchanged (075).
+- Proposal bases and the accept staleness guard both anchor to the card's
+  latest version of ANY status, so round-2+ draft proposals diff against the
+  last accepted iteration and the guard is real during draft phase (075).
+- Archive/return sweeps supersede only `('published','approved')` — draft
+  rows keep their label forever (075). `forge_publish_card` untouched: first
+  release may be v5 and diffs against the last draft, by design.
+- The propose affordance is a primary outline button, "Propose changes"
+  (§ the earlier "Request another elder's review" demotion is reverted).
+- 076 backfilled the single 073-era draft accept that folded without minting.
