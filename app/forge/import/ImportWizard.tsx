@@ -110,22 +110,28 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Grow the previewed window when the sentinel below the grid scrolls near the viewport.
+  // Grow the previewed window when the loaded/unloaded BOUNDARY nears the viewport.
+  // The observed element is the first still-loading tile — a fixed sentinel at the
+  // grid's bottom would sit thousands of px below a mid-grid scroll position and
+  // never fire. The callback ref re-targets the observer as the boundary moves;
+  // observe() reports current intersection immediately, so a boundary that's
+  // already in view cascades until it passes the viewport.
   const totalPreviewable = new Set(cards.map((c) => c.entryName).filter(Boolean)).size;
   const morePreviews = previewCount < totalPreviewable;
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const previewObserver = useRef<IntersectionObserver | null>(null);
   useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !morePreviews) return;
-    // Re-arm after every growth: observe() reports current intersection immediately,
-    // so a sentinel that STAYS in view keeps growing the window (IO alone only fires
-    // on transitions and would stall after the first chunk).
-    const io = new IntersectionObserver((entries) => {
+    previewObserver.current = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) setPreviewCount((c) => c + PREVIEW_CHUNK);
     }, { rootMargin: "600px" });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [morePreviews, previewCount]);
+    return () => previewObserver.current?.disconnect();
+  }, []);
+  const boundaryRef = (el: HTMLDivElement | null) => {
+    const io = previewObserver.current;
+    if (io && el) { io.disconnect(); io.observe(el); }
+  };
+  const firstPendingIdx = morePreviews
+    ? cards.findIndex((c) => c.entryName && !previews.has(c.entryName))
+    : -1;
 
   function switchSource(next: Source) {
     if (running || next === source) return;
@@ -213,10 +219,10 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
             </p>
           )}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {cards.map((c) => {
+            {cards.map((c, i) => {
               const url = c.entryName ? previews.get(c.entryName) : null;
               return (
-                <div key={`${c.name}|${c.entryName}`}>
+                <div key={`${c.name}|${c.entryName}`} ref={i === firstPendingIdx ? boundaryRef : undefined}>
                   <div className="relative w-full overflow-hidden rounded-md border bg-muted/30" style={{ aspectRatio: "2.5 / 3.5" }}>
                     {url ? (
                       <img src={url} alt={c.name} loading="lazy" decoding="async"
@@ -240,7 +246,6 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
               );
             })}
           </div>
-          {morePreviews && <div ref={sentinelRef} aria-hidden className="h-px" />}
         </fieldset>
       )}
 
