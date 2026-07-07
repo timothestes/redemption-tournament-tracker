@@ -8743,9 +8743,17 @@
         .replace(/\u2029/g, '\\u2029');
       var bootstrap = '<script>window.__TF_VIEW__ = ' + payload + ';<\/script>\n';
       var html = shellHtml.replace('<script>', bootstrap + '<script>');
-      win.document.open();
-      win.document.write(html);
-      win.document.close();
+      // Navigate the popup to a Blob URL rather than calling document.write()
+      // a second time on it -- re-opening/re-writing a document that was
+      // already written to once before (the "Loading preview..." message
+      // above) is unreliable across browsers: it can leave the new document
+      // stuck at readyState "loading" forever, so none of the page's
+      // init-time script (including the rank/agur/etc. tile setup) ever
+      // actually runs, even though window.__TF_VIEW__ itself is present in
+      // the markup. A real navigation to a Blob URL doesn't have that problem.
+      var blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      win.addEventListener('load', function() { URL.revokeObjectURL(blobUrl); });
+      win.location.href = blobUrl;
     }).catch(function() {
       win.document.open();
       win.document.write('<p style="font-family:sans-serif;padding:20px;">Preview failed to load -- try again.</p>');
