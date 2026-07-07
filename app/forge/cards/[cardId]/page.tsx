@@ -4,6 +4,7 @@ import { getCard } from "@/app/forge/lib/cards";
 import { getSet, listSets } from "@/app/forge/lib/sets";
 import { getOpenProposalDiffs, listProposals } from "@/app/forge/lib/proposals";
 import { listComments } from "@/app/forge/lib/comments";
+import { listVersions, listCardEvents } from "@/app/forge/lib/versions";
 import StudioEditor from "./StudioEditor";
 import ReviewPanel from "./ReviewPanel";
 
@@ -20,9 +21,15 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
 
   const inSet = card.setId !== null;
   const sets = inSet ? [] : await listSets();
-  const [openDiffs, proposals, comments] = inSet
-    ? await Promise.all([getOpenProposalDiffs(cardId), listProposals(cardId), listComments(cardId)])
-    : [[], [], []];
+  const [openDiffs, proposals, comments, versions, events] = inSet
+    ? await Promise.all([
+        getOpenProposalDiffs(cardId),
+        listProposals(cardId),
+        listComments(cardId),
+        listVersions(cardId),
+        listCardEvents(cardId),
+      ])
+    : [[], [], [], [], []];
   const canReview = ctx.role === "elder" || ctx.role === "superadmin";
 
   const { data: meRow } = await ctx.supabase
@@ -41,6 +48,8 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
           openDiffs={openDiffs}
           proposals={proposals}
           comments={comments}
+          versions={versions}
+          events={events}
           canReview={canReview}
         />
       )}
