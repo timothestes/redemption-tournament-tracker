@@ -1607,34 +1607,27 @@
   #agur-view-spec-brigade {
     font-size: 11px; color: var(--gray); margin-bottom: 6px; font-style: italic;
   }
+  #agur-view-spec-stats {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700;
+    color: var(--teal-dark); margin-bottom: 4px;
+  }
+  #agur-view-spec-class {
+    font-size: 11px; color: var(--gray); margin-bottom: 4px; font-style: italic;
+  }
+  #agur-view-spec-identifier {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 11px; color: var(--teal);
+    margin-bottom: 8px; letter-spacing: 0.3px;
+  }
   /* Ability text plays the role of a card's rules-text box: it fills whatever
      vertical space is left in the fixed-ratio card and scrolls internally
      rather than growing the card taller for a long ability. */
   #agur-view-spec-ability {
     font-size: 12px; color: var(--text); line-height: 1.5;
-    border-top: 1px solid var(--teal-light); padding-top: 8px; margin-top: 2px;
+    border-top: 1px solid var(--teal-light); padding-top: 8px;
     flex: 1; min-height: 0; overflow-y: auto;
   }
-  /* Footer strip -- Class / STR-TGH / Identifier sit together at the bottom
-     of the card, mirroring where that print actually sits on a real card. */
-  #agur-view-spec-footer {
-    display: flex; align-items: center; justify-content: space-between; gap: 6px;
-    margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--teal-light);
-  }
-  #agur-view-spec-class {
-    font-size: 10px; color: var(--gray); font-style: italic;
-  }
-  #agur-view-spec-stats {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700;
-    color: var(--teal-dark); border: 1px solid var(--teal-light); border-radius: 4px;
-    padding: 1px 6px; white-space: nowrap;
-  }
-  #agur-view-spec-identifier {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; color: var(--teal);
-    letter-spacing: 0.3px; white-space: nowrap;
-  }
   #agur-view-spec-scripture {
-    font-size: 10px; color: var(--gray); font-style: italic; margin-top: 6px; text-align: center;
+    font-size: 10px; color: var(--gray); font-style: italic; margin-top: 6px;
   }
   /* Image display -- same fixed portrait ratio as the text spec card above,
      so switching between a text design and a photo design doesn't change
@@ -1668,9 +1661,8 @@
   #agur-view-notes-empty { font-size: 12px; color: var(--placeholder); font-style: italic; }
   body.dark-mode #agur-view-content { background: var(--teal-dark); }
   body.dark-mode #agur-view-spec { background: rgba(255,255,255,0.06); }
-  body.dark-mode #agur-view-spec-stats { color: var(--teal-mid); border-color: rgba(255,255,255,0.15); }
+  body.dark-mode #agur-view-spec-stats { color: var(--teal-mid); }
   body.dark-mode #agur-view-spec-ability { color: rgba(255,255,255,0.85); border-top-color: rgba(255,255,255,0.1); }
-  body.dark-mode #agur-view-spec-footer { border-top-color: rgba(255,255,255,0.1); }
   body.dark-mode #agur-view-img-wrap { background: rgba(255,255,255,0.06); }
   body.dark-mode #agur-view-img-caption { color: var(--teal-mid); }
   body.dark-mode #agur-view-right { border-left-color: rgba(255,255,255,0.1); }
@@ -2728,12 +2720,10 @@
         <div id="agur-view-spec-type"></div>
         <div id="agur-view-spec-title"></div>
         <div id="agur-view-spec-brigade"></div>
+        <div id="agur-view-spec-stats"></div>
+        <div id="agur-view-spec-class"></div>
+        <div id="agur-view-spec-identifier"></div>
         <div id="agur-view-spec-ability"></div>
-        <div id="agur-view-spec-footer">
-          <span id="agur-view-spec-class"></span>
-          <span id="agur-view-spec-stats"></span>
-          <span id="agur-view-spec-identifier"></span>
-        </div>
         <div id="agur-view-spec-scripture"></div>
       </div>
       <!-- Image display -->
@@ -6326,7 +6316,9 @@
         var el = document.getElementById(elId);
         if (el) { el.textContent = val; el.style.display = val ? '' : 'none'; }
       };
-      // Order: Title, Type, Brigade, STR/TGH, Class, Identifier, Ability, Scripture
+      // Displayed order (DOM order in #agur-view-spec): Type, Title, Brigade,
+      // STR/TGH, Class, Identifier, Ability, Scripture. Each line hides itself
+      // via setSpec() when its field wasn't filled in.
       setSpec('agur-view-spec-title',      g('agur-title-' + n));
       setSpec('agur-view-spec-type',       g('agur-type-' + n));
       setSpec('agur-view-spec-brigade',    g('agur-brigade-' + n) ? 'Brigade: ' + g('agur-brigade-' + n) : '');
@@ -6337,10 +6329,6 @@
       var abilityEl = document.getElementById('agur-ability-' + n);
       setSpec('agur-view-spec-ability',    abilityEl ? abilityEl.value : '');
       setSpec('agur-view-spec-scripture',  g('agur-scripture-' + n));
-      // Hide the footer strip entirely when Class/Stats/Identifier are all
-      // blank, instead of leaving a bare divider line with nothing on it.
-      var footer = document.getElementById('agur-view-spec-footer');
-      if (footer) footer.style.display = (str || tgh || g('agur-class-' + n) || g('agur-identifier-' + n)) ? '' : 'none';
     }
 
     // Notes
