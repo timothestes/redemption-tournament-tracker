@@ -29,9 +29,10 @@ const H = 112;
 
 interface StateMapProps {
   location: string;
+  className?: string;
 }
 
-export default function StateMap({ location }: StateMapProps) {
+export default function StateMap({ location, className = "w-40 h-28 text-primary" }: StateMapProps) {
   const [svgData, setSvgData] = useState<{
     pathD: string;
     pin: { cx: number; cy: number } | null;
@@ -87,14 +88,14 @@ export default function StateMap({ location }: StateMapProps) {
     };
   }, [location]);
 
-  if (!svgData) return <div className="w-40 h-28" aria-hidden />;
+  if (!svgData) return <div className={className} aria-hidden />;
 
   return (
     <svg
       width={W}
       height={H}
       viewBox={`0 0 ${W} ${H}`}
-      className="w-40 h-28 text-primary"
+      className={className}
       aria-hidden
     >
       <path
