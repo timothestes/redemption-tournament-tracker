@@ -18,9 +18,10 @@ async function cornersNearWhite(img: sharp.Sharp): Promise<boolean> {
     .flatten({ background: "#ffffff" })
     .raw()
     .toBuffer({ resolveWithObject: true });
+  const channels = Math.min(3, info.channels); // grayscale rasters have < 3 channels
   const px = (x: number, y: number): number[] => {
     const i = (y * info.width + x) * info.channels;
-    return [data[i], data[i + 1], data[i + 2]];
+    return Array.from({ length: channels }, (_, c) => data[i + c]);
   };
   return [
     px(0, 0),
@@ -35,6 +36,15 @@ export async function normalizeCardImage(input: Buffer): Promise<NormalizedImage
   if (!meta.width || !meta.height) throw new Error("Could not read image");
   const base = sharp(input).rotate(); // apply EXIF orientation
 
+  // EXIF orientations 5-8 turn the image 90°, so the base pipeline's output
+  // dimensions are transposed relative to meta.width/meta.height (which
+  // describe the pre-rotation raster). Compare trim output against these
+  // post-rotation dimensions, not the raw stored ones.
+  const orientationSwapsAxes =
+    meta.orientation !== undefined && meta.orientation >= 5 && meta.orientation <= 8;
+  const baseWidth = orientationSwapsAxes ? meta.height : meta.width;
+  const baseHeight = orientationSwapsAxes ? meta.width : meta.height;
+
   // Corner-gated margin trim: white print-bleed margins only. Full-bleed card
   // images have dark frame corners, so the gate skips them and the border
   // ring survives; trimming against an explicit white background can never
@@ -48,9 +58,9 @@ export async function normalizeCardImage(input: Buffer): Promise<NormalizedImage
         .flatten({ background: "#ffffff" })
         .trim({ background: "#ffffff", threshold: TRIM_THRESHOLD })
         .toBuffer({ resolveWithObject: true });
-      const shrank = info.width < meta.width || info.height < meta.height;
+      const shrank = info.width < baseWidth || info.height < baseHeight;
       const degenerate =
-        info.width < meta.width * MIN_TRIM_RATIO || info.height < meta.height * MIN_TRIM_RATIO;
+        info.width < baseWidth * MIN_TRIM_RATIO || info.height < baseHeight * MIN_TRIM_RATIO;
       if (shrank && !degenerate) {
         working = sharp(data);
         trimmed = true;
