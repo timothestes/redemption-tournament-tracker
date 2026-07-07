@@ -141,7 +141,7 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
           />
         </label>
         <span className="text-xs text-muted-foreground">{filtered.length} of {cards.length}</span>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {selecting && (
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{selected.size} selected</span>
@@ -184,6 +184,9 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
             return rel ? [[c.id, `v${rel.versionNumber}${rel.status === "draft" ? " draft" : ""} · ${new Date(rel.releasedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`]] : [];
           })
         ) : undefined}
+        versionNumbers={Object.fromEntries(
+          Object.entries(releases ?? {}).map(([id, r]) => [id, r.versionNumber])
+        )}
         selection={{ active: selecting, selected, onToggle: toggle }}
         leading={canCreate ? <AddCardTile setId={setId} disabled={selecting} /> : undefined}
       />

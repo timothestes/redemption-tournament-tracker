@@ -13,7 +13,7 @@ export type GridSelection = {
 };
 
 export default function ForgeCardGrid({
-  cards, showStatus = false, selection, leading, commentCounts, proposalCounts, releaseBadges,
+  cards, showStatus = false, selection, leading, commentCounts, proposalCounts, releaseBadges, versionNumbers,
 }: {
   cards: ForgeCardFull[];
   showStatus?: boolean;
@@ -22,6 +22,8 @@ export default function ForgeCardGrid({
   commentCounts?: Record<string, number>;
   proposalCounts?: Record<string, number>;
   releaseBadges?: Record<string, string>;
+  // Latest version per card — appended to the status pill ("Draft · v2").
+  versionNumbers?: Record<string, number>;
 }) {
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -76,6 +78,7 @@ export default function ForgeCardGrid({
               {showStatus && (
                 <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] ${STATUS_BADGE_CLASS[c.status] ?? "text-muted-foreground"}`}>
                   {STATUS_LABEL[c.status] ?? c.status}
+                  {versionNumbers?.[c.id] != null && <> · v{versionNumbers[c.id]}</>}
                 </span>
               )}
             </div>
