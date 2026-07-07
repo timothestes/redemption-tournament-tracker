@@ -90,9 +90,9 @@ describe("PUT /threshingfloor/api/store/[key]", () => {
     expect(r.status).toBe(400);
   });
 
-  it("400s when data is a primitive", async () => {
+  it("400s when data is a disallowed primitive (number)", async () => {
     authorized([]);
-    const r = await put("players", { data: "nope" });
+    const r = await put("players", { data: 42 });
     expect(r.status).toBe(400);
   });
 
