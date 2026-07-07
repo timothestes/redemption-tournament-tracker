@@ -34,7 +34,15 @@ export function ChampionsView({ setView }: ChampionsViewProps) {
 
   const filtered = useMemo(() => {
     if (format === "All") return champions;
-    return champions.filter((c) => c.formats.includes(format));
+    // Scope each champion's card to just the selected format's wins/years/badge.
+    return champions
+      .filter((c) => c.formats.includes(format))
+      .map((c) => ({
+        ...c,
+        wins: c.byFormat[format].length,
+        years: c.byFormat[format],
+        formats: [format],
+      }));
   }, [champions, format]);
 
   const sorted = useMemo(() => {

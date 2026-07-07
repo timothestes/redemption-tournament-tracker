@@ -16,6 +16,8 @@ export interface Champion {
   years: number[];
   /** Distinct set of formats in which they won at least once (NOT parallel to `years`) */
   formats: string[];
+  /** Win years broken out per format, for format-scoped views */
+  byFormat: Record<string, number[]>;
 }
 
 /**
@@ -74,7 +76,12 @@ export function buildChampionData(seed: NationalsData): Champion[] {
     // formats is a de-duped list of distinct formats won (not index-parallel to years)
     const formats = Array.from(new Set(Object.keys(fmtMap)));
 
-    return { name, wins: years.length, years, formats };
+    const byFormat: Record<string, number[]> = {};
+    for (const [fmt, fmtYears] of Object.entries(fmtMap)) {
+      byFormat[fmt] = [...fmtYears].sort((a, b) => a - b);
+    }
+
+    return { name, wins: years.length, years, formats, byFormat };
   });
 }
 
