@@ -1632,12 +1632,16 @@
   /* Image display -- same fixed portrait ratio as the text spec card above,
      so switching between a text design and a photo design doesn't change
      the size/shape of the left column. */
-  #agur-view-img-wrap {
+  /* The fixed-ratio box lives on this inner element, not #agur-view-img-wrap
+     itself -- #agur-view-img-wrap also holds the caption below it, and
+     giving *that* a fixed-height flex box used to squeeze the caption into
+     the same row as the image instead of sitting underneath it. */
+  #agur-view-img-box {
     border-radius: 6px; overflow: hidden; aspect-ratio: 5 / 7;
     display: flex; align-items: center; justify-content: center;
     background: var(--gray-light);
   }
-  #agur-view-img-wrap img { width: 100%; height: 100%; border-radius: 6px; object-fit: contain; }
+  #agur-view-img-box img { width: 100%; height: 100%; border-radius: 6px; object-fit: contain; }
   #agur-view-img-caption {
     font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 14px;
     color: var(--teal-dark); margin-top: 8px; text-align: center;
@@ -1663,7 +1667,7 @@
   body.dark-mode #agur-view-spec { background: rgba(255,255,255,0.06); }
   body.dark-mode #agur-view-spec-stats { color: var(--teal-mid); }
   body.dark-mode #agur-view-spec-ability { color: rgba(255,255,255,0.85); border-top-color: rgba(255,255,255,0.1); }
-  body.dark-mode #agur-view-img-wrap { background: rgba(255,255,255,0.06); }
+  body.dark-mode #agur-view-img-box { background: rgba(255,255,255,0.06); }
   body.dark-mode #agur-view-img-caption { color: var(--teal-mid); }
   body.dark-mode #agur-view-right { border-left-color: rgba(255,255,255,0.1); }
   body.dark-mode #agur-view-notes-label { color: var(--teal-mid); }
@@ -2728,7 +2732,9 @@
       </div>
       <!-- Image display -->
       <div id="agur-view-img-wrap" style="display:none;">
-        <img id="agur-view-img" src="" alt="">
+        <div id="agur-view-img-box">
+          <img id="agur-view-img" src="" alt="">
+        </div>
         <div id="agur-view-img-caption"></div>
       </div>
     </div>
