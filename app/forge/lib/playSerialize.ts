@@ -70,9 +70,10 @@ export function buildForgeGoldfishCards(
         card_name: r.name,
         card_set: "Forge",
         card_img_file: forgeProxyUrl(r), // '' when no image; leading-/ proxy URL otherwise
-        card_type: r.typeDisplay, card_brigade: "", card_strength: "", card_toughness: "",
+        card_type: r.typeDisplay,
+        card_brigade: r.brigade, card_strength: r.strength, card_toughness: r.toughness,
         card_special_ability: r.rawText,
-        card_identifier: "", card_reference: "", card_alignment: "",
+        card_identifier: r.identifier, card_reference: r.reference, card_alignment: r.alignment,
         quantity: e.qty,
         is_reserve,
       });

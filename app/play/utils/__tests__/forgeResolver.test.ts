@@ -3,7 +3,11 @@ import { forgeCardIdFromImgFile, forgeProxyUrl, resolveCardImageUrl, mergeForgeD
 import { getCardImageUrl, getCardImageUrlOrNull } from "@/app/shared/utils/cardImageUrl";
 
 const ID = "11111111-2222-3333-4444-555555555555";
-const entry = { cardId: ID, name: "Test Hero", rawText: "Does things.", hasFinished: true, hasArt: true, versionId: "v-1" };
+const entry = {
+  cardId: ID, name: "Test Hero", rawText: "Does things.", hasFinished: true, hasArt: true, versionId: "v-1",
+  typeDisplay: "Hero", alignment: "Good", brigade: "Blue", strength: "5", toughness: "4",
+  identifier: "Judah", reference: "Genesis 1:1",
+};
 const resolver = new Map([[ID, entry]]);
 
 describe("forge image seams", () => {
@@ -33,10 +37,31 @@ describe("forge image seams", () => {
       { cardName: "", cardSet: "Forge", cardImgFile: `forge:${ID}`, cardType: "", brigade: "", strength: "", toughness: "", alignment: "", identifier: "", reference: "", specialAbility: "", isReserve: false },
       { cardName: "Public", cardSet: "S", cardImgFile: "Public.jpg", cardType: "", brigade: "", strength: "", toughness: "", alignment: "", identifier: "", reference: "", specialAbility: "", isReserve: false },
     ];
-    const merged = mergeForgeDeckData(cards as any, resolver);
+    const merged = mergeForgeDeckData(cards as any, resolver as any);
     expect(merged[0].cardName).toBe("Test Hero");
     expect(merged[0].specialAbility).toBe("Does things.");
     expect(merged[0].cardImgFile).toContain("/forge/api/art/");
     expect(merged[1]).toBe(cards[1]);
+  });
+
+  it("mergeForgeDeckData restores the searchable metadata (alignment/brigade/stats/identifier/reference)", () => {
+    // Regression: the world-readable STDB row blanks these fields (leak spine),
+    // so the owner's client must re-hydrate them — otherwise the in-game Search
+    // Deck modal can't match forge cards by alignment/brigade/identifier/reference.
+    const evil = {
+      cardId: ID, name: "Wormwood", rawText: "Bad things.", hasFinished: false, hasArt: false, versionId: "v-2",
+      typeDisplay: "Evil Character", alignment: "Evil", brigade: "Gray", strength: "7", toughness: "6",
+      identifier: "Demon", reference: "Revelation 8:11",
+    };
+    const cards = [
+      { cardName: "", cardSet: "Forge", cardImgFile: `forge:${ID}`, cardType: "Evil Character", brigade: "", strength: "", toughness: "", alignment: "", identifier: "", reference: "", specialAbility: "", isReserve: false },
+    ];
+    const merged = mergeForgeDeckData(cards as any, new Map([[ID, evil]]) as any);
+    expect(merged[0].alignment).toBe("Evil");
+    expect(merged[0].brigade).toBe("Gray");
+    expect(merged[0].strength).toBe("7");
+    expect(merged[0].toughness).toBe("6");
+    expect(merged[0].identifier).toBe("Demon");
+    expect(merged[0].reference).toBe("Revelation 8:11");
   });
 });

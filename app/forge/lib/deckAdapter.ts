@@ -33,6 +33,33 @@ function alignmentDisplay(a?: string): string {
   return a === "Good_Evil" ? "Good/Evil" : (a ?? "");
 }
 
+// The subset of card fields the in-game "Search Deck" modal filters on, derived
+// from a DesignCard. Mirrors designCardToCard's field mapping but blanks unset
+// stats/brigade with "" (not "—") to match how PUBLIC cards are serialized for
+// play — so forge and public cards behave identically in the deck-search grid.
+// Carried on the forge play resolver so the owner's client can re-hydrate these
+// after the leak spine blanks them on the world-readable STDB row.
+export interface ForgeSearchFields {
+  alignment: string;
+  brigade: string;
+  strength: string;
+  toughness: string;
+  identifier: string;
+  reference: string;
+}
+
+export function designCardSearchFields(data: DesignCard): ForgeSearchFields {
+  const brigades = data.brigades ?? [];
+  return {
+    alignment: alignmentDisplay(data.alignment),
+    brigade: brigades.map((b) => BRIGADE_DISPLAY[b] ?? b).join("/"),
+    strength: data.strength != null ? String(data.strength) : "",
+    toughness: data.toughness != null ? String(data.toughness) : "",
+    identifier: (data.identifiers ?? []).join(", "),
+    reference: data.reference ?? "",
+  };
+}
+
 export function designCardToCard(data: DesignCard, cardId: string, setName: string): Card {
   const types = data.cardType ?? [];
   const brigades = data.brigades ?? [];
