@@ -9,6 +9,7 @@
 // app's public card-image store. See `forgeAuth` below for how requests authenticate.
 import { randomUUID } from "crypto";
 import { put, get, del, type GetBlobResult } from "@vercel/blob";
+import { normalizeCardImage } from "@/app/forge/lib/imageNormalize";
 
 /**
  * Auth for the PRIVATE Forge store. Production uses Vercel OIDC (no static secret):
@@ -38,26 +39,32 @@ export function validateArtFile(file: { type: string; size: number }): string | 
   return null;
 }
 
-/** Upload to the PRIVATE blob store under an unguessable UUID key. Returns the stored pathname. */
+/**
+ * Normalize (trim white print-bleed margins, cap 1050px tall, re-encode JPEG)
+ * and upload to the PRIVATE blob store under an unguessable UUID key.
+ * Throws if the file cannot be decoded as an image. Returns the stored pathname.
+ */
 export async function uploadForgeArt(file: File): Promise<string> {
+  const normalized = await normalizeCardImage(Buffer.from(await file.arrayBuffer()));
   const key = `${ART_PREFIX}${randomUUID()}`;
-  const blob = await put(key, file, {
+  const blob = await put(key, normalized.data, {
     access: "private",
     addRandomSuffix: false,
     ...forgeAuth,
-    contentType: file.type,
+    contentType: normalized.contentType,
   });
   return blob.pathname;
 }
 
-/** Upload a finished-card image to the PRIVATE store under an unguessable UUID key. */
+/** Same normalization + upload for finished-card images under forge-finished/. */
 export async function uploadForgeFinished(file: File): Promise<string> {
+  const normalized = await normalizeCardImage(Buffer.from(await file.arrayBuffer()));
   const key = `${FINISHED_PREFIX}${randomUUID()}`;
-  const blob = await put(key, file, {
+  const blob = await put(key, normalized.data, {
     access: "private",
     addRandomSuffix: false,
     ...forgeAuth,
-    contentType: file.type,
+    contentType: normalized.contentType,
   });
   return blob.pathname;
 }

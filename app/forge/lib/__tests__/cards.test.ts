@@ -5,8 +5,8 @@ vi.mock("@/app/forge/lib/auth", () => ({ requireForge: vi.fn(), requireElder: vi
 vi.mock("@/app/forge/lib/art", () => ({ validateArtFile: vi.fn(), uploadForgeArt: vi.fn(), uploadForgeFinished: vi.fn() }));
 
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
-import { validateArtFile, uploadForgeFinished } from "@/app/forge/lib/art";
-import { saveCard, getCard, listForgeCards, uploadFinished } from "../cards";
+import { validateArtFile, uploadForgeArt, uploadForgeFinished } from "@/app/forge/lib/art";
+import { saveCard, getCard, listForgeCards, uploadArt, uploadFinished } from "../cards";
 
 function ctx(rpcImpl?: any, queryRows?: any[]) {
   const order = vi.fn(async () => ({ data: queryRows ?? [], error: null }));
@@ -91,5 +91,27 @@ describe("getCard maps hasFinished", () => {
     const row = { id: "c1", title: "T", working_snapshot: {}, working_art_key: null, working_art_is_placeholder: false, working_finished_key: "forge-finished/x", status: "draft", updated_at: "t", set_id: null, published_version_id: null, approved_version_id: null };
     (requireForge as any).mockResolvedValue(ctx(undefined, [row]));
     expect((await getCard("c1"))?.hasFinished).toBe(true);
+  });
+});
+
+describe("upload decode failures", () => {
+  it("uploadArt returns a clear error when the image cannot be decoded", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    (validateArtFile as any).mockReturnValue(null);
+    (uploadForgeArt as any).mockRejectedValue(new Error("unsupported image format"));
+    const fd = new FormData();
+    fd.set("file", new File([new Uint8Array([1, 2, 3])], "a.png", { type: "image/png" }));
+    expect(await uploadArt("c1", fd)).toEqual({ ok: false, error: "Could not read image file." });
+  });
+
+  it("uploadFinished returns a clear error when the image cannot be decoded", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    (validateArtFile as any).mockReturnValue(null);
+    (uploadForgeFinished as any).mockRejectedValue(new Error("unsupported image format"));
+    const fd = new FormData();
+    fd.set("file", new File([new Uint8Array([1, 2, 3])], "c.png", { type: "image/png" }));
+    expect(await uploadFinished("c1", fd)).toEqual({ ok: false, error: "Could not read image file." });
   });
 });
