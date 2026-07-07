@@ -289,6 +289,22 @@ describe("tableToCards", () => {
     expect(cards[0].snapshot.alignment).toBe("Good_Evil");
   });
 
+  it('accepts paired dual-side stats like "6 (0)", normalized to "N (M)"', () => {
+    const header = ["Name", "Type", "Strength", "Toughness"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards([
+      header,
+      ["Spiritual Warfare [RR2]", "Dual-Alignment Enhancement", "6 (0)", "0 (6)"],
+      ["Philosophy [RR2]", "Dual-Alignment Enhancement", "3(2)", "2(3)"],
+    ], mapping);
+    expect(cards[0].warnings).toEqual([]);
+    expect(cards[0].snapshot.strength).toBe("6 (0)");
+    expect(cards[0].snapshot.toughness).toBe("0 (6)");
+    expect(cards[1].warnings).toEqual([]);
+    expect(cards[1].snapshot.strength).toBe("3 (2)"); // tight spelling normalizes
+    expect(cards[1].snapshot.toughness).toBe("2 (3)");
+  });
+
   it('accepts "X" as a valid variable strength/toughness (The Faithful Followers)', () => {
     const header = ["Name", "Type", "Strength", "Toughness"];
     const { mapping } = detectColumns(header);
@@ -378,8 +394,10 @@ describe("auditLackeyRow", () => {
     expect(warnings[0]).toMatch(/Wizard/);
   });
 
-  it('is silent on "X" stats', () => {
+  it('is silent on "X" and paired stats, but still flags junk', () => {
     expect(auditLackeyRow({ ...base, strength: "X", toughness: "x" })).toEqual([]);
+    expect(auditLackeyRow({ ...base, strength: "6 (0)", toughness: "X (6)" })).toEqual([]);
+    expect(auditLackeyRow({ ...base, strength: "6 (a)" })).toHaveLength(1);
   });
 });
 

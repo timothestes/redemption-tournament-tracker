@@ -26,8 +26,11 @@ export const LEGALITIES = ["Rotation", "Classic", "Scrolls", "Paragon", "Banned"
 // `_forge_is_card_field` (used to validate field-anchored suggestions); its
 // current definition is in supabase/migrations/067_forge_scripture_field.sql.
 // Keep the two lists in sync.
-// "X" is a real stat value (variable strength/toughness, e.g. The Faithful Followers).
-export type StatValue = number | "X" | null;
+// A stat is a number, "X" (variable, e.g. The Faithful Followers), or a paired
+// dual-side value like "6 (0)" — the official card pool's convention for
+// dual-alignment enhancements and dual-sided characters (142 cards use it).
+// parseStatInput below is the only producer of the string forms.
+export type StatValue = number | string | null;
 
 export type DesignCard = {
   name?: string;
@@ -122,11 +125,19 @@ export function cardRawText(card: DesignCard): string {
   return card.rawText ?? card.specialAbility ?? "";
 }
 
-/** Parse a stats text input: "" → null, "x"/"X" → "X", numbers pass, junk → null. Pure. */
+const PAIRED_STAT_RE = /^(x|\d+)\s*\(\s*(x|\d+)\s*\)$/i;
+
+/** Parse a stat: "" → null, "x"/"X" → "X", numbers pass, paired dual-side values
+ *  normalize to `N (M)` (e.g. "3(2)" → "3 (2)", "x(0)" → "X (0)"), junk → null. Pure. */
 export function parseStatInput(raw: string): StatValue {
   const t = raw.trim();
   if (!t) return null;
   if (/^x$/i.test(t)) return "X";
+  const paired = PAIRED_STAT_RE.exec(t);
+  if (paired) {
+    const side = (s: string) => (/^x$/i.test(s) ? "X" : s);
+    return `${side(paired[1])} (${side(paired[2])})`;
+  }
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
 }

@@ -1,7 +1,7 @@
 // Pure LackeyCCG plugin-format helpers for the Forge set importer.
 // CLIENT-SAFE: no server-only imports. Column conventions mirror scripts/parse-carddata.js.
 
-import { cardRawText, type Brigade, type CardType, type DesignCard } from "./designCard";
+import { cardRawText, parseStatInput, type Brigade, type CardType, type DesignCard } from "./designCard";
 
 export interface LackeyRow {
   name: string; set: string; imageFile: string; officialSet: string;
@@ -129,12 +129,9 @@ function clean(v: string): string {
   return t === "-" ? "" : t;
 }
 
-function parseStat(v: string): number | "X" | null {
-  const t = clean(v);
-  if (!t) return null;
-  if (/^x$/i.test(t)) return "X"; // variable stats are printed as X (e.g. X/X)
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
+// Accepts numbers, "X", and paired dual-side values like "6 (0)" — see parseStatInput.
+function parseStat(v: string): number | string | null {
+  return parseStatInput(clean(v));
 }
 
 const CLASS_TOKENS = new Set(["warrior", "weapon", "territory", "star", "cloud"]);
@@ -258,7 +255,7 @@ function tsvSafe(value: string): string {
   return value.replace(/[\t\r\n]+/g, " ").trim();
 }
 
-function statCell(v: number | "X" | null | undefined): string {
+function statCell(v: number | string | null | undefined): string {
   return v === null || v === undefined ? "" : String(v);
 }
 
