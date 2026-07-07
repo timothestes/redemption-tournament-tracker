@@ -11,6 +11,8 @@ export type ProposalRow = {
   id: string;
   cardId: string;
   baseVersionId: string | null;
+  resultingVersionId: string | null;
+  closedBy: string | null;
   summary: string | null;
   status: ProposalStatus;
   proposedSnapshot: DesignCard;
@@ -22,13 +24,15 @@ export type ProposalRow = {
 export type ProposalDiffData = { proposal: ProposalRow; current: DesignCard };
 
 const COLS =
-  "id, card_id, base_version_id, summary, status, proposed_snapshot, created_by, created_at, closed_at";
+  "id, card_id, base_version_id, resulting_version_id, summary, status, proposed_snapshot, created_by, created_at, closed_at, closed_by";
 
 function toProposal(row: any): ProposalRow {
   return {
     id: row.id,
     cardId: row.card_id,
     baseVersionId: row.base_version_id ?? null,
+    resultingVersionId: row.resulting_version_id ?? null,
+    closedBy: row.closed_by ?? null,
     summary: row.summary ?? null,
     status: row.status,
     proposedSnapshot: (row.proposed_snapshot ?? {}) as DesignCard,
