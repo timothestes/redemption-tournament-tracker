@@ -35,9 +35,27 @@ export default function CardDetailsFields({
   const reference = (snapshot.reference ?? "").trim();
   const { testament, isGospel } = deriveTestamentAndGospel(reference);
 
+  // Collapsed by default (the block is tall); the summary previews what's set so
+  // the card stays readable at a glance without opening it.
+  const preview = [
+    ...types,
+    ...(snapshot.brigades ?? []),
+    snapshot.strength || snapshot.toughness
+      ? `${snapshot.strength ?? "—"}/${snapshot.toughness ?? "—"}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <fieldset className="space-y-4 rounded-lg border bg-card p-4">
-      <legend className="px-1 text-sm font-medium">Card details</legend>
+    <details className="rounded-lg border bg-card">
+      <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+        Card details
+        <span className="ml-2 font-normal text-muted-foreground">
+          {preview || "type, brigade, stats, identifiers…"}
+        </span>
+      </summary>
+      <div className="space-y-4 px-4 pb-4">
       <p className="text-xs text-muted-foreground">
         Used for deck building — the builder reads these to categorize and validate the card.
       </p>
@@ -181,6 +199,7 @@ export default function CardDetailsFields({
           placeholder="The scripture text printed on the card."
           className="h-20 w-full rounded-md border bg-background px-3 py-2 text-sm" />
       </label>
-    </fieldset>
+      </div>
+    </details>
   );
 }

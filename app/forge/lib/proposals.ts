@@ -11,6 +11,8 @@ export type ProposalRow = {
   id: string;
   cardId: string;
   baseVersionId: string | null;
+  resultingVersionId: string | null;
+  closedBy: string | null;
   summary: string | null;
   status: ProposalStatus;
   proposedSnapshot: DesignCard;
@@ -22,13 +24,15 @@ export type ProposalRow = {
 export type ProposalDiffData = { proposal: ProposalRow; current: DesignCard };
 
 const COLS =
-  "id, card_id, base_version_id, summary, status, proposed_snapshot, created_by, created_at, closed_at";
+  "id, card_id, base_version_id, resulting_version_id, summary, status, proposed_snapshot, created_by, created_at, closed_at, closed_by";
 
 function toProposal(row: any): ProposalRow {
   return {
     id: row.id,
     cardId: row.card_id,
     baseVersionId: row.base_version_id ?? null,
+    resultingVersionId: row.resulting_version_id ?? null,
+    closedBy: row.closed_by ?? null,
     summary: row.summary ?? null,
     status: row.status,
     proposedSnapshot: (row.proposed_snapshot ?? {}) as DesignCard,
@@ -40,32 +44,38 @@ function toProposal(row: any): ProposalRow {
 
 export async function createProposal(
   cardId: string,
-  snapshot: DesignCard,
   summary: string
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const ctx = await requireForge();
   if (!ctx) return { ok: false, error: "Not authorized" };
   if (!summary.trim()) return { ok: false, error: "A summary is required" };
 
-  // No-op guard: a proposal must differ from the last published version. The client
-  // never loads the base version, so this is the authoritative check. Never-published
-  // cards (base = {}) still allow a first real proposal.
+  // The proposal freezes the card's SAVED working draft (server truth). The
+  // editor autosaves within ~1s and proposing happens after typing a summary,
+  // so the draft is current by submit time; server truth is also what the
+  // no-op guard below compares.
   const { data: card } = await ctx.supabase
     .from("forge_cards")
-    .select("published_version_id")
+    .select("working_snapshot")
     .eq("id", cardId)
     .maybeSingle();
-  let base: DesignCard = {};
-  if (card?.published_version_id) {
-    const { data: ver } = await ctx.supabase
-      .from("card_versions")
-      .select("data")
-      .eq("id", card.published_version_id)
-      .maybeSingle();
-    base = (ver?.data ?? {}) as DesignCard;
-  }
+  if (!card) return { ok: false, error: "Card not found" };
+  const snapshot = (card.working_snapshot ?? {}) as DesignCard;
+
+  // No-op guard: a proposal must differ from the card's LATEST version of any
+  // status — draft iterations included — matching the base the RPC records and
+  // the diff the reviewer will see. Cards with no versions ({} base) still
+  // allow a first real proposal.
+  const { data: latest } = await ctx.supabase
+    .from("card_versions")
+    .select("data")
+    .eq("card_id", cardId)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const base = (latest?.data ?? {}) as DesignCard;
   if (diffCards(base, snapshot).length === 0) {
-    return { ok: false, error: "No changes to propose since the last published version." };
+    return { ok: false, error: "No changes to review since the last accepted version." };
   }
 
   const { data, error } = await ctx.supabase.rpc("forge_create_proposal", {

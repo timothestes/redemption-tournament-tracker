@@ -3,6 +3,7 @@ import { requireForge } from "@/app/forge/lib/auth";
 import { listSetCards, canDesignSet } from "@/app/forge/lib/sets";
 import { listUnresolvedCommentCounts } from "@/app/forge/lib/comments";
 import { listOpenProposalCounts } from "@/app/forge/lib/proposals";
+import { listSetActivity } from "@/app/forge/lib/versions";
 import SetCardsBrowser from "./SetCardsBrowser";
 import AddCardTile from "./AddCardTile";
 
@@ -34,9 +35,10 @@ export default async function SetCardsPage({ params }: { params: Promise<{ setId
     );
   }
   const cardIds = cards.map((c) => c.id);
-  const [commentCounts, proposalCounts] = await Promise.all([
+  const [commentCounts, proposalCounts, releases] = await Promise.all([
     listUnresolvedCommentCounts(cardIds),
     listOpenProposalCounts(cardIds),
+    listSetActivity(cardIds),
   ]);
-  return <SetCardsBrowser cards={cards} setId={setId} canCreate={canCreate} commentCounts={commentCounts} proposalCounts={proposalCounts} />;
+  return <SetCardsBrowser cards={cards} setId={setId} canCreate={canCreate} commentCounts={commentCounts} proposalCounts={proposalCounts} releases={releases} />;
 }
