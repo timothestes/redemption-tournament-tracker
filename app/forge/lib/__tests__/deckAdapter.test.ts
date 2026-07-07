@@ -63,6 +63,17 @@ describe("designCardToCard", () => {
     expect(designCardToCard({ name: "Z", cardType: ["Hero"] }, "z1", "S").testament).toBe("");
   });
 
+  it("prefers rawText over a stale specialAbility, falling back when rawText is absent", () => {
+    // Regression: designCardToCard must read via cardRawText (rawText-first) so a
+    // stale legacy specialAbility can't shadow a newer rawText edit (Heavenly
+    // Temple bug, 2026-07-06).
+    const both: DesignCard = { name: "A", cardType: ["Hero"], rawText: "new text", specialAbility: "old text" };
+    expect(designCardToCard(both, "a1", "S").specialAbility).toBe("new text");
+
+    const legacyOnly: DesignCard = { name: "B", cardType: ["Hero"], specialAbility: "legacy" };
+    expect(designCardToCard(legacyOnly, "b1", "S").specialAbility).toBe("legacy");
+  });
+
   it("dataLine helpers round-trip", () => {
     const dl = forgeDataLine("uuid-9");
     expect(isForgeDataLine(dl)).toBe(true);

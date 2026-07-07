@@ -109,7 +109,7 @@ This is the single choke point: `uploadArt`/`uploadFinished` server actions
 import route ([app/forge/api/import/route.ts](../../../app/forge/api/import/route.ts))
 all pass through these two helpers.
 
-### 3. Backfill script — `scripts/forge-normalize-images.mjs`
+### 3. Backfill script — `scripts/forge-normalize-images.ts`
 
 One-off, run manually with `.env.local` creds (service-role Supabase key +
 `FORGE_BLOB_READ_WRITE_TOKEN`). Never runs in the app.

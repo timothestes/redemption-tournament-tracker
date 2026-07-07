@@ -161,10 +161,14 @@ async function main() {
       ...auth,
     });
     for (const ref of refList) {
+      // WHERE <col> = <old key> guards against an elder replacing the art between
+      // collectRefs() and this write. A 0-row update is a silent no-op in
+      // supabase-js (no error) — that's correct: the ref moved on, our blob dangles.
       const { error } = await supabase
         .from(ref.table)
         .update({ [ref.column]: newKey })
-        .eq("id", ref.id);
+        .eq("id", ref.id)
+        .eq(ref.column, key);
       if (error) throw new Error(`UPDATE ${ref.table}.${ref.column} for ${ref.id}: ${error.message}`);
       touchedCards.add(ref.cardId);
     }
