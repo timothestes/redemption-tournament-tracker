@@ -458,6 +458,10 @@
   }
   .trd-rank.tied { /* color unchanged when tied */ }
   .trd-player { font-size: 12px; color: var(--text); line-height: 1.3; }
+  .trd-player-name-clickable {
+    cursor: pointer; border-bottom: 1px dotted var(--placeholder); transition: color 0.15s, border-color 0.15s;
+  }
+  .trd-player-name-clickable:hover { color: var(--teal); border-bottom-color: var(--teal); }
   .trd-empty-state { font-size: 11px; color: var(--placeholder); font-style: italic; padding: 8px 0; }
 
   /* dark mode for new modals */
@@ -482,6 +486,7 @@
   body.dark-mode .tre-tie-btn.active { background: var(--teal-mid); border-color: var(--teal-mid); color: #fff; }
   body.dark-mode .trd-format-label { color: var(--teal-mid); }
   body.dark-mode .trd-player { color: var(--text); }
+  body.dark-mode .trd-player-name-clickable:hover { color: var(--teal-mid); border-bottom-color: var(--teal-mid); }
   body.dark-mode .trd-rank { color: var(--teal-mid); }
   body.dark-mode .trd-rank.tied { /* color unchanged when tied */ }
   body.dark-mode .trd-empty-state { color: var(--placeholder); }
@@ -4616,6 +4621,32 @@
   }
 
   // ---- Tournament Results Display Modal (published/view) ----
+  // Renders one or two individual player names (Teams pairs share a single
+  // result line) as separate spans, each clickable to open that player's
+  // profile when a registry match exists -- same click-to-view-profile
+  // affordance as a filled Power Rankings card, but scoped per-name since a
+  // Teams line can name two different players who each need their own link.
+  function renderTrdPlayerNames(playerEl, names) {
+    playerEl.innerHTML = '';
+    names.forEach(function(n, idx) {
+      if (idx > 0) playerEl.appendChild(document.createTextNode(' / '));
+      var key = findPlayerKey(n);
+      var span = document.createElement('span');
+      span.textContent = n;
+      if (key) {
+        span.className = 'trd-player-name trd-player-name-clickable';
+        span.title = 'View profile';
+        span.addEventListener('click', function(e) {
+          e.stopPropagation();
+          openPlayerProfileModal(key, false);
+        });
+      } else {
+        span.className = 'trd-player-name';
+      }
+      playerEl.appendChild(span);
+    });
+  }
+
   function openTournResultsDisplay(b) {
     var nameEl = document.getElementById('t' + b + '-name');
     var hostEl = document.getElementById('t' + b + '-host');
@@ -4663,13 +4694,16 @@
         var rankLabel = rankLabels[ri];
 
         if (row.tie) {
-          // Tied: show as two T-Nth lines.
+          // Tied: show as two T-Nth lines. Each line is a *group* of one
+          // (singles) or two (Teams partners) individual names, kept as
+          // separate strings rather than pre-joined so each name can get
+          // its own profile-click span below.
           var p3 = displayPlayerName((row.p3 || '').trim()), p4 = displayPlayerName((row.p4 || '').trim());
-          var names = fmt.teams
-            ? [p2 ? p1 + ' / ' + p2 : p1, p3 ? (p3 + (p4 ? ' / ' + p4 : '')) : null].filter(Boolean)
-            : [p1, p2].filter(Boolean);
+          var groups = fmt.teams
+            ? [[p1, p2].filter(Boolean), [p3, p4].filter(Boolean)].filter(function(g) { return g.length; })
+            : [p1, p2].filter(Boolean).map(function(n) { return [n]; });
 
-          names.forEach(function(playerName) {
+          groups.forEach(function(group) {
             var trdRow = document.createElement('div');
             trdRow.className = 'trd-row';
             var rkEl = document.createElement('div');
@@ -4678,7 +4712,7 @@
             trdRow.appendChild(rkEl);
             var playerEl = document.createElement('div');
             playerEl.className = 'trd-player';
-            playerEl.textContent = playerName;
+            renderTrdPlayerNames(playerEl, group);
             trdRow.appendChild(playerEl);
             fBlock.appendChild(trdRow);
           });
@@ -4692,7 +4726,7 @@
           trdRow.appendChild(rkEl);
           var playerEl = document.createElement('div');
           playerEl.className = 'trd-player';
-          playerEl.textContent = fmt.teams && p2 ? p1 + ' / ' + p2 : p1;
+          renderTrdPlayerNames(playerEl, (fmt.teams && p2) ? [p1, p2] : [p1]);
           trdRow.appendChild(playerEl);
           fBlock.appendChild(trdRow);
         }
