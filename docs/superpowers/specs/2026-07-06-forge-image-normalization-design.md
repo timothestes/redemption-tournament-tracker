@@ -70,6 +70,13 @@ Pipeline:
    - **Degenerate-trim guard:** if the trimmed result is smaller than 60% of
      the original along either axis, discard the trim and use the untrimmed
      image (protects near-white card faces).
+   - **Significance floor:** the trim must remove at least 3% along at least
+     one axis, or it is discarded. Live Lackey scans have white rounded-corner
+     pixels (passing the corner gate) plus a ~9px (1.8%) near-white fringe; a
+     2026-07-06 dry-run showed that without this floor every one of the 1,323
+     conforming JPEGs would trim marginally and re-encode, violating the
+     no-generation-loss non-goal. Real print-bleed margins (Heavenly Temple:
+     ~8%) clear the floor easily.
 3. `.resize({ height: 1050, withoutEnlargement: true })` — cap resolution,
    preserve aspect ratio, never upscale.
 4. `.flatten({ background: "#ffffff" })` — remove alpha.

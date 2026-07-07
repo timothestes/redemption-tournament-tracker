@@ -14,7 +14,7 @@
 
 - Never import server-only modules (`app/forge/lib/art.ts`, `imageNormalize.ts`) into `"use client"` files.
 - Never upscale images; never re-encode already-conforming JPEGs (byte-identical passthrough).
-- Trim only fires when ALL four corner pixels are near-white (each RGB channel ≥ 240 after flattening alpha onto white); trim threshold 25; degenerate-trim guard at 60% of original per axis.
+- Trim only fires when ALL four corner pixels are near-white (each RGB channel ≥ 240 after flattening alpha onto white); trim threshold 25; degenerate-trim guard at 60% of original per axis; significance floor: the trim must remove ≥3% along at least one axis or it is discarded (live Lackey scans have white rounded corners + a ~1.8% fringe that must NOT trigger re-encoding).
 - Output is always JPEG quality 85 (mozjpeg) unless the passthrough applies.
 - Height cap: 1050px.
 - Tests: Vitest, run with `npx vitest run <path>`. Generate image fixtures in-test with sharp — no binary fixtures in the repo.
