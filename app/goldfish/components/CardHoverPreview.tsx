@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameCard } from '../types';
 import { getCardImageUrl } from '../../shared/utils/cardImageUrl';
@@ -49,7 +48,13 @@ export function CardHoverPreview({ card, anchorX, anchorY }: CardHoverPreviewPro
           boxShadow: '0 8px 32px rgba(0,0,0,0.8), 0 0 12px rgba(212,168,103,0.3)',
         }}
       >
-        <Image
+        {/* Plain <img>, not next/image: Forge cards resolve to the cookie-authed
+            /forge/api/art proxy, which next/image's server-side optimizer can't
+            fetch (no auth cookies; the proxy is private/no-store) → broken image.
+            A direct <img> loads client-side with the user's cookies. Mirrors
+            CardLoupePanel. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={imageUrl}
           alt={card.cardName}
           width={previewWidth}
