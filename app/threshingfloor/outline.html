@@ -9257,8 +9257,12 @@
     removeCountdownField();
     removeCollectorsCard();
     syncCollectorsBullets();
-    document.getElementById('agur-card-grid').innerHTML = '';
-    document.getElementById('agur-empty-state').style.display = '';
+    document.getElementById('agur-grid').innerHTML = '';
+    window.agurCount = 0;
+    window.agurCardImgs = {};
+    window.agurCardCaptions = {};
+    addAgurItem();
+    createAgurAddRow();
     document.getElementById('spoiler-card-grid').innerHTML = '';
     document.getElementById('spoiler-empty-state').style.display = '';
     window.spoilerCardCount = 0;
