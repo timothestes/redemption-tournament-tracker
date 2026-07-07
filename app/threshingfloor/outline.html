@@ -8743,6 +8743,12 @@
         .replace(/\u2029/g, '\\u2029');
       var bootstrap = '<script>window.__TF_VIEW__ = ' + payload + ';<\/script>\n';
       var html = shellHtml.replace('<script>', bootstrap + '<script>');
+      // A blob: URL has no path of its own, so every relative fetch() the
+      // page makes (player registry, tournament listings, team logos, etc.)
+      // would otherwise fail to resolve at all. <base href> makes the real
+      // site's origin the base for those, while the document itself still
+      // loads from the blob: URL.
+      html = html.replace('<head>', '<head><base href="' + location.origin + '/">');
       // Navigate the popup to a Blob URL rather than calling document.write()
       // a second time on it -- re-opening/re-writing a document that was
       // already written to once before (the "Loading preview..." message
