@@ -27,8 +27,11 @@ import { useImportRunner, mimeFor, type RunCard } from "./useImportRunner";
 import type { SourceSelection } from "./selection";
 
 // Cap on decompressed object-URL previews — a 200-card zip of ~1MB PNGs would
-// otherwise pin hundreds of MB of blobs. Tiles past the cap show a placeholder.
-const PREVIEW_LIMIT = 120;
+// Previews load lazily in chunks as the grid scrolls: decompression is synchronous
+// main-thread work and each ~1MB PNG pins a blob URL, so a 224-card zip decompressed
+// all at once would freeze the page and hold hundreds of MB. Chunks keep each pause
+// short and spend memory only on what the elder actually scrolls to.
+const PREVIEW_CHUNK = 60;
 
 type Source = "lackey" | "spreadsheet";
 
@@ -48,6 +51,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
   const [creating, setCreating] = useState(false);
   const [previews, setPreviews] = useState<Map<string, string>>(new Map());
   const [previewError, setPreviewError] = useState(false);
+  const [previewCount, setPreviewCount] = useState(PREVIEW_CHUNK);
 
   const runner = useImportRunner();
   const { items, doneSetId, counts, finished } = runner;
@@ -59,6 +63,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
   useEffect(() => {
     runner.reset();
     setRunError(null);
+    setPreviewCount(PREVIEW_CHUNK);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection?.key]);
 
@@ -67,44 +72,60 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
     if (selection?.defaultSetName) setNewSetName(selection.defaultSetName);
   }, [selection?.defaultSetName]);
 
-  // Decompress selected images into object URLs. Cached by (zip bytes, wanted entries):
-  // mapping/filter edits that don't change which images are shown skip the (synchronous,
-  // main-thread) re-decompression entirely. Guarded — a zip whose directory scanned fine
-  // at pick time can still hold corrupt image data, and that must not crash the wizard.
-  const previewCache = useRef<{ bytes: Uint8Array | null; key: string; urls: Map<string, string> }>(
-    { bytes: null, key: "", urls: new Map() },
+  // Decompress the first `previewCount` selected images into object URLs, incrementally:
+  // already-decompressed entries are kept (mapping/filter edits and scroll growth only
+  // pay for the delta); everything is revoked when the zip itself changes. Guarded — a
+  // zip whose directory scanned fine at pick time can still hold corrupt image data,
+  // and that must not crash the wizard.
+  const previewCache = useRef<{ bytes: Uint8Array | null; urls: Map<string, string> }>(
+    { bytes: null, urls: new Map() },
   );
   useEffect(() => {
     const zipBytes = selection?.zipBytes ?? null;
-    const wanted = [...new Set(
-      (selection?.cards ?? []).map((c) => c.entryName).filter(Boolean) as string[],
-    )].slice(0, PREVIEW_LIMIT);
-    const key = wanted.join("\n");
     const cache = previewCache.current;
-    if (cache.bytes === zipBytes && cache.key === key) return;
-    for (const u of cache.urls.values()) URL.revokeObjectURL(u);
-    cache.bytes = zipBytes;
-    cache.key = key;
-    cache.urls = new Map();
-    setPreviewError(false);
-    if (zipBytes && wanted.length > 0) {
+    if (cache.bytes !== zipBytes) {
+      for (const u of cache.urls.values()) URL.revokeObjectURL(u);
+      cache.bytes = zipBytes;
+      cache.urls = new Map();
+      setPreviewError(false);
+    }
+    const missing = [...new Set(
+      (selection?.cards ?? []).map((c) => c.entryName).filter(Boolean) as string[],
+    )].slice(0, previewCount).filter((n) => !cache.urls.has(n));
+    if (zipBytes && missing.length > 0) {
       try {
-        const wantedSet = new Set(wanted);
-        const files = unzipSync(zipBytes, { filter: (f) => wantedSet.has(f.name) });
+        const missingSet = new Set(missing);
+        const files = unzipSync(zipBytes, { filter: (f) => missingSet.has(f.name) });
         for (const [name, bytes] of Object.entries(files)) {
           cache.urls.set(name, URL.createObjectURL(new Blob([bytes.slice()], { type: mimeFor(name) })));
         }
       } catch {
-        cache.urls = new Map();
         setPreviewError(true);
       }
     }
     setPreviews(new Map(cache.urls));
-  }, [selection]);
+  }, [selection, previewCount]);
   useEffect(() => () => {
     for (const u of previewCache.current.urls.values()) URL.revokeObjectURL(u);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Grow the previewed window when the sentinel below the grid scrolls near the viewport.
+  const totalPreviewable = new Set(cards.map((c) => c.entryName).filter(Boolean)).size;
+  const morePreviews = previewCount < totalPreviewable;
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !morePreviews) return;
+    // Re-arm after every growth: observe() reports current intersection immediately,
+    // so a sentinel that STAYS in view keeps growing the window (IO alone only fires
+    // on transitions and would stall after the first chunk).
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setPreviewCount((c) => c + PREVIEW_CHUNK);
+    }, { rootMargin: "600px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [morePreviews, previewCount]);
 
   function switchSource(next: Source) {
     if (running || next === source) return;
@@ -191,11 +212,6 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
               images will likely fail to import.
             </p>
           )}
-          {cards.filter((c) => c.entryName).length > PREVIEW_LIMIT && (
-            <p className="mb-2 text-xs text-muted-foreground">
-              Showing the first {PREVIEW_LIMIT} image previews — the rest still import with their images.
-            </p>
-          )}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {cards.map((c) => {
               const url = c.entryName ? previews.get(c.entryName) : null;
@@ -207,7 +223,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
                         className="absolute inset-0 h-full w-full object-contain" />
                     ) : (
                       <div className="flex h-full items-center justify-center p-2 text-center text-xs text-muted-foreground">
-                        {c.entryName ? "Image ready (not previewed)" : "No image"}
+                        {c.entryName ? "Loading preview…" : "No image"}
                       </div>
                     )}
                     {c.warnings.length > 0 && (
@@ -224,6 +240,7 @@ export default function ImportWizard({ sets }: { sets: ForgeSetSummary[] }) {
               );
             })}
           </div>
+          {morePreviews && <div ref={sentinelRef} aria-hidden className="h-px" />}
         </fieldset>
       )}
 
