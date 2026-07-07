@@ -1,7 +1,7 @@
 // Server-only: normalizes Forge card images at upload time so every stored
 // image is flush (no baked-in print-bleed margins), at most 1050px tall, and
 // JPEG-encoded. Design: docs/superpowers/specs/2026-07-06-forge-image-normalization-design.md
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 
 export type NormalizedImage = { data: Buffer; contentType: "image/jpeg" };
 
@@ -12,7 +12,7 @@ const MIN_TRIM_RATIO = 0.6; // trim keeping less than this per axis is degenerat
 const JPEG_QUALITY = 85;
 
 /** True when all four corners are near-white after flattening alpha onto white. */
-async function cornersNearWhite(img: sharp.Sharp): Promise<boolean> {
+async function cornersNearWhite(img: Sharp): Promise<boolean> {
   const { data, info } = await img
     .clone()
     .flatten({ background: "#ffffff" })
@@ -49,7 +49,7 @@ export async function normalizeCardImage(input: Buffer): Promise<NormalizedImage
   // images have dark frame corners, so the gate skips them and the border
   // ring survives; trimming against an explicit white background can never
   // eat a dark frame either way.
-  let working: sharp.Sharp | null = null;
+  let working: Sharp | null = null;
   let trimmed = false;
   if (await cornersNearWhite(base)) {
     try {
