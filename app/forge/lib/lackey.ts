@@ -132,6 +132,35 @@ function parseStat(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const CLASS_TOKENS = new Set(["warrior", "weapon", "territory", "star", "cloud"]);
+const ALIGNMENT_TOKENS = new Set(["good", "evil", "neutral", "good/evil"]);
+
+/** Data-quality audit: one warning per cell value that lackeyRowToDesignCard would
+ *  silently drop (unknown type/brigade/class token, non-numeric stat, unknown
+ *  alignment or legality). Empty and "-" cells are fine. Pure. */
+export function auditLackeyRow(row: LackeyRow): string[] {
+  const warnings: string[] = [];
+  for (const t of splitMulti(row.type)) {
+    if (!TYPE_MAP[t.toLowerCase()]) warnings.push(`unrecognized type "${t}"`);
+  }
+  for (const b of splitMulti(row.brigade)) {
+    if (!BRIGADE_MAP[b.toLowerCase()]) warnings.push(`unrecognized brigade "${b}"`);
+  }
+  for (const c of splitMulti(row.class)) {
+    if (!CLASS_TOKENS.has(c.toLowerCase())) warnings.push(`unrecognized class "${c}"`);
+  }
+  for (const [label, v] of [["strength", row.strength], ["toughness", row.toughness]] as const) {
+    if (clean(v) && parseStat(v) === null) warnings.push(`non-numeric ${label} "${clean(v)}"`);
+  }
+  const alignment = clean(row.alignment);
+  if (alignment && !ALIGNMENT_TOKENS.has(alignment.toLowerCase())) {
+    warnings.push(`unrecognized alignment "${alignment}"`);
+  }
+  const legality = clean(row.legality);
+  if (legality && !LEGALITIES.includes(legality)) warnings.push(`unrecognized legality "${legality}"`);
+  return warnings;
+}
+
 // Best-effort structured mapping; full fidelity lives in the finished-card image + rawText.
 export function lackeyRowToDesignCard(row: LackeyRow): DesignCard {
   const card: DesignCard = { name: row.name };

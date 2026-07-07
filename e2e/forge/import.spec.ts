@@ -27,7 +27,7 @@ test.describe("forge lackey set import", () => {
 
   async function uploadFixture(page: Page) {
     await gotoSettled(page, "/forge/import");
-    await page.getByLabel("Lackey zip file").setInputFiles({
+    await page.getByLabel("Choose zip…").setInputFiles({
       name: "Test Plugin V1.zip", mimeType: "application/zip", buffer: buildFixtureZip(),
     });
     await page.getByLabel("Set filter").fill("TST");
