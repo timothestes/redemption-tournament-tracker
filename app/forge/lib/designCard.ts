@@ -12,9 +12,10 @@ export const ALIGNMENTS = ["Good", "Evil", "Neutral", "Good_Evil"] as const;
 export type Alignment = (typeof ALIGNMENTS)[number];
 
 // Resolved brigades only — no GoodMulti/EvilMulti sentinels (spec Decision #2).
-// Red, Teal, and Evil Gold are intentionally unsupported (the kit has no frame for them).
-export const GOOD_BRIGADES = ["Blue", "Clay", "GoodGold", "Green", "Purple", "Silver", "White"] as const;
-export const EVIL_BRIGADES = ["Black", "Brown", "Crimson", "Gray", "Orange", "PaleGreen"] as const;
+// The kit has no Red/Teal wash — those preview as solid BRIGADE_HEX; EvilGold
+// reuses the kit's single "gold" wash.
+export const GOOD_BRIGADES = ["Blue", "Clay", "GoodGold", "Green", "Purple", "Red", "Silver", "Teal", "White"] as const;
+export const EVIL_BRIGADES = ["Black", "Brown", "Crimson", "EvilGold", "Gray", "Orange", "PaleGreen"] as const;
 export const BRIGADES = [...GOOD_BRIGADES, ...EVIL_BRIGADES] as const;
 export type Brigade = (typeof BRIGADES)[number];
 

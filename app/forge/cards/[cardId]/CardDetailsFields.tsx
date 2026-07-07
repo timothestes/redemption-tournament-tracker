@@ -10,7 +10,7 @@ import { BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
 import { deriveTestamentAndGospel, formatTestament } from "@/app/decklist/card-search/data/testament";
 
 // Light-colored brigades need dark text for legible chip labels.
-const LIGHT_BRIGADES = new Set<Brigade>(["White", "Silver", "GoodGold", "PaleGreen"]);
+const LIGHT_BRIGADES = new Set<Brigade>(["White", "Silver", "GoodGold", "EvilGold", "PaleGreen"]);
 
 type ClassName = (typeof CLASSES)[number];
 type IconName = (typeof ICONS)[number];

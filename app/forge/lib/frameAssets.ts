@@ -3,11 +3,11 @@ import type { Brigade, CardType, DesignCard } from "./designCard";
 const BASE = "/forge/frames/Elements";
 const ICONS = "/forge/frames/Icons";
 
-// Brigade -> wash slug. GoodGold uses the kit's single "gold" wash.
+// Brigade -> wash slug. GoodGold and EvilGold share the kit's single "gold" wash.
 const BRIGADE_SLUG: Record<Brigade, string> = {
   Blue: "blue", Clay: "clay", GoodGold: "gold", Green: "green", Purple: "purple",
-  Silver: "silver", White: "white",
-  Black: "black", Brown: "brown", Crimson: "crimson",
+  Red: "red", Silver: "silver", Teal: "teal", White: "white",
+  Black: "black", Brown: "brown", Crimson: "crimson", EvilGold: "gold",
   Gray: "gray", Orange: "orange", PaleGreen: "pale-green",
 };
 
@@ -20,8 +20,8 @@ const AVAILABLE_WASH = new Set([
 // Fallback solid colors for every brigade (used for dual washes / safety).
 export const BRIGADE_HEX: Record<Brigade, string> = {
   Blue: "#2f6fb3", Clay: "#b08a5a", GoodGold: "#d4af37", Green: "#2f8f4e",
-  Purple: "#7a4fa3", Silver: "#aab2bd", White: "#e8e8e8",
-  Black: "#222222", Brown: "#6b4423", Crimson: "#a01a4a",
+  Purple: "#7a4fa3", Red: "#c0392b", Silver: "#aab2bd", Teal: "#2f8f8f", White: "#e8e8e8",
+  Black: "#222222", Brown: "#6b4423", Crimson: "#a01a4a", EvilGold: "#d4af37",
   Gray: "#6b7280", Orange: "#d2691e", PaleGreen: "#9bbf8a",
 };
 

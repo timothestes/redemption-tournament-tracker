@@ -18,8 +18,8 @@ import {
 // The per-brigade columns the editor exposes; "none" is the brigade-less bucket
 // used by types that have no brigade and by per-type-only edits.
 const BRIGADES = [
-  "none", "Blue", "Clay", "GoodGold", "Green", "Purple", "Silver",
-  "White", "Black", "Brown", "Crimson", "Gray", "Orange", "PaleGreen",
+  "none", "Blue", "Clay", "GoodGold", "Green", "Purple", "Red", "Silver",
+  "Teal", "White", "Black", "Brown", "Crimson", "EvilGold", "Gray", "Orange", "PaleGreen",
 ];
 
 const inputClass = "rounded-md border border-input bg-background px-2 py-1 text-sm";

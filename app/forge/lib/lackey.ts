@@ -110,9 +110,9 @@ const TYPE_MAP: Record<string, CardType | CardType[]> = {
 
 const BRIGADE_MAP: Record<string, Brigade> = {
   "blue": "Blue", "clay": "Clay", "good gold": "GoodGold", "green": "Green",
-  "purple": "Purple", "silver": "Silver", "white": "White",
-  "black": "Black", "brown": "Brown", "crimson": "Crimson", "gray": "Gray",
-  "orange": "Orange", "pale green": "PaleGreen",
+  "purple": "Purple", "red": "Red", "silver": "Silver", "teal": "Teal", "white": "White",
+  "black": "Black", "brown": "Brown", "crimson": "Crimson", "evil gold": "EvilGold",
+  "gray": "Gray", "orange": "Orange", "pale green": "PaleGreen",
 };
 
 const LEGALITIES = ["Rotation", "Classic", "Scrolls", "Paragon", "Banned"];
@@ -242,8 +242,9 @@ const TYPE_TO_LACKEY: Record<CardType, string> = {
 
 const BRIGADE_TO_LACKEY: Record<Brigade, string> = {
   Blue: "Blue", Clay: "Clay", GoodGold: "Good Gold", Green: "Green",
-  Purple: "Purple", Silver: "Silver", White: "White", Black: "Black",
-  Brown: "Brown", Crimson: "Crimson", Gray: "Gray", Orange: "Orange", PaleGreen: "Pale Green",
+  Purple: "Purple", Red: "Red", Silver: "Silver", Teal: "Teal", White: "White",
+  Black: "Black", Brown: "Brown", Crimson: "Crimson", EvilGold: "Evil Gold",
+  Gray: "Gray", Orange: "Orange", PaleGreen: "Pale Green",
 };
 
 const ALIGNMENT_TO_LACKEY: Record<NonNullable<DesignCard["alignment"]>, string> = {

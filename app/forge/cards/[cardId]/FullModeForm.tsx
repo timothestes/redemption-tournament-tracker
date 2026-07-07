@@ -11,7 +11,7 @@ import { BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
 import StatInput from "./StatInput";
 
 // Light-colored brigades need dark text for legible chip labels.
-const LIGHT_BRIGADES = new Set<Brigade>(["White", "Silver", "GoodGold", "PaleGreen"]);
+const LIGHT_BRIGADES = new Set<Brigade>(["White", "Silver", "GoodGold", "EvilGold", "PaleGreen"]);
 
 export default function FullModeForm({
   card, snapshot, update,

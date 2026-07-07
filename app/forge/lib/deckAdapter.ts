@@ -25,7 +25,8 @@ export const TYPE_DISPLAY: Record<CardType, string> = {
 
 const BRIGADE_DISPLAY: Record<Brigade, string> = {
   Blue: "Blue", Clay: "Clay", GoodGold: "Good Gold", Green: "Green", Purple: "Purple",
-  Silver: "Silver", White: "White", Black: "Black", Brown: "Brown", Crimson: "Crimson",
+  Red: "Red", Silver: "Silver", Teal: "Teal", White: "White",
+  Black: "Black", Brown: "Brown", Crimson: "Crimson", EvilGold: "Evil Gold",
   Gray: "Gray", Orange: "Orange", PaleGreen: "Pale Green",
 };
 
