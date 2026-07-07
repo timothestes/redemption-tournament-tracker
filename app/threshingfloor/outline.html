@@ -7644,7 +7644,10 @@
       bnValueToEditor(_venueNotesBulletEditor, notesEl ? notesEl.value : '');
     } else {
       document.getElementById('venue-notes-edit-section').style.display = 'none';
-      document.getElementById('venue-notes-view').style.display = '';
+      // #venue-notes-view is display:none by default in CSS -- clearing the
+      // inline style here (style.display = '') just falls back to that same
+      // "none", leaving the modal open but blank. Needs an explicit value.
+      document.getElementById('venue-notes-view').style.display = 'block';
       document.getElementById('venue-notes-save-btn').style.display = 'none';
       document.getElementById('venue-notes-cancel-btn').textContent = 'Close';
 
