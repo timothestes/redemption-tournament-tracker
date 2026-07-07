@@ -8071,6 +8071,7 @@
                 if (btn3 && notesEl3.value.trim()) { btn3.textContent = '✏ Notes ●'; btn3.classList.add('has-notes'); }
               }
             }
+            refreshSeTile(n);
             eventsAdded++;
           }
         }
@@ -9713,8 +9714,12 @@
             var input = document.getElementById(prefix + '-' + i);
             if (input) {
               input.value = val;
-              if (type === 'rankings') updateRankDeltaGeneric('rank', i, window.previousRankings);
-              else updateRankDeltaGeneric('meta-rank', i, window.previousMetaRankings);
+              if (type === 'rankings') {
+                refreshRankCard(i);
+                updateRankDeltaGeneric('rank', i, window.previousRankings);
+              } else {
+                updateRankDeltaGeneric('meta-rank', i, window.previousMetaRankings);
+              }
             }
           }
         }
