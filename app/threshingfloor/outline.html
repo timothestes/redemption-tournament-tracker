@@ -8948,9 +8948,20 @@
             }
           }
 
-          // Restore previous-episode ranking baselines for movement deltas
-          if (data['previous-rankings']) window.previousRankings = data['previous-rankings'];
-          if (data['previous-meta-rankings']) window.previousMetaRankings = data['previous-meta-rankings'];
+          // Restore previous-episode ranking baselines for movement deltas.
+          // Reflect whether *this* episode's own saved data actually had a
+          // baseline, rather than leaving whatever resetForm() just set (or
+          // a stale message left over from an earlier episode this session).
+          if (data['previous-rankings']) {
+            window.previousRankings = data['previous-rankings'];
+            var prs = document.getElementById('prev-rankings-status');
+            if (prs) prs.textContent = 'Loaded with this draft.';
+          }
+          if (data['previous-meta-rankings']) {
+            window.previousMetaRankings = data['previous-meta-rankings'];
+            var pmrs = document.getElementById('prev-meta-rankings-status');
+            if (pmrs) pmrs.textContent = 'Loaded with this draft.';
+          }
 
           // Pre-build mailbag items to match saved data, preserving original indices
           // so rebuilt rows always match their saved keys (same numbering-gap fix
@@ -9394,6 +9405,15 @@
     window.previousMetaRankings = null;
     updateAllRankDeltas();
     updateAllMetaRankDeltas();
+    // Without this, loading a different draft after clicking "Recall Last
+    // Rankings" earlier in the same session left this status text stuck on
+    // "Recalled from last saved episode" even though the baseline itself was
+    // just cleared above -- misleadingly implying the newly-loaded episode
+    // has a baseline when it may not.
+    var prevRankStatus = document.getElementById('prev-rankings-status');
+    if (prevRankStatus) prevRankStatus.textContent = 'No previous rankings loaded';
+    var prevMetaRankStatus = document.getElementById('prev-meta-rankings-status');
+    if (prevMetaRankStatus) prevMetaRankStatus.textContent = 'No previous rankings loaded';
     window.loadedDraftUpdatedAt = null;
   }
 
