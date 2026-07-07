@@ -2042,6 +2042,16 @@
   .rank-profile-btn:hover { opacity: 1; color: var(--teal); }
   .rank-profile-btn-add { font-weight: 900; font-size: 15px; color: var(--teal); opacity: 0.75; }
   .rank-profile-btn-add:hover { opacity: 1; color: var(--teal-dark); }
+  /* Tournament Results is the one other place (besides Power Rankings, which
+     uses .rank-profile-btn only for legacy store-compat elements that stay
+     hidden) where the "add/view player profile" affordance is meant to be
+     visible -- POTM/Guest deliberately keep .rank-profile-btn's blanket hide
+     below, so this is a separate class rather than reusing that one. */
+  .tre-profile-btn {
+    background: none; border: none; padding: 0 2px; cursor: pointer; color: var(--placeholder);
+    font-size: 13px; line-height: 1; flex-shrink: 0; opacity: 0.6; transition: opacity 0.15s, color 0.15s;
+  }
+  .tre-profile-btn:hover { opacity: 1; color: var(--teal); }
   /* Profile modal edit form — override registry panel's white-on-dark field styles for light bg */
   #ppm-edit-form .pr-field-label { color: var(--teal); }
   #ppm-edit-form .pr-field-input {
@@ -4332,7 +4342,7 @@
   function createTrePlayerBtn(inputEl, suffix) {
     var btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'rank-profile-btn';
+    btn.className = 'tre-profile-btn';
     btn.id = 'tre-profile-btn-' + suffix;
     btn.addEventListener('click', function() { handlePlayerProfileBtnClick(inputEl.id); });
     syncPlayerProfileBtn(inputEl.value, btn);
