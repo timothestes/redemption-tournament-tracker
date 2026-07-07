@@ -45,27 +45,25 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Default order: by card type DESCENDING (reverse of the canonical CARD_TYPES
-  // order), then brigade, then title. Cards missing a known primary type still
-  // sort last (not first); brigade uses the canonical BRIGADES order ascending.
+  // Default order: by card type alphabetically, then brigade, then title. Cards
+  // missing a primary type sort last; brigade uses the canonical BRIGADES order
+  // ascending.
   const sorted = useMemo(() => {
     const rank = (value: string | undefined, order: readonly string[]) => {
       const i = value ? order.indexOf(value) : -1;
       return i === -1 ? Number.MAX_SAFE_INTEGER : i;
     };
-    const typeRank = (c: ForgeCardFull) => rank(c.snapshot?.cardType?.[0], CARD_TYPES);
     const brigadeRank = (c: ForgeCardFull) => rank(c.snapshot?.brigades?.[0], BRIGADES);
-    const UNKNOWN = Number.MAX_SAFE_INTEGER;
-    const typeDesc = (a: ForgeCardFull, b: ForgeCardFull) => {
-      const ra = typeRank(a), rb = typeRank(b);
-      if (ra === rb) return 0;
-      if (ra === UNKNOWN) return 1; // no known type → last
-      if (rb === UNKNOWN) return -1;
-      return rb - ra; // descending among known types
+    const typeAlpha = (a: ForgeCardFull, b: ForgeCardFull) => {
+      const ta = a.snapshot?.cardType?.[0], tb = b.snapshot?.cardType?.[0];
+      if (ta === tb) return 0;
+      if (!ta) return 1; // no primary type → last
+      if (!tb) return -1;
+      return ta.localeCompare(tb);
     };
     return [...cards].sort(
       (a, b) =>
-        typeDesc(a, b) ||
+        typeAlpha(a, b) ||
         brigadeRank(a) - brigadeRank(b) ||
         (a.title ?? "").localeCompare(b.title ?? ""),
     );
