@@ -26,14 +26,17 @@ export const LEGALITIES = ["Rotation", "Classic", "Scrolls", "Paragon", "Banned"
 // `_forge_is_card_field` (used to validate field-anchored suggestions); its
 // current definition is in supabase/migrations/067_forge_scripture_field.sql.
 // Keep the two lists in sync.
+// "X" is a real stat value (variable strength/toughness, e.g. The Faithful Followers).
+export type StatValue = number | "X" | null;
+
 export type DesignCard = {
   name?: string;
   rawText?: string;
   cardType?: CardType[];
   alignment?: Alignment;
   brigades?: Brigade[];
-  strength?: number | null;
-  toughness?: number | null;
+  strength?: StatValue;
+  toughness?: StatValue;
   class?: (typeof CLASSES)[number][];
   icons?: (typeof ICONS)[number][];
   identifiers?: string[];
@@ -117,4 +120,13 @@ export function validate(card: DesignCard): ValidationHint[] {
  */
 export function cardRawText(card: DesignCard): string {
   return card.rawText ?? card.specialAbility ?? "";
+}
+
+/** Parse a stats text input: "" → null, "x"/"X" → "X", numbers pass, junk → null. Pure. */
+export function parseStatInput(raw: string): StatValue {
+  const t = raw.trim();
+  if (!t) return null;
+  if (/^x$/i.test(t)) return "X";
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
 }

@@ -125,9 +125,10 @@ function clean(v: string): string {
   return t === "-" ? "" : t;
 }
 
-function parseStat(v: string): number | null {
+function parseStat(v: string): number | "X" | null {
   const t = clean(v);
   if (!t) return null;
+  if (/^x$/i.test(t)) return "X"; // variable stats are printed as X (e.g. X/X)
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
 }
@@ -253,7 +254,7 @@ function tsvSafe(value: string): string {
   return value.replace(/[\t\r\n]+/g, " ").trim();
 }
 
-function statCell(v: number | null | undefined): string {
+function statCell(v: number | "X" | null | undefined): string {
   return v === null || v === undefined ? "" : String(v);
 }
 

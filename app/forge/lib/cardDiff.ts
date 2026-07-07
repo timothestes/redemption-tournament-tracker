@@ -71,7 +71,11 @@ export function summarizeDiff(changes: FieldChange[]): string {
 // Best-effort coercion of a free-text suggestion value into the field's jsonb shape.
 export function coerceFieldValue(field: string, text: string): unknown {
   const t = text.trim();
-  if (NUMBER_FIELDS.has(field)) { const n = Number(t); return Number.isFinite(n) ? n : null; }
+  if (NUMBER_FIELDS.has(field)) {
+    if (/^x$/i.test(t)) return "X"; // variable stat
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
   if (ARRAY_FIELDS.has(field)) return t ? t.split(",").map((s) => s.trim()).filter(Boolean) : [];
   return t;
 }

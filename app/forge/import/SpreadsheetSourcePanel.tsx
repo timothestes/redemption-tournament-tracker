@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { unzipSync } from "fflate";
 import {
   parseCsv, parseXlsx, detectColumns, tableToCards, findLooseImageEntry, isImageEntry,
+  imageFileStem, imageEntryStem,
   MAPPABLE_FIELDS, type ColumnMapping, type MappableField, type SheetTable,
 } from "@/app/forge/lib/spreadsheet";
 import FilePicker from "@/app/forge/components/FilePicker";
@@ -55,9 +56,12 @@ export default function SpreadsheetSourcePanel({
   // Bumped on every file pick so re-uploading a fixed file with the SAME name still
   // yields a new selection key — otherwise a finished run's results would never reset.
   const [pickNonce, setPickNonce] = useState(0);
+  // Set when the zip↔sheet affinity check switches sheets on the user's behalf.
+  const [autoNote, setAutoNote] = useState<string | null>(null);
 
   async function onPickImagesZip(file: File) {
     setZipError(null);
+    setAutoNote(null);
     setZipBusy(true); // images zips run to hundreds of MB — reading takes visible seconds
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -94,7 +98,7 @@ export default function SpreadsheetSourcePanel({
   }
 
   async function onPickMeta(file: File) {
-    setMetaError(null); setOverride(null);
+    setMetaError(null); setOverride(null); setAutoNote(null);
     setMetaBusy(true);
     try {
       let sheets: SheetTable[];
@@ -128,6 +132,44 @@ export default function SpreadsheetSourcePanel({
     () => (sheet ? tableToCards(sheet.rows, mapping) : null),
     [sheet, mapping],
   );
+
+  // zip ↔ sheet affinity: how many of each sheet's Image values exist in the zip.
+  // A multi-set workbook + a one-set images zip is the normal case (EoT + Roots 2),
+  // and the wrong sheet renders an all-"No image" preview that reads as broken.
+  const sheetMatchCounts = useMemo(() => {
+    if (!meta || !zip) return null;
+    const stems = new Set(zip.entryNames.map(imageEntryStem).filter(Boolean) as string[]);
+    return meta.sheets.map((s) => {
+      const imgIdx = detectColumns(s.rows[0] ?? []).mapping.image;
+      if (imgIdx === undefined) return 0;
+      let count = 0;
+      for (let i = 1; i < s.rows.length; i++) {
+        const stem = imageFileStem(s.rows[i]?.[imgIdx] ?? "");
+        if (stem && stems.has(stem)) count++;
+      }
+      return count;
+    });
+  }, [meta, zip]);
+  const bestSheetIdx = useMemo(() => {
+    if (!sheetMatchCounts) return -1;
+    return sheetMatchCounts.reduce((best, c, i) => (c > (sheetMatchCounts[best] ?? 0) ? i : best), 0);
+  }, [sheetMatchCounts]);
+
+  // When a freshly-picked file pairing leaves the CURRENT sheet with zero image
+  // matches but another sheet matches, switch to it once and say so.
+  const affinityHandled = useRef<{ zip: ImagesZip | null; meta: unknown } | null>(null);
+  useEffect(() => {
+    if (!zip || !meta || !sheetMatchCounts) return;
+    const h = affinityHandled.current;
+    if (h && h.zip === zip && h.meta === meta) return;
+    affinityHandled.current = { zip, meta };
+    if ((sheetMatchCounts[sheetIdx] ?? 0) > 0) return;
+    if (bestSheetIdx !== sheetIdx && (sheetMatchCounts[bestSheetIdx] ?? 0) > 0) {
+      setSheetIdx(bestSheetIdx);
+      setOverride(null);
+      setAutoNote(`Switched to the “${meta.sheets[bestSheetIdx].name}” sheet — its Image column matches this zip.`);
+    }
+  }, [zip, meta, sheetMatchCounts, sheetIdx, bestSheetIdx]);
 
   const selection = useMemo<SourceSelection | null>(() => {
     if (!meta || !sheet || !table || table.cards.length === 0 || mapping.name === undefined) return null;
@@ -223,13 +265,21 @@ export default function SpreadsheetSourcePanel({
             <label className="mb-3 flex items-center gap-2 text-sm">
               Sheet
               <select value={sheetIdx} disabled={disabled}
-                onChange={(e) => { setSheetIdx(Number(e.target.value)); setOverride(null); }}
+                onChange={(e) => { setSheetIdx(Number(e.target.value)); setOverride(null); setAutoNote(null); }}
                 aria-label="Sheet" className="rounded-md border bg-background px-2 py-1 text-sm">
                 {meta.sheets.map((s, i) => (
                   <option key={i} value={i}>{s.name} ({Math.max(0, s.rows.length - 1)} rows)</option>
                 ))}
               </select>
             </label>
+          )}
+          {autoNote && <p className="mb-2 text-xs text-muted-foreground">{autoNote}</p>}
+          {sheetMatchCounts && meta.sheets.length > 1 && bestSheetIdx !== sheetIdx
+            && (sheetMatchCounts[sheetIdx] ?? 0) === 0 && (sheetMatchCounts[bestSheetIdx] ?? 0) > 0 && (
+            <p className="mb-2 text-xs text-amber-600 dark:text-amber-500">
+              None of the zip’s images match this sheet — they match the
+              “{meta.sheets[bestSheetIdx].name}” sheet ({sheetMatchCounts[bestSheetIdx]} cards).
+            </p>
           )}
 
           {mapping.name === undefined && (

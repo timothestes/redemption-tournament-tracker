@@ -307,16 +307,27 @@ export function isImageEntry(entryName: string): boolean {
   return !base.startsWith("._") && IMAGE_EXT_RE.test(base);
 }
 
+/** Canonical form of an Image column value for matching: lowercased, trimmed,
+ *  extension stripped ("" when blank). Pure. */
+export function imageFileStem(value: string): string {
+  return value.trim().toLowerCase().replace(IMAGE_EXT_RE, "");
+}
+
+/** Canonical form of a zip entry for matching: lowercased base name without the
+ *  extension — or null for directories, macOS junk, and non-images. Pure. */
+export function imageEntryStem(entryName: string): string | null {
+  if (!isImageEntry(entryName)) return null;
+  return (entryName.split("/").pop() ?? "").toLowerCase().replace(IMAGE_EXT_RE, "");
+}
+
 /** Match a spreadsheet Image value to a zip entry by BASE NAME at any depth —
  *  images zips are flat folder exports, not Lackey trees. Case-insensitive and
  *  tolerates the column already carrying an extension. Pure. */
 export function findLooseImageEntry(imageFile: string, entryNames: string[]): string | null {
-  const stem = imageFile.trim().toLowerCase().replace(IMAGE_EXT_RE, "");
+  const stem = imageFileStem(imageFile);
   if (!stem) return null;
   for (const entry of entryNames) {
-    if (!isImageEntry(entry)) continue;
-    const base = (entry.split("/").pop() ?? "").toLowerCase();
-    if (base.replace(IMAGE_EXT_RE, "") === stem) return entry;
+    if (imageEntryStem(entry) === stem) return entry;
   }
   return null;
 }

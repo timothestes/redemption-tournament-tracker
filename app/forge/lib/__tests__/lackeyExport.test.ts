@@ -75,6 +75,14 @@ describe("designCardToLackeyRow → serialize → parseCarddata round-trip", () 
     expect(back.strength).toBeUndefined();
     expect(back.toughness).toBeUndefined();
   });
+
+  it('round-trips variable "X" stats', () => {
+    const back = roundTrip({
+      cardType: ["Hero"], brigades: ["Green"], strength: "X", toughness: "X",
+    }, "The Faithful Followers");
+    expect(back.strength).toBe("X");
+    expect(back.toughness).toBe("X");
+  });
 });
 
 describe("tsv safety", () => {

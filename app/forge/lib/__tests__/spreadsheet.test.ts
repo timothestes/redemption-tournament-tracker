@@ -278,6 +278,17 @@ describe("tableToCards", () => {
     expect(dashes.cards[0].warnings).toEqual([]);
   });
 
+  it('accepts "X" as a valid variable strength/toughness (The Faithful Followers)', () => {
+    const header = ["Name", "Type", "Strength", "Toughness"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards(
+      [header, ["The Faithful Followers", "Hero", "X", "x"]], mapping,
+    );
+    expect(cards[0].warnings).toEqual([]);
+    expect(cards[0].snapshot.strength).toBe("X");
+    expect(cards[0].snapshot.toughness).toBe("X");
+  });
+
   it("skips rows without a name and dedupes repeated names (first wins)", () => {
     const header = ["Name", "Type"];
     const { mapping } = detectColumns(header);
@@ -354,6 +365,10 @@ describe("auditLackeyRow", () => {
     const warnings = auditLackeyRow({ ...base, class: "Warrior/Wizard" });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/Wizard/);
+  });
+
+  it('is silent on "X" stats', () => {
+    expect(auditLackeyRow({ ...base, strength: "X", toughness: "x" })).toEqual([]);
   });
 });
 
