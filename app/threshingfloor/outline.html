@@ -2846,6 +2846,7 @@
         <div class="pr-field-label" style="display:block; margin-bottom:2px;">Handle</div>
         <div id="ppm-edit-handle-display" style="font-family:'Barlow',sans-serif; font-size:13px; color:var(--text); padding:4px 0; opacity:0.7;"></div>
       </div>
+      <div>
         <label class="pr-field-label">Real Name</label>
         <input class="pr-field-input" id="ppm-realname" placeholder="Optional" autocomplete="off">
       </div>
@@ -6873,7 +6874,8 @@
     if (!handle) return;
     window.ppmCurrentHandle = handle;
     window.ppmIsNew = !!isNew;
-    document.getElementById('ppm-handle').textContent = handle;
+    var titleProfile = (window.playerProfiles && window.playerProfiles[handle]) ? window.playerProfiles[handle] : {};
+    document.getElementById('ppm-handle').textContent = titleProfile.realName || handle;
     if (window.ppmIsNew || !document.body.classList.contains('view-mode')) {
       enterPlayerProfileEditMode();
     } else {
@@ -6895,10 +6897,13 @@
     } else {
       logoEl.style.display = 'none';
     }
+    // Real name is already the modal title -- don't repeat it here. "Handle"
+    // is the distinct profile.handle field (set via the picker's full-profile
+    // quick-add), not the realName-keyed dictionary lookup key passed in as
+    // `handle` -- so it's simply omitted below when no handle was ever set.
     var rows = '';
     var fields = [
-      { label: 'Handle',         value: handle },
-      { label: 'Real Name',      value: profile.realName },
+      { label: 'Handle',         value: profile.handle },
       { label: 'Pronunciation',  value: profile.pronunciation },
       { label: 'Region',         value: profile.region },
       { label: 'Team',           value: profile.team }
@@ -6970,8 +6975,13 @@
     var handle = window.ppmCurrentHandle;
     if (!handle) return;
     var status = document.getElementById('ppm-edit-status');
+    // This form has no input for profile.handle (only set via the player
+    // picker's full-profile quick-add) -- carry the existing value forward
+    // so saving any other field here doesn't silently erase it.
+    var existing = (window.playerProfiles && window.playerProfiles[handle]) ? window.playerProfiles[handle] : {};
     var profileData = {
       realName:      document.getElementById('ppm-realname').value.trim(),
+      handle:        existing.handle || '',
       pronunciation: document.getElementById('ppm-pronunciation').value.trim(),
       region:        document.getElementById('ppm-region').value.trim(),
       team:          document.getElementById('ppm-team').value.trim()
