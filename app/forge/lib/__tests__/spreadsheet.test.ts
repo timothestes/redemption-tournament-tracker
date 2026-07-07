@@ -278,6 +278,17 @@ describe("tableToCards", () => {
     expect(dashes.cards[0].warnings).toEqual([]);
   });
 
+  it('maps "Dual-Alignment Enhancement" to GE + EE with no warning', () => {
+    const header = ["Name", "Type", "Alignment"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards(
+      [header, ["Philosophy [RR2]", "Dual-Alignment Enhancement", "Good/Evil"]], mapping,
+    );
+    expect(cards[0].warnings).toEqual([]);
+    expect(cards[0].snapshot.cardType).toEqual(["GE", "EE"]);
+    expect(cards[0].snapshot.alignment).toBe("Good_Evil");
+  });
+
   it('accepts "X" as a valid variable strength/toughness (The Faithful Followers)', () => {
     const header = ["Name", "Type", "Strength", "Toughness"];
     const { mapping } = detectColumns(header);

@@ -94,10 +94,14 @@ export function findImageEntry(row: LackeyRow, entryNames: string[]): string | n
   return null;
 }
 
-const TYPE_MAP: Record<string, CardType> = {
+// One token may map to multiple design types: a Dual-Alignment Enhancement IS
+// both a good and an evil enhancement (the kit has no separate dual frame).
+const TYPE_MAP: Record<string, CardType | CardType[]> = {
   "hero": "Hero", "evil character": "EvilCharacter",
   "ge": "GE", "good enhancement": "GE",
   "ee": "EE", "evil enhancement": "EE",
+  "dual-alignment enhancement": ["GE", "EE"],
+  "dual alignment enhancement": ["GE", "EE"],
   "lost soul": "LostSoul", "artifact": "Artifact",
   "dominant": "Dominant", "evil dominant": "Dominant",
   "fortress": "Fortress", "site": "Site", "city": "City",
@@ -173,7 +177,7 @@ export function lackeyRowToDesignCard(row: LackeyRow): DesignCard {
   }
 
   const types = [...new Set(
-    splitMulti(row.type).map((t) => TYPE_MAP[t.toLowerCase()]).filter(Boolean),
+    splitMulti(row.type).flatMap((t) => TYPE_MAP[t.toLowerCase()] ?? []),
   )] as CardType[];
   if (types.length) card.cardType = types;
 
