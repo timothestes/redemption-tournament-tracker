@@ -9,6 +9,7 @@ const MAX_HEIGHT = 1050;
 const CORNER_WHITE_MIN = 240; // per-channel floor for a corner to count as "white margin"
 const TRIM_THRESHOLD = 25;
 const MIN_TRIM_RATIO = 0.6; // trim keeping less than this per axis is degenerate
+const MIN_TRIM_FRACTION = 0.03; // trim removing less than this on every axis is noise (e.g. scan fringes), not a real margin
 const JPEG_QUALITY = 85;
 
 /** True when all four corners are near-white after flattening alpha onto white. */
@@ -61,7 +62,10 @@ export async function normalizeCardImage(input: Buffer): Promise<NormalizedImage
       const shrank = info.width < baseWidth || info.height < baseHeight;
       const degenerate =
         info.width < baseWidth * MIN_TRIM_RATIO || info.height < baseHeight * MIN_TRIM_RATIO;
-      if (shrank && !degenerate) {
+      const significant =
+        info.width <= baseWidth * (1 - MIN_TRIM_FRACTION) ||
+        info.height <= baseHeight * (1 - MIN_TRIM_FRACTION);
+      if (shrank && !degenerate && significant) {
         working = sharp(data);
         trimmed = true;
       }

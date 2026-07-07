@@ -38,6 +38,32 @@ async function darkWithWhiteTopStrip(canvasW: number, canvasH: number, stripH: n
     .toBuffer();
 }
 
+/**
+ * Dark JPEG scan with small near-white rounded-corner squares (passes the
+ * corner gate, like real Lackey scans) plus a thin pure-white fringe band
+ * across the bottom — models the print-scan artifact the trim floor exists
+ * to ignore.
+ */
+async function lackeyScanWithCornersAndBottomFringe(
+  width: number,
+  height: number,
+  cornerSize: number,
+  fringeHeight: number,
+): Promise<Buffer> {
+  const corner = await sharp({ create: { width: cornerSize, height: cornerSize, channels: 3, background: "#ffffff" } }).png().toBuffer();
+  const fringe = await sharp({ create: { width, height: fringeHeight, channels: 3, background: "#ffffff" } }).png().toBuffer();
+  return sharp({ create: { width, height, channels: 3, background: DARK } })
+    .composite([
+      { input: corner, top: 0, left: 0 },
+      { input: corner, top: 0, left: width - cornerSize },
+      { input: corner, top: height - cornerSize, left: 0 },
+      { input: corner, top: height - cornerSize, left: width - cornerSize },
+      { input: fringe, top: height - fringeHeight, left: 0 },
+    ])
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
 describe("normalizeCardImage", () => {
   it("trims white print-bleed margins and re-encodes as JPEG", async () => {
     const input = await withWhiteMargins(815, 1125, 750, 1046);
@@ -142,5 +168,18 @@ describe("normalizeCardImage", () => {
     const d = await dims(out.data);
     expect(d.width).toBe(600);
     expect(d.height).toBe(800);
+  });
+
+  it("returns real-scan JPEGs with rounded corners and a thin fringe byte-identical (trim significance floor)", async () => {
+    // Models a 345x495 Lackey scan: near-white rounded-corner squares pass
+    // the corner gate, and a ~1.8%-of-height (9px) near-white fringe along
+    // the bottom would trim under the old logic — defeating the passthrough
+    // for every already-conforming image. The significance floor rejects
+    // trims removing less than 3% on both axes, so this must come back
+    // untouched, byte-identical.
+    const input = await lackeyScanWithCornersAndBottomFringe(345, 495, 8, 9);
+    const out = await normalizeCardImage(input);
+    expect(out.data.equals(input)).toBe(true);
+    expect(out.contentType).toBe("image/jpeg");
   });
 });
