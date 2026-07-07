@@ -35,11 +35,10 @@ describe("mintInvite", () => {
     expect(r.ok).toBe(false);
   });
 
-  it("an elder cannot mint an elder invite (needs superadmin)", async () => {
+  it("an elder can mint an elder invite (DB forge_role_outranks caps the role)", async () => {
     (requireElder as any).mockResolvedValue(ctx("elder"));
-    (requireForgeSuperadmin as any).mockResolvedValue(null);
     const r = await mintInvite({ role: "elder" });
-    expect(r.ok).toBe(false);
+    expect(r.ok).toBe(true);
   });
 
   it("mints: hashes the token (raw never sent to RPC) and emails the URL", async () => {
