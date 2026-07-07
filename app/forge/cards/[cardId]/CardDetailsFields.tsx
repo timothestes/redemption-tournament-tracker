@@ -5,6 +5,7 @@ import {
   type DesignCard, type CardType, type Brigade,
 } from "@/app/forge/lib/designCard";
 import StatInput from "./StatInput";
+import IdentifiersInput from "./IdentifiersInput";
 import { BRIGADE_HEX } from "@/app/forge/lib/frameAssets";
 import { deriveTestamentAndGospel, formatTestament } from "@/app/decklist/card-search/data/testament";
 
@@ -85,17 +86,22 @@ export default function CardDetailsFields({
       </div>
 
       {/* Strength / Toughness */}
-      <div className="flex gap-3">
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium">Strength</span>
-          <StatInput value={snapshot.strength} onCommit={(v) => update({ strength: v })}
-            className="w-24 rounded-md border bg-background px-3 py-2 text-sm" />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium">Toughness</span>
-          <StatInput value={snapshot.toughness} onCommit={(v) => update({ toughness: v })}
-            className="w-24 rounded-md border bg-background px-3 py-2 text-sm" />
-        </label>
+      <div>
+        <div className="flex gap-3">
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Strength</span>
+            <StatInput value={snapshot.strength} onCommit={(v) => update({ strength: v })}
+              className="w-24 rounded-md border bg-background px-3 py-2 text-sm" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Toughness</span>
+            <StatInput value={snapshot.toughness} onCommit={(v) => update({ toughness: v })}
+              className="w-24 rounded-md border bg-background px-3 py-2 text-sm" />
+          </label>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Dual-alignment or dual-sided? Enter both sides per stat as <span className="font-medium">6/0</span> (stored as 6 (0)). Use <span className="font-medium">X</span> for a variable value.
+        </p>
       </div>
 
       {/* Class */}
@@ -135,9 +141,9 @@ export default function CardDetailsFields({
       {/* Identifier(s) */}
       <label className="block">
         <span className="mb-1 block text-sm font-medium">Identifier(s)</span>
-        <input
-          value={(snapshot.identifiers ?? []).join(", ")}
-          onChange={(e) => update({ identifiers: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+        <IdentifiersInput
+          value={snapshot.identifiers ?? []}
+          onChange={(identifiers) => update({ identifiers })}
           placeholder="Comma-separated, e.g. Genesis, Patriarch"
           className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
       </label>
