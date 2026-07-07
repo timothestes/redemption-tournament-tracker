@@ -13,7 +13,7 @@ export type GridSelection = {
 };
 
 export default function ForgeCardGrid({
-  cards, showStatus = false, selection, leading, commentCounts, proposalCounts,
+  cards, showStatus = false, selection, leading, commentCounts, proposalCounts, releaseBadges,
 }: {
   cards: ForgeCardFull[];
   showStatus?: boolean;
@@ -21,6 +21,7 @@ export default function ForgeCardGrid({
   leading?: ReactNode;
   commentCounts?: Record<string, number>;
   proposalCounts?: Record<string, number>;
+  releaseBadges?: Record<string, string>;
 }) {
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -32,6 +33,7 @@ export default function ForgeCardGrid({
         const shelved = c.status === "archived";
         const count = commentCounts?.[c.id] ?? 0;
         const propCount = proposalCounts?.[c.id] ?? 0;
+        const release = releaseBadges?.[c.id];
         const inner = (
           <>
             <div className="relative">
@@ -58,6 +60,14 @@ export default function ForgeCardGrid({
                 >
                   <GitPullRequest className="h-3 w-3" />
                   {propCount}
+                </span>
+              )}
+              {release && (
+                <span
+                  className="absolute bottom-1 left-1 z-10 rounded-full border bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur-sm"
+                  title={`Latest release ${release}`}
+                >
+                  {release}
                 </span>
               )}
             </div>

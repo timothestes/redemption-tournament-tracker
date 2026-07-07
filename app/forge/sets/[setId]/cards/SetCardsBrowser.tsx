@@ -11,6 +11,7 @@ import {
 } from "@/app/forge/lib/lifecycleCopy";
 import { cardRawText, CARD_TYPES, BRIGADES, type CardType, type Brigade } from "@/app/forge/lib/designCard";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
+import type { ReleaseInfo } from "@/app/forge/lib/versions";
 import { Button } from "@/components/ui/button";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 
@@ -18,13 +19,14 @@ const SET_STATUSES = ["draft", "playtesting", "approved", "archived"] as const;
 const BULK_ACTIONS: LifecycleAction[] = ["release", "markFinal", "shelve", "restore", "returnToIdeas", "delete"];
 const selectClass = "rounded-md border bg-background px-2 py-1.5 text-sm";
 
-export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts, proposalCounts }: { cards: ForgeCardFull[]; setId: string; canCreate: boolean; commentCounts?: Record<string, number>; proposalCounts?: Record<string, number> }) {
+export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts, proposalCounts, releases }: { cards: ForgeCardFull[]; setId: string; canCreate: boolean; commentCounts?: Record<string, number>; proposalCounts?: Record<string, number>; releases?: Record<string, ReleaseInfo> }) {
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState<CardType | "">("");
   const [brigade, setBrigade] = useState<Brigade | "">("");
+  const [since, setSince] = useState("");
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState<LifecycleAction | null>(null);
@@ -79,8 +81,20 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
     if (status && c.status !== status) return false;
     if (type && !(s.cardType ?? []).includes(type)) return false;
     if (brigade && !(s.brigades ?? []).includes(brigade)) return false;
+    if (since) {
+      const cutoff = Date.parse(since);
+      const rel = releases?.[c.id];
+      if (!rel || Date.parse(rel.releasedAt) < cutoff) return false;
+    }
     return true;
-  }), [sorted, q, status, type, brigade]);
+  }), [sorted, q, status, type, brigade, since, releases]);
+
+  const shown = useMemo(() => {
+    if (!since) return filtered;
+    return [...filtered].sort(
+      (a, b) => Date.parse(releases?.[b.id]?.releasedAt ?? "") - Date.parse(releases?.[a.id]?.releasedAt ?? "")
+    );
+  }, [filtered, since, releases]);
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const ids = [...selected];
@@ -135,14 +149,24 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
           <option value="">All brigades</option>
           {BRIGADES.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          Updated since
+          <input
+            type="date"
+            value={since}
+            onChange={(e) => setSince(e.target.value)}
+            aria-label="Show cards released since date"
+            className={selectClass}
+          />
+        </label>
         <span className="text-xs text-muted-foreground">{filtered.length} of {cards.length}</span>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
           {selecting && (
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{selected.size} selected</span>
               <button type="button" className="hover:text-foreground hover:underline"
-                onClick={() => setSelected(new Set(filtered.map((c) => c.id)))}>
-                Select all ({filtered.length})
+                onClick={() => setSelected(new Set(shown.map((c) => c.id)))}>
+                Select all ({shown.length})
               </button>
               <button type="button" className="hover:text-foreground hover:underline" onClick={() => setSelected(new Set())}>
                 Clear
@@ -168,10 +192,16 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
       )}
 
       <ForgeCardGrid
-        cards={filtered}
+        cards={shown}
         showStatus
         commentCounts={commentCounts}
         proposalCounts={proposalCounts}
+        releaseBadges={since ? Object.fromEntries(
+          shown.flatMap((c) => {
+            const rel = releases?.[c.id];
+            return rel ? [[c.id, `v${rel.versionNumber} · ${new Date(rel.releasedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`]] : [];
+          })
+        ) : undefined}
         selection={{ active: selecting, selected, onToggle: toggle }}
         leading={canCreate ? <AddCardTile setId={setId} disabled={selecting} /> : undefined}
       />
