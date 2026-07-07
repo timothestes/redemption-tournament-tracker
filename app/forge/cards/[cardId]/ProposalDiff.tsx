@@ -150,7 +150,8 @@ export default function ProposalDiff({
           <DialogHeader>
             <DialogTitle>Accept proposal</DialogTitle>
             <DialogDescription>
-              Releases a new published version and replaces the working draft with this proposal.
+              Releases a new version to playtesters (not the public card database) and replaces the
+              working draft with this proposal. The card stays in playtest — use Mark final when it’s done.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-2">
@@ -167,7 +168,7 @@ export default function ProposalDiff({
             <Button variant="outline" disabled={pending} onClick={() => { setAcceptOpen(false); setErr(null); }}>
               Cancel
             </Button>
-            <Button disabled={pending} onClick={doAccept}>Accept &amp; publish</Button>
+            <Button disabled={pending} onClick={doAccept}>Accept &amp; release</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

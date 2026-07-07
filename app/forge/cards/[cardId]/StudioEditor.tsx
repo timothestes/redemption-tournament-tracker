@@ -148,24 +148,29 @@ export default function StudioEditor({
           </span>
         </div>
         <LifecycleControls card={card} sets={sets} />
-        {card.setId &&
-          (proposing ? (
-            <div className="flex flex-col gap-1 text-xs">
-              <div className="flex items-start gap-1">
-                <textarea autoFocus value={proposeSummary} onChange={(e) => setProposeSummary(e.target.value)}
-                  placeholder="Summarize your proposed change…" className="h-16 flex-1 rounded-md border bg-background px-2 py-1" />
-                <Button size="sm" className="h-7 px-3 text-xs" disabled={proposeBusy || !proposeSummary.trim()} onClick={submitProposal}>
-                  Submit proposal
-                </Button>
-                <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setProposing(false); setProposeErr(null); }}>Cancel</Button>
-              </div>
-              {proposeErr && <p className="text-destructive">{proposeErr}</p>}
+        {card.setId && (
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>Releases are visible to Forge playtesters only — they don’t change the public card database.</span>
+            {!proposing && (
+              <button type="button" className="underline-offset-2 hover:text-foreground hover:underline" onClick={() => setProposing(true)}>
+                Request another elder’s review
+              </button>
+            )}
+          </div>
+        )}
+        {card.setId && proposing && (
+          <div className="flex flex-col gap-1 text-xs">
+            <div className="flex items-start gap-1">
+              <textarea autoFocus value={proposeSummary} onChange={(e) => setProposeSummary(e.target.value)}
+                placeholder="What should the other elder look at?" className="h-16 flex-1 rounded-md border bg-background px-2 py-1" />
+              <Button size="sm" className="h-7 px-3 text-xs" disabled={proposeBusy || !proposeSummary.trim()} onClick={submitProposal}>
+                Submit proposal
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setProposing(false); setProposeErr(null); }}>Cancel</Button>
             </div>
-          ) : (
-            <Button size="sm" variant="outline" className="h-7 self-start px-3 text-xs" onClick={() => setProposing(true)}>
-              Propose changes for review
-            </Button>
-          ))}
+            {proposeErr && <p className="text-destructive">{proposeErr}</p>}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,360px)_1fr]">

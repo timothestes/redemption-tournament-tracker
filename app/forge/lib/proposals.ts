@@ -65,7 +65,7 @@ export async function createProposal(
     base = (ver?.data ?? {}) as DesignCard;
   }
   if (diffCards(base, snapshot).length === 0) {
-    return { ok: false, error: "No changes to propose since the last published version." };
+    return { ok: false, error: "No changes to review since the last released version." };
   }
 
   const { data, error } = await ctx.supabase.rpc("forge_create_proposal", {

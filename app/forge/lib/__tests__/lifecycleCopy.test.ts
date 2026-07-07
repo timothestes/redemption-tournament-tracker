@@ -16,7 +16,7 @@ describe("lifecycleCopy", () => {
   });
 
   it("labels the publish action by where the card is", () => {
-    expect(releaseLabel("draft")).toBe("Release to playtest");
+    expect(releaseLabel("draft")).toBe("Release to playtesters");
     expect(releaseLabel("playtesting")).toBe("Release update");
   });
 

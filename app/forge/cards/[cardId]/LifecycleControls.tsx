@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import { shareToSet, sendToPrivate, publish, approve, unapprove, archive, unarchive, deleteCard } from "@/app/forge/lib/lifecycle";
+import { addComment } from "@/app/forge/lib/comments";
 import { STATUS_PATH, STATUS_LABEL, ACTION_LABEL, releaseLabel, CONFIRM_COPY } from "@/app/forge/lib/lifecycleCopy";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
@@ -16,6 +17,15 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function LifecycleControls({ card, sets }: { card: ForgeCardFull; sets: ForgeSetSummary[] }) {
   const router = useRouter();
@@ -23,10 +33,25 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
   const [picking, setPicking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmReturn, setConfirmReturn] = useState(false);
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  const [releaseNote, setReleaseNote] = useState("");
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => {
       const r = await fn();
       if (r.ok === false) alert(r.error ?? "Action failed");
+      router.refresh();
+    });
+
+  // Release freezes a new version; the optional note lands in the card's comment
+  // thread so the "why" is recorded without the propose→accept ceremony.
+  const doRelease = () =>
+    start(async () => {
+      const r = await publish(card.id);
+      if (r.ok === false) { alert(r.error ?? "Could not release card"); return; }
+      const note = releaseNote.trim();
+      if (note) await addComment({ cardId: card.id, body: note });
+      setReleaseOpen(false);
+      setReleaseNote("");
       router.refresh();
     });
 
@@ -55,7 +80,7 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
           </ol>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {(card.status === "draft" || card.status === "playtesting") && (
-              <Button size="sm" className="h-7 px-3 text-xs" disabled={pending} onClick={() => run(() => publish(card.id))}>
+              <Button size="sm" className="h-7 px-3 text-xs" disabled={pending} onClick={() => setReleaseOpen(true)}>
                 {releaseLabel(card.status)}
               </Button>
             )}
@@ -109,6 +134,32 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
           )}
         </div>
       )}
+      <Dialog open={releaseOpen} onOpenChange={(o) => { if (!o) setReleaseOpen(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{releaseLabel(card.status)}</DialogTitle>
+            <DialogDescription>
+              Freezes the current draft as a new version visible to playtesters.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-2">
+            <label className="block text-xs font-medium text-muted-foreground">What changed? (optional)</label>
+            <textarea
+              autoFocus
+              value={releaseNote}
+              onChange={(e) => setReleaseNote(e.target.value)}
+              placeholder="Recorded in the card’s comments…"
+              className="h-24 w-full rounded-md border bg-background px-2 py-1 text-sm"
+            />
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" disabled={pending} onClick={() => setReleaseOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={pending} onClick={doRelease}>Release</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <ConfirmationDialog
         open={confirmReturn}
         onOpenChange={setConfirmReturn}
