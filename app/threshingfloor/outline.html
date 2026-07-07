@@ -8876,12 +8876,15 @@
             }
           });
 
-          // Pre-build RTN dynamic rows/fields so values have somewhere to land
+          // Pre-build RTN dynamic rows/fields so values have somewhere to land.
+          // rtn-extra-notes needs no such step -- it's a static, always-present
+          // textarea (unlike the countdown field, which is hidden by default),
+          // and refreshVenueNotesCard() below already updates its tile once the
+          // value is restored. showExtraNotesField() is a legacy stub that now
+          // just opens the Venue/Other Notes modal, which used to pop open
+          // uninvited on every load of a draft with saved venue notes.
           if (data['rtn-nats-date'] || data['rtn-nationals-info']) {
             showCountdownField();
-          }
-          if (data['rtn-extra-notes'] && data['rtn-extra-notes'].trim()) {
-            showExtraNotesField();
           }
           // Pre-build RTN Deadlines using forceId so each row's id exactly matches its
           // saved data keys -- same numbering-gap fix as tournament blocks above, since
