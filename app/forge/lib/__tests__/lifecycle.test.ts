@@ -23,11 +23,19 @@ describe("lifecycle actions", () => {
     expect((await shareToSet("c1", "s1")).ok).toBe(true);
     expect((c.supabase.rpc as any).mock.calls[0]).toEqual(["forge_share_card_to_set", { p_card_id: "c1", p_set_id: "s1" }]);
   });
-  it("publish calls forge_publish_card", async () => {
+  it("publish calls forge_publish_card with a null note by default", async () => {
     const c = ctx();
     (requireElder as any).mockResolvedValue(c);
     await publish("c1");
-    expect((c.supabase.rpc as any).mock.calls[0]).toEqual(["forge_publish_card", { p_card_id: "c1" }]);
+    expect((c.supabase.rpc as any).mock.calls[0]).toEqual(["forge_publish_card", { p_card_id: "c1", p_note: null }]);
+  });
+  it("publish passes a trimmed note and blanks become null", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    await publish("c1", "  fixed toughness typo  ");
+    expect((c.supabase.rpc as any).mock.calls[0][1]).toEqual({ p_card_id: "c1", p_note: "fixed toughness typo" });
+    await publish("c2", "   ");
+    expect((c.supabase.rpc as any).mock.calls[1][1]).toEqual({ p_card_id: "c2", p_note: null });
   });
   it("approve surfaces an RPC error as ok:false", async () => {
     const c = ctx(async () => ({ data: null, error: { message: "nope" } }));

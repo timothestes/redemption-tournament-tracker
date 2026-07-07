@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import { shareToSet, sendToPrivate, publish, approve, unapprove, archive, unarchive, deleteCard } from "@/app/forge/lib/lifecycle";
-import { addComment } from "@/app/forge/lib/comments";
 import { STATUS_PATH, STATUS_LABEL, ACTION_LABEL, releaseLabel, CONFIRM_COPY } from "@/app/forge/lib/lifecycleCopy";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
@@ -42,14 +41,12 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
       router.refresh();
     });
 
-  // Release freezes a new version; the optional note lands in the card's comment
-  // thread so the "why" is recorded without the propose→accept ceremony.
+  // Release freezes a new version; the optional note is stamped on the version
+  // row inside the same transaction (migration 072).
   const doRelease = () =>
     start(async () => {
-      const r = await publish(card.id);
+      const r = await publish(card.id, releaseNote);
       if (r.ok === false) { alert(r.error ?? "Could not release card"); return; }
-      const note = releaseNote.trim();
-      if (note) await addComment({ cardId: card.id, body: note });
       setReleaseOpen(false);
       setReleaseNote("");
       router.refresh();
@@ -148,7 +145,7 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
               autoFocus
               value={releaseNote}
               onChange={(e) => setReleaseNote(e.target.value)}
-              placeholder="Recorded in the card’s comments…"
+              placeholder="Shown in the card’s history…"
               className="h-24 w-full rounded-md border bg-background px-2 py-1 text-sm"
             />
           </DialogBody>

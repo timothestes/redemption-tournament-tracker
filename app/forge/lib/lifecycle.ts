@@ -22,8 +22,12 @@ export async function shareToSet(cardId: string, setId: string): Promise<Result>
 export async function sendToPrivate(cardId: string): Promise<Result> {
   return call("forge_send_card_to_private", { p_card_id: cardId }, "Could not send card to private");
 }
-export async function publish(cardId: string): Promise<Result> {
-  return call("forge_publish_card", { p_card_id: cardId }, "Could not release card");
+export async function publish(cardId: string, note?: string): Promise<Result> {
+  return call(
+    "forge_publish_card",
+    { p_card_id: cardId, p_note: note?.trim() || null },
+    "Could not release card",
+  );
 }
 export async function approve(cardId: string): Promise<Result> {
   return call("forge_approve_card", { p_card_id: cardId }, "Could not approve card");
