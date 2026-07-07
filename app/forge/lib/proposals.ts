@@ -44,12 +44,23 @@ function toProposal(row: any): ProposalRow {
 
 export async function createProposal(
   cardId: string,
-  snapshot: DesignCard,
   summary: string
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const ctx = await requireForge();
   if (!ctx) return { ok: false, error: "Not authorized" };
   if (!summary.trim()) return { ok: false, error: "A summary is required" };
+
+  // The proposal freezes the card's SAVED working draft (server truth). The
+  // editor autosaves within ~1s and proposing happens after typing a summary,
+  // so the draft is current by submit time; server truth is also what the
+  // no-op guard below compares.
+  const { data: card } = await ctx.supabase
+    .from("forge_cards")
+    .select("working_snapshot")
+    .eq("id", cardId)
+    .maybeSingle();
+  if (!card) return { ok: false, error: "Card not found" };
+  const snapshot = (card.working_snapshot ?? {}) as DesignCard;
 
   // No-op guard: a proposal must differ from the card's LATEST version of any
   // status — draft iterations included — matching the base the RPC records and

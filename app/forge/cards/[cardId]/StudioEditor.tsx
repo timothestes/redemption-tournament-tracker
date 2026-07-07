@@ -7,12 +7,11 @@ import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
 import FilePicker from "@/app/forge/components/FilePicker";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 import { cn } from "@/lib/utils";
 import { saveCard, uploadArt, uploadFinished, setPlaceholder, type ForgeCardFull } from "@/app/forge/lib/cards";
-import { createProposal } from "@/app/forge/lib/proposals";
 import { cardRawText, type DesignCard } from "@/app/forge/lib/designCard";
 import LifecycleControls from "./LifecycleControls";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
@@ -129,22 +128,6 @@ export default function StudioEditor({
     }
   }
 
-  const [proposing, setProposing] = useState(false);
-  const [proposeSummary, setProposeSummary] = useState("");
-  const [proposeBusy, setProposeBusy] = useState(false);
-  const [proposeErr, setProposeErr] = useState<string | null>(null);
-  const submitProposal = async () => {
-    if (!proposeSummary.trim()) return;
-    setProposeErr(null);
-    setProposeBusy(true);
-    const r = await createProposal(card.id, snapshot, proposeSummary);
-    setProposeBusy(false);
-    if (r.ok === false) { setProposeErr(r.error); return; }
-    setProposing(false);
-    setProposeSummary("");
-    router.refresh();
-  };
-
   // Cache-buster: updated_at bumps on every image/snapshot write, so the browser can
   // cache each t-stamped art URL indefinitely and still swap after router.refresh().
   const t = Date.parse(card.updatedAt) || 0;
@@ -174,27 +157,9 @@ export default function StudioEditor({
         </div>
         <LifecycleControls card={card} sets={sets} />
         {card.setId && (
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span>Releases are visible to Forge playtesters only — they don’t change the public card database.</span>
-            {!proposing && (
-              <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={() => setProposing(true)}>
-                Propose changes
-              </Button>
-            )}
-          </div>
-        )}
-        {card.setId && proposing && (
-          <div className="flex flex-col gap-1 text-xs">
-            <div className="flex items-start gap-1">
-              <textarea autoFocus value={proposeSummary} onChange={(e) => setProposeSummary(e.target.value)}
-                placeholder="Summarize this change — what and why?" className="h-16 flex-1 rounded-md border bg-background px-2 py-1" />
-              <Button size="sm" className="h-7 px-3 text-xs" disabled={proposeBusy || !proposeSummary.trim()} onClick={submitProposal}>
-                Submit proposal
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setProposing(false); setProposeErr(null); }}>Cancel</Button>
-            </div>
-            {proposeErr && <p className="text-destructive">{proposeErr}</p>}
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Releases are visible to Forge playtesters only — they don’t change the public card database.
+          </p>
         )}
       </div>
 
