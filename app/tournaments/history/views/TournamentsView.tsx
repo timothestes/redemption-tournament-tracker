@@ -5,7 +5,6 @@ import { useSeed } from "../seed-context";
 import { FormatBadge } from "../components/FormatBadge";
 import { SectionTitle } from "../components/SectionTitle";
 import { EmptyState } from "../components/EmptyState";
-import StateMap from "../components/StateMap.loader";
 
 interface TournamentsViewProps {
   setView: (
@@ -54,24 +53,15 @@ export function TournamentsView({ setView }: TournamentsViewProps) {
               {/* top accent bar */}
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
 
-              {t.location && (
-                <StateMap
-                  location={t.location}
-                  className="absolute top-3 right-3 w-20 h-14 text-primary/50 pointer-events-none"
-                />
-              )}
-
-              <div className="pr-16">
-                <div className="text-3xl font-cinzel font-bold text-foreground leading-none mb-1">
-                  {t.year}
-                </div>
-                <div className="text-sm font-medium text-foreground mb-1">
-                  {t.location || "Location TBD"}
-                </div>
-                {meta && (
-                  <div className="text-xs text-muted-foreground mb-3">{meta}</div>
-                )}
+              <div className="text-3xl font-cinzel font-bold text-foreground leading-none mb-1">
+                {t.year}
               </div>
+              <div className="text-sm font-medium text-foreground mb-1">
+                {t.location || "Location TBD"}
+              </div>
+              {meta && (
+                <div className="text-xs text-muted-foreground mb-3">{meta}</div>
+              )}
               {t.formats.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {t.formats.map((f) => (
