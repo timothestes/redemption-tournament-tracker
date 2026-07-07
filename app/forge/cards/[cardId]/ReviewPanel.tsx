@@ -48,6 +48,7 @@ export default function ReviewPanel({
                 artUrl={artUrl}
                 finishedUrl={finishedUrl}
                 canReview={canReview}
+                cardStatus={card.status}
               />
             ))}
           </div>
