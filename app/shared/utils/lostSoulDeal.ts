@@ -31,9 +31,23 @@ export const STAGGER_MS = 100;
 /** Flyer scale as it leaves the deck; grows to 1 on landing. */
 export const START_SCALE = 0.72;
 
-/** IDs present in `currentIds` that were not in `prevIds`, in input order. */
-export function diffNewArrivals(prevIds: Set<string>, currentIds: string[]): string[] {
-  return currentIds.filter((id) => !prevIds.has(id));
+/**
+ * Souls that should be "dealt" this frame: newly arrived in the LOB AND whose
+ * previous zone was a deck source. This excludes manual drags into the LOB
+ * (hand/reserve/territory → LOB) and initial placement, which shouldn't fly
+ * from the deck. Matches how the draw "deal" (#171) gates on deck→hand.
+ *
+ * @param prevLobIds  LOB soul ids from the previous frame.
+ * @param prevDeckIds Deck-source card ids from the previous frame (unfiltered —
+ *                    covers hidden opponent-deck cards, which lack card data).
+ * @param lobSoulIds  LOB soul ids this frame, in current order.
+ */
+export function diffDealtSouls(
+  prevLobIds: Set<string>,
+  prevDeckIds: Set<string>,
+  lobSoulIds: string[],
+): string[] {
+  return lobSoulIds.filter((id) => !prevLobIds.has(id) && prevDeckIds.has(id));
 }
 
 /**

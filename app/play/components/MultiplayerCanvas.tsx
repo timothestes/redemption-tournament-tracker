@@ -679,10 +679,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
   }, [lobSoulNameById]);
 
+  // Deck-source ids gate the deal: a soul only flies from the deck if it was in
+  // the deck last frame (a draw/route), not dragged in from hand/reserve/etc.
+  const myDeckIds = useMemo(
+    () => (myCards['deck'] ?? []).map(c => String(c.id)),
+    [myCards],
+  );
+  const oppDeckIds = useMemo(
+    () => (opponentCards['deck'] ?? []).map(c => String(c.id)),
+    [opponentCards],
+  );
   const { inFlight: myDeals, onLand: onMyLand } =
-    useLostSoulDeals(myLobSoulIds, soulsHydrated, fireSoulToast);
+    useLostSoulDeals(myLobSoulIds, myDeckIds, soulsHydrated, fireSoulToast);
   const { inFlight: oppDeals, onLand: onOppLand } =
-    useLostSoulDeals(oppLobSoulIds, soulsHydrated, fireSoulToast);
+    useLostSoulDeals(oppLobSoulIds, oppDeckIds, soulsHydrated, fireSoulToast);
 
   // Route the glow to *visible* ids: a soul in flight is excluded until it lands,
   // so the amber glow fires on landing rather than on server placement.
@@ -705,8 +715,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     () => (sharedCards['land-of-bondage'] ?? []).filter(isLostSoulCard).map(c => String(c.id)),
     [sharedCards],
   );
+  const sharedDeckIds = useMemo(
+    () => (sharedCards['soul-deck'] ?? []).map(c => String(c.id)),
+    [sharedCards],
+  );
   const { inFlight: sharedDeals, onLand: onSharedLand } =
-    useLostSoulDeals(sharedLobSoulIds, soulsHydrated, (newIds) => {
+    useLostSoulDeals(sharedLobSoulIds, sharedDeckIds, soulsHydrated, (newIds) => {
       if (newIds.length === 1) {
         const c = (sharedCards['land-of-bondage'] ?? []).find(x => String(x.id) === newIds[0]);
         showGameToast(`Lost Soul dealt: ${simplifyLostSoulName(c?.cardName ?? 'Lost Soul')}`);

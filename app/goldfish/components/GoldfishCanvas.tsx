@@ -90,8 +90,19 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     () => (state.zones['land-of-bondage'] ?? []).filter(isLostSoulCard).map(c => c.instanceId),
     [state.zones['land-of-bondage']],
   );
+  // Deck sources — a soul only flies from the deck if it was there last frame
+  // (a draw/route), not dragged in from hand/reserve/territory. `soul-deck`
+  // covers the Paragon format.
+  const deckSourceIds = useMemo(
+    () => [
+      ...(state.zones['deck'] ?? []),
+      ...(state.zones['soul-deck'] ?? []),
+    ].map(c => c.instanceId),
+    [state.zones['deck'], state.zones['soul-deck']],
+  );
   const { inFlight: soulDeals, onLand: onSoulLand } = useLostSoulDeals(
     lobSoulIds,
+    deckSourceIds,
     true,
     (newIds) => {
       if (newIds.length === 1) {

@@ -1,28 +1,41 @@
 import { describe, it, expect } from 'vitest';
 import {
-  diffNewArrivals,
+  diffDealtSouls,
   computeDealFlight,
   STAGGER_MS,
   START_SCALE,
 } from '../lostSoulDeal';
 
-describe('diffNewArrivals', () => {
-  it('returns ids present now but not before', () => {
-    const prev = new Set(['a', 'b']);
-    expect(diffNewArrivals(prev, ['a', 'b', 'c'])).toEqual(['c']);
+describe('diffDealtSouls', () => {
+  it('deals a soul that moved from the deck into the LOB', () => {
+    const prevLob = new Set<string>([]);
+    const prevDeck = new Set(['s1', 'c2']);
+    // s1 was in the deck last frame, now in the LOB → dealt.
+    expect(diffDealtSouls(prevLob, prevDeck, ['s1'])).toEqual(['s1']);
   });
 
-  it('returns empty when nothing is new', () => {
-    const prev = new Set(['a', 'b']);
-    expect(diffNewArrivals(prev, ['a', 'b'])).toEqual([]);
+  it('does NOT deal a soul dragged in from a non-deck zone', () => {
+    const prevLob = new Set<string>([]);
+    const prevDeck = new Set(['c2']); // s1 was NOT in the deck (came from hand)
+    expect(diffDealtSouls(prevLob, prevDeck, ['s1'])).toEqual([]);
   });
 
-  it('returns all when prev is empty', () => {
-    expect(diffNewArrivals(new Set(), ['a', 'b'])).toEqual(['a', 'b']);
+  it('does NOT re-deal a soul already in the LOB', () => {
+    const prevLob = new Set(['s1']);
+    const prevDeck = new Set(['s1']); // even if still listed in deck, not newly arrived
+    expect(diffDealtSouls(prevLob, prevDeck, ['s1'])).toEqual([]);
   });
 
-  it('preserves input order of new ids', () => {
-    expect(diffNewArrivals(new Set(['x']), ['x', 'c', 'a', 'b'])).toEqual(['c', 'a', 'b']);
+  it('deals only the deck-sourced souls in a mixed batch, in order', () => {
+    const prevLob = new Set<string>([]);
+    const prevDeck = new Set(['fromDeck1', 'fromDeck2']); // dragged is not here
+    expect(
+      diffDealtSouls(prevLob, prevDeck, ['fromDeck1', 'dragged', 'fromDeck2']),
+    ).toEqual(['fromDeck1', 'fromDeck2']);
+  });
+
+  it('deals nothing when the deck set is empty (e.g. initial placement)', () => {
+    expect(diffDealtSouls(new Set(), new Set(), ['s1', 's2'])).toEqual([]);
   });
 });
 

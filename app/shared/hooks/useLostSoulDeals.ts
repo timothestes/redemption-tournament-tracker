@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { diffNewArrivals } from '../utils/lostSoulDeal';
+import { diffDealtSouls } from '../utils/lostSoulDeal';
 
 export interface SoulDealState {
   /** Souls currently in flight → their stagger seq within the arrival batch. */
@@ -11,8 +11,11 @@ export interface SoulDealState {
 }
 
 /**
- * Detects Lost Souls newly arriving in a Land-of-Bondage zone and tracks which
- * are mid-flight. The consumer:
+ * Detects Lost Souls dealt from the deck into a Land-of-Bondage zone and tracks
+ * which are mid-flight. A soul only "deals" when its previous zone was a deck
+ * source (`deckSourceIds`) — a draw or auto-route. Souls dragged in from hand /
+ * reserve / territory don't fly from the deck; they just appear where dropped.
+ * The consumer:
  *   - hides the settled node for any id in `inFlight` (the flyer shows it),
  *   - renders a flyer per `inFlight` entry and calls `onLand(id)` when its
  *     tween finishes,
@@ -24,7 +27,7 @@ export interface SoulDealState {
  * soul would register as a new arrival. Pass `false` until subscription applied
  * (and `myPlayer` resolved), then `true`. Goldfish passes `true`.
  *
- * `onArrive` fires once per detected batch with the new ids (for a single
+ * `onArrive` fires once per detected batch with the dealt ids (for a single
  * summarizing toast). It fires as the souls begin dealing (~one flight ahead of
  * landing) — close enough to "on land" without coordinating N flyer landings.
  *
@@ -32,10 +35,12 @@ export interface SoulDealState {
  */
 export function useLostSoulDeals(
   soulIds: string[],
+  deckSourceIds: string[],
   ready: boolean,
   onArrive?: (newIds: string[]) => void,
 ): SoulDealState {
-  const prevIdsRef = useRef<Set<string>>(new Set());
+  const prevLobIdsRef = useRef<Set<string>>(new Set());
+  const prevDeckIdsRef = useRef<Set<string>>(new Set());
   const isInitialRef = useRef(true);
   const [inFlight, setInFlight] = useState<Map<string, number>>(new Map());
 
@@ -45,13 +50,17 @@ export function useLostSoulDeals(
     const currentIds = new Set(soulIds);
 
     if (isInitialRef.current) {
-      prevIdsRef.current = currentIds;
+      prevLobIdsRef.current = currentIds;
+      prevDeckIdsRef.current = new Set(deckSourceIds);
       isInitialRef.current = false;
       return;
     }
 
-    const newIds = diffNewArrivals(prevIdsRef.current, soulIds);
-    prevIdsRef.current = currentIds;
+    // Only souls that were in the deck last frame count as dealt — excludes
+    // drags in from hand/reserve/territory (see diffDealtSouls).
+    const newIds = diffDealtSouls(prevLobIdsRef.current, prevDeckIdsRef.current, soulIds);
+    prevLobIdsRef.current = currentIds;
+    prevDeckIdsRef.current = new Set(deckSourceIds);
 
     // Prune any in-flight souls that left the LOB before landing (e.g. rescued
     // mid-flight) so we never leave a permanently hidden settled node.
@@ -74,7 +83,7 @@ export function useLostSoulDeals(
     });
 
     if (newIds.length > 0) onArrive?.(newIds);
-  }, [soulIds, ready, onArrive]);
+  }, [soulIds, deckSourceIds, ready, onArrive]);
 
   const onLand = useCallback((id: string) => {
     setInFlight((prev) => {
