@@ -16,6 +16,7 @@ import { toScreenPos, toDbPos, cardCenter, adjustAnchorForRotationChange } from 
 import { calculateHandPositions, HAND_TOOLBAR_RESERVE } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
 import { useDealAnimation } from '@/app/shared/hooks/useDealAnimation';
+import { useHandLayoutTween } from '@/app/shared/hooks/useHandLayoutTween';
 import { DealLayer, type DealSpriteSpec } from '@/app/shared/components/DealLayer';
 import {
   GameCardNode,
@@ -2159,6 +2160,27 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       cardNodeRefs.current.delete(instanceId);
     }
   }, []);
+
+  // Smooth hand re-layout: when cards enter/leave the hand the remaining
+  // cards glide to their shifted slots instead of snapping.
+  const myHandSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    const cards = myCards['hand'] ?? [];
+    if (!myHandRect || cards.length === 0) return m;
+    const pos = calculateHandPositions(
+      cards.length,
+      myHandRect,
+      handCardWidth,
+      handCardHeight,
+      viewerKind === 'spectator' ? true : isSpreadHand,
+    );
+    cards.forEach((c, i) => {
+      const p = pos[i];
+      if (p) m.set(String(c.id), p);
+    });
+    return m;
+  }, [myCards, myHandRect, handCardWidth, handCardHeight, viewerKind, isSpreadHand]);
+  useHandLayoutTween(myHandSlots, cardNodeRefs);
 
   // Multi-card drag: offsets of follower cards relative to the dragged card
   const dragFollowerOffsets = useRef<Map<string, { dx: number; dy: number }> | null>(null);

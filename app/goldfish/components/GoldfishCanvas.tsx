@@ -42,6 +42,7 @@ import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
 import { useDealAnimation } from '@/app/shared/hooks/useDealAnimation';
+import { useHandLayoutTween } from '@/app/shared/hooks/useHandLayoutTween';
 import { DealLayer, type DealSpriteSpec } from '@/app/shared/components/DealLayer';
 import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
 import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
@@ -1347,6 +1348,18 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     () => calculateHandPositions(state.zones.hand.length, virtualWidth, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight),
     [state.zones.hand.length, state.isSpreadHand, cardWidth, cardHeight, virtualWidth]
   );
+
+  // Smooth hand re-layout: when cards enter/leave the hand the remaining
+  // cards glide to their shifted slots instead of snapping.
+  const handSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    state.zones.hand.forEach((c, i) => {
+      const p = handPositions[i];
+      if (p) m.set(c.instanceId, p);
+    });
+    return m;
+  }, [state.zones.hand, handPositions]);
+  useHandLayoutTween(handSlots, cardNodeRefs);
 
   // Render all zones except hand
   const nonHandZones: ZoneId[] = useMemo(() => [
