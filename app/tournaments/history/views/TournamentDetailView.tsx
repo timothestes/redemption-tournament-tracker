@@ -9,7 +9,6 @@ import { FormatBadge } from "../components/FormatBadge";
 import { PlacementBadge } from "../components/PlacementBadge";
 import { SectionTitle } from "../components/SectionTitle";
 import { EmptyState } from "../components/EmptyState";
-import StateMap from "../components/StateMap.loader";
 import { PromoCardsModal } from "../components/PromoCardsModal";
 import { FantasyDraftModal } from "../components/FantasyDraftModal";
 import { promosForYear } from "@/lib/nationals/promos";
@@ -371,9 +370,6 @@ export function TournamentDetailView({
         {tournament.notes && (
           <p className="text-sm text-muted-foreground mb-3">{linkifyNotes(tournament.notes)}</p>
         )}
-
-        {/* ── State map ────────────────────────────────────────────────── */}
-        <StateMap location={tournament.location} />
 
         {/* ── Action buttons row ───────────────────────────────────────── */}
         <div className="flex flex-wrap items-center gap-2 mt-3">

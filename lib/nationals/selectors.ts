@@ -16,6 +16,8 @@ export interface Champion {
   years: number[];
   /** Distinct set of formats in which they won at least once (NOT parallel to `years`) */
   formats: string[];
+  /** Win years broken out per format, for format-scoped views */
+  byFormat: Record<string, number[]>;
 }
 
 /**
@@ -74,7 +76,12 @@ export function buildChampionData(seed: NationalsData): Champion[] {
     // formats is a de-duped list of distinct formats won (not index-parallel to years)
     const formats = Array.from(new Set(Object.keys(fmtMap)));
 
-    return { name, wins: years.length, years, formats };
+    const byFormat: Record<string, number[]> = {};
+    for (const [fmt, fmtYears] of Object.entries(fmtMap)) {
+      byFormat[fmt] = [...fmtYears].sort((a, b) => a - b);
+    }
+
+    return { name, wins: years.length, years, formats, byFormat };
   });
 }
 
@@ -97,6 +104,32 @@ export interface CareerHistoryEntry {
   deck: string;
   record: string;
   notes: string;
+  /** Distinct players who played Round 1 that year+format, or null if no match data exists for that key. */
+  fieldSize: number | null;
+  /** (fieldSize - placement) / (fieldSize - 1) * 100, clamped 0-100; null if fieldSize is unknown or 1. */
+  fieldPct: number | null;
+  /** This player's W-L(-D) record in that year+format, derived from match data; null if no match data exists for that key. */
+  matchRecord: string | null;
+}
+
+/**
+ * Counts distinct participants in a format's Round 1, from match data.
+ * Round 1 is used (rather than the results/standings list) because some
+ * entrants drop before final standings are recorded, undercounting the
+ * true field size; Round 1 attendance isn't affected by drops.
+ * Returns null when no match data exists for the key (older years, or
+ * multiplayer formats that aren't tracked in the matches map).
+ */
+function countRoundOneField(matches: MatchEntry[] | undefined): number | null {
+  if (!matches) return null;
+  const names = new Set<string>();
+  for (const m of matches) {
+    if (m.round !== "Round 1") continue;
+    for (const n of [m.playerA, m.playerB]) {
+      if (n && n.toLowerCase() !== "bye") names.add(n);
+    }
+  }
+  return names.size > 0 ? names.size : null;
 }
 
 /** A match entry enriched with year and format (derived from the matches map key). */
@@ -184,6 +217,8 @@ export interface PlayerProfile {
   tp2Draws: number;
   /** Win % string over decisive games, e.g. "62.5%" or "—" */
   tp2WinPct: string;
+  /** Average placement-vs-field-size percentage (100 = won, 0 = last), or null if no placements have known field size */
+  avgFieldPct: number | null;
 
   // Top-cut record
   topCutWins: number;
@@ -224,7 +259,14 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
     const year = parseInt(key.slice(0, i), 10);
     const fmt = key.slice(i + 1);
     const r = results.find((x) => x.playerName === name);
-    if (r) placements.push({ year, format: fmt, ...r });
+    if (r) {
+      const fieldSize = countRoundOneField(seed.matches[key]);
+      const fieldPct =
+        fieldSize != null && fieldSize > 1 && r.placement
+          ? Math.max(0, Math.min(100, ((fieldSize - r.placement) / (fieldSize - 1)) * 100))
+          : null;
+      placements.push({ year, format: fmt, ...r, fieldSize, fieldPct, matchRecord: null });
+    }
   }
   placements.sort((a, b) => b.year - a.year);
 
@@ -232,12 +274,16 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
   const matchStatsByFmt: Record<string, WLDRecord> = {};
   const matchStatsByOpp: Record<string, WLDRecord> = {};
   const allMatches: MatchRow[] = [];
+  // Per year+format record (mirrors matchStatsByFmt, but scoped to one key
+  // instead of aggregated across years) — feeds CareerHistoryEntry.matchRecord.
+  const recordByKey: Record<string, WLDRecord> = {};
 
   for (const [key, matches] of Object.entries(seed.matches)) {
     const i = key.indexOf("_");
     const year = parseInt(key.slice(0, i), 10);
     const fmt = key.slice(i + 1);
     const isTeams = fmt === "Teams";
+    const keyRecord: WLDRecord = { wins: 0, losses: 0, draws: 0 };
 
     // Teams is team-vs-team: each player plays every opposing player, so a player
     // has multiple cross-pairing records per round. Head-to-head keeps full per-game
@@ -275,20 +321,34 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
 
       // Non-Teams: one record == one game == one format credit.
       if (!matchStatsByFmt[fmt]) matchStatsByFmt[fmt] = { wins: 0, losses: 0, draws: 0 };
-      if (won) matchStatsByFmt[fmt].wins++;
-      else if (lost) matchStatsByFmt[fmt].losses++;
-      else if (draw) matchStatsByFmt[fmt].draws++;
+      if (won) { matchStatsByFmt[fmt].wins++; keyRecord.wins++; }
+      else if (lost) { matchStatsByFmt[fmt].losses++; keyRecord.losses++; }
+      else if (draw) { matchStatsByFmt[fmt].draws++; keyRecord.draws++; }
     }
 
     // Teams: collapse each round into a single W/L/D by majority of its games.
     if (isTeams) {
       for (const t of Object.values(roundTally)) {
         if (!matchStatsByFmt[fmt]) matchStatsByFmt[fmt] = { wins: 0, losses: 0, draws: 0 };
-        if (t.wins > t.losses) matchStatsByFmt[fmt].wins++;
-        else if (t.losses > t.wins) matchStatsByFmt[fmt].losses++;
-        else matchStatsByFmt[fmt].draws++;
+        if (t.wins > t.losses) { matchStatsByFmt[fmt].wins++; keyRecord.wins++; }
+        else if (t.losses > t.wins) { matchStatsByFmt[fmt].losses++; keyRecord.losses++; }
+        else { matchStatsByFmt[fmt].draws++; keyRecord.draws++; }
       }
     }
+
+    if (keyRecord.wins + keyRecord.losses + keyRecord.draws > 0) {
+      recordByKey[key] = keyRecord;
+    }
+  }
+
+  // Attach each placement's year+format match record, now that recordByKey is built.
+  for (const p of placements) {
+    const rec = recordByKey[`${p.year}_${p.format}`];
+    p.matchRecord = rec
+      ? rec.draws > 0
+        ? `${rec.wins}–${rec.losses}–${rec.draws}`
+        : `${rec.wins}–${rec.losses}`
+      : null;
   }
 
   // ── Multiplayer W/L/D (from multiWL map) ───────────────────────────────────
@@ -314,6 +374,15 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
   const tp2Decisive = tp2Wins + tp2Losses;
   const tp2WinPct =
     tp2Decisive > 0 ? ((tp2Wins / tp2Decisive) * 100).toFixed(1) + "%" : "—";
+
+  // Field % — average of each placement's fieldPct (see the placements loop above).
+  const fieldPcts = placements
+    .map((p) => p.fieldPct)
+    .filter((v): v is number => v != null);
+  const avgFieldPct =
+    fieldPcts.length > 0
+      ? fieldPcts.reduce((a, b) => a + b, 0) / fieldPcts.length
+      : null;
 
   // ── Top-cut record ──────────────────────────────────────────────────────────
   let topCutWins = 0;
@@ -368,6 +437,7 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
     tp2Losses,
     tp2Draws,
     tp2WinPct,
+    avgFieldPct,
     topCutWins,
     topCutLosses,
     topCutWinPct,

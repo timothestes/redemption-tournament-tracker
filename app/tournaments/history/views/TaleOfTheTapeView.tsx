@@ -197,6 +197,7 @@ interface TapeStats {
   p1: number;
   podiums: number;
   avgPl: number | null;
+  avgFieldPct: number | null; // 0–100
   winPct2: number | null; // 0–100
   W2: number;
   L2: number;
@@ -265,6 +266,7 @@ function tapeGetStats(profile: PlayerProfile, fullByFmt: Record<string, Set<numb
     p1,
     podiums: p1 + p2 + p3,
     avgPl,
+    avgFieldPct: profile.avgFieldPct,
     winPct2,
     W2,
     L2,
@@ -469,6 +471,12 @@ export function TaleOfTheTapeView() {
               bVal={statsR.avgPl}
               lowerBetter
               fmt={(v) => v.toFixed(2)}
+            />
+            <StatRow
+              label="Field %"
+              aVal={statsL.avgFieldPct}
+              bVal={statsR.avgFieldPct}
+              fmt={(v) => v.toFixed(1) + "%"}
             />
           </StatTable>
 

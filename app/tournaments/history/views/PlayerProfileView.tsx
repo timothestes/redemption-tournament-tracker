@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { ViewId } from "../NavTabs";
 import { useSeed } from "../seed-context";
 import { playerProfile } from "@/lib/nationals/selectors";
@@ -10,6 +10,30 @@ import { SectionTitle } from "../components/SectionTitle";
 import { EmptyState } from "../components/EmptyState";
 
 const MATCH_DATA_START_YEAR = 2003;
+
+// Long tables (Head-to-Head, Career History, Fantasy Draft History) preview
+// this many rows by default with a "Show all" toggle, so the profile page
+// doesn't grow unbounded as more years/opponents accumulate.
+const PREVIEW_ROWS = 5;
+
+function ShowMoreRow({
+  expanded,
+  totalCount,
+  onToggle,
+}: {
+  expanded: boolean;
+  totalCount: number;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full px-4 py-2 text-xs font-medium text-primary hover:bg-muted/50 border-t border-border text-center transition"
+    >
+      {expanded ? "Show less" : `Show all ${totalCount}`}
+    </button>
+  );
+}
 
 interface PlayerProfileViewProps {
   playerName: string | null;
@@ -32,6 +56,15 @@ export function PlayerProfileView({
     [seed, playerName]
   );
 
+  const [showAllH2H, setShowAllH2H] = useState(false);
+  const [showAllCareer, setShowAllCareer] = useState(false);
+  const [showAllFantasy, setShowAllFantasy] = useState(false);
+  useEffect(() => {
+    setShowAllH2H(false);
+    setShowAllCareer(false);
+    setShowAllFantasy(false);
+  }, [playerName]);
+
   if (!profile) {
     return <EmptyState icon="👤" title="Player not found" />;
   }
@@ -52,6 +85,7 @@ export function PlayerProfileView({
     tp2Losses,
     tp2Draws,
     tp2WinPct,
+    avgFieldPct,
     topCutWins,
     topCutLosses,
     topCutWinPct,
@@ -78,6 +112,15 @@ export function PlayerProfileView({
   const sortedOpponents = Object.entries(matchStatsByOpp).sort(
     ([, a], [, b]) => b.wins + b.losses - (a.wins + a.losses)
   );
+  const visibleOpponents = showAllH2H
+    ? sortedOpponents
+    : sortedOpponents.slice(0, PREVIEW_ROWS);
+  const visiblePlacements = showAllCareer
+    ? placements
+    : placements.slice(0, PREVIEW_ROWS);
+  const visibleFantasyDraftHistory = showAllFantasy
+    ? fantasyDraftHistory
+    : fantasyDraftHistory.slice(0, PREVIEW_ROWS);
 
   // Check if opponent is a known player (for linking)
   const playerNames = new Set(seed.players.map((p) => p.name));
@@ -193,6 +236,12 @@ export function PlayerProfileView({
                     <div className={statValueClass}>{tp2WinPct}</div>
                     <div className={statLabelClass}>Win %</div>
                   </div>
+                  {avgFieldPct != null && (
+                    <div>
+                      <div className={statValueClass}>{avgFieldPct.toFixed(1)}%</div>
+                      <div className={statLabelClass}>Field %</div>
+                    </div>
+                  )}
                   {tcTotal > 0 && (
                     <div>
                       <div className={statValueClass}>
@@ -503,7 +552,7 @@ export function PlayerProfileView({
                 </tr>
               </thead>
               <tbody>
-                {sortedOpponents.map(([opp, s]) => {
+                {visibleOpponents.map(([opp, s]) => {
                   const decisive = s.wins + s.losses;
                   const pct =
                     decisive > 0
@@ -548,6 +597,13 @@ export function PlayerProfileView({
                 })}
               </tbody>
             </table>
+            {sortedOpponents.length > PREVIEW_ROWS && (
+              <ShowMoreRow
+                expanded={showAllH2H}
+                totalCount={sortedOpponents.length}
+                onToggle={() => setShowAllH2H((v) => !v)}
+              />
+            )}
           </div>
         </div>
       )}
@@ -569,6 +625,12 @@ export function PlayerProfileView({
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Place
                   </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Field
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Field %
+                  </th>
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">
                     Deck
                   </th>
@@ -581,7 +643,7 @@ export function PlayerProfileView({
                 </tr>
               </thead>
               <tbody>
-                {placements.map((h) => (
+                {visiblePlacements.map((h) => (
                   <tr
                     key={h.id}
                     className="border-b border-border last:border-0 odd:bg-muted/40"
@@ -599,11 +661,17 @@ export function PlayerProfileView({
                         "—"
                       )}
                     </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">
+                      {h.fieldSize != null ? `${h.fieldSize} players` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">
+                      {h.fieldPct != null ? `${h.fieldPct.toFixed(1)}%` : "—"}
+                    </td>
                     <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">
                       {h.deck || "—"}
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">
-                      {h.record || "—"}
+                      {h.matchRecord || h.record || "—"}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground hidden lg:table-cell">
                       {h.notes || "—"}
@@ -612,6 +680,13 @@ export function PlayerProfileView({
                 ))}
               </tbody>
             </table>
+            {placements.length > PREVIEW_ROWS && (
+              <ShowMoreRow
+                expanded={showAllCareer}
+                totalCount={placements.length}
+                onToggle={() => setShowAllCareer((v) => !v)}
+              />
+            )}
           </div>
         </div>
       )}
@@ -645,7 +720,7 @@ export function PlayerProfileView({
                 </tr>
               </thead>
               <tbody>
-                {fantasyDraftHistory.map((fd, i) => (
+                {visibleFantasyDraftHistory.map((fd, i) => (
                   <tr
                     key={`${fd.year}-${fd.gmName}-${i}`}
                     className="border-b border-border last:border-0 odd:bg-muted/40"
@@ -679,6 +754,13 @@ export function PlayerProfileView({
                 ))}
               </tbody>
             </table>
+            {fantasyDraftHistory.length > PREVIEW_ROWS && (
+              <ShowMoreRow
+                expanded={showAllFantasy}
+                totalCount={fantasyDraftHistory.length}
+                onToggle={() => setShowAllFantasy((v) => !v)}
+              />
+            )}
           </div>
         </div>
       )}

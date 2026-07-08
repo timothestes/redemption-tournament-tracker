@@ -133,7 +133,7 @@ export default function HistoryClient({
       case "trivia":
         return <TriviaView initialLeaderboard={initialLeaderboard} />;
       case "stats":
-        return <MetricsView />;
+        return <MetricsView setView={setView} />;
       case "tape":
         return <TaleOfTheTapeView />;
       case "search":

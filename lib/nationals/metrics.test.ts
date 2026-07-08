@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import seed from "../../public/data/nationals-history.json";
 import { AM_MODES, AM_COLS, computeMetric, sortRows } from "./metrics";
 import type { MetricFilters } from "./metrics";
+import { playerProfile } from "./selectors";
 
 const data = seed as any;
 
@@ -34,8 +35,8 @@ it("winpct rows have a name and numeric win pct", () => {
   expect(out.rows.every((r) => typeof r.pct === "number")).toBe(true);
 });
 
-it("AM_MODES has exactly 10 entries", () => {
-  expect(AM_MODES.length).toBe(10);
+it("AM_MODES has exactly 11 entries", () => {
+  expect(AM_MODES.length).toBe(11);
 });
 
 it("AM_COLS has a key for every mode id", () => {
@@ -59,6 +60,55 @@ it("placement rows have avg best worst apps", () => {
     expect(typeof r.worst).toBe("number");
     expect(typeof r.apps).toBe("number");
   }
+});
+
+it("percentile rows are bounded 0-100 and worst<=avg<=best", () => {
+  const out = computeMetric(data, { ...baseFilters, mode: "percentile" });
+  expect(out.rows.length).toBeGreaterThan(0);
+  for (const r of out.rows) {
+    expect(r.best).toBeGreaterThanOrEqual(r.avg);
+    expect(r.avg).toBeGreaterThanOrEqual(r.worst);
+    expect(r.worst).toBeGreaterThanOrEqual(0);
+    expect(r.best).toBeLessThanOrEqual(100);
+  }
+});
+
+it("percentile scores a Round 1 field winner at 100 and last place at 0", () => {
+  // 2025_T1 2-Player: field of 64 (see selectors.test.ts). Find the
+  // recorded 1st place finisher and the recorded last place finisher.
+  const key = "2025_T1 2-Player";
+  const results = data.results[key];
+  const winner = results.find((r: any) => r.placement === 1);
+  const last = [...results].sort((a: any, b: any) => b.placement - a.placement)[0];
+
+  const out = computeMetric(data, { ...baseFilters, mode: "percentile", minApp: 1 });
+  const winnerRow = out.rows.find((r) => r.name === winner.playerName);
+  expect(winnerRow?.best).toBe(100);
+
+  const lastRow = out.rows.find((r) => r.name === last.playerName);
+  expect(lastRow?.worst).toBeCloseTo(
+    ((64 - last.placement) / (64 - 1)) * 100,
+    5
+  );
+});
+
+it("percentile counts one row per player per key, matching the profile (no double-count)", () => {
+  // Some keys carry a duplicate standings row for the same player (e.g. Andrew
+  // Wills has two rows in 2017_T1 2-Player). Field % in Advanced Metrics must
+  // count that once and agree with the player profile's Field %, which uses the
+  // first row per key (results.find).
+  const name = "Andrew Wills";
+  const dupRows = data.results["2017_T1 2-Player"].filter(
+    (e: any) => e.playerName === name
+  );
+  expect(dupRows.length).toBeGreaterThan(1); // guards the fixture assumption
+
+  const out = computeMetric(data, { ...baseFilters, mode: "percentile", minApp: 1 });
+  const row = out.rows.find((r) => r.name === name);
+  const profile = playerProfile(data, name);
+  expect(row).toBeDefined();
+  expect(profile.avgFieldPct).not.toBeNull();
+  expect(row!.avg).toBeCloseTo(profile.avgFieldPct!, 5);
 });
 
 it("podiums rows have p1 p2 p3 top3 fields", () => {

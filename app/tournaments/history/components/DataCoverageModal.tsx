@@ -9,15 +9,15 @@ interface DataCoverageModalProps {
 }
 
 const FULL_DATA_ROWS: Array<[string, string]> = [
-  ["T1 2-Player", "2003–present (all years)"],
+  ["T1 2-Player", "2003–present"],
   ["T2 2-Player", "2004–present (missing 2019)"],
   ["Sealed", "2003–present (missing 2004)"],
-  ["Booster Draft (2P)", "2005–present (missing 2015)"],
-  ["Teams", "2010–present (missing 2014)"],
-  ["Type A", "2005–present (missing several years due to insufficient participation)"],
-  ["T1 Multiplayer", "2004–2021 (missing 2015; retired after 2021)"],
-  ["T2 Multiplayer", "2004–2021 (missing 2015; retired after 2021)"],
-  ["Booster Draft (Multi)", "2005–2017 (missing 2015; retired after 2017)"],
+  ["Booster Draft (2P)", "2018–present"],
+  ["Teams", "2010–present"],
+  ["Type A", "2005–present (missing several years)"],
+  ["T1 Multiplayer", "2004–2021 (retired after 2021)"],
+  ["T2 Multiplayer", "2004–2021 (retired after 2021)"],
+  ["Booster Draft (Multi)", "2005–2017 (retired after 2017)"],
 ];
 
 export function DataCoverageModal({ open, onClose }: DataCoverageModalProps) {
@@ -70,9 +70,9 @@ export function DataCoverageModal({ open, onClose }: DataCoverageModalProps) {
             <h3 className="font-semibold text-foreground">Early Years (1995–2002)</h3>
             <p>
               Records from 1995–2002 are incomplete — only some top-3 placings were preserved from
-              this era. These years are excluded from Avg Placement and Soul Differential metrics,
-              but top-3 finishes <em>are</em> counted in Podium Finishes (marked with * in
-              Appearances). No match-level W/L data exists for these years.
+              this era. These years are excluded from advanced metrics, but top-3 finishes <em>are</em> counted
+              in Podium Finishes (marked with * in Appearances). No match-level W/L data exists for
+              these years.
             </p>
           </section>
 

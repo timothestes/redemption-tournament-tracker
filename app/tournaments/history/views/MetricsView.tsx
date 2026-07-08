@@ -2,6 +2,7 @@
 
 import { useReducer, useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { useSeed } from "../seed-context";
+import type { ViewId } from "../NavTabs";
 import { SectionTitle } from "../components/SectionTitle";
 import { EmptyState } from "../components/EmptyState";
 import { DataCoverageModal } from "../components/DataCoverageModal";
@@ -415,6 +416,11 @@ function formatCell(col: Col, val: unknown, mode: string): string {
       return n % 1 === 0 ? String(n) : n.toFixed(2);
     }
   }
+  if (mode === "percentile") {
+    if ((col.id === "avg" || col.id === "best" || col.id === "worst") && n !== null) {
+      return n.toFixed(1) + "%";
+    }
+  }
   if (n !== null) return String(n);
   return String(val);
 }
@@ -455,7 +461,14 @@ function buildSubtitle(
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MetricsView() {
+interface MetricsViewProps {
+  setView: (
+    view: ViewId,
+    opts?: { tournamentId?: string; playerName?: string; backTo?: ViewId }
+  ) => void;
+}
+
+export function MetricsView({ setView }: MetricsViewProps) {
   const seed = useSeed();
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const { filters, sortCol, sortAsc, selectedFmtLabels } = state;
@@ -1023,7 +1036,21 @@ export function MetricsView() {
                           key={col.id}
                           className="px-3 py-2 text-foreground"
                         >
-                          {col.nosort
+                          {(col.id === "name" || col.id === "opponent") && row[col.id]
+                            ? (
+                              <button
+                                onClick={() =>
+                                  setView("player", {
+                                    playerName: row[col.id],
+                                    backTo: "stats",
+                                  })
+                                }
+                                className="hover:text-primary hover:underline text-left transition-colors"
+                              >
+                                {row[col.id]}
+                              </button>
+                            )
+                            : col.nosort
                             ? col.id === "_rank"
                               ? i + 1
                               : row[col.id]

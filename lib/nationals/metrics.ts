@@ -41,16 +41,17 @@ export interface MetricFilters {
 // ── Mode list (SRC:1609-1622) ─────────────────────────────────────────────────
 
 export const AM_MODES: { id: string; label: string }[] = [
-  { id: "winpct",    label: "Win % (2P)" },
-  { id: "placement", label: "Avg Placement" },
-  { id: "podiums",   label: "Podium Finishes" },
-  { id: "lsd",       label: "Soul Differential" },
-  { id: "pts",       label: "Career Points" },
-  { id: "multiwl",   label: "Multi Win %" },
-  { id: "topcut",    label: "Top Cut" },
-  { id: "rivalry",   label: "Rivalry" },
-  { id: "unique",    label: "Unique Wins" },
-  { id: "vsp",       label: "Record vs Player" },
+  { id: "winpct",     label: "Win % (2P)" },
+  { id: "placement",  label: "Avg Placement" },
+  { id: "percentile", label: "Field %" },
+  { id: "podiums",    label: "Podium Finishes" },
+  { id: "lsd",        label: "Soul Differential" },
+  { id: "pts",        label: "Career Points" },
+  { id: "multiwl",    label: "Multi Win %" },
+  { id: "topcut",     label: "Top Cut" },
+  { id: "rivalry",    label: "Rivalry" },
+  { id: "unique",     label: "Unique Wins" },
+  { id: "vsp",        label: "Record vs Player" },
 ];
 
 // ── Column definitions (SRC:1956-2059) ────────────────────────────────────────
@@ -87,6 +88,15 @@ export const AM_COLS: Record<string, Col[]> = {
     { id: "best",     label: "Best" },
     { id: "worst",    label: "Worst" },
     { id: "avg",      label: "Avg Placement", dflt: true, dfltAsc: true },
+  ],
+  percentile: [
+    { id: "_rank",    label: "#",            nosort: true },
+    { id: "name",     label: "Player" },
+    { id: "apps",     label: "Appearances" },
+    { id: "nats",     label: "Nats" },
+    { id: "best",     label: "Best" },
+    { id: "worst",    label: "Worst" },
+    { id: "avg",      label: "Avg Field %", dflt: true, dfltAsc: false },
   ],
   podiums: [
     { id: "_rank",     label: "#",           nosort: true },
@@ -193,6 +203,27 @@ function amActiveFmtSet(seed: NationalsData, filters: MetricFilters): Set<string
   if (filters.formats.has("All") || filters.formats.size === 0) return null;
   // filters.formats may contain internal keys directly (Task 12 will pass internal keys)
   return new Set(filters.formats);
+}
+
+/**
+ * Builds field size (distinct Round 1 participants, BYE excluded) keyed by
+ * "<year>_<format>". Only includes keys with match data — older years and
+ * multiplayer formats aren't tracked round-by-round, so they're absent here
+ * rather than guessed from the (possibly drop-shrunk) standings count.
+ */
+function amBuildFieldSizeByKey(seed: NationalsData): Record<string, number> {
+  const out: Record<string, number> = {};
+  Object.entries(seed.matches).forEach(([k, matches]) => {
+    const names = new Set<string>();
+    matches.forEach((m) => {
+      if (m.round !== "Round 1") return;
+      [m.playerA, m.playerB].forEach((p) => {
+        if (p && p.toLowerCase() !== "bye") names.add(p);
+      });
+    });
+    if (names.size > 0) out[k] = names.size;
+  });
+  return out;
 }
 
 /**
@@ -345,6 +376,63 @@ function buildPlacement(seed: NationalsData, filters: MetricFilters): Record<str
       const best = Math.min(...pls);
       const worst = Math.max(...pls);
       return { name, avg, best, worst, apps: pls.length, nats: att[name] || 0 };
+    })
+    .filter(
+      (r) =>
+        r.apps >= minApp &&
+        r.apps <= filters.maxApp &&
+        r.nats >= minNats &&
+        r.nats <= filters.maxNats
+    );
+}
+
+/**
+ * Field % — how a placement compares to the size of the field it was
+ * placed in. 100% = beat the entire field (won), 0% = last place. Only
+ * counts year+formats with known Round 1 field size (see
+ * amBuildFieldSizeByKey) and a field of >1, since the source data is the
+ * community-requested addition to Career History (fieldSize on
+ * CareerHistoryEntry in selectors.ts) generalized across all players.
+ */
+function buildPercentile(seed: NationalsData, filters: MetricFilters): Record<string, any>[] {
+  const activeFmts = amActiveFmtSet(seed, filters);
+  const minApp = filters.minApp;
+  const att = amBuildAttendance(seed);
+  const minNats = filters.minNats;
+  const activeYrs = amActiveYears(filters);
+  const fieldByKey = amBuildFieldSizeByKey(seed);
+  const players: Record<string, number[]> = {};
+
+  Object.entries(seed.results).forEach(([k, entries]) => {
+    const { yr, fmt } = amParseKey(k);
+    if (activeFmts && !activeFmts.has(fmt)) return;
+    if (!activeYrs.has(yr)) return;
+    const fieldSize = fieldByKey[k];
+    if (!fieldSize || fieldSize <= 1) return;
+    // One row per player per key, mirroring playerProfile's results.find (first
+    // row), so Field % here agrees with the profile's Field % — some keys carry
+    // a duplicate standings row for the same player.
+    const seen = new Set<string>();
+    entries.forEach((e) => {
+      if (!e.playerName || e.playerName.toLowerCase() === "bye") return;
+      if (seen.has(e.playerName)) return;
+      seen.add(e.playerName);
+      if (!e.placement) return;
+      // Clamp: a handful of rows have a placement one past the Round 1 field,
+      // which would otherwise put a "last place" finish slightly below 0%.
+      const raw = ((fieldSize - e.placement) / (fieldSize - 1)) * 100;
+      const pct = Math.max(0, Math.min(100, raw));
+      if (!players[e.playerName]) players[e.playerName] = [];
+      players[e.playerName].push(pct);
+    });
+  });
+
+  return Object.entries(players)
+    .map(([name, pcts]) => {
+      const avg = pcts.reduce((s, p) => s + p, 0) / pcts.length;
+      const best = Math.max(...pcts);
+      const worst = Math.min(...pcts);
+      return { name, avg, best, worst, apps: pcts.length, nats: att[name] || 0 };
     })
     .filter(
       (r) =>
@@ -716,6 +804,7 @@ export function computeMetric(
   let raw: Record<string, any>[];
   if (mode === "winpct")    raw = buildWinPct(seed, filters);
   else if (mode === "placement") raw = buildPlacement(seed, filters);
+  else if (mode === "percentile") raw = buildPercentile(seed, filters);
   else if (mode === "podiums")   raw = buildPodiums(seed, filters);
   else if (mode === "lsd")       raw = buildLSD(seed, filters);
   else if (mode === "multiwl")   raw = buildMultiWL(seed, filters);

@@ -63,6 +63,88 @@ describe("playerProfile shape", () => {
   });
 });
 
+describe("playerProfile career history fieldSize", () => {
+  it("counts distinct Round 1 participants when match data exists, independent of drops before standings", () => {
+    const key = "2025_T1 2-Player";
+    const [year, format] = [2025, "T1 2-Player"];
+    const expected = new Set<string>();
+    for (const m of data.matches[key]) {
+      if (m.round !== "Round 1") continue;
+      for (const n of [m.playerA, m.playerB]) {
+        if (n && n.toLowerCase() !== "bye") expected.add(n);
+      }
+    }
+    // Field size (Round 1 attendance) should exceed the results/standings
+    // row count whenever players dropped before final standings.
+    expect(expected.size).toBeGreaterThan(data.results[key].length);
+
+    const player = data.results[key][0].playerName;
+    const p = playerProfile(data, player);
+    const entry = p.placements.find((h) => h.year === year && h.format === format);
+    expect(entry?.fieldSize).toBe(expected.size);
+  });
+
+  it("is null when no match data exists for that year+format", () => {
+    const key = "2016_T1 Multiplayer";
+    expect(data.matches[key]).toBeUndefined();
+    const player = data.results[key][0].playerName;
+    const p = playerProfile(data, player);
+    const entry = p.placements.find((h) => h.year === 2016 && h.format === "T1 Multiplayer");
+    expect(entry?.fieldSize).toBeNull();
+    expect(entry?.fieldPct).toBeNull();
+    expect(entry?.matchRecord).toBeNull();
+  });
+
+  it("fieldPct matches the field-size formula, and is null when fieldSize is null", () => {
+    const key = "2025_T1 2-Player";
+    const player = data.results[key][0].playerName;
+    const p = playerProfile(data, player);
+    const entry = p.placements.find((h) => h.year === 2025 && h.format === "T1 2-Player");
+    expect(entry?.fieldSize).not.toBeNull();
+    const expected = Math.max(
+      0,
+      Math.min(100, ((entry!.fieldSize! - entry!.placement) / (entry!.fieldSize! - 1)) * 100)
+    );
+    expect(entry?.fieldPct).toBeCloseTo(expected, 10);
+  });
+
+  it("matchRecord is this player's W-L(-D) for that specific year+format, from match data", () => {
+    const key = "2025_T1 2-Player";
+    const player = data.results[key][0].playerName;
+
+    let wins = 0, losses = 0, draws = 0;
+    for (const m of data.matches[key]) {
+      if (m.playerA !== player && m.playerB !== player) continue;
+      if (m.winner === player) wins++;
+      else if (m.winner) losses++;
+      else draws++;
+    }
+    const expected = draws > 0 ? `${wins}–${losses}–${draws}` : `${wins}–${losses}`;
+
+    const p = playerProfile(data, player);
+    const entry = p.placements.find((h) => h.year === 2025 && h.format === "T1 2-Player");
+    expect(entry?.matchRecord).toBe(expected);
+  });
+
+  it("avgFieldPct averages only placements with known field size, clamped 0-100", () => {
+    const player = data.results["2025_T1 2-Player"][0].playerName;
+    const p = playerProfile(data, player);
+    const known = p.placements.filter((h) => h.fieldSize != null && h.fieldSize > 1);
+    expect(known.length).toBeGreaterThan(0);
+
+    const expectedAvg =
+      known.reduce((sum, h) => {
+        const raw = ((h.fieldSize! - h.placement) / (h.fieldSize! - 1)) * 100;
+        return sum + Math.max(0, Math.min(100, raw));
+      }, 0) / known.length;
+
+    expect(p.avgFieldPct).not.toBeNull();
+    expect(p.avgFieldPct).toBeCloseTo(expectedAvg, 5);
+    expect(p.avgFieldPct!).toBeGreaterThanOrEqual(0);
+    expect(p.avgFieldPct!).toBeLessThanOrEqual(100);
+  });
+});
+
 describe("headToHead", () => {
   it("returns empty matches when players never met", () => {
     const h2h = headToHead(data, "NOBODY_A", "NOBODY_B");
