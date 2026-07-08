@@ -15,8 +15,8 @@ import {
 import { toScreenPos, toDbPos, cardCenter, adjustAnchorForRotationChange } from '../utils/coordinateTransforms';
 import { calculateHandPositions, HAND_TOOLBAR_RESERVE } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
-import { useDealAnimation } from '../hooks/useDealAnimation';
-import { DealLayer, type DealSpriteSpec } from './DealLayer';
+import { useDealAnimation } from '@/app/shared/hooks/useDealAnimation';
+import { DealLayer, type DealSpriteSpec } from '@/app/shared/components/DealLayer';
 import {
   GameCardNode,
   CardBackShape,

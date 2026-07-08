@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Group, Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
-import { CardBackShape } from '@/app/shared/components/GameCardNode';
+import { CardBackShape } from './GameCardNode';
 import { DEAL_FLIGHT_MS } from '../hooks/dealAnimationCore';
 import type { ActiveDeal } from '../hooks/useDealAnimation';
 

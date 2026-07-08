@@ -41,6 +41,8 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useDealAnimation } from '@/app/shared/hooks/useDealAnimation';
+import { DealLayer, type DealSpriteSpec } from '@/app/shared/components/DealLayer';
 import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
 import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
@@ -82,6 +84,24 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     [state.zones],
   );
   const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
+
+  // ---- "The deal" — flying-card animation when cards move deck → hand ----
+  // (Draw button, draw N/bottom, ability draws.) Snapshot is id+zone only;
+  // diffing happens inside the hook. New games mint fresh instanceIds, so
+  // loading a deck or resetting never animates the opening hand.
+  const cardZoneSnapshot = useMemo(() => {
+    const flat: { id: string; zone: string }[] = [];
+    for (const zoneId of Object.keys(state.zones) as ZoneId[]) {
+      for (const card of state.zones[zoneId]) flat.push({ id: card.instanceId, zone: zoneId });
+    }
+    return flat;
+  }, [state.zones]);
+  const {
+    deals: activeDeals,
+    dealingIds,
+    glowIds: dealGlowIds,
+    completeDeal,
+  } = useDealAnimation(cardZoneSnapshot, true);
 
   // ---- Lost Soul cinematic — full-screen flourish on arrival ----
   // Filter to actual Lost Souls (sites can be attached to LOB cards but they
@@ -2274,6 +2294,9 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           {state.zones.hand.map((card, i) => {
             const pos = handPositions[i];
             if (!pos) return null;
+            // Card is mid-deal: its DealLayer sprite is flying — don't render
+            // the real node yet (handPositions still reserves its slot).
+            if (dealingIds.has(card.instanceId)) return null;
             return (
               <GameCardNode
                 key={card.instanceId}
@@ -2287,6 +2310,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                 {...(getTargetingProps(card) ?? {})}
                 isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                lobArrivalGlow={dealGlowIds.has(card.instanceId)}
                 nodeRef={registerCardNode}
                 onDragStart={handleCardDragStart}
                 onDragMove={handleCardDragMove}
@@ -2299,6 +2323,35 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               />
             );
           })}
+
+          {/* "The deal" sprites — card backs flying deck pile → hand slot */}
+          {(() => {
+            const deckZone = zoneLayout['deck'];
+            if (!deckZone || activeDeals.length === 0) return null;
+            // Match the deck pile's rendered card-back size (see sidebar piles).
+            const pileWidth = Math.min(cardWidth, deckZone.width - 4);
+            const originScale = cardWidth > 0 ? pileWidth / cardWidth : 1;
+            const sprites: DealSpriteSpec[] = [];
+            for (const deal of activeDeals) {
+              const idx = state.zones.hand.findIndex(c => c.instanceId === deal.instanceId);
+              if (idx === -1) continue;
+              const dealPos = handPositions[idx];
+              if (!dealPos) continue;
+              sprites.push({
+                deal,
+                origin: {
+                  x: deckZone.x + deckZone.width / 2 - (cardWidth * originScale) / 2,
+                  y: deckZone.y + deckZone.height / 2 - (cardHeight * originScale) / 2,
+                },
+                originScale,
+                target: { x: dealPos.x, y: dealPos.y, rotation: dealPos.rotation },
+                cardWidth,
+                cardHeight,
+                image: getImage(state.zones.hand[idx].cardImgFile),
+              });
+            }
+            return <DealLayer sprites={sprites} onLanded={completeDeal} />;
+          })()}
         </Layer>
 
         {/* Selection rectangle layer — scaled to match game layer */}
