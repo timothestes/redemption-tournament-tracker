@@ -1361,6 +1361,22 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   }, [state.zones.hand, handPositions]);
   useHandLayoutTween(handSlots, cardNodeRefs);
 
+  // Same glide for the Land of Bondage strip — when a soul is rescued or
+  // removed, the remaining souls slide left instead of snapping.
+  const lobSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    const cards = state.zones['land-of-bondage'] ?? [];
+    const rect = zoneLayout['land-of-bondage'];
+    if (!rect || cards.length === 0) return m;
+    const pos = calculateAutoArrangePositions(cards.length, rect, cardWidth, cardHeight);
+    cards.forEach((c, i) => {
+      const p = pos[i];
+      if (p) m.set(c.instanceId, { x: p.x, y: p.y, rotation: 0 });
+    });
+    return m;
+  }, [state.zones['land-of-bondage'], zoneLayout, cardWidth, cardHeight]);
+  useHandLayoutTween(lobSlots, cardNodeRefs);
+
   // Render all zones except hand
   const nonHandZones: ZoneId[] = useMemo(() => [
     'territory', 'land-of-bondage',

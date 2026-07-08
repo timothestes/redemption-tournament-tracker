@@ -4172,6 +4172,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return { hostPositions, accessoryPositions };
   }, [sharedCards, mpLayout, lobCard.cardWidth, lobCard.cardHeight]);
 
+  // Smooth LOB re-layout: when a soul is rescued/removed the remaining cards
+  // glide to their new slots instead of snapping. Rotation matches each
+  // strip's render (mine/shared 0°, opponent's 180°).
+  const lobSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    for (const [id, p] of myLobLayout.hostPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
+    for (const [id, p] of myLobLayout.accessoryPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
+    for (const [id, p] of opponentLobLayout.hostPositions) m.set(id, { x: p.x, y: p.y, rotation: 180 });
+    for (const [id, p] of opponentLobLayout.accessoryPositions) m.set(id, { x: p.x, y: p.y, rotation: 180 });
+    for (const [id, p] of sharedLobLayout.hostPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
+    for (const [id, p] of sharedLobLayout.accessoryPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
+    return m;
+  }, [myLobLayout, opponentLobLayout, sharedLobLayout]);
+  useHandLayoutTween(lobSlots, cardNodeRefs);
+
   // ---- Derive per-accessory screen positions + seam (for detach overlay) ----
   // Accessories (weapons in territory, sites in LOB) don't use their own posX/
   // posY at render time — they're anchored to their host at an offset so they
