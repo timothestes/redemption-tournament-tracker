@@ -644,6 +644,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myVisibleLobIds);
   const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppVisibleLobIds);
 
+  // Paragon: souls live in the shared LOB and fly from the shared Soul Deck.
+  // (The old cinematic never fired here, so this is new arrival feedback; the
+  // shared LOB has no glow today and we keep it that way — deal + toast is the
+  // signal.)
+  const sharedLobSoulIds = useMemo(
+    () => (sharedCards['land-of-bondage'] ?? []).filter(isLostSoulCard).map(c => String(c.id)),
+    [sharedCards],
+  );
+  const { inFlight: sharedDeals, onLand: onSharedLand } =
+    useLostSoulDeals(sharedLobSoulIds, soulsHydrated, (newIds) => {
+      if (newIds.length === 1) {
+        const c = (sharedCards['land-of-bondage'] ?? []).find(x => String(x.id) === newIds[0]);
+        showGameToast(`Lost Soul dealt: ${simplifyLostSoulName(c?.cardName ?? 'Lost Soul')}`);
+      } else if (newIds.length > 1) {
+        showGameToast(`${newIds.length} Lost Souls dealt`);
+      }
+    });
+
   // ---- Hand → play prompt for cards with `set_card_outline` abilities ----
   // Three Woes is the v1 target. The choice routes through the same
   // executeCardAbility flow that powers the right-click menu.
@@ -5288,6 +5306,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             for (const host of hosts) {
               const hostPos = sharedLobLayout.hostPositions.get(String(host.id));
               if (!hostPos) continue;
+              if (sharedDeals.has(String(host.id))) continue;
               const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
               for (const accessory of attached) {
                 const pos = sharedLobLayout.accessoryPositions.get(String(accessory.id));
@@ -6232,6 +6251,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             };
             return deals.length > 0
               ? <LostSoulDealLayer deals={deals} onLand={handleLand} />
+              : null;
+          })()}
+
+          {/* Paragon: deal souls from the shared Soul Deck into the shared LOB. */}
+          {normalizedFormat === 'Paragon' && mpLayout?.zones.soulDeck && (() => {
+            const deck = mpLayout.zones.soulDeck;
+            const deals: SoulDeal[] = [];
+            for (const [id, seq] of sharedDeals) {
+              const slot = sharedLobLayout.hostPositions.get(id);
+              const card = (sharedCards['land-of-bondage'] ?? []).find(c => String(c.id) === id);
+              if (!slot || !card) continue;
+              deals.push({
+                id,
+                image: getCardImage(card),
+                cardWidth: lobCard.cardWidth,
+                cardHeight: lobCard.cardHeight,
+                rotation: 0,
+                flight: computeDealFlight({
+                  deck, slot, cardWidth: lobCard.cardWidth,
+                  cardHeight: lobCard.cardHeight, seq,
+                }),
+              });
+            }
+            return deals.length > 0
+              ? <LostSoulDealLayer deals={deals} onLand={onSharedLand} />
               : null;
           })()}
         </Layer>
