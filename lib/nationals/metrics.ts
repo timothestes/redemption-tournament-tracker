@@ -409,11 +409,17 @@ function buildPercentile(seed: NationalsData, filters: MetricFilters): Record<st
     if (!activeYrs.has(yr)) return;
     const fieldSize = fieldByKey[k];
     if (!fieldSize || fieldSize <= 1) return;
+    // One row per player per key, mirroring playerProfile's results.find (first
+    // row), so Field % here agrees with the profile's Field % — some keys carry
+    // a duplicate standings row for the same player.
+    const seen = new Set<string>();
     entries.forEach((e) => {
-      if (!e.playerName || e.playerName.toLowerCase() === "bye" || !e.placement) return;
-      // Clamp: a handful of rows have a placement one past the Round 1 field
-      // (source data has an occasional duplicate standings row), which would
-      // otherwise put a "last place" finish slightly below 0%.
+      if (!e.playerName || e.playerName.toLowerCase() === "bye") return;
+      if (seen.has(e.playerName)) return;
+      seen.add(e.playerName);
+      if (!e.placement) return;
+      // Clamp: a handful of rows have a placement one past the Round 1 field,
+      // which would otherwise put a "last place" finish slightly below 0%.
       const raw = ((fieldSize - e.placement) / (fieldSize - 1)) * 100;
       const pct = Math.max(0, Math.min(100, raw));
       if (!players[e.playerName]) players[e.playerName] = [];
