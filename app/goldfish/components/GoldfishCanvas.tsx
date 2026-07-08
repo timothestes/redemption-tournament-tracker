@@ -41,14 +41,15 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
-import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
-import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
+import { useLostSoulDeals } from '@/app/shared/hooks/useLostSoulDeals';
+import { LostSoulDealLayer, type SoulDeal } from '@/app/shared/components/LostSoulDealLayer';
+import { computeDealFlight } from '@/app/shared/utils/lostSoulDeal';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePrompt';
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
-import { getEffectiveAbilities, isLostSoulCard, isHeroCard } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isLostSoulCard, isHeroCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
 import { Link2Off } from 'lucide-react';
 
@@ -76,29 +77,34 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // ---- Card sound effects (joke easter-egg, once per game) ----
   useCardSounds(state.zones['territory'] ?? [], state.sessionId);
 
-  // ---- LOB arrival glow effect ----
+  // ---- LOB arrival glow + Lost Soul "deal" animation ----
   const lobCardIds = useMemo(
     () => (state.zones['land-of-bondage'] ?? []).map(c => c.instanceId),
     [state.zones],
   );
-  const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
-
-  // ---- Lost Soul cinematic — full-screen flourish on arrival ----
-  // Filter to actual Lost Souls (sites can be attached to LOB cards but they
-  // shouldn't trigger the cinematic). Caller filters; hook just detects arrivals.
-  // Dep is narrowed to the LOB array specifically so unrelated zone mutations
-  // (territory drags, hand shuffles, etc.) don't re-run this work.
-  const lobSouls = useMemo(() => {
-    const cards = state.zones['land-of-bondage'] ?? [];
-    return cards
-      .filter(c => isLostSoulCard(c))
-      .map(c => ({
-        instanceId: c.instanceId,
-        cardName: c.cardName,
-        imageUrl: getCardImageUrl(c.cardImgFile),
-      }));
-  }, [state.zones['land-of-bondage']]);
-  const { activeBatch: soulCinematic } = useLostSoulCinematic(lobSouls);
+  // Only Lost Souls fly; other LOB arrivals (attached sites) keep the plain glow.
+  const lobSoulIds = useMemo(
+    () => (state.zones['land-of-bondage'] ?? []).filter(isLostSoulCard).map(c => c.instanceId),
+    [state.zones['land-of-bondage']],
+  );
+  const { inFlight: soulDeals, onLand: onSoulLand } = useLostSoulDeals(
+    lobSoulIds,
+    true,
+    (newIds) => {
+      if (newIds.length === 1) {
+        const c = (state.zones['land-of-bondage'] ?? []).find(x => x.instanceId === newIds[0]);
+        showGameToast(`Lost Soul dealt: ${simplifyLostSoulName(c?.cardName ?? 'Lost Soul')}`);
+      } else if (newIds.length > 1) {
+        showGameToast(`${newIds.length} Lost Souls dealt`);
+      }
+    },
+  );
+  // Route the glow to *visible* ids so it fires on landing, not server placement.
+  const visibleLobIds = useMemo(
+    () => lobCardIds.filter(id => !soulDeals.has(id)),
+    [lobCardIds, soulDeals],
+  );
+  const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(visibleLobIds);
 
   // Drive 1s re-renders while any visible card has an active per-card reveal —
   // hand (30s flash) or reserve top (10s from Herod's Temple). Needed for the
@@ -2103,6 +2109,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                   {cards.map((card, i) => {
                     const pos = lobPositions[i];
                     if (!pos) return null;
+                    // In flight → the flyer shows it; skip the settled node.
+                    if (soulDeals.has(card.instanceId)) return null;
                     return (
                       <GameCardNode
                         key={card.instanceId}
@@ -2299,6 +2307,33 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               />
             );
           })}
+
+          {/* Lost Soul "deal" flyers — dealt from the deck into the LOB slot. */}
+          {(() => {
+            const lobZone = zoneLayout['land-of-bondage'];
+            const deck = zoneLayout['deck'];
+            if (!lobZone || !deck) return null;
+            const lobCards = state.zones['land-of-bondage'] ?? [];
+            const slots = calculateAutoArrangePositions(lobCards.length, lobZone, cardWidth, cardHeight);
+            const deals: SoulDeal[] = [];
+            for (const [id, seq] of soulDeals) {
+              const idx = lobCards.findIndex(c => c.instanceId === id);
+              const slot = idx >= 0 ? slots[idx] : undefined;
+              const card = idx >= 0 ? lobCards[idx] : undefined;
+              if (!slot || !card) continue;
+              deals.push({
+                id,
+                image: getImage(card.cardImgFile),
+                cardWidth,
+                cardHeight,
+                rotation: 0,
+                flight: computeDealFlight({ deck, slot, cardWidth, cardHeight, seq }),
+              });
+            }
+            return deals.length > 0
+              ? <LostSoulDealLayer deals={deals} onLand={onSoulLand} />
+              : null;
+          })()}
         </Layer>
 
         {/* Selection rectangle layer — scaled to match game layer */}
@@ -2991,13 +3026,6 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       <GameToastContainer />
       <CardChoicePromptContainer />
       <DiceRollOverlay />
-
-      {soulCinematic && (
-        <LostSoulCinematic
-          key={soulCinematic.id}
-          souls={soulCinematic.souls}
-        />
-      )}
 
       {targeting && (
         <TargetCardOverlay
