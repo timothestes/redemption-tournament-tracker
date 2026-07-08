@@ -42,6 +42,13 @@ function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onL
 
   const { isReady, progress } = useImagePreloader(imageUrls);
 
+  // Warm the canvas chunk while the loading screen is up — GoldfishCanvas is
+  // dynamically imported, and without this it only starts downloading after
+  // isReady flips, leaving the cave background briefly unshaded.
+  useEffect(() => {
+    import('../components/GoldfishCanvas');
+  }, []);
+
   const paragonEntries = useMemo(
     () => buildParagonEntries({
       players: [
@@ -62,6 +69,7 @@ function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onL
 
   return (
     <div
+      className="gf-area-enter"
       style={{
         position: 'relative',
         width: '100vw',
