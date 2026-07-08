@@ -608,14 +608,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     return flat;
   }, [myCards]);
-  // Opening-hand deal: fires when the game transitioned to 'playing' moments
-  // ago (covers both "canvas mounted during pregame" and "mounted right after
-  // start"), but never on later reloads/reconnects. Hands are dealt server-side
-  // at create/join, so by the time this key flips the hand rows are already in
-  // the client cache.
+  // Opening-hand deal: fires once when the pregame begins (hands are dealt
+  // server-side at create/join, so the rows are already in the client cache;
+  // the deal plays under the dice-roll overlay). The 'playing' branch covers a
+  // canvas that mounts moments after start; the same key value across
+  // pregame → playing means it can't fire twice. Later reloads/reconnects get
+  // null — no replay.
   const openingDealKey = useMemo(() => {
     const g = gameState.game;
-    if (!g || g.status !== 'playing') return null;
+    if (!g) return null;
+    if (g.status === 'pregame') return `opening-${String(g.id)}`;
+    if (g.status !== 'playing') return null;
     const startedMicros = g.playingStartedAtMicros ?? 0n;
     if (startedMicros === 0n) return null;
     const startedMs = Number(startedMicros / 1000n);
