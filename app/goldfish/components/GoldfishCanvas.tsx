@@ -451,20 +451,68 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
   // Card left sitting on the deck pile while a deck-drop popup is open —
   // committing an option unmounts it into the deck; canceling glides it home.
-  const deckDropHoldRef = useRef<{ instanceId: string; homeX: number; homeY: number } | null>(null);
+  // For group drags, `group` holds the claimed ghost stack + hidden followers.
+  const deckDropHoldRef = useRef<{
+    instanceId: string;
+    homeX: number;
+    homeY: number;
+    group?: {
+      ghost: Konva.Image | null;
+      ghostHomeX: number | null;
+      ghostHomeY: number | null;
+      followerIds: string[];
+    };
+  } | null>(null);
+  // Deferred group-drag settle (destroy ghost, re-show followers). Scheduled
+  // as a microtask at drag end; a deck-pile drop claims it within the same
+  // tick so the ghost stack can wait on the pile instead.
+  const pendingGroupSettleRef = useRef<(() => void) | null>(null);
   const releaseDeckHold = useCallback((glideHome: boolean) => {
     const hold = deckDropHoldRef.current;
     deckDropHoldRef.current = null;
-    if (!hold || !glideHome) return;
+    if (!hold) return;
+    const group = hold.group;
+    const settleGroup = () => {
+      if (!group) return;
+      if (group.ghost) {
+        group.ghost.destroy();
+        dragGhostLayerRef.current?.batchDraw();
+      }
+      // On commit the follower rows move into the deck and their hidden
+      // nodes unmount with the state change — only a cancel re-shows them.
+      if (glideHome) {
+        for (const id of group.followerIds) {
+          const fNode = cardNodeRefs.current.get(id);
+          if (fNode) fNode.visible(true);
+        }
+      }
+    };
+    if (!glideHome) {
+      settleGroup();
+      return;
+    }
     const node = cardNodeRefs.current.get(hold.instanceId);
-    if (!node || !node.getStage()) return;
-    new KonvaLib.Tween({
-      node,
-      duration: 0.2,
-      x: hold.homeX,
-      y: hold.homeY,
-      easing: KonvaLib.Easings.EaseOut,
-    }).play();
+    if (node && node.getStage()) {
+      new KonvaLib.Tween({
+        node,
+        duration: 0.2,
+        x: hold.homeX,
+        y: hold.homeY,
+        easing: KonvaLib.Easings.EaseOut,
+      }).play();
+    }
+    if (group?.ghost && group.ghostHomeX != null && group.ghostHomeY != null && group.ghost.getStage()) {
+      new KonvaLib.Tween({
+        node: group.ghost,
+        duration: 0.2,
+        x: group.ghostHomeX,
+        y: group.ghostHomeY,
+        easing: KonvaLib.Easings.EaseOut,
+        onFinish: settleGroup,
+      }).play();
+    } else {
+      settleGroup();
+    }
   }, []);
 
   // Selection state
@@ -842,24 +890,35 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       canvasDragZoneRef.current = null;
       dragSourceZoneRef.current = null;
       dragFollowerOffsets.current = null;
+      const ghostOffset = dragGhostOffsetRef.current;
       dragGhostOffsetRef.current = null;
       const dragStartPosition = dragStartPositionRef.current;
       dragStartPositionRef.current = null;
       setCanvasDragZone(null);
       setDragSourceZone(null);
 
-      // Clean up ghost image
-      if (dragGhostRef.current) {
-        dragGhostRef.current.destroy();
-        dragGhostRef.current = null;
-        dragGhostLayerRef.current?.batchDraw();
-      }
-      // Restore follower node visibility
-      if (followerOffsets) {
-        for (const [id] of followerOffsets) {
-          const node = cardNodeRefs.current.get(id);
-          if (node) node.visible(true);
-        }
+      // Group-drag visuals (ghost + hidden followers): normally settled
+      // immediately, but a drop onto a deck pile claims them within this
+      // tick (deckDropHoldRef) so the stack waits on the pile while the
+      // popup is open.
+      const heldGhost = dragGhostRef.current;
+      dragGhostRef.current = null;
+      const heldFollowerIds = followerOffsets ? [...followerOffsets.keys()] : [];
+      if (heldGhost || heldFollowerIds.length > 0) {
+        pendingGroupSettleRef.current = () => {
+          if (heldGhost) {
+            heldGhost.destroy();
+            dragGhostLayerRef.current?.batchDraw();
+          }
+          for (const id of heldFollowerIds) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) fNode.visible(true);
+          }
+        };
+        queueMicrotask(() => {
+          pendingGroupSettleRef.current?.();
+          pendingGroupSettleRef.current = null;
+        });
       }
 
       // Equip: if a weapon is dropped on top of a warrior in territory, attach.
@@ -960,10 +1019,21 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         // popup is open — committing an option moves it into the deck;
         // canceling glides it back to its drag-start position.
         if (dragStartPosition?.instanceId === card.instanceId) {
+          let group: NonNullable<typeof deckDropHoldRef.current>['group'];
+          if (pendingGroupSettleRef.current) {
+            pendingGroupSettleRef.current = null; // claim — the settle microtask no-ops
+            group = {
+              ghost: heldGhost,
+              ghostHomeX: ghostOffset ? dragStartPosition.x + ghostOffset.dx : null,
+              ghostHomeY: ghostOffset ? dragStartPosition.y + ghostOffset.dy : null,
+              followerIds: heldFollowerIds,
+            };
+          }
           deckDropHoldRef.current = {
             instanceId: card.instanceId,
             homeX: dragStartPosition.x,
             homeY: dragStartPosition.y,
+            group,
           };
         }
         const stage = stageRef.current;
@@ -979,10 +1049,21 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         // Paragon: dropping on the soul deck pile opens a top/bottom/shuffle popup.
         // The card waits on the pile; a canceled popup glides it home.
         if (dragStartPosition?.instanceId === card.instanceId) {
+          let group: NonNullable<typeof deckDropHoldRef.current>['group'];
+          if (pendingGroupSettleRef.current) {
+            pendingGroupSettleRef.current = null; // claim — the settle microtask no-ops
+            group = {
+              ghost: heldGhost,
+              ghostHomeX: ghostOffset ? dragStartPosition.x + ghostOffset.dx : null,
+              ghostHomeY: ghostOffset ? dragStartPosition.y + ghostOffset.dy : null,
+              followerIds: heldFollowerIds,
+            };
+          }
           deckDropHoldRef.current = {
             instanceId: card.instanceId,
             homeX: dragStartPosition.x,
             homeY: dragStartPosition.y,
+            group,
           };
         }
         const stage = stageRef.current;

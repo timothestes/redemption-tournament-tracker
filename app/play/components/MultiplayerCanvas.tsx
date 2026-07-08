@@ -1041,6 +1041,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // the deck); cancel/exchange glides it back home. Null for popups opened
   // from modal drags — those have no canvas node to hold.
   const deckDropHoldRef = useRef<{ cardId: string; glideBack: () => void; discard: () => void } | null>(null);
+  // Deferred group-drag settle (destroy ghost, re-show followers). Scheduled
+  // as a microtask at drag end; a deck-pile drop claims it within the same
+  // tick so the ghost stack can wait on the pile instead.
+  const pendingGroupSettleRef = useRef<(() => void) | null>(null);
   const releaseDeckHold = useCallback((action: 'commit' | 'glide') => {
     const hold = deckDropHoldRef.current;
     deckDropHoldRef.current = null;
@@ -3249,6 +3253,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       dragOriginalZIndexRef.current = null;
       dragHoverZoneRef.current = null;
       dragFollowerOffsets.current = null;
+      const ghostOffset = dragGhostOffsetRef.current;
       dragGhostOffsetRef.current = null;
       setDragHoverZone(null);
 
@@ -3256,18 +3261,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const gameLayer = gameLayerRef.current;
       if (gameLayer) gameLayer.listening(true);
 
-      // Clean up ghost image and restore card visibility
-      if (dragGhostRef.current) {
-        dragGhostRef.current.destroy();
-        dragGhostRef.current = null;
-        dragGhostLayerRef.current?.batchDraw();
-      }
-      // Restore follower visibility
-      if (followerOffsets) {
-        for (const [id] of followerOffsets) {
-          const fNode = cardNodeRefs.current.get(id);
-          if (fNode) fNode.visible(true);
-        }
+      // Group-drag visuals (ghost + hidden followers): normally settled
+      // immediately, but a drop onto a deck pile claims them within this
+      // tick (holdOnPile) so the stack waits on the pile while the popup
+      // is open.
+      const heldGhost = dragGhostRef.current;
+      dragGhostRef.current = null;
+      const heldFollowerIds = followerOffsets ? [...followerOffsets.keys()] : [];
+      if (heldGhost || heldFollowerIds.length > 0) {
+        pendingGroupSettleRef.current = () => {
+          if (heldGhost) {
+            heldGhost.destroy();
+            dragGhostLayerRef.current?.batchDraw();
+          }
+          for (const id of heldFollowerIds) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) fNode.visible(true);
+          }
+        };
+        queueMicrotask(() => {
+          pendingGroupSettleRef.current?.();
+          pendingGroupSettleRef.current = null;
+        });
       }
 
       const node = e.target;
@@ -3711,30 +3726,86 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Hold the dragged node where it was dropped (on the pile) while a
       // deck-drop popup is open. Committing an option discards the node (the
       // move re-renders the card inside the deck); canceling glides it home
-      // via the deferred snapBack.
+      // via the deferred snapBack. For group drags the ghost stack + hidden
+      // followers are claimed too, so the whole pile waits together.
       const holdOnPile = () => {
+        let group: {
+          ghost: Konva.Image | null;
+          ghostHome: { x: number; y: number } | null;
+          followerIds: string[];
+        } | null = null;
+        if (pendingGroupSettleRef.current) {
+          pendingGroupSettleRef.current = null; // claim — the settle microtask no-ops
+          group = {
+            ghost: heldGhost,
+            ghostHome:
+              ghostOffset && originalPos
+                ? { x: originalPos.x + ghostOffset.dx, y: originalPos.y + ghostOffset.dy }
+                : null,
+            followerIds: heldFollowerIds,
+          };
+        }
+        const settleGroup = (reshowFollowers: boolean) => {
+          if (!group) return;
+          if (group.ghost) {
+            group.ghost.destroy();
+            dragGhostLayerRef.current?.batchDraw();
+          }
+          if (reshowFollowers) {
+            for (const id of group.followerIds) {
+              const fNode = cardNodeRefs.current.get(id);
+              if (fNode) fNode.visible(true);
+            }
+          }
+        };
         deckDropHoldRef.current = {
           cardId: String(cardId),
           glideBack: () => {
-            if (!node.getStage()) return;
-            const abs = node.absolutePosition();
-            snapBack();
-            const homeX = node.x();
-            const homeY = node.y();
-            node.absolutePosition(abs);
-            new KonvaLib.Tween({
-              node,
-              duration: 0.2,
-              x: homeX,
-              y: homeY,
-              easing: KonvaLib.Easings.EaseOut,
-            }).play();
+            if (node.getStage()) {
+              const abs = node.absolutePosition();
+              snapBack();
+              const homeX = node.x();
+              const homeY = node.y();
+              node.absolutePosition(abs);
+              new KonvaLib.Tween({
+                node,
+                duration: 0.2,
+                x: homeX,
+                y: homeY,
+                easing: KonvaLib.Easings.EaseOut,
+              }).play();
+            }
+            if (group?.ghost && group.ghostHome && group.ghost.getStage()) {
+              new KonvaLib.Tween({
+                node: group.ghost,
+                duration: 0.2,
+                x: group.ghostHome.x,
+                y: group.ghostHome.y,
+                easing: KonvaLib.Easings.EaseOut,
+                onFinish: () => settleGroup(true),
+              }).play();
+            } else {
+              settleGroup(true);
+            }
           },
           discard: () => {
             if (cardNodeRefs.current.get(card.instanceId) === node) {
               cardNodeRefs.current.delete(card.instanceId);
             }
             node.destroy();
+            // Followers stay hidden — the reducer moves their rows into the
+            // deck and the nodes unmount with the subscription update.
+            // Failsafe: re-show any node still around (e.g. rejected move).
+            if (group && group.followerIds.length > 0) {
+              const ids = group.followerIds;
+              setTimeout(() => {
+                for (const id of ids) {
+                  const fNode = cardNodeRefs.current.get(id);
+                  if (fNode) fNode.visible(true);
+                }
+              }, 5000);
+            }
+            settleGroup(false);
             gameLayerRef.current?.batchDraw();
           },
         };
