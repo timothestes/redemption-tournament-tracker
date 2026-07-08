@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // `next build` and `next dev` share .next/ — running a build while the dev
+  // server is up corrupts the dev server's cache (missing vendor-chunks, 500s).
+  // Verification builds should run in a separate dir:
+  //   NEXT_DIST_DIR=.next-build npm run build
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // @vercel/blob 2.4.x pulls in Node-only deps (@vercel/oidc, undici) that read
   // fs/path and have no react-server export condition, so webpack bundling them
   // into the RSC server bundle throws at load. Externalize so Next require()s the
