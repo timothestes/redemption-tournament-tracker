@@ -15,6 +15,7 @@ import {
 import { toScreenPos, toDbPos, cardCenter, adjustAnchorForRotationChange } from '../utils/coordinateTransforms';
 import { calculateHandPositions, HAND_TOOLBAR_RESERVE } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
+import { splitLobCards } from '../layout/lobClassification';
 import { useDealAnimation } from '@/app/shared/hooks/useDealAnimation';
 import { useHandLayoutTween } from '@/app/shared/hooks/useHandLayoutTween';
 import { DealLayer, type DealSpriteSpec } from '@/app/shared/components/DealLayer';
@@ -3452,7 +3453,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           const sortedLob = [...myLobRaw].sort(
             (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex),
           );
-          const lobHosts = sortedLob.filter((c) => c.equippedToInstanceId === 0n);
+          const lobHosts = splitLobCards(sortedLob).hosts;
           const slotPositions = calculateAutoArrangePositions(
             lobHosts.length,
             myLobZone,
@@ -4142,14 +4143,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       return { hostPositions, accessoryPositions };
     }
     const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-    const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
-    const accessoriesByHost = new Map<bigint, CardInstance[]>();
-    for (const c of sorted) {
-      if (c.equippedToInstanceId === 0n) continue;
-      const list = accessoriesByHost.get(c.equippedToInstanceId);
-      if (list) list.push(c);
-      else accessoriesByHost.set(c.equippedToInstanceId, [c]);
-    }
+    const { hosts, accessoriesByHost } = splitLobCards(sorted);
     const slotPositions = calculateAutoArrangePositions(
       hosts.length,
       zone,
@@ -4190,14 +4184,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       return { hostPositions, accessoryPositions };
     }
     const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-    const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
-    const accessoriesByHost = new Map<bigint, CardInstance[]>();
-    for (const c of sorted) {
-      if (c.equippedToInstanceId === 0n) continue;
-      const list = accessoriesByHost.get(c.equippedToInstanceId);
-      if (list) list.push(c);
-      else accessoriesByHost.set(c.equippedToInstanceId, [c]);
-    }
+    const { hosts, accessoriesByHost } = splitLobCards(sorted);
     const slotPositions = calculateAutoArrangePositions(
       hosts.length,
       zone,
@@ -4243,14 +4230,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (!zone || cards.length === 0) {
       return { hostPositions, accessoryPositions };
     }
-    const hosts = cards.filter((c) => c.equippedToInstanceId === 0n);
-    const accessoriesByHost = new Map<bigint, CardInstance[]>();
-    for (const c of cards) {
-      if (c.equippedToInstanceId === 0n) continue;
-      const list = accessoriesByHost.get(c.equippedToInstanceId);
-      if (list) list.push(c);
-      else accessoriesByHost.set(c.equippedToInstanceId, [c]);
-    }
+    const { hosts, accessoriesByHost } = splitLobCards(cards);
     // Base 3 slots (canonical rescue-slot grid). Expand the grid if any host
     // has zoneIndex beyond slot 2 — e.g., a stray card dropped into an
     // overflow slot must render in its own position, not stacked on slot 0.
@@ -4458,7 +4438,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const zone = myZones[zoneKey];
       if (cards.length > 0 && zone) {
         const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-        const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+        const { hosts, accessoriesByHost } = splitLobCards(sorted);
         const positions = calculateAutoArrangePositions(hosts.length, zone, lobCard.cardWidth, lobCard.cardHeight);
         hosts.forEach((host, i) => {
           const pos = positions[i];
@@ -4472,7 +4452,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             rotation: 0,
             owner: 'my',
           });
-          const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+          const attached = accessoriesByHost.get(host.id) ?? [];
           for (const accessory of attached) {
             const derived = myDerivedWeaponPositions.get(String(accessory.id));
             if (!derived) continue;
@@ -4497,10 +4477,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const cards = sharedCards['land-of-bondage'] ?? [];
       for (const card of cards) {
         const idStr = String(card.id);
-        const isAccessory = card.equippedToInstanceId !== 0n;
-        const pos = isAccessory
-          ? sharedLobLayout.accessoryPositions.get(idStr)
-          : sharedLobLayout.hostPositions.get(idStr);
+        const pos =
+          sharedLobLayout.hostPositions.get(idStr) ??
+          sharedLobLayout.accessoryPositions.get(idStr);
         if (!pos) continue;
         bounds.push({
           instanceId: idStr,
@@ -4521,7 +4500,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const zone = opponentZones[zoneKey];
       if (cards.length > 0 && zone) {
         const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-        const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+        const { hosts, accessoriesByHost } = splitLobCards(sorted);
         const positions = calculateAutoArrangePositions(hosts.length, zone, lobCard.cardWidth, lobCard.cardHeight);
         hosts.forEach((host, i) => {
           const pos = positions[i];
@@ -4537,7 +4516,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             rotation: 180,
             owner: 'opponent',
           });
-          const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+          const attached = accessoriesByHost.get(host.id) ?? [];
           for (const accessory of attached) {
             const derived = opponentDerivedWeaponPositions.get(String(accessory.id));
             if (!derived) continue;
@@ -5285,7 +5264,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const zone = myZones[zoneKey];
             if (!zone) return null;
             const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-            const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+            const { hosts, accessoriesByHost } = splitLobCards(sorted);
             const renderLobCard = (card: CardInstance, overridePos: { x: number; y: number }) => {
               const gameCard = adaptCard(card, 'player1');
               const cardIdStr = String(card.id);
@@ -5323,7 +5302,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             for (const host of hosts) {
               const hostPos = myLobLayout.hostPositions.get(String(host.id));
               if (!hostPos) continue;
-              const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+              const attached = accessoriesByHost.get(host.id) ?? [];
               for (const accessory of attached) {
                 const pos = myLobLayout.accessoryPositions.get(String(accessory.id));
                 if (!pos) continue;
@@ -5355,7 +5334,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const zone = opponentZones[zoneKey];
             if (!zone) return null;
             const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-            const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+            const { hosts, accessoriesByHost } = splitLobCards(sorted);
             const renderOppLobCard = (
               card: CardInstance,
               anchor: { x: number; y: number },
@@ -5397,7 +5376,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             for (const host of hosts) {
               const hostPos = opponentLobLayout.hostPositions.get(String(host.id));
               if (!hostPos) continue;
-              const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+              const attached = accessoriesByHost.get(host.id) ?? [];
               for (const accessory of attached) {
                 const pos = opponentLobLayout.accessoryPositions.get(String(accessory.id));
                 if (!pos) continue;
@@ -5433,7 +5412,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const zone = mpLayout?.zones.sharedLob;
             if (!zone) return null;
             const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-            const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+            const { hosts, accessoriesByHost } = splitLobCards(sorted);
             const renderSharedLobCard = (card: CardInstance, overridePos: { x: number; y: number }) => {
               const gameCard = adaptCard(card, 'player1');
               const cardIdStr = String(card.id);
@@ -5468,7 +5447,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             for (const host of hosts) {
               const hostPos = sharedLobLayout.hostPositions.get(String(host.id));
               if (!hostPos) continue;
-              const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+              const attached = accessoriesByHost.get(host.id) ?? [];
               for (const accessory of attached) {
                 const pos = sharedLobLayout.accessoryPositions.get(String(accessory.id));
                 if (!pos) continue;
