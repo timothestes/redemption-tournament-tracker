@@ -1035,6 +1035,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   >(null);
   const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
   const [deckDrop, setDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
+
+  // Dragged node left sitting on the deck pile while a deck-drop popup is
+  // open. Committing an option discards it (the reducer moves the row into
+  // the deck); cancel/exchange glides it back home. Null for popups opened
+  // from modal drags — those have no canvas node to hold.
+  const deckDropHoldRef = useRef<{ cardId: string; glideBack: () => void; discard: () => void } | null>(null);
+  const releaseDeckHold = useCallback((action: 'commit' | 'glide') => {
+    const hold = deckDropHoldRef.current;
+    deckDropHoldRef.current = null;
+    if (!hold) return;
+    if (action === 'commit') hold.discard();
+    else hold.glideBack();
+  }, []);
   // Paragon: drop popup when a card is dragged onto the soul deck pile —
   // lets the player choose top / bottom / shuffle in.
   const [soulDeckDrop, setSoulDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
@@ -3695,6 +3708,38 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const isDeckDropWithPopup = targetZone === 'deck' && stageRef.current;
       const isSoulDeckDropWithPopup = targetZone === 'soul-deck' && hit.owner === 'shared' && stageRef.current;
 
+      // Hold the dragged node where it was dropped (on the pile) while a
+      // deck-drop popup is open. Committing an option discards the node (the
+      // move re-renders the card inside the deck); canceling glides it home
+      // via the deferred snapBack.
+      const holdOnPile = () => {
+        deckDropHoldRef.current = {
+          cardId: String(cardId),
+          glideBack: () => {
+            if (!node.getStage()) return;
+            const abs = node.absolutePosition();
+            snapBack();
+            const homeX = node.x();
+            const homeY = node.y();
+            node.absolutePosition(abs);
+            new KonvaLib.Tween({
+              node,
+              duration: 0.2,
+              x: homeX,
+              y: homeY,
+              easing: KonvaLib.Easings.EaseOut,
+            }).play();
+          },
+          discard: () => {
+            if (cardNodeRefs.current.get(card.instanceId) === node) {
+              cardNodeRefs.current.delete(card.instanceId);
+            }
+            node.destroy();
+            gameLayerRef.current?.batchDraw();
+          },
+        };
+      };
+
       if (isSoulDeckDropWithPopup) {
         if (followerOffsets && originalPos) {
           for (const [id, offset] of followerOffsets) {
@@ -3705,7 +3750,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             }
           }
         }
-        snapBack();
+        holdOnPile();
         const stage = stageRef.current;
         if (stage) {
           const screenPos = virtualToScreen(center.x, center.y, scale, offsetX, offsetY);
@@ -3720,9 +3765,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
 
       if (isDeckDropWithPopup) {
-        // Deck drop: snap card back to original position while popup is open.
-        // The reducer will fire when the user picks an option, and the
-        // subscription update will properly move the card.
+        // Deck drop: the card waits on the pile while the popup is open.
+        // The reducer fires when the user picks an option; cancel glides the
+        // card back to where it came from. Followers return home now.
         if (followerOffsets && originalPos) {
           for (const [id, offset] of followerOffsets) {
             const fNode = cardNodeRefs.current.get(id);
@@ -3732,7 +3777,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             }
           }
         }
-        snapBack();
+        holdOnPile();
       } else {
         // Non-deck zone: destroy the reparented node so React-Konva creates
         // a fresh node in the correct parent Group with correct dimensions.
@@ -6897,6 +6942,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             x={deckDrop.x}
             y={deckDrop.y}
             onShuffleIn={() => {
+              releaseDeckHold('commit');
               if (ids.length === 1) {
                 multiplayerActions.shuffleCardIntoDeck(ids[0]);
               } else {
@@ -6906,15 +6952,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               setDeckDrop(null);
             }}
             onTopDeck={() => {
+              releaseDeckHold('commit');
               for (const id of ids) multiplayerActions.moveCardToTopOfDeck(id);
               setDeckDrop(null);
             }}
             onBottomDeck={() => {
+              releaseDeckHold('commit');
               for (const id of ids) multiplayerActions.moveCardToBottomOfDeck(id);
               setDeckDrop(null);
             }}
-            onExchange={!isBatch ? () => { setDeckDrop(null); setExchangeState({ cardIds: [deckDrop.cardId], targetZone: 'deck' }); } : undefined}
-            onCancel={() => setDeckDrop(null)}
+            onExchange={!isBatch ? () => { releaseDeckHold('glide'); setDeckDrop(null); setExchangeState({ cardIds: [deckDrop.cardId], targetZone: 'deck' }); } : undefined}
+            onCancel={() => { releaseDeckHold('glide'); setDeckDrop(null); }}
           />
         );
       })()}
@@ -6934,18 +6982,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 gameState.moveCardsBatch(JSON.stringify(ids), 'soul-deck');
               }
               gameState.shuffleSoulDeck();
+              releaseDeckHold('commit');
               setSoulDeckDrop(null);
             }}
             onTopDeck={() => {
+              releaseDeckHold('commit');
               for (const id of ids) gameState.moveCard(BigInt(id), 'soul-deck', '0');
               setSoulDeckDrop(null);
             }}
             onBottomDeck={() => {
+              releaseDeckHold('commit');
               for (const id of ids) gameState.moveCard(BigInt(id), 'soul-deck');
               setSoulDeckDrop(null);
             }}
-            onExchange={!isBatch ? () => { setSoulDeckDrop(null); setExchangeState({ cardIds: [soulDeckDrop.cardId], targetZone: 'soul-deck' }); } : undefined}
-            onCancel={() => setSoulDeckDrop(null)}
+            onExchange={!isBatch ? () => { releaseDeckHold('glide'); setSoulDeckDrop(null); setExchangeState({ cardIds: [soulDeckDrop.cardId], targetZone: 'soul-deck' }); } : undefined}
+            onCancel={() => { releaseDeckHold('glide'); setSoulDeckDrop(null); }}
           />
         );
       })()}

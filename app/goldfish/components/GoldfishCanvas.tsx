@@ -449,6 +449,24 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // opens a popup (deck/soul-deck) instead of moving the card immediately.
   const dragStartPositionRef = useRef<{ instanceId: string; x: number; y: number } | null>(null);
 
+  // Card left sitting on the deck pile while a deck-drop popup is open —
+  // committing an option unmounts it into the deck; canceling glides it home.
+  const deckDropHoldRef = useRef<{ instanceId: string; homeX: number; homeY: number } | null>(null);
+  const releaseDeckHold = useCallback((glideHome: boolean) => {
+    const hold = deckDropHoldRef.current;
+    deckDropHoldRef.current = null;
+    if (!hold || !glideHome) return;
+    const node = cardNodeRefs.current.get(hold.instanceId);
+    if (!node || !node.getStage()) return;
+    new KonvaLib.Tween({
+      node,
+      duration: 0.2,
+      x: hold.homeX,
+      y: hold.homeY,
+      easing: KonvaLib.Easings.EaseOut,
+    }).play();
+  }, []);
+
   // Selection state
   const {
     selectedIds, isSelectingRef, onRectChangeRef,
@@ -937,15 +955,16 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         // Snap the card back to its drag-start position so it doesn't sit at
         // the deck position while the popup is open. If the user picks an
         // action, moveCard runs and the card animates from the source zone;
-        // if they cancel, the card is already in the right place.
-        let cardGroup: Konva.Node | null = node;
-        while (cardGroup && !cardGroup.draggable()) {
-          cardGroup = cardGroup.parent;
-        }
-        if (cardGroup && dragStartPosition?.instanceId === card.instanceId) {
-          cardGroup.x(dragStartPosition.x);
-          cardGroup.y(dragStartPosition.y);
-          cardGroup.getLayer()?.batchDraw();
+        // if they cancel, the card glides back home.
+        // Leave the card sitting where it was dropped (on the pile) while the
+        // popup is open — committing an option moves it into the deck;
+        // canceling glides it back to its drag-start position.
+        if (dragStartPosition?.instanceId === card.instanceId) {
+          deckDropHoldRef.current = {
+            instanceId: card.instanceId,
+            homeX: dragStartPosition.x,
+            homeY: dragStartPosition.y,
+          };
         }
         const stage = stageRef.current;
         if (stage) {
@@ -958,15 +977,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         }
       } else if (targetZone === 'soul-deck' && card.zone !== 'soul-deck') {
         // Paragon: dropping on the soul deck pile opens a top/bottom/shuffle popup.
-        // Snap back to drag-start so a canceled popup leaves no stale node.
-        let cardGroup: Konva.Node | null = node;
-        while (cardGroup && !cardGroup.draggable()) {
-          cardGroup = cardGroup.parent;
-        }
-        if (cardGroup && dragStartPosition?.instanceId === card.instanceId) {
-          cardGroup.x(dragStartPosition.x);
-          cardGroup.y(dragStartPosition.y);
-          cardGroup.getLayer()?.batchDraw();
+        // The card waits on the pile; a canceled popup glides it home.
+        if (dragStartPosition?.instanceId === card.instanceId) {
+          deckDropHoldRef.current = {
+            instanceId: card.instanceId,
+            homeX: dragStartPosition.x,
+            homeY: dragStartPosition.y,
+          };
         }
         const stage = stageRef.current;
         if (stage) {
@@ -2985,6 +3002,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           x={deckDropPopup.x}
           y={deckDropPopup.y}
           onShuffleIn={() => {
+            releaseDeckHold(false);
             const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
             if (ids.length === 1) {
               moveCard(ids[0], 'deck');
@@ -2997,6 +3015,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (batchDeckDropIds) clearSelection();
           }}
           onTopDeck={() => {
+            releaseDeckHold(false);
             const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
             for (const id of ids) {
               moveCardToTopOfDeck(id);
@@ -3006,6 +3025,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (batchDeckDropIds) clearSelection();
           }}
           onBottomDeck={() => {
+            releaseDeckHold(false);
             const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
             for (const id of ids) {
               moveCardToBottomOfDeck(id);
@@ -3015,12 +3035,18 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (batchDeckDropIds) clearSelection();
           }}
           onExchange={() => {
+            releaseDeckHold(true);
             const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
             setExchangeCardIds(ids);
             setDeckDropPopup(null);
             setBatchDeckDropIds(null);
           }}
-          onCancel={() => { setDeckDropPopup(null); setBatchDeckDropIds(null); setCardRenderKey(k => k + 1); }}
+          onCancel={() => {
+            releaseDeckHold(true);
+            if (batchDeckDropIds) setCardRenderKey(k => k + 1);
+            setDeckDropPopup(null);
+            setBatchDeckDropIds(null);
+          }}
         />
       )}
 
@@ -3031,22 +3057,29 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             x={soulDeckDropPopup.x}
             y={soulDeckDropPopup.y}
             onShuffleIn={() => {
+              releaseDeckHold(false);
               for (const id of ids) moveCard(id, 'soul-deck');
               dispatch(gameActionCreators.shuffleSoulDeck());
               setSoulDeckDropPopup(null);
               if (soulDeckDropPopup.batchIds) clearSelection();
             }}
             onTopDeck={() => {
+              releaseDeckHold(false);
               for (const id of ids) moveCard(id, 'soul-deck', 0);
               setSoulDeckDropPopup(null);
               if (soulDeckDropPopup.batchIds) clearSelection();
             }}
             onBottomDeck={() => {
+              releaseDeckHold(false);
               for (const id of ids) moveCard(id, 'soul-deck');
               setSoulDeckDropPopup(null);
               if (soulDeckDropPopup.batchIds) clearSelection();
             }}
-            onCancel={() => { setSoulDeckDropPopup(null); setCardRenderKey(k => k + 1); }}
+            onCancel={() => {
+              releaseDeckHold(true);
+              if (soulDeckDropPopup.batchIds) setCardRenderKey(k => k + 1);
+              setSoulDeckDropPopup(null);
+            }}
           />
         );
       })()}
