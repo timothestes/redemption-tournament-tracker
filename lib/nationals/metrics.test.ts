@@ -34,8 +34,8 @@ it("winpct rows have a name and numeric win pct", () => {
   expect(out.rows.every((r) => typeof r.pct === "number")).toBe(true);
 });
 
-it("AM_MODES has exactly 10 entries", () => {
-  expect(AM_MODES.length).toBe(10);
+it("AM_MODES has exactly 11 entries", () => {
+  expect(AM_MODES.length).toBe(11);
 });
 
 it("AM_COLS has a key for every mode id", () => {
@@ -59,6 +59,36 @@ it("placement rows have avg best worst apps", () => {
     expect(typeof r.worst).toBe("number");
     expect(typeof r.apps).toBe("number");
   }
+});
+
+it("percentile rows are bounded 0-100 and worst<=avg<=best", () => {
+  const out = computeMetric(data, { ...baseFilters, mode: "percentile" });
+  expect(out.rows.length).toBeGreaterThan(0);
+  for (const r of out.rows) {
+    expect(r.best).toBeGreaterThanOrEqual(r.avg);
+    expect(r.avg).toBeGreaterThanOrEqual(r.worst);
+    expect(r.worst).toBeGreaterThanOrEqual(0);
+    expect(r.best).toBeLessThanOrEqual(100);
+  }
+});
+
+it("percentile scores a Round 1 field winner at 100 and last place at 0", () => {
+  // 2025_T1 2-Player: field of 64 (see selectors.test.ts). Find the
+  // recorded 1st place finisher and the recorded last place finisher.
+  const key = "2025_T1 2-Player";
+  const results = data.results[key];
+  const winner = results.find((r: any) => r.placement === 1);
+  const last = [...results].sort((a: any, b: any) => b.placement - a.placement)[0];
+
+  const out = computeMetric(data, { ...baseFilters, mode: "percentile", minApp: 1 });
+  const winnerRow = out.rows.find((r) => r.name === winner.playerName);
+  expect(winnerRow?.best).toBe(100);
+
+  const lastRow = out.rows.find((r) => r.name === last.playerName);
+  expect(lastRow?.worst).toBeCloseTo(
+    ((64 - last.placement) / (64 - 1)) * 100,
+    5
+  );
 });
 
 it("podiums rows have p1 p2 p3 top3 fields", () => {

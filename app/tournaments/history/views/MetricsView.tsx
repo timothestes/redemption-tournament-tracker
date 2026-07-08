@@ -415,6 +415,11 @@ function formatCell(col: Col, val: unknown, mode: string): string {
       return n % 1 === 0 ? String(n) : n.toFixed(2);
     }
   }
+  if (mode === "percentile") {
+    if ((col.id === "avg" || col.id === "best" || col.id === "worst") && n !== null) {
+      return n.toFixed(1) + "%";
+    }
+  }
   if (n !== null) return String(n);
   return String(val);
 }
