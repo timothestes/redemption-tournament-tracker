@@ -92,6 +92,24 @@ describe("playerProfile career history fieldSize", () => {
     const entry = p.placements.find((h) => h.year === 2016 && h.format === "T1 Multiplayer");
     expect(entry?.fieldSize).toBeNull();
   });
+
+  it("avgFieldPct averages only placements with known field size, clamped 0-100", () => {
+    const player = data.results["2025_T1 2-Player"][0].playerName;
+    const p = playerProfile(data, player);
+    const known = p.placements.filter((h) => h.fieldSize != null && h.fieldSize > 1);
+    expect(known.length).toBeGreaterThan(0);
+
+    const expectedAvg =
+      known.reduce((sum, h) => {
+        const raw = ((h.fieldSize! - h.placement) / (h.fieldSize! - 1)) * 100;
+        return sum + Math.max(0, Math.min(100, raw));
+      }, 0) / known.length;
+
+    expect(p.avgFieldPct).not.toBeNull();
+    expect(p.avgFieldPct).toBeCloseTo(expectedAvg, 5);
+    expect(p.avgFieldPct!).toBeGreaterThanOrEqual(0);
+    expect(p.avgFieldPct!).toBeLessThanOrEqual(100);
+  });
 });
 
 describe("headToHead", () => {

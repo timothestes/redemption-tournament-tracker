@@ -213,6 +213,8 @@ export interface PlayerProfile {
   tp2Draws: number;
   /** Win % string over decisive games, e.g. "62.5%" or "—" */
   tp2WinPct: string;
+  /** Average placement-vs-field-size percentage (100 = won, 0 = last), or null if no placements have known field size */
+  avgFieldPct: number | null;
 
   // Top-cut record
   topCutWins: number;
@@ -347,6 +349,21 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
   const tp2WinPct =
     tp2Decisive > 0 ? ((tp2Wins / tp2Decisive) * 100).toFixed(1) + "%" : "—";
 
+  // Field % — average of (fieldSize - placement) / (fieldSize - 1) * 100 across
+  // placements with known Round 1 field size. Same clamp as the Field % advanced
+  // metric (a rare source-data duplicate standings row can push placement one
+  // past the real field).
+  const fieldPcts = placements
+    .filter((p) => p.fieldSize != null && p.fieldSize > 1 && p.placement)
+    .map((p) => {
+      const raw = ((p.fieldSize! - p.placement) / (p.fieldSize! - 1)) * 100;
+      return Math.max(0, Math.min(100, raw));
+    });
+  const avgFieldPct =
+    fieldPcts.length > 0
+      ? fieldPcts.reduce((a, b) => a + b, 0) / fieldPcts.length
+      : null;
+
   // ── Top-cut record ──────────────────────────────────────────────────────────
   let topCutWins = 0;
   let topCutLosses = 0;
@@ -400,6 +417,7 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
     tp2Losses,
     tp2Draws,
     tp2WinPct,
+    avgFieldPct,
     topCutWins,
     topCutLosses,
     topCutWinPct,
