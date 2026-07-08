@@ -628,6 +628,9 @@ export function PlayerProfileView({
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Field
                   </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Field %
+                  </th>
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">
                     Deck
                   </th>
@@ -661,11 +664,14 @@ export function PlayerProfileView({
                     <td className="px-4 py-2.5 text-muted-foreground">
                       {h.fieldSize != null ? `${h.fieldSize} players` : "—"}
                     </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">
+                      {h.fieldPct != null ? `${h.fieldPct.toFixed(1)}%` : "—"}
+                    </td>
                     <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">
                       {h.deck || "—"}
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">
-                      {h.record || "—"}
+                      {h.matchRecord || h.record || "—"}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground hidden lg:table-cell">
                       {h.notes || "—"}

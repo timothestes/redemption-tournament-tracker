@@ -106,6 +106,10 @@ export interface CareerHistoryEntry {
   notes: string;
   /** Distinct players who played Round 1 that year+format, or null if no match data exists for that key. */
   fieldSize: number | null;
+  /** (fieldSize - placement) / (fieldSize - 1) * 100, clamped 0-100; null if fieldSize is unknown or 1. */
+  fieldPct: number | null;
+  /** This player's W-L(-D) record in that year+format, derived from match data; null if no match data exists for that key. */
+  matchRecord: string | null;
 }
 
 /**
@@ -257,7 +261,11 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
     const r = results.find((x) => x.playerName === name);
     if (r) {
       const fieldSize = countRoundOneField(seed.matches[key]);
-      placements.push({ year, format: fmt, ...r, fieldSize });
+      const fieldPct =
+        fieldSize != null && fieldSize > 1 && r.placement
+          ? Math.max(0, Math.min(100, ((fieldSize - r.placement) / (fieldSize - 1)) * 100))
+          : null;
+      placements.push({ year, format: fmt, ...r, fieldSize, fieldPct, matchRecord: null });
     }
   }
   placements.sort((a, b) => b.year - a.year);
@@ -266,12 +274,16 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
   const matchStatsByFmt: Record<string, WLDRecord> = {};
   const matchStatsByOpp: Record<string, WLDRecord> = {};
   const allMatches: MatchRow[] = [];
+  // Per year+format record (mirrors matchStatsByFmt, but scoped to one key
+  // instead of aggregated across years) — feeds CareerHistoryEntry.matchRecord.
+  const recordByKey: Record<string, WLDRecord> = {};
 
   for (const [key, matches] of Object.entries(seed.matches)) {
     const i = key.indexOf("_");
     const year = parseInt(key.slice(0, i), 10);
     const fmt = key.slice(i + 1);
     const isTeams = fmt === "Teams";
+    const keyRecord: WLDRecord = { wins: 0, losses: 0, draws: 0 };
 
     // Teams is team-vs-team: each player plays every opposing player, so a player
     // has multiple cross-pairing records per round. Head-to-head keeps full per-game
@@ -309,20 +321,34 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
 
       // Non-Teams: one record == one game == one format credit.
       if (!matchStatsByFmt[fmt]) matchStatsByFmt[fmt] = { wins: 0, losses: 0, draws: 0 };
-      if (won) matchStatsByFmt[fmt].wins++;
-      else if (lost) matchStatsByFmt[fmt].losses++;
-      else if (draw) matchStatsByFmt[fmt].draws++;
+      if (won) { matchStatsByFmt[fmt].wins++; keyRecord.wins++; }
+      else if (lost) { matchStatsByFmt[fmt].losses++; keyRecord.losses++; }
+      else if (draw) { matchStatsByFmt[fmt].draws++; keyRecord.draws++; }
     }
 
     // Teams: collapse each round into a single W/L/D by majority of its games.
     if (isTeams) {
       for (const t of Object.values(roundTally)) {
         if (!matchStatsByFmt[fmt]) matchStatsByFmt[fmt] = { wins: 0, losses: 0, draws: 0 };
-        if (t.wins > t.losses) matchStatsByFmt[fmt].wins++;
-        else if (t.losses > t.wins) matchStatsByFmt[fmt].losses++;
-        else matchStatsByFmt[fmt].draws++;
+        if (t.wins > t.losses) { matchStatsByFmt[fmt].wins++; keyRecord.wins++; }
+        else if (t.losses > t.wins) { matchStatsByFmt[fmt].losses++; keyRecord.losses++; }
+        else { matchStatsByFmt[fmt].draws++; keyRecord.draws++; }
       }
     }
+
+    if (keyRecord.wins + keyRecord.losses + keyRecord.draws > 0) {
+      recordByKey[key] = keyRecord;
+    }
+  }
+
+  // Attach each placement's year+format match record, now that recordByKey is built.
+  for (const p of placements) {
+    const rec = recordByKey[`${p.year}_${p.format}`];
+    p.matchRecord = rec
+      ? rec.draws > 0
+        ? `${rec.wins}–${rec.losses}–${rec.draws}`
+        : `${rec.wins}–${rec.losses}`
+      : null;
   }
 
   // ── Multiplayer W/L/D (from multiWL map) ───────────────────────────────────
@@ -349,16 +375,10 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
   const tp2WinPct =
     tp2Decisive > 0 ? ((tp2Wins / tp2Decisive) * 100).toFixed(1) + "%" : "—";
 
-  // Field % — average of (fieldSize - placement) / (fieldSize - 1) * 100 across
-  // placements with known Round 1 field size. Same clamp as the Field % advanced
-  // metric (a rare source-data duplicate standings row can push placement one
-  // past the real field).
+  // Field % — average of each placement's fieldPct (see the placements loop above).
   const fieldPcts = placements
-    .filter((p) => p.fieldSize != null && p.fieldSize > 1 && p.placement)
-    .map((p) => {
-      const raw = ((p.fieldSize! - p.placement) / (p.fieldSize! - 1)) * 100;
-      return Math.max(0, Math.min(100, raw));
-    });
+    .map((p) => p.fieldPct)
+    .filter((v): v is number => v != null);
   const avgFieldPct =
     fieldPcts.length > 0
       ? fieldPcts.reduce((a, b) => a + b, 0) / fieldPcts.length

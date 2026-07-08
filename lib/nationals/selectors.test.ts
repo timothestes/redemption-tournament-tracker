@@ -91,6 +91,39 @@ describe("playerProfile career history fieldSize", () => {
     const p = playerProfile(data, player);
     const entry = p.placements.find((h) => h.year === 2016 && h.format === "T1 Multiplayer");
     expect(entry?.fieldSize).toBeNull();
+    expect(entry?.fieldPct).toBeNull();
+    expect(entry?.matchRecord).toBeNull();
+  });
+
+  it("fieldPct matches the field-size formula, and is null when fieldSize is null", () => {
+    const key = "2025_T1 2-Player";
+    const player = data.results[key][0].playerName;
+    const p = playerProfile(data, player);
+    const entry = p.placements.find((h) => h.year === 2025 && h.format === "T1 2-Player");
+    expect(entry?.fieldSize).not.toBeNull();
+    const expected = Math.max(
+      0,
+      Math.min(100, ((entry!.fieldSize! - entry!.placement) / (entry!.fieldSize! - 1)) * 100)
+    );
+    expect(entry?.fieldPct).toBeCloseTo(expected, 10);
+  });
+
+  it("matchRecord is this player's W-L(-D) for that specific year+format, from match data", () => {
+    const key = "2025_T1 2-Player";
+    const player = data.results[key][0].playerName;
+
+    let wins = 0, losses = 0, draws = 0;
+    for (const m of data.matches[key]) {
+      if (m.playerA !== player && m.playerB !== player) continue;
+      if (m.winner === player) wins++;
+      else if (m.winner) losses++;
+      else draws++;
+    }
+    const expected = draws > 0 ? `${wins}–${losses}–${draws}` : `${wins}–${losses}`;
+
+    const p = playerProfile(data, player);
+    const entry = p.placements.find((h) => h.year === 2025 && h.format === "T1 2-Player");
+    expect(entry?.matchRecord).toBe(expected);
   });
 
   it("avgFieldPct averages only placements with known field size, clamped 0-100", () => {
