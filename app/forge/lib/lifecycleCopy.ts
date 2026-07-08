@@ -33,7 +33,7 @@ export type LifecycleAction =
   | "delete";
 
 export const ACTION_LABEL: Record<LifecycleAction, string> = {
-  release: "Release to playtest",
+  release: "Release to playtesters",
   markFinal: "Mark final",
   reopen: "Reopen testing",
   shelve: "Shelve",

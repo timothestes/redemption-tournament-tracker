@@ -13,7 +13,7 @@ export type GridSelection = {
 };
 
 export default function ForgeCardGrid({
-  cards, showStatus = false, selection, leading, commentCounts, proposalCounts,
+  cards, showStatus = false, selection, leading, commentCounts, proposalCounts, releaseBadges, versionNumbers,
 }: {
   cards: ForgeCardFull[];
   showStatus?: boolean;
@@ -21,6 +21,9 @@ export default function ForgeCardGrid({
   leading?: ReactNode;
   commentCounts?: Record<string, number>;
   proposalCounts?: Record<string, number>;
+  releaseBadges?: Record<string, string>;
+  // Latest version per card — appended to the status pill ("Draft · v2").
+  versionNumbers?: Record<string, number>;
 }) {
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -32,6 +35,7 @@ export default function ForgeCardGrid({
         const shelved = c.status === "archived";
         const count = commentCounts?.[c.id] ?? 0;
         const propCount = proposalCounts?.[c.id] ?? 0;
+        const release = releaseBadges?.[c.id];
         const inner = (
           <>
             <div className="relative">
@@ -60,12 +64,21 @@ export default function ForgeCardGrid({
                   {propCount}
                 </span>
               )}
+              {release && (
+                <span
+                  className="absolute bottom-1 left-1 z-10 rounded-full border bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur-sm"
+                  title={`Latest update ${release}`}
+                >
+                  {release}
+                </span>
+              )}
             </div>
             <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
               <p className="min-w-[6rem] flex-1 truncate text-xs text-muted-foreground">{c.title ?? "Untitled"}</p>
               {showStatus && (
                 <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] ${STATUS_BADGE_CLASS[c.status] ?? "text-muted-foreground"}`}>
                   {STATUS_LABEL[c.status] ?? c.status}
+                  {versionNumbers?.[c.id] != null && <> · v{versionNumbers[c.id]}</>}
                 </span>
               )}
             </div>

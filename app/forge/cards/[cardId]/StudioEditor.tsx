@@ -2,16 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download } from "lucide-react";
+import Link from "next/link";
+import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
 import FilePicker from "@/app/forge/components/FilePicker";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 import { cn } from "@/lib/utils";
 import { saveCard, uploadArt, uploadFinished, setPlaceholder, type ForgeCardFull } from "@/app/forge/lib/cards";
-import { createProposal } from "@/app/forge/lib/proposals";
 import { cardRawText, type DesignCard } from "@/app/forge/lib/designCard";
 import LifecycleControls from "./LifecycleControls";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
@@ -25,14 +25,21 @@ import CardDetailsFields from "./CardDetailsFields";
 // raw text + optional artwork + optional finished-card image. Both files remain on
 // disk (unused here) for recovery.
 
+// Prev/next arrows overlaid on the card face edges. Inside the edges (not the
+// gutter) so they never clip on mobile.
+const arrowClass =
+  "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border bg-background/70 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-background hover:text-foreground";
+
 export default function StudioEditor({
-  card, sets, currentUser, setId, setName,
+  card, sets, currentUser, setId, setName, prevId, nextId,
 }: {
   card: ForgeCardFull;
   sets: ForgeSetSummary[];
   currentUser: { userId: string; displayName: string | null };
   setId: string | null;
   setName: string | null;
+  prevId?: string | null;
+  nextId?: string | null;
 }) {
   const [snapshot, setSnapshot] = useState<DesignCard>(card.snapshot ?? {});
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -85,6 +92,23 @@ export default function StudioEditor({
     };
   }, [card.id]);
 
+  // Arrow keys step to the prev/next card in the set — but only when focus is
+  // outside a field, so they still move the text cursor while editing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      const dest = e.key === "ArrowLeft" ? prevId : nextId;
+      if (!dest) return;
+      e.preventDefault();
+      router.push(`/forge/cards/${dest}`);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [prevId, nextId, router]);
+
   const update = (patch: Partial<DesignCard>) => {
     fieldsDirty.current = true;
     setSnapshot((s) => ({ ...s, ...patch }));
@@ -103,22 +127,6 @@ export default function StudioEditor({
       setUploading(null);
     }
   }
-
-  const [proposing, setProposing] = useState(false);
-  const [proposeSummary, setProposeSummary] = useState("");
-  const [proposeBusy, setProposeBusy] = useState(false);
-  const [proposeErr, setProposeErr] = useState<string | null>(null);
-  const submitProposal = async () => {
-    if (!proposeSummary.trim()) return;
-    setProposeErr(null);
-    setProposeBusy(true);
-    const r = await createProposal(card.id, snapshot, proposeSummary);
-    setProposeBusy(false);
-    if (r.ok === false) { setProposeErr(r.error); return; }
-    setProposing(false);
-    setProposeSummary("");
-    router.refresh();
-  };
 
   // Cache-buster: updated_at bumps on every image/snapshot write, so the browser can
   // cache each t-stamped art URL indefinitely and still swap after router.refresh().
@@ -148,35 +156,35 @@ export default function StudioEditor({
           </span>
         </div>
         <LifecycleControls card={card} sets={sets} />
-        {card.setId &&
-          (proposing ? (
-            <div className="flex flex-col gap-1 text-xs">
-              <div className="flex items-start gap-1">
-                <textarea autoFocus value={proposeSummary} onChange={(e) => setProposeSummary(e.target.value)}
-                  placeholder="Summarize your proposed change…" className="h-16 flex-1 rounded-md border bg-background px-2 py-1" />
-                <Button size="sm" className="h-7 px-3 text-xs" disabled={proposeBusy || !proposeSummary.trim()} onClick={submitProposal}>
-                  Submit proposal
-                </Button>
-                <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setProposing(false); setProposeErr(null); }}>Cancel</Button>
-              </div>
-              {proposeErr && <p className="text-destructive">{proposeErr}</p>}
-            </div>
-          ) : (
-            <Button size="sm" variant="outline" className="h-7 self-start px-3 text-xs" onClick={() => setProposing(true)}>
-              Propose changes for review
-            </Button>
-          ))}
+        {card.setId && (
+          <p className="text-xs text-muted-foreground">
+            Releases are visible to Forge playtesters only — they don’t change the public card database.
+          </p>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,360px)_1fr]">
         {/* Face — sticky on desktop, top on mobile */}
         <div className="md:sticky md:top-4 md:self-start">
-          <ForgeCardFace
-            name={snapshot.name ?? null}
-            rawText={cardRawText(snapshot)}
-            finishedUrl={card.hasFinished ? `/forge/api/art/${card.id}?kind=finished&t=${t}` : null}
-            artUrl={card.hasArt ? `/forge/api/art/${card.id}?t=${t}` : null}
-          />
+          <div className="relative">
+            <ForgeCardFace
+              name={snapshot.name ?? null}
+              rawText={cardRawText(snapshot)}
+              finishedUrl={card.hasFinished ? `/forge/api/art/${card.id}?kind=finished&t=${t}` : null}
+              artUrl={card.hasArt ? `/forge/api/art/${card.id}?t=${t}` : null}
+            />
+            {/* Prev/next within the set — same order as the grid, no wrap at ends. */}
+            {prevId && (
+              <Link href={`/forge/cards/${prevId}`} aria-label="Previous card in set" className={arrowClass + " left-1.5"}>
+                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+              </Link>
+            )}
+            {nextId && (
+              <Link href={`/forge/cards/${nextId}`} aria-label="Next card in set" className={arrowClass + " right-1.5"}>
+                <ChevronRight className="h-5 w-5" aria-hidden="true" />
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Form */}

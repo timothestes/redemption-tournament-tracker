@@ -1,9 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { requireForge } from "@/app/forge/lib/auth";
 import { getCard } from "@/app/forge/lib/cards";
-import { getSet, listSets } from "@/app/forge/lib/sets";
+import { getSet, listSets, listSetCards } from "@/app/forge/lib/sets";
+import { sortSetCards } from "@/app/forge/lib/cardOrder";
 import { getOpenProposalDiffs, listProposals } from "@/app/forge/lib/proposals";
 import { listComments } from "@/app/forge/lib/comments";
+import { listVersions, listCardEvents } from "@/app/forge/lib/versions";
 import StudioEditor from "./StudioEditor";
 import ReviewPanel from "./ReviewPanel";
 
@@ -20,10 +22,24 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
 
   const inSet = card.setId !== null;
   const sets = inSet ? [] : await listSets();
-  const [openDiffs, proposals, comments] = inSet
-    ? await Promise.all([getOpenProposalDiffs(cardId), listProposals(cardId), listComments(cardId)])
-    : [[], [], []];
+  const [openDiffs, proposals, comments, versions, events, siblings] = inSet
+    ? await Promise.all([
+        getOpenProposalDiffs(cardId),
+        listProposals(cardId),
+        listComments(cardId),
+        listVersions(cardId),
+        listCardEvents(cardId),
+        listSetCards(card.setId!),
+      ])
+    : [[], [], [], [], [], []];
   const canReview = ctx.role === "elder" || ctx.role === "superadmin";
+
+  // Prev/next arrows on the card face walk the set in the same order as the grid.
+  // No wrap: the boundary card gets null and hides that arrow.
+  const ordered = sortSetCards(siblings);
+  const idx = ordered.findIndex((c) => c.id === cardId);
+  const prevId = idx > 0 ? ordered[idx - 1].id : null;
+  const nextId = idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1].id : null;
 
   const { data: meRow } = await ctx.supabase
     .from("playtest_members")
@@ -34,13 +50,15 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
 
   return (
     <>
-      <StudioEditor card={card} sets={sets} currentUser={currentUser} setId={card.setId ?? null} setName={set?.name ?? null} />
+      <StudioEditor card={card} sets={sets} currentUser={currentUser} setId={card.setId ?? null} setName={set?.name ?? null} prevId={prevId} nextId={nextId} />
       {inSet && (
         <ReviewPanel
           card={card}
           openDiffs={openDiffs}
           proposals={proposals}
           comments={comments}
+          versions={versions}
+          events={events}
           canReview={canReview}
         />
       )}

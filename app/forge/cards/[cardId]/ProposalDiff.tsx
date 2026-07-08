@@ -35,12 +35,14 @@ export default function ProposalDiff({
   artUrl,
   finishedUrl,
   canReview,
+  cardStatus,
 }: {
   proposal: ProposalRow;
   current: DesignCard;
   artUrl: string | null;
   finishedUrl: string | null;
   canReview: boolean;
+  cardStatus: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -51,6 +53,10 @@ export default function ProposalDiff({
   const [reason, setReason] = useState("");
   const changes = diffCards(current, proposal.proposedSnapshot);
   const proposed = proposal.proposedSnapshot;
+  // No base version = the card has never been released; a field-by-field
+  // "— → value" diff is noise, so render the proposal as a plain new card.
+  const isNewCard = proposal.baseVersionId === null;
+  const isDraft = cardStatus === "draft";
 
   const doAccept = () =>
     start(async () => {
@@ -77,7 +83,9 @@ export default function ProposalDiff({
   return (
     <div className="rounded-md border p-3">
       <p className="text-sm font-medium">{proposal.summary ?? "Proposed change"}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{summarizeDiff(changes)}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {isNewCard ? "New card — first proposal" : summarizeDiff(changes)}
+      </p>
 
       {/* Decision controls + change list render ABOVE the previews (mobile-first). */}
       {proposal.status === "open" && canReview && (
@@ -94,7 +102,18 @@ export default function ProposalDiff({
       {changes.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs">
           {changes.map((c) =>
-            isBlockChange(c) ? (
+            isNewCard ? (
+              isBlockChange(c) ? (
+                <li key={c.field as string} className="space-y-1">
+                  <span className="font-medium">{c.label}</span>
+                  <div className="whitespace-pre-wrap rounded bg-muted/60 px-2 py-1">{c.after ?? "—"}</div>
+                </li>
+              ) : (
+                <li key={c.field as string}>
+                  <span className="font-medium">{c.label}:</span> {c.after ?? "—"}
+                </li>
+              )
+            ) : isBlockChange(c) ? (
               <li key={c.field as string} className="space-y-1">
                 <span className="font-medium">{c.label}</span>
                 {c.before !== null && (
@@ -150,7 +169,9 @@ export default function ProposalDiff({
           <DialogHeader>
             <DialogTitle>Accept proposal</DialogTitle>
             <DialogDescription>
-              Releases a new published version and replaces the working draft with this proposal.
+              {isDraft
+                ? "Applies this change to the working draft and records it as a new draft version in the card’s history. The card stays in Draft — nothing is visible to playtesters."
+                : "Releases a new version to playtesters (not the public card database) and replaces the working draft with this proposal. The card stays in playtest — use Mark final when it’s done."}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-2">
@@ -167,7 +188,7 @@ export default function ProposalDiff({
             <Button variant="outline" disabled={pending} onClick={() => { setAcceptOpen(false); setErr(null); }}>
               Cancel
             </Button>
-            <Button disabled={pending} onClick={doAccept}>Accept &amp; publish</Button>
+            <Button disabled={pending} onClick={doAccept}>{isDraft ? "Accept" : "Accept & release"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
