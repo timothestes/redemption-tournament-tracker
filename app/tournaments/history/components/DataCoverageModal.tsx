@@ -12,7 +12,7 @@ const FULL_DATA_ROWS: Array<[string, string]> = [
   ["T1 2-Player", "2003–present (all years)"],
   ["T2 2-Player", "2004–present (missing 2019)"],
   ["Sealed", "2003–present (missing 2004)"],
-  ["Booster Draft (2P)", "2005–present (Booster Draft was multiplayer-only in 2015 — see Booster Draft (Multi) below)"],
+  ["Booster Draft (2P)", "2018–present (all years)"],
   ["Teams", "2010–present (all years)"],
   ["Type A", "2005–present (missing several years due to insufficient participation)"],
   ["T1 Multiplayer", "2004–2021 (retired after 2021)"],
