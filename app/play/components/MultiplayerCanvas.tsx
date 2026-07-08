@@ -3904,18 +3904,42 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         }
         holdOnPile();
       } else {
+        // Lost Souls dropped on a graveyard pile (discard/reserve/banish) are
+        // redirected by the server back into the Land of Bondage. When the
+        // drag started in a LoB the card re-renders in the SAME parent Group
+        // with the same key, so its element never unmounts — destroying the
+        // node here would orphan the row (React-Konva still thinks the node
+        // exists and never recreates it), leaving an invisible "ghost" soul
+        // holding a slot. Mirrors the server predicate at moveCard's
+        // lost-soul redirect (token souls are deleted there, not redirected).
+        const GRAVEYARD_PILE_ZONES = ['discard', 'reserve', 'banish'];
+        const staysInLobAfterPileDrop = (id: string): boolean => {
+          if (!GRAVEYARD_PILE_ZONES.includes(targetZone)) return false;
+          const inst = findAnyCardById(id);
+          if (!inst || inst.isToken) return false;
+          if (inst.zone !== 'land-of-bondage') return false;
+          return inst.cardType === 'LS' || inst.cardName.toLowerCase().includes('lost soul');
+        };
         // Non-deck zone: destroy the reparented node so React-Konva creates
         // a fresh node in the correct parent Group with correct dimensions.
         const draggedNode = cardNodeRefs.current.get(card.instanceId);
         if (draggedNode) {
-          cardNodeRefs.current.delete(card.instanceId);
-          draggedNode.destroy();
+          if (staysInLobAfterPileDrop(card.instanceId)) {
+            // Node must survive — the subscription update repositions it.
+            snapBack();
+          } else {
+            cardNodeRefs.current.delete(card.instanceId);
+            draggedNode.destroy();
+          }
         }
         // Also clean up any follower nodes that were reparented
         if (followerOffsets) {
           for (const [id] of followerOffsets) {
             const fNode = cardNodeRefs.current.get(id);
             if (fNode) {
+              // Redirected souls keep their node (it never left its parent);
+              // the group-settle microtask re-shows it in place.
+              if (staysInLobAfterPileDrop(id)) continue;
               cardNodeRefs.current.delete(id);
               fNode.destroy();
             }
