@@ -41,6 +41,9 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useDealAnimation } from '@/app/shared/hooks/useDealAnimation';
+import { useHandLayoutTween } from '@/app/shared/hooks/useHandLayoutTween';
+import { DealLayer, type DealSpriteSpec } from '@/app/shared/components/DealLayer';
 import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
 import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
@@ -82,6 +85,24 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     [state.zones],
   );
   const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
+
+  // ---- "The deal" — flying-card animation when cards move deck → hand ----
+  // (Draw button, draw N/bottom, ability draws.) Snapshot is id+zone only;
+  // diffing happens inside the hook. sessionId changes on every new game
+  // (fresh deck load, New Game), which triggers the fast opening-hand deal.
+  const cardZoneSnapshot = useMemo(() => {
+    const flat: { id: string; zone: string }[] = [];
+    for (const zoneId of Object.keys(state.zones) as ZoneId[]) {
+      for (const card of state.zones[zoneId]) flat.push({ id: card.instanceId, zone: zoneId });
+    }
+    return flat;
+  }, [state.zones]);
+  const {
+    deals: activeDeals,
+    dealingIds,
+    glowIds: dealGlowIds,
+    completeDeal,
+  } = useDealAnimation(cardZoneSnapshot, true, state.sessionId);
 
   // ---- Lost Soul cinematic — full-screen flourish on arrival ----
   // Filter to actual Lost Souls (sites can be attached to LOB cards but they
@@ -427,6 +448,72 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // Drag-start position of the leader card so we can snap it back if the drop
   // opens a popup (deck/soul-deck) instead of moving the card immediately.
   const dragStartPositionRef = useRef<{ instanceId: string; x: number; y: number } | null>(null);
+
+  // Card left sitting on the deck pile while a deck-drop popup is open —
+  // committing an option unmounts it into the deck; canceling glides it home.
+  // For group drags, `group` holds the claimed ghost stack + hidden followers.
+  const deckDropHoldRef = useRef<{
+    instanceId: string;
+    homeX: number;
+    homeY: number;
+    group?: {
+      ghost: Konva.Image | null;
+      ghostHomeX: number | null;
+      ghostHomeY: number | null;
+      followerIds: string[];
+    };
+  } | null>(null);
+  // Deferred group-drag settle (destroy ghost, re-show followers). Scheduled
+  // as a microtask at drag end; a deck-pile drop claims it within the same
+  // tick so the ghost stack can wait on the pile instead.
+  const pendingGroupSettleRef = useRef<(() => void) | null>(null);
+  const releaseDeckHold = useCallback((glideHome: boolean) => {
+    const hold = deckDropHoldRef.current;
+    deckDropHoldRef.current = null;
+    if (!hold) return;
+    const group = hold.group;
+    const settleGroup = () => {
+      if (!group) return;
+      if (group.ghost) {
+        group.ghost.destroy();
+        dragGhostLayerRef.current?.batchDraw();
+      }
+      // On commit the follower rows move into the deck and their hidden
+      // nodes unmount with the state change — only a cancel re-shows them.
+      if (glideHome) {
+        for (const id of group.followerIds) {
+          const fNode = cardNodeRefs.current.get(id);
+          if (fNode) fNode.visible(true);
+        }
+      }
+    };
+    if (!glideHome) {
+      settleGroup();
+      return;
+    }
+    const node = cardNodeRefs.current.get(hold.instanceId);
+    if (node && node.getStage()) {
+      new KonvaLib.Tween({
+        node,
+        duration: 0.2,
+        x: hold.homeX,
+        y: hold.homeY,
+        easing: KonvaLib.Easings.EaseOut,
+      }).play();
+    }
+    if (group?.ghost && group.ghostHomeX != null && group.ghostHomeY != null && group.ghost.getStage()) {
+      new KonvaLib.Tween({
+        node: group.ghost,
+        duration: 0.2,
+        x: group.ghostHomeX,
+        y: group.ghostHomeY,
+        easing: KonvaLib.Easings.EaseOut,
+        onFinish: settleGroup,
+      }).play();
+    } else {
+      settleGroup();
+    }
+  }, []);
 
   // Selection state
   const {
@@ -803,24 +890,35 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       canvasDragZoneRef.current = null;
       dragSourceZoneRef.current = null;
       dragFollowerOffsets.current = null;
+      const ghostOffset = dragGhostOffsetRef.current;
       dragGhostOffsetRef.current = null;
       const dragStartPosition = dragStartPositionRef.current;
       dragStartPositionRef.current = null;
       setCanvasDragZone(null);
       setDragSourceZone(null);
 
-      // Clean up ghost image
-      if (dragGhostRef.current) {
-        dragGhostRef.current.destroy();
-        dragGhostRef.current = null;
-        dragGhostLayerRef.current?.batchDraw();
-      }
-      // Restore follower node visibility
-      if (followerOffsets) {
-        for (const [id] of followerOffsets) {
-          const node = cardNodeRefs.current.get(id);
-          if (node) node.visible(true);
-        }
+      // Group-drag visuals (ghost + hidden followers): normally settled
+      // immediately, but a drop onto a deck pile claims them within this
+      // tick (deckDropHoldRef) so the stack waits on the pile while the
+      // popup is open.
+      const heldGhost = dragGhostRef.current;
+      dragGhostRef.current = null;
+      const heldFollowerIds = followerOffsets ? [...followerOffsets.keys()] : [];
+      if (heldGhost || heldFollowerIds.length > 0) {
+        pendingGroupSettleRef.current = () => {
+          if (heldGhost) {
+            heldGhost.destroy();
+            dragGhostLayerRef.current?.batchDraw();
+          }
+          for (const id of heldFollowerIds) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) fNode.visible(true);
+          }
+        };
+        queueMicrotask(() => {
+          pendingGroupSettleRef.current?.();
+          pendingGroupSettleRef.current = null;
+        });
       }
 
       // Equip: if a weapon is dropped on top of a warrior in territory, attach.
@@ -916,15 +1014,27 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         // Snap the card back to its drag-start position so it doesn't sit at
         // the deck position while the popup is open. If the user picks an
         // action, moveCard runs and the card animates from the source zone;
-        // if they cancel, the card is already in the right place.
-        let cardGroup: Konva.Node | null = node;
-        while (cardGroup && !cardGroup.draggable()) {
-          cardGroup = cardGroup.parent;
-        }
-        if (cardGroup && dragStartPosition?.instanceId === card.instanceId) {
-          cardGroup.x(dragStartPosition.x);
-          cardGroup.y(dragStartPosition.y);
-          cardGroup.getLayer()?.batchDraw();
+        // if they cancel, the card glides back home.
+        // Leave the card sitting where it was dropped (on the pile) while the
+        // popup is open — committing an option moves it into the deck;
+        // canceling glides it back to its drag-start position.
+        if (dragStartPosition?.instanceId === card.instanceId) {
+          let group: NonNullable<typeof deckDropHoldRef.current>['group'];
+          if (pendingGroupSettleRef.current) {
+            pendingGroupSettleRef.current = null; // claim — the settle microtask no-ops
+            group = {
+              ghost: heldGhost,
+              ghostHomeX: ghostOffset ? dragStartPosition.x + ghostOffset.dx : null,
+              ghostHomeY: ghostOffset ? dragStartPosition.y + ghostOffset.dy : null,
+              followerIds: heldFollowerIds,
+            };
+          }
+          deckDropHoldRef.current = {
+            instanceId: card.instanceId,
+            homeX: dragStartPosition.x,
+            homeY: dragStartPosition.y,
+            group,
+          };
         }
         const stage = stageRef.current;
         if (stage) {
@@ -937,15 +1047,24 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         }
       } else if (targetZone === 'soul-deck' && card.zone !== 'soul-deck') {
         // Paragon: dropping on the soul deck pile opens a top/bottom/shuffle popup.
-        // Snap back to drag-start so a canceled popup leaves no stale node.
-        let cardGroup: Konva.Node | null = node;
-        while (cardGroup && !cardGroup.draggable()) {
-          cardGroup = cardGroup.parent;
-        }
-        if (cardGroup && dragStartPosition?.instanceId === card.instanceId) {
-          cardGroup.x(dragStartPosition.x);
-          cardGroup.y(dragStartPosition.y);
-          cardGroup.getLayer()?.batchDraw();
+        // The card waits on the pile; a canceled popup glides it home.
+        if (dragStartPosition?.instanceId === card.instanceId) {
+          let group: NonNullable<typeof deckDropHoldRef.current>['group'];
+          if (pendingGroupSettleRef.current) {
+            pendingGroupSettleRef.current = null; // claim — the settle microtask no-ops
+            group = {
+              ghost: heldGhost,
+              ghostHomeX: ghostOffset ? dragStartPosition.x + ghostOffset.dx : null,
+              ghostHomeY: ghostOffset ? dragStartPosition.y + ghostOffset.dy : null,
+              followerIds: heldFollowerIds,
+            };
+          }
+          deckDropHoldRef.current = {
+            instanceId: card.instanceId,
+            homeX: dragStartPosition.x,
+            homeY: dragStartPosition.y,
+            group,
+          };
         }
         const stage = stageRef.current;
         if (stage) {
@@ -1327,6 +1446,34 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     () => calculateHandPositions(state.zones.hand.length, virtualWidth, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight),
     [state.zones.hand.length, state.isSpreadHand, cardWidth, cardHeight, virtualWidth]
   );
+
+  // Smooth hand re-layout: when cards enter/leave the hand the remaining
+  // cards glide to their shifted slots instead of snapping.
+  const handSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    state.zones.hand.forEach((c, i) => {
+      const p = handPositions[i];
+      if (p) m.set(c.instanceId, p);
+    });
+    return m;
+  }, [state.zones.hand, handPositions]);
+  useHandLayoutTween(handSlots, cardNodeRefs);
+
+  // Same glide for the Land of Bondage strip — when a soul is rescued or
+  // removed, the remaining souls slide left instead of snapping.
+  const lobSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    const cards = state.zones['land-of-bondage'] ?? [];
+    const rect = zoneLayout['land-of-bondage'];
+    if (!rect || cards.length === 0) return m;
+    const pos = calculateAutoArrangePositions(cards.length, rect, cardWidth, cardHeight);
+    cards.forEach((c, i) => {
+      const p = pos[i];
+      if (p) m.set(c.instanceId, { x: p.x, y: p.y, rotation: 0 });
+    });
+    return m;
+  }, [state.zones['land-of-bondage'], zoneLayout, cardWidth, cardHeight]);
+  useHandLayoutTween(lobSlots, cardNodeRefs);
 
   // Render all zones except hand
   const nonHandZones: ZoneId[] = useMemo(() => [
@@ -2274,6 +2421,9 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           {state.zones.hand.map((card, i) => {
             const pos = handPositions[i];
             if (!pos) return null;
+            // Card is mid-deal: its DealLayer sprite is flying — don't render
+            // the real node yet (handPositions still reserves its slot).
+            if (dealingIds.has(card.instanceId)) return null;
             return (
               <GameCardNode
                 key={card.instanceId}
@@ -2287,6 +2437,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                 {...(getTargetingProps(card) ?? {})}
                 isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                lobArrivalGlow={dealGlowIds.has(card.instanceId)}
                 nodeRef={registerCardNode}
                 onDragStart={handleCardDragStart}
                 onDragMove={handleCardDragMove}
@@ -2299,6 +2450,35 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               />
             );
           })}
+
+          {/* "The deal" sprites — card backs flying deck pile → hand slot */}
+          {(() => {
+            const deckZone = zoneLayout['deck'];
+            if (!deckZone || activeDeals.length === 0) return null;
+            // Match the deck pile's rendered card-back size (see sidebar piles).
+            const pileWidth = Math.min(cardWidth, deckZone.width - 4);
+            const originScale = cardWidth > 0 ? pileWidth / cardWidth : 1;
+            const sprites: DealSpriteSpec[] = [];
+            for (const deal of activeDeals) {
+              const idx = state.zones.hand.findIndex(c => c.instanceId === deal.instanceId);
+              if (idx === -1) continue;
+              const dealPos = handPositions[idx];
+              if (!dealPos) continue;
+              sprites.push({
+                deal,
+                origin: {
+                  x: deckZone.x + deckZone.width / 2 - (cardWidth * originScale) / 2,
+                  y: deckZone.y + deckZone.height / 2 - (cardHeight * originScale) / 2,
+                },
+                originScale,
+                target: { x: dealPos.x, y: dealPos.y, rotation: dealPos.rotation },
+                cardWidth,
+                cardHeight,
+                image: getImage(state.zones.hand[idx].cardImgFile),
+              });
+            }
+            return <DealLayer sprites={sprites} onLanded={completeDeal} />;
+          })()}
         </Layer>
 
         {/* Selection rectangle layer — scaled to match game layer */}
@@ -2903,6 +3083,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           x={deckDropPopup.x}
           y={deckDropPopup.y}
           onShuffleIn={() => {
+            releaseDeckHold(false);
             const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
             if (ids.length === 1) {
               moveCard(ids[0], 'deck');
@@ -2915,6 +3096,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (batchDeckDropIds) clearSelection();
           }}
           onTopDeck={() => {
+            releaseDeckHold(false);
             const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
             for (const id of ids) {
               moveCardToTopOfDeck(id);
@@ -2924,6 +3106,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (batchDeckDropIds) clearSelection();
           }}
           onBottomDeck={() => {
+            releaseDeckHold(false);
             const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
             for (const id of ids) {
               moveCardToBottomOfDeck(id);
@@ -2933,12 +3116,18 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (batchDeckDropIds) clearSelection();
           }}
           onExchange={() => {
+            releaseDeckHold(true);
             const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
             setExchangeCardIds(ids);
             setDeckDropPopup(null);
             setBatchDeckDropIds(null);
           }}
-          onCancel={() => { setDeckDropPopup(null); setBatchDeckDropIds(null); setCardRenderKey(k => k + 1); }}
+          onCancel={() => {
+            releaseDeckHold(true);
+            if (batchDeckDropIds) setCardRenderKey(k => k + 1);
+            setDeckDropPopup(null);
+            setBatchDeckDropIds(null);
+          }}
         />
       )}
 
@@ -2949,22 +3138,29 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             x={soulDeckDropPopup.x}
             y={soulDeckDropPopup.y}
             onShuffleIn={() => {
+              releaseDeckHold(false);
               for (const id of ids) moveCard(id, 'soul-deck');
               dispatch(gameActionCreators.shuffleSoulDeck());
               setSoulDeckDropPopup(null);
               if (soulDeckDropPopup.batchIds) clearSelection();
             }}
             onTopDeck={() => {
+              releaseDeckHold(false);
               for (const id of ids) moveCard(id, 'soul-deck', 0);
               setSoulDeckDropPopup(null);
               if (soulDeckDropPopup.batchIds) clearSelection();
             }}
             onBottomDeck={() => {
+              releaseDeckHold(false);
               for (const id of ids) moveCard(id, 'soul-deck');
               setSoulDeckDropPopup(null);
               if (soulDeckDropPopup.batchIds) clearSelection();
             }}
-            onCancel={() => { setSoulDeckDropPopup(null); setCardRenderKey(k => k + 1); }}
+            onCancel={() => {
+              releaseDeckHold(true);
+              if (soulDeckDropPopup.batchIds) setCardRenderKey(k => k + 1);
+              setSoulDeckDropPopup(null);
+            }}
           />
         );
       })()}

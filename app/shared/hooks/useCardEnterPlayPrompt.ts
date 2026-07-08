@@ -15,10 +15,12 @@ const PLAY_ZONES: ReadonlySet<string> = new Set([
 
 // Any of these → a play zone fires the prompt. Excludes paragon and soul-deck
 // (different lifecycle) and the play zones themselves (cross-play moves don't
-// re-prompt since the choice would already have been made).
+// re-prompt since the choice would already have been made). Also excludes
+// deck: cards that land in play straight from the deck (top-deck toss
+// effects, reveals) aren't a deliberate play — interrupting with the
+// Choose Good/Evil dialog there is just noise (Three Woes feedback).
 const PROMPT_SOURCE_ZONES: ReadonlySet<string> = new Set([
   'hand',
-  'deck',
   'reserve',
   'discard',
   'banish',

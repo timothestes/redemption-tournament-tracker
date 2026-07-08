@@ -288,6 +288,20 @@ button:focus, button:focus-visible,
 }
 
 /* -----------------------------------------------------------------------------
+ * Goldfish game-area entrance — brief fade-in after the loading screen.
+ * The Konva canvas (dynamic chunk) paints its dark zone shading a few frames
+ * after the DOM cave background; fading the whole area in hides that flash.
+ * Component: app/goldfish/[deckId]/client.tsx.
+ * -------------------------------------------------------------------------- */
+@keyframes gf-area-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.gf-area-enter {
+  animation: gf-area-fade-in 240ms ease-out 100ms both;
+}
+
+/* -----------------------------------------------------------------------------
  * Lost Soul cinematic — full-screen overlay on LOB arrival.
  * Component: app/shared/components/LostSoulCinematic.tsx.
  * Hoisted here so the ~3KB rule set isn't re-injected on every mount.

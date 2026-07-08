@@ -1,13 +1,15 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { LOADING_MESSAGES } from '@/app/shared/constants/loadingMessages';
 
 export function LoadingScreen({ progress }: { progress: number }) {
-  const message = useMemo(
-    () => LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)],
-    []
-  );
+  // Randomize only after mount: picking during render runs on the server too,
+  // and a different pick on the client is a hydration text mismatch.
+  const [message, setMessage] = useState(LOADING_MESSAGES[0]);
+  useEffect(() => {
+    setMessage(LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)]);
+  }, []);
   const percent = Math.round(progress * 100);
 
   return (

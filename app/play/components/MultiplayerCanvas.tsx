@@ -15,6 +15,9 @@ import {
 import { toScreenPos, toDbPos, cardCenter, adjustAnchorForRotationChange } from '../utils/coordinateTransforms';
 import { calculateHandPositions, HAND_TOOLBAR_RESERVE } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
+import { useDealAnimation } from '@/app/shared/hooks/useDealAnimation';
+import { useHandLayoutTween } from '@/app/shared/hooks/useHandLayoutTween';
+import { DealLayer, type DealSpriteSpec } from '@/app/shared/components/DealLayer';
 import {
   GameCardNode,
   CardBackShape,
@@ -596,6 +599,55 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myLobIds);
   const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppLobIds);
 
+  // ---- "The deal" — flying-card animation when my cards move deck → hand ----
+  // (turn-start auto-draw, Draw button, draw N/bottom/random.) Snapshot is
+  // id+zone only; diffing happens inside the hook.
+  const myCardZoneSnapshot = useMemo(() => {
+    const flat: { id: string; zone: string }[] = [];
+    for (const [zone, zoneCards] of Object.entries(myCards)) {
+      for (const c of zoneCards) flat.push({ id: String(c.id), zone });
+    }
+    return flat;
+  }, [myCards]);
+  // Opening-hand deal: fires once when the pregame begins (hands are dealt
+  // server-side at create/join, so the rows are already in the client cache;
+  // the deal plays under the dice-roll overlay). The 'playing' branch covers a
+  // canvas that mounts moments after start; the same key value across
+  // pregame → playing means it can't fire twice. Later reloads/reconnects get
+  // null — no replay.
+  const openingDealKey = useMemo(() => {
+    const g = gameState.game;
+    if (!g) return null;
+    if (g.status === 'pregame') return `opening-${String(g.id)}`;
+    if (g.status !== 'playing') return null;
+    const startedMicros = g.playingStartedAtMicros ?? 0n;
+    if (startedMicros === 0n) return null;
+    const startedMs = Number(startedMicros / 1000n);
+    return Date.now() - startedMs < 20_000 ? `opening-${String(g.id)}` : null;
+  }, [gameState.game]);
+  const {
+    deals: activeDeals,
+    dealingIds,
+    glowIds: dealGlowIds,
+    completeDeal,
+  } = useDealAnimation(myCardZoneSnapshot, viewerKind !== 'spectator', openingDealKey);
+
+  // Opponent's draws get the same deal — card backs flying from their deck
+  // pile to their hand strip. No face image ever (hidden info), no glow (their
+  // strip renders plain backs).
+  const oppCardZoneSnapshot = useMemo(() => {
+    const flat: { id: string; zone: string }[] = [];
+    for (const [zone, zoneCards] of Object.entries(opponentCards)) {
+      for (const c of zoneCards) flat.push({ id: String(c.id), zone });
+    }
+    return flat;
+  }, [opponentCards]);
+  const {
+    deals: oppActiveDeals,
+    dealingIds: oppDealingIds,
+    completeDeal: completeOppDeal,
+  } = useDealAnimation(oppCardZoneSnapshot, viewerKind !== 'spectator', openingDealKey);
+
   // ---- Lost Soul cinematic — combined across both players ----
   // Combine my + opp LOB Lost Souls into one input so simultaneous arrivals
   // share a single cinematic moment rather than triggering two overlays.
@@ -983,6 +1035,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   >(null);
   const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
   const [deckDrop, setDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
+
+  // Dragged node left sitting on the deck pile while a deck-drop popup is
+  // open. Committing an option discards it (the reducer moves the row into
+  // the deck); cancel/exchange glides it back home. Null for popups opened
+  // from modal drags — those have no canvas node to hold.
+  const deckDropHoldRef = useRef<{ cardId: string; glideBack: () => void; discard: () => void } | null>(null);
+  // Deferred group-drag settle (destroy ghost, re-show followers). Scheduled
+  // as a microtask at drag end; a deck-pile drop claims it within the same
+  // tick so the ghost stack can wait on the pile instead.
+  const pendingGroupSettleRef = useRef<(() => void) | null>(null);
+  const releaseDeckHold = useCallback((action: 'commit' | 'glide') => {
+    const hold = deckDropHoldRef.current;
+    deckDropHoldRef.current = null;
+    if (!hold) return;
+    if (action === 'commit') hold.discard();
+    else hold.glideBack();
+  }, []);
   // Paragon: drop popup when a card is dragged onto the soul deck pile —
   // lets the player choose top / bottom / shuffle in.
   const [soulDeckDrop, setSoulDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
@@ -2109,6 +2178,27 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
   }, []);
 
+  // Smooth hand re-layout: when cards enter/leave the hand the remaining
+  // cards glide to their shifted slots instead of snapping.
+  const myHandSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    const cards = myCards['hand'] ?? [];
+    if (!myHandRect || cards.length === 0) return m;
+    const pos = calculateHandPositions(
+      cards.length,
+      myHandRect,
+      handCardWidth,
+      handCardHeight,
+      viewerKind === 'spectator' ? true : isSpreadHand,
+    );
+    cards.forEach((c, i) => {
+      const p = pos[i];
+      if (p) m.set(String(c.id), p);
+    });
+    return m;
+  }, [myCards, myHandRect, handCardWidth, handCardHeight, viewerKind, isSpreadHand]);
+  useHandLayoutTween(myHandSlots, cardNodeRefs);
+
   // Multi-card drag: offsets of follower cards relative to the dragged card
   const dragFollowerOffsets = useRef<Map<string, { dx: number; dy: number }> | null>(null);
   // Ghost image for multi-card drag — a single rasterized snapshot of all followers
@@ -3163,6 +3253,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       dragOriginalZIndexRef.current = null;
       dragHoverZoneRef.current = null;
       dragFollowerOffsets.current = null;
+      const ghostOffset = dragGhostOffsetRef.current;
       dragGhostOffsetRef.current = null;
       setDragHoverZone(null);
 
@@ -3170,18 +3261,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const gameLayer = gameLayerRef.current;
       if (gameLayer) gameLayer.listening(true);
 
-      // Clean up ghost image and restore card visibility
-      if (dragGhostRef.current) {
-        dragGhostRef.current.destroy();
-        dragGhostRef.current = null;
-        dragGhostLayerRef.current?.batchDraw();
-      }
-      // Restore follower visibility
-      if (followerOffsets) {
-        for (const [id] of followerOffsets) {
-          const fNode = cardNodeRefs.current.get(id);
-          if (fNode) fNode.visible(true);
-        }
+      // Group-drag visuals (ghost + hidden followers): normally settled
+      // immediately, but a drop onto a deck pile claims them within this
+      // tick (holdOnPile) so the stack waits on the pile while the popup
+      // is open.
+      const heldGhost = dragGhostRef.current;
+      dragGhostRef.current = null;
+      const heldFollowerIds = followerOffsets ? [...followerOffsets.keys()] : [];
+      if (heldGhost || heldFollowerIds.length > 0) {
+        pendingGroupSettleRef.current = () => {
+          if (heldGhost) {
+            heldGhost.destroy();
+            dragGhostLayerRef.current?.batchDraw();
+          }
+          for (const id of heldFollowerIds) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) fNode.visible(true);
+          }
+        };
+        queueMicrotask(() => {
+          pendingGroupSettleRef.current?.();
+          pendingGroupSettleRef.current = null;
+        });
       }
 
       const node = e.target;
@@ -3622,6 +3723,94 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const isDeckDropWithPopup = targetZone === 'deck' && stageRef.current;
       const isSoulDeckDropWithPopup = targetZone === 'soul-deck' && hit.owner === 'shared' && stageRef.current;
 
+      // Hold the dragged node where it was dropped (on the pile) while a
+      // deck-drop popup is open. Committing an option discards the node (the
+      // move re-renders the card inside the deck); canceling glides it home
+      // via the deferred snapBack. For group drags the ghost stack + hidden
+      // followers are claimed too, so the whole pile waits together.
+      const holdOnPile = () => {
+        let group: {
+          ghost: Konva.Image | null;
+          ghostHome: { x: number; y: number } | null;
+          followerIds: string[];
+        } | null = null;
+        if (pendingGroupSettleRef.current) {
+          pendingGroupSettleRef.current = null; // claim — the settle microtask no-ops
+          group = {
+            ghost: heldGhost,
+            ghostHome:
+              ghostOffset && originalPos
+                ? { x: originalPos.x + ghostOffset.dx, y: originalPos.y + ghostOffset.dy }
+                : null,
+            followerIds: heldFollowerIds,
+          };
+        }
+        const settleGroup = (reshowFollowers: boolean) => {
+          if (!group) return;
+          if (group.ghost) {
+            group.ghost.destroy();
+            dragGhostLayerRef.current?.batchDraw();
+          }
+          if (reshowFollowers) {
+            for (const id of group.followerIds) {
+              const fNode = cardNodeRefs.current.get(id);
+              if (fNode) fNode.visible(true);
+            }
+          }
+        };
+        deckDropHoldRef.current = {
+          cardId: String(cardId),
+          glideBack: () => {
+            if (node.getStage()) {
+              const abs = node.absolutePosition();
+              snapBack();
+              const homeX = node.x();
+              const homeY = node.y();
+              node.absolutePosition(abs);
+              new KonvaLib.Tween({
+                node,
+                duration: 0.2,
+                x: homeX,
+                y: homeY,
+                easing: KonvaLib.Easings.EaseOut,
+              }).play();
+            }
+            if (group?.ghost && group.ghostHome && group.ghost.getStage()) {
+              new KonvaLib.Tween({
+                node: group.ghost,
+                duration: 0.2,
+                x: group.ghostHome.x,
+                y: group.ghostHome.y,
+                easing: KonvaLib.Easings.EaseOut,
+                onFinish: () => settleGroup(true),
+              }).play();
+            } else {
+              settleGroup(true);
+            }
+          },
+          discard: () => {
+            if (cardNodeRefs.current.get(card.instanceId) === node) {
+              cardNodeRefs.current.delete(card.instanceId);
+            }
+            node.destroy();
+            // Followers stay hidden — the reducer moves their rows into the
+            // deck and the nodes unmount with the subscription update.
+            // Failsafe: re-show any node still around (e.g. rejected move).
+            if (group && group.followerIds.length > 0) {
+              const ids = group.followerIds;
+              setTimeout(() => {
+                for (const id of ids) {
+                  const fNode = cardNodeRefs.current.get(id);
+                  if (fNode) fNode.visible(true);
+                }
+              }, 5000);
+            }
+            settleGroup(false);
+            gameLayerRef.current?.batchDraw();
+          },
+        };
+      };
+
       if (isSoulDeckDropWithPopup) {
         if (followerOffsets && originalPos) {
           for (const [id, offset] of followerOffsets) {
@@ -3632,7 +3821,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             }
           }
         }
-        snapBack();
+        holdOnPile();
         const stage = stageRef.current;
         if (stage) {
           const screenPos = virtualToScreen(center.x, center.y, scale, offsetX, offsetY);
@@ -3647,9 +3836,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
 
       if (isDeckDropWithPopup) {
-        // Deck drop: snap card back to original position while popup is open.
-        // The reducer will fire when the user picks an option, and the
-        // subscription update will properly move the card.
+        // Deck drop: the card waits on the pile while the popup is open.
+        // The reducer fires when the user picks an option; cancel glides the
+        // card back to where it came from. Followers return home now.
         if (followerOffsets && originalPos) {
           for (const [id, offset] of followerOffsets) {
             const fNode = cardNodeRefs.current.get(id);
@@ -3659,7 +3848,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             }
           }
         }
-        snapBack();
+        holdOnPile();
       } else {
         // Non-deck zone: destroy the reparented node so React-Konva creates
         // a fresh node in the correct parent Group with correct dimensions.
@@ -4098,6 +4287,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     return { hostPositions, accessoryPositions };
   }, [sharedCards, mpLayout, lobCard.cardWidth, lobCard.cardHeight]);
+
+  // Smooth LOB re-layout: when a soul is rescued/removed the remaining cards
+  // glide to their new slots instead of snapping. Rotation matches each
+  // strip's render (mine/shared 0°, opponent's 180°).
+  const lobSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    for (const [id, p] of myLobLayout.hostPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
+    for (const [id, p] of myLobLayout.accessoryPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
+    for (const [id, p] of opponentLobLayout.hostPositions) m.set(id, { x: p.x, y: p.y, rotation: 180 });
+    for (const [id, p] of opponentLobLayout.accessoryPositions) m.set(id, { x: p.x, y: p.y, rotation: 180 });
+    for (const [id, p] of sharedLobLayout.hostPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
+    for (const [id, p] of sharedLobLayout.accessoryPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
+    return m;
+  }, [myLobLayout, opponentLobLayout, sharedLobLayout]);
+  useHandLayoutTween(lobSlots, cardNodeRefs);
 
   // ---- Derive per-accessory screen positions + seam (for detach overlay) ----
   // Accessories (weapons in territory, sites in LOB) don't use their own posX/
@@ -6032,7 +6236,34 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
             const oppHandViewerKind: ViewerKind = viewerKind === 'spectator' ? 'spectator' : 'opponent';
 
+            // Opponent deal sprites — rendered OUTSIDE the clipped strip group
+            // below, so the flight from their deck pile stays visible.
+            const oppDeckRect = opponentZones['deck'];
+            const oppDealSprites: DealSpriteSpec[] = [];
+            if (oppDeckRect && oppActiveDeals.length > 0) {
+              const originScale = oppHandCard.cardWidth > 0 ? pileCardWidth / oppHandCard.cardWidth : 1;
+              for (const deal of oppActiveDeals) {
+                const idx = opponentHandCards.findIndex(c => String(c.id) === deal.instanceId);
+                if (idx === -1) continue;
+                const dealPos = oppHandPositions[idx];
+                if (!dealPos) continue;
+                oppDealSprites.push({
+                  deal,
+                  origin: {
+                    x: oppDeckRect.x + oppDeckRect.width / 2 - (oppHandCard.cardWidth * originScale) / 2,
+                    y: oppDeckRect.y + oppDeckRect.height / 2 - (oppHandCard.cardHeight * originScale) / 2,
+                  },
+                  originScale,
+                  target: { x: dealPos.x, y: dealPos.y, rotation: dealPos.rotation },
+                  cardWidth: oppHandCard.cardWidth,
+                  cardHeight: oppHandCard.cardHeight,
+                  image: undefined,
+                });
+              }
+            }
+
             return (
+              <>
               <Group
                 clipX={opponentHandRect!.x}
                 clipY={opponentHandRect!.y}
@@ -6049,6 +6280,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               >
                 {oppHandPositions.map((pos, i) => {
                   const card = opponentHandCards[i];
+                  // Mid-deal: the sprite is flying — keep the slot reserved
+                  // but don't render the real card back yet.
+                  if (card && oppDealingIds.has(String(card.id))) return null;
                   const nowMicros = BigInt(Date.now()) * 1000n;
                   if (card && isHandCardFaceVisible(card, oppHandViewerKind, gameState.opponentPlayer, nowMicros)) {
                     const gameCard = adaptCard(card, 'player2');
@@ -6083,6 +6317,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   );
                 })}
               </Group>
+              <DealLayer sprites={oppDealSprites} onLanded={completeOppDeal} />
+              </>
             );
           })()}
 
@@ -6106,11 +6342,42 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             // the player has shared it with spectators (or a per-card flash).
             const myHandViewerKind: ViewerKind = viewerKind === 'spectator' ? 'spectator' : 'self';
 
+            // "The deal" sprites — one per in-flight draw, flying from the
+            // deck pile to the slot the real (hidden) card already reserves.
+            const deckRect = myZones['deck'];
+            const dealSprites: DealSpriteSpec[] = [];
+            if (deckRect && activeDeals.length > 0) {
+              const originScale = handCardWidth > 0 ? pileCardWidth / handCardWidth : 1;
+              for (const deal of activeDeals) {
+                const idx = handCards.findIndex(c => String(c.id) === deal.instanceId);
+                if (idx === -1) continue;
+                const dealPos = positions[idx];
+                if (!dealPos) continue;
+                dealSprites.push({
+                  deal,
+                  origin: {
+                    x: deckRect.x + deckRect.width / 2 - (handCardWidth * originScale) / 2,
+                    y: deckRect.y + deckRect.height / 2 - (handCardHeight * originScale) / 2,
+                  },
+                  originScale,
+                  target: { x: dealPos.x, y: dealPos.y, rotation: dealPos.rotation },
+                  cardWidth: handCardWidth,
+                  cardHeight: handCardHeight,
+                  image: getCardImage(handCards[idx]),
+                });
+              }
+            }
+
             return (
               <Group>
                 {handCards.map((card, i) => {
                   const pos = positions[i];
                   if (!pos) return null;
+                  const idStr = String(card.id);
+                  // Card is mid-deal: its DealLayer sprite is flying — don't
+                  // render the real node yet (positions[] still reserves its
+                  // slot in the fan).
+                  if (dealingIds.has(idStr)) return null;
                   if (myHandViewerKind === 'spectator') {
                     const nowMicros = BigInt(Date.now()) * 1000n;
                     if (!isHandCardFaceVisible(card, 'spectator', gameState.myPlayer, nowMicros)) {
@@ -6124,7 +6391,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   const gameCard = adaptCard(card, 'player1');
                   return (
                     <GameCardNode
-                      key={String(card.id)}
+                      key={idStr}
                       card={gameCard}
                       x={pos.x}
                       y={pos.y}
@@ -6133,9 +6400,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       cardHeight={handCardHeight}
                       image={getCardImage(card)}
                       {...(getTargetingProps(gameCard) ?? {})}
-                      isSelected={isSelected(String(card.id))}
+                      isSelected={isSelected(idStr)}
                       isDraggable={!isSpectator}
-                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                      hoverProgress={hoveredInstanceId === idStr ? hoverProgress : 0}
+                      lobArrivalGlow={dealGlowIds.has(idStr)}
                       suppressRevealRing
                       nodeRef={registerCardNode}
                       onClick={handleCardClick}
@@ -6149,6 +6417,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     />
                   );
                 })}
+                <DealLayer sprites={dealSprites} onLanded={completeDeal} />
               </Group>
             );
           })()}
@@ -6744,6 +7013,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             x={deckDrop.x}
             y={deckDrop.y}
             onShuffleIn={() => {
+              releaseDeckHold('commit');
               if (ids.length === 1) {
                 multiplayerActions.shuffleCardIntoDeck(ids[0]);
               } else {
@@ -6753,15 +7023,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               setDeckDrop(null);
             }}
             onTopDeck={() => {
+              releaseDeckHold('commit');
               for (const id of ids) multiplayerActions.moveCardToTopOfDeck(id);
               setDeckDrop(null);
             }}
             onBottomDeck={() => {
+              releaseDeckHold('commit');
               for (const id of ids) multiplayerActions.moveCardToBottomOfDeck(id);
               setDeckDrop(null);
             }}
-            onExchange={!isBatch ? () => { setDeckDrop(null); setExchangeState({ cardIds: [deckDrop.cardId], targetZone: 'deck' }); } : undefined}
-            onCancel={() => setDeckDrop(null)}
+            onExchange={!isBatch ? () => { releaseDeckHold('glide'); setDeckDrop(null); setExchangeState({ cardIds: [deckDrop.cardId], targetZone: 'deck' }); } : undefined}
+            onCancel={() => { releaseDeckHold('glide'); setDeckDrop(null); }}
           />
         );
       })()}
@@ -6781,18 +7053,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 gameState.moveCardsBatch(JSON.stringify(ids), 'soul-deck');
               }
               gameState.shuffleSoulDeck();
+              releaseDeckHold('commit');
               setSoulDeckDrop(null);
             }}
             onTopDeck={() => {
+              releaseDeckHold('commit');
               for (const id of ids) gameState.moveCard(BigInt(id), 'soul-deck', '0');
               setSoulDeckDrop(null);
             }}
             onBottomDeck={() => {
+              releaseDeckHold('commit');
               for (const id of ids) gameState.moveCard(BigInt(id), 'soul-deck');
               setSoulDeckDrop(null);
             }}
-            onExchange={!isBatch ? () => { setSoulDeckDrop(null); setExchangeState({ cardIds: [soulDeckDrop.cardId], targetZone: 'soul-deck' }); } : undefined}
-            onCancel={() => setSoulDeckDrop(null)}
+            onExchange={!isBatch ? () => { releaseDeckHold('glide'); setSoulDeckDrop(null); setExchangeState({ cardIds: [soulDeckDrop.cardId], targetZone: 'soul-deck' }); } : undefined}
+            onCancel={() => { releaseDeckHold('glide'); setSoulDeckDrop(null); }}
           />
         );
       })()}
