@@ -63,6 +63,37 @@ describe("playerProfile shape", () => {
   });
 });
 
+describe("playerProfile career history fieldSize", () => {
+  it("counts distinct Round 1 participants when match data exists, independent of drops before standings", () => {
+    const key = "2025_T1 2-Player";
+    const [year, format] = [2025, "T1 2-Player"];
+    const expected = new Set<string>();
+    for (const m of data.matches[key]) {
+      if (m.round !== "Round 1") continue;
+      for (const n of [m.playerA, m.playerB]) {
+        if (n && n.toLowerCase() !== "bye") expected.add(n);
+      }
+    }
+    // Field size (Round 1 attendance) should exceed the results/standings
+    // row count whenever players dropped before final standings.
+    expect(expected.size).toBeGreaterThan(data.results[key].length);
+
+    const player = data.results[key][0].playerName;
+    const p = playerProfile(data, player);
+    const entry = p.placements.find((h) => h.year === year && h.format === format);
+    expect(entry?.fieldSize).toBe(expected.size);
+  });
+
+  it("is null when no match data exists for that year+format", () => {
+    const key = "2016_T1 Multiplayer";
+    expect(data.matches[key]).toBeUndefined();
+    const player = data.results[key][0].playerName;
+    const p = playerProfile(data, player);
+    const entry = p.placements.find((h) => h.year === 2016 && h.format === "T1 Multiplayer");
+    expect(entry?.fieldSize).toBeNull();
+  });
+});
+
 describe("headToHead", () => {
   it("returns empty matches when players never met", () => {
     const h2h = headToHead(data, "NOBODY_A", "NOBODY_B");

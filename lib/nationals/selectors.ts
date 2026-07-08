@@ -104,6 +104,28 @@ export interface CareerHistoryEntry {
   deck: string;
   record: string;
   notes: string;
+  /** Distinct players who played Round 1 that year+format, or null if no match data exists for that key. */
+  fieldSize: number | null;
+}
+
+/**
+ * Counts distinct participants in a format's Round 1, from match data.
+ * Round 1 is used (rather than the results/standings list) because some
+ * entrants drop before final standings are recorded, undercounting the
+ * true field size; Round 1 attendance isn't affected by drops.
+ * Returns null when no match data exists for the key (older years, or
+ * multiplayer formats that aren't tracked in the matches map).
+ */
+function countRoundOneField(matches: MatchEntry[] | undefined): number | null {
+  if (!matches) return null;
+  const names = new Set<string>();
+  for (const m of matches) {
+    if (m.round !== "Round 1") continue;
+    for (const n of [m.playerA, m.playerB]) {
+      if (n && n.toLowerCase() !== "bye") names.add(n);
+    }
+  }
+  return names.size > 0 ? names.size : null;
 }
 
 /** A match entry enriched with year and format (derived from the matches map key). */
@@ -231,7 +253,10 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
     const year = parseInt(key.slice(0, i), 10);
     const fmt = key.slice(i + 1);
     const r = results.find((x) => x.playerName === name);
-    if (r) placements.push({ year, format: fmt, ...r });
+    if (r) {
+      const fieldSize = countRoundOneField(seed.matches[key]);
+      placements.push({ year, format: fmt, ...r, fieldSize });
+    }
   }
   placements.sort((a, b) => b.year - a.year);
 

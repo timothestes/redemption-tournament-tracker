@@ -569,6 +569,9 @@ export function PlayerProfileView({
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Place
                   </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Field
+                  </th>
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">
                     Deck
                   </th>
@@ -598,6 +601,9 @@ export function PlayerProfileView({
                       ) : (
                         "—"
                       )}
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">
+                      {h.fieldSize != null ? `${h.fieldSize} players` : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">
                       {h.deck || "—"}
