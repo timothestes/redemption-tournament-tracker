@@ -15,6 +15,8 @@ import {
 import { toScreenPos, toDbPos, cardCenter, adjustAnchorForRotationChange } from '../utils/coordinateTransforms';
 import { calculateHandPositions, HAND_TOOLBAR_RESERVE } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
+import { useDealAnimation } from '../hooks/useDealAnimation';
+import { DealLayer, type DealSpriteSpec } from './DealLayer';
 import {
   GameCardNode,
   CardBackShape,
@@ -595,6 +597,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   );
   const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myLobIds);
   const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppLobIds);
+
+  // ---- "The deal" — flying-card animation when my cards move deck → hand ----
+  // (turn-start auto-draw, Draw button, draw N/bottom/random.) Snapshot is
+  // id+zone only; diffing happens inside the hook.
+  const myCardZoneSnapshot = useMemo(() => {
+    const flat: { id: string; zone: string }[] = [];
+    for (const [zone, zoneCards] of Object.entries(myCards)) {
+      for (const c of zoneCards) flat.push({ id: String(c.id), zone });
+    }
+    return flat;
+  }, [myCards]);
+  const {
+    deals: activeDeals,
+    dealingIds,
+    glowIds: dealGlowIds,
+    completeDeal,
+  } = useDealAnimation(myCardZoneSnapshot, viewerKind !== 'spectator');
 
   // ---- Lost Soul cinematic — combined across both players ----
   // Combine my + opp LOB Lost Souls into one input so simultaneous arrivals
@@ -6106,11 +6125,42 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             // the player has shared it with spectators (or a per-card flash).
             const myHandViewerKind: ViewerKind = viewerKind === 'spectator' ? 'spectator' : 'self';
 
+            // "The deal" sprites — one per in-flight draw, flying from the
+            // deck pile to the slot the real (hidden) card already reserves.
+            const deckRect = myZones['deck'];
+            const dealSprites: DealSpriteSpec[] = [];
+            if (deckRect && activeDeals.length > 0) {
+              const originScale = handCardWidth > 0 ? pileCardWidth / handCardWidth : 1;
+              for (const deal of activeDeals) {
+                const idx = handCards.findIndex(c => String(c.id) === deal.instanceId);
+                if (idx === -1) continue;
+                const dealPos = positions[idx];
+                if (!dealPos) continue;
+                dealSprites.push({
+                  deal,
+                  origin: {
+                    x: deckRect.x + deckRect.width / 2 - (handCardWidth * originScale) / 2,
+                    y: deckRect.y + deckRect.height / 2 - (handCardHeight * originScale) / 2,
+                  },
+                  originScale,
+                  target: { x: dealPos.x, y: dealPos.y, rotation: dealPos.rotation },
+                  cardWidth: handCardWidth,
+                  cardHeight: handCardHeight,
+                  image: getCardImage(handCards[idx]),
+                });
+              }
+            }
+
             return (
               <Group>
                 {handCards.map((card, i) => {
                   const pos = positions[i];
                   if (!pos) return null;
+                  const idStr = String(card.id);
+                  // Card is mid-deal: its DealLayer sprite is flying — don't
+                  // render the real node yet (positions[] still reserves its
+                  // slot in the fan).
+                  if (dealingIds.has(idStr)) return null;
                   if (myHandViewerKind === 'spectator') {
                     const nowMicros = BigInt(Date.now()) * 1000n;
                     if (!isHandCardFaceVisible(card, 'spectator', gameState.myPlayer, nowMicros)) {
@@ -6124,7 +6174,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   const gameCard = adaptCard(card, 'player1');
                   return (
                     <GameCardNode
-                      key={String(card.id)}
+                      key={idStr}
                       card={gameCard}
                       x={pos.x}
                       y={pos.y}
@@ -6133,9 +6183,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       cardHeight={handCardHeight}
                       image={getCardImage(card)}
                       {...(getTargetingProps(gameCard) ?? {})}
-                      isSelected={isSelected(String(card.id))}
+                      isSelected={isSelected(idStr)}
                       isDraggable={!isSpectator}
-                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                      hoverProgress={hoveredInstanceId === idStr ? hoverProgress : 0}
+                      lobArrivalGlow={dealGlowIds.has(idStr)}
                       suppressRevealRing
                       nodeRef={registerCardNode}
                       onClick={handleCardClick}
@@ -6149,6 +6200,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     />
                   );
                 })}
+                <DealLayer sprites={dealSprites} onLanded={completeDeal} />
               </Group>
             );
           })()}
