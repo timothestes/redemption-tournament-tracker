@@ -631,6 +631,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     completeDeal,
   } = useDealAnimation(myCardZoneSnapshot, viewerKind !== 'spectator', openingDealKey);
 
+  // Opponent's draws get the same deal — card backs flying from their deck
+  // pile to their hand strip. No face image ever (hidden info), no glow (their
+  // strip renders plain backs).
+  const oppCardZoneSnapshot = useMemo(() => {
+    const flat: { id: string; zone: string }[] = [];
+    for (const [zone, zoneCards] of Object.entries(opponentCards)) {
+      for (const c of zoneCards) flat.push({ id: String(c.id), zone });
+    }
+    return flat;
+  }, [opponentCards]);
+  const {
+    deals: oppActiveDeals,
+    dealingIds: oppDealingIds,
+    completeDeal: completeOppDeal,
+  } = useDealAnimation(oppCardZoneSnapshot, viewerKind !== 'spectator', openingDealKey);
+
   // ---- Lost Soul cinematic — combined across both players ----
   // Combine my + opp LOB Lost Souls into one input so simultaneous arrivals
   // share a single cinematic moment rather than triggering two overlays.
@@ -6067,7 +6083,34 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
             const oppHandViewerKind: ViewerKind = viewerKind === 'spectator' ? 'spectator' : 'opponent';
 
+            // Opponent deal sprites — rendered OUTSIDE the clipped strip group
+            // below, so the flight from their deck pile stays visible.
+            const oppDeckRect = opponentZones['deck'];
+            const oppDealSprites: DealSpriteSpec[] = [];
+            if (oppDeckRect && oppActiveDeals.length > 0) {
+              const originScale = oppHandCard.cardWidth > 0 ? pileCardWidth / oppHandCard.cardWidth : 1;
+              for (const deal of oppActiveDeals) {
+                const idx = opponentHandCards.findIndex(c => String(c.id) === deal.instanceId);
+                if (idx === -1) continue;
+                const dealPos = oppHandPositions[idx];
+                if (!dealPos) continue;
+                oppDealSprites.push({
+                  deal,
+                  origin: {
+                    x: oppDeckRect.x + oppDeckRect.width / 2 - (oppHandCard.cardWidth * originScale) / 2,
+                    y: oppDeckRect.y + oppDeckRect.height / 2 - (oppHandCard.cardHeight * originScale) / 2,
+                  },
+                  originScale,
+                  target: { x: dealPos.x, y: dealPos.y, rotation: dealPos.rotation },
+                  cardWidth: oppHandCard.cardWidth,
+                  cardHeight: oppHandCard.cardHeight,
+                  image: undefined,
+                });
+              }
+            }
+
             return (
+              <>
               <Group
                 clipX={opponentHandRect!.x}
                 clipY={opponentHandRect!.y}
@@ -6084,6 +6127,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               >
                 {oppHandPositions.map((pos, i) => {
                   const card = opponentHandCards[i];
+                  // Mid-deal: the sprite is flying — keep the slot reserved
+                  // but don't render the real card back yet.
+                  if (card && oppDealingIds.has(String(card.id))) return null;
                   const nowMicros = BigInt(Date.now()) * 1000n;
                   if (card && isHandCardFaceVisible(card, oppHandViewerKind, gameState.opponentPlayer, nowMicros)) {
                     const gameCard = adaptCard(card, 'player2');
@@ -6118,6 +6164,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   );
                 })}
               </Group>
+              <DealLayer sprites={oppDealSprites} onLanded={completeOppDeal} />
+              </>
             );
           })()}
 
