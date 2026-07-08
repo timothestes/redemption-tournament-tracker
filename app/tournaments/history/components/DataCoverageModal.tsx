@@ -12,12 +12,12 @@ const FULL_DATA_ROWS: Array<[string, string]> = [
   ["T1 2-Player", "2003–present (all years)"],
   ["T2 2-Player", "2004–present (missing 2019)"],
   ["Sealed", "2003–present (missing 2004)"],
-  ["Booster Draft (2P)", "2005–present (missing 2015)"],
-  ["Teams", "2010–present (missing 2014)"],
+  ["Booster Draft (2P)", "2005–present (Booster Draft was multiplayer-only in 2015 — see Booster Draft (Multi) below)"],
+  ["Teams", "2010–present (all years)"],
   ["Type A", "2005–present (missing several years due to insufficient participation)"],
-  ["T1 Multiplayer", "2004–2021 (missing 2015; retired after 2021)"],
-  ["T2 Multiplayer", "2004–2021 (missing 2015; retired after 2021)"],
-  ["Booster Draft (Multi)", "2005–2017 (missing 2015; retired after 2017)"],
+  ["T1 Multiplayer", "2004–2021 (retired after 2021)"],
+  ["T2 Multiplayer", "2004–2021 (retired after 2021)"],
+  ["Booster Draft (Multi)", "2005–2017 (retired after 2017)"],
 ];
 
 export function DataCoverageModal({ open, onClose }: DataCoverageModalProps) {
