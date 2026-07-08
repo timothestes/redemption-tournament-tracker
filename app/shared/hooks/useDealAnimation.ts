@@ -1,12 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   diffDeals,
   scheduleDeals,
   DEAL_OPENING_STAGGER_MS,
   type DealCardSnapshot,
 } from './dealAnimationCore';
+
+// The deal diff must run BEFORE the browser paints: with a plain useEffect
+// there is one painted frame where freshly drawn cards sit fully laid out in
+// the hand, then vanish when the sprites spawn — a visible flash. SSR guard
+// only silences React's useLayoutEffect-on-server warning; both canvases are
+// client-only.
+const useBeforePaintEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export interface ActiveDeal {
   instanceId: string;
@@ -93,7 +100,7 @@ export function useDealAnimation(
     );
   }, []);
 
-  useEffect(() => {
+  useBeforePaintEffect(() => {
     const { dealt, nextZones } = diffDeals(prevZonesRef.current, cards);
     prevZonesRef.current = nextZones;
 

@@ -120,6 +120,10 @@ function DealSprite({
       y={spec.origin.y}
       scaleX={spec.originScale}
       scaleY={spec.originScale}
+      // Mounted hidden so the sprite can't paint at the deck pile before its
+      // launch effect runs. The prop value never changes, so react-konva never
+      // re-applies it — the imperative visible(true) at launch sticks.
+      visible={false}
       listening={false}
     >
       {/* offsetX/x pair recenters the flip axis on the card's vertical midline */}
