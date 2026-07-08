@@ -569,6 +569,14 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const maxSidebarCardHeight = sidebarZoneHeight - 28; // room for label + padding
   const sidebarCardHeight = Math.min(cardHeight, maxSidebarCardHeight);
   const sidebarCardWidth = Math.round(sidebarCardHeight / CARD_ASPECT_RATIO);
+  // Land of Bondage cards are capped to fit within the short LOB strip. Lost
+  // Souls are full-height cards; without this cap they render cropped by the
+  // zone clip. Mirrors the multiplayer layout's lobCard sizing (85% of zone).
+  const lobZoneHeight = zoneLayout['land-of-bondage']?.height ?? 0;
+  const lobCardHeight = lobZoneHeight > 0
+    ? Math.min(cardHeight, Math.round(lobZoneHeight * 0.85))
+    : cardHeight;
+  const lobCardWidth = Math.round(lobCardHeight / CARD_ASPECT_RATIO);
   // Virtual canvas is always 16:9 — no need to rotate sidebar piles
   const rotateSidebarPiles = false;
 
@@ -1007,7 +1015,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         const lobZone = zoneLayout['land-of-bondage'];
         if (lobZone) {
           const lobPositions = calculateAutoArrangePositions(
-            state.zones['land-of-bondage'].length, lobZone, cardWidth, cardHeight
+            state.zones['land-of-bondage'].length, lobZone, lobCardWidth, lobCardHeight
           );
           const idx = state.zones['land-of-bondage'].findIndex(c => c.instanceId === card.instanceId);
           if (idx !== -1 && lobPositions[idx]) {
@@ -1472,13 +1480,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     const cards = state.zones['land-of-bondage'] ?? [];
     const rect = zoneLayout['land-of-bondage'];
     if (!rect || cards.length === 0) return m;
-    const pos = calculateAutoArrangePositions(cards.length, rect, cardWidth, cardHeight);
+    const pos = calculateAutoArrangePositions(cards.length, rect, lobCardWidth, lobCardHeight);
     cards.forEach((c, i) => {
       const p = pos[i];
       if (p) m.set(c.instanceId, { x: p.x, y: p.y, rotation: 0 });
     });
     return m;
-  }, [state.zones['land-of-bondage'], zoneLayout, cardWidth, cardHeight]);
+  }, [state.zones['land-of-bondage'], zoneLayout, lobCardWidth, lobCardHeight]);
   useHandLayoutTween(lobSlots, cardNodeRefs);
 
   // Render all zones except hand
@@ -1560,10 +1568,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     // Land of bondage (auto-arrange)
     const lobZone = zoneLayout['land-of-bondage'];
     if (lobZone && state.zones['land-of-bondage'].length > 0) {
-      const lobPositions = calculateAutoArrangePositions(state.zones['land-of-bondage'].length, lobZone, cardWidth, cardHeight);
+      const lobPositions = calculateAutoArrangePositions(state.zones['land-of-bondage'].length, lobZone, lobCardWidth, lobCardHeight);
       state.zones['land-of-bondage'].forEach((card, i) => {
         const pos = lobPositions[i];
-        if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: 0 });
+        if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: lobCardWidth, height: lobCardHeight, rotation: 0 });
       });
     }
 
@@ -2247,7 +2255,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             // Land of Bondage: auto-arrange horizontal strip with drag-to-reorder
             if (zoneId === 'land-of-bondage') {
               const zone = zoneLayout[zoneId];
-              const lobPositions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
+              const lobPositions = calculateAutoArrangePositions(cards.length, zone, lobCardWidth, lobCardHeight);
               const lobClipProps = dragSourceZone === 'land-of-bondage'
                 ? {}
                 : { clipX: zone.x, clipY: zone.y, clipWidth: zone.width, clipHeight: zone.height };
@@ -2265,8 +2273,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         x={pos.x}
                         y={pos.y}
                         rotation={0}
-                        cardWidth={cardWidth}
-                        cardHeight={cardHeight}
+                        cardWidth={lobCardWidth}
+                        cardHeight={lobCardHeight}
                         image={getImage(card.cardImgFile)}
                         {...(getTargetingProps(card) ?? {})}
                         isSelected={selectedIds.has(card.instanceId)}
@@ -2465,7 +2473,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             const deck = zoneLayout['deck'];
             if (!lobZone || !deck) return null;
             const lobCards = state.zones['land-of-bondage'] ?? [];
-            const slots = calculateAutoArrangePositions(lobCards.length, lobZone, cardWidth, cardHeight);
+            const slots = calculateAutoArrangePositions(lobCards.length, lobZone, lobCardWidth, lobCardHeight);
             const deals: SoulDeal[] = [];
             for (const [id, seq] of soulDeals) {
               const idx = lobCards.findIndex(c => c.instanceId === id);
@@ -2475,10 +2483,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               deals.push({
                 id,
                 image: getImage(card.cardImgFile),
-                cardWidth,
-                cardHeight,
+                cardWidth: lobCardWidth,
+                cardHeight: lobCardHeight,
                 rotation: 0,
-                flight: computeDealFlight({ deck, slot, cardWidth, cardHeight, seq }),
+                flight: computeDealFlight({ deck, slot, cardWidth: lobCardWidth, cardHeight: lobCardHeight, seq }),
               });
             }
             return deals.length > 0
