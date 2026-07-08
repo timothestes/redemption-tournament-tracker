@@ -41,17 +41,18 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useLostSoulDeals } from '@/app/shared/hooks/useLostSoulDeals';
+import { LostSoulDealLayer, type SoulDeal } from '@/app/shared/components/LostSoulDealLayer';
+import { computeDealFlight } from '@/app/shared/utils/lostSoulDeal';
 import { useDealAnimation } from '@/app/shared/hooks/useDealAnimation';
 import { useHandLayoutTween } from '@/app/shared/hooks/useHandLayoutTween';
 import { DealLayer, type DealSpriteSpec } from '@/app/shared/components/DealLayer';
-import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
-import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePrompt';
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
-import { getEffectiveAbilities, isLostSoulCard, isHeroCard } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isLostSoulCard, isHeroCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
 import { Link2Off } from 'lucide-react';
 
@@ -79,12 +80,45 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // ---- Card sound effects (joke easter-egg, once per game) ----
   useCardSounds(state.zones['territory'] ?? [], state.sessionId);
 
-  // ---- LOB arrival glow effect ----
+  // ---- LOB arrival glow + Lost Soul "deal" animation ----
   const lobCardIds = useMemo(
     () => (state.zones['land-of-bondage'] ?? []).map(c => c.instanceId),
     [state.zones],
   );
-  const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
+  // Only Lost Souls fly; other LOB arrivals (attached sites) keep the plain glow.
+  const lobSoulIds = useMemo(
+    () => (state.zones['land-of-bondage'] ?? []).filter(isLostSoulCard).map(c => c.instanceId),
+    [state.zones['land-of-bondage']],
+  );
+  // Deck sources — a soul only flies from the deck if it was there last frame
+  // (a draw/route), not dragged in from hand/reserve/territory. `soul-deck`
+  // covers the Paragon format.
+  const deckSourceIds = useMemo(
+    () => [
+      ...(state.zones['deck'] ?? []),
+      ...(state.zones['soul-deck'] ?? []),
+    ].map(c => c.instanceId),
+    [state.zones['deck'], state.zones['soul-deck']],
+  );
+  const { inFlight: soulDeals, onLand: onSoulLand } = useLostSoulDeals(
+    lobSoulIds,
+    deckSourceIds,
+    true,
+    (newIds) => {
+      if (newIds.length === 1) {
+        const c = (state.zones['land-of-bondage'] ?? []).find(x => x.instanceId === newIds[0]);
+        showGameToast(`Lost Soul dealt: ${simplifyLostSoulName(c?.cardName ?? 'Lost Soul')}`);
+      } else if (newIds.length > 1) {
+        showGameToast(`${newIds.length} Lost Souls dealt`);
+      }
+    },
+  );
+  // Route the glow to *visible* ids so it fires on landing, not server placement.
+  const visibleLobIds = useMemo(
+    () => lobCardIds.filter(id => !soulDeals.has(id)),
+    [lobCardIds, soulDeals],
+  );
+  const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(visibleLobIds);
 
   // ---- "The deal" — flying-card animation when cards move deck → hand ----
   // (Draw button, draw N/bottom, ability draws.) Snapshot is id+zone only;
@@ -103,23 +137,6 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     glowIds: dealGlowIds,
     completeDeal,
   } = useDealAnimation(cardZoneSnapshot, true, state.sessionId);
-
-  // ---- Lost Soul cinematic — full-screen flourish on arrival ----
-  // Filter to actual Lost Souls (sites can be attached to LOB cards but they
-  // shouldn't trigger the cinematic). Caller filters; hook just detects arrivals.
-  // Dep is narrowed to the LOB array specifically so unrelated zone mutations
-  // (territory drags, hand shuffles, etc.) don't re-run this work.
-  const lobSouls = useMemo(() => {
-    const cards = state.zones['land-of-bondage'] ?? [];
-    return cards
-      .filter(c => isLostSoulCard(c))
-      .map(c => ({
-        instanceId: c.instanceId,
-        cardName: c.cardName,
-        imageUrl: getCardImageUrl(c.cardImgFile),
-      }));
-  }, [state.zones['land-of-bondage']]);
-  const { activeBatch: soulCinematic } = useLostSoulCinematic(lobSouls);
 
   // Drive 1s re-renders while any visible card has an active per-card reveal —
   // hand (30s flash) or reserve top (10s from Herod's Temple). Needed for the
@@ -563,6 +580,14 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const maxSidebarCardHeight = sidebarZoneHeight - 28; // room for label + padding
   const sidebarCardHeight = Math.min(cardHeight, maxSidebarCardHeight);
   const sidebarCardWidth = Math.round(sidebarCardHeight / CARD_ASPECT_RATIO);
+  // Land of Bondage cards are capped to fit within the short LOB strip. Lost
+  // Souls are full-height cards; without this cap they render cropped by the
+  // zone clip. Mirrors the multiplayer layout's lobCard sizing (85% of zone).
+  const lobZoneHeight = zoneLayout['land-of-bondage']?.height ?? 0;
+  const lobCardHeight = lobZoneHeight > 0
+    ? Math.min(cardHeight, Math.round(lobZoneHeight * 0.85))
+    : cardHeight;
+  const lobCardWidth = Math.round(lobCardHeight / CARD_ASPECT_RATIO);
   // Virtual canvas is always 16:9 — no need to rotate sidebar piles
   const rotateSidebarPiles = false;
 
@@ -1001,7 +1026,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         const lobZone = zoneLayout['land-of-bondage'];
         if (lobZone) {
           const lobPositions = calculateAutoArrangePositions(
-            state.zones['land-of-bondage'].length, lobZone, cardWidth, cardHeight
+            state.zones['land-of-bondage'].length, lobZone, lobCardWidth, lobCardHeight
           );
           const idx = state.zones['land-of-bondage'].findIndex(c => c.instanceId === card.instanceId);
           if (idx !== -1 && lobPositions[idx]) {
@@ -1466,13 +1491,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     const cards = state.zones['land-of-bondage'] ?? [];
     const rect = zoneLayout['land-of-bondage'];
     if (!rect || cards.length === 0) return m;
-    const pos = calculateAutoArrangePositions(cards.length, rect, cardWidth, cardHeight);
+    const pos = calculateAutoArrangePositions(cards.length, rect, lobCardWidth, lobCardHeight);
     cards.forEach((c, i) => {
       const p = pos[i];
       if (p) m.set(c.instanceId, { x: p.x, y: p.y, rotation: 0 });
     });
     return m;
-  }, [state.zones['land-of-bondage'], zoneLayout, cardWidth, cardHeight]);
+  }, [state.zones['land-of-bondage'], zoneLayout, lobCardWidth, lobCardHeight]);
   useHandLayoutTween(lobSlots, cardNodeRefs);
 
   // Render all zones except hand
@@ -1554,10 +1579,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     // Land of bondage (auto-arrange)
     const lobZone = zoneLayout['land-of-bondage'];
     if (lobZone && state.zones['land-of-bondage'].length > 0) {
-      const lobPositions = calculateAutoArrangePositions(state.zones['land-of-bondage'].length, lobZone, cardWidth, cardHeight);
+      const lobPositions = calculateAutoArrangePositions(state.zones['land-of-bondage'].length, lobZone, lobCardWidth, lobCardHeight);
       state.zones['land-of-bondage'].forEach((card, i) => {
         const pos = lobPositions[i];
-        if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: 0 });
+        if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: lobCardWidth, height: lobCardHeight, rotation: 0 });
       });
     }
 
@@ -2241,7 +2266,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             // Land of Bondage: auto-arrange horizontal strip with drag-to-reorder
             if (zoneId === 'land-of-bondage') {
               const zone = zoneLayout[zoneId];
-              const lobPositions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
+              const lobPositions = calculateAutoArrangePositions(cards.length, zone, lobCardWidth, lobCardHeight);
               const lobClipProps = dragSourceZone === 'land-of-bondage'
                 ? {}
                 : { clipX: zone.x, clipY: zone.y, clipWidth: zone.width, clipHeight: zone.height };
@@ -2250,6 +2275,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                   {cards.map((card, i) => {
                     const pos = lobPositions[i];
                     if (!pos) return null;
+                    // In flight → the flyer shows it; skip the settled node.
+                    if (soulDeals.has(card.instanceId)) return null;
                     return (
                       <GameCardNode
                         key={card.instanceId}
@@ -2257,8 +2284,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         x={pos.x}
                         y={pos.y}
                         rotation={0}
-                        cardWidth={cardWidth}
-                        cardHeight={cardHeight}
+                        cardWidth={lobCardWidth}
+                        cardHeight={lobCardHeight}
                         image={getImage(card.cardImgFile)}
                         {...(getTargetingProps(card) ?? {})}
                         isSelected={selectedIds.has(card.instanceId)}
@@ -2450,6 +2477,33 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               />
             );
           })}
+
+          {/* Lost Soul "deal" flyers — dealt from the deck into the LOB slot. */}
+          {(() => {
+            const lobZone = zoneLayout['land-of-bondage'];
+            const deck = zoneLayout['deck'];
+            if (!lobZone || !deck) return null;
+            const lobCards = state.zones['land-of-bondage'] ?? [];
+            const slots = calculateAutoArrangePositions(lobCards.length, lobZone, lobCardWidth, lobCardHeight);
+            const deals: SoulDeal[] = [];
+            for (const [id, seq] of soulDeals) {
+              const idx = lobCards.findIndex(c => c.instanceId === id);
+              const slot = idx >= 0 ? slots[idx] : undefined;
+              const card = idx >= 0 ? lobCards[idx] : undefined;
+              if (!slot || !card) continue;
+              deals.push({
+                id,
+                image: getImage(card.cardImgFile),
+                cardWidth: lobCardWidth,
+                cardHeight: lobCardHeight,
+                rotation: 0,
+                flight: computeDealFlight({ deck, slot, cardWidth: lobCardWidth, cardHeight: lobCardHeight, seq }),
+              });
+            }
+            return deals.length > 0
+              ? <LostSoulDealLayer deals={deals} onLand={onSoulLand} />
+              : null;
+          })()}
 
           {/* "The deal" sprites — card backs flying deck pile → hand slot */}
           {(() => {
@@ -3187,13 +3241,6 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       <GameToastContainer />
       <CardChoicePromptContainer />
       <DiceRollOverlay />
-
-      {soulCinematic && (
-        <LostSoulCinematic
-          key={soulCinematic.id}
-          souls={soulCinematic.souls}
-        />
-      )}
 
       {targeting && (
         <TargetCardOverlay

@@ -54,7 +54,7 @@ import { isHeroCard } from '@/lib/cards/cardAbilities';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
-import { getEffectiveAbilities, isLostSoulCard } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isLostSoulCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
@@ -76,8 +76,9 @@ import { useCardScale } from '@/app/shared/hooks/useCardScale';
 import { useCardSounds } from '@/app/shared/hooks/useCardSounds';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
-import { useLostSoulCinematic } from '@/app/shared/hooks/useLostSoulCinematic';
-import { LostSoulCinematic } from '@/app/shared/components/LostSoulCinematic';
+import { useLostSoulDeals } from '@/app/shared/hooks/useLostSoulDeals';
+import { LostSoulDealLayer, type SoulDeal } from '@/app/shared/components/LostSoulDealLayer';
+import { computeDealFlight } from '@/app/shared/utils/lostSoulDeal';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { cardInstanceToGameCard } from '../utils/cardAdapter';
 import { resolveCardImageUrl, type ForgeResolverMap } from '../utils/forgeResolver';
@@ -588,7 +589,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return { handCardWidth: cappedW, handCardHeight: cappedH };
   }, [myHandRect, cardWidth, cardHeight]);
 
-  // ---- LOB arrival glow effect ----
+  // ---- LOB arrival glow + Lost Soul "deal" animation ----
   const myLobIds = useMemo(
     () => (myCards['land-of-bondage'] ?? []).map(c => String(c.id)),
     [myCards],
@@ -597,8 +598,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     () => (opponentCards['land-of-bondage'] ?? []).map(c => String(c.id)),
     [opponentCards],
   );
-  const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myLobIds);
-  const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppLobIds);
 
   // ---- "The deal" — flying-card animation when my cards move deck → hand ----
   // (turn-start auto-draw, Draw button, draw N/bottom/random.) Snapshot is
@@ -649,32 +648,86 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     completeDeal: completeOppDeal,
   } = useDealAnimation(oppCardZoneSnapshot, viewerKind !== 'spectator', openingDealKey);
 
-  // ---- Lost Soul cinematic — combined across both players ----
-  // Combine my + opp LOB Lost Souls into one input so simultaneous arrivals
-  // share a single cinematic moment rather than triggering two overlays.
-  // Dep is narrowed to the LOB arrays so unrelated card mutations don't
-  // re-run this work.
-  const lobSoulsForCinematic = useMemo(() => {
-    const out: { instanceId: string; cardName: string; imageUrl: string }[] = [];
-    // Resolve through the Forge-aware resolver so `forge:<uuid>` refs become the
-    // cookie-authed proxy URL (matching the canvas preloader's cache key).
-    // getCardImageUrl alone returns '' for Forge refs → blank card + empty-src warning.
-    for (const c of (myCards['land-of-bondage'] ?? [])) {
-      if (!isLostSoulCard(c)) continue;
-      out.push({ instanceId: String(c.id), cardName: c.cardName, imageUrl: resolveCardImageUrl(c.cardImgFile, forgeResolver) });
-    }
-    for (const c of (opponentCards['land-of-bondage'] ?? [])) {
-      if (!isLostSoulCard(c)) continue;
-      out.push({ instanceId: String(c.id), cardName: c.cardName, imageUrl: resolveCardImageUrl(c.cardImgFile, forgeResolver) });
-    }
-    return out;
-  }, [myCards['land-of-bondage'], opponentCards['land-of-bondage'], forgeResolver]);
   // Gate detection until the subscription has applied AND we know who the
   // local player is — otherwise the initial SpacetimeDB push of pre-existing
   // LOB souls would register as "new arrivals" on game load / reconnect.
   const soulsHydrated = !gameState.isLoading && !!gameState.myPlayer;
-  const { activeBatch: soulCinematic } =
-    useLostSoulCinematic(lobSoulsForCinematic, soulsHydrated);
+
+  // Only Lost Souls fly; other LOB arrivals (attached sites) keep the plain glow.
+  const myLobSoulIds = useMemo(
+    () => (myCards['land-of-bondage'] ?? []).filter(isLostSoulCard).map(c => String(c.id)),
+    [myCards],
+  );
+  const oppLobSoulIds = useMemo(
+    () => (opponentCards['land-of-bondage'] ?? []).filter(isLostSoulCard).map(c => String(c.id)),
+    [opponentCards],
+  );
+  // id → display name, for the summarizing toast.
+  const lobSoulNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of (myCards['land-of-bondage'] ?? [])) m.set(String(c.id), c.cardName);
+    for (const c of (opponentCards['land-of-bondage'] ?? [])) m.set(String(c.id), c.cardName);
+    return m;
+  }, [myCards, opponentCards]);
+
+  const fireSoulToast = useCallback((newIds: string[]) => {
+    if (newIds.length === 1) {
+      const name = simplifyLostSoulName(lobSoulNameById.get(newIds[0]) ?? 'Lost Soul');
+      showGameToast(`Lost Soul dealt: ${name}`);
+    } else if (newIds.length > 1) {
+      showGameToast(`${newIds.length} Lost Souls dealt`);
+    }
+  }, [lobSoulNameById]);
+
+  // Deck-source ids gate the deal: a soul only flies from the deck if it was in
+  // the deck last frame (a draw/route), not dragged in from hand/reserve/etc.
+  const myDeckIds = useMemo(
+    () => (myCards['deck'] ?? []).map(c => String(c.id)),
+    [myCards],
+  );
+  const oppDeckIds = useMemo(
+    () => (opponentCards['deck'] ?? []).map(c => String(c.id)),
+    [opponentCards],
+  );
+  const { inFlight: myDeals, onLand: onMyLand } =
+    useLostSoulDeals(myLobSoulIds, myDeckIds, soulsHydrated, fireSoulToast);
+  const { inFlight: oppDeals, onLand: onOppLand } =
+    useLostSoulDeals(oppLobSoulIds, oppDeckIds, soulsHydrated, fireSoulToast);
+
+  // Route the glow to *visible* ids: a soul in flight is excluded until it lands,
+  // so the amber glow fires on landing rather than on server placement.
+  const myVisibleLobIds = useMemo(
+    () => myLobIds.filter(id => !myDeals.has(id)),
+    [myLobIds, myDeals],
+  );
+  const oppVisibleLobIds = useMemo(
+    () => oppLobIds.filter(id => !oppDeals.has(id)),
+    [oppLobIds, oppDeals],
+  );
+  const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myVisibleLobIds);
+  const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppVisibleLobIds);
+
+  // Paragon: souls live in the shared LOB and fly from the shared Soul Deck.
+  // (The old cinematic never fired here, so this is new arrival feedback; the
+  // shared LOB has no glow today and we keep it that way — deal + toast is the
+  // signal.)
+  const sharedLobSoulIds = useMemo(
+    () => (sharedCards['land-of-bondage'] ?? []).filter(isLostSoulCard).map(c => String(c.id)),
+    [sharedCards],
+  );
+  const sharedDeckIds = useMemo(
+    () => (sharedCards['soul-deck'] ?? []).map(c => String(c.id)),
+    [sharedCards],
+  );
+  const { inFlight: sharedDeals, onLand: onSharedLand } =
+    useLostSoulDeals(sharedLobSoulIds, sharedDeckIds, soulsHydrated, (newIds) => {
+      if (newIds.length === 1) {
+        const c = (sharedCards['land-of-bondage'] ?? []).find(x => String(x.id) === newIds[0]);
+        showGameToast(`Lost Soul dealt: ${simplifyLostSoulName(c?.cardName ?? 'Lost Soul')}`);
+      } else if (newIds.length > 1) {
+        showGameToast(`${newIds.length} Lost Souls dealt`);
+      }
+    });
 
   // ---- Hand → play prompt for cards with `set_card_outline` abilities ----
   // Three Woes is the v1 target. The choice routes through the same
@@ -5302,6 +5355,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             for (const host of hosts) {
               const hostPos = myLobLayout.hostPositions.get(String(host.id));
               if (!hostPos) continue;
+              // In flight → the flyer shows it; skip the settled node this frame.
+              if (myDeals.has(String(host.id))) continue;
               const attached = accessoriesByHost.get(host.id) ?? [];
               for (const accessory of attached) {
                 const pos = myLobLayout.accessoryPositions.get(String(accessory.id));
@@ -5376,6 +5431,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             for (const host of hosts) {
               const hostPos = opponentLobLayout.hostPositions.get(String(host.id));
               if (!hostPos) continue;
+              if (oppDeals.has(String(host.id))) continue;
               const attached = accessoriesByHost.get(host.id) ?? [];
               for (const accessory of attached) {
                 const pos = opponentLobLayout.accessoryPositions.get(String(accessory.id));
@@ -5447,6 +5503,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             for (const host of hosts) {
               const hostPos = sharedLobLayout.hostPositions.get(String(host.id));
               if (!hostPos) continue;
+              if (sharedDeals.has(String(host.id))) continue;
               const attached = accessoriesByHost.get(host.id) ?? [];
               for (const accessory of attached) {
                 const pos = sharedLobLayout.accessoryPositions.get(String(accessory.id));
@@ -6399,6 +6456,89 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 <DealLayer sprites={dealSprites} onLanded={completeDeal} />
               </Group>
             );
+          })()}
+
+          {/* ================================================================
+              Lost Soul "deal" flyers — transient cards dealt deck → LOB slot.
+              Rendered last in the game layer so they draw above settled cards,
+              unclipped so they can cross the zone boundary mid-flight.
+              ================================================================ */}
+          {normalizedFormat !== 'Paragon' && (() => {
+            const deals: SoulDeal[] = [];
+            const myDeck = myZones['deck'];
+            const oppDeck = opponentZones['deck'];
+            const byId = (cards: CardInstance[] | undefined, id: string) =>
+              (cards ?? []).find(c => String(c.id) === id);
+
+            if (myDeck) {
+              for (const [id, seq] of myDeals) {
+                const slot = myLobLayout.hostPositions.get(id);
+                const card = byId(myCards['land-of-bondage'], id);
+                if (!slot || !card) continue;
+                deals.push({
+                  id,
+                  image: getCardImage(card),
+                  cardWidth: lobCard.cardWidth,
+                  cardHeight: lobCard.cardHeight,
+                  rotation: 0,
+                  flight: computeDealFlight({
+                    deck: myDeck, slot, cardWidth: lobCard.cardWidth,
+                    cardHeight: lobCard.cardHeight, seq,
+                  }),
+                });
+              }
+            }
+            if (oppDeck) {
+              for (const [id, seq] of oppDeals) {
+                const slot = opponentLobLayout.hostPositions.get(id);
+                const card = byId(opponentCards['land-of-bondage'], id);
+                if (!slot || !card) continue;
+                deals.push({
+                  id,
+                  image: getCardImage(card),
+                  cardWidth: lobCard.cardWidth,
+                  cardHeight: lobCard.cardHeight,
+                  rotation: 180,
+                  flight: computeDealFlight({
+                    deck: oppDeck, slot, cardWidth: lobCard.cardWidth,
+                    cardHeight: lobCard.cardHeight, seq,
+                  }),
+                });
+              }
+            }
+
+            const handleLand = (id: string) => {
+              if (myDeals.has(id)) onMyLand(id);
+              if (oppDeals.has(id)) onOppLand(id);
+            };
+            return deals.length > 0
+              ? <LostSoulDealLayer deals={deals} onLand={handleLand} />
+              : null;
+          })()}
+
+          {/* Paragon: deal souls from the shared Soul Deck into the shared LOB. */}
+          {normalizedFormat === 'Paragon' && mpLayout?.zones.soulDeck && (() => {
+            const deck = mpLayout.zones.soulDeck;
+            const deals: SoulDeal[] = [];
+            for (const [id, seq] of sharedDeals) {
+              const slot = sharedLobLayout.hostPositions.get(id);
+              const card = (sharedCards['land-of-bondage'] ?? []).find(c => String(c.id) === id);
+              if (!slot || !card) continue;
+              deals.push({
+                id,
+                image: getCardImage(card),
+                cardWidth: lobCard.cardWidth,
+                cardHeight: lobCard.cardHeight,
+                rotation: 0,
+                flight: computeDealFlight({
+                  deck, slot, cardWidth: lobCard.cardWidth,
+                  cardHeight: lobCard.cardHeight, seq,
+                }),
+              });
+            }
+            return deals.length > 0
+              ? <LostSoulDealLayer deals={deals} onLand={onSharedLand} />
+              : null;
           })()}
         </Layer>
 
@@ -7854,13 +7994,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           />
         );
       })()}
-
-      {soulCinematic && (
-        <LostSoulCinematic
-          key={soulCinematic.id}
-          souls={soulCinematic.souls}
-        />
-      )}
     </div>
   );
 }
