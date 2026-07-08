@@ -608,12 +608,25 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     return flat;
   }, [myCards]);
+  // Opening-hand deal: fires when the game transitioned to 'playing' moments
+  // ago (covers both "canvas mounted during pregame" and "mounted right after
+  // start"), but never on later reloads/reconnects. Hands are dealt server-side
+  // at create/join, so by the time this key flips the hand rows are already in
+  // the client cache.
+  const openingDealKey = useMemo(() => {
+    const g = gameState.game;
+    if (!g || g.status !== 'playing') return null;
+    const startedMicros = g.playingStartedAtMicros ?? 0n;
+    if (startedMicros === 0n) return null;
+    const startedMs = Number(startedMicros / 1000n);
+    return Date.now() - startedMs < 20_000 ? `opening-${String(g.id)}` : null;
+  }, [gameState.game]);
   const {
     deals: activeDeals,
     dealingIds,
     glowIds: dealGlowIds,
     completeDeal,
-  } = useDealAnimation(myCardZoneSnapshot, viewerKind !== 'spectator');
+  } = useDealAnimation(myCardZoneSnapshot, viewerKind !== 'spectator', openingDealKey);
 
   // ---- Lost Soul cinematic — combined across both players ----
   // Combine my + opp LOB Lost Souls into one input so simultaneous arrivals

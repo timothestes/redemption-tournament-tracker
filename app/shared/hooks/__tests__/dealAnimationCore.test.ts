@@ -75,4 +75,11 @@ describe('scheduleDeals', () => {
     expect(startAts[11] - startAts[0]).toBeLessThanOrEqual(DEAL_MAX_SPREAD_MS + 1e-6);
     expect(startAts[1] - startAts[0]).toBeGreaterThan(0);
   });
+
+  it('accepts a custom stagger (opening-hand fast deal)', () => {
+    const { startAts } = scheduleDeals(500, -Infinity, 8, 90);
+    expect(startAts[0]).toBe(500);
+    expect(startAts[1] - startAts[0]).toBe(90);
+    expect(startAts[7] - startAts[0]).toBe(7 * 90);
+  });
 });

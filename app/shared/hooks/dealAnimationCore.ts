@@ -9,6 +9,8 @@ export interface DealCardSnapshot {
 
 /** Delay between consecutive card launches. */
 export const DEAL_STAGGER_MS = 200;
+/** Faster stagger for the opening-hand deal (8 cards shouldn't take 2s). */
+export const DEAL_OPENING_STAGGER_MS = 90;
 /** Flight duration for one card, deck pile → hand slot. */
 export const DEAL_FLIGHT_MS = 420;
 /** A batch never spreads its launches over more than this (big draws compress). */
@@ -51,9 +53,10 @@ export function scheduleDeals(
   nowMs: number,
   prevLastStartAt: number,
   count: number,
+  staggerMs: number = DEAL_STAGGER_MS,
 ): { startAts: number[] } {
   const stagger =
-    count > 1 ? Math.min(DEAL_STAGGER_MS, DEAL_MAX_SPREAD_MS / (count - 1)) : DEAL_STAGGER_MS;
+    count > 1 ? Math.min(staggerMs, DEAL_MAX_SPREAD_MS / (count - 1)) : staggerMs;
   const first = Math.max(nowMs, prevLastStartAt + stagger);
   return {
     startAts: Array.from({ length: count }, (_, i) => first + i * stagger),

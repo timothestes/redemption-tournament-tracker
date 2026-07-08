@@ -1,7 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { diffDeals, scheduleDeals, type DealCardSnapshot } from './dealAnimationCore';
+import {
+  diffDeals,
+  scheduleDeals,
+  DEAL_OPENING_STAGGER_MS,
+  type DealCardSnapshot,
+} from './dealAnimationCore';
 
 export interface ActiveDeal {
   instanceId: string;
@@ -29,9 +34,20 @@ function prefersReducedMotion(): boolean {
  * flight (render the real card hidden), and which just landed (render with
  * the arrival glow). `completeDeal` is called by the DealLayer sprite when it
  * lands — or by the failsafe timer, whichever comes first.
+ *
+ * `openingKey` triggers the opening-hand deal: when it changes to a new
+ * non-null value, EVERY card currently in hand is dealt with the fast opening
+ * stagger — regardless of previous zone. Callers pass a value that changes
+ * exactly when a fresh game begins (goldfish: state.sessionId; multiplayer:
+ * a key derived from playingStartedAtMicros), and null/undefined otherwise.
  */
-export function useDealAnimation(cards: DealCardSnapshot[], enabled: boolean) {
+export function useDealAnimation(
+  cards: DealCardSnapshot[],
+  enabled: boolean,
+  openingKey?: string | null,
+) {
   const prevZonesRef = useRef<Map<string, string> | null>(null);
+  const prevOpeningKeyRef = useRef<string | null>(null);
   const lastStartAtRef = useRef(-Infinity);
   const [deals, setDeals] = useState<ActiveDeal[]>([]);
   const [glowIds, setGlowIds] = useState<Set<string>>(new Set());
@@ -87,23 +103,37 @@ export function useDealAnimation(cards: DealCardSnapshot[], enabled: boolean) {
       return stillDealing.length === prev.length ? prev : stillDealing;
     });
 
-    if (!enabled || dealt.length === 0) return;
+    // Opening-hand deal: a fresh game began — deal the whole hand, fast.
+    // (dealt ⊆ hand, so the opening set supersedes the normal diff.)
+    const openingChanged = openingKey != null && openingKey !== prevOpeningKeyRef.current;
+    if (openingKey != null) prevOpeningKeyRef.current = openingKey;
+    let toDeal = dealt;
+    let staggerMs: number | undefined;
+    if (openingChanged) {
+      const handIds = cards.filter(c => c.zone === 'hand').map(c => c.id);
+      if (handIds.length > 0) {
+        toDeal = handIds;
+        staggerMs = DEAL_OPENING_STAGGER_MS;
+      }
+    }
+
+    if (!enabled || toDeal.length === 0) return;
 
     if (prefersReducedMotion()) {
       // No flight — just mark the new cards with the landing glow.
-      for (const id of dealt) completeDeal(id);
+      for (const id of toDeal) completeDeal(id);
       return;
     }
 
     const now = performance.now();
-    const { startAts } = scheduleDeals(now, lastStartAtRef.current, dealt.length);
+    const { startAts } = scheduleDeals(now, lastStartAtRef.current, toDeal.length, staggerMs);
     lastStartAtRef.current = startAts[startAts.length - 1];
 
     setDeals(prev => [
       ...prev,
-      ...dealt.map((instanceId, i) => ({ instanceId, startAt: startAts[i] })),
+      ...toDeal.map((instanceId, i) => ({ instanceId, startAt: startAts[i] })),
     ]);
-    dealt.forEach((instanceId, i) => {
+    toDeal.forEach((instanceId, i) => {
       const t = setTimeout(
         () => completeDeal(instanceId),
         Math.max(0, startAts[i] - now) + DEAL_FAILSAFE_MS,
@@ -112,7 +142,7 @@ export function useDealAnimation(cards: DealCardSnapshot[], enabled: boolean) {
       if (existing) clearTimeout(existing);
       failsafeTimersRef.current.set(instanceId, t);
     });
-  }, [cards, enabled, completeDeal]);
+  }, [cards, enabled, openingKey, completeDeal]);
 
   const dealingIds = useMemo(() => new Set(deals.map(d => d.instanceId)), [deals]);
 

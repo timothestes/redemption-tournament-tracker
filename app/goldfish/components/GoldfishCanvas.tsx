@@ -87,8 +87,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
   // ---- "The deal" — flying-card animation when cards move deck → hand ----
   // (Draw button, draw N/bottom, ability draws.) Snapshot is id+zone only;
-  // diffing happens inside the hook. New games mint fresh instanceIds, so
-  // loading a deck or resetting never animates the opening hand.
+  // diffing happens inside the hook. sessionId changes on every new game
+  // (fresh deck load, New Game), which triggers the fast opening-hand deal.
   const cardZoneSnapshot = useMemo(() => {
     const flat: { id: string; zone: string }[] = [];
     for (const zoneId of Object.keys(state.zones) as ZoneId[]) {
@@ -101,7 +101,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     dealingIds,
     glowIds: dealGlowIds,
     completeDeal,
-  } = useDealAnimation(cardZoneSnapshot, true);
+  } = useDealAnimation(cardZoneSnapshot, true, state.sessionId);
 
   // ---- Lost Soul cinematic — full-screen flourish on arrival ----
   // Filter to actual Lost Souls (sites can be attached to LOB cards but they
