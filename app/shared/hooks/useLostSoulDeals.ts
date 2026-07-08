@@ -28,7 +28,7 @@ export interface SoulDealState {
  * summarizing toast). It fires as the souls begin dealing (~one flight ahead of
  * landing) — close enough to "on land" without coordinating N flyer landings.
  *
- * Strict-mode safe: detection lives in refs, mirroring useLostSoulCinematic.
+ * Strict-mode safe: detection lives in refs (prev-ids + is-initial gate).
  */
 export function useLostSoulDeals(
   soulIds: string[],
