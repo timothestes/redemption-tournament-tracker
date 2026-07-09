@@ -6,16 +6,21 @@ import { useTable } from "spacetimedb/react";
 import { tables } from "@/lib/spacetimedb/module_bindings";
 import { useSpacetimeConnection } from "@/app/play/hooks/useSpacetimeConnection";
 import { SpacetimeProvider } from "@/app/play/lib/spacetimedb-provider";
-import type { ForgeDeckSummary } from "@/app/forge/lib/deckTypes";
+import type { ForgeDeckSummary, SharedForgeDeckSummary } from "@/app/forge/lib/deckTypes";
 
-interface Props { decks: ForgeDeckSummary[]; displayName: string; userId: string; initialJoinCode?: string }
+interface Props { decks: ForgeDeckSummary[]; sharedDecks: SharedForgeDeckSummary[]; displayName: string; userId: string; initialJoinCode?: string }
 
-function LobbyInner({ decks, displayName, userId, initialJoinCode }: Props) {
+function LobbyInner({ decks, sharedDecks, displayName, userId, initialJoinCode }: Props) {
   const router = useRouter();
-  const [selectedDeckId, setSelectedDeckId] = useState<string | null>(decks[0]?.id ?? null);
+  const [selectedDeckId, setSelectedDeckId] = useState<string | null>(decks[0]?.id ?? sharedDecks[0]?.id ?? null);
   const [joinCode, setJoinCode] = useState(initialJoinCode ?? "");
   const [error, setError] = useState<string | null>(null);
-  const selected = decks.find((d) => d.id === selectedDeckId) ?? null;
+  // Selection resolves across both your decks and shared decks; stash() only
+  // needs id/name/format, which both summary shapes carry.
+  const selected =
+    decks.find((d) => d.id === selectedDeckId) ??
+    sharedDecks.find((d) => d.id === selectedDeckId) ??
+    null;
 
   const [forgeGames] = useTable(tables.ForgeGame);
   const [games] = useTable(tables.Game);
@@ -61,7 +66,7 @@ function LobbyInner({ decks, displayName, userId, initialJoinCode }: Props) {
     <div className="mx-auto max-w-3xl space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-semibold">Playtest games</h1>
-        <p className="text-sm text-muted-foreground">Private games with your Forge decks.</p>
+        <p className="text-sm text-muted-foreground">Private games with Forge decks.</p>
       </div>
       {initialJoinCode && (
         <div className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
@@ -72,8 +77,8 @@ function LobbyInner({ decks, displayName, userId, initialJoinCode }: Props) {
       )}
       {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">{error}</div>}
       <section className="space-y-2">
-        <h2 className="text-sm font-medium">Your deck</h2>
-        {decks.length === 0 ? (
+        <h2 className="text-sm font-medium">Deck</h2>
+        {decks.length === 0 && sharedDecks.length === 0 ? (
           <p className="text-sm text-muted-foreground">No Forge decks yet — build one first.</p>
         ) : (
           <select
@@ -81,9 +86,20 @@ function LobbyInner({ decks, displayName, userId, initialJoinCode }: Props) {
             value={selectedDeckId ?? ""}
             onChange={(e) => setSelectedDeckId(e.target.value)}
           >
-            {decks.map((d) => (
-              <option key={d.id} value={d.id}>{d.name} — {d.format || "Type 1"} ({d.cardCount})</option>
-            ))}
+            {decks.length > 0 && (
+              <optgroup label="Your decks">
+                {decks.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name} — {d.format || "Type 1"} ({d.cardCount})</option>
+                ))}
+              </optgroup>
+            )}
+            {sharedDecks.length > 0 && (
+              <optgroup label="Shared by others">
+                {sharedDecks.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name} — {d.format || "Type 1"} ({d.cardCount}) · {d.ownerName}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
         )}
       </section>
