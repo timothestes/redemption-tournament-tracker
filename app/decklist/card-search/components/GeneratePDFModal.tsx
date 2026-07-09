@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Deck } from "../types/deck";
 import { generateDeckText } from "../utils/deckImportExport";
+import { decklistPdfDownloadUrl } from "../utils/pdfDownloadUrl";
 import {
   Dialog,
   DialogContent,
@@ -244,7 +245,7 @@ export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDF
                   Close
                 </button>
                 <a
-                  href={success.url}
+                  href={decklistPdfDownloadUrl(success.url, deck.name)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-foreground text-background rounded-lg text-sm font-medium hover:bg-foreground/90 transition-colors inline-flex items-center gap-2"

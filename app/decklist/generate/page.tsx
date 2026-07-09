@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "flowbite-react";
 import ToastNotification from "../../../components/ui/toast-notification";
 import DeckSourcePicker from "./DeckSourcePicker";
+import { decklistPdfDownloadUrl } from "../card-search/utils/pdfDownloadUrl";
 
 async function checkLegality(decklist: string, deckType: string, deckId?: string | null): Promise<boolean | null> {
   // The PDF/image generator omits the legal/illegal seal entirely (renders `?`)
@@ -506,7 +507,7 @@ export default function GenerateDeckList() {
                 </div>
               </div>
               <Button
-                onClick={() => window.open(success.url, '_blank')}
+                onClick={() => window.open(decklistPdfDownloadUrl(success.url, loadedDeckName), '_blank')}
                 gradientDuoTone="greenToBlue"
                 size="lg"
                 className="font-semibold"
