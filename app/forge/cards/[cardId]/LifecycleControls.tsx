@@ -122,7 +122,7 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
       ) : (
         <div className="ml-auto">
           {picking ? (
-            <select autoFocus disabled={pending} defaultValue="" onChange={(e) => e.target.value && run(() => shareToSet(card.id, e.target.value))} className="rounded-md border bg-background px-2 py-1">
+            <select autoFocus disabled={pending} value="" onChange={(e) => e.target.value && run(() => shareToSet(card.id, e.target.value))} className="rounded-md border bg-background px-2 py-1">
               <option value="" disabled>Share into set…</option>
               {sets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>

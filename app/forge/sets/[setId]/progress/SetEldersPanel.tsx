@@ -29,7 +29,7 @@ export default function SetEldersPanel({ setId, elders, addable }: { setId: stri
         ))}
       </ul>
       {addable.length > 0 && (
-        <select disabled={busy} defaultValue="" onChange={(e) => e.target.value && run(() => addSetElder(setId, e.target.value))} className="mt-2 rounded-md border bg-background px-2 py-1 text-xs">
+        <select disabled={busy} value="" onChange={(e) => e.target.value && run(() => addSetElder(setId, e.target.value))} className="mt-2 rounded-md border bg-background px-2 py-1 text-xs">
           <option value="" disabled>Add a designer…</option>
           {addable.map((m) => <option key={m.userId} value={m.userId}>{m.displayName ?? m.userId}</option>)}
         </select>
