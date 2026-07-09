@@ -6,6 +6,7 @@ import { useTable } from "spacetimedb/react";
 import { tables } from "@/lib/spacetimedb/module_bindings";
 import { useSpacetimeConnection } from "@/app/play/hooks/useSpacetimeConnection";
 import { SpacetimeProvider } from "@/app/play/lib/spacetimedb-provider";
+import { ForgeDeckPicker } from "./ForgeDeckPicker";
 import type { ForgeDeckSummary, SharedForgeDeckSummary } from "@/app/forge/lib/deckTypes";
 
 interface Props { decks: ForgeDeckSummary[]; sharedDecks: SharedForgeDeckSummary[]; displayName: string; userId: string; initialJoinCode?: string }
@@ -81,26 +82,12 @@ function LobbyInner({ decks, sharedDecks, displayName, userId, initialJoinCode }
         {decks.length === 0 && sharedDecks.length === 0 ? (
           <p className="text-sm text-muted-foreground">No Forge decks yet — build one first.</p>
         ) : (
-          <select
-            className="w-full rounded-md border bg-background p-2 text-sm"
-            value={selectedDeckId ?? ""}
-            onChange={(e) => setSelectedDeckId(e.target.value)}
-          >
-            {decks.length > 0 && (
-              <optgroup label="Your decks">
-                {decks.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name} — {d.format || "Type 1"} ({d.cardCount})</option>
-                ))}
-              </optgroup>
-            )}
-            {sharedDecks.length > 0 && (
-              <optgroup label="Shared by others">
-                {sharedDecks.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name} — {d.format || "Type 1"} ({d.cardCount}) · {d.ownerName}</option>
-                ))}
-              </optgroup>
-            )}
-          </select>
+          <ForgeDeckPicker
+            decks={decks}
+            sharedDecks={sharedDecks}
+            selectedDeckId={selectedDeckId}
+            onSelect={setSelectedDeckId}
+          />
         )}
       </section>
       <section className="grid gap-3 sm:grid-cols-2">
