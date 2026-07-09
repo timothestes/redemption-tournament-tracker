@@ -14,6 +14,32 @@ import type { Card } from "./utils";
 import type { DeckZone } from "./types/deck";
 
 /* ------------------------------------------------------------------ */
+/*  Card image contain-frame                                          */
+/* ------------------------------------------------------------------ */
+/**
+ * Constrains the card image to the largest 2.5:3.5 box that fits the parent in
+ * EITHER orientation (width- or height-bound), so a card is never clipped by the
+ * modal's fixed-height, overflow-hidden image column (which was cutting the verse
+ * off the bottom of Forge cards).
+ *
+ * `object-contain` alone can't fix it: Forge cards without a finished scan render
+ * as a composite <div> (ForgeCardPreview), which has no object-fit and so would
+ * stretch. Instead we make the parent a size container and size the frame with
+ * `min(100%, 71.4286cqh)` — 71.4286cqh is the card-aspect width derived from the
+ * container height — giving a true "contain" fit for both <img> and <div> cards.
+ */
+function CardImageFrame({ children, align = "center" }: { children: React.ReactNode; align?: "center" | "start" }) {
+  return (
+    <div
+      className={`flex h-full w-full justify-center ${align === "start" ? "items-start" : "items-center"}`}
+      style={{ containerType: "size" }}
+    >
+      <div style={{ width: "min(100%, 71.4286cqh)", aspectRatio: "2.5 / 3.5" }}>{children}</div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Inline Edit Ruling (replaces a ruling's text with editable fields) */
 /* ------------------------------------------------------------------ */
 
@@ -884,24 +910,28 @@ export default function ModalWithClose({
               {hasNavigation && (() => {
                 const prev = getAdjacentCard('left');
                 return prev ? (
-                  <CardThumb
-                    card={prev}
-                    alt={prev.name}
-                    className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
-                    draggable={false}
-                  />
+                  <CardImageFrame>
+                    <CardThumb
+                      card={prev}
+                      alt={prev.name}
+                      className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
+                      draggable={false}
+                    />
+                  </CardImageFrame>
                 ) : null;
               })()}
             </div>
 
             {/* Current card */}
             <div className="w-full h-full flex-shrink-0 flex items-center justify-center px-2 py-1">
-              <CardThumb
-                card={modalCard}
-                alt={modalCard.name}
-                className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
-                draggable={false}
-              />
+              <CardImageFrame>
+                <CardThumb
+                  card={modalCard}
+                  alt={modalCard.name}
+                  className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
+                  draggable={false}
+                />
+              </CardImageFrame>
             </div>
 
             {/* Next card */}
@@ -909,12 +939,14 @@ export default function ModalWithClose({
               {hasNavigation && (() => {
                 const next = getAdjacentCard('right');
                 return next ? (
-                  <CardThumb
-                    card={next}
-                    alt={next.name}
-                    className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
-                    draggable={false}
-                  />
+                  <CardImageFrame>
+                    <CardThumb
+                      card={next}
+                      alt={next.name}
+                      className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
+                      draggable={false}
+                    />
+                  </CardImageFrame>
                 ) : null;
               })()}
             </div>
@@ -1283,23 +1315,25 @@ export default function ModalWithClose({
           /* Normal side-by-side layout: image left, details + rulings right */
           <div className="px-4 py-4 flex gap-6 flex-1 overflow-hidden">
             <div className="w-2/5 flex-shrink-0 flex items-start overflow-hidden">
-              <CardThumb
-                card={modalCard}
-                alt={modalCard.name}
-                className={`max-w-full max-h-full object-contain rounded shadow-lg ${canDragToDeck ? "cursor-grab active:cursor-grabbing" : ""}`}
-                draggable={canDragToDeck}
-                onDragStart={canDragToDeck ? (e) => {
-                  e.dataTransfer.setData(
-                    SEARCH_DRAG_MIME,
-                    JSON.stringify({ name: modalCard.name, set: modalCard.set }),
-                  );
-                  e.dataTransfer.effectAllowed = "copy";
-                  // Defer close one frame so the browser captures the drag-ghost
-                  // snapshot of the image first — closing synchronously can
-                  // cancel the drag in Firefox before the snapshot is taken.
-                  requestAnimationFrame(() => closeModal());
-                } : undefined}
-              />
+              <CardImageFrame align="start">
+                <CardThumb
+                  card={modalCard}
+                  alt={modalCard.name}
+                  className={`max-w-full max-h-full object-contain rounded shadow-lg ${canDragToDeck ? "cursor-grab active:cursor-grabbing" : ""}`}
+                  draggable={canDragToDeck}
+                  onDragStart={canDragToDeck ? (e) => {
+                    e.dataTransfer.setData(
+                      SEARCH_DRAG_MIME,
+                      JSON.stringify({ name: modalCard.name, set: modalCard.set }),
+                    );
+                    e.dataTransfer.effectAllowed = "copy";
+                    // Defer close one frame so the browser captures the drag-ghost
+                    // snapshot of the image first — closing synchronously can
+                    // cancel the drag in Firefox before the snapshot is taken.
+                    requestAnimationFrame(() => closeModal());
+                  } : undefined}
+                />
+              </CardImageFrame>
             </div>
             <div className="flex-1 overflow-auto pr-1">
               <div className="space-y-1">
