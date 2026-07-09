@@ -14,6 +14,16 @@ Next.js 15 (App Router), React 19, TypeScript, Supabase (PostgreSQL + Auth), Tai
 - **Migrations**: `supabase/migrations/` with numeric prefix (e.g., `001_create_deck_tables.sql`). Run via Supabase MCP or directly.
 - **Styling**: Tailwind utilities first, dark mode via `next-themes`, `cn()` from `lib/utils.ts`.
 
+## Parallel Agents / Avoiding Toe-Stepping
+
+I dispatch multiple agents on this repo often. A single git working directory can only be on one branch with one set of uncommitted changes, so two agents sharing this checkout will clobber each other's branches, edits, and stashes. Rules for any agent that will edit files or run git:
+
+- **Isolate with a git worktree.** Before working, create your own: `git worktree add ../rtt-<task> -b <branch> origin/main`, then do **all** work inside `../rtt-<task>` using **absolute paths**. Assume another agent owns the main checkout — never touch it. Commit, push, and open the PR from your worktree. Clean up with `git worktree remove` when done.
+- **If you cannot use a worktree, stay in your lane.** Do **not** run `git checkout`/`switch`/`reset`/`stash` on the shared tree, and edit only the files you were explicitly assigned.
+- **Sanity-check the tree.** Before and after git commands, verify `git status` and the current branch. If the working tree or branch is not what you left it (e.g. `git reflog` shows checkouts you didn't make), **stop and report** — don't push through; a sibling agent is likely active.
+- **Never stage broadly.** Only `git add <your specific files>` — never `git add -A`/`.`/`-a` — so you don't sweep up another agent's in-flight work.
+- **PRs base off `origin/main`** (fetch first), not off whatever branch happens to be checked out.
+
 ## Dev Commands
 
 ```bash
