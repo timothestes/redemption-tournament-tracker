@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireForge } from "@/app/forge/lib/auth";
-import { listForgeDecks } from "@/app/forge/lib/forgeDecks";
+import { listForgeDecks, listSharedForgeDecks } from "@/app/forge/lib/forgeDecks";
 import ForgeGameLobby from "./games/ForgeGameLobby";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export default async function ForgePlayPage({
 }) {
   const ctx = await requireForge();
   if (!ctx) notFound();
-  const decks = await listForgeDecks();
+  const [decks, sharedDecks] = await Promise.all([listForgeDecks(), listSharedForgeDecks()]);
   const { data: member } = await ctx.supabase
     .from("playtest_members")
     .select("display_name")
@@ -25,6 +25,7 @@ export default async function ForgePlayPage({
   return (
     <ForgeGameLobby
       decks={decks}
+      sharedDecks={sharedDecks}
       displayName={displayName}
       userId={ctx.user.id}
       initialJoinCode={initialJoinCode}
