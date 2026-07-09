@@ -71,8 +71,9 @@ export const iconPredicates: Record<string, (c: Card) => boolean> = {
   Curse: (c) => c.type === "Curse",
   "Good Dominant": (c) => c.type.includes("Dominant") && (c.alignment.includes("Good") || c.alignment.includes("Neutral")),
   "Evil Dominant": (c) => c.type.includes("Dominant") && (c.alignment.includes("Evil") || c.alignment.includes("Neutral")),
-  "Good Fortress": (c) => c.type.includes("Fortress") && c.alignment.includes("Good"),
-  "Evil Fortress": (c) => c.type.includes("Fortress") && c.alignment.includes("Evil"),
+  // A City is a type of Fortress in Redemption, so surface Cities under the Fortress filters too.
+  "Good Fortress": (c) => (c.type.includes("Fortress") || c.type.includes("City")) && c.alignment.includes("Good"),
+  "Evil Fortress": (c) => (c.type.includes("Fortress") || c.type.includes("City")) && c.alignment.includes("Evil"),
   // other icons use existing category filters
   // Good Enhancements also surface Covenants (a good-side enhancement-like type)
   GE: (c) => c.type.includes("GE") || c.type === "Covenant",
