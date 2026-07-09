@@ -4352,12 +4352,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     const m = new Map<string, { x: number; y: number; rotation: number }>();
     for (const [id, p] of myLobLayout.hostPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
     for (const [id, p] of myLobLayout.accessoryPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
-    for (const [id, p] of opponentLobLayout.hostPositions) m.set(id, { x: p.x, y: p.y, rotation: 180 });
+    // Opponent hosts render rotated 180° anchored at the slot's bottom-right
+    // corner (x+cardWidth, y+cardHeight) — see the opponent LoB render. The
+    // glide target must use that SAME anchor, or useHandLayoutTween drags each
+    // host a full card up-and-left of its slot; clipping to the zone then
+    // leaves only a sliver visible on the opponent's view. Opponent accessory
+    // positions already bake the rotated anchor in, so they pass through as-is.
+    for (const [id, p] of opponentLobLayout.hostPositions)
+      m.set(id, { x: p.x + lobCard.cardWidth, y: p.y + lobCard.cardHeight, rotation: 180 });
     for (const [id, p] of opponentLobLayout.accessoryPositions) m.set(id, { x: p.x, y: p.y, rotation: 180 });
     for (const [id, p] of sharedLobLayout.hostPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
     for (const [id, p] of sharedLobLayout.accessoryPositions) m.set(id, { x: p.x, y: p.y, rotation: 0 });
     return m;
-  }, [myLobLayout, opponentLobLayout, sharedLobLayout]);
+  }, [myLobLayout, opponentLobLayout, sharedLobLayout, lobCard.cardWidth, lobCard.cardHeight]);
   useHandLayoutTween(lobSlots, cardNodeRefs);
 
   // ---- Derive per-accessory screen positions + seam (for detach overlay) ----
