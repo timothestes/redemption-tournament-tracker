@@ -5891,7 +5891,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   return (a.cardType ?? '').localeCompare(b.cardType ?? '') || (a.cardName ?? '').localeCompare(b.cardName ?? '');
                 })
               : cards;
-            const topCard = sortedCards[sortedCards.length - 1];
+            // For the deck, the top of the pile is the lowest zoneIndex (cards
+            // are sorted ascending), so the draggable "draw" card is the first
+            // element. For face-up piles (discard/reserve/banish/LOR) the last
+            // element renders on top, so that one is the visible top card.
+            const topCard = zoneKey === 'deck' ? sortedCards[0] : sortedCards[sortedCards.length - 1];
             const showFace = topCard && ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') ? !topCard.isFlipped : (zoneKey === 'reserve' && canViewMyReserve));
 
             return (
