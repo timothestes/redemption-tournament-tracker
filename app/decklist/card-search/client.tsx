@@ -14,6 +14,7 @@ import {
   iconPredicates,
 } from "./utils";
 import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG, BuilderConfigProvider } from "./builderConfig";
+import { readStickyFilters, writeStickyFilters } from "./stickyFilters";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
@@ -214,8 +215,11 @@ export default function CardSearchClient({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selectedTestaments, setSelectedTestaments] = useState<string[]>([]);
   const [isGospel, setIsGospel] = useState(false);
-  const [noAltArt, setnoAltArt] = useState(true);
-  const [noFirstPrint, setnoFirstPrint] = useState(true);
+  // Seed the two print/art filters from the user's per-device sticky preference
+  // (default "hide" for both when unset). Applies in all modes, including deck
+  // editing and the Forge, where a deckId is always present.
+  const [noAltArt, setnoAltArt] = useState(() => readStickyFilters().noAltArt);
+  const [noFirstPrint, setnoFirstPrint] = useState(() => readStickyFilters().noFirstPrint);
   const [nativityOnly, setNativityOnly] = useState(false);
   const [hasStarOnly, setHasStarOnly] = useState(false);
   const [cloudOnly, setCloudOnly] = useState(false);
@@ -707,15 +711,15 @@ export default function CardSearchClient({
         setToughnessOp(searchParams.get('toughnessOp') || 'eq');
       }
 
-      // Explicit shared-link intent wins; otherwise fall back to the user's
-      // saved per-device preference, defaulting to "hide AB versions" (true).
+      // Explicit shared-link intent overrides the sticky default; otherwise the
+      // values keep their initial state seeded from the saved per-device
+      // preference (see the useState initializers above).
       if (searchParams.get('showAltArt') === 'true') {
         setnoAltArt(false);
-      } else {
-        const savedNoAltArt = localStorage.getItem('deck-filter-noab');
-        setnoAltArt(savedNoAltArt === null ? true : savedNoAltArt === 'true');
       }
-      setnoFirstPrint(searchParams.get('showFirstPrint') !== 'true');
+      if (searchParams.get('showFirstPrint') === 'true') {
+        setnoFirstPrint(false);
+      }
       setNativityOnly(searchParams.get('nativity') === 'true');
       setNativityNot(searchParams.get('nativityNot') === 'true');
       setHasStarOnly(searchParams.get('hasStar') === 'true');
@@ -740,13 +744,14 @@ export default function CardSearchClient({
     }
   }, [searchParams, isInitialized]);
 
-  // Persist the "No AB Versions" toggle as a per-device default so the user's
-  // choice sticks across visits. Skipped until initialized so we don't clobber
-  // the saved value with the initial render default.
+  // Persist the two print/art filters as per-device defaults so the user's
+  // choice sticks across sessions (public builder and the Forge alike). Skipped
+  // until initialized so we don't clobber the saved value with the mount default
+  // before any shared-link URL params have been applied.
   useEffect(() => {
     if (!isInitialized) return;
-    localStorage.setItem('deck-filter-noab', String(noAltArt));
-  }, [noAltArt, isInitialized]);
+    writeStickyFilters({ noAltArt, noFirstPrint });
+  }, [noAltArt, noFirstPrint, isInitialized]);
 
   // Update URL whenever filters change
   useEffect(() => {
@@ -1391,8 +1396,8 @@ export default function CardSearchClient({
     setSelectedRarityFilters([]);
     setSelectedTestaments([]);
     setIsGospel(false);
-    setnoAltArt(true);
-    setnoFirstPrint(true);
+    // Keep the sticky print/art preferences on reset (don't force "hide" back
+    // on) — they mirror the persisted per-device default, like legalityMode above.
     setNativityOnly(false);
     setHasStarOnly(false);
     setCloudOnly(false);
