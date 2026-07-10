@@ -1860,7 +1860,14 @@ export default function CardSearchClient({
             </div>
             {/* Desktop: centered buttons with filters right-aligned */}
             <div className="hidden sm:flex flex-row flex-wrap gap-2 w-full items-center">
-            <div className="hidden md:block flex-1" />
+            {/* Result count — fills the left spacer so it stays visible without scrolling */}
+            <div className="hidden md:flex flex-1 items-center">
+              {visibleCards.length > 0 && (
+                <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
+                  {filtered.length} {filtered.length === 1 ? 'card' : 'cards'}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2 mx-auto md:mx-0">
             <button
               className="px-4 shrink-0 rounded bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 transition font-medium shadow-sm text-center relative h-9 sm:h-11"
@@ -2179,6 +2186,12 @@ export default function CardSearchClient({
           </span>
         )}
         </div>
+        {/* Result count — mobile only; desktop shows it in the search header toolbar */}
+        {visibleCards.length > 0 && (
+          <span className="md:hidden shrink-0 pl-2 pr-3 text-xs font-medium text-muted-foreground whitespace-nowrap">
+            {filtered.length} {filtered.length === 1 ? 'card' : 'cards'}
+          </span>
+        )}
       </div>
       {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
       <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-between px-3 py-1.5 bg-background border-b border-border`}>
