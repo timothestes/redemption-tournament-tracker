@@ -2,6 +2,7 @@
 
 import { isValidElement, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type CSSProperties } from 'react';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
+import { normalizeForgeLogPayload, type ForgeResolverMap } from '@/app/play/utils/forgeResolver';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,8 @@ interface ChatPanelProps {
   chatScale?: number;
   /** When true, the chat input is disabled (read-only). Defaults to false. */
   chatDisabled?: boolean;
+  /** Viewer's granted forge resolver — re-hydrates blanked forge card names/art in the log. */
+  forgeResolver?: ForgeResolverMap | null;
   // ---- Spectator-controls subsection (player-mode only) ----
   /** Spectators in the current game. When provided, the Spectators tab renders. */
   spectators?: Array<{ id: bigint; identity: { toHexString: () => string }; displayName: string }>;
@@ -1034,6 +1037,7 @@ export default function ChatPanel({
   onActiveTabChange,
   chatScale = 1,
   chatDisabled = false,
+  forgeResolver,
   spectators,
   myIdentityHex,
   shareHandWithSpectators,
@@ -1114,11 +1118,11 @@ export default function ChatPanel({
     const map = new Map<string, string>();
     for (const a of visibleGameActions) {
       const playerName = playerNames[a.playerId.toString()] ?? `Player ${a.playerId}`;
-      const verb = formatActionType(a.actionType, a.payload, playerNames, a.playerId.toString(), myPlayerId.toString());
+      const verb = formatActionType(a.actionType, normalizeForgeLogPayload(a.payload, forgeResolver), playerNames, a.playerId.toString(), myPlayerId.toString());
       map.set(a.id.toString(), `${playerName} ${nodeToText(verb)} ${a.actionType}`.toLowerCase());
     }
     return map;
-  }, [visibleGameActions, playerNames, myPlayerId]);
+  }, [visibleGameActions, playerNames, myPlayerId, forgeResolver]);
 
   const matchesQuery = (text: string) => !isSearching || text.includes(normalizedQuery);
 
@@ -1792,7 +1796,7 @@ export default function ChatPanel({
                   const playerName =
                     playerNames[action.playerId.toString()] ??
                     `Player ${action.playerId}`;
-                  const verb = formatActionType(action.actionType, action.payload, playerNames, action.playerId.toString(), myPlayerId.toString());
+                  const verb = formatActionType(action.actionType, normalizeForgeLogPayload(action.payload, forgeResolver), playerNames, action.playerId.toString(), myPlayerId.toString());
                   const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
                   const turn = Number(action.turnNumber);
                   return (
@@ -1968,7 +1972,7 @@ export default function ChatPanel({
                       const playerName =
                         playerNames[action.playerId.toString()] ??
                         `Player ${action.playerId}`;
-                      const verb = formatActionType(action.actionType, action.payload, playerNames, action.playerId.toString(), myPlayerId.toString());
+                      const verb = formatActionType(action.actionType, normalizeForgeLogPayload(action.payload, forgeResolver), playerNames, action.playerId.toString(), myPlayerId.toString());
                       const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
                       const turn = Number(action.turnNumber);
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import ChatPanel from '@/app/play/components/ChatPanel';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import type { ForgeResolverMap } from '@/app/play/utils/forgeResolver';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,6 +39,8 @@ interface RightPanelProps {
   unreadChatCount?: number;
   /** When true, chat input is disabled (read-only chat). Used by spectators. */
   chatDisabled?: boolean;
+  /** Viewer's granted forge resolver — re-hydrates blanked forge card names/art in the log. */
+  forgeResolver?: ForgeResolverMap | null;
   // ---- Spectator-controls subsection (player-mode only) ----
   spectators?: Array<{ id: bigint; identity: { toHexString: () => string }; displayName: string }>;
   myIdentityHex?: string;
@@ -64,6 +67,7 @@ export default function RightPanel({
   chatScale,
   unreadChatCount = 0,
   chatDisabled = false,
+  forgeResolver,
   spectators,
   myIdentityHex,
   shareHandWithSpectators,
@@ -239,6 +243,7 @@ export default function RightPanel({
               onActiveTabChange={setChatTab}
               chatScale={chatScale}
               chatDisabled={chatDisabled}
+              forgeResolver={forgeResolver}
               spectators={spectators}
               myIdentityHex={myIdentityHex}
               shareHandWithSpectators={shareHandWithSpectators}

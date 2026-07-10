@@ -547,6 +547,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
               chatScale={chatScale}
               unreadChatCount={unreadChatCount}
               chatDisabled
+              forgeResolver={forgeResolver}
             />
           </div>
         )}

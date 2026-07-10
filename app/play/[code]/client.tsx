@@ -1272,6 +1272,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       playerNames={playerNameMap}
       chatScale={chatScale}
       unreadChatCount={unreadChatCount}
+      forgeResolver={forgeResolver}
       spectators={gameState.spectators as Array<{ id: bigint; identity: { toHexString: () => string }; displayName: string }>}
       myIdentityHex={gameState.identityHex}
       shareHandWithSpectators={gameState.myPlayer?.shareHandWithSpectators}
