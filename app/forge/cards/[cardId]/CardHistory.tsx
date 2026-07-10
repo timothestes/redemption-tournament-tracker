@@ -73,6 +73,12 @@ export default function CardHistory({ history }: { history: HistoryEvent[] }) {
                   {p.status === "accepted" && e.resultingVersionNumber != null && <> → v{e.resultingVersionNumber}</>}
                 </span>
               </div>
+              <p className="mt-0.5 text-muted-foreground">
+                Proposed by <span className="font-medium text-foreground">{p.proposerName ?? "Forge member"}</span>
+                {p.status === "accepted" && p.approverName && (
+                  <> · accepted by <span className="font-medium text-foreground">{p.approverName}</span></>
+                )}
+              </p>
               {p.status === "superseded" && (
                 <p className="mt-1 text-muted-foreground">
                   {e.supersededBy
