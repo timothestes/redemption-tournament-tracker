@@ -19,6 +19,13 @@ export type ProposalRow = {
   createdBy: string;
   createdAt: string;
   closedAt: string | null;
+  // Display names resolved from playtest_members (null until listProposals
+  // enriches them). proposerName = who authored the proposal; approverName =
+  // who closed it (the accepting elder on an accept). Preserves proposer
+  // credit in History even though the resulting version is stamped to the
+  // approver.
+  proposerName: string | null;
+  approverName: string | null;
 };
 
 export type ProposalDiffData = { proposal: ProposalRow; current: DesignCard };
@@ -39,7 +46,22 @@ function toProposal(row: any): ProposalRow {
     createdBy: row.created_by,
     createdAt: row.created_at,
     closedAt: row.closed_at ?? null,
+    proposerName: null,
+    approverName: null,
   };
+}
+
+// Resolve user UUIDs -> display names (member-readable). Same pattern as versions.ts / comments.ts.
+async function nameMap(
+  ctx: NonNullable<Awaited<ReturnType<typeof requireForge>>>,
+  ids: string[]
+): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const { data } = await ctx.supabase
+    .from("playtest_members")
+    .select("user_id, display_name")
+    .in("user_id", [...new Set(ids)]);
+  return new Map((data ?? []).map((m: any) => [m.user_id, m.display_name]));
 }
 
 export async function createProposal(
@@ -128,7 +150,16 @@ export async function listProposals(cardId: string): Promise<ProposalRow[]> {
     .select(COLS)
     .eq("card_id", cardId)
     .order("created_at", { ascending: false });
-  return (data ?? []).map(toProposal);
+  const proposals = (data ?? []).map(toProposal);
+  const names = await nameMap(
+    ctx,
+    proposals.flatMap((p) => [p.createdBy, p.closedBy].filter((x): x is string => !!x))
+  );
+  return proposals.map((p) => ({
+    ...p,
+    proposerName: names.get(p.createdBy) ?? null,
+    approverName: p.closedBy ? names.get(p.closedBy) ?? null : null,
+  }));
 }
 
 export async function getOpenProposalDiffs(cardId: string): Promise<ProposalDiffData[]> {
