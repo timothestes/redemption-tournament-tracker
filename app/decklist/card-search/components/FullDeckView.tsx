@@ -10,6 +10,7 @@ import { createGlobalTagAction } from "../../../admin/tags/actions";
 import { HexColorPicker } from "react-colorful";
 import { useIsAdmin } from "../../../../hooks/useIsAdmin";
 import { useCardPrices } from "../hooks/useCardPrices";
+import { compareCardsDefault, compareTypeGroups } from "@/lib/cards/defaultSort";
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -150,58 +151,9 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
   const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
   const maybeboardCards = deck.cards.filter((dc) => dc.zone === 'maybeboard');
 
-    // Sort cards by type, then alignment, then name
-  const sortCards = (cards: typeof deck.cards, sortByAlignmentTypeBrigade = false) => {
-    return [...cards].sort((a, b) => {
-      if (sortByAlignmentTypeBrigade) {
-        // When grouping by type, sort by alignment first, then type, then brigade, then name
-        const alignmentA = a.card.alignment || 'Neutral';
-        const alignmentB = b.card.alignment || 'Neutral';
-        const alignmentOrder = ['Good', 'Evil', 'Neutral'];
-        const aAlignmentIndex = alignmentOrder.indexOf(alignmentA);
-        const bAlignmentIndex = alignmentOrder.indexOf(alignmentB);
-        if (aAlignmentIndex !== bAlignmentIndex) {
-          return (aAlignmentIndex === -1 ? 999 : aAlignmentIndex) - (bAlignmentIndex === -1 ? 999 : bAlignmentIndex);
-        }
-        
-        // Then by type
-        const typeA = a.card.type || 'Unknown';
-        const typeB = b.card.type || 'Unknown';
-        if (typeA !== typeB) {
-          return typeA.localeCompare(typeB);
-        }
-        
-        // Then by brigade
-        const brigadeA = a.card.brigade || 'None';
-        const brigadeB = b.card.brigade || 'None';
-        if (brigadeA !== brigadeB) {
-          return brigadeA.localeCompare(brigadeB);
-        }
-        
-        // Finally by name
-        return a.card.name.localeCompare(b.card.name);
-      }
-      
-      // Default sorting: First sort by type
-      const typeA = a.card.type || 'Unknown';
-      const typeB = b.card.type || 'Unknown';
-      if (typeA !== typeB) {
-        return typeA.localeCompare(typeB);
-      }
-      
-      // Then by alignment
-      const alignmentA = a.card.alignment || 'Neutral';
-      const alignmentB = b.card.alignment || 'Neutral';
-      const alignmentOrder = ['Good', 'Evil', 'Neutral'];
-      const aIndex = alignmentOrder.indexOf(alignmentA);
-      const bIndex = alignmentOrder.indexOf(alignmentB);
-      if (aIndex !== bIndex) {
-        return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
-      }
-      
-      // Finally by name
-      return a.card.name.localeCompare(b.card.name);
-    });
+  // Canonical default sort (sections → brigades → strength → name)
+  const sortCards = (cards: typeof deck.cards) => {
+    return [...cards].sort((a, b) => compareCardsDefault(a.card, b.card));
   };
 
   // Group cards by the selected grouping method
@@ -241,10 +193,9 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
       grouped[key].push(deckCard);
     });
 
-    // Sort each group
+    // Sort each group with the canonical default order
     Object.keys(grouped).forEach((key) => {
-      // When grouping by type, sort by alignment, type, then brigade within each type group
-      grouped[key] = sortCards(grouped[key], groupBy === 'type');
+      grouped[key] = sortCards(grouped[key]);
     });
 
     // Return groups in a specific order
@@ -265,10 +216,10 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
     }
 
     if (groupBy === 'type') {
-      // Sort type groups alphabetically
+      // Order type buckets canonically (Dominants, Artifacts, Fortresses, …)
       const orderedGroups: Record<string, typeof deck.cards> = {};
       Object.keys(grouped)
-        .sort((a, b) => a.localeCompare(b))
+        .sort(compareTypeGroups)
         .forEach((key) => {
           orderedGroups[key] = grouped[key];
         });

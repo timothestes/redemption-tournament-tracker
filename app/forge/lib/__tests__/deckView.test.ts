@@ -91,7 +91,7 @@ describe("grouping and sorting", () => {
     expect(getGroupDisplayName("Lost Soul")).toBe("Lost Souls");
   });
 
-  it("groups main items alphabetically and orders Good > Evil within a group", () => {
+  it("orders main-item groups canonically and known brigades before unknown within a group", () => {
     const catalog = [
       publicCard("Zeal", "I", "GE", "Good", "Silver"),
       publicCard("Guard", "I", "Hero", "Good", "Silver"),
@@ -102,9 +102,10 @@ describe("grouping and sorting", () => {
       source: "public" as const, name: c.name, set: c.set, qty: 1, zone: "main" as const,
     }));
     const groups = groupMainItems(resolveDeckEntries([], entries, catalog));
-    expect(groups.map(([g]) => g)).toEqual(["Evil Character", "Good Enhancement", "Hero"]);
+    expect(groups.map(([g]) => g)).toEqual(["Hero", "Good Enhancement", "Evil Character"]);
     const heroes = groups.find(([g]) => g === "Hero")![1];
-    expect(heroes.map((i) => i.name)).toEqual(["Guard", "Mixed"]); // Good before Evil
+    // Silver is a known good brigade; Brown isn't, so it sorts after.
+    expect(heroes.map((i) => i.name)).toEqual(["Guard", "Mixed"]);
   });
 
   it("groups by alignment in Good > Evil > Neutral order, blank alignment → Neutral", () => {
@@ -134,7 +135,7 @@ describe("grouping and sorting", () => {
     expect(groups[0][1].map((i) => i.name)).toEqual(["Guard", "Demon"]); // Good before Evil
   });
 
-  it("sorts side items by display type then name and counts quantities", () => {
+  it("sorts side items in the canonical default order and counts quantities", () => {
     const catalog = [
       publicCard("Bravery", "I", "GE"),
       publicCard("Axe", "I", "EE"),
@@ -144,7 +145,7 @@ describe("grouping and sorting", () => {
       { source: "public", name: "Axe", set: "I", qty: 1, zone: "reserve" },
     ];
     const items = sortSideItems(resolveDeckEntries([], entries, catalog));
-    expect(items.map((i) => i.name)).toEqual(["Axe", "Bravery"]); // Evil Enh. < Good Enh.
+    expect(items.map((i) => i.name)).toEqual(["Bravery", "Axe"]); // Good section before Evil
     expect(countItems(items)).toBe(3);
   });
 });

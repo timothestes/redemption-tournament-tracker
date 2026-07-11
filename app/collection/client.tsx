@@ -10,6 +10,7 @@ import { useCollectionState, cardFullKey } from "./hooks/useCollectionState";
 import { downloadCollectionTxt } from "./utils/collectionCsv";
 import ImportCsvModal from "./components/ImportCsvModal";
 import { useShowPrices } from "../../hooks/useShowPrices";
+import { compareCardsDefault } from "@/lib/cards/defaultSort";
 
 const BATCH_SIZE = 60;
 const RARITY_OPTIONS = ["Common", "Rare", "Ultra Rare", "Promo"];
@@ -95,8 +96,8 @@ export default function CollectionClient() {
   const [rarityFilter, setRarityFilter] = useState("");
   const [ownershipFilter, setOwnershipFilter] = useState<"all" | "owned" | "unowned">("all");
   const [sortBy, setSortBy] = useState<
-    "name" | "set" | "strength" | "toughness" | "type" | "brigade" | "quantity" | "price"
-  >("name");
+    "default" | "name" | "set" | "strength" | "toughness" | "type" | "brigade" | "quantity" | "price"
+  >("default");
   const [showPrices, setShowPrices] = useShowPrices();
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -196,8 +197,10 @@ export default function CollectionClient() {
           return bPrice - aPrice || a.name.localeCompare(b.name);
         }
         case "name":
-        default:
           return a.name.localeCompare(b.name) || a.set.localeCompare(b.set);
+        case "default":
+        default:
+          return compareCardsDefault(a, b) || a.set.localeCompare(b.set);
       }
     });
   }, [search, formatMode, typeFilter, brigadeFilter, alignmentFilter, rarityFilter, ownershipFilter, sortBy, quantities, getPrice]);
@@ -493,6 +496,7 @@ export default function CollectionClient() {
           title="Sort by"
           className="w-36 rounded-lg border border-border bg-background px-2 py-2 text-sm"
         >
+          <option value="default">Sort: Default</option>
           <option value="name">Sort: Name</option>
           <option value="set">Sort: Set</option>
           <option value="brigade">Sort: Brigade</option>

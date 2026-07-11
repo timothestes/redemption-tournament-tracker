@@ -13,6 +13,7 @@ import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
 import type { ForgeDeckEntry } from "@/app/forge/lib/deckTypes";
 import { designCardToCard } from "@/app/forge/lib/deckAdapter";
 import { ALL_CARDS } from "@/app/decklist/card-search/data/cardIndex";
+import { compareCardsDefault, compareTypeGroups } from "@/lib/cards/defaultSort";
 
 export type ResolvedDeckItem = {
   key: string;
@@ -22,6 +23,8 @@ export type ResolvedDeckItem = {
   type: string;      // display type ("Hero", "Good Enhancement", …)
   alignment: string;
   brigade: string;
+  strength: string;  // for the default sort (characters by strength desc)
+  reference: string; // for the default sort (Lost Souls in biblical order)
   // Present for forge entries; data null = ref the viewer can't resolve.
   forge: { cardId: string; data: DesignCard | null; hasArt: boolean; hasFinished: boolean } | null;
   imgFile: string;   // public card image file; "" for forge entries
@@ -98,6 +101,8 @@ export function resolveDeckEntries(
         type: card?.type ?? "Forge Card",
         alignment: card?.alignment ?? "",
         brigade: card?.brigade ?? "",
+        strength: card?.strength ?? "",
+        reference: card?.reference ?? "",
         forge: {
           cardId: e.cardId,
           data: g?.data ?? null,
@@ -116,6 +121,8 @@ export function resolveDeckEntries(
       type: pc?.type ?? "",
       alignment: pc?.alignment ?? "",
       brigade: pc?.brigade ?? "",
+      strength: pc?.strength ?? "",
+      reference: pc?.reference ?? "",
       forge: null,
       imgFile: pc?.imgFile ?? "",
     };
@@ -124,9 +131,10 @@ export function resolveDeckEntries(
 
 export type DeckGroupBy = "type" | "alignment" | "none";
 
-// Group main-deck items by display group, sorted within each group by
-// alignment (Good > Evil > Neutral) → brigade → name. Type groups sort
-// alphabetically; alignment groups follow the Good > Evil > Neutral order.
+// Group main-deck items by display group, sorted within each group by the
+// canonical default card order. Type groups follow the canonical bucket order
+// (Dominants, Artifacts, Fortresses, …); alignment groups follow the
+// Good > Evil > Neutral order.
 export function groupMainItems(
   items: ResolvedDeckItem[],
   groupBy: DeckGroupBy = "type",
@@ -143,15 +151,7 @@ export function groupMainItems(
     else grouped.set(key, [item]);
   }
   for (const bucket of grouped.values()) {
-    bucket.sort((a, b) => {
-      const aIdx = alignmentOrder.indexOf(a.alignment);
-      const bIdx = alignmentOrder.indexOf(b.alignment);
-      const aOrder = aIdx === -1 ? 999 : aIdx;
-      const bOrder = bIdx === -1 ? 999 : bIdx;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      if (a.brigade !== b.brigade) return a.brigade.localeCompare(b.brigade);
-      return a.name.localeCompare(b.name);
-    });
+    bucket.sort(compareCardsDefault);
   }
   return [...grouped.entries()].sort(([a], [b]) => {
     if (groupBy === "alignment") {
@@ -159,8 +159,9 @@ export function groupMainItems(
       const bIdx = alignmentOrder.indexOf(b);
       const diff = (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
       if (diff !== 0) return diff;
+      return a.localeCompare(b);
     }
-    return a.localeCompare(b);
+    return compareTypeGroups(a, b);
   });
 }
 
@@ -197,14 +198,9 @@ export function splitStack(items: ResolvedDeckItem[], maxPerColumn = 17): Resolv
   return columns;
 }
 
-// Reserve/maybeboard: flat, sorted by display type then name (public page semantics).
+// Reserve/maybeboard: flat, in the canonical default order (public page semantics).
 export function sortSideItems(items: ResolvedDeckItem[]): ResolvedDeckItem[] {
-  return [...items].sort((a, b) => {
-    const typeA = prettifyTypeName(a.type);
-    const typeB = prettifyTypeName(b.type);
-    if (typeA !== typeB) return typeA.localeCompare(typeB);
-    return a.name.localeCompare(b.name);
-  });
+  return [...items].sort(compareCardsDefault);
 }
 
 export function countItems(items: ResolvedDeckItem[]): number {

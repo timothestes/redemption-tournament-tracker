@@ -27,7 +27,8 @@ import DeleteDeckModal from "./DeleteDeckModal";
 import FolderModal from "./FolderModal";
 import UsernameModal from "./UsernameModal";
 import QuickLookModal from "./QuickLookModal";
-import { cardKey, buildTypeRanks } from "./cardTypeSort";
+import { buildSortInfo, compareDeckCards } from "./cardTypeSort";
+import type { SortableCard } from "@/lib/cards/defaultSort";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import ShareDeckModal from "../card-search/components/ShareDeckModal";
@@ -2019,7 +2020,7 @@ function CoverPickerModal({
   onSaved: (deckId: string, card1: string | null, card2: string | null) => void;
 }) {
   const [cards, setCards] = useState<DeckCardData[]>([]);
-  const [rankByKey, setRankByKey] = useState<Record<string, number>>({});
+  const [sortInfo, setSortInfo] = useState<Record<string, SortableCard>>({});
   const [loading, setLoading] = useState(true);
   const [previewCard1, setPreviewCard1] = useState<string | null>(initialCard1);
   const [previewCard2, setPreviewCard2] = useState<string | null>(initialCard2);
@@ -2035,8 +2036,8 @@ function CoverPickerModal({
         const mainCards = ((result.deck as any).cards?.filter((c: DeckCardData) => c.zone === 'main') || []) as DeckCardData[];
         setCards(mainCards);
         setLoading(false);
-        const ranks = await buildTypeRanks(mainCards);
-        if (active) setRankByKey(ranks);
+        const info = await buildSortInfo(mainCards);
+        if (active) setSortInfo(info);
       } else {
         setLoading(false);
       }
@@ -2055,11 +2056,8 @@ function CoverPickerModal({
   const filteredCards = coverSearch.trim()
     ? cards.filter(c => c.card_name.toLowerCase().includes(coverSearch.trim().toLowerCase()))
     : cards;
-  // Sort by card type (grouping same types together), then alphabetically — consistent with quick look.
-  const sortedCards = [...filteredCards].sort((a, b) =>
-    (rankByKey[cardKey(a)] ?? 99) - (rankByKey[cardKey(b)] ?? 99) ||
-    a.card_name.localeCompare(b.card_name)
-  );
+  // Canonical default sort — consistent with quick look.
+  const sortedCards = [...filteredCards].sort((a, b) => compareDeckCards(sortInfo, a, b));
 
   async function handleSelect(imgFile: string) {
     const c1 = activeSlot === 1 ? imgFile : previewCard1;

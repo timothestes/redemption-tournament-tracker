@@ -69,6 +69,7 @@ import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
 import { findCard, isWarrior, isWeapon, isSite } from '@/lib/cards/lookup';
+import { compareCardsDefault } from '@/lib/cards/defaultSort';
 import { normalizeDeckFormat } from '@/lib/deck-format';
 import { SOUL_DECK_BACK_IMG } from '@/app/shared/paragon/soulDeck';
 import { Link2Off } from 'lucide-react';
@@ -5878,17 +5879,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
             // Discard, LOR, and Reserve show top card face-up; everything else shows card back
             // Reserve always shows face-up to the owner regardless of isFlipped
-            // Reserve sorts by type then name to match the browse modal order. While a
-            // per-card reveal is active (e.g. Herod's Temple), pin the revealed card
-            // to the end so it renders on top of the visual stack instead of being
-            // buried by the alphabetical sort.
+            // Reserve sorts in the canonical default order to match the browse modal.
+            // While a per-card reveal is active (e.g. Herod's Temple), pin the revealed
+            // card to the end so it renders on top of the visual stack instead of being
+            // buried by the sort.
             const nowMicrosForSort = BigInt(Date.now()) * 1000n;
             const sortedCards = zoneKey === 'reserve'
               ? [...cards].sort((a, b) => {
                   const aRevealed = a.revealExpiresAt !== undefined && a.revealExpiresAt.microsSinceUnixEpoch > nowMicrosForSort ? 1 : 0;
                   const bRevealed = b.revealExpiresAt !== undefined && b.revealExpiresAt.microsSinceUnixEpoch > nowMicrosForSort ? 1 : 0;
                   if (aRevealed !== bRevealed) return aRevealed - bRevealed;
-                  return (a.cardType ?? '').localeCompare(b.cardType ?? '') || (a.cardName ?? '').localeCompare(b.cardName ?? '');
+                  return compareCardsDefault(
+                    { name: a.cardName ?? '', type: a.cardType ?? '', brigade: a.brigade, alignment: a.alignment, strength: a.strength, reference: a.reference },
+                    { name: b.cardName ?? '', type: b.cardType ?? '', brigade: b.brigade, alignment: b.alignment, strength: b.strength, reference: b.reference },
+                  );
                 })
               : cards;
             // For the deck, the top of the pile is the lowest zoneIndex (cards
