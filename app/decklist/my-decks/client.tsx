@@ -24,6 +24,7 @@ import {
 } from "../actions";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 import DeleteDeckModal from "./DeleteDeckModal";
+import DeleteFolderModal from "./DeleteFolderModal";
 import FolderModal from "./FolderModal";
 import UsernameModal from "./UsernameModal";
 import QuickLookModal from "./QuickLookModal";
@@ -316,6 +317,8 @@ export default function MyDecksClient() {
     const result = await deleteFolderAction(folderId);
     if (result.success) {
       setFolders(folders.filter((f) => f.id !== folderId));
+      // Decks inside the folder are cascade-deleted server-side; drop them locally too.
+      setDecks((prev) => prev.filter((d) => d.folder_id !== folderId));
       if (selectedFolder === folderId) {
         setSelectedFolder(null); // Go back to "My Decks"
       }
@@ -1193,8 +1196,9 @@ export default function MyDecksClient() {
 
       {/* Delete Folder Confirmation */}
       {folderToDelete && (
-        <DeleteDeckModal
-          deckName={folderToDelete.name}
+        <DeleteFolderModal
+          folderName={folderToDelete.name}
+          deckCount={decks.filter((d) => d.folder_id === folderToDelete.id).length}
           onConfirm={() => handleDeleteFolder(folderToDelete.id)}
           onClose={() => setFolderToDelete(null)}
         />
@@ -1757,11 +1761,9 @@ function DropdownMenu({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
-  const [submenuOnLeft, setSubmenuOnLeft] = useState(false);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const moveItemRef = useRef<HTMLDivElement>(null);
 
   function handleToggle() {
     if (!isOpen && buttonRef.current) {
@@ -1781,14 +1783,6 @@ function DropdownMenu({
     }
     setIsOpen(!isOpen);
   }
-
-  // Flip submenu to left side when it would overflow the right edge of the viewport
-  useEffect(() => {
-    if (!showMoveMenu || !moveItemRef.current) return;
-    const rect = moveItemRef.current.getBoundingClientRect();
-    const submenuWidth = 192; // w-48
-    setSubmenuOnLeft(rect.right + 8 + submenuWidth > window.innerWidth);
-  }, [showMoveMenu]);
 
   // Reposition on scroll/resize while open
   useEffect(() => {
@@ -1930,59 +1924,57 @@ function DropdownMenu({
               Share…
             </button>
 
-            {/* Move to Folder submenu */}
+            {/* Move to Folder submenu (expands inline so it isn't clipped by the menu's scroll container) */}
             <div className="border-t border-border my-1"></div>
-            <div className="relative" ref={moveItemRef}>
-              <button
-                onClick={() => setShowMoveMenu(!showMoveMenu)}
-                className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
-                <span className="flex-1">Move to...</span>
-                <svg className={`w-4 h-4 ${submenuOnLeft ? "rotate-180" : ""}`} fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                </svg>
-              </button>
+            <button
+              onClick={() => setShowMoveMenu(!showMoveMenu)}
+              className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
+            >
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              <span className="flex-1">Move to...</span>
+              <svg className={`w-4 h-4 transition-transform ${showMoveMenu ? "rotate-90" : ""}`} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            </button>
 
-              {showMoveMenu && (
-                <div className={`absolute top-0 w-48 bg-card rounded-md shadow-lg border border-border max-h-60 overflow-y-auto ${submenuOnLeft ? "right-full mr-1" : "left-full ml-1"}`}>
+            {showMoveMenu && (
+              <div className="bg-muted/40">
+                <button
+                  onClick={() => {
+                    onMove(null);
+                    setIsOpen(false);
+                    setShowMoveMenu(false);
+                  }}
+                  className={`w-full text-left pl-11 pr-4 py-2 text-sm hover:bg-muted ${
+                    !currentFolderId ? "bg-primary/10" : ""
+                  }`}
+                >
+                  My Decks
+                </button>
+                {folders.map((folder) => (
                   <button
+                    key={folder.id}
                     onClick={() => {
-                      onMove(null);
+                      onMove(folder.id!);
                       setIsOpen(false);
                       setShowMoveMenu(false);
                     }}
-                    className={`w-full text-left px-4 py-2 hover:bg-muted first:rounded-t-md ${
-                      !currentFolderId ? "bg-primary/10" : ""
+                    className={`w-full text-left pl-11 pr-4 py-2 text-sm truncate hover:bg-muted ${
+                      currentFolderId === folder.id ? "bg-primary/10" : ""
                     }`}
                   >
-                    My Decks
+                    {folder.name}
                   </button>
-                  {folders.map((folder) => (
-                    <button
-                      key={folder.id}
-                      onClick={() => {
-                        onMove(folder.id!);
-                        setIsOpen(false);
-                        setShowMoveMenu(false);
-                      }}
-                      className={`w-full text-left px-4 py-2 hover:bg-muted last:rounded-b-md ${
-                        currentFolderId === folder.id ? "bg-primary/10" : ""
-                      }`}
-                    >
-                      {folder.name}
-                    </button>
-                  ))}
-                  {folders.length === 0 && (
-                    <div className="px-4 py-2 text-sm text-muted-foreground">
-                      No folders available
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                ))}
+                {folders.length === 0 && (
+                  <div className="pl-11 pr-4 py-2 text-sm text-muted-foreground">
+                    No folders available
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="border-t border-border my-1"></div>
             <button
