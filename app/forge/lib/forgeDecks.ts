@@ -117,6 +117,19 @@ export async function copyForgeDeck(id: string): Promise<{ ok: true; id: string 
   return { ok: true, id: data.id };
 }
 
+// Just the share flag, for the builder's share modal (it doesn't track
+// is_shared, and pulling the full deck for one boolean is wasteful).
+export async function getForgeDeckShared(id: string): Promise<boolean> {
+  const ctx = await requireForge();
+  if (!ctx) return false;
+  const { data } = await ctx.supabase
+    .from("forge_decks")
+    .select("is_shared")
+    .eq("id", id)
+    .maybeSingle();
+  return data?.is_shared === true;
+}
+
 export async function setForgeDeckShared(id: string, shared: boolean): Promise<{ ok: boolean; error?: string }> {
   const ctx = await requireForge();
   if (!ctx) return { ok: false, error: "Not authorized" };
