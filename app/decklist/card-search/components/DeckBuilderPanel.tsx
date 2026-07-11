@@ -249,6 +249,10 @@ export default function DeckBuilderPanel({
   // persistence hides Load Deck unless it supplies its own `listDecks`
   // (the Forge lists forge_decks).
   const canLoadDeckList = !builderConfig.persistence || !!builderConfig.persistence.listDecks;
+  // A config-supplied share modal (the Forge's member-only share) surfaces the
+  // Share controls even with the public share (`canShare`) off.
+  const renderShareModal = builderConfig.renderShareModal;
+  const canOpenShare = canShare || !!renderShareModal;
 
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab ?? "main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -1169,7 +1173,7 @@ export default function DeckBuilderPanel({
             </button>
 
             {/* Share button (opens the share/visibility modal) */}
-            {canShare && isAuthenticated && deck.id && (
+            {canOpenShare && isAuthenticated && deck.id && (
               <button
                 onClick={() => setShowShareModal(true)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
@@ -1300,7 +1304,7 @@ export default function DeckBuilderPanel({
                       Replace Evil…
                     </button>
                   )}
-                  {canShare && isAuthenticated && deck.id && (
+                  {canOpenShare && isAuthenticated && deck.id && (
                     <button
                       onClick={() => { setShowShareModal(true); setShowMenu(false); }}
                       className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
@@ -1677,7 +1681,7 @@ export default function DeckBuilderPanel({
             </button>
 
             {/* Share button (opens the share/visibility modal) */}
-            {canShare && isAuthenticated && deck.id && (
+            {canOpenShare && isAuthenticated && deck.id && (
               <button
                 onClick={() => setShowShareModal(true)}
                 className="px-3 py-1.5 rounded border border-border bg-card hover:bg-muted text-muted-foreground transition-colors flex items-center"
@@ -1832,7 +1836,7 @@ export default function DeckBuilderPanel({
               )}
 
               {/* Sharing Section */}
-              {canShare && isAuthenticated && deck.id && (
+              {canOpenShare && isAuthenticated && deck.id && (
                 <button
                   onClick={() => { setShowShareModal(true); setShowMenu(false); }}
                   className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
@@ -3648,8 +3652,17 @@ export default function DeckBuilderPanel({
         </div>
       )}
 
-      {/* Share / visibility modal */}
-      {canShare && deck.id && (
+      {/* Share / visibility modal. A config-supplied modal (the Forge's
+          member-only share) replaces the public one outright — the public
+          modal writes public visibility, which Forge decks must never do. */}
+      {renderShareModal && deck.id ? (
+        renderShareModal({
+          open: showShareModal,
+          onOpenChange: setShowShareModal,
+          deckId: deck.id,
+          deckName: deck.name,
+        })
+      ) : canShare && deck.id ? (
         <ShareDeckModal
           open={showShareModal}
           onOpenChange={setShowShareModal}
@@ -3658,7 +3671,7 @@ export default function DeckBuilderPanel({
           visibility={currentVisibility}
           onSetVisibility={handleSelectVisibility}
         />
-      )}
+      ) : null}
 
       {/* Username Modal */}
       {showUsernameModal && (

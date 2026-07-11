@@ -33,6 +33,7 @@ import type { ForgeDeckEntry } from "@/app/forge/lib/deckTypes";
 import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
 import { saveForgeDeck, getForgeDeck, listForgeDecks, deleteForgeDeck } from "@/app/forge/lib/forgeDecks";
 import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
+import ForgeBuilderShareModal from "@/app/forge/components/ForgeBuilderShareModal";
 
 export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilderConfig {
   // Forge cards → Card[], with imgFile stamped to the forge dataLine so the cardId
@@ -214,6 +215,9 @@ export function makeForgeBuilderConfig(granted: GrantedForgeCard[]): DeckBuilder
     resolveCardImage,
     renderThumb,
     persistence: { save, loadById, resolveCard, listDecks, delete: deleteDeck },
+    // Member-only share (is_shared on forge_decks) in place of the public
+    // share modal — enableSharing stays off so nothing writes public data.
+    renderShareModal: (props) => <ForgeBuilderShareModal {...props} />,
     features: {
       localStoragePersist: false,
       syncFiltersToUrl: false,

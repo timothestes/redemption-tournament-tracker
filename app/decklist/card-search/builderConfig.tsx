@@ -132,6 +132,16 @@ export interface DeckBuilderConfig {
   persistence?: DeckBuilderPersistence;
   /** Feature toggles. Omit for all-public-defaults. */
   features?: DeckBuilderFeatures;
+  /** Replacement share modal. When provided, the builder shows its Share
+   *  controls even with `enableSharing` off and renders this instead of the
+   *  public ShareDeckModal (which writes public visibility — never for the
+   *  Forge). The Forge supplies its member-only share here. */
+  renderShareModal?: (props: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    deckId: string;
+    deckName?: string;
+  }) => ReactNode;
   /** Called after the Load Deck modal successfully loads a deck in place. The
    *  Forge rewrites /forge/play/decks/<id> via history.replaceState (its deck
    *  id lives in the URL; the public builder's does not). */
