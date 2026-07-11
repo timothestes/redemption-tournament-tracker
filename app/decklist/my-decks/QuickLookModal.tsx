@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { loadDeckByIdAction, DeckCardData } from "../actions";
-import { cardKey, buildTypeRanks } from "./cardTypeSort";
+import { buildSortInfo, compareDeckCards } from "./cardTypeSort";
+import type { SortableCard } from "@/lib/cards/defaultSort";
 
 // Mirror of the helper in client.tsx (kept local to avoid cross-file coupling).
 function getCardImageUrl(cardName: string | null | undefined): string | null {
@@ -26,7 +27,7 @@ export default function QuickLookModal({
   onOpenEditor: (deckId: string) => void;
 }) {
   const [cards, setCards] = useState<DeckCardData[]>([]);
-  const [rankByKey, setRankByKey] = useState<Record<string, number>>({});
+  const [sortInfo, setSortInfo] = useState<Record<string, SortableCard>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,10 +38,10 @@ export default function QuickLookModal({
         const list = (((result.deck as any).cards as DeckCardData[]) || []);
         setCards(list);
         setLoading(false);
-        // Enrich with card type for "group by type" sorting (lazy-loaded dataset).
-        const ranks = await buildTypeRanks(list);
+        // Enrich with card data for the default sort (lazy-loaded dataset).
+        const info = await buildSortInfo(list);
         if (!active) return;
-        setRankByKey(ranks);
+        setSortInfo(info);
       } else {
         setLoading(false);
       }
@@ -58,12 +59,11 @@ export default function QuickLookModal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Sort by card type (grouping same types together), then alphabetically.
-  const byTypeThenName = (a: DeckCardData, b: DeckCardData) =>
-    (rankByKey[cardKey(a)] ?? 99) - (rankByKey[cardKey(b)] ?? 99) ||
-    a.card_name.localeCompare(b.card_name);
-  const main = cards.filter((c) => c.zone === "main").sort(byTypeThenName);
-  const reserve = cards.filter((c) => c.zone === "reserve").sort(byTypeThenName);
+  // Canonical default sort (sections → brigades → strength → name).
+  const byDefaultOrder = (a: DeckCardData, b: DeckCardData) =>
+    compareDeckCards(sortInfo, a, b);
+  const main = cards.filter((c) => c.zone === "main").sort(byDefaultOrder);
+  const reserve = cards.filter((c) => c.zone === "reserve").sort(byDefaultOrder);
 
   const countCards = (list: DeckCardData[]) =>
     list.reduce((sum, c) => sum + (c.quantity || 0), 0);

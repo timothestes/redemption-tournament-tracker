@@ -9,6 +9,7 @@ import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
 import { DraggableTitleBar } from './DraggableTitleBar';
+import { compareCardsDefault } from '@/lib/cards/defaultSort';
 
 const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'hand', label: 'Hand' },
@@ -151,9 +152,12 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck } = actions;
   const rawCards = zones[zoneId] ?? [];
-  // Sort reserve by type then name (matches goldfish canvas convention)
+  // Sort reserve in the canonical default order (matches goldfish canvas convention)
   const cards = zoneId === 'reserve'
-    ? [...rawCards].sort((a, b) => a.type.localeCompare(b.type) || a.cardName.localeCompare(b.cardName))
+    ? [...rawCards].sort((a, b) => compareCardsDefault(
+        { name: a.cardName, type: a.type, brigade: a.brigade, alignment: a.alignment, strength: a.strength, reference: a.reference },
+        { name: b.cardName, type: b.type, brigade: b.brigade, alignment: b.alignment, strength: b.strength, reference: b.reference },
+      ))
     : rawCards;
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(200, { setPreviewCard, isLoupeVisible });

@@ -25,6 +25,7 @@ import FullDeckView from "./FullDeckView";
 import DragGhost from "./DragGhost";
 import { Switch } from "@headlessui/react";
 import { Card, normalizeBrigadeField } from "../utils";
+import { compareCardsDefault, compareTypeGroups } from "@/lib/cards/defaultSort";
 import { validateDeck } from "../utils/deckValidation";
 import GeneratePDFModal from "./GeneratePDFModal";
 import AodCountCard from "./AodCountCard";
@@ -787,29 +788,13 @@ export default function DeckBuilderPanel({
       return acc;
     }, {} as Record<string, typeof deck.cards>);
 
-    // Sort types alphabetically
+    // Order type buckets canonically (Dominants, Artifacts, Fortresses, …)
     return Object.keys(grouped)
-      .sort()
+      .sort(compareTypeGroups)
       .map((type) => ({
         type,
-        // Sort cards within each type by alignment, then by name
-        cards: grouped[type].sort((a, b) => {
-          const alignmentA = a.card.alignment || 'Neutral';
-          const alignmentB = b.card.alignment || 'Neutral';
-          
-          // Define alignment order: Good, Evil, Neutral
-          const alignmentOrder = ['Good', 'Evil', 'Neutral'];
-          const aIndex = alignmentOrder.indexOf(alignmentA);
-          const bIndex = alignmentOrder.indexOf(alignmentB);
-          
-          // Sort by alignment first
-          if (aIndex !== bIndex) {
-            return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
-          }
-          
-          // Then by card name
-          return a.card.name.localeCompare(b.card.name);
-        }),
+        // Sort cards within each type with the canonical default order
+        cards: grouped[type].sort((a, b) => compareCardsDefault(a.card, b.card)),
         count: grouped[type].reduce((sum, dc) => sum + dc.quantity, 0),
       }));
   };
@@ -837,15 +822,8 @@ export default function DeckBuilderPanel({
       })
       .map((alignment) => ({
         type: alignment,
-        // Sort cards within each alignment by type, then by name
-        cards: grouped[alignment].sort((a, b) => {
-          const typeA = a.card.type || '';
-          const typeB = b.card.type || '';
-          if (typeA !== typeB) {
-            return typeA.localeCompare(typeB);
-          }
-          return a.card.name.localeCompare(b.card.name);
-        }),
+        // Sort cards within each alignment with the canonical default order
+        cards: grouped[alignment].sort((a, b) => compareCardsDefault(a.card, b.card)),
         count: grouped[alignment].reduce((sum, dc) => sum + dc.quantity, 0),
       }));
   };
@@ -2933,7 +2911,7 @@ export default function DeckBuilderPanel({
                     case "brigade":
                       return (a.card.brigade || "").localeCompare(b.card.brigade || "") || a.card.name.localeCompare(b.card.name);
                     default:
-                      return 0;
+                      return compareCardsDefault(a.card, b.card);
                   }
                 });
                 return (

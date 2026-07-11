@@ -9,6 +9,7 @@ import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
 import { DraggableTitleBar } from './DraggableTitleBar';
+import { compareCardsDefault } from '@/lib/cards/defaultSort';
 
 const OPPONENT_ACTIONS = [
   { id: 'discard', label: 'Discard' },
@@ -185,7 +186,10 @@ export function OpponentBrowseModal({
   const isReserve = zoneName.toLowerCase().includes('reserve');
   const isDeck = zoneName.toLowerCase().includes('deck');
   const sortedCards = isReserve
-    ? [...cards].sort((a, b) => a.type.localeCompare(b.type) || a.cardName.localeCompare(b.cardName))
+    ? [...cards].sort((a, b) => compareCardsDefault(
+        { name: a.cardName, type: a.type, brigade: a.brigade, alignment: a.alignment, strength: a.strength, reference: a.reference },
+        { name: b.cardName, type: b.type, brigade: b.brigade, alignment: b.alignment, strength: b.strength, reference: b.reference },
+      ))
     : cards;
 
   const matchesSearch = (c: GameCard, term: string): boolean => {

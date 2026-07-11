@@ -52,6 +52,7 @@ import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePro
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
+import { compareCardsDefault } from '@/lib/cards/defaultSort';
 import { getEffectiveAbilities, isLostSoulCard, isHeroCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
 import { Link2Off } from 'lucide-react';
@@ -2011,14 +2012,15 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               );
             }
 
-            // Reserve: overlap cards horizontally, sorted by type then name
+            // Reserve: overlap cards horizontally, in the canonical default order
             if (zoneId === 'reserve') {
               const zone = zoneLayout[zoneId];
               const pad = 8;
               const availW = zone.width - pad * 2;
-              const sorted = [...cards].sort((a, b) =>
-                a.type.localeCompare(b.type) || a.cardName.localeCompare(b.cardName)
-              );
+              const sorted = [...cards].sort((a, b) => compareCardsDefault(
+                { name: a.cardName, type: a.type, brigade: a.brigade, alignment: a.alignment, strength: a.strength, reference: a.reference },
+                { name: b.cardName, type: b.type, brigade: b.brigade, alignment: b.alignment, strength: b.strength, reference: b.reference },
+              ));
               const overlap = sorted.length <= 1
                 ? 0
                 : Math.min(sidebarCardWidth * 0.3, (availW - sidebarCardWidth) / (sorted.length - 1));

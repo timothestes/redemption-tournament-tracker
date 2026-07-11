@@ -16,6 +16,7 @@ import {
 import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG, BuilderConfigProvider } from "./builderConfig";
 import { readStickyFilters, writeStickyFilters, type AltArtMode } from "./stickyFilters";
 import { hasAbReprint } from "@/lib/cards/lookup";
+import { compareCardsDefault } from "@/lib/cards/defaultSort";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
@@ -196,7 +197,7 @@ export default function CardSearchClient({
   // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned), Paragon
   const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'|'Paragon'>('Rotation');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
-  const [sortBy, setSortBy] = useState<'name' | 'set' | 'strength' | 'toughness' | 'type' | 'brigade'>('name');
+  const [sortBy, setSortBy] = useState<'default' | 'name' | 'set' | 'strength' | 'toughness' | 'type' | 'brigade'>('default');
 
   const [modalCard, setModalCardRaw] = useState<Card | null>(null);
   const modalOpenedFromDeckRef = useRef(false);
@@ -1295,8 +1296,10 @@ export default function CardSearchClient({
         case 'brigade':
           return a.brigade.localeCompare(b.brigade) || a.name.localeCompare(b.name);
         case 'name':
-        default:
           return a.name.localeCompare(b.name);
+        case 'default':
+        default:
+          return compareCardsDefault(a, b);
       }
     });
   }, [filtered, sortBy]);
@@ -1941,6 +1944,7 @@ export default function CardSearchClient({
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                 className="px-2 py-1.5 border rounded text-sm font-semibold bg-muted text-foreground border-border focus:outline-none h-9 sm:h-11"
               >
+                <option value="default">Default</option>
                 <option value="name">Name</option>
                 <option value="set">Set</option>
                 <option value="strength">Strength</option>
@@ -2223,6 +2227,7 @@ export default function CardSearchClient({
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
             className="px-2 py-1 border rounded text-xs font-semibold bg-muted text-foreground border-border focus:outline-none"
           >
+            <option value="default">Default</option>
             <option value="name">Name</option>
             <option value="set">Set</option>
             <option value="strength">Strength</option>

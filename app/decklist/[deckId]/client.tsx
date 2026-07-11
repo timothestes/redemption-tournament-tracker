@@ -23,6 +23,7 @@ import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import { Deck as DeckType } from "../card-search/types/deck";
 import { generateDeckText } from "../card-search/utils/deckImportExport";
+import { compareCardsDefault, compareTypeGroups, type SortableCard } from "@/lib/cards/defaultSort";
 
 interface PublicDeckData {
   id: string;
@@ -65,6 +66,19 @@ interface EnrichedCard extends DeckCardData {
   alignment: string;
   brigade: string;
   fullCard: Card | null;
+}
+
+// Adapt an enriched deck card for the canonical default comparator.
+// Strength/reference only live on the full card record when we resolved one.
+function toSortable(c: EnrichedCard): SortableCard {
+  return {
+    name: c.card_name,
+    type: c.type,
+    brigade: c.brigade,
+    alignment: c.alignment,
+    strength: c.fullCard?.strength,
+    reference: c.fullCard?.reference,
+  };
 }
 
 // Prettify raw type abbreviations
@@ -404,21 +418,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   }, [mainCards, groupBy]);
 
   const sortedReserveCards = useMemo(() => {
-    return [...reserveCards].sort((a, b) => {
-      const typeA = prettifyTypeName(a.type);
-      const typeB = prettifyTypeName(b.type);
-      if (typeA !== typeB) return typeA.localeCompare(typeB);
-      return a.card_name.localeCompare(b.card_name);
-    });
+    return [...reserveCards].sort((a, b) => compareCardsDefault(toSortable(a), toSortable(b)));
   }, [reserveCards]);
 
   const sortedMaybeboardCards = useMemo(() => {
-    return [...maybeboardCards].sort((a, b) => {
-      const typeA = prettifyTypeName(a.type);
-      const typeB = prettifyTypeName(b.type);
-      if (typeA !== typeB) return typeA.localeCompare(typeB);
-      return a.card_name.localeCompare(b.card_name);
-    });
+    return [...maybeboardCards].sort((a, b) => compareCardsDefault(toSortable(a), toSortable(b)));
   }, [maybeboardCards]);
 
   // Build flat list of Card objects for modal navigation (main + reserve + maybeboard)
@@ -990,7 +994,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
             case "brigade":
               return (a.brigade || "").localeCompare(b.brigade || "") || a.card_name.localeCompare(b.card_name);
             default:
-              return 0;
+              return compareCardsDefault(toSortable(a), toSortable(b));
           }
         });
         const close = () => { setCoverEditorOpen(false); setCoverPickerSlot(null); };
@@ -1810,18 +1814,9 @@ function groupAndSortCards(
     grouped[key].push(card);
   }
 
-  // Sort within each group: alignment (Good > Evil > Neutral), then brigade, then name
-  const alignmentOrder = ["Good", "Evil", "Neutral"];
+  // Sort within each group with the canonical default order
   for (const key of Object.keys(grouped)) {
-    grouped[key].sort((a, b) => {
-      const aIdx = alignmentOrder.indexOf(a.alignment);
-      const bIdx = alignmentOrder.indexOf(b.alignment);
-      const aOrder = aIdx === -1 ? 999 : aIdx;
-      const bOrder = bIdx === -1 ? 999 : bIdx;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      if (a.brigade !== b.brigade) return a.brigade.localeCompare(b.brigade);
-      return a.card_name.localeCompare(b.card_name);
-    });
+    grouped[key].sort((a, b) => compareCardsDefault(toSortable(a), toSortable(b)));
   }
 
   // Order the groups
@@ -1835,8 +1830,9 @@ function groupAndSortCards(
       if (!ordered[k]) ordered[k] = grouped[k];
     });
   } else {
+    // Order type buckets canonically (Dominants, Artifacts, Fortresses, …)
     Object.keys(grouped)
-      .sort((a, b) => a.localeCompare(b))
+      .sort(compareTypeGroups)
       .forEach((key) => {
         ordered[key] = grouped[key];
       });
