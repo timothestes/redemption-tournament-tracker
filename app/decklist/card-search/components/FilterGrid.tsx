@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import clsx from "clsx";
+import type { AltArtMode } from "../stickyFilters";
 
 interface FilterGridProps {
   // Legality & Alignment
@@ -30,8 +31,8 @@ interface FilterGridProps {
   setToughnessFilter: (toughness: number | null) => void;
   toughnessOp: string;
   setToughnessOp: (op: string) => void;
-  noAltArt: boolean;
-  setnoAltArt: (value: boolean | ((prev: boolean) => boolean)) => void;
+  altArtMode: AltArtMode;
+  setAltArtMode: (mode: AltArtMode) => void;
   noFirstPrint: boolean;
   setnoFirstPrint: (value: boolean | ((prev: boolean) => boolean)) => void;
   nativityOnly: boolean;
@@ -97,8 +98,8 @@ export default function FilterGrid({
   setToughnessFilter,
   toughnessOp,
   setToughnessOp,
-  noAltArt,
-  setnoAltArt,
+  altArtMode,
+  setAltArtMode,
   noFirstPrint,
   setnoFirstPrint,
   nativityOnly,
@@ -423,17 +424,30 @@ export default function FilterGrid({
           <section className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
           <span className="text-muted-foreground uppercase text-xs font-medium shrink-0 sm:w-[88px]">Misc</span>
           <div className="flex flex-wrap gap-1">
-            <button
-              className={clsx(
-                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
-                noAltArt
-                  ? 'bg-primary/20 text-primary border-primary/30'
-                  : 'bg-muted text-foreground hover:bg-muted/80 border-border'
-              )}
-              onClick={() => setnoAltArt(v => !v)}
-            >
-              No AB Versions
-            </button>
+            <div className="inline-flex rounded border border-border overflow-hidden" role="group" aria-label="AB versions">
+              {([
+                ['hide', 'Hide AB', 'Hide all AB (alternate-art) versions'],
+                ['all', 'Show AB', 'Show AB versions alongside the standard printings'],
+                ['prefer', 'Prefer AB', 'Show the AB version of any card that has one; standard printing otherwise'],
+              ] as const).map(([mode, label, title], i) => (
+                <button
+                  key={mode}
+                  type="button"
+                  title={title}
+                  aria-pressed={altArtMode === mode}
+                  className={clsx(
+                    'px-2 py-1 text-xs font-semibold transition-colors duration-150',
+                    i > 0 && 'border-l border-border',
+                    altArtMode === mode
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-muted text-foreground hover:bg-muted/80'
+                  )}
+                  onClick={() => setAltArtMode(mode)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <button
               className={clsx(
                 'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
