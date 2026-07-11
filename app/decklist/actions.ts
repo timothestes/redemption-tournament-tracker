@@ -792,12 +792,13 @@ export async function deleteFolderAction(folderId: string) {
       };
     }
 
-    // Check if folder has decks
+    // Collect the decks in this folder so we can cascade-delete them and
+    // invalidate their public caches (card rows cascade-delete via FK).
     const { data: decksInFolder, error: checkError } = await supabase
       .from("decks")
       .select("id")
       .eq("folder_id", folderId)
-      .limit(1);
+      .eq("user_id", user.id);
 
     if (checkError) {
       console.error("Error checking folder contents:", checkError);
@@ -807,14 +808,24 @@ export async function deleteFolderAction(folderId: string) {
       };
     }
 
+    // Delete every deck inside the folder (their cards cascade-delete via FK).
     if (decksInFolder && decksInFolder.length > 0) {
-      return {
-        success: false,
-        error: "Cannot delete folder that contains decks. Move or delete the decks first.",
-      };
+      const { error: decksError } = await supabase
+        .from("decks")
+        .delete()
+        .eq("folder_id", folderId)
+        .eq("user_id", user.id);
+
+      if (decksError) {
+        console.error("Error deleting decks in folder:", decksError);
+        return {
+          success: false,
+          error: "Failed to delete folder",
+        };
+      }
     }
 
-    // Delete folder
+    // Delete the folder itself
     const { error } = await supabase
       .from("deck_folders")
       .delete()
@@ -830,10 +841,14 @@ export async function deleteFolderAction(folderId: string) {
     }
 
     revalidatePath("/decklist/my-decks");
+    revalidateTag("public-decks-list");
+    for (const deck of decksInFolder ?? []) {
+      revalidateTag(`public-deck:${deck.id}`);
+    }
 
     return {
       success: true,
-      message: "Folder deleted successfully",
+      message: "Folder and its decks deleted successfully",
     };
   } catch (error) {
     console.error("Error in deleteFolderAction:", error);
