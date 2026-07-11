@@ -14,7 +14,8 @@ import {
   iconPredicates,
 } from "./utils";
 import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG, BuilderConfigProvider } from "./builderConfig";
-import { readStickyFilters, writeStickyFilters } from "./stickyFilters";
+import { readStickyFilters, writeStickyFilters, type AltArtMode } from "./stickyFilters";
+import { hasAbReprint } from "@/lib/cards/lookup";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
@@ -218,7 +219,11 @@ export default function CardSearchClient({
   // Seed the two print/art filters from the user's per-device sticky preference
   // (default "hide" for both when unset). Applies in all modes, including deck
   // editing and the Forge, where a deckId is always present.
-  const [noAltArt, setnoAltArt] = useState(() => readStickyFilters().noAltArt);
+  // AB (alternate-art) display mode, seeded from the user's per-device sticky
+  // preference. 'hide' (default) hides AB versions; 'all' shows them alongside
+  // the standard prints; 'prefer' shows the AB version of any card that has one
+  // and hides that card's original. Applies in every mode, including the Forge.
+  const [altArtMode, setAltArtMode] = useState<AltArtMode>(() => readStickyFilters().altArt);
   const [noFirstPrint, setnoFirstPrint] = useState(() => readStickyFilters().noFirstPrint);
   const [nativityOnly, setNativityOnly] = useState(false);
   const [hasStarOnly, setHasStarOnly] = useState(false);
@@ -602,7 +607,7 @@ export default function CardSearchClient({
       params.set('toughness', filters.toughnessFilter.toString());
       params.set('toughnessOp', filters.toughnessOp);
     }
-    if (!filters.noAltArt) params.set('showAltArt', 'true');
+    if (filters.altArtMode !== 'hide') params.set('showAltArt', filters.altArtMode);
     if (!filters.noFirstPrint) params.set('showFirstPrint', 'true');
     if (filters.nativityOnly) {
       params.set('nativity', 'true');
@@ -713,9 +718,13 @@ export default function CardSearchClient({
 
       // Explicit shared-link intent overrides the sticky default; otherwise the
       // values keep their initial state seeded from the saved per-device
-      // preference (see the useState initializers above).
-      if (searchParams.get('showAltArt') === 'true') {
-        setnoAltArt(false);
+      // preference (see the useState initializers above). Legacy shared links
+      // used showAltArt=true to mean "show all".
+      const showAltArtParam = searchParams.get('showAltArt');
+      if (showAltArtParam === 'prefer') {
+        setAltArtMode('prefer');
+      } else if (showAltArtParam === 'all' || showAltArtParam === 'true') {
+        setAltArtMode('all');
       }
       if (searchParams.get('showFirstPrint') === 'true') {
         setnoFirstPrint(false);
@@ -750,8 +759,8 @@ export default function CardSearchClient({
   // before any shared-link URL params have been applied.
   useEffect(() => {
     if (!isInitialized) return;
-    writeStickyFilters({ noAltArt, noFirstPrint });
-  }, [noAltArt, noFirstPrint, isInitialized]);
+    writeStickyFilters({ altArt: altArtMode, noFirstPrint });
+  }, [altArtMode, noFirstPrint, isInitialized]);
 
   // Update URL whenever filters change
   useEffect(() => {
@@ -770,7 +779,7 @@ export default function CardSearchClient({
       strengthOp,
       toughnessFilter,
       toughnessOp,
-      noAltArt,
+      altArtMode,
       noFirstPrint,
       nativityOnly,
       nativityNot,
@@ -793,7 +802,7 @@ export default function CardSearchClient({
     queries, legalityMode, iconFilterMode, selectedIconFilters,
     selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, testamentNots,
     isGospel, gospelNot, strengthFilter,
-    strengthOp, toughnessFilter, toughnessOp, noAltArt, noFirstPrint,
+    strengthOp, toughnessFilter, toughnessOp, altArtMode, noFirstPrint,
     nativityOnly, nativityNot, hasStarOnly, hasStarNot, cloudOnly, cloudNot,
     angelOnly, angelNot, demonOnly, demonNot, danielOnly, danielNot,
     postexilicOnly, postexilicNot, updateURL, mode
@@ -1157,8 +1166,14 @@ export default function CardSearchClient({
             default: return true;
           }
         })
-        // Misc filters (hide AB Versions, hide 1st Print K/L Starters)
-        .filter((c) => !noAltArt || !c.set.includes("AB"))
+        // Misc filters (AB display mode, hide 1st Print K/L Starters)
+        .filter((c) => {
+          const isAB = c.set.includes("AB");
+          if (altArtMode === 'hide') return !isAB;      // hide all AB versions
+          if (altArtMode === 'all') return true;         // show AB alongside originals
+          // 'prefer': keep every AB card; hide the one original that has an AB twin
+          return isAB || !hasAbReprint(c.name, c.set);
+        })
         .filter((c) => !noFirstPrint || (
           !c.set.includes("K1P") && !c.set.includes("L1P")
         ))
@@ -1226,7 +1241,7 @@ export default function CardSearchClient({
           const matches = postexilicCards.includes(c.name);
           return postexilicNot ? !matches : matches;
         }),
-    [cards, queries, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode, nativityNot, hasStarNot, cloudNot, angelNot, demonNot, danielNot, postexilicNot, testamentNots, gospelNot]
+    [cards, queries, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode, nativityNot, hasStarNot, cloudNot, angelNot, demonNot, danielNot, postexilicNot, testamentNots, gospelNot]
   );
 
   // Effect to show all cards when any filter is applied
@@ -1242,7 +1257,7 @@ export default function CardSearchClient({
       isGospel || 
       strengthFilter !== null || 
       toughnessFilter !== null || 
-      !noAltArt || 
+      altArtMode !== 'hide' ||
       !noFirstPrint || 
       nativityOnly || 
       hasStarOnly || 
@@ -1258,7 +1273,7 @@ export default function CardSearchClient({
     } else {
       setVisibleCount(0);
     }
-  }, [filtered.length, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, testamentNots, gospelNot]);
+  }, [filtered.length, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, testamentNots, gospelNot]);
 
   const sortedFiltered = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -1301,7 +1316,7 @@ export default function CardSearchClient({
     isGospel ||
     strengthFilter !== null ||
     toughnessFilter !== null ||
-    !noAltArt ||
+    altArtMode !== 'hide' ||
     !noFirstPrint ||
     nativityOnly ||
     hasStarOnly ||
@@ -2136,9 +2151,9 @@ export default function CardSearchClient({
           </span>
         )}
         {/* Misc booleans */}
-        {noAltArt === false && (
-          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
-            AB Versions
+        {altArtMode !== 'hide' && (
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => setAltArtMode('hide')} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
+            {altArtMode === 'prefer' ? 'Prefer AB' : 'Show AB'}
             <span className="ml-1">×</span>
           </span>
         )}
@@ -2289,8 +2304,8 @@ export default function CardSearchClient({
             setToughnessFilter={setToughnessFilter}
             toughnessOp={toughnessOp}
             setToughnessOp={setToughnessOp}
-            noAltArt={noAltArt}
-            setnoAltArt={setnoAltArt}
+            altArtMode={altArtMode}
+            setAltArtMode={setAltArtMode}
             noFirstPrint={noFirstPrint}
             setnoFirstPrint={setnoFirstPrint}
             nativityOnly={nativityOnly}

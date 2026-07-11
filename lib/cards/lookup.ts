@@ -6,10 +6,24 @@
  */
 
 import { CARDS } from './generated/cardData';
+import abMap from './generated/abMap.json';
 
 export { CARDS, type CardData } from './generated/cardData';
 
 import type { CardData } from './generated/cardData';
+
+// `name|set` keys of the standard prints that have an AB (alternate-art booster)
+// reprint. Derived from the generated AB→original map (abMap.json), which pairs
+// each AB card to its original print. Used by the deckbuilder's "Prefer AB"
+// filter to hide an original when its AB version is available.
+const ORIGINAL_KEYS_WITH_AB: ReadonlySet<string> = new Set(
+  Object.values(abMap as Record<string, string>),
+);
+
+/** Does this exact print (by name + set) have an AB reprint of the same card? */
+export function hasAbReprint(name: string, set: string): boolean {
+  return ORIGINAL_KEYS_WITH_AB.has(`${name}|${set}`);
+}
 
 // Lookup maps are built once at module load from CARDS rather than serialized
 // into the generated artifact — keeping the giant card literal out of the .ts
