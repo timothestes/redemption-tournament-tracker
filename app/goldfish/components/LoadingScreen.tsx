@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { LOADING_MESSAGES } from '@/app/shared/constants/loadingMessages';
 
-export function LoadingScreen({ progress }: { progress: number }) {
+export function LoadingScreen({ progress, isForge }: { progress: number; isForge?: boolean }) {
   // Randomize only after mount: picking during render runs on the server too,
   // and a different pick on the client is a hydration text mismatch.
   const [message, setMessage] = useState(LOADING_MESSAGES[0]);
@@ -27,12 +27,12 @@ export function LoadingScreen({ progress }: { progress: number }) {
         gap: 24,
       }}
     >
-      {/* Cave background */}
+      {/* Cave (or Forge) background */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: 'url(/gameplay/cave_background.png)',
+          backgroundImage: `url(/gameplay/${isForge ? 'forge_background' : 'cave_background'}.png)`,
           backgroundSize: 'cover',
           backgroundPosition: 'center 70%',
           backgroundRepeat: 'no-repeat',

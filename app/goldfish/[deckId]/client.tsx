@@ -42,6 +42,11 @@ function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onL
 
   const { isReady, progress } = useImagePreloader(imageUrls);
 
+  // Forge decks play against the forge background; everything else the cave.
+  const backgroundImage = deck.isForge
+    ? 'url(/gameplay/forge_background.png)'
+    : 'url(/gameplay/cave_background.png)';
+
   // Warm the canvas chunk while the loading screen is up — GoldfishCanvas is
   // dynamically imported, and without this it only starts downloading after
   // isReady flips, leaving the cave background briefly unshaded.
@@ -64,7 +69,7 @@ function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onL
   );
 
   if (!isReady) {
-    return <LoadingScreen progress={progress} />;
+    return <LoadingScreen progress={progress} isForge={deck.isForge} />;
   }
 
   return (
@@ -81,13 +86,13 @@ function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onL
         flexDirection: 'row',
       }}
     >
-      {/* Cave background image — shared across game area and loupe */}
+      {/* Cave (or Forge) background image — shared across game area and loupe */}
       <div
         className="cave-bg"
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: 'url(/gameplay/cave_background.png)',
+          backgroundImage,
           backgroundSize: 'cover',
           backgroundPosition: 'center 70%',
           backgroundRepeat: 'no-repeat',
