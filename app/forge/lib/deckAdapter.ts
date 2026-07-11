@@ -78,7 +78,11 @@ export function designCardToCard(data: DesignCard, cardId: string, setName: stri
     brigade: brigades.map((b) => BRIGADE_DISPLAY[b] ?? b).join("/") || "—",
     strength: data.strength != null ? String(data.strength) : "—",
     toughness: data.toughness != null ? String(data.toughness) : "—",
-    class: (data.class ?? []).join("/"),
+    // Public data keeps Warrior/Weapon AND the Territory/Star/Cloud icons in one
+    // combined `class` string (the deckbuilder's class filters substring-match it).
+    // The forge model splits them, so recombine here — mirroring the Lackey export
+    // (lackey.ts) — or forge Territory/Star/Cloud cards vanish from those filters.
+    class: [...(data.class ?? []), ...(data.icons ?? [])].join("/"),
     identifier: (data.identifiers ?? []).join(", "),
     // rawText-first (via cardRawText) — the studio edits rawText; a stale legacy
     // specialAbility must not shadow it (Heavenly Temple bug, 2026-07-06).

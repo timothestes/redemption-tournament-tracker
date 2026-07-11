@@ -36,6 +36,25 @@ describe("designCardToCard", () => {
     expect(c.type.toLowerCase()).toContain("dominant");
   });
 
+  it("folds Territory/Star/Cloud icons into the class string so the class filters match", () => {
+    // Regression: the deckbuilder's Territory/Warrior/Weapon-Class filters all read
+    // a single combined `class` string — public data keeps Warrior/Weapon AND the
+    // Territory/Star/Cloud icons together there. The forge model splits `class`
+    // (Warrior/Weapon) from `icons` (Territory/Star/Cloud), so the adapter must
+    // recombine them (like the Lackey export) or forge Territory Class cards are
+    // invisible to the Territory Class selector.
+    const territory: DesignCard = { name: "Hope", cardType: ["Hero"], icons: ["Territory"] };
+    expect(designCardToCard(territory, "t1", "EoT").class).toContain("Territory");
+
+    const both: DesignCard = { name: "Mixed", cardType: ["Hero"], class: ["Warrior"], icons: ["Star"] };
+    const mixed = designCardToCard(both, "m1", "EoT").class;
+    expect(mixed).toContain("Warrior");
+    expect(mixed).toContain("Star");
+
+    // No class/icons → empty string (unchanged).
+    expect(designCardToCard({ name: "Plain", cardType: ["Hero"] }, "p1", "S").class).toBe("");
+  });
+
   it("defaults an unset legality to 'Rotation' but preserves an explicit choice", () => {
     const unset: DesignCard = { name: "New", cardType: ["Hero"] };
     expect(designCardToCard(unset, "id3", "S").legality).toBe("Rotation");
