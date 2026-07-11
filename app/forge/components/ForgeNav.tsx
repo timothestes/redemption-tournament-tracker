@@ -18,13 +18,15 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
       ? [
           { href: "/forge/play", label: "Play", match: (p) => p === "/forge/play" || p.startsWith("/forge/play/games") },
           { href: "/forge/play/sets", label: "Sets", match: (p) => p.startsWith("/forge/play/sets") || (/^\/forge\/play\/[^/]+$/.test(p) && !p.startsWith("/forge/play/decks") && !p.startsWith("/forge/play/games")) },
-          { href: "/forge/play/decks", label: "Decks", match: (p) => p.startsWith("/forge/play/decks") },
+          { href: "/forge/play/decks", label: "Decks", match: (p) => p.startsWith("/forge/play/decks") && p !== "/forge/play/decks/new" },
+          { href: "/forge/play/decks/new", label: "Deckbuilder", match: (p) => p === "/forge/play/decks/new" },
         ]
       : [
           { href: "/forge/ideas", label: "Ideas", match: (p) => p.startsWith("/forge/ideas") },
           { href: "/forge/sets", label: "Sets", match: (p) => p.startsWith("/forge/sets") },
           { href: "/forge/play", label: "Play", match: (p) => p.startsWith("/forge/play") && !p.startsWith("/forge/play/decks") },
-          { href: "/forge/play/decks", label: "Decks", match: (p) => p.startsWith("/forge/play/decks") },
+          { href: "/forge/play/decks", label: "Decks", match: (p) => p.startsWith("/forge/play/decks") && p !== "/forge/play/decks/new" },
+          { href: "/forge/play/decks/new", label: "Deckbuilder", match: (p) => p === "/forge/play/decks/new" },
           { href: "/forge/announcements", label: "Announcements", match: (p) => p.startsWith("/forge/announcements") },
           ...(role === "superadmin" || role === "elder"
             ? [{ href: "/forge/admin", label: "Admin", match: (p: string) => p.startsWith("/forge/admin") }]
