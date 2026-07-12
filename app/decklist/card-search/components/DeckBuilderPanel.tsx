@@ -3173,7 +3173,7 @@ export default function DeckBuilderPanel({
                 Add notes or strategy for your deck (supports Markdown).
               </p>
               {descriptionPreview ? (
-                <div className="w-full min-h-[8rem] p-3 text-sm border border-border rounded-lg bg-card text-card-foreground overflow-auto prose prose-sm dark:prose-invert max-w-none">
+                <div className="w-full min-h-[16rem] p-3 text-sm border border-border rounded-lg bg-card text-card-foreground overflow-auto prose prose-sm dark:prose-invert max-w-none">
                   {deck.description ? (
                     <ReactMarkdown>{deck.description}</ReactMarkdown>
                   ) : (
@@ -3185,7 +3185,7 @@ export default function DeckBuilderPanel({
                   value={deck.description || ""}
                   onChange={(e) => onDescriptionChange?.(e.target.value)}
                   placeholder="Deck strategy, card choices, matchup notes..."
-                  className="w-full h-32 p-3 text-sm border border-border rounded-lg bg-card text-card-foreground placeholder-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                  className="w-full h-64 min-h-[16rem] p-3 text-sm border border-border rounded-lg bg-card text-card-foreground placeholder-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                 />
               )}
             </div>
