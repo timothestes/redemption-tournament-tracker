@@ -47,4 +47,7 @@ export default __t.row({
   pauseRequestType: __t.string().name("pause_request_type"),
   pauseStartedAtMicros: __t.u64().name("pause_started_at_micros"),
   totalPausedMicros: __t.u64().name("total_paused_micros"),
+  battleState: __t.string().name("battle_state"),
+  battleAttackerSeat: __t.string().name("battle_attacker_seat"),
+  lastBattlePlayBySeat: __t.string().name("last_battle_play_by_seat"),
 });

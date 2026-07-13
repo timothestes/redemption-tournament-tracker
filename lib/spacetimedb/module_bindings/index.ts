@@ -48,7 +48,9 @@ import DetachCardReducer from "./detach_card_reducer";
 import DiscardReserveCharactersExecuteReducer from "./discard_reserve_characters_execute_reducer";
 import DrawCardReducer from "./draw_card_reducer";
 import DrawMultipleReducer from "./draw_multiple_reducer";
+import EndBattleReducer from "./end_battle_reducer";
 import EndTurnReducer from "./end_turn_reducer";
+import EnterBattleReducer from "./enter_battle_reducer";
 import ExchangeCardsReducer from "./exchange_cards_reducer";
 import ExchangeFromDeckReducer from "./exchange_from_deck_reducer";
 import ExecuteCardAbilityReducer from "./execute_card_ability_reducer";
@@ -97,6 +99,7 @@ import RequestSpectatorHandRevealReducer from "./request_spectator_hand_reveal_r
 import RequestZoneSearchReducer from "./request_zone_search_reducer";
 import RescueLostSoulReducer from "./rescue_lost_soul_reducer";
 import ResignGameReducer from "./resign_game_reducer";
+import ResolveBattleReducer from "./resolve_battle_reducer";
 import RespondRematchReducer from "./respond_rematch_reducer";
 import RespondToPauseReducer from "./respond_to_pause_reducer";
 import RespondToResumeReducer from "./respond_to_resume_reducer";
@@ -120,6 +123,7 @@ import ShuffleSoulDeckReducer from "./shuffle_soul_deck_reducer";
 import SpawnLostSoulReducer from "./spawn_lost_soul_reducer";
 import StopImitatingLostSoulReducer from "./stop_imitating_lost_soul_reducer";
 import SurrenderLostSoulReducer from "./surrender_lost_soul_reducer";
+import SurrenderSoulReducer from "./surrender_soul_reducer";
 import ThreeNailsResetExecuteReducer from "./three_nails_reset_execute_reducer";
 import ToggleRevealHandReducer from "./toggle_reveal_hand_reducer";
 import ToggleRevealReserveReducer from "./toggle_reveal_reserve_reducer";
@@ -397,7 +401,9 @@ const reducersSchema = __reducers(
   __reducerSchema("discard_reserve_characters_execute", DiscardReserveCharactersExecuteReducer),
   __reducerSchema("draw_card", DrawCardReducer),
   __reducerSchema("draw_multiple", DrawMultipleReducer),
+  __reducerSchema("end_battle", EndBattleReducer),
   __reducerSchema("end_turn", EndTurnReducer),
+  __reducerSchema("enter_battle", EnterBattleReducer),
   __reducerSchema("exchange_cards", ExchangeCardsReducer),
   __reducerSchema("exchange_from_deck", ExchangeFromDeckReducer),
   __reducerSchema("execute_card_ability", ExecuteCardAbilityReducer),
@@ -446,6 +452,7 @@ const reducersSchema = __reducers(
   __reducerSchema("request_zone_search", RequestZoneSearchReducer),
   __reducerSchema("rescue_lost_soul", RescueLostSoulReducer),
   __reducerSchema("resign_game", ResignGameReducer),
+  __reducerSchema("resolve_battle", ResolveBattleReducer),
   __reducerSchema("respond_rematch", RespondRematchReducer),
   __reducerSchema("respond_to_pause", RespondToPauseReducer),
   __reducerSchema("respond_to_resume", RespondToResumeReducer),
@@ -469,6 +476,7 @@ const reducersSchema = __reducers(
   __reducerSchema("spawn_lost_soul", SpawnLostSoulReducer),
   __reducerSchema("stop_imitating_lost_soul", StopImitatingLostSoulReducer),
   __reducerSchema("surrender_lost_soul", SurrenderLostSoulReducer),
+  __reducerSchema("surrender_soul", SurrenderSoulReducer),
   __reducerSchema("three_nails_reset_execute", ThreeNailsResetExecuteReducer),
   __reducerSchema("toggle_reveal_hand", ToggleRevealHandReducer),
   __reducerSchema("toggle_reveal_reserve", ToggleRevealReserveReducer),

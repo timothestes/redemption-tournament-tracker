@@ -46,6 +46,9 @@ export const CardInstance = __t.object("CardInstance", {
   revealExpiresAt: __t.option(__t.timestamp()),
   originalOwnerId: __t.u64(),
   revealStartedAt: __t.option(__t.timestamp()),
+  originZone: __t.string(),
+  originPosX: __t.string(),
+  originPosY: __t.string(),
   outlineColor: __t.string(),
   imitatingName: __t.string(),
 });
@@ -146,6 +149,9 @@ export const Game = __t.object("Game", {
   pauseRequestType: __t.string(),
   pauseStartedAtMicros: __t.u64(),
   totalPausedMicros: __t.u64(),
+  battleState: __t.string(),
+  battleAttackerSeat: __t.string(),
+  lastBattlePlayBySeat: __t.string(),
 });
 export type Game = __Infer<typeof Game>;
 

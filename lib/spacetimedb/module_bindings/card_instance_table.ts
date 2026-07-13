@@ -38,6 +38,9 @@ export default __t.row({
   revealExpiresAt: __t.option(__t.timestamp()).name("reveal_expires_at"),
   originalOwnerId: __t.u64().name("original_owner_id"),
   revealStartedAt: __t.option(__t.timestamp()).name("reveal_started_at"),
+  originZone: __t.string().name("origin_zone"),
+  originPosX: __t.string().name("origin_pos_x"),
+  originPosY: __t.string().name("origin_pos_y"),
   outlineColor: __t.string().name("outline_color"),
   imitatingName: __t.string().name("imitating_name"),
 });
