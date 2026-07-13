@@ -1,7 +1,7 @@
 # Battle Zone ("Field of Battle") — Design Spec
 
 Date: 2026-07-12
-Status: Reviewed by 2 design subagents (Konva/layout lens + server/rules lens); findings incorporated.
+Status: Two review rounds incorporated — design review (Konva/layout + server/rules lenses), then spec review (implementability audit + REG-rules/UX judge audit).
 Scope: Multiplayer play mode (`app/play`). Goldfish mode is out of scope except for shared-type fallout.
 
 ## 1. Overview
@@ -25,7 +25,11 @@ having no mechanized abilities).
    whoever did not play the last card). **Special initiative is out of scope.**
 5. Resolution flow: Claim Victory (attacker) / Battle Lost (defender) → soul-surrender
    dialog (T1: defender picks; T2 & Paragon: attacker picks, incl. Paragon shared
-   LoB/soul-deck souls); End Battle (either player) for stalemate/no-block.
+   LoB/soul-deck souls). An **unopposed rescue** (defender declines to block while souls
+   are at stake — the most common battle in the game) also resolves through Claim
+   Victory, dialog as usual. End Battle (either player) is only for no-stakes endings:
+   stalemate, declined battle challenge, repelled attack (all attackers defeated), or
+   escape hatch.
 
 ### Non-goals
 Special initiative, automated ability resolution, automatic battle detection from phase
@@ -82,11 +86,16 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   (0–1), opponent-owned cards flipped at render (`toScreenPos(..., 'opponent')`, rot 180,
   bottom-right anchor). This automatically renders each player's cards on their own half
   on *both* screens with zero new transform code.
-- **Side is derived, never stored:** `battleSideOf(card): dbY >= 0.5 ? ownerSeat :
-  opponentSeat` (owner-local frame — a card dragged past the centerline fights for the
-  other side). One shared helper in `app/play/lib/battleMath.ts` used by totals,
-  initiative, and brigade checks. Rationale: intra-zone drags go through
-  `update_card_position`, which would never refresh a stored column (reviewer consensus).
+- **Side is derived, never stored,** from the card's owner-local **center**:
+  `centerY = dbY + cardRelH / 2` (storage is top-left-anchored in the owner frame;
+  rot-180 is render-only); side = `centerY >= 0.5 ? ownerSeat : opponentSeat`. The
+  anchor alone cannot work: write-time clamping caps an own-card anchor at
+  `1 − cardRelH ≈ 0.33` in a 0.19-height band, so an anchor-based `>= 0.5` test would
+  classify every card as opponent-side. `battleSideOf(card, cardRelH)` lives in
+  `app/play/lib/battleMath.ts` (takes band + card heights) and is the single helper
+  used by totals, initiative, and brigade checks. A card dragged past the centerline
+  fights for the other side. Rationale for never storing: intra-zone drags go through
+  `update_card_position`, which would never refresh a stored column.
 - **Half membership is center-point-based** (a mainCard is taller than a half-band;
   containment clamping degenerates). Cards clamp to the *full band* rect only.
 
@@ -125,15 +134,25 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   Opponent-owned glide targets must bake the `+(cardW, cardH)` rot-180 anchor (PR #176
   lesson). The band background rect alone gets a one-off `Konva.Tween` for the
   "seam opens" visual.
-- **Band chrome (Konva):** centerline rule, per-half totals chips (`⚔ STR/TGH`), initiative
-  banner on the centerline. States: "Waiting for a blocker…" (a side has no characters);
-  "⚔ INITIATIVE: <name> — losing / stalemate / mutual destruction".
+- **Band chrome (Konva):** centerline rule; per-half totals chips (`⚔ STR/TGH`) anchored
+  in the band's left/right **gutters** — at 1366px the mainCard is 80%+ of band height
+  and cards straddle the centerline, so chips, banner, and buttons all get a backdrop
+  and render **above** card nodes. A header line shows context a reconnecting player or
+  spectator can't get from card positions: "⚔ <attacker name> attacking — Rescue
+  attempt | Battle challenge" (derived from `battleAttackerSeat` + stakes-LoB count).
+  Banner states key on which side is empty **relative to the attacker**: defender side
+  empty → "Waiting for a blocker…" (attacker's view adds "No block? Claim Victory to
+  rescue." while souls are at stake); attacker side empty → "No attacker in battle —
+  End Battle?"; both populated → "⚔ INITIATIVE: <name> — losing / stalemate / mutual
+  destruction".
 - **Band buttons (HTML overlay via `virtualToScreen`,** zIndex between drag overlay 450
   and toasts 900): `⚑ Claim Victory` (attacker only), `🏳 Battle Lost` (defender only),
   `↩ End Battle` (both).
-- **Battle toasts:** the default toast container is dead-center (on the band) and
-  `pointerEvents: none`. Brigade-mismatch toasts (which carry a tappable **Discard**
-  button) render in a dedicated band-edge-anchored container with pointer events enabled.
+- **Battle toasts:** every existing overlay (game toasts, emote overlay, request
+  banners) is `pointerEvents: none` and top/bottom-anchored — none can host a button.
+  Brigade-mismatch toasts (which carry a tappable **Discard** button) render in a NEW
+  dedicated band-edge-anchored container with pointer events enabled, zIndex between
+  the drag overlay (450) and toasts (900).
 
 ## 6. Battle math (client, pure lib + tests)
 
@@ -145,6 +164,9 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   initiative; both `tgh > opp str` → stalemate; both `str >= opp tgh` → mutual
   destruction; stalemate/mutual → seat ≠ `lastBattlePlayBySeat`. Forge cards blank
   stats for non-granted spectators — accepted display noise.
+- **Unknown-stat honesty:** when either side has `hasUnknown` or a face-down card, the
+  banner must not assert a rules conclusion from zero-filled stats — it degrades to
+  "⚔ INITIATIVE: unknown (variable/face-down stats)". The chips keep their `?` markers.
 - Brigade soft-check: enhancement's brigade tokens (split on `/`, trimmed) ∩ brigades of
   same-side characters; neutral/generic matches anything. On mismatch: red pulsing border
   + toast "No matching brigade in battle — REG says discard it" [Discard]. Non-blocking.
@@ -172,10 +194,25 @@ No `battleSide` column (derived — §3).
   clears the three origin fields whenever `toZone !== 'battle'` — **clearing lives only
   here**, because both move reducers have three completing write paths (token-delete,
   lost-soul redirect, main) and ad-hoc clears will miss one (F3).
-- `ABILITY_SOURCE_ZONES` (5 copy-pasted sites → extract one shared const): right-click
-  abilities must fire from battle.
-- Client `ZoneId` union + goldfish zone initializers get a `battle: []` key (build fails
-  otherwise).
+- `ABILITY_SOURCE_ZONES` — **6** copy-pasted server sites (index.ts 2188, 3957, 4077,
+  4126, 4234, 5324 → extract one shared const) **plus the client gate**
+  `DEFAULT_ABILITY_SOURCE_ZONES` in `lib/cards/cardAbilities.ts` (and its
+  `spacetimedb/src/cardAbilities.ts` duplicate) — without the client change the
+  right-click menu items stay hidden even though the reducers would accept them.
+  Abilities with explicit per-ability `sourceZones` arrays keep their lists (extend
+  case-by-case later).
+- `shuffle_card_into_deck` and `move_opponent_card` bypass BOTH central helpers (they
+  call neither `leavePlayFieldOverrides` nor `clearCountersIfLeavingPlay` — a
+  pre-existing counters/notes leak from territory, incidentally). Route their zone
+  writes through the helpers; `move_opponent_card` additionally must not accept
+  `toZone='battle'` (stamping bypass).
+- Client `ZoneId` union fallout (adding `'battle'`): `ZONE_LABELS`
+  (`Record<ZoneId, string>`) needs an entry; goldfish `zoneLayout.ts` returns a
+  fully-keyed `Record<ZoneId, ZoneRect>` and needs an off-canvas placeholder rect
+  (follow the `paragonZone` precedent). `ALL_ZONES`: include `'battle'` and audit the
+  shared iterators (`MultiCardContextMenu`, `ZoneBrowseModal`, `refill.test`) — note
+  goldfish `createEmptyZones` builds from `ALL_ZONES` through a cast, so omission does
+  NOT fail the build, it silently yields `zones['battle'] === undefined` at runtime.
 - `HOME_ZONES`/`HIDDEN_HOME_ZONES`/`GRAVEYARD_PILE_ZONES`/`TOKEN_REMOVE_ZONES` correctly
   exclude battle — no change.
 
@@ -191,15 +228,27 @@ No `battleSide` column (derived — §3).
   the lost-soul redirect pattern) so undo replays and stale dispatches can't create
   invisible cards in a closed band (F3/F10-undo).
 - `resolve_battle(gameId)`: caller must be attacker (Claim Victory) or defender (Battle
-  Lost). If the defender-side LoB (T1/T2: defender's; Paragon: shared) holds ≥1 Lost
-  Soul → `battleState='awaiting-soul'`; else (battle challenge) → auto-return + clear.
-- `surrender_soul(gameId, cardId)`: caller permission by `normalizeFormat(game.format)` —
-  T1: defender; T2/Paragon: attacker. Validates the card is a Lost Soul in the eligible
-  LoB. Transfers via the existing **`moveLostSoulToLor`** primitive targeted at **the
-  attacker's LoR** regardless of caller (it already handles ownership transfer, site
-  unlink, LoB compaction, Paragon shared-soul `ownerId 0n`, and `refillSoulDeck`).
-  Then auto-return + `battleState=''` **in the same reducer** — never rely on a second
-  client call (disconnect between calls would strand the state).
+  Lost); **refuses unless `battleState === 'active'`**. Paragon: run `refillSoulDeck`
+  first so a transient empty shared LoB can't misclassify a live rescue as a challenge.
+  If the stakes LoB (T1/T2: defender's; Paragon: shared) holds ≥1 Lost Soul →
+  `battleState='awaiting-soul'`; else (battle challenge / nothing left to rescue) →
+  auto-return + clear. Unopposed rescues resolve HERE, not via end_battle.
+- `surrender_soul(gameId, cardId)`: **refuses unless `battleState === 'awaiting-soul'`**
+  (kills the end_battle race — otherwise a defender's End Battle landing while the pick
+  is in flight lets a soul score after the battle cleared). Caller permission by
+  `normalizeFormat(game.format)` — T1: defender; T2/Paragon: attacker. Validates the
+  card is a Lost Soul in the eligible LoB. Transfers via the existing
+  **`moveLostSoulToLor(ctx, gameId, card, targetOwnerId, game)`** primitive targeted at
+  **the attacker's LoR** regardless of caller (it already handles ownership transfer,
+  site unlink, LoB compaction, Paragon shared-soul `ownerId 0n`, and `refillSoulDeck`).
+  - **T1 / Paragon:** then auto-return + `battleState=''` **in the same reducer** —
+    never rely on a second client call (a disconnect between calls strands the state).
+  - **T2:** does NOT auto-return — state stays `'awaiting-soul'` and the dialog offers
+    "Surrender another / Done" (multi-hero T2 rescues can award multiple souls; the app
+    doesn't enforce a count — players decide). Done calls `end_battle`, whose
+    awaiting-soul path performs auto-return + clear; that same hatch is the disconnect
+    backstop. **Open question for product owner: confirm REG v11 T2 soul count per
+    multi-hero rescue** — if it is strictly one, collapse T2 into the T1 path.
 - `end_battle(gameId)`: either player, callable from **both `'active'` and
   `'awaiting-soul'`** — the unconditional escape hatch (defender can `reload_deck` away
   every surrenderable soul, or the picker can disconnect).
@@ -217,16 +266,18 @@ been deleted by `reload_deck`):
    position : a free territory spot (hand/reserve/discard-origin survivors go to
    territory per REG, never back to hidden zones).
 4. Enhancements — exact `GE`/`EE` segment match on `cardType` (split on `/`, trim; there
-   is **no** literal `"Enhancement"` type) → owner's **discard**, *unless*
-   `/place/i.test(specialAbility)` → owner's territory free spot + log. Tokens whose
+   is **no** literal `"Enhancement"` type) → owner's **discard**, *unless* the keep
+   heuristic matches: `/\bplace\b/i` on `specialAbility`, excluding "in place of" /
+   "take the place of" phrasings → owner's territory free spot. Tokens whose
    destination is a removal pile go through `deleteTokenWithCounters`, not a move.
 5. **Everything else — Dominants, Artifacts, Curses, Fortresses, unknown types, and all
    Forge cards (their `specialAbility` is blanked on the public row, so `/place/i` can
    never match) → return to origin, never discard.** Discard is the destructive branch;
    default away from it. Players drag to fix mis-routes.
 
-All routed writes clear the origin fields. One `BATTLE_END` logAction with a summary.
-Everything stays manually draggable afterward.
+All routed writes clear the origin fields. One `BATTLE_END` logAction whose summary
+**names every enhancement kept in play** (heuristic mis-routes are then one glance +
+one drag to fix). Everything stays manually draggable afterward.
 
 **Subscriptions:** no changes — player and spectator hooks already subscribe CardInstance
 filtered only by gameId with the predicate on the hook. New Game columns flow through the
@@ -234,15 +285,28 @@ existing unfiltered Game `useTable`.
 
 ## 8. Resolution UX
 
-- Attacker presses **Claim Victory** (win or mutual destruction — soul is rescued either
-  way per REG), or defender presses **Battle Lost** → soul-surrender modal for the
-  chooser (T1 defender / T2+Paragon attacker) listing eligible souls as card images;
-  pick → soul glides to attacker's LoR, survivors return, band closes.
-- **End Battle** → no dialog, auto-return, band closes (stalemate, declined challenge,
-  no-block, or escape hatch).
+- Attacker presses **Claim Victory** (win, mutual destruction, or unopposed rescue — a
+  soul is rescued in all three per REG), or defender presses **Battle Lost** →
+  soul-surrender modal for the chooser (T1 defender / T2+Paragon attacker) listing
+  eligible souls as card images. Site-attached souls are badged ("⚑ in Site") so they
+  aren't picked by accident; "cannot be rescued"-type souls remain table-talk — the
+  dialog lists all souls and players self-police. If the LoB empties mid-pick (Dominant
+  snipe), the dialog shows an explicit empty state with an inline End Battle button.
+  Pick → soul glides to the attacker's LoR; T1/Paragon auto-return and close; T2 keeps
+  the dialog open ("Surrender another / Done") for multi-hero rescues.
+- **End Battle** → no soul dialog, auto-return, band closes (stalemate, declined battle
+  challenge, repelled attack, or escape hatch). **Never for unopposed rescues.**
+- **All three buttons first show a confirm summarizing what auto-return will do**,
+  computed from live rows: "3 characters → territory · 4 enhancements → discard ·
+  1 weapon stays attached". Cancel returns to the band so players can drag the defeated
+  to discard first, then re-press. This is also the mutual-destruction guard — without
+  it, resolving first resurrects every corpse into territory as a "survivor".
 - Defeated characters are dragged to discard manually *before* resolving — the routine
-  only routes what's still in the band. Dialog-open state is a pure function of
-  `battleState` (reconnect-safe).
+  only routes what's still in the band. Dialog/confirm visibility is a pure function of
+  `battleState` + format + seat (reconnect-safe). Spectators see a status line
+  ("Waiting for <name> to choose a soul…"), never the modal. **End Turn during
+  `awaiting-soul` gets a client confirm** ("A soul surrender is pending — end turn
+  anyway?"); the server end_turn hook remains the ultimate fallback.
 
 ## 9. Edge-case matrix
 
@@ -255,15 +319,24 @@ existing unfiltered Game `useTable`.
 | Undo of a battle move after close | Server redirects `toZone='battle'` → territory |
 | Same-turn second battle | `enter_battle` guard + origin fields re-stamped on entry; end-battle writes cleared them |
 | Card re-dragged battle→territory→battle | Origin re-stamped (records the adjusted spot — fine) |
-| Face-down card in battle | Excluded from totals, `+?` chip marker; row data is already client-visible today (UI-masked only) — unchanged |
-| Spectator joins mid-battle | Full state from rows; band renders; read-only |
+| Face-down card in battle | Excluded from totals, `+?` chip marker, banner degrades to "initiative unknown"; row data is already client-visible today (UI-masked only) — unchanged |
+| Spectator joins mid-battle | Full state from rows; band renders; read-only; during `awaiting-soul` sees a status line, never the modal |
+| end_battle vs surrender_soul race | `surrender_soul` refuses unless `battleState==='awaiting-soul'` — no soul can score after the battle cleared |
+| End Turn during `awaiting-soul` | Client confirm ("soul surrender pending"); server end_turn hook auto-returns as fallback |
+| Dominant ends the battle from hand (SoG/AoD) | Manual card play, then End Battle; during `awaiting-soul` the soul dialog live-updates (empty state if souls are gone) |
+| Band empties entirely (retreat drags / all defeated) | `battleState` stays `'active'`, no auto-close; End Battle or end_turn closes it |
+| Attacker side empties mid-battle | Banner switches to "No attacker in battle — End Battle?"; no auto-close |
+| Non-turn player opens the band first (pre-emptive blocker) | `battleAttackerSeat` = turn seat regardless of who dragged |
 
 ## 10. Testing
 
 - **Unit (vitest):** `battleMath` (all four initiative-table rows incl. the `<=`/`<`
-  boundaries, side derivation from posY incl. opponent mirroring, neutral placement,
-  face-down exclusion, unparseable stats); layout invariants (sums = 1.0, midline pinned,
-  idle-keyed sidebar, all profiles × formats × viewerKinds); auto-return routing table
+  boundaries; center-based side derivation `dbY + cardRelH/2` incl. opponent mirroring
+  AND the anchor-clamp regression — anchors max out at `1 − cardRelH`, so an
+  anchor-based test must fail; neutral placement; face-down exclusion + banner-unknown
+  degradation; unparseable stats); layout invariants (sums = 1.0, midline pinned
+  **against the same-viewerKind idle layout** — the spectator idle center is 0.485, not
+  0.45; idle-keyed sidebar, all profiles × formats × viewerKinds); auto-return routing table
   (every cardType class incl. duals `GE/Evil Character`, `Fortress / Evil Character` with
   stray spaces, tokens, Forge blanked rows, weapons-follow-host, place-enhancements).
 - **E2E (verify skill, two sessions):** T1 full rescue (present → block → enhance →
@@ -275,7 +348,10 @@ existing unfiltered Game `useTable`.
 
 1. **Server:** schema columns + shared const extraction + stamping/clearing + redirect
    guard + reducers + auto-return + rematch reset. Deploy via `spacetimedb-deploy`
-   (`--clear` on dev). Bindings regen.
+   (`--clear` on dev). Bindings regen. **Prod rollout:** the prod module publish must be
+   paired with a Vercel deploy carrying the regenerated bindings (a bindings-only client
+   deploy with no battle UI keeps the app shippable); already-open sessions need a
+   refresh — schedule the publish accordingly.
 2. **Layout:** battle profile variants + invariants + unit tests. `battleActive` param.
 3. **Canvas plumbing (static band):** hit-test order, divider proxy, `isFreeFormZone`,
    render blocks (both owners, render-time clamp), drag-size/rotation rules, marquee/
