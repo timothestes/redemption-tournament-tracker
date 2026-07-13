@@ -53,6 +53,7 @@ make update-cards        # Download latest carddata.txt and regenerate TypeScrip
 | Goldfish mode | `prompt_context/goldfish_practice_mode.md` |
 | Goldfish design system | `prompt_context/goldfish_design_system.md` |
 | Multiplayer design spec | `docs/superpowers/specs/2026-03-23-multiplayer-spacetimedb-design.md` |
+| Battle zone design | `docs/superpowers/specs/2026-07-12-battle-zone-design.md` |
 | SpacetimeDB SDK rules | `spacetimedb/CLAUDE.md` — **READ THIS before writing any SpacetimeDB code.** Contains critical SDK gotchas, hallucinated API warnings, and correct patterns. |
 
 ## Design Context

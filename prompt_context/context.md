@@ -116,3 +116,25 @@ with check (auth.uid() = (select host_id from tournaments where tournaments.id =
 -- Ensure only authenticated users can perform actions
 grant select, insert, update, delete on rounds to authenticated;
 ```
+
+## SpacetimeDB Multiplayer Schema (Battle Zone)
+
+Live-game state (not Postgres) lives in `spacetimedb/src/schema.ts`. The
+`Game` and `CardInstance` tables carry the battle-zone fields:
+
+```ts
+// Game
+battleState: t.string().default(''),          // '' | 'active' | 'awaiting-soul'
+battleAttackerSeat: t.string().default(''),    // '' | '0' | '1'
+lastBattlePlayBySeat: t.string().default(''),  // '' | '0' | '1' — REG stalemate/mutual tiebreak
+
+// CardInstance — stamped when a card enters zone 'battle', cleared when it
+// leaves. Drives end-of-battle auto-return of survivors to their pre-battle
+// zone/position.
+originZone: t.string().default(''),
+originPosX: t.string().default(''),
+originPosY: t.string().default(''),
+```
+
+See `docs/superpowers/specs/2026-07-12-battle-zone-design.md` for the full
+design and `spacetimedb/CLAUDE.md` for SDK conventions.
