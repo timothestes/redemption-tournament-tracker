@@ -64,6 +64,7 @@ import type { ZoneId } from '@/app/shared/types/gameCard';
 import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLayout';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
+import BattleResolutionUI from './BattleResolutionUI';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
@@ -7574,6 +7575,32 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           </div>
         );
       })()}
+
+      {/* ================================================================
+          Battle resolution buttons + confirm summary (spec §8, Task 13).
+          Mounted here (not client.tsx) because it needs band geometry +
+          scale/offsets, which only live in this component. Spectators are
+          gated out at this call site (!isSpectator — matching the brigade
+          toast above); status==='playing' && battleActive also gate here.
+          BattleResolutionUI itself additionally gates button visibility on
+          battleState==='active' (hidden during awaiting-soul — Task 14 owns
+          that dialog) and on seat (isAttacker/isDefender derived from
+          mySeat vs attackerSeat).
+          ================================================================ */}
+      {!isSpectator && battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && (
+        <BattleResolutionUI
+          band={mpLayout.zones.battle}
+          scale={scale}
+          offsetX={offsetX}
+          offsetY={offsetY}
+          battleState={gameState.battleState}
+          mySeat={gameState.myPlayer ? String(gameState.myPlayer.seat) : ''}
+          attackerSeat={gameState.battleAttackerSeat}
+          cards={battleCardEntries.map((e) => e.like)}
+          onResolveBattle={gameState.resolveBattle}
+          onEndBattle={gameState.endBattle}
+        />
+      )}
 
       {/* ================================================================
           Shared context menu — positioned relative to canvas container
