@@ -2124,11 +2124,21 @@ export const end_turn = spacetimedb.reducer(
   },
   (ctx, { gameId }) => {
     const player = findPlayerBySender(ctx, gameId);
-    const game = ctx.db.Game.id.find(gameId);
+    let game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
     if (player.seat !== game.currentTurn) {
       throw new SenderError('Not your turn');
+    }
+
+    // Battles cannot span turns (spec §7): auto-return before this reducer's
+    // own Game write below. runBattleAutoReturn mutates the Game row (clears
+    // battleState/battleAttackerSeat/lastBattlePlayBySeat), so re-read
+    // afterward — spreading the stale pre-return `game` snapshot into the
+    // write below would resurrect battleState.
+    if (game.battleState !== '') {
+      runBattleAutoReturn(ctx, gameId, player.id);
+      game = ctx.db.Game.id.find(gameId) ?? game;
     }
 
     const nextSeat = game.currentTurn === 0n ? 1n : 0n;
@@ -2162,6 +2172,236 @@ export const end_turn = spacetimedb.reducer(
     }
 
     logAction(ctx, gameId, player.id, 'END_TURN', JSON.stringify({ newTurn: newTurnNumber.toString() }), newTurnNumber, 'draw');
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Helper: runBattleAutoReturn
+// End-of-battle card routing (spec §7). Snapshot-first: materializes every
+// CardInstance row for the game ONCE before any mutation (mutating while
+// iterating a live query is unsafe per spacetimedb/CLAUDE.md), then routes
+// every row currently in zone 'battle' — never a remembered id list, since
+// e.g. reload_deck may have deleted some of them mid-battle — by REG-derived
+// precedence:
+//   1. Attached accessories (equippedToInstanceId !== 0n) are skipped in the
+//      main pass and follow their host's routed destination in pass 2,
+//      attachment preserved.
+//   2. Lost Souls -> the deck owner's Land of Bondage (mirrors the existing
+//      lost-soul redirect in move_card/move_cards_batch).
+//   3. Characters (isCharacterCard — handles duals + tokens) -> Territory:
+//      the stamped origin position when they entered from Territory,
+//      otherwise a free Territory spot. Hand/reserve/discard-origin
+//      survivors never go back to a hidden zone per REG.
+//   4. Enhancements (exact 'GE'/'EE' segment on cardType, split on '/' and
+//      trimmed — there is no literal "Enhancement" type) -> owner's Discard,
+//      unless the "keep in play" heuristic matches: `specialAbility`
+//      contains "place" wording that ISN'T "in place of" / "take the place
+//      of" -> a free Territory spot, and the card's name is recorded for the
+//      BATTLE_END log.
+//   5. Everything else — Dominants, Artifacts, Curses, Fortresses, unknown
+//      types, and Forge cards (whose specialAbility is blanked on the public
+//      row, so the rule-4 keep heuristic can never match them) -> the card's
+//      stamped origin zone/position when set and isn't 'battle' itself,
+//      otherwise a free Territory spot. NEVER discard — that's the one
+//      destructive branch and rule 5 stays out of it.
+// Tokens whose COMPUTED destination (whichever rule actually fired) is a
+// removal zone (deck/hand/discard/reserve/banish) are deleted via
+// deleteTokenWithCounters instead of moved.
+// Every completing write clears in-play state (counters, notes, outline,
+// meek) and the origin fields via the shared
+// `leavePlayFieldOverrides('battle', toZone)` spread — the same idiom every
+// other move reducer's write path uses.
+// ---------------------------------------------------------------------------
+function runBattleAutoReturn(ctx: any, gameId: bigint, actingPlayerId: bigint) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game || game.battleState === '') return;
+
+  const all = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+  const inBattle = all.filter((c: any) => c.zone === 'battle');
+  const keptNames: string[] = [];
+
+  // Local per-(owner,zone) zoneIndex counters. Lazily seeded from the
+  // pre-mutation snapshot (`all`) the first time a given owner+zone is
+  // touched, then incremented locally for every further card routed to that
+  // same owner+zone in this call — generalizes move_cards_batch's
+  // `nextFreeFormIndex` seeding (~2755-2778, "max existing index + 1, then
+  // increment per placement") across every destination zone/owner instead of
+  // a single batch target. Max-based seeding is equivalent to the codebase's
+  // count-based LOB/hand idioms here because compaction keeps those zones'
+  // indices gap-free, so one scheme safely covers all destinations.
+  const nextIdx = new Map<string, bigint>();
+  const nextIndexFor = (ownerId: bigint, zone: string): bigint => {
+    const key = `${ownerId.toString()}:${zone}`;
+    if (!nextIdx.has(key)) {
+      let maxIdx = -1n;
+      for (const c of all) {
+        if (c.ownerId === ownerId && c.zone === zone && c.zoneIndex > maxIdx) maxIdx = c.zoneIndex;
+      }
+      nextIdx.set(key, maxIdx + 1n);
+    }
+    const idx = nextIdx.get(key)!;
+    nextIdx.set(key, idx + 1n);
+    return idx;
+  };
+
+  // Free-spot auto-fan per owner — mirrors move_cards_batch's territory
+  // auto-fan grid (~2982-2992). Fresh counter for this call only (matching
+  // that reducer's behavior), shared by every branch that needs "a free
+  // Territory spot": surviving characters with a non-Territory origin, kept
+  // enhancements, and the rule-5 fallback.
+  const fanIdx = new Map<string, number>();
+  const nextFreeSpot = (ownerId: bigint): { posX: string; posY: string } => {
+    const key = ownerId.toString();
+    const i = fanIdx.get(key) ?? 0;
+    fanIdx.set(key, i + 1);
+    const cardsPerRow = 10;
+    const col = i % cardsPerRow;
+    const row = Math.floor(i / cardsPerRow);
+    return { posX: String(0.03 + col * 0.04 + row * 0.02), posY: String(0.05 + row * 0.28) };
+  };
+
+  // Lost-soul check per the idiom at index.ts ~4479 (surrender_lost_soul) —
+  // includes TOKEN_LS, unlike the narrower two-part check used inline by the
+  // move reducers' discard/reserve/banish redirect.
+  const isLostSoulCard = (c: any): boolean =>
+    c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
+  const isPlaceKeep = (sa: string): boolean =>
+    /\bplace\b/i.test(sa) && !/\bin (the )?place of\b/i.test(sa) && !/take the place of/i.test(sa);
+  const enhSegment = (ct: string): boolean =>
+    ct.split('/').map((s: string) => s.trim()).some((s: string) => s === 'GE' || s === 'EE');
+
+  // Precedence rules 2-5 (rule 1, attached accessories, is handled by the
+  // caller routing them in pass 2 below via their host's result instead).
+  const computeDestination = (c: any): { toZone: string; posX: string; posY: string; toOwnerId: bigint } => {
+    if (isLostSoulCard(c)) {
+      // Lost Souls always go to the deck owner's LoB — same rule as the
+      // move_card/move_cards_batch redirect, even if currently owned by an
+      // opponent (e.g. mid-capture) while sitting in the battle band.
+      const lobOwnerId = c.originalOwnerId !== 0n ? c.originalOwnerId : c.ownerId;
+      return { toZone: 'land-of-bondage', posX: '', posY: '', toOwnerId: lobOwnerId };
+    }
+    if (isCharacterCard({ cardType: c.cardType })) {
+      if (c.originZone === 'territory') {
+        return { toZone: 'territory', posX: c.originPosX, posY: c.originPosY, toOwnerId: c.ownerId };
+      }
+      const spot = nextFreeSpot(c.ownerId);
+      return { toZone: 'territory', posX: spot.posX, posY: spot.posY, toOwnerId: c.ownerId };
+    }
+    if (enhSegment(c.cardType)) {
+      if (isPlaceKeep(c.specialAbility)) {
+        keptNames.push(c.cardName);
+        const spot = nextFreeSpot(c.ownerId);
+        return { toZone: 'territory', posX: spot.posX, posY: spot.posY, toOwnerId: c.ownerId };
+      }
+      return { toZone: 'discard', posX: '', posY: '', toOwnerId: c.ownerId };
+    }
+    // Rule 5: Dominants/Artifacts/Curses/Fortresses/unknown/Forge-blanked —
+    // origin if set and not 'battle' itself (defensive; stampBattleEntry
+    // never stamps a card already in battle, so this shouldn't occur), else
+    // a free Territory spot. Never discard.
+    if (c.originZone !== '' && c.originZone !== 'battle') {
+      return { toZone: c.originZone, posX: c.originPosX, posY: c.originPosY, toOwnerId: c.ownerId };
+    }
+    const spot = nextFreeSpot(c.ownerId);
+    return { toZone: 'territory', posX: spot.posX, posY: spot.posY, toOwnerId: c.ownerId };
+  };
+
+  // Routes a single unattached card per the precedence above (token-delete
+  // check runs against the COMPUTED destination, since a card can be both a
+  // token and, say, an enhancement — what matters is where the rule that
+  // fired actually sent it). Returns the routed {zone,pos,owner} for hosts to
+  // report to their accessories in pass 2, or null when the card was deleted.
+  const routeCard = (c: any): { zone: string; posX: string; posY: string; ownerId: bigint } | null => {
+    const { toZone, posX, posY, toOwnerId } = computeDestination(c);
+    if (c.isToken && ['deck', 'hand', 'discard', 'reserve', 'banish'].includes(toZone)) {
+      deleteTokenWithCounters(ctx, c);
+      return null;
+    }
+    const zoneIndex = nextIndexFor(toOwnerId, toZone);
+    const isFlipped = toZone === 'land-of-bondage'
+      ? false
+      : (toZone === 'deck' || toZone === 'soul-deck') ? true : c.isFlipped;
+    clearCountersIfLeavingPlay(ctx, c.id, 'battle', toZone);
+    ctx.db.CardInstance.id.update({
+      ...c,
+      zone: toZone,
+      zoneIndex,
+      posX,
+      posY,
+      isFlipped,
+      ownerId: toOwnerId,
+      equippedToInstanceId: 0n,
+      ...leavePlayFieldOverrides(c, 'battle', toZone),
+    });
+    return { zone: toZone, posX, posY, ownerId: toOwnerId };
+  };
+
+  const hosts = new Map<string, { zone: string; posX: string; posY: string; ownerId: bigint }>();
+
+  for (const c of inBattle) {
+    if (c.equippedToInstanceId !== 0n) continue; // pass 2 below
+    const routed = routeCard(c);
+    if (routed) hosts.set(c.id.toString(), routed);
+  }
+
+  // Pass 2: attached accessories follow their host's routed destination,
+  // attachment preserved. Position inherits the host's only in Territory
+  // (mirrors attach_card's `inheritPos`, ~4673) since that's the only
+  // destination a host — always a character, rule 3 — can land in while
+  // still carrying an attached accessory.
+  for (const c of inBattle) {
+    if (c.equippedToInstanceId === 0n) continue;
+    const host = hosts.get(c.equippedToInstanceId.toString());
+    if (!host) {
+      // Defensive: a host is always a character, which rule 3 always routes
+      // to Territory, so this should be unreachable. Never leave a card
+      // stranded in the closed 'battle' zone though — route the orphaned
+      // accessory itself (routeCard already clears equippedToInstanceId).
+      routeCard(c);
+      continue;
+    }
+    const destZone = host.zone;
+    const zoneIndex = nextIndexFor(host.ownerId, destZone);
+    clearCountersIfLeavingPlay(ctx, c.id, 'battle', destZone);
+    ctx.db.CardInstance.id.update({
+      ...c,
+      zone: destZone,
+      zoneIndex,
+      posX: destZone === 'territory' ? host.posX : '',
+      posY: destZone === 'territory' ? host.posY : '',
+      ownerId: host.ownerId,
+      ...leavePlayFieldOverrides(c, 'battle', destZone),
+    });
+  }
+
+  logAction(
+    ctx, gameId, actingPlayerId, 'BATTLE_END',
+    JSON.stringify({ kept: keptNames }),
+    game.turnNumber, game.currentPhase,
+  );
+
+  const g2 = ctx.db.Game.id.find(gameId);
+  if (g2) {
+    ctx.db.Game.id.update({ ...g2, battleState: '', battleAttackerSeat: '', lastBattlePlayBySeat: '' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: end_battle
+// Unconditional escape hatch (spec §7/§8): either player may close the
+// battle band from either 'active' or 'awaiting-soul' (e.g. the defender
+// reload_decks away every surrenderable soul, or the soul-picker
+// disconnects mid-choice).
+// ---------------------------------------------------------------------------
+export const end_battle = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+    if (game.battleState === '') throw new SenderError('No battle in progress');
+    const player = findPlayerBySender(ctx, gameId); // either player; also blocks spectators
+    runBattleAutoReturn(ctx, gameId, player.id);
   }
 );
 
