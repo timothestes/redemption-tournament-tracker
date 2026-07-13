@@ -19,10 +19,10 @@ import { virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { summarizeAutoReturn, type BattleCardLike } from '../lib/battleMath';
 import type { ZoneRect } from '../layout/multiplayerLayout';
 import type { CardInstance } from '@/lib/spacetimedb/module_bindings/types';
+import type { DeckFormat } from '@/lib/deck-format';
 import { resolveCardImageUrl, type ForgeResolverMap } from '../utils/forgeResolver';
 
 type ResolutionAction = 'claim-victory' | 'battle-lost' | 'end-battle';
-type DeckFormat = 'T1' | 'T2' | 'Paragon';
 
 interface BattleResolutionUIProps {
   /** Battle band rect (virtual coords). Caller gates mounting on this being present. */
@@ -56,6 +56,10 @@ interface BattleResolutionUIProps {
    *  mirrored client-side — see MultiplayerCanvas's stakesLostSoulRows). Only meaningful
    *  while battleState === 'awaiting-soul'. */
   eligibleSouls: CardInstance[];
+  /** Stakes-soul ids (stringified) that have a Site attached — derived by the caller
+   *  from the ACCESSORY rows' equippedToInstanceId links (a soul's own field is always
+   *  0n; see siteAttachedSoulIds in battleMath). Drives the "⚑ in Site" badge. */
+  siteAttachedSoulIds: Set<string>;
   /** Forge card-art resolver, for Forge playtest games. */
   forgeResolver?: ForgeResolverMap | null;
   /** Both Claim Victory and Battle Lost dispatch the same server reducer (resolve_battle) —
@@ -145,6 +149,7 @@ function AwaitingSoulUI({
   myPlayerName,
   opponentPlayerName,
   eligibleSouls,
+  siteAttachedSoulIds,
   forgeResolver,
   pendingSoulId,
   setPendingSoulId,
@@ -161,6 +166,7 @@ function AwaitingSoulUI({
   myPlayerName: string;
   opponentPlayerName: string;
   eligibleSouls: CardInstance[];
+  siteAttachedSoulIds: Set<string>;
   forgeResolver?: ForgeResolverMap | null;
   pendingSoulId: bigint | null;
   setPendingSoulId: (id: bigint | null) => void;
@@ -308,7 +314,10 @@ function AwaitingSoulUI({
             >
               {eligibleSouls.map((soul) => {
                 const imageUrl = resolveCardImageUrl(soul.cardImgFile, forgeResolver);
-                const isSiteAttached = soul.equippedToInstanceId !== 0n;
+                // Attachment link lives on the ACCESSORY row (the Site), not
+                // the soul — the caller pre-derives membership; see
+                // siteAttachedSoulIds in battleMath.
+                const isSiteAttached = siteAttachedSoulIds.has(String(soul.id));
                 const disabled = pendingSoulId !== null;
                 return (
                   <button
@@ -421,6 +430,7 @@ export default function BattleResolutionUI({
   opponentPlayerName,
   cards,
   eligibleSouls,
+  siteAttachedSoulIds,
   forgeResolver,
   onResolveBattle,
   onEndBattle,
@@ -460,6 +470,7 @@ export default function BattleResolutionUI({
         myPlayerName={myPlayerName}
         opponentPlayerName={opponentPlayerName}
         eligibleSouls={eligibleSouls}
+        siteAttachedSoulIds={siteAttachedSoulIds}
         forgeResolver={forgeResolver}
         pendingSoulId={pendingSoulId}
         setPendingSoulId={setPendingSoulId}

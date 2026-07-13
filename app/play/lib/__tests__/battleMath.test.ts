@@ -5,6 +5,7 @@ import {
   computeInitiative,
   brigadeMismatch,
   summarizeAutoReturn,
+  siteAttachedSoulIds,
   type BattleCardLike,
 } from '../battleMath';
 
@@ -369,5 +370,47 @@ describe('summarizeAutoReturn', () => {
       keptInPlay: ['Curse'],
       weaponsAttached: 1,
     });
+  });
+});
+
+describe('siteAttachedSoulIds', () => {
+  // Attachment direction per the server's attach_card: the ACCESSORY row
+  // carries the nonzero equippedToInstanceId pointing at the HOST (the
+  // soul); the soul's own equippedToInstanceId is always 0n.
+  it('marks a soul when an accessory row points at it', () => {
+    const souls = [{ id: 10n }, { id: 11n }];
+    const rows = [
+      { equippedToInstanceId: 0n }, // the soul itself
+      { equippedToInstanceId: 10n }, // the attached Site
+      { equippedToInstanceId: 0n },
+    ];
+    expect(siteAttachedSoulIds(souls, rows)).toEqual(new Set(['10']));
+  });
+
+  it('ignores accessories pointing at non-soul hosts (weapon on a warrior)', () => {
+    const souls = [{ id: 10n }];
+    const rows = [
+      { equippedToInstanceId: 99n }, // weapon -> warrior 99, not a stakes soul
+    ];
+    expect(siteAttachedSoulIds(souls, rows).size).toBe(0);
+  });
+
+  it('never marks a soul from its own (always-0n) equippedToInstanceId', () => {
+    const souls = [{ id: 10n }];
+    const rows = [{ equippedToInstanceId: 0n }];
+    expect(siteAttachedSoulIds(souls, rows).size).toBe(0);
+  });
+
+  it('returns an empty set for no souls without scanning rows', () => {
+    expect(siteAttachedSoulIds([], [{ equippedToInstanceId: 10n }]).size).toBe(0);
+  });
+
+  it('marks multiple souls independently', () => {
+    const souls = [{ id: 10n }, { id: 11n }, { id: 12n }];
+    const rows = [
+      { equippedToInstanceId: 10n },
+      { equippedToInstanceId: 12n },
+    ];
+    expect(siteAttachedSoulIds(souls, rows)).toEqual(new Set(['10', '12']));
   });
 });

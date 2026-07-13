@@ -91,6 +91,7 @@ import {
   sideTotals,
   computeInitiative,
   brigadeMismatch as computeBrigadeMismatch,
+  siteAttachedSoulIds,
   type BattleCardLike,
   type BattleSeat,
 } from '../lib/battleMath';
@@ -4774,6 +4775,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   const stakesLostSoulCount = stakesLostSoulRows.length;
 
+  // Which stakes souls have a Site attached — for the surrender picker's
+  // "⚑ in Site" badge. The attachment link lives on the ACCESSORY row
+  // (attach_card writes equippedToInstanceId on the Site, pointing at the
+  // soul; a soul's own equippedToInstanceId is always 0n), so membership is
+  // derived by scanning every card row for one pointing at a stakes soul.
+  const stakesSiteAttachedSoulIds = useMemo<Set<string>>(() => {
+    if (stakesLostSoulRows.length === 0) return new Set<string>();
+    const allRows: CardInstance[] = [];
+    for (const rows of Object.values(myCards)) allRows.push(...rows);
+    for (const rows of Object.values(opponentCards)) allRows.push(...rows);
+    for (const rows of Object.values(sharedCards)) allRows.push(...rows);
+    return siteAttachedSoulIds(stakesLostSoulRows, allRows);
+  }, [stakesLostSoulRows, myCards, opponentCards, sharedCards]);
+
   // Field of Battle band — chrome (Task 12, spec §5/§6): totals chips,
   // header line, initiative banner. Rendered AFTER the battle card groups
   // (below, in JSX) so it sits above card art. listening={false}
@@ -7610,6 +7625,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           opponentPlayerName={gameState.opponentPlayer?.displayName || 'Player 2'}
           cards={battleCardEntries.map((e) => e.like)}
           eligibleSouls={stakesLostSoulRows}
+          siteAttachedSoulIds={stakesSiteAttachedSoulIds}
           forgeResolver={forgeResolver}
           onResolveBattle={gameState.resolveBattle}
           onEndBattle={gameState.endBattle}

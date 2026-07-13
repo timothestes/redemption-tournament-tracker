@@ -266,3 +266,32 @@ export function summarizeAutoReturn(cards: BattleCardLike[]): AutoReturnSummary 
 
   return { toTerritory, toDiscard, toLandOfBondage, keptInPlay, weaponsAttached };
 }
+
+/**
+ * Which of the stakes Lost Souls have a Site (or any accessory) attached.
+ *
+ * Attachment direction (server attach_card / the unlink cascade in
+ * moveLostSoulToLor): the ACCESSORY row carries the nonzero
+ * equippedToInstanceId pointing at its HOST — a soul's own
+ * equippedToInstanceId is always 0n. So "soul s is site-attached" iff any
+ * other row in the game points at s. Any-accessory-pointing-at-soul is the
+ * safe superset (attach_card infers site-vs-weapon from the accessory's own
+ * type; only site/city accessories attach to souls in practice).
+ *
+ * Pure so the derivation is unit-testable; the caller (MultiplayerCanvas)
+ * feeds it every card row in the game plus the eligible-souls list.
+ */
+export function siteAttachedSoulIds(
+  souls: ReadonlyArray<{ id: bigint }>,
+  allRows: ReadonlyArray<{ equippedToInstanceId: bigint }>,
+): Set<string> {
+  const result = new Set<string>();
+  if (souls.length === 0) return result;
+  const soulIds = new Set(souls.map((s) => s.id.toString()));
+  for (const row of allRows) {
+    if (row.equippedToInstanceId === 0n) continue;
+    const hostId = row.equippedToInstanceId.toString();
+    if (soulIds.has(hostId)) result.add(hostId);
+  }
+  return result;
+}
