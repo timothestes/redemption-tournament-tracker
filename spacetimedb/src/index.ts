@@ -377,6 +377,9 @@ function insertCardsShuffleDraw(
       isToken: false,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      originZone: '',
+      originPosX: '',
+      originPosY: '',
       outlineColor: '',
       imitatingName: '',
     });
@@ -479,6 +482,9 @@ function initializeSoulDeck(ctx: any, game: any) {
       isToken: false,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      originZone: '',
+      originPosX: '',
+      originPosY: '',
       outlineColor: '',
       imitatingName: '',
     });
@@ -1422,6 +1428,9 @@ export const respond_rematch = spacetimedb.reducer(
         rematchParagon1: '',
         rematchResponse: '',
         rematchCode: '',
+        battleState: '',
+        battleAttackerSeat: '',
+        lastBattlePlayBySeat: '',
         choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
         playingStartedAtMicros: 0n,
       });
@@ -3276,6 +3285,9 @@ function spawnTokenImpl(
       reference: tokenData.reference,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      originZone: '',
+      originPosX: '',
+      originPosY: '',
       outlineColor: '',
       imitatingName: '',
     });
@@ -6233,6 +6245,9 @@ export const spawn_lost_soul = spacetimedb.reducer(
       isToken: true,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      originZone: '',
+      originPosX: '',
+      originPosY: '',
       outlineColor: '',
       imitatingName: '',
     });
