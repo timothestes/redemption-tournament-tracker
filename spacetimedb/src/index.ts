@@ -2405,6 +2405,270 @@ export const end_battle = spacetimedb.reducer(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Helper: writeBattleEntryMove
+// Single-card write for a card entering the 'battle' zone (enter_battle).
+// Deliberately NOT a call into move_card's monolithic branch: move_card's
+// zone/pos/zoneIndex/ownership machinery is generic across every destination
+// zone and entangled with lost-soul redirects, token cleanup, and Paragon
+// rescue ownership transfers that never apply here (entering battle never
+// changes ownership, and 'battle' is never a token-removal or lost-soul
+// destination). Mirrors move_card's free-form zoneIndex assignment,
+// leavePlayFieldOverrides spread, stampBattleEntry call, and its own-equip /
+// accessory-unlink cascade (~2765-2838) — the minimal single-card write path
+// the brief asks to reuse, without the surrounding routing subtleties.
+// ---------------------------------------------------------------------------
+function writeBattleEntryMove(ctx: any, gameId: bigint, card: any, posX: string, posY: string): string {
+  const fromZone = card.zone;
+  const alreadyInBattle = fromZone === 'battle';
+
+  // Free-form zoneIndex: highest existing index for this owner's battle
+  // cards + 1, same idiom move_card uses for territory (~2707-2717).
+  let maxIdx = -1n;
+  for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+    if (c.ownerId === card.ownerId && c.zone === 'battle' && c.zoneIndex > maxIdx) maxIdx = c.zoneIndex;
+  }
+  const finalZoneIndex = maxIdx + 1n;
+
+  // Leaving deck/reserve/soul-deck reveals the card, matching move_card's
+  // generic isFlipped rule; 'battle' is never a face-down destination itself.
+  const isFlipped = (fromZone === 'deck' || fromZone === 'reserve' || fromZone === 'soul-deck') ? false : card.isFlipped;
+
+  const battleEntryUpdates: any = {};
+  stampBattleEntry(ctx, gameId, card, battleEntryUpdates); // no-op if already in battle
+  clearCountersIfLeavingPlay(ctx, card.id, fromZone, 'battle');
+
+  ctx.db.CardInstance.id.update({
+    ...card,
+    zone: 'battle',
+    zoneIndex: finalZoneIndex,
+    posX,
+    posY,
+    isFlipped,
+    equippedToInstanceId: alreadyInBattle ? card.equippedToInstanceId : 0n,
+    revealExpiresAt: undefined,
+    revealStartedAt: undefined,
+    ...leavePlayFieldOverrides(card, fromZone, 'battle'),
+    ...battleEntryUpdates,
+  });
+
+  // Own-equip cascade (mirrors move_card ~2765-2838): unlink any accessories
+  // that were pointing at this card so a weapon never keeps
+  // equippedToInstanceId aimed at a host that just changed zones out from
+  // under it. Skipped for the defensive already-in-battle case (a
+  // reposition, not a real entry) so an attach_card'd weapon isn't stripped.
+  if (!alreadyInBattle) {
+    for (const accessory of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+      if (accessory.equippedToInstanceId === card.id) {
+        ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
+      }
+    }
+  }
+
+  return fromZone;
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: enter_battle
+// Atomic open+move (spec §4/§7): opens the battle band if it isn't already
+// open (attacker = whoever's turn it is, NOT who dragged — a courtesy drag
+// of your card during the opponent's turn doesn't make you the attacker),
+// then performs the single-card move into 'battle' with stamping. Two
+// players dragging into an empty band near-simultaneously both succeed:
+// whichever call lands first opens the band, the second just moves its own
+// card into the now-active band (spec §9 race note).
+// ---------------------------------------------------------------------------
+export const enter_battle = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    posX: t.string(),
+    posY: t.string(),
+  },
+  (ctx, { gameId, cardInstanceId, posX, posY }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+    // Courtesy drags of an opponent's card go through the ordinary move flow —
+    // enter_battle only ever sends the caller's own cards into the band.
+    if (card.ownerId !== player.id) throw new SenderError('You can only send your own cards into battle');
+
+    if (game.battleState === 'awaiting-soul') {
+      throw new SenderError('Battle is resolving a soul surrender');
+    }
+    if (game.battleState === '') {
+      ctx.db.Game.id.update({
+        ...game,
+        battleState: 'active',
+        battleAttackerSeat: game.currentTurn.toString(),
+        lastBattlePlayBySeat: '',
+      });
+    }
+    // battleState === 'active': band already open — just move+stamp below.
+
+    const fromZone = writeBattleEntryMove(ctx, gameId, card, posX, posY);
+
+    logAction(
+      ctx, gameId, player.id, 'ENTER_BATTLE',
+      JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, from: fromZone }),
+      game.turnNumber, game.currentPhase,
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Helper: isLostSoulRow
+// Same three-part check used elsewhere (surrender_lost_soul, rescue_lost_soul,
+// runBattleAutoReturn's local isLostSoulCard) — shared here between
+// resolve_battle and surrender_soul, which both need to identify Lost Souls
+// sitting in a battle's stakes LoB.
+// ---------------------------------------------------------------------------
+function isLostSoulRow(c: any): boolean {
+  return c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
+}
+
+// ---------------------------------------------------------------------------
+// Helper: battleStakesLobLostSouls
+// The Lost Souls "at stake" for the battle currently in progress: the
+// defender's (non-attacker-seat player's) Land of Bondage for T1/T2, or the
+// shared Paragon Land of Bondage (ownerId 0n) for Paragon. Used by both
+// resolve_battle (to decide active -> awaiting-soul vs. auto-return) and
+// surrender_soul (to validate the chosen card is actually at stake).
+// ---------------------------------------------------------------------------
+function battleStakesLobLostSouls(ctx: any, gameId: bigint, format: 'T1' | 'T2' | 'Paragon', attackerSeat: string): any[] {
+  const all = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+  if (format === 'Paragon') {
+    return all.filter((c: any) => c.ownerId === 0n && c.zone === 'land-of-bondage' && isLostSoulRow(c));
+  }
+  const defender = [...ctx.db.Player.player_game_id.filter(gameId)].find(
+    (p: any) => p.seat.toString() !== attackerSeat,
+  );
+  if (!defender) return [];
+  return all.filter((c: any) => c.ownerId === defender.id && c.zone === 'land-of-bondage' && isLostSoulRow(c));
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: resolve_battle
+// Either combatant may resolve (Claim Victory / Battle Lost hit this same
+// logic — with exactly two seats, "caller is the attacker" and "caller is
+// the other seat" together cover every player, so no extra permission guard
+// is needed beyond findPlayerBySender already excluding spectators). Paragon
+// refills the shared LoB first so a transient-empty LoB (the last soul was
+// just rescued) can't misclassify a live rescue as a challenge with nothing
+// at stake. >=1 Lost Soul in the stakes LoB -> awaiting-soul; otherwise the
+// battle auto-returns immediately (spec §7: "Unopposed rescues resolve HERE,
+// not via end_battle").
+// ---------------------------------------------------------------------------
+export const resolve_battle = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+    if (game.battleState !== 'active') throw new SenderError('No battle in progress');
+
+    const format = normalizeFormat(game.format);
+    if (format === 'Paragon') {
+      refillSoulDeck(ctx, gameId);
+    }
+
+    const stakesLostSouls = battleStakesLobLostSouls(ctx, gameId, format, game.battleAttackerSeat);
+
+    logAction(
+      ctx, gameId, player.id, 'RESOLVE_BATTLE',
+      JSON.stringify({
+        callerSeat: player.seat.toString(),
+        attackerSeat: game.battleAttackerSeat,
+        lostSoulsAtStake: stakesLostSouls.length,
+      }),
+      game.turnNumber, game.currentPhase,
+    );
+
+    if (stakesLostSouls.length > 0) {
+      ctx.db.Game.id.update({ ...game, battleState: 'awaiting-soul' });
+    } else {
+      runBattleAutoReturn(ctx, gameId, player.id);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: surrender_soul
+// Chooser permission by format (spec §7): T1 the defender picks which of
+// their own souls to give up; T2/Paragon the attacker picks which soul to
+// take. Transfers via the existing moveLostSoulToLor primitive, always
+// targeting the attacker's Land of Redemption regardless of caller. T1 and
+// Paragon auto-return in the same reducer (never rely on a second client
+// call — a disconnect between calls would strand the state); T2 leaves
+// battleState 'awaiting-soul' for the "Surrender another / Done" flow, where
+// Done calls end_battle.
+// ---------------------------------------------------------------------------
+export const surrender_soul = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+    if (game.battleState !== 'awaiting-soul') throw new SenderError('No soul surrender is pending');
+
+    const format = normalizeFormat(game.format);
+    const callerIsAttacker = player.seat.toString() === game.battleAttackerSeat;
+    if (format === 'T1' && callerIsAttacker) {
+      throw new SenderError('Only the defender chooses which soul to surrender');
+    }
+    if (format !== 'T1' && !callerIsAttacker) {
+      throw new SenderError('Only the attacker chooses which soul to surrender');
+    }
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+    if (!isLostSoulRow(card)) throw new SenderError('Card is not a Lost Soul');
+
+    const stakesLostSouls = battleStakesLobLostSouls(ctx, gameId, format, game.battleAttackerSeat);
+    if (!stakesLostSouls.some((c: any) => c.id === card.id)) {
+      throw new SenderError('Card is not an eligible soul for this battle');
+    }
+
+    const attacker = [...ctx.db.Player.player_game_id.filter(gameId)].find(
+      (p: any) => p.seat.toString() === game.battleAttackerSeat,
+    );
+    if (!attacker) throw new SenderError('Attacker not found');
+
+    const fromOwnerId = card.ownerId;
+    moveLostSoulToLor(ctx, gameId, card, attacker.id, game);
+
+    logAction(
+      ctx, gameId, player.id, 'SURRENDER_SOUL',
+      JSON.stringify({
+        cardInstanceId: cardInstanceId.toString(),
+        cardName: card.cardName,
+        cardImgFile: card.cardImgFile,
+        fromOwnerId: fromOwnerId.toString(),
+        targetOwnerId: attacker.id.toString(),
+      }),
+      game.turnNumber, game.currentPhase,
+    );
+
+    // T1 / Paragon: the band closes in this same reducer. T2: battleState
+    // stays 'awaiting-soul' — the soul dialog's Done button calls
+    // end_battle, whose awaiting-soul path performs auto-return + clear.
+    if (format === 'T1' || format === 'Paragon') {
+      runBattleAutoReturn(ctx, gameId, player.id);
+    }
+  },
+);
+
 // ===========================================================================
 // Card action reducers
 // ===========================================================================
