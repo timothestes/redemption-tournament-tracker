@@ -3470,36 +3470,43 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const isSameZone = targetZone === sourceZone && (hit.owner === sourceOwner || targetZone === 'battle');
 
       // Equip: if a weapon is dropped on a warrior in the local player's
-      // territory, attach instead of moving. Gated to single-card drags
-      // (group drags are intentional batch moves, not equip intents).
+      // territory OR on a warrior already in the battle band, attach instead
+      // of moving. Gated to single-card drags (group drags are intentional
+      // batch moves, not equip intents). Battle host candidates are drawn
+      // from `myCards['battle']` (card ownership), never `hit.owner` — the
+      // battle band hit-test always reports owner 'my' as a formality (see
+      // findZoneAtPosition), so restricting the candidate pool to my own
+      // battle cards is what keeps this from equipping onto the opponent's
+      // battling warrior.
       //
       // Note: `hitTestWarrior` was written for goldfish where GameCard.posX/posY
       // are pixel coords. In multiplayer they're normalized 0–1 DB values, so
       // we convert each candidate's position to virtual-canvas pixels first.
       if (
         !isGroupDrag &&
-        targetZone === 'territory' &&
+        (targetZone === 'territory' || targetZone === 'battle') &&
         hit.owner === 'my' &&
         card.ownerId === 'player1'
       ) {
         const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
-        const myTerritoryZone = myZones['territory'];
-        if (isWeapon(cardMeta) && myTerritoryZone) {
-          const myTerritoryRaw = myCards['territory'] ?? [];
-          const myTerritoryCards = myTerritoryRaw.map((c) => {
+        const isBattleTarget = targetZone === 'battle';
+        const hostZoneRect = isBattleTarget ? battleBandRect : myZones['territory'];
+        if (isWeapon(cardMeta) && hostZoneRect) {
+          const myHostRaw = isBattleTarget ? myCards['battle'] ?? [] : myCards['territory'] ?? [];
+          const myHostCards = myHostRaw.map((c) => {
             const adapted = cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1', forgeResolver);
             if (adapted.posX !== undefined && adapted.posY !== undefined) {
-              const { x, y } = toScreenPos(adapted.posX, adapted.posY, myTerritoryZone, 'my');
+              const { x, y } = toScreenPos(adapted.posX, adapted.posY, hostZoneRect, 'my');
               return { ...adapted, posX: x, posY: y };
             }
             return adapted;
           });
-          const warriorCandidates = myTerritoryCards.filter((c) => {
+          const warriorCandidates = myHostCards.filter((c) => {
             if (c.instanceId === card.instanceId) return false;
             if (c.equippedTo) return false;
             const meta = findCard(c.cardName, c.cardSet, c.cardImgFile);
             if (!isWarrior(meta)) return false;
-            const attached = myTerritoryCards.filter((x) => x.equippedTo === c.instanceId);
+            const attached = myHostCards.filter((x) => x.equippedTo === c.instanceId);
             return attached.length < MAX_EQUIPPED_WEAPONS_PER_WARRIOR;
           });
           const hitWarrior = hitTestWarrior(
@@ -4570,6 +4577,72 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return result;
   }, [opponentCards, opponentZones, cardWidth, cardHeight, opponentLobLayout]);
 
+  // ---- Derive battle-band weapon offsets (same math as territory, anchored
+  // to the band rect instead) ----
+  // Mirrors by CARD ownership (myCards['battle'] / opponentCards['battle']),
+  // matching the battle render's split — NOT by hit owner, since the battle
+  // hit-test always reports owner 'my' as a formality (see
+  // findZoneAtPosition). No seam tracking: battle doesn't have a detach
+  // ("unlink") affordance yet, so these maps are render-only.
+  const myBattleDerivedWeaponPositions = useMemo(() => {
+    const result = new Map<string, { x: number; y: number }>();
+    const battle = myCards['battle'] ?? [];
+    if (!battleBandRect || battle.length === 0) return result;
+    const byHost = new Map<bigint, CardInstance[]>();
+    for (const c of battle) {
+      if (c.equippedToInstanceId === 0n) continue;
+      const list = byHost.get(c.equippedToInstanceId);
+      if (list) list.push(c);
+      else byHost.set(c.equippedToInstanceId, [c]);
+    }
+    for (const [hostId, accessories] of byHost) {
+      const host = battle.find((c) => c.id === hostId);
+      if (!host || !host.posX) continue;
+      const { x: hostX, y: hostY } = toScreenPos(
+        parseFloat(host.posX),
+        parseFloat(host.posY),
+        battleBandRect,
+        'my',
+      );
+      accessories.forEach((w, i) => {
+        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
+        result.set(String(w.id), { x: hostX + dx, y: hostY + dy });
+      });
+    }
+    return result;
+  }, [myCards, battleBandRect, cardWidth, cardHeight]);
+
+  // Opponent battle accessory offsets are mirror-flipped (the opponent's
+  // half of the band renders rotated 180°) — same convention as
+  // `opponentDerivedWeaponPositions` for territory.
+  const opponentBattleDerivedWeaponPositions = useMemo(() => {
+    const result = new Map<string, { x: number; y: number }>();
+    const battle = opponentCards['battle'] ?? [];
+    if (!battleBandRect || battle.length === 0) return result;
+    const byHost = new Map<bigint, CardInstance[]>();
+    for (const c of battle) {
+      if (c.equippedToInstanceId === 0n) continue;
+      const list = byHost.get(c.equippedToInstanceId);
+      if (list) list.push(c);
+      else byHost.set(c.equippedToInstanceId, [c]);
+    }
+    for (const [hostId, accessories] of byHost) {
+      const host = battle.find((c) => c.id === hostId);
+      if (!host || !host.posX) continue;
+      const { x: hostX, y: hostY } = toScreenPos(
+        parseFloat(host.posX),
+        parseFloat(host.posY),
+        battleBandRect,
+        'opponent',
+      );
+      accessories.forEach((w, i) => {
+        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
+        result.set(String(w.id), { x: hostX - dx, y: hostY - dy });
+      });
+    }
+    return result;
+  }, [opponentCards, battleBandRect, cardWidth, cardHeight]);
+
   // ---- Card bounds for marquee selection (my + opponent free-form, LOB, hand cards) ----
   const allCardBounds = useMemo((): CardBound[] => {
     if (!mpLayout || !myHandRect) return [];
@@ -5555,9 +5628,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               cards when a battle closes, so nothing renders here when the band
               is closed (defensive: stray rows in 'battle' while inactive would
               be invisible; acceptable, the server guarantees the invariant).
-              Attached weapons render at their own posX/posY (inherited from
-              the host at attach time); the battle derived-offset map is a
-              later task.
+              Attached weapons render offset from their host via
+              myBattleDerivedWeaponPositions / opponentBattleDerivedWeaponPositions,
+              same convention as the territory groups.
               ================================================================ */}
           {battleActive && mpLayout?.zones.battle && (() => {
             const band = mpLayout.zones.battle;
@@ -5566,10 +5639,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (myBattle.length === 0 && oppBattle.length === 0) return null;
             const renderBattleCard = (owner: 'my' | 'opponent') => {
               const adaptedOwner = owner === 'my' ? 'player1' : 'player2';
-              return (card: CardInstance) => {
+              return (card: CardInstance, overridePos?: { x: number; y: number }) => {
                 const gameCard = adaptCard(card, adaptedOwner);
                 let x: number, y: number;
-                if (card.posX) {
+                if (overridePos) {
+                  x = overridePos.x;
+                  y = overridePos.y;
+                } else if (card.posX) {
                   ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), band, owner));
                 } else if (owner === 'my') {
                   x = band.x + 20;
@@ -5613,17 +5689,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               };
             };
             // Two-pass cluster render (weapons behind their hosts), mirroring
-            // the territory groups.
+            // the territory groups. Attached weapons render at their derived
+            // offset (peeking out from behind their host) instead of their
+            // own raw posX/posY.
             const buildBattleNodes = (
               cards: CardInstance[],
-              render: (card: CardInstance) => React.ReactNode,
+              render: (card: CardInstance, overridePos?: { x: number; y: number }) => React.ReactNode,
+              derivedPositions: Map<string, { x: number; y: number }>,
             ) => {
               const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
               const unequipped = sorted.filter((c) => c.equippedToInstanceId === 0n);
               return unequipped.flatMap((card) => {
                 const attachedWeapons = sorted.filter((w) => w.equippedToInstanceId === card.id);
                 const nodes: React.ReactNode[] = [];
-                for (const weapon of attachedWeapons) nodes.push(render(weapon));
+                for (const weapon of attachedWeapons) {
+                  nodes.push(render(weapon, derivedPositions.get(String(weapon.id))));
+                }
                 nodes.push(render(card));
                 return nodes;
               });
@@ -5636,8 +5717,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 clipWidth={band.width}
                 clipHeight={band.height}
               >
-                <Group key="battle-my">{buildBattleNodes(myBattle, renderBattleCard('my'))}</Group>
-                <Group key="battle-opp">{buildBattleNodes(oppBattle, renderBattleCard('opponent'))}</Group>
+                <Group key="battle-my">
+                  {buildBattleNodes(myBattle, renderBattleCard('my'), myBattleDerivedWeaponPositions)}
+                </Group>
+                <Group key="battle-opp">
+                  {buildBattleNodes(oppBattle, renderBattleCard('opponent'), opponentBattleDerivedWeaponPositions)}
+                </Group>
               </Group>
             );
           })()}
