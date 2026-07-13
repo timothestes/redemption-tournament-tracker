@@ -54,7 +54,7 @@ import { isHeroCard } from '@/lib/cards/cardAbilities';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
-import { getEffectiveAbilities, isLostSoulCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isCharacterCard, isLostSoulCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
@@ -85,6 +85,14 @@ import { cardInstanceToGameCard } from '../utils/cardAdapter';
 import { resolveCardImageUrl, type ForgeResolverMap } from '../utils/forgeResolver';
 import type { UndoStack, Captured } from '../hooks/useUndoStack';
 import { makeReverseAction, makeBatchReverseAction, reverseIsSafe } from '../hooks/useUndoStack';
+import {
+  battleSideOf,
+  sideTotals,
+  computeInitiative,
+  brigadeMismatch as computeBrigadeMismatch,
+  type BattleCardLike,
+  type BattleSeat,
+} from '../lib/battleMath';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -123,6 +131,36 @@ function isFreeFormZone(zone: string): boolean {
 /** Determine if a zone key is an auto-arrange zone (horizontal strip layout). */
 function isAutoArrangeZone(zone: string): boolean {
   return zone === 'land-of-bondage';
+}
+
+// ---------------------------------------------------------------------------
+// Battle Zone chrome helpers (spec §5/§6, Task 12)
+// ---------------------------------------------------------------------------
+
+/** A battle-band CardInstance row paired with the owner-relative BattleCardLike
+ *  shape battleMath.ts consumes, plus which local rendering "half" it belongs
+ *  to (my cards vs. opponent-owned cards). */
+interface BattleCardEntry {
+  row: CardInstance;
+  owner: 'my' | 'opponent';
+  like: BattleCardLike;
+}
+
+/** Mirrors battleMath.ts's private isEnhancementSegment / the server's
+ *  enhSegment: exact 'GE'/'EE' segment on cardType, split on '/' and
+ *  trimmed — there is no literal "Enhancement" type. */
+function isBattleEnhancementSegment(cardType: string): boolean {
+  return cardType
+    .split('/')
+    .map((s) => s.trim())
+    .some((s) => s === 'GE' || s === 'EE');
+}
+
+/** Mirrors battleMath.ts's private isLostSoulLike / the server's
+ *  isLostSoulRow (battleStakesLobLostSouls): used client-side to count the
+ *  stakes Lost Souls for the Rescue-attempt vs. Battle-challenge header. */
+function isBattleLostSoulRow(c: { cardType: string; cardName: string }): boolean {
+  return c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
 }
 
 /** Build a human-readable fragment for an opponent-action request, used in the
@@ -4643,6 +4681,275 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return result;
   }, [opponentCards, battleBandRect, cardWidth, cardHeight]);
 
+  // ---- Battle Zone chrome derived state (spec §5/§6, Task 12) ----
+  // BattleCardLike[] built from the live battle rows (my + opponent-owned).
+  // dbY is read straight off posY — already owner-local, no viewer flip
+  // (spec §3). cardRelH uses the layout's UNSCALED mainCard height (not the
+  // cardScale-zoomed `cardHeight` used for actual rendering) so side
+  // derivation stays consistent regardless of either viewer's zoom
+  // preference — both clients compute the same band-relative ratio from the
+  // same mpLayout inputs.
+  const battleCardEntries = useMemo<BattleCardEntry[]>(() => {
+    if (!battleActive || !mpLayout?.zones.battle) return [];
+    const band = mpLayout.zones.battle;
+    const cardRelH = band.height > 0 ? rawMain.cardHeight / band.height : 0;
+    const mySeat = gameState.myPlayer ? (String(gameState.myPlayer.seat) as BattleSeat) : null;
+    const oppSeat = gameState.opponentPlayer ? (String(gameState.opponentPlayer.seat) as BattleSeat) : null;
+    const entries: BattleCardEntry[] = [];
+    const pushRows = (rows: CardInstance[] | undefined, owner: 'my' | 'opponent', seat: BattleSeat | null) => {
+      if (!seat || !rows) return;
+      for (const row of rows) {
+        entries.push({
+          row,
+          owner,
+          like: {
+            ownerSeat: seat,
+            dbY: parseFloat(row.posY || '0'),
+            cardRelH,
+            strength: row.strength,
+            toughness: row.toughness,
+            brigade: row.brigade,
+            cardType: row.cardType,
+            specialAbility: row.specialAbility,
+            isFlipped: row.isFlipped,
+            cardName: row.cardName,
+            equippedToInstanceId: row.equippedToInstanceId,
+          },
+        });
+      }
+    };
+    pushRows(myCards['battle'], 'my', mySeat);
+    pushRows(opponentCards['battle'], 'opponent', oppSeat);
+    return entries;
+  }, [battleActive, mpLayout, rawMain.cardHeight, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards]);
+
+  // Brigade soft-check (spec §6): every GE/EE-segment enhancement in the band
+  // whose brigade has no match among same-side characters. Order follows
+  // battleCardEntries (my cards, then opponent cards) so "show the first" is
+  // deterministic; the full list drives the red glow on every mismatched
+  // card, while only mismatchedBattleCards[0] gets the one interactive toast.
+  const mismatchedBattleCards = useMemo(() => {
+    if (battleCardEntries.length === 0) return [] as BattleCardEntry[];
+    const result: BattleCardEntry[] = [];
+    for (const entry of battleCardEntries) {
+      if (!isBattleEnhancementSegment(entry.like.cardType)) continue;
+      const side = battleSideOf(entry.like);
+      const sameSideCharacters = battleCardEntries
+        .filter((e) => e !== entry && battleSideOf(e.like) === side && isCharacterCard({ cardType: e.like.cardType }))
+        .map((e) => e.like);
+      if (computeBrigadeMismatch(entry.like, sameSideCharacters)) {
+        result.push(entry);
+      }
+    }
+    return result;
+  }, [battleCardEntries]);
+
+  const mismatchedBattleCardIds = useMemo(
+    () => new Set(mismatchedBattleCards.map((e) => String(e.row.id))),
+    [mismatchedBattleCards],
+  );
+
+  // Stakes Lost Soul count (spec §5 header: Rescue attempt vs. Battle
+  // challenge). Mirrors the server's battleStakesLobLostSouls: T1/T2 count
+  // the DEFENDER's land-of-bondage; Paragon counts the shared LoB.
+  const stakesLostSoulCount = useMemo(() => {
+    if (!battleActive) return 0;
+    if (normalizedFormat === 'Paragon') {
+      return (sharedCards['land-of-bondage'] ?? []).filter(isBattleLostSoulRow).length;
+    }
+    const attackerSeat = gameState.battleAttackerSeat;
+    if (!attackerSeat) return 0;
+    const mySeatStr = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
+    const oppSeatStr = gameState.opponentPlayer ? String(gameState.opponentPlayer.seat) : '';
+    const defenderRows =
+      attackerSeat === mySeatStr ? (opponentCards['land-of-bondage'] ?? [])
+      : attackerSeat === oppSeatStr ? (myCards['land-of-bondage'] ?? [])
+      : [];
+    return defenderRows.filter(isBattleLostSoulRow).length;
+  }, [battleActive, normalizedFormat, sharedCards, gameState.battleAttackerSeat, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards]);
+
+  // Field of Battle band — chrome (Task 12, spec §5/§6): totals chips,
+  // header line, initiative banner. Rendered AFTER the battle card groups
+  // (below, in JSX) so it sits above card art. listening={false}
+  // throughout — nothing here is clickable (drags must pass through); the
+  // one interactive element (the brigade-mismatch Discard toast) is a
+  // separate HTML overlay, not part of this Konva group. Gates on
+  // status==='playing' && battleActive, same as the background block.
+  //
+  // Wrapped in useMemo (not an inline IIFE), matching every other derived
+  // battle/layout value in this component (myZones, derivedWeaponPositions,
+  // battleCardEntries, etc.) — avoids rebuilding ~15 Konva primitives on
+  // unrelated re-renders, e.g. the per-frame ticks MultiplayerCanvas gets
+  // from useRevealTick while any card's post-draw reveal flash is active.
+  const battleChromeNode = useMemo(() => {
+    if (!battleActive || gameStatus !== 'playing' || !mpLayout?.zones.battle) return null;
+    const band = mpLayout.zones.battle;
+    const midY = band.y + band.height / 2;
+
+    const mySeatStr = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
+    const oppSeatStr = gameState.opponentPlayer ? String(gameState.opponentPlayer.seat) : '';
+    const attackerSeat = gameState.battleAttackerSeat;
+    // Defensive — the server always stamps battleAttackerSeat before
+    // battleState flips to 'active' (spec §7), so this should never be
+    // empty while battleActive is true.
+    if (!attackerSeat) return null;
+
+    const nameForSeat = (seat: string): string => {
+      if (seat === mySeatStr) return gameState.myPlayer?.displayName || 'You';
+      if (seat === oppSeatStr) return gameState.opponentPlayer?.displayName || 'Opponent';
+      return 'Player';
+    };
+
+    const battleLikes = battleCardEntries.map((e) => e.like);
+    const myTotals = mySeatStr ? sideTotals(battleLikes, mySeatStr as BattleSeat) : { str: 0, tgh: 0, hasUnknown: false };
+    const oppTotals = oppSeatStr ? sideTotals(battleLikes, oppSeatStr as BattleSeat) : { str: 0, tgh: 0, hasUnknown: false };
+
+    const headerText = `⚔ ${nameForSeat(attackerSeat)} attacking — ${stakesLostSoulCount >= 1 ? 'Rescue attempt' : 'Battle challenge'}`;
+
+    const initiative = computeInitiative(
+      battleLikes,
+      attackerSeat as BattleSeat,
+      (gameState.lastBattlePlayBySeat || '') as BattleSeat | '',
+    );
+    let bannerMain = '';
+    let bannerSub: string | null = null;
+    switch (initiative.kind) {
+      case 'waiting-blocker':
+        bannerMain = 'Waiting for a blocker…';
+        if (mySeatStr === attackerSeat && stakesLostSoulCount >= 1) {
+          bannerSub = 'No block? Claim Victory to rescue.';
+        }
+        break;
+      case 'no-attacker':
+        bannerMain = 'No attacker in battle — End Battle?';
+        break;
+      case 'unknown':
+        bannerMain = '⚔ INITIATIVE: unknown (variable/face-down stats)';
+        break;
+      case 'initiative': {
+        const reasonLabel = initiative.reason === 'mutual-destruction' ? 'mutual destruction' : initiative.reason;
+        bannerMain = `⚔ INITIATIVE: ${nameForSeat(initiative.seat)} — ${reasonLabel}`;
+        break;
+      }
+    }
+
+    const chipWidth = 64 * fsGrowth(11);
+    const chipHeight = 20;
+
+    return (
+      <Group key="battle-chrome" listening={false}>
+        {/* Header — attacker + stakes type, top edge of the band */}
+        <Rect x={band.x} y={band.y} width={band.width} height={18} fill="rgba(10,5,5,0.72)" perfectDrawEnabled={false} />
+        <Text
+          x={band.x + 4}
+          y={band.y + 2}
+          width={band.width - 8}
+          text={headerText}
+          fontSize={fs(12)}
+          fontFamily="Cinzel, Georgia, serif"
+          fontStyle="bold"
+          fill="#e8b3a3"
+          align="center"
+          letterSpacing={1}
+          ellipsis
+          wrap="none"
+          perfectDrawEnabled={false}
+        />
+
+        {/* Opponent-seat totals chip — top gutter (left edge) */}
+        <Group x={band.x + 6} y={band.y + 22}>
+          <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#6496e0" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
+          <Text
+            width={chipWidth}
+            height={chipHeight}
+            text={`⚔ ${oppTotals.str}/${oppTotals.tgh}${oppTotals.hasUnknown ? '?' : ''}`}
+            fontSize={fs(11)}
+            fontStyle="bold"
+            fill="#a3c5e8"
+            align="center"
+            verticalAlign="middle"
+            perfectDrawEnabled={false}
+          />
+        </Group>
+
+        {/* My-seat totals chip — bottom gutter (left edge). Halves are
+            viewer-relative: my cards always render on the bottom half, so
+            my chip anchors to the band's bottom edge. */}
+        <Group x={band.x + 6} y={band.y + band.height - 6 - chipHeight}>
+          <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#c4955a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
+          <Text
+            width={chipWidth}
+            height={chipHeight}
+            text={`⚔ ${myTotals.str}/${myTotals.tgh}${myTotals.hasUnknown ? '?' : ''}`}
+            fontSize={fs(11)}
+            fontStyle="bold"
+            fill="#e8d5a3"
+            align="center"
+            verticalAlign="middle"
+            perfectDrawEnabled={false}
+          />
+        </Group>
+
+        {/* Initiative banner — centered on the centerline */}
+        {(() => {
+          const bannerWidth = Math.min(band.width - 24, 360 * fsGrowth(12));
+          const bannerHeight = bannerSub ? 40 : 22;
+          const bx = band.x + band.width / 2 - bannerWidth / 2;
+          const by = midY - bannerHeight / 2;
+          return (
+            <Group x={bx} y={by}>
+              <Rect width={bannerWidth} height={bannerHeight} fill="rgba(10,5,5,0.85)" stroke="#8a5a4a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
+              <Text
+                x={4}
+                y={4}
+                width={bannerWidth - 8}
+                text={bannerMain}
+                fontSize={fs(12)}
+                fontStyle="bold"
+                fontFamily="Cinzel, Georgia, serif"
+                fill="#f0d9a8"
+                align="center"
+                ellipsis
+                wrap="none"
+                perfectDrawEnabled={false}
+              />
+              {bannerSub && (
+                <Text
+                  x={4}
+                  y={22}
+                  width={bannerWidth - 8}
+                  text={bannerSub}
+                  fontSize={fs(10)}
+                  fill="#c9b896"
+                  align="center"
+                  ellipsis
+                  wrap="none"
+                  perfectDrawEnabled={false}
+                />
+              )}
+            </Group>
+          );
+        })()}
+      </Group>
+    );
+    // fs/fsGrowth are derived purely from `scale` (see their definitions
+    // near the top of the component) — depending on `scale` directly keeps
+    // this memo correct across window resizes without needing to list the
+    // fs/fsGrowth closures themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    battleActive,
+    gameStatus,
+    mpLayout,
+    battleCardEntries,
+    stakesLostSoulCount,
+    gameState.battleAttackerSeat,
+    gameState.lastBattlePlayBySeat,
+    gameState.myPlayer,
+    gameState.opponentPlayer,
+    scale,
+  ]);
+
   // ---- Card bounds for marquee selection (my + opponent free-form, LOB, hand cards) ----
   const allCardBounds = useMemo((): CardBound[] => {
     if (!mpLayout || !myHandRect) return [];
@@ -5201,11 +5508,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           })}
 
           {/* ================================================================
-              Field of Battle band — static background. Rendered ONLY while a
-              battle is open (battleActive). Chrome (totals chips, initiative
-              banner, buttons) is Task 12.
+              Field of Battle band — static background (band rect + dashed
+              centerline). Rendered ONLY while a battle is open AND the game
+              is still playing (spec: "all battle UI gates on
+              status === 'playing'" — battle columns are left dangling after
+              resign/finish). The "FIELD OF BATTLE" label is superseded by
+              the dynamic header line in the Task 12 chrome group below.
               ================================================================ */}
-          {battleActive && mpLayout?.zones.battle && (() => {
+          {battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && (() => {
             const band = mpLayout.zones.battle;
             const midY = band.y + band.height / 2;
             return (
@@ -5229,17 +5539,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   strokeWidth={1}
                   dash={[10, 8]}
                   opacity={0.6}
-                  perfectDrawEnabled={false}
-                />
-                <Text
-                  x={band.x + 6}
-                  y={band.y + 4}
-                  text="FIELD OF BATTLE"
-                  fontSize={fs(11)}
-                  fontFamily="Cinzel, Georgia, serif"
-                  fill="#e8b3a3"
-                  letterSpacing={2}
-                  listening={false}
                   perfectDrawEnabled={false}
                 />
               </Group>
@@ -5675,6 +5974,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     isSelected={isSelected(String(card.id))}
                     isDraggable={!isSpectator}
                     hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                    brigadeMismatch={mismatchedBattleCardIds.has(String(card.id))}
                     nodeRef={registerCardNode}
                     onClick={handleCardClick}
                     onDragStart={handleCardDragStart}
@@ -5726,6 +6026,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               </Group>
             );
           })()}
+
+          {battleChromeNode}
 
           {/* ================================================================
               Cards in auto-arrange zones — My LOB (draggable, horizontal strip).
@@ -7199,6 +7501,70 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           })}
         </div>
       )}
+
+      {/* ================================================================
+          Brigade-mismatch toast (Battle Zone soft-check, spec §6, Task 12).
+          Every existing overlay (game toasts, emote overlay, request
+          banners) is pointerEvents:none and top/bottom-anchored — none can
+          host a button, so this gets its own band-edge-anchored container
+          with pointer events enabled. zIndex 600 sits between the drag
+          overlay (450) and GameToast (900). One toast at a time (the first
+          mismatched card, by battleCardEntries order); it disappears on its
+          own once that card leaves the band or the mismatch resolves, since
+          it's a pure function of live battle state — no local dismiss state
+          needed. Never rendered for spectators.
+          ================================================================ */}
+      {!isSpectator && battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && mismatchedBattleCards.length > 0 && (() => {
+        const band = mpLayout.zones.battle;
+        const toastCard = mismatchedBattleCards[0];
+        const width = 250;
+        // Band-edge-anchored: just inside the band's bottom-right corner —
+        // clear of the header/banner (centered) and the totals chips (left
+        // gutter).
+        const anchor = virtualToScreen(band.x + band.width - width - 8, band.y + band.height - 66, scale, offsetX, offsetY);
+        return (
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
+            <div
+              style={{
+                position: 'absolute',
+                left: anchor.x,
+                top: anchor.y,
+                width,
+                pointerEvents: 'auto',
+                background: 'rgba(14, 10, 6, 0.95)',
+                border: '1px solid rgba(220, 38, 38, 0.5)',
+                borderRadius: 8,
+                padding: '10px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
+              }}
+            >
+              <div style={{ fontSize: 12, color: '#e8bfbf', fontFamily: 'var(--font-cinzel), Georgia, serif', lineHeight: 1.4 }}>
+                No matching brigade in battle — REG says discard it
+              </div>
+              <button
+                onClick={() => moveCard(toastCard.row.id, 'discard')}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '6px 14px',
+                  background: '#5a2727',
+                  border: '1px solid #8a4242',
+                  borderRadius: 6,
+                  color: '#e8bfbf',
+                  fontSize: 12,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ================================================================
           Shared context menu — positioned relative to canvas container

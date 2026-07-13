@@ -67,6 +67,10 @@ export interface GameCardNodeProps {
   /** When true, plays a one-shot amber pulse glow: a brief fade-in + bloom,
    *  followed by a longer fade-out. Total duration ~1.8s. */
   lobArrivalGlow?: boolean;
+  /** When true (Battle Zone brigade soft-check), renders a continuous red
+   *  pulsing glow — "this enhancement has no matching-brigade character on
+   *  its side" (spec §6). Non-blocking warning, not a hard-block indicator. */
+  brigadeMismatch?: boolean;
   /** When true, suppress the per-card reveal countdown ring. Used when
    *  rendering the local viewer's own hand — the ring is meant for the
    *  receiving party (opponent), not the holder. */
@@ -103,6 +107,7 @@ export const GameCardNode = memo(function GameCardNode({
   isDraggable = true,
   hoverProgress,
   lobArrivalGlow,
+  brigadeMismatch,
   suppressRevealRing,
   nodeRef,
   onDragStart,
@@ -132,6 +137,8 @@ export const GameCardNode = memo(function GameCardNode({
 
   // Ref for the LOB arrival glow rect — used to run an imperative Konva Tween
   const arrivalGlowRef = useRef<Konva.Rect | null>(null);
+  // Ref for the brigade-mismatch glow rect — continuous pulse via yoyo tween.
+  const mismatchGlowRef = useRef<Konva.Rect | null>(null);
 
   useEffect(() => {
     const node = arrivalGlowRef.current;
@@ -177,6 +184,38 @@ export const GameCardNode = memo(function GameCardNode({
       node.opacity(0);
     }
   }, [lobArrivalGlow]);
+
+  // Brigade-mismatch glow — continuous pulse for as long as the mismatch
+  // holds (unlike the one-shot arrival bloom above). Reuses the same
+  // imperative-Tween idiom: a yoyo'd opacity tween looping indefinitely is
+  // cheap here because mismatches are rare (typically 0-1 cards at a time),
+  // unlike the LOB arrival glow which fires on every card that lands in a
+  // LOB and therefore avoids shadowBlur for perf. A handful of concurrent
+  // mismatch glows is an acceptable tradeoff for the "pulsing" requirement.
+  useEffect(() => {
+    const node = mismatchGlowRef.current;
+    if (!node) return;
+
+    if (brigadeMismatch) {
+      node.visible(true);
+      node.opacity(0.35);
+      const tween = new KonvaLib.Tween({
+        node,
+        duration: 0.9,
+        opacity: 0.85,
+        easing: KonvaLib.Easings.EaseInOut,
+        yoyo: true,
+        repeat: -1,
+      });
+      tween.play();
+      return () => {
+        tween.destroy();
+      };
+    } else {
+      node.visible(false);
+      node.opacity(0);
+    }
+  }, [brigadeMismatch]);
 
   const groupRefCb = useCallback((node: Konva.Group | null) => {
     nodeRef?.(card.instanceId, node);
@@ -253,6 +292,27 @@ export const GameCardNode = memo(function GameCardNode({
         stroke="#e8b86a"
         strokeWidth={1.5}
         cornerRadius={6}
+        visible={false}
+        opacity={0}
+        listening={false}
+        perfectDrawEnabled={false}
+      />
+
+      {/* Brigade-mismatch glow — red pulsing border (Battle Zone soft-check,
+          spec §6). opacity is animated imperatively in the effect above. */}
+      <Rect
+        ref={mismatchGlowRef as any}
+        x={-2}
+        y={-2}
+        width={cardWidth + 4}
+        height={cardHeight + 4}
+        fill="transparent"
+        stroke="#dc2626"
+        strokeWidth={2.5}
+        cornerRadius={6}
+        shadowColor="#dc2626"
+        shadowBlur={12}
+        shadowOpacity={0.7}
         visible={false}
         opacity={0}
         listening={false}
