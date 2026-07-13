@@ -27,6 +27,12 @@ const AUTO_REVEAL_HAND_MICROS = 10_000_000n; // 10 seconds
 // in goldfish/multiplayer UIs (HAND_LIMIT). Auto-draws stop short of this.
 const HAND_LIMIT = 16;
 
+// Zones an ability's source card may fire from by default (the "in play"
+// zones plus Land of Redemption, where redeemed souls can still trigger
+// abilities). Shared across every ability-source gate below; per-ability
+// explicit sourceZones overrides are untouched by this list.
+const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption', 'battle'];
+
 // ---------------------------------------------------------------------------
 // Forge playtest games (Phase 2.3)
 // ---------------------------------------------------------------------------
@@ -217,13 +223,13 @@ function compactLobIndices(
 // ---------------------------------------------------------------------------
 // Helper: clearCountersIfLeavingPlay
 // Counters reflect in-play state (damage, charges, generic markers). When a
-// card leaves Territory or Land of Bondage for any other zone, drop all
-// CardCounter rows for it so they don't follow the card into deck/hand/discard
-// or persist when it later returns to play.
+// card leaves Territory, Land of Bondage, or Battle for any other zone, drop
+// all CardCounter rows for it so they don't follow the card into
+// deck/hand/discard or persist when it later returns to play.
 // ---------------------------------------------------------------------------
 function clearCountersIfLeavingPlay(ctx: any, cardId: bigint, fromZone: string, toZone: string) {
   if (fromZone === toZone) return;
-  if (fromZone !== 'territory' && fromZone !== 'land-of-bondage') return;
+  if (fromZone !== 'territory' && fromZone !== 'land-of-bondage' && fromZone !== 'battle') return;
   for (const counter of [...ctx.db.CardCounter.card_counter_card_instance_id.filter(cardId)]) {
     ctx.db.CardCounter.id.delete(counter.id);
   }
@@ -233,13 +239,16 @@ function clearCountersIfLeavingPlay(ctx: any, cardId: bigint, fromZone: string, 
 // Helper: leavePlayFieldOverrides
 // Player-attached annotations (notes, Three Woes Choose Good/Evil outline) and
 // the meek conversion are in-play state and shouldn't ride along when the card
-// leaves Territory or Land of Bondage. Returns the override map to spread into
-// a CardInstance update; preserves the existing values for moves that aren't
-// leave-play.
+// leaves Territory, Land of Bondage, or Battle. Returns the override map to
+// spread into a CardInstance update; preserves the existing values for moves
+// that aren't leave-play. Also centralizes clearing the battle-origin fields
+// (originZone/originPosX/originPosY) whenever the destination isn't 'battle'
+// — this is the ONLY place those fields get cleared, so every move reducer's
+// completing write path picks it up via the shared spread.
 // ---------------------------------------------------------------------------
-function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string; isMeek: boolean; imitatingName: string; cardImgFile: string } {
+function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string; isMeek: boolean; imitatingName: string; cardImgFile: string; originZone?: string; originPosX?: string; originPosY?: string } {
   const leaving =
-    fromZone !== toZone && (fromZone === 'territory' || fromZone === 'land-of-bondage');
+    fromZone !== toZone && (fromZone === 'territory' || fromZone === 'land-of-bondage' || fromZone === 'battle');
   // When an Imitate Lost Soul leaves play (rescued, shuffled, banished, etc.),
   // drop the imitation and restore its canonical art. Pre-existing cardImgFile
   // is returned unchanged for non-imitating cards so this is a no-op write.
@@ -247,12 +256,16 @@ function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): {
   const canonicalImg = wasImitating
     ? (IMITATE_ORIGINAL_IMG[card.cardName] ?? card.cardImgFile)
     : card.cardImgFile;
+  const battleClears = toZone !== 'battle'
+    ? { originZone: '', originPosX: '', originPosY: '' }
+    : {};
   return {
     notes: leaving ? '' : card.notes,
     outlineColor: leaving ? '' : card.outlineColor,
     isMeek: leaving ? false : card.isMeek,
     imitatingName: wasImitating ? '' : card.imitatingName,
     cardImgFile: canonicalImg,
+    ...battleClears,
   };
 }
 
@@ -2197,7 +2210,6 @@ export const matthew_draw_brigades = spacetimedb.reducer(
     if (!source) throw new SenderError('Card not found');
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
     if (source.ownerId !== player.id) throw new SenderError('Not your card');
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -3969,7 +3981,6 @@ export const execute_card_ability = spacetimedb.reducer(
     // Abilities only fire when the source card is in play. Matches the
     // client-side menu gate but the server enforces independently.
     // LoR included so resting Heroes (Angel of the Harvest, etc.) can spawn.
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -4089,7 +4100,6 @@ export const execute_card_ability_with_count = spacetimedb.reducer(
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
     if (source.ownerId !== player.id) throw new SenderError('Not your card');
 
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -4138,7 +4148,6 @@ export const resurrect_heroes = spacetimedb.reducer(
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
     if (source.ownerId !== player.id) throw new SenderError('Not your card');
 
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -4246,7 +4255,6 @@ export const imitate_lost_soul = spacetimedb.reducer(
     if (!(source.cardName in IMITATE_ORIGINAL_IMG)) {
       throw new SenderError('Source is not an Imitate Lost Soul');
     }
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -5336,7 +5344,6 @@ export const discard_reserve_characters_execute = spacetimedb.reducer(
     // requester. No-op if it moved/was negated mid-flight; leave request
     // cleanup to complete_zone_search (client responsibility).
     const source = ctx.db.CardInstance.id.find(sourceInstanceId);
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (
       !source ||
       source.gameId !== gameId ||
