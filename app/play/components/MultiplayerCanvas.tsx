@@ -3806,6 +3806,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         return;
       }
 
+      // Battle drops while the battle is resolving ('awaiting-soul'): the band
+      // is still open, but the server refuses enter_battle and redirects plain
+      // move_card battle drops back to territory. For a territory-origin card
+      // that redirect keeps the row in its SOURCE zone with the same React
+      // key, so the destroy below would orphan it as an invisible ghost node
+      // (same class as the LOB pile-drop guard further down). New plays are
+      // not meaningful mid-resolution — snap everything back instead. The
+      // closed-band proxy path is untouched (battleState '' → enter_battle).
+      if (targetZone === 'battle' && !battleNeedsEnter && gameState.game?.battleState !== 'active') {
+        if (followerOffsets && originalPos) {
+          for (const [id, offset] of followerOffsets) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) {
+              fNode.x(originalPos.x + offset.dx);
+              fNode.y(originalPos.y + offset.dy);
+            }
+          }
+        }
+        snapBack();
+        return;
+      }
+
       // Turn 1 reserve protection — check before executing the move
       if (sourceZone === 'reserve' && targetZone !== 'reserve' && isMyFirstTurn && hasOpponent) {
         const executeDragMove = () => {
