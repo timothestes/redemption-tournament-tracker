@@ -117,7 +117,7 @@ function pointInRect(px: number, py: number, rect: ZoneRect): boolean {
 
 /** Determine if a zone key is a free-form zone (cards positioned at arbitrary x/y). */
 function isFreeFormZone(zone: string): boolean {
-  return zone === 'territory';
+  return zone === 'territory' || zone === 'battle';
 }
 
 /** Determine if a zone key is an auto-arrange zone (horizontal strip layout). */

@@ -41,7 +41,7 @@ function makeState(hand: GameCard[] = [], territory: GameCard[] = []): GameState
     zones: {
       deck: [], hand, reserve: [], discard: [], paragon: [],
       'land-of-bondage': [], 'soul-deck': [], territory,
-      'land-of-redemption': [], banish: [],
+      'land-of-redemption': [], banish: [], battle: [],
     },
     history: [],
     options: DEFAULT_OPTIONS,

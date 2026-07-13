@@ -136,6 +136,17 @@ export function calculateZoneLayout(
     label: 'Paragon',
   };
 
+  // Goldfish (single-player practice) has no battle zone — it's a multiplayer-only
+  // concept. Keep an off-canvas placeholder so zone-keyed code (Record<ZoneId, ZoneRect>)
+  // stays exhaustive; battle must never render here.
+  const battleZone: ZoneRect = {
+    x: -1000,
+    y: -1000,
+    width: 0,
+    height: 0,
+    label: 'Field of Battle',
+  };
+
   // --- Hand ---
   const handZone: ZoneRect = {
     x: 0,
@@ -156,6 +167,7 @@ export function calculateZoneLayout(
     'territory': territoryZone,
     'land-of-redemption': landOfRedemptionZone,
     'banish': banishZone,
+    'battle': battleZone,
   };
 }
 
