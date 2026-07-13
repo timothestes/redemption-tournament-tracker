@@ -162,6 +162,19 @@ export interface GameState {
   shuffleOpponentDeck: (requestId: bigint) => void;
   reorderHand: (cardIds: string) => void;
   reorderLob: (cardIds: string) => void;
+
+  // Battle zone (Field of Battle) — denormalized Game fields + reducer wrappers.
+  /** '' | 'active' | 'awaiting-soul' */
+  battleState: string;
+  /** '' | '0' | '1' — seat of the attacker (turn seat when the band opened). */
+  battleAttackerSeat: string;
+  /** '' | '0' | '1' — seat that last played a card into the band. */
+  lastBattlePlayBySeat: string;
+  /** Atomic open-if-closed + move + stamp (server enter_battle). */
+  enterBattle: (cardInstanceId: bigint, posX: string, posY: string) => void;
+  endBattle: () => void;
+  resolveBattle: () => void;
+  surrenderSoul: (cardInstanceId: bigint) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -901,6 +914,28 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     [conn, gameId],
   );
 
+  const enterBattle = useCallback(
+    (cardInstanceId: bigint, posX: string, posY: string) => {
+      conn?.reducers.enterBattle({ gameId, cardInstanceId, posX, posY });
+    },
+    [conn, gameId],
+  );
+
+  const endBattle = useCallback(() => {
+    conn?.reducers.endBattle({ gameId });
+  }, [conn, gameId]);
+
+  const resolveBattle = useCallback(() => {
+    conn?.reducers.resolveBattle({ gameId });
+  }, [conn, gameId]);
+
+  const surrenderSoul = useCallback(
+    (cardInstanceId: bigint) => {
+      conn?.reducers.surrenderSoul({ gameId, cardInstanceId });
+    },
+    [conn, gameId],
+  );
+
   // ---------------------------------------------------------------------------
   // Return
   // ---------------------------------------------------------------------------
@@ -1001,6 +1036,13 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     completeZoneSearch,
     moveOpponentCard,
     shuffleOpponentDeck,
+    battleState: game?.battleState ?? '',
+    battleAttackerSeat: game?.battleAttackerSeat ?? '',
+    lastBattlePlayBySeat: game?.lastBattlePlayBySeat ?? '',
+    enterBattle,
+    endBattle,
+    resolveBattle,
+    surrenderSoul,
     reorderHand,
     reorderLob,
     isForgeGame,
@@ -1302,6 +1344,15 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     shuffleOpponentDeck: noopBigint,
     reorderHand: noopString,
     reorderLob: noopString,
+
+    // Battle zone — read-only fields plus no-op action stubs
+    battleState: game?.battleState ?? '',
+    battleAttackerSeat: game?.battleAttackerSeat ?? '',
+    lastBattlePlayBySeat: game?.lastBattlePlayBySeat ?? '',
+    enterBattle: useCallback((_cardInstanceId: bigint, _posX: string, _posY: string) => {}, []),
+    endBattle: noop,
+    resolveBattle: noop,
+    surrenderSoul: noopBigint,
   };
 }
 

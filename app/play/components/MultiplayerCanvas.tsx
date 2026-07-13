@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Stage, Layer, Rect, Text, Group, Image as KonvaImage } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Line, Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 
@@ -528,10 +528,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Normalize the raw game.format string (e.g. "Paragon Type 1", "Type 2") to
   // the canonical 'T1' | 'T2' | 'Paragon' expected by the layout function.
   const normalizedFormat = normalizeDeckFormat(gameState.game?.format ?? '');
+  // Field of Battle band stays open through the soul-surrender pick.
+  // TODO(Task 15): defer flips while dragging
+  const battleActive =
+    gameState.game?.battleState === 'active' || gameState.game?.battleState === 'awaiting-soul';
+  const gameStatus = gameState.game?.status ?? '';
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player'),
-    [virtualWidth, normalizedFormat, viewerKind],
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', battleActive),
+    [virtualWidth, normalizedFormat, viewerKind, battleActive],
   );
+  // Band rect used for battle DROPS. While the band is still closed (a
+  // divider-proxy drop that opens the battle) the current layout has no
+  // battle rect yet, so normalize against the rect the band WILL have once
+  // battleActive flips — that is the frame every client renders after
+  // enter_battle lands.
+  const battleBandRect = useMemo(() => {
+    if (mpLayout?.zones.battle) return mpLayout.zones.battle;
+    return calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', true).zones.battle;
+  }, [mpLayout, virtualWidth, normalizedFormat, viewerKind]);
 
   // Card scale preference
   const { cardScale, zoomIn, zoomOut, resetScale, MIN_SCALE, MAX_SCALE, STEP, setCardScale } = useCardScale();
@@ -2290,6 +2304,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         return { zone: 'soul-deck', owner: 'shared' };
       }
 
+      // Battle band (Field of Battle) — checked BEFORE the territory loops.
+      // Owner 'my' is a formality: the drop path always sends targetOwnerId ''
+      // so ownership never transfers on battle drops (spec §4).
+      if (battleActive) {
+        if (mpLayout.zones.battle && pointInRect(x, y, mpLayout.zones.battle)) {
+          return { zone: 'battle', owner: 'my' };
+        }
+      } else if (gameStatus === 'playing') {
+        // Idle divider proxy: a thin strip (divider center ± 1.5% of stage
+        // height, play-area width) on the seam between the territories.
+        // Dropping a card here opens a battle via the atomic enter_battle.
+        const divider = mpLayout.zones.divider;
+        const proxyHalf = VIRTUAL_HEIGHT * 0.015;
+        const dividerCenterY = divider.y + divider.height / 2;
+        if (
+          x >= 0 && x <= mpLayout.playAreaWidth &&
+          y >= dividerCenterY - proxyHalf && y <= dividerCenterY + proxyHalf
+        ) {
+          return { zone: 'battle', owner: 'my' };
+        }
+      }
+
       // Check my zones (all: free-form + sidebar piles)
       for (const [key, rect] of Object.entries(myZones)) {
         if (pointInRect(x, y, rect)) {
@@ -2314,7 +2350,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       return null;
     },
-    [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect, normalizedFormat],
+    [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect, normalizedFormat, battleActive, gameStatus],
   );
 
   // Dragging the Soul Deck pile: capture the top soul's ID at drag-start,
@@ -3428,7 +3464,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           : card.ownerId === 'player1'
           ? 'my'
           : 'opponent';
-      const isSameZone = targetZone === sourceZone && hit.owner === sourceOwner;
+      // Battle is a single band rect and its hit owner is always 'my', so a
+      // card already in battle re-dropped inside the band is an intra-band
+      // reposition regardless of which player owns the card.
+      const isSameZone = targetZone === sourceZone && (hit.owner === sourceOwner || targetZone === 'battle');
 
       // Equip: if a weapon is dropped on a warrior in the local player's
       // territory, attach instead of moving. Gated to single-card drags
@@ -3566,15 +3605,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // (0–1 ratios). This ensures cards render at the correct proportional position
       // regardless of each player's screen/window size.
       const zoneRect =
-        hit.owner === 'my'
+        targetZone === 'battle'
+          ? battleBandRect
+          : hit.owner === 'my'
           ? myZones[targetZone]
           : hit.owner === 'opponent'
           ? opponentZones[targetZone]
           : mpLayout?.zones.sharedLob;
       // Resolve target owner ID — always set to the target zone's owner so
       // cards transfer ownership when moving between players' zones.
+      // Battle: ownership NEVER transfers on battle drops (spec §4) — always
+      // send an empty targetOwnerId regardless of the hit's formal owner.
       const targetOwnerId =
-        hit.owner === 'shared'
+        targetZone === 'battle'
+          ? ''
+          : hit.owner === 'shared'
           ? '0'
           : hit.owner === 'my' && gameState.myPlayer
           ? String(gameState.myPlayer.id)
@@ -3593,14 +3638,41 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // When crossing between them, offset by card dimensions so the visual
       // position stays consistent.
       const sourceIsRotated = sourceOwner === 'opponent' && (isFreeFormZone(sourceZone ?? '') || isAutoArrangeZone(sourceZone ?? '') || SIDEBAR_PILE_ZONES.includes(sourceZone as any));
-      const targetIsRotated = isOpponentTarget && isFreeFormZone(targetZone);
+      // Battle renders by CARD owner (my cards rot 0, opponent-owned rot 180)
+      // — the hit owner is always 'my' and must not drive rotation there.
+      const targetIsRotated =
+        targetZone === 'battle'
+          ? sourceOwner === 'opponent'
+          : isOpponentTarget && isFreeFormZone(targetZone);
       const { x: adjDropX, y: adjDropY } = adjustAnchorForRotationChange(
         dropX, dropY, dragW, dragH, sourceIsRotated, targetIsRotated,
       );
 
-      const targetOwner: 'my' | 'opponent' = isOpponentTarget ? 'opponent' : 'my';
+      // Battle positions mirror by CARD owner ('my'/'opponent' relative to me),
+      // NOT by hit owner, so each player's cards land on their own half on
+      // both screens (spec §3). Shared-owned cards render rot 0 → 'my'.
+      const targetOwner: 'my' | 'opponent' =
+        targetZone === 'battle'
+          ? (sourceOwner === 'opponent' ? 'opponent' : 'my')
+          : isOpponentTarget
+          ? 'opponent'
+          : 'my';
       const clampOpts = isFreeFormZone(targetZone) ? { cardWidth, cardHeight } : undefined;
       const toDb = (px: number, py: number) => toDbPos(px, py, zoneRect!, targetOwner, clampOpts);
+
+      // Battle drops: when the band is closed, opening must be atomic with the
+      // move — a client-side startBattle();moveCard(); pair would race the
+      // opponent (spec §4). enter_battle throws during 'awaiting-soul', but
+      // the server redirects stray move_card battle drops to territory then,
+      // so route non-'active' states through enter_battle only when closed.
+      const battleNeedsEnter = targetZone === 'battle' && gameState.game?.battleState === '';
+      const dropSingleCard = (db: { x: number; y: number }) => {
+        if (battleNeedsEnter) {
+          gameState.enterBattle(cardId, String(db.x), String(db.y));
+        } else {
+          moveCard(cardId, targetZone, '', String(db.x), String(db.y), targetOwnerId);
+        }
+      };
 
       // Same free-form zone: just update position.
       // Restore the node to its original parent Group first — it was reparented
@@ -3752,13 +3824,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   positions[id] = { posX: String(fDb.x), posY: String(fDb.y) };
                 }
               }
+              if (battleNeedsEnter) {
+                // Open the battle atomically with the lead card; the batch
+                // executes after it server-side (same-connection reducer
+                // ordering), so the group lands in an already-open band.
+                gameState.enterBattle(cardId, positions[card.instanceId].posX, positions[card.instanceId].posY);
+              }
               moveCardsBatch(JSON.stringify(cardIds), targetZone, JSON.stringify(positions), targetOwnerId);
             } else {
               moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
             }
           } else if (isFreeFormZone(targetZone)) {
             const db = toDb(adjDropX, adjDropY);
-            moveCard(cardId, targetZone, '', String(db.x), String(db.y), targetOwnerId);
+            dropSingleCard(db);
           } else if (isAutoArrangeZone(targetZone)) {
             moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
           } else {
@@ -3976,6 +4054,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               positions[id] = { posX: String(fDb.x), posY: String(fDb.y) };
             }
           }
+          if (battleNeedsEnter) {
+            // Open the battle atomically with the lead card; the batch
+            // executes after it server-side (same-connection reducer
+            // ordering), so the group lands in an already-open band.
+            gameState.enterBattle(cardId, positions[card.instanceId].posX, positions[card.instanceId].posY);
+          }
           moveCardsBatch(
             JSON.stringify(cardIds),
             targetZone,
@@ -3988,7 +4072,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         clearSelection();
       } else if (isFreeFormZone(targetZone)) {
         const db = toDb(adjDropX, adjDropY);
-        moveCard(cardId, targetZone, '', String(db.x), String(db.y), targetOwnerId);
+        dropSingleCard(db);
       } else if (isAutoArrangeZone(targetZone)) {
         // Auto-arrange zone: positions are ignored by rendering
         moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
@@ -4024,6 +4108,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       myZones,
       opponentZones,
       mpLayout,
+      battleBandRect,
       gameState.myPlayer,
       gameState.opponentPlayer,
       scale,
@@ -4516,6 +4601,48 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
     }
 
+    // Battle band cards — my half (rot 0) and opponent-owned half (rot 180).
+    // Both mirror against the FULL band rect by card owner (spec §3). The
+    // rect only exists while a battle is open, which gates this naturally.
+    if (mpLayout.zones.battle) {
+      const band = mpLayout.zones.battle;
+      for (const card of myCards['battle'] ?? []) {
+        let x: number, y: number;
+        if (card.posX) {
+          ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), band, 'my'));
+        } else {
+          x = band.x + 20;
+          y = band.y + 24;
+        }
+        bounds.push({
+          instanceId: String(card.id),
+          x,
+          y,
+          width: cardWidth,
+          height: cardHeight,
+          rotation: 0,
+          owner: 'my',
+        });
+      }
+      for (const card of opponentCards['battle'] ?? []) {
+        const { x: anchorX, y: anchorY } = toScreenPos(
+          card.posX ? parseFloat(card.posX) : 0,
+          card.posY ? parseFloat(card.posY) : 0,
+          band, 'opponent',
+        );
+        // Rotation=180: anchor is the bottom-right corner.
+        bounds.push({
+          instanceId: String(card.id),
+          x: anchorX - cardWidth,
+          y: anchorY - cardHeight,
+          width: cardWidth,
+          height: cardHeight,
+          rotation: 180,
+          owner: 'opponent',
+        });
+      }
+    }
+
     // My auto-arrange zone cards (LOB). Attached sites don't get a slot —
     // their bounds come from the derived offset relative to the host slot.
     for (const zoneKey of AUTO_ARRANGE_ZONES) {
@@ -4773,6 +4900,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   if (normalizedFormat === 'Paragon' && mpLayout?.zones.sharedLob) {
     allZoneRects.push({ key: 'shared:land-of-bondage', rect: mpLayout.zones.sharedLob, owner: 'shared' });
   }
+  if (battleActive && mpLayout?.zones.battle) {
+    // Keyed 'my:battle' to match findZoneAtPosition's hit owner so the hover
+    // glow and source-zone suppression follow the `${owner}:${zone}` convention.
+    allZoneRects.push({ key: 'my:battle', rect: mpLayout.zones.battle, owner: 'my' });
+  }
 
   return (
     <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} onContextMenu={(e) => e.preventDefault()}>
@@ -4972,6 +5104,52 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               </Group>
             );
           })}
+
+          {/* ================================================================
+              Field of Battle band — static background. Rendered ONLY while a
+              battle is open (battleActive). Chrome (totals chips, initiative
+              banner, buttons) is Task 12.
+              ================================================================ */}
+          {battleActive && mpLayout?.zones.battle && (() => {
+            const band = mpLayout.zones.battle;
+            const midY = band.y + band.height / 2;
+            return (
+              <Group key="battle-band-bg" listening={false}>
+                <Rect
+                  x={band.x}
+                  y={band.y}
+                  width={band.width}
+                  height={band.height}
+                  fill="#1a0d0d"
+                  stroke="#6b2f27"
+                  strokeWidth={1}
+                  cornerRadius={3}
+                  opacity={0.75}
+                  perfectDrawEnabled={false}
+                />
+                {/* Dashed centerline — placement above/below decides a card's side */}
+                <Line
+                  points={[band.x + 8, midY, band.x + band.width - 8, midY]}
+                  stroke="#8a5a4a"
+                  strokeWidth={1}
+                  dash={[10, 8]}
+                  opacity={0.6}
+                  perfectDrawEnabled={false}
+                />
+                <Text
+                  x={band.x + 6}
+                  y={band.y + 4}
+                  text="FIELD OF BATTLE"
+                  fontSize={fs(11)}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fill="#e8b3a3"
+                  letterSpacing={2}
+                  listening={false}
+                  perfectDrawEnabled={false}
+                />
+              </Group>
+            );
+          })()}
 
           {/* ================================================================
               Hand zone backgrounds
@@ -5210,6 +5388,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 x = (myZone?.x ?? 0) + 20;
                 y = (myZone?.y ?? 0) + 24;
               }
+              // Render-time bottom clamp (spec §2): battle mode compresses the
+              // territories, so positions write-clamped against the taller idle
+              // zone can otherwise park a card's bottom outside the clip rect.
+              if (myZone) y = Math.min(y, myZone.y + myZone.height - cardHeight);
               return (
                 <GameCardNode
                   key={String(card.id)}
@@ -5286,6 +5468,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   'opponent',
                 ));
               }
+              // Mirrored render-time clamp (spec §2): the rot-180 anchor is the
+              // visual bottom-right — keep the anchor at least a card-height
+              // below the zone top so the VISUAL card stays inside.
+              y = Math.max(y, oppZone.y + cardHeight);
               return (
                 <GameCardNode
                   key={String(card.id)}
@@ -5335,6 +5521,104 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               </Group>
             );
           })}
+
+          {/* ================================================================
+              Cards in the Field of Battle band — one clip Group over the full
+              band with two owner groups inside: my cards (rot 0, 'my' mirror)
+              and opponent-owned cards (rot 180, 'opponent' mirror, bottom-right
+              anchor) — the same conventions as the territory groups. Mirroring
+              is by CARD owner, so each player's cards render on their own half
+              on BOTH screens (spec §3). Battle rows only exist while
+              battleState is 'active'/'awaiting-soul' — the server auto-returns
+              cards when a battle closes, so nothing renders here when the band
+              is closed (defensive: stray rows in 'battle' while inactive would
+              be invisible; acceptable, the server guarantees the invariant).
+              Attached weapons render at their own posX/posY (inherited from
+              the host at attach time); the battle derived-offset map is a
+              later task.
+              ================================================================ */}
+          {battleActive && mpLayout?.zones.battle && (() => {
+            const band = mpLayout.zones.battle;
+            const myBattle = myCards['battle'] ?? [];
+            const oppBattle = opponentCards['battle'] ?? [];
+            if (myBattle.length === 0 && oppBattle.length === 0) return null;
+            const renderBattleCard = (owner: 'my' | 'opponent') => {
+              const adaptedOwner = owner === 'my' ? 'player1' : 'player2';
+              return (card: CardInstance) => {
+                const gameCard = adaptCard(card, adaptedOwner);
+                let x: number, y: number;
+                if (card.posX) {
+                  ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), band, owner));
+                } else if (owner === 'my') {
+                  x = band.x + 20;
+                  y = band.y + 24;
+                } else {
+                  ({ x, y } = toScreenPos(0, 0, band, 'opponent'));
+                }
+                // Render-time clamp (spec §2): own cards clamp the bottom edge;
+                // opponent-owned rot-180 anchors are the visual bottom-right, so
+                // keep the anchor a card-height below the band top instead.
+                if (owner === 'my') {
+                  y = Math.min(y, band.y + band.height - cardHeight);
+                } else {
+                  y = Math.max(y, band.y + cardHeight);
+                }
+                return (
+                  <GameCardNode
+                    key={String(card.id)}
+                    card={gameCard}
+                    x={x}
+                    y={y}
+                    rotation={owner === 'my' ? 0 : 180}
+                    cardWidth={cardWidth}
+                    cardHeight={cardHeight}
+                    image={getCardImage(card)}
+                    {...(getTargetingProps(gameCard) ?? {})}
+                    isSelected={isSelected(String(card.id))}
+                    isDraggable={!isSpectator}
+                    hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                    nodeRef={registerCardNode}
+                    onClick={handleCardClick}
+                    onDragStart={handleCardDragStart}
+                    onDragMove={handleCardDragMove}
+                    onDragEnd={handleCardDragEnd}
+                    onContextMenu={handleCardContextMenu}
+                    onDblClick={owner === 'my' ? handleDblClick : noopDblClick}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                  />
+                );
+              };
+            };
+            // Two-pass cluster render (weapons behind their hosts), mirroring
+            // the territory groups.
+            const buildBattleNodes = (
+              cards: CardInstance[],
+              render: (card: CardInstance) => React.ReactNode,
+            ) => {
+              const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+              const unequipped = sorted.filter((c) => c.equippedToInstanceId === 0n);
+              return unequipped.flatMap((card) => {
+                const attachedWeapons = sorted.filter((w) => w.equippedToInstanceId === card.id);
+                const nodes: React.ReactNode[] = [];
+                for (const weapon of attachedWeapons) nodes.push(render(weapon));
+                nodes.push(render(card));
+                return nodes;
+              });
+            };
+            return (
+              <Group
+                key="battle-band-cards"
+                clipX={band.x}
+                clipY={band.y}
+                clipWidth={band.width}
+                clipHeight={band.height}
+              >
+                <Group key="battle-my">{buildBattleNodes(myBattle, renderBattleCard('my'))}</Group>
+                <Group key="battle-opp">{buildBattleNodes(oppBattle, renderBattleCard('opponent'))}</Group>
+              </Group>
+            );
+          })()}
 
           {/* ================================================================
               Cards in auto-arrange zones — My LOB (draggable, horizontal strip).
