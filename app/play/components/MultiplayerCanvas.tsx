@@ -568,10 +568,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Normalize the raw game.format string (e.g. "Paragon Type 1", "Type 2") to
   // the canonical 'T1' | 'T2' | 'Paragon' expected by the layout function.
   const normalizedFormat = normalizeDeckFormat(gameState.game?.format ?? '');
+  // ---- Drag state (isDraggingRef only — declared early so the battle-flip
+  // deferral effect below can read it; the rest of the drag-state refs live
+  // in their usual block further down). ----
+  const isDraggingRef = useRef(false);
+
   // Field of Battle band stays open through the soul-surrender pick.
-  // TODO(Task 15): defer flips while dragging
-  const battleActive =
+  // Layout flips are deferred while a card drag is in flight (Task 15, spec
+  // §4): a previous attempt at this feature broke because an opponent
+  // opening/closing the band mid-drag reflowed the layout under the dragged
+  // card, teleporting it and dropping it somewhere the cursor never was.
+  // `rawBattleActive` is the live server-derived truth; `battleActive` (the
+  // APPLIED value everything below actually renders from) only follows it
+  // while no drag is in flight. A flip that arrives mid-drag stays parked in
+  // `rawBattleActiveRef` and is flushed by handleCardDragEnd on
+  // dragend/drag-cancel — a single-step flip, never a per-frame recompute.
+  const rawBattleActive =
     gameState.game?.battleState === 'active' || gameState.game?.battleState === 'awaiting-soul';
+  const rawBattleActiveRef = useRef(rawBattleActive);
+  rawBattleActiveRef.current = rawBattleActive;
+  const [battleActive, setBattleActive] = useState(rawBattleActive);
+  useEffect(() => {
+    if (isDraggingRef.current) return; // parked; flushed on dragend/drag-cancel
+    setBattleActive(rawBattleActive);
+  }, [rawBattleActive]);
   const gameStatus = gameState.game?.status ?? '';
   const mpLayout = useMemo(
     () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', battleActive),
@@ -586,6 +606,72 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (mpLayout?.zones.battle) return mpLayout.zones.battle;
     return calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', true).zones.battle;
   }, [mpLayout, virtualWidth, normalizedFormat, viewerKind]);
+
+  // Field of Battle band seam (Task 15 spec §4/§5): the band background Rect
+  // eases its height/opacity open/closed via a one-off Konva.Tween instead of
+  // popping. `lastBandRectRef` snapshots the last real band rect — once
+  // `battleActive` flips false, mpLayout stops producing `zones.battle`
+  // entirely, so the closing tween needs a frozen rect to animate against.
+  // `bandBgVisible` keeps the Rect mounted a beat past `battleActive` going
+  // false so the closing tween can finish before it actually unmounts.
+  const lastBandRectRef = useRef<ZoneRect | null>(null);
+  if (mpLayout?.zones.battle) lastBandRectRef.current = mpLayout.zones.battle;
+  const [bandBgVisible, setBandBgVisible] = useState(battleActive);
+  const bandBgRectRef = useRef<Konva.Rect | null>(null);
+  const bandBgTweenRef = useRef<Konva.Tween | null>(null);
+
+  useEffect(() => {
+    if (battleActive) {
+      setBandBgVisible(true);
+      return;
+    }
+    const rect = bandBgRectRef.current;
+    if (!rect) {
+      setBandBgVisible(false);
+      return;
+    }
+    bandBgTweenRef.current?.destroy();
+    const tween = new KonvaLib.Tween({
+      node: rect,
+      duration: 0.2,
+      height: 0,
+      opacity: 0,
+      easing: KonvaLib.Easings.EaseOut,
+      onFinish: () => {
+        bandBgTweenRef.current = null;
+        setBandBgVisible(false);
+      },
+    });
+    bandBgTweenRef.current = tween;
+    tween.play();
+  }, [battleActive]);
+
+  // Opening: once the Rect has actually mounted at its full target
+  // height/opacity (React sets those as the create-time attrs), ease up
+  // from 0 so the seam visibly opens.
+  useEffect(() => {
+    if (!battleActive || !bandBgVisible) return;
+    const rect = bandBgRectRef.current;
+    if (!rect) return;
+    bandBgTweenRef.current?.destroy();
+    const targetHeight = rect.height();
+    const targetOpacity = rect.opacity();
+    rect.height(0);
+    rect.opacity(0);
+    const tween = new KonvaLib.Tween({
+      node: rect,
+      duration: 0.2,
+      height: targetHeight,
+      opacity: targetOpacity,
+      easing: KonvaLib.Easings.EaseOut,
+    });
+    bandBgTweenRef.current = tween;
+    tween.play();
+  }, [battleActive, bandBgVisible]);
+
+  useEffect(() => {
+    return () => { bandBgTweenRef.current?.destroy(); };
+  }, []);
 
   // Card scale preference
   const { cardScale, zoomIn, zoomOut, resetScale, MIN_SCALE, MAX_SCALE, STEP, setCardScale } = useCardScale();
@@ -2256,10 +2342,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const soulDeckDragTopIdRef = useRef<string | null>(null);
 
   // ---- Drag state ----
-  const isDraggingRef = useRef(false);
+  // isDraggingRef is declared earlier (battle-flip deferral, spec §4).
   const dragEndTimeRef = useRef<number>(0);
   const dragSourceZoneRef = useRef<string | null>(null);
   const dragSourceOwnerRef = useRef<'my' | 'opponent' | 'shared' | null>(null);
+  // instanceId of the card currently mid-Konva-drag — used by the mid-drag
+  // zone-change guard below (Task 15 spec §5) to look up its live zone/node.
+  const draggedCardIdRef = useRef<string | null>(null);
+  // Set by the mid-drag zone-change guard right before it calls
+  // node.stopDrag(); tells handleCardDragEnd (fired synchronously by
+  // stopDrag()) to skip drop resolution — there's no user-intended drop here.
+  const dragCancelledRef = useRef(false);
   const dragOriginalPosRef = useRef<{ x: number; y: number } | null>(null);
   // Local coords in the original parent (before reparenting to the layer).
   // Used by snapBack to restore the card inside its source Group accurately.
@@ -3096,6 +3189,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const handleCardDragStart = useCallback(
     (card: GameCard) => {
       isDraggingRef.current = true;
+      draggedCardIdRef.current = card.instanceId;
+      dragCancelledRef.current = false;
       if (dragSettleTimerRef.current !== null) {
         clearTimeout(dragSettleTimerRef.current);
         dragSettleTimerRef.current = null;
@@ -3414,6 +3509,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           pendingGroupSettleRef.current?.();
           pendingGroupSettleRef.current = null;
         });
+      }
+
+      // Task 15 spec §4: flush any battle-state flip parked while this drag
+      // was in flight, and release the id the mid-drag zone-change guard
+      // tracks. Runs on every dragend — including the stopDrag()-triggered
+      // cancel path below — so the deferral can never wedge open.
+      draggedCardIdRef.current = null;
+      setBattleActive(rawBattleActiveRef.current);
+
+      if (dragCancelledRef.current) {
+        // The mid-drag zone-change guard (below) already called
+        // node.stopDrag() because the row's zone changed server-side while
+        // this client was still dragging it (e.g. the opponent's End Battle
+        // auto-returned a battle card). There's no drop to resolve — the
+        // row's new zone/position is already authoritative from the server,
+        // and resolving one here would race a stale drop target against it.
+        dragCancelledRef.current = false;
+        return;
       }
 
       const node = e.target;
@@ -4192,6 +4305,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     ],
   );
 
+  // Mid-drag zone-change guard (Task 15 spec §4/§5): if the row backing the
+  // actively-dragged card moves to a different zone server-side (e.g. the
+  // opponent's End Battle auto-returns a battle card mid-drag), stop the
+  // Konva drag immediately. react-konva must never destroy a node while
+  // node.isDragging() is true — that corrupts Konva's internal drag state
+  // and leaves a "ghost" node still consuming pointer events, the exact
+  // class of bug this feature previously died on. dragCancelledRef tells the
+  // dragend handler (fired synchronously by stopDrag()) to skip drop
+  // resolution instead of racing a stale drop target against the server.
+  useEffect(() => {
+    if (!isDraggingRef.current) return;
+    const id = draggedCardIdRef.current;
+    if (!id) return;
+    const liveZone = findAnyCardById(id)?.zone ?? null;
+    if (liveZone === dragSourceZoneRef.current) return;
+    const node = cardNodeRefs.current.get(id);
+    if (node && node.getStage() && node.isDragging()) {
+      dragCancelledRef.current = true;
+      node.stopDrag();
+    }
+  }, [findAnyCardById]);
+
   // Noop handlers for non-draggable cards
   const noopDrag = useCallback((_e: Konva.KonvaEventObject<DragEvent>) => {}, []);
   const noopCardDrag = useCallback((_card: GameCard) => {}, []);
@@ -4682,6 +4817,115 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     return result;
   }, [opponentCards, battleBandRect, cardWidth, cardHeight]);
+
+  // ---- FLIP glides: territory + battle-band reflows (Task 15 spec §4) ----
+  // Extends the useHandLayoutTween slot-map pattern used above for hand
+  // slots and lobSlots: when the band opens/closes, territories
+  // compress/expand and existing cards reflow to new screen positions — this
+  // glides them instead of snapping. Each slot's x/y/rotation must exactly
+  // match what the render below assigns as GameCardNode props (same
+  // toScreenPos + clamp math, same weapon-offset maps), or the tween's
+  // target would fight the JSX-asserted value on the next render.
+  //
+  // Scope cut: territory<->battle CROSSING moves (a card entering the band
+  // on open, or auto-returning to territory on close) are NOT glided here —
+  // each zone renders its cards inside its own clipped Konva Group, so a
+  // card crossing zones unmounts from one Group and mounts fresh in the
+  // other; there's no single persistent Konva node to tween across that
+  // boundary without restructuring the render into one unclipped group.
+  // Those moves snap — consistent with how a card's first appearance in any
+  // of these slot maps already never tweens (same convention as hand/LOB
+  // deals). Within-zone reflows (territory compress/expand; a battle card
+  // repositioning while others remain) DO glide via the maps below.
+  const territorySlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    const myTerrZone = myZones['territory'];
+    if (myTerrZone) {
+      for (const card of myCards['territory'] ?? []) {
+        if (card.equippedToInstanceId !== 0n) {
+          const derived = myDerivedWeaponPositions.get(String(card.id));
+          if (derived) {
+            m.set(String(card.id), { x: derived.x, y: derived.y, rotation: 0 });
+            continue;
+          }
+        }
+        let x: number, y: number;
+        if (card.posX) {
+          ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), myTerrZone, 'my'));
+        } else {
+          x = myTerrZone.x + 20;
+          y = myTerrZone.y + 24;
+        }
+        y = Math.min(y, myTerrZone.y + myTerrZone.height - cardHeight);
+        m.set(String(card.id), { x, y, rotation: 0 });
+      }
+    }
+    const oppTerrZone = opponentZones['territory'];
+    if (oppTerrZone) {
+      for (const card of opponentCards['territory'] ?? []) {
+        if (card.equippedToInstanceId !== 0n) {
+          const derived = opponentDerivedWeaponPositions.get(String(card.id));
+          if (derived) {
+            m.set(String(card.id), { x: derived.x, y: derived.y, rotation: 180 });
+            continue;
+          }
+        }
+        const { x: rawX, y: rawY } = toScreenPos(
+          card.posX ? parseFloat(card.posX) : 0,
+          card.posY ? parseFloat(card.posY) : 0,
+          oppTerrZone,
+          'opponent',
+        );
+        const y = Math.max(rawY, oppTerrZone.y + cardHeight);
+        m.set(String(card.id), { x: rawX, y, rotation: 180 });
+      }
+    }
+    return m;
+  }, [myCards, opponentCards, myZones, opponentZones, cardHeight, myDerivedWeaponPositions, opponentDerivedWeaponPositions]);
+  useHandLayoutTween(territorySlots, cardNodeRefs);
+
+  const battleSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    const band = mpLayout?.zones.battle;
+    if (!band) return m;
+    for (const card of myCards['battle'] ?? []) {
+      if (card.equippedToInstanceId !== 0n) {
+        const derived = myBattleDerivedWeaponPositions.get(String(card.id));
+        if (derived) {
+          m.set(String(card.id), { x: derived.x, y: derived.y, rotation: 0 });
+          continue;
+        }
+      }
+      let x: number, y: number;
+      if (card.posX) {
+        ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), band, 'my'));
+      } else {
+        x = band.x + 20;
+        y = band.y + 24;
+      }
+      y = Math.min(y, band.y + band.height - cardHeight);
+      m.set(String(card.id), { x, y, rotation: 0 });
+    }
+    for (const card of opponentCards['battle'] ?? []) {
+      if (card.equippedToInstanceId !== 0n) {
+        const derived = opponentBattleDerivedWeaponPositions.get(String(card.id));
+        if (derived) {
+          m.set(String(card.id), { x: derived.x, y: derived.y, rotation: 180 });
+          continue;
+        }
+      }
+      const { x: rawX, y: rawY } = toScreenPos(
+        card.posX ? parseFloat(card.posX) : 0,
+        card.posY ? parseFloat(card.posY) : 0,
+        band,
+        'opponent',
+      );
+      const y = Math.max(rawY, band.y + cardHeight);
+      m.set(String(card.id), { x: rawX, y, rotation: 180 });
+    }
+    return m;
+  }, [myCards, opponentCards, mpLayout, cardHeight, myBattleDerivedWeaponPositions, opponentBattleDerivedWeaponPositions]);
+  useHandLayoutTween(battleSlots, cardNodeRefs);
 
   // ---- Battle Zone chrome derived state (spec §5/§6, Task 12) ----
   // BattleCardLike[] built from the live battle rows (my + opponent-owned).
@@ -5536,12 +5780,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               resign/finish). The "FIELD OF BATTLE" label is superseded by
               the dynamic header line in the Task 12 chrome group below.
               ================================================================ */}
-          {battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && (() => {
-            const band = mpLayout.zones.battle;
+          {bandBgVisible && gameStatus === 'playing' && lastBandRectRef.current && (() => {
+            const band = lastBandRectRef.current!;
             const midY = band.y + band.height / 2;
             return (
               <Group key="battle-band-bg" listening={false}>
                 <Rect
+                  ref={bandBgRectRef as any}
                   x={band.x}
                   y={band.y}
                   width={band.width}
