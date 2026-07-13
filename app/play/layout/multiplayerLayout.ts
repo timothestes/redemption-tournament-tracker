@@ -22,6 +22,26 @@
  * Two layout profiles (Narrow ≤1700 / Standard >1700 virtual width)
  * with different proportions tuned for each aspect ratio range.
  *
+ * Battle mode (`battleActive`) swaps the Divider row for a "Field of
+ * Battle" band, pinned so its vertical midline matches the idle divider's
+ * midline exactly (territories shrink to make room; hands/LOBs untouched):
+ *
+ * ┌──────────────────────────────────────────────────────────────┐
+ * │ Opponent Hand                              (full width)      │
+ * ├────────────────────────────────────────────┬─────────────────┤
+ * │ Opponent LOB                               │ Opp sidebar     │
+ * ├────────────────────────────────────────────┤ (idle-keyed —   │
+ * │ Opponent Territory (shrunk)                │  never moves)   │
+ * ├══════════════════════════════════════════════╪═════════════════┤
+ * │ Field of Battle                            │                 │
+ * ├══════════════════════════════════════════════╪═════════════════┤
+ * │ Player Territory (shrunk)                  │ Your sidebar    │
+ * ├────────────────────────────────────────────┤ (idle-keyed —   │
+ * │ Player LOB                                 │  never moves)   │
+ * ├────────────────────────────────────────────┴─────────────────┤
+ * │ Player Hand                                (full width)      │
+ * └──────────────────────────────────────────────────────────────┘
+ *
  * stageWidth is already the Konva canvas width (loupe is outside).
  * Phase bar (TurnIndicator) is HTML below the canvas.
  */
@@ -54,6 +74,7 @@ export interface MultiplayerLayout {
     playerHand: ZoneRect;
     sharedLob?: ZoneRect;     // NEW — present when Paragon
     soulDeck?: ZoneRect;      // NEW — present when Paragon
+    battle?: ZoneRect;        // NEW — present when battleActive
   };
   sidebar: {
     opponent: Partial<Record<PileZone, ZoneRect>>;
@@ -125,6 +146,55 @@ const BREAKPOINT_WIDTH = 1700;
 
 function getProfile(virtualWidth: number): LayoutProfile {
   return virtualWidth <= BREAKPOINT_WIDTH ? NARROW_PROFILE : STANDARD_PROFILE;
+}
+
+// ── Battle-mode row ratios ───────────────────────────────────────────────
+// Battle mode replaces the Divider with a "Field of Battle" band. Hand and
+// LOB ratios are unchanged from the idle profile above (battle never moves
+// or resizes hands/LOBs) — they're listed here anyway so each set's
+// sum-check covers the whole board, matching the idle profiles' style.
+// Band midline (oppHand + oppLob + oppTerritory + band/2) is pinned to
+// equal the idle divider's midline (oppHand + oppLob + oppTerritory +
+// divider/2) exactly, by construction.
+
+interface BattleProfile {
+  oppHandRatio: number;
+  oppLobRatio: number;
+  oppTerritoryRatio: number;
+  bandRatio: number;
+  playerTerritoryRatio: number;
+  playerLobRatio: number;
+  playerHandRatio: number;
+}
+
+/** Narrow displays: battle-mode row ratios. */
+const NARROW_BATTLE_PROFILE: BattleProfile = {
+  oppHandRatio: 0.07,
+  oppLobRatio: 0.10,
+  oppTerritoryRatio: 0.1975,
+  bandRatio: 0.17,
+  playerTerritoryRatio: 0.2125,
+  playerLobRatio: 0.10,
+  playerHandRatio: 0.15,
+};
+// Sum check: 0.07 + 0.10 + 0.1975 + 0.17 + 0.2125 + 0.10 + 0.15 = 1.0 ✓
+// Midline check: 0.07 + 0.10 + 0.1975 + 0.17 / 2 = 0.4525 — matches idle ✓
+
+/** Standard/wide displays: battle-mode row ratios. */
+const STANDARD_BATTLE_PROFILE: BattleProfile = {
+  oppHandRatio: 0.08,
+  oppLobRatio: 0.09,
+  oppTerritoryRatio: 0.185,
+  bandRatio: 0.19,
+  playerTerritoryRatio: 0.21,
+  playerLobRatio: 0.09,
+  playerHandRatio: 0.155,
+};
+// Sum check: 0.08 + 0.09 + 0.185 + 0.19 + 0.21 + 0.09 + 0.155 = 1.0 ✓
+// Midline check: 0.08 + 0.09 + 0.185 + 0.19 / 2 = 0.45 — matches idle ✓
+
+function getBattleProfile(virtualWidth: number): BattleProfile {
+  return virtualWidth <= BREAKPOINT_WIDTH ? NARROW_BATTLE_PROFILE : STANDARD_BATTLE_PROFILE;
 }
 
 // ── Card dimension helpers (derived from actual virtual width + height) ──
@@ -276,14 +346,18 @@ function buildSidebar(
  * Calculate zone positions, sidebar piles, and four card-dimension tiers
  * for a two-player multiplayer board.
  *
- * @param stageWidth   Konva canvas width (loupe is outside)
- * @param stageHeight  Konva canvas height
+ * @param stageWidth    Konva canvas width (loupe is outside)
+ * @param stageHeight   Konva canvas height
+ * @param battleActive  When true, swap the Divider for a "Field of Battle"
+ *   band (`zones.battle`). Sidebar + pileCard are always computed from the
+ *   idle anchors regardless — piles never move or resize when battle opens.
  */
 export function calculateMultiplayerLayout(
   stageWidth: number,
   stageHeight: number,
   format: 'T1' | 'T2' | 'Paragon' = 'T1',
   viewerKind: 'player' | 'spectator' = 'player',
+  battleActive = false,
 ): MultiplayerLayout {
   const baseProfile = getProfile(stageWidth);
   // Spectators have no toolbar and no personal hand — rebalance some height
@@ -384,6 +458,73 @@ export function calculateMultiplayerLayout(
     label: 'Hand',
   };
 
+  // ── Battle-mode geometry (T1/T2) ────────────────────────────────────
+  // Battle mode swaps the Divider for a "Field of Battle" band. Hand and
+  // LOB ratios are identical between the idle and battle profiles (see the
+  // sum-check comments above), so everything above the opponent territory
+  // — hand, LOB — reuses the idle Y anchors verbatim; only the territories
+  // and the band itself get new anchors. `battleProfile`/`bandHeight` are
+  // also read by the Paragon branch below, so this always runs (cheap).
+  const battleProfile = getBattleProfile(stageWidth);
+  const battleOppTerritoryHeight = Math.round(stageHeight * battleProfile.oppTerritoryRatio);
+  const bandHeight = Math.round(stageHeight * battleProfile.bandRatio);
+  const battlePlayerTerritoryHeight = Math.round(stageHeight * battleProfile.playerTerritoryRatio);
+
+  const bandY = oppTerritoryY + battleOppTerritoryHeight;
+  const battlePlayerTerritoryY = bandY + bandHeight;
+  const battlePlayerLobY = battlePlayerTerritoryY + battlePlayerTerritoryHeight;
+  const battlePlayerHandY = battlePlayerLobY + playerLobHeight; // LOB height untouched by battle
+
+  const battleZone: ZoneRect = {
+    x: pad,
+    y: bandY + gap,
+    width: playAreaWidth - pad * 2,
+    height: bandHeight - gap * 2,
+    label: 'Field of Battle',
+  };
+
+  // Divider collapses to a zero-height placeholder at the band's midline
+  // (same precedent as the Paragon collapsed rects below).
+  const battleDivider: ZoneRect = {
+    x: 0,
+    y: bandY + bandHeight / 2,
+    width: stageWidth,
+    height: 0,
+    label: '',
+  };
+
+  const battleOpponentTerritory: ZoneRect = {
+    x: pad,
+    y: oppTerritoryY + gap,
+    width: playAreaWidth - pad * 2,
+    height: battleOppTerritoryHeight - gap,
+    label: "Opponent's Territory",
+  };
+
+  const battlePlayerTerritory: ZoneRect = {
+    x: pad,
+    y: battlePlayerTerritoryY,
+    width: playAreaWidth - pad * 2,
+    height: battlePlayerTerritoryHeight - gap,
+    label: 'Territory',
+  };
+
+  const battlePlayerLob: ZoneRect = {
+    x: pad,
+    y: battlePlayerLobY + gap,
+    width: playAreaWidth - pad * 2,
+    height: playerLobHeight - gap * 2,
+    label: 'Land of Bondage',
+  };
+
+  const battlePlayerHandZone: ZoneRect = {
+    x: 0,
+    y: battlePlayerHandY,
+    width: stageWidth,
+    height: stageHeight - battlePlayerHandY,
+    label: 'Hand',
+  };
+
   // Paragon: replace the two per-seat LoBs + divider with a single shared
   // LoB band positioned between the territories. The Soul Deck pile anchors
   // the left end. Per-seat LoBs and divider rects collapse to zero-height
@@ -401,6 +542,12 @@ export function calculateMultiplayerLayout(
   let paragonOpponentTerritory: ZoneRect | undefined;
   let paragonPlayerTerritory: ZoneRect | undefined;
   let paragonPlayerHand: ZoneRect | undefined;
+  // Battle-mode Paragon overrides (only computed when battleActive).
+  let paragonBattleSharedLob: ZoneRect | undefined;
+  let paragonBattleSoulDeck: ZoneRect | undefined;
+  let paragonBattleOpponentTerritory: ZoneRect | undefined;
+  let paragonBattlePlayerTerritory: ZoneRect | undefined;
+  let paragonBattleBand: ZoneRect | undefined;
   if (format === 'Paragon') {
     const SOUL_DECK_GUTTER = 4;
 
@@ -463,6 +610,39 @@ export function calculateMultiplayerLayout(
       height: paragonPlayerHandHeight,
       label: 'Hand',
     };
+
+    // Battle mode: open the "Field of Battle" band directly below the
+    // shared LoB, taking half the band's height from each territory —
+    // sharedLob + soulDeck shift up by band/2 to make room. The total
+    // vertical budget is conserved (band added == sum of the two
+    // territory shrinks), so paragonPlayerHandY/paragonPlayerLob are
+    // unaffected and don't need battle-specific variants.
+    if (battleActive) {
+      const oppShrink = Math.floor(bandHeight / 2);
+      const playerShrink = bandHeight - oppShrink;
+      const battleSharedBandY = paragonSharedBandY - oppShrink;
+      const battleBandY = battleSharedBandY + paragonSharedBandHeight;
+
+      paragonBattleSharedLob = { ...sharedLob, y: battleSharedBandY + gap };
+      paragonBattleSoulDeck = { ...soulDeck, y: battleSharedBandY + gap };
+      paragonBattleOpponentTerritory = {
+        ...opponentTerritory,
+        y: paragonOppTerritoryY + gap,
+        height: paragonOppTerritoryHeight - oppShrink - gap,
+      };
+      paragonBattlePlayerTerritory = {
+        ...playerTerritory,
+        y: battleBandY + bandHeight,
+        height: paragonPlayerTerritoryHeight - playerShrink - gap,
+      };
+      paragonBattleBand = {
+        x: pad,
+        y: battleBandY + gap,
+        width: playAreaWidth - pad * 2,
+        height: bandHeight - gap * 2,
+        label: 'Field of Battle',
+      };
+    }
   }
 
   // ── Sidebars ─────────────────────────────────────────────────────────
@@ -532,17 +712,39 @@ export function calculateMultiplayerLayout(
   const pileEffectiveWidth = Math.round((sidebarWidth - zonePad * 2 - slotPad) / 2 + zonePad * 2);
   const pileCard = getPileCardDimensions(pileSlotHeight, pileEffectiveWidth, zonePad, profile.pileLabelRatio);
 
+  // ── Resolve idle vs. battle geometry for the returned zone rects ──────
+  // Sidebar + pileCard above are always idle-anchored (piles never move or
+  // resize when battle opens); only these zone rects switch to battle
+  // geometry. Divider/playerLob/playerHand are unaffected by battle in
+  // Paragon (the band's height is conserved out of the two territories),
+  // so they fall straight through to the existing idle-or-Paragon values.
+  const finalOpponentTerritory = battleActive
+    ? (format === 'Paragon' ? paragonBattleOpponentTerritory! : battleOpponentTerritory)
+    : (paragonOpponentTerritory ?? opponentTerritory);
+  const finalPlayerTerritory = battleActive
+    ? (format === 'Paragon' ? paragonBattlePlayerTerritory! : battlePlayerTerritory)
+    : (paragonPlayerTerritory ?? playerTerritory);
+  const finalDivider = battleActive && format !== 'Paragon' ? battleDivider : (paragonDivider ?? divider);
+  const finalPlayerLob = battleActive && format !== 'Paragon' ? battlePlayerLob : (paragonPlayerLob ?? playerLob);
+  const finalPlayerHand = battleActive && format !== 'Paragon' ? battlePlayerHandZone : (paragonPlayerHand ?? playerHand);
+  const finalSharedLob = battleActive && format === 'Paragon' ? paragonBattleSharedLob : sharedLob;
+  const finalSoulDeck = battleActive && format === 'Paragon' ? paragonBattleSoulDeck : soulDeck;
+  const finalBattle: ZoneRect | undefined = !battleActive
+    ? undefined
+    : (format === 'Paragon' ? paragonBattleBand : battleZone);
+
   return {
     zones: {
       opponentHand,
-      opponentTerritory: paragonOpponentTerritory ?? opponentTerritory,
+      opponentTerritory: finalOpponentTerritory,
       opponentLob: paragonOpponentLob ?? opponentLob,
-      divider: paragonDivider ?? divider,
-      playerLob: paragonPlayerLob ?? playerLob,
-      playerTerritory: paragonPlayerTerritory ?? playerTerritory,
-      playerHand: paragonPlayerHand ?? playerHand,
-      sharedLob,
-      soulDeck,
+      divider: finalDivider,
+      playerLob: finalPlayerLob,
+      playerTerritory: finalPlayerTerritory,
+      playerHand: finalPlayerHand,
+      sharedLob: finalSharedLob,
+      soulDeck: finalSoulDeck,
+      battle: finalBattle,
     },
     sidebar: {
       opponent: opponentSidebar,
