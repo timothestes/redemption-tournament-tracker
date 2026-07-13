@@ -4750,24 +4750,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     [mismatchedBattleCards],
   );
 
-  // Stakes Lost Soul count (spec §5 header: Rescue attempt vs. Battle
-  // challenge). Mirrors the server's battleStakesLobLostSouls: T1/T2 count
-  // the DEFENDER's land-of-bondage; Paragon counts the shared LoB.
-  const stakesLostSoulCount = useMemo(() => {
-    if (!battleActive) return 0;
+  // Stakes Lost Soul rows (spec §5 header: Rescue attempt vs. Battle
+  // challenge; spec §7/§8: Task 14's awaiting-soul picker eligibility).
+  // Mirrors the server's battleStakesLobLostSouls exactly: T1/T2 use the
+  // DEFENDER's land-of-bondage; Paragon uses the shared LoB. Single source
+  // of truth for both the header count and the surrender-dialog grid so
+  // they can never drift apart.
+  const stakesLostSoulRows = useMemo<CardInstance[]>(() => {
+    if (!battleActive) return [];
     if (normalizedFormat === 'Paragon') {
-      return (sharedCards['land-of-bondage'] ?? []).filter(isBattleLostSoulRow).length;
+      return (sharedCards['land-of-bondage'] ?? []).filter(isBattleLostSoulRow);
     }
     const attackerSeat = gameState.battleAttackerSeat;
-    if (!attackerSeat) return 0;
+    if (!attackerSeat) return [];
     const mySeatStr = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
     const oppSeatStr = gameState.opponentPlayer ? String(gameState.opponentPlayer.seat) : '';
     const defenderRows =
       attackerSeat === mySeatStr ? (opponentCards['land-of-bondage'] ?? [])
       : attackerSeat === oppSeatStr ? (myCards['land-of-bondage'] ?? [])
       : [];
-    return defenderRows.filter(isBattleLostSoulRow).length;
+    return defenderRows.filter(isBattleLostSoulRow);
   }, [battleActive, normalizedFormat, sharedCards, gameState.battleAttackerSeat, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards]);
+
+  const stakesLostSoulCount = stakesLostSoulRows.length;
 
   // Field of Battle band — chrome (Task 12, spec §5/§6): totals chips,
   // header line, initiative banner. Rendered AFTER the battle card groups
@@ -7577,17 +7582,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       })()}
 
       {/* ================================================================
-          Battle resolution buttons + confirm summary (spec §8, Task 13).
+          Battle resolution buttons + confirm summary (spec §8, Task 13),
+          plus the awaiting-soul chooser dialog / waiting pill (Task 14).
           Mounted here (not client.tsx) because it needs band geometry +
-          scale/offsets, which only live in this component. Spectators are
-          gated out at this call site (!isSpectator — matching the brigade
-          toast above); status==='playing' && battleActive also gate here.
-          BattleResolutionUI itself additionally gates button visibility on
-          battleState==='active' (hidden during awaiting-soul — Task 14 owns
-          that dialog) and on seat (isAttacker/isDefender derived from
-          mySeat vs attackerSeat).
+          scale/offsets, which only live in this component.
+          status==='playing' && battleActive gate mounting here; spectators
+          now DO mount (they need the awaiting-soul waiting pill) but pass
+          isSpectator=true so BattleResolutionUI never shows them buttons or
+          the soul picker. mySeat/opponentSeat are always the two real
+          players' seats (even for the spectator viewer's canvas-compat
+          "myPlayer"=seat0) — isSpectator is what keeps a spectator from
+          ever being treated as attacker/defender/chooser.
           ================================================================ */}
-      {!isSpectator && battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && (
+      {battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && (
         <BattleResolutionUI
           band={mpLayout.zones.battle}
           scale={scale}
@@ -7595,10 +7602,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           offsetY={offsetY}
           battleState={gameState.battleState}
           mySeat={gameState.myPlayer ? String(gameState.myPlayer.seat) : ''}
+          opponentSeat={gameState.opponentPlayer ? String(gameState.opponentPlayer.seat) : ''}
           attackerSeat={gameState.battleAttackerSeat}
+          isSpectator={isSpectator}
+          format={normalizedFormat}
+          myPlayerName={gameState.myPlayer?.displayName || 'Player 1'}
+          opponentPlayerName={gameState.opponentPlayer?.displayName || 'Player 2'}
           cards={battleCardEntries.map((e) => e.like)}
+          eligibleSouls={stakesLostSoulRows}
+          forgeResolver={forgeResolver}
           onResolveBattle={gameState.resolveBattle}
           onEndBattle={gameState.endBattle}
+          onSurrenderSoul={gameState.surrenderSoul}
         />
       )}
 
