@@ -641,6 +641,9 @@ function createGameCore(
     pauseRequestType: '',
     pauseStartedAtMicros: 0n,
     totalPausedMicros: 0n,
+    battleState: '',
+    battleAttackerSeat: '',
+    lastBattlePlayBySeat: '',
   });
   if (isForge) ctx.db.ForgeGame.insert({ gameId: game.id });
 
