@@ -110,6 +110,11 @@ type FreeFormZone = (typeof FREE_FORM_ZONES)[number];
 /** Zones where cards are auto-arranged in a horizontal strip. */
 const AUTO_ARRANGE_ZONES = ['land-of-bondage'] as const;
 
+/** Battle-band background Rect opacity — the seam tween's open target. Must
+ *  stay in sync with the Rect's JSX `opacity` (single source of truth for
+ *  both; the tween must never read the Rect's live value as a target). */
+const BAND_BG_OPACITY = 0.75;
+
 /** All zone keys that can be a drop target. */
 type DropZoneKey = string;
 
@@ -614,6 +619,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // entirely, so the closing tween needs a frozen rect to animate against.
   // `bandBgVisible` keeps the Rect mounted a beat past `battleActive` going
   // false so the closing tween can finish before it actually unmounts.
+  //
+  // Race discipline (review finding): a rapid open→close→open must not read
+  // the in-flight tween's intermediate height/opacity as targets, and no
+  // branch may leave a stale tween running toward the wrong end state. So:
+  // every transition destroys the current tween FIRST, and tween TARGETS
+  // always come from layout data (band.height, BAND_BG_OPACITY) — never
+  // from the Rect's live values. Live values are only ever used as a glide
+  // START (reopen-while-closing resumes from where the close got to).
   const lastBandRectRef = useRef<ZoneRect | null>(null);
   if (mpLayout?.zones.battle) lastBandRectRef.current = mpLayout.zones.battle;
   const [bandBgVisible, setBandBgVisible] = useState(battleActive);
@@ -621,16 +634,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const bandBgTweenRef = useRef<Konva.Tween | null>(null);
 
   useEffect(() => {
+    // Kill any in-flight tween on EVERY transition — including open, where a
+    // still-running close tween would otherwise keep driving the rect to 0
+    // and its onFinish would unmount it despite battleActive being true.
+    bandBgTweenRef.current?.destroy();
+    bandBgTweenRef.current = null;
     if (battleActive) {
       setBandBgVisible(true);
       return;
     }
     const rect = bandBgRectRef.current;
-    if (!rect) {
+    if (!rect || !rect.getStage()) {
       setBandBgVisible(false);
       return;
     }
-    bandBgTweenRef.current?.destroy();
     const tween = new KonvaLib.Tween({
       node: rect,
       duration: 0.2,
@@ -646,24 +663,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     tween.play();
   }, [battleActive]);
 
-  // Opening: once the Rect has actually mounted at its full target
-  // height/opacity (React sets those as the create-time attrs), ease up
-  // from 0 so the seam visibly opens.
+  // Opening: ease the seam up to its layout-derived full size. On a fresh
+  // mount the Rect sits at its full JSX attrs, so the glide starts from 0;
+  // on a reopen that interrupted a close tween, the glide resumes from the
+  // rect's current (partially closed) values instead of snapping to 0 first.
   useEffect(() => {
     if (!battleActive || !bandBgVisible) return;
     const rect = bandBgRectRef.current;
-    if (!rect) return;
+    const band = lastBandRectRef.current;
+    if (!rect || !band) return;
     bandBgTweenRef.current?.destroy();
-    const targetHeight = rect.height();
-    const targetOpacity = rect.opacity();
-    rect.height(0);
-    rect.opacity(0);
+    const interruptedMidClose = rect.height() < band.height;
+    if (!interruptedMidClose) {
+      rect.height(0);
+      rect.opacity(0);
+    }
     const tween = new KonvaLib.Tween({
       node: rect,
       duration: 0.2,
-      height: targetHeight,
-      opacity: targetOpacity,
+      height: band.height,
+      opacity: BAND_BG_OPACITY,
       easing: KonvaLib.Easings.EaseOut,
+      onFinish: () => {
+        bandBgTweenRef.current = null;
+      },
     });
     bandBgTweenRef.current = tween;
     tween.play();
@@ -2353,6 +2376,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // node.stopDrag(); tells handleCardDragEnd (fired synchronously by
   // stopDrag()) to skip drop resolution — there's no user-intended drop here.
   const dragCancelledRef = useRef(false);
+  // Zone of each FOLLOWER card at drag start (multi-select / equip-follower
+  // drags). handleCardDragEnd's synchronous stale-row check compares each
+  // follower's live zone against this — a follower the server moved
+  // mid-drag is dropped from the batch dispatch (its new position wins).
+  // The lead card's start zone lives in dragSourceZoneRef.
+  const dragStartFollowerZonesRef = useRef<Map<string, string> | null>(null);
   const dragOriginalPosRef = useRef<{ x: number; y: number } | null>(null);
   // Local coords in the original parent (before reparenting to the layer).
   // Used by snapBack to restore the card inside its source Group accurately.
@@ -3291,6 +3320,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         ? Array.from(selectedIds).filter((id) => id !== card.instanceId)
         : equipFollowerIds;
 
+      // Record each follower's zone at drag start — dragend's synchronous
+      // stale-row check drops from the batch any follower the server moved
+      // mid-drag. (Multi-select followers can start in different zones than
+      // the lead, so a per-card snapshot is required; the lead's own start
+      // zone is dragSourceZoneRef.)
+      if (followerIds.length > 0) {
+        const startZones = new Map<string, string>();
+        for (const id of followerIds) {
+          const inst = findAnyCardById(id);
+          if (inst) startZones.set(id, inst.zone);
+        }
+        dragStartFollowerZonesRef.current = startZones;
+      } else {
+        dragStartFollowerZonesRef.current = null;
+      }
+
       if (followerIds.length > 0) {
         const dragNode = cardNodeRefs.current.get(card.instanceId);
         if (dragNode) {
@@ -3450,6 +3495,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const originalPos = dragOriginalPosRef.current;
       const originalLocalPos = dragOriginalLocalPosRef.current;
       const sourceZone = dragSourceZoneRef.current;
+      const startFollowerZones = dragStartFollowerZonesRef.current;
       const originalParent = dragOriginalParentRef.current;
       const originalZIndex = dragOriginalZIndexRef.current;
       // Capture the dragged card's actual rendered size before resetting
@@ -3479,6 +3525,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       dragOriginalZIndexRef.current = null;
       dragHoverZoneRef.current = null;
       dragFollowerOffsets.current = null;
+      dragStartFollowerZonesRef.current = null;
       const ghostOffset = dragGhostOffsetRef.current;
       dragGhostOffsetRef.current = null;
       setDragHoverZone(null);
@@ -3529,6 +3576,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         return;
       }
 
+      // SYNCHRONOUS stale-row check (review Critical): for a genuine
+      // cross-zone server move mid-drag (e.g. opponent's End Battle
+      // auto-return), react-konva's removeChild runs in React's commit
+      // mutation phase and Konva's own Node.remove() stops the drag and
+      // fires THIS dragend synchronously — all before the passive effect
+      // guard above ever runs, so dragCancelledRef is still false here.
+      // The guard therefore cannot be the only protection: re-check the
+      // row's live zone right now, inside dragend itself, independent of
+      // what triggered it. Row gone, or zone no longer the drag-start
+      // zone → the server moved the card mid-drag; its position wins.
+      // Dispatch NOTHING (no moveCard, no undo entry) and don't touch the
+      // node — react-konva has already destroyed/remounted it in the new
+      // zone, and destroying a live node here is the ghost-card class.
+      const liveLeadRow = findAnyCardById(card.instanceId);
+      if (!liveLeadRow || liveLeadRow.zone !== sourceZone) {
+        return;
+      }
+
       const node = e.target;
       const dropX = node.x();
       const dropY = node.y();
@@ -3543,10 +3608,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const hasEquipFollowers =
         !isMultiSelectDrag && followerOffsets !== null && followerOffsets.size > 0;
       const isGroupDrag = isMultiSelectDrag || hasEquipFollowers;
+      // Same stale-row rule applied per FOLLOWER: a follower the server
+      // moved mid-drag (zone differs from its drag-start snapshot, or row
+      // deleted) is dropped from the batch so the group dispatch can't
+      // re-move it. The lead card was already validated above.
+      const followerStillDraggable = (id: string): boolean => {
+        if (id === card.instanceId) return true;
+        const live = findAnyCardById(id);
+        if (!live) return false;
+        const startZone = startFollowerZones?.get(id);
+        return startZone === undefined || live.zone === startZone;
+      };
       // Sort selected card IDs by their current zoneIndex so the server
       // assigns new zoneIndices in the same relative order — prevents
       // card order from getting scrambled during group drags.
-      const cardIds = isMultiSelectDrag
+      const cardIds = (isMultiSelectDrag
         ? Array.from(selectedIds).sort((a, b) => {
             const aCard = findAnyCardById(a);
             const bCard = findAnyCardById(b);
@@ -3554,7 +3630,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           })
         : hasEquipFollowers
         ? [card.instanceId, ...Array.from(followerOffsets!.keys())]
-        : [card.instanceId];
+        : [card.instanceId]
+      ).filter(followerStillDraggable);
       const cardId = BigInt(card.instanceId);
 
       // Helper to snap back to original position and restore to original parent.
@@ -4305,15 +4382,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     ],
   );
 
-  // Mid-drag zone-change guard (Task 15 spec §4/§5): if the row backing the
-  // actively-dragged card moves to a different zone server-side (e.g. the
-  // opponent's End Battle auto-returns a battle card mid-drag), stop the
-  // Konva drag immediately. react-konva must never destroy a node while
-  // node.isDragging() is true — that corrupts Konva's internal drag state
-  // and leaves a "ghost" node still consuming pointer events, the exact
-  // class of bug this feature previously died on. dragCancelledRef tells the
-  // dragend handler (fired synchronously by stopDrag()) to skip drop
-  // resolution instead of racing a stale drop target against the server.
+  // Mid-drag zone-change guard (Task 15 spec §4/§5), UX layer: if the row
+  // backing the actively-dragged card moves to a different zone server-side
+  // (e.g. the opponent's End Battle auto-returns a battle card mid-drag) and
+  // the node SURVIVED the commit, stop the Konva drag now rather than letting
+  // the user keep dragging a phantom until pointerup. This effect is NOT the
+  // correctness guarantee: when the server move unmounts the node,
+  // react-konva's removeChild → Konva Node.remove() runs synchronously in
+  // the commit mutation phase, Konva stops the drag itself and fires dragend
+  // — all before this passive effect can run, so dragCancelledRef is never
+  // set on that path. The synchronous stale-row check at the top of
+  // handleCardDragEnd is what actually blocks the stale dispatch in every
+  // case; this effect just ends the drag early when it gets the chance.
   useEffect(() => {
     if (!isDraggingRef.current) return;
     const id = draggedCardIdRef.current;
@@ -5786,7 +5866,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             return (
               <Group key="battle-band-bg" listening={false}>
                 <Rect
-                  ref={bandBgRectRef as any}
+                  ref={bandBgRectRef}
                   x={band.x}
                   y={band.y}
                   width={band.width}
@@ -5795,7 +5875,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   stroke="#6b2f27"
                   strokeWidth={1}
                   cornerRadius={3}
-                  opacity={0.75}
+                  opacity={BAND_BG_OPACITY}
                   perfectDrawEnabled={false}
                 />
                 {/* Dashed centerline — placement above/below decides a card's side */}
