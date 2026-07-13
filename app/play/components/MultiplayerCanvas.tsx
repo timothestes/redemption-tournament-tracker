@@ -7517,19 +7517,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {!isSpectator && battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && mismatchedBattleCards.length > 0 && (() => {
         const band = mpLayout.zones.battle;
         const toastCard = mismatchedBattleCards[0];
-        const width = 250;
         // Band-edge-anchored: just inside the band's bottom-right corner —
         // clear of the header/banner (centered) and the totals chips (left
-        // gutter).
-        const anchor = virtualToScreen(band.x + band.width - width - 8, band.y + band.height - 66, scale, offsetX, offsetY);
+        // gutter). The 250-unit width is reserved in VIRTUAL space, so both
+        // corners go through virtualToScreen and the CSS width is their
+        // difference (the dragHoverZone pattern above) — a raw `width: 250`
+        // in screen px would exceed the reserved virtual span whenever
+        // scale < 1 (i.e. on essentially every viewport) and overflow past
+        // the band's right edge. Font sizes stay fixed CSS px, matching the
+        // file's other HTML overlays (dragHoverZone labels, GameToast) —
+        // they remain legible at small scales and the box just wraps taller.
+        const toastVirtualWidth = 250;
+        const anchorY = band.y + band.height - 66;
+        const screenTopLeft = virtualToScreen(band.x + band.width - toastVirtualWidth - 8, anchorY, scale, offsetX, offsetY);
+        const screenRight = virtualToScreen(band.x + band.width - 8, anchorY, scale, offsetX, offsetY);
         return (
           <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
             <div
               style={{
                 position: 'absolute',
-                left: anchor.x,
-                top: anchor.y,
-                width,
+                left: screenTopLeft.x,
+                top: screenTopLeft.y,
+                width: screenRight.x - screenTopLeft.x,
                 pointerEvents: 'auto',
                 background: 'rgba(14, 10, 6, 0.95)',
                 border: '1px solid rgba(220, 38, 38, 0.5)',
