@@ -1448,6 +1448,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     return undefined;
   }, [myCards, opponentCards, sharedCards]);
+  // Render-fresh mirror of findAnyCardById for handleCardDragEnd's
+  // synchronous stale-row check. On the destroy-path dragend (server moved
+  // the dragged row cross-zone → react-konva unmounts the node in the
+  // commit's mutation phase → Konva fires dragend synchronously), the
+  // deleted fiber never received a prop update, so the event runs the
+  // PREVIOUS commit's handleCardDragEnd closure — whose captured
+  // findAnyCardById still sees the card in its source zone, defeating the
+  // check. This render-body assignment lands during the render phase, i.e.
+  // BEFORE that same commit's mutation phase, so reading through the ref
+  // always yields the zone data of the update that triggered the destroy.
+  // (Same pattern as rawBattleActiveRef above.)
+  const findAnyCardByIdRef = useRef(findAnyCardById);
+  findAnyCardByIdRef.current = findAnyCardById;
 
   // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel).
   // Resolve the live card (by instanceId) from the current zone data so fields like
@@ -3589,7 +3602,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Dispatch NOTHING (no moveCard, no undo entry) and don't touch the
       // node — react-konva has already destroyed/remounted it in the new
       // zone, and destroying a live node here is the ghost-card class.
-      const liveLeadRow = findAnyCardById(card.instanceId);
+      //
+      // MUST read through findAnyCardByIdRef, not the closure: the deleted
+      // fiber never got a prop update, so this destroy-path dragend runs
+      // the PREVIOUS commit's closure, whose captured findAnyCardById still
+      // reports the card in its source zone (re-review finding). The ref is
+      // reassigned in the render body, which precedes the same commit's
+      // mutation phase — it is always fresh when this fires.
+      const liveLeadRow = findAnyCardByIdRef.current(card.instanceId);
       if (!liveLeadRow || liveLeadRow.zone !== sourceZone) {
         return;
       }
@@ -3611,10 +3631,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Same stale-row rule applied per FOLLOWER: a follower the server
       // moved mid-drag (zone differs from its drag-start snapshot, or row
       // deleted) is dropped from the batch so the group dispatch can't
-      // re-move it. The lead card was already validated above.
+      // re-move it. The lead card was already validated above. Reads
+      // through findAnyCardByIdRef for the same stale-closure reason.
       const followerStillDraggable = (id: string): boolean => {
         if (id === card.instanceId) return true;
-        const live = findAnyCardById(id);
+        const live = findAnyCardByIdRef.current(id);
         if (!live) return false;
         const startZone = startFollowerZones?.get(id);
         return startZone === undefined || live.zone === startZone;
