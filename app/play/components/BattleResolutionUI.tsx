@@ -4,11 +4,12 @@
 // awaiting-soul chooser dialog / waiting pill (Task 14). HTML overlay,
 // positioned band-relative via the dual-corner virtualToScreen pattern the
 // brigade-mismatch toast established (MultiplayerCanvas.tsx ~7517-7576) —
-// the row is anchored just BELOW the band's bottom-right corner (not
-// inside it) specifically so it never collides with that toast, which
-// occupies the band's own bottom-right corner. Mounted from
-// MultiplayerCanvas (not client.tsx) because it needs band geometry +
-// scale/offsets, which only exist there.
+// the row is anchored just BELOW the band's bottom-LEFT corner (not
+// inside it, and not the right corner — product direction, PR #197,
+// previously overlapped the sidebar's Territory pile), clear of the
+// brigade-mismatch toast, which occupies the band's own bottom-right
+// corner. Mounted from MultiplayerCanvas (not client.tsx) because it needs
+// band geometry + scale/offsets, which only exist there.
 //
 // battleState === 'active' and 'awaiting-soul' are mutually exclusive, so
 // the resolution-button row and the awaiting-soul pill/modal safely reuse
@@ -186,7 +187,7 @@ function AwaitingSoulUI({
             width: right.x - topLeft.x,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'flex-end',
+            justifyContent: 'flex-start',
             gap: 8,
             pointerEvents: 'auto',
           }}
@@ -425,13 +426,14 @@ export default function BattleResolutionUI({
 
   // Dual-corner virtualToScreen (width only, height is CSS content-driven) —
   // same idiom as the brigade toast. Anchored just BELOW the band's bottom
-  // edge (not inside it) so it never collides with that toast's corner,
-  // which lives inside the band's own bottom-right. battleState 'active' and
-  // 'awaiting-soul' are mutually exclusive, so the resolution-button row and
-  // the awaiting-soul pill safely share this anchor.
+  // LEFT edge (product direction, PR #197 — previously the right edge,
+  // which overlapped the sidebar's Territory pile at narrower viewports).
+  // battleState 'active' and 'awaiting-soul' are mutually exclusive, so the
+  // resolution-button row and the awaiting-soul pill safely share this
+  // anchor.
   const rowVirtualWidth = 300;
-  const topLeft = virtualToScreen(band.x + band.width - rowVirtualWidth - 8, band.y + band.height + 6, scale, offsetX, offsetY);
-  const right = virtualToScreen(band.x + band.width - 8, band.y + band.height + 6, scale, offsetX, offsetY);
+  const topLeft = virtualToScreen(band.x + 8, band.y + band.height + 6, scale, offsetX, offsetY);
+  const right = virtualToScreen(band.x + 8 + rowVirtualWidth, band.y + band.height + 6, scale, offsetX, offsetY);
 
   if (battleState === 'awaiting-soul') {
     return (
@@ -470,7 +472,7 @@ export default function BattleResolutionUI({
           top: topLeft.y,
           width: right.x - topLeft.x,
           display: 'flex',
-          justifyContent: 'flex-end',
+          justifyContent: 'flex-start',
           gap: 8,
           pointerEvents: 'auto',
         }}

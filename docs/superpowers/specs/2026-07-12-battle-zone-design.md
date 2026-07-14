@@ -152,24 +152,28 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   lesson). The band background rect alone gets a one-off `Konva.Tween` for the
   "seam opens" visual.
 - **Band chrome (Konva):** a **vertical** dashed centerline at the band's midX (own
-  right half vs. opponent's left, per §3). Per-half totals chips (`⚔ STR/TGH`) anchor in
-  the band's **top corners** — my chip top-right (my own right half), the opponent's
-  chip top-left — just below the header line. The header line stays **top-center**,
-  spanning the band: "⚔ <attacker name> attacking — Rescue attempt | Battle challenge"
-  (derived from `battleAttackerSeat` + stakes-LoB count). The initiative banner renders
-  as a **compact single-line strip on the band's top edge**, directly beneath the header
-  (second row, centered between the totals chips) — moved off the centerline (PR #197)
-  since it originally sat on top of the cards; text stays horizontal, nothing rotates. At
-  1366px the mainCard is 80%+ of
-  band height and cards can straddle the centerline, so chips, banner, and buttons all
-  get a backdrop and render **above** card nodes. Banner states key on which side is
-  empty **relative to the attacker**: defender side empty → "Waiting for a blocker…"
-  (attacker's view adds "No block? Claim Victory to rescue." while souls are at stake);
-  attacker side empty → "No attacker in battle — End Battle?"; both populated →
-  "⚔ INITIATIVE: <name> — losing / stalemate / mutual destruction".
+  right half vs. opponent's left, per §3). Per-half totals chips (`⚔ STR/TGH`) **flank
+  the centerline, vertically centered in the band** (PR #197 — "move the numbers to be
+  in the middle") — the opponent's chip just left of midX, my chip just right of it. The
+  header line stays **top-center**, spanning the band: "⚔ <attacker name> attacking —
+  Rescue attempt | Battle challenge" (derived from `battleAttackerSeat` + stakes-LoB
+  count). The initiative/status banner renders as a **compact single-line strip
+  horizontally centered just below the band's bottom edge, outside the band** (PR #197 —
+  moved out from beneath the header now that the chips no longer occupy the top
+  corners); falls back to right-aligned (still below the band) if the centered strip
+  would collide with the button row at narrow viewports. Text stays horizontal, nothing
+  rotates. At 1366px the mainCard is 80%+ of band height and cards can straddle the
+  centerline, so chips and the header get a backdrop and render **above** card nodes.
+  Banner states key on which side is empty **relative to the attacker**: defender side
+  empty → "Waiting for a blocker…" (attacker's view adds "No block? Claim Victory to
+  rescue." while souls are at stake); attacker side empty → "No attacker in battle — End
+  Battle?"; both populated → "⚔ INITIATIVE: <name> — losing / stalemate / mutual
+  destruction".
 - **Band buttons (HTML overlay via `virtualToScreen`,** zIndex between drag overlay 450
   and toasts 900): `⚑ Claim Victory` (attacker only), `🏳 Battle Lost` (defender only),
-  `↩ End Battle` (both).
+  `↩ End Battle` (both) — anchored just below the band's **bottom-left** corner (PR #197;
+  previously bottom-right, where it overlapped the sidebar's Territory pile at narrower
+  viewports).
 - **Battle toasts:** every existing overlay (game toasts, emote overlay, request
   banners) is `pointerEvents: none` and top/bottom-anchored — none can host a button.
   Brigade-mismatch toasts (which carry a tappable **Discard** button) render in a NEW

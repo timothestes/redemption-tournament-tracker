@@ -5347,10 +5347,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           perfectDrawEnabled={false}
         />
 
-        {/* Opponent-seat totals chip — top-left corner. Halves are
+        {/* Opponent-seat totals chip — flanks the vertical centerline on
+            the left, vertically centered in the band (product direction,
+            PR #197: "move the numbers to be in the middle"). Halves are
             viewer-relative (spec §3: every player plays into their own
             right half), so the opponent's totals sit on my left. */}
-        <Group x={band.x + 6} y={band.y + 22}>
+        <Group x={midX - 10 - chipWidth} y={band.y + band.height / 2 - chipHeight / 2}>
           <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#6496e0" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
           <Text
             width={chipWidth}
@@ -5365,10 +5367,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           />
         </Group>
 
-        {/* My-seat totals chip — top-right corner. My cards always render
-            on my own right half, so my chip anchors to the band's right
-            edge. */}
-        <Group x={band.x + band.width - 6 - chipWidth} y={band.y + 22}>
+        {/* My-seat totals chip — flanks the vertical centerline on the
+            right, vertically centered in the band. My cards always render
+            on my own right half. */}
+        <Group x={midX + 10} y={band.y + band.height / 2 - chipHeight / 2}>
           <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#c4955a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
           <Text
             width={chipWidth}
@@ -5383,20 +5385,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           />
         </Group>
 
-        {/* Initiative banner — a compact single-line strip on the band's TOP
-            edge, directly beneath the header (second row, centered between
-            the totals chips). Previously centered on the band (midX/midY),
-            which sat on top of the cards and was distracting; moved per
-            product direction. bannerSub (attacker-only "no block" hint)
-            folds into the same line via " · " to keep it one row. Width is
-            capped well inside the chip-to-chip gap (verified by measurement
-            at 1366x768 and 1920x1080 — see PR #197) so it never collides
-            with the corner chips. */}
+        {/* Status/initiative strip — horizontally centered, just below the
+            band's bottom edge (outside the band; product direction,
+            PR #197). Previously rendered on the band's top edge beneath
+            the header; moved below now that the totals chips converge on
+            the centerline instead of the top corners. bannerSub
+            (attacker-only "no block" hint) folds into the same line via
+            " · " to keep it one row. Shares its y with the resolution
+            button row (BattleResolutionUI, left-anchored below the band)
+            but is capped narrow enough to never intersect it (verified by
+            measurement at 1366x768 and 1920x1080 — see PR #197). */}
         {(() => {
-          const stripY = band.y + 18;
+          const stripY = band.y + band.height + 6;
           const stripHeight = 16;
           const stripText = bannerSub ? `${bannerMain} · ${bannerSub}` : bannerMain;
-          const stripWidth = Math.min(band.width - 2 * (chipWidth + 12), 480 * fsGrowth(10));
+          const stripWidth = Math.min(band.width - 16, 420 * fsGrowth(10));
           const sx = midX - stripWidth / 2;
           return (
             <Group x={sx} y={stripY}>
