@@ -624,21 +624,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', true).zones.battle;
   }, [mpLayout, virtualWidth, normalizedFormat, viewerKind]);
 
-  // Field of Battle band seam (Task 15 spec §4/§5): the band background Rect
-  // eases its height/opacity open/closed via a one-off Konva.Tween instead of
-  // popping. `lastBandRectRef` snapshots the last real band rect — once
-  // `battleActive` flips false, mpLayout stops producing `zones.battle`
-  // entirely, so the closing tween needs a frozen rect to animate against.
-  // `bandBgVisible` keeps the Rect mounted a beat past `battleActive` going
-  // false so the closing tween can finish before it actually unmounts.
+  // Field of Battle band background lifecycle. OPEN is deliberately NOT
+  // animated: the moment `battleActive` flips, the layout flip compresses the
+  // territories in that same commit and the band region belongs to no zone —
+  // it has no tint rect of its own, so any delay before the dark band Rect
+  // covers it exposes the raw (bright) board art as a visible flash. The old
+  // height/opacity grow-tween made that worse: it re-zeroed the Rect and left
+  // most of the strip uncovered for the full 200ms glide. So the Rect now
+  // renders in the SAME commit as the layout flip (`battleActive` in the JSX
+  // gate below, not just `bandBgVisible`) at its full JSX height/opacity, and
+  // motion comes from the card FLIP glides instead. Only the CLOSE fades:
+  // by then the re-expanded territories already tint the region underneath,
+  // so a fade-out can't expose anything bright.
   //
-  // Race discipline (review finding): a rapid open→close→open must not read
-  // the in-flight tween's intermediate height/opacity as targets, and no
-  // branch may leave a stale tween running toward the wrong end state. So:
-  // every transition destroys the current tween FIRST, and tween TARGETS
-  // always come from layout data (band.height, BAND_BG_OPACITY) — never
-  // from the Rect's live values. Live values are only ever used as a glide
-  // START (reopen-while-closing resumes from where the close got to).
+  // `lastBandRectRef` snapshots the last real band rect — once `battleActive`
+  // flips false, mpLayout stops producing `zones.battle` entirely, so the
+  // closing tween needs a frozen rect to animate against. `bandBgVisible`
+  // keeps the Rect mounted a beat past `battleActive` going false so the
+  // closing tween can finish before it actually unmounts. Every transition
+  // destroys the in-flight tween FIRST (a rapid close→open must not leave a
+  // stale close tween driving the rect to 0), and a reopen snaps the
+  // imperatively-mutated height/opacity back to their layout-derived values —
+  // React won't re-apply JSX attrs it doesn't know changed.
   const lastBandRectRef = useRef<ZoneRect | null>(null);
   if (mpLayout?.zones.battle) lastBandRectRef.current = mpLayout.zones.battle;
   const [bandBgVisible, setBandBgVisible] = useState(battleActive);
@@ -646,13 +653,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const bandBgTweenRef = useRef<Konva.Tween | null>(null);
 
   useEffect(() => {
-    // Kill any in-flight tween on EVERY transition — including open, where a
-    // still-running close tween would otherwise keep driving the rect to 0
-    // and its onFinish would unmount it despite battleActive being true.
     bandBgTweenRef.current?.destroy();
     bandBgTweenRef.current = null;
     if (battleActive) {
       setBandBgVisible(true);
+      // Reopen while a close tween was mid-fade: restore the full layout
+      // values it had been dragging toward 0. On a fresh open this is a
+      // no-op — the Rect just mounted with these exact JSX attrs.
+      const rect = bandBgRectRef.current;
+      const band = lastBandRectRef.current;
+      if (rect && band) {
+        rect.height(band.height);
+        rect.opacity(BAND_BG_OPACITY);
+      }
       return;
     }
     const rect = bandBgRectRef.current;
@@ -674,35 +687,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     bandBgTweenRef.current = tween;
     tween.play();
   }, [battleActive]);
-
-  // Opening: ease the seam up to its layout-derived full size. On a fresh
-  // mount the Rect sits at its full JSX attrs, so the glide starts from 0;
-  // on a reopen that interrupted a close tween, the glide resumes from the
-  // rect's current (partially closed) values instead of snapping to 0 first.
-  useEffect(() => {
-    if (!battleActive || !bandBgVisible) return;
-    const rect = bandBgRectRef.current;
-    const band = lastBandRectRef.current;
-    if (!rect || !band) return;
-    bandBgTweenRef.current?.destroy();
-    const interruptedMidClose = rect.height() < band.height;
-    if (!interruptedMidClose) {
-      rect.height(0);
-      rect.opacity(0);
-    }
-    const tween = new KonvaLib.Tween({
-      node: rect,
-      duration: 0.2,
-      height: band.height,
-      opacity: BAND_BG_OPACITY,
-      easing: KonvaLib.Easings.EaseOut,
-      onFinish: () => {
-        bandBgTweenRef.current = null;
-      },
-    });
-    bandBgTweenRef.current = tween;
-    tween.play();
-  }, [battleActive, bandBgVisible]);
 
   useEffect(() => {
     return () => { bandBgTweenRef.current?.destroy(); };
@@ -6097,7 +6081,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               resign/finish). The "FIELD OF BATTLE" label is superseded by
               the dynamic header line in the Task 12 chrome group below.
               ================================================================ */}
-          {bandBgVisible && gameStatus === 'playing' && lastBandRectRef.current && (() => {
+          {/* Gate on battleActive OR bandBgVisible: battleActive mounts the
+              Rect in the SAME commit as the battle layout flip (waiting for
+              the bandBgVisible effect leaves the untinted band region flashing
+              bright for a frame); bandBgVisible keeps it mounted through the
+              close fade after battleActive drops. */}
+          {(battleActive || bandBgVisible) && gameStatus === 'playing' && lastBandRectRef.current && (() => {
             const band = lastBandRectRef.current!;
             const midX = band.x + band.width / 2;
             return (
