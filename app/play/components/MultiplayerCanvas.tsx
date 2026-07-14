@@ -663,29 +663,59 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // re-applies (same discipline as the guidance-cue tween), so a re-render
   // can't fight an in-flight fade.
   const bandBgGroupRef = useRef<Konva.Group | null>(null);
+  const bandBgRectRef = useRef<Konva.Rect | null>(null);
   const bandChromeRef = useRef<Konva.Group | null>(null);
   const bandBgTweenRef = useRef<Konva.Tween | null>(null);
   const bandChromeTweenRef = useRef<Konva.Tween | null>(null);
 
-  // Whole-band open/close animation. OPEN washes the chrome IN over the
-  // instantly-placed background — the bg stays opaque from frame 0 so it can
-  // never expose raw board art (the flash the old grow-tween caused; see the
-  // BAND_BG_OPACITY note). CLOSE fades BOTH groups out together, so the dashed
-  // centerline no longer hangs at full strength while everything else
+  // Whole-band open/close animation. OPEN: the background rect "settles" from
+  // fully opaque down to its resting BAND_BG_OPACITY while the chrome washes
+  // IN — the bg is only ever MORE opaque than rest during the settle, so it
+  // can never expose raw board art (the flash the old grow-tween caused; see
+  // the BAND_BG_OPACITY note). CLOSE fades BOTH groups out together, so the
+  // dashed centerline no longer hangs at full strength while everything else
   // dissolves. Every transition destroys the in-flight tweens FIRST so a rapid
-  // open⇄close can't leave a stale fade driving a group toward 0.
+  // open⇄close can't leave a stale fade driving a node toward 0. `bandBgTweenRef`
+  // holds whichever bg animation is live (open = rect settle, close = group
+  // fade) — the two branches are mutually exclusive so they never overlap.
+  // Reduced motion: skip every tween and snap to the end state (mirrors
+  // useHandLayoutTween, which gates the territory/battle card glides the same
+  // way).
   useEffect(() => {
     bandBgTweenRef.current?.destroy();
     bandBgTweenRef.current = null;
     bandChromeTweenRef.current?.destroy();
     bandChromeTweenRef.current = null;
     const bg = bandBgGroupRef.current;
+    const rect = bandBgRectRef.current;
     const chrome = bandChromeRef.current;
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      !!window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (battleActive) {
       setBandBgVisible(true);
-      // Background present at full opacity immediately (a reopen mid-close
-      // snaps it back from a fade the close tween had driven toward 0).
+      // Group opacity at full immediately (a reopen mid-close snaps it back
+      // from a fade the close tween had driven toward 0).
       bg?.opacity(1);
+      if (reduceMotion) {
+        rect?.opacity(BAND_BG_OPACITY);
+        chrome?.opacity(1);
+        return;
+      }
+      // BG settle: materialize from fully opaque to resting opacity.
+      if (rect) {
+        rect.opacity(1);
+        const rt = new KonvaLib.Tween({
+          node: rect,
+          duration: BAND_CHROME_FADE_MS / 1000,
+          opacity: BAND_BG_OPACITY,
+          easing: KonvaLib.Easings.EaseOut,
+          onFinish: () => { bandBgTweenRef.current = null; },
+        });
+        bandBgTweenRef.current = rt;
+        rt.play();
+      }
       // Chrome washes in from transparent so header/chips don't pop.
       if (chrome) {
         chrome.opacity(0);
@@ -702,6 +732,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       return;
     }
     // CLOSE — fade both groups out, then unmount once the bg fade lands.
+    if (reduceMotion || !bg || !bg.getStage()) {
+      chrome?.opacity(0);
+      bg?.opacity(0);
+      setBandBgVisible(false);
+      return;
+    }
     if (chrome) {
       const ct = new KonvaLib.Tween({
         node: chrome,
@@ -712,10 +748,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       });
       bandChromeTweenRef.current = ct;
       ct.play();
-    }
-    if (!bg || !bg.getStage()) {
-      setBandBgVisible(false);
-      return;
     }
     const tween = new KonvaLib.Tween({
       node: bg,
@@ -6141,6 +6173,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             return (
               <Group key="battle-band-bg" ref={bandBgGroupRef} opacity={1} listening={false}>
                 <Rect
+                  ref={bandBgRectRef}
                   x={band.x}
                   y={band.y}
                   width={band.width}
