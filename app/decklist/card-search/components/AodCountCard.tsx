@@ -20,10 +20,12 @@ const DECKLIST_TYPE: Record<AodCountCardProps["deckType"], string> = {
 };
 
 const AOD_TOOLTIP =
-  "Top-9 draw stats over a 10,000-iteration Monte Carlo, given a Daniel reference " +
-  "in the top 3. Non-Soul: avg Daniel cards in the top 9 excluding Lost Souls. " +
-  "Soul: the same average counting Daniel Lost Souls too. Whiff: % of draws with " +
-  "no Daniel in the top 3.";
+  "Top-9 draw stats from a 10,000-iteration Monte Carlo. " +
+  "Non-Soul is the true expected value: average non-Soul Daniel cards in your top 9 " +
+  "across every draw, counting whiffs as 0. If Fires is that same average over only " +
+  "the draws that don't whiff — the expected haul when the Ancient of Days actually " +
+  "goes off — so it is always ≥ Non-Soul. Soul is Non-Soul plus Daniel Lost Souls. " +
+  "Whiff is the % of draws with no Daniel reference in the top 3, where the chain never fires.";
 
 // One labeled figure within the revealed breakdown row.
 function Stat({ label, value }: { label: string; value: string }) {
@@ -124,6 +126,12 @@ export default function AodCountCard({ deck, deckType }: AodCountCardProps) {
   // Revealed result — mirrors the alignment cells' label + big-number layout.
   if (status === "done") {
     const tooFewCards = mainDeckCount < 9;
+    // EV of the Non-Soul count given the chain fires — whiff draws removed from
+    // the denominator, so it's the expected haul when it actually goes off.
+    // Derived from the returned figures (unconditional / P(fires)); always
+    // >= the unconditional Non-Soul number.
+    const nonWhiffFraction = 1 - whiff / 100;
+    const ifFires = nonWhiffFraction > 0 ? nonSoul / nonWhiffFraction : 0;
     return (
       <button
         type="button"
@@ -138,8 +146,9 @@ export default function AodCountCard({ deck, deckType }: AodCountCardProps) {
             &#9432;
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           <Stat label="Non-Soul" value={nonSoul.toFixed(2)} />
+          <Stat label="If Fires" value={ifFires.toFixed(2)} />
           <Stat label="Soul" value={soul.toFixed(2)} />
           <Stat label="Whiff" value={`${whiff.toFixed(1)}%`} />
         </div>
