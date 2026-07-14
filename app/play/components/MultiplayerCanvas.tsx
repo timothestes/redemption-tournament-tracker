@@ -92,7 +92,6 @@ import {
   computeInitiative,
   brigadeMismatch as computeBrigadeMismatch,
   siteAttachedSoulIds,
-  summarizeAutoReturn,
   type BattleCardLike,
   type BattleSeat,
 } from '../lib/battleMath';
@@ -176,24 +175,6 @@ function isBattleEnhancementSegment(cardType: string): boolean {
  *  stakes Lost Souls for the Rescue-attempt vs. Battle-challenge header. */
 function isBattleLostSoulRow(c: { cardType: string; cardName: string }): boolean {
   return c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
-}
-
-/** Post-battle summary toast copy (spec §8): a short 3-number readout —
- *  "N characters returned · N enhancements discarded · N kept in play" —
- *  built from summarizeAutoReturn over the battle-rows snapshot captured
- *  just before battleState flipped to '' (see battleCardEntriesSnapshotRef
- *  below). "returned" folds summarizeAutoReturn's toTerritory + toOrigin
- *  buckets together (both are "the card went back to a visible zone", just
- *  a different one) rather than reproducing the old confirm dialog's full
- *  per-bucket breakdown — this replaces that dialog, not mirrors it. */
-function battleSummaryToastText(cards: BattleCardLike[]): string {
-  const s = summarizeAutoReturn(cards);
-  const returned = s.toTerritory + s.toOrigin;
-  return (
-    `Battle ended — ${returned} character${returned === 1 ? '' : 's'} returned · ` +
-    `${s.toDiscard} enhancement${s.toDiscard === 1 ? '' : 's'} discarded · ` +
-    `${s.keptInPlay.length} kept in play`
-  );
 }
 
 /** Build a human-readable fragment for an opponent-action request, used in the
@@ -5176,31 +5157,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     pushRows(opponentCards['battle'], 'opponent', oppSeat);
     return entries;
   }, [battleActive, mpLayout, rawMain.cardWidth, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards]);
-
-  // Post-battle summary toast (spec §8, replaces the old confirm-summary
-  // dialog): each client derives its own copy from the rows IT saw in the
-  // band, no server round-trip. `battleCardEntriesSnapshotRef` snapshots
-  // battleCardEntries on every render where the battle is still open —
-  // whichever snapshot lands LAST before battleState flips to '' is
-  // necessarily the final one, since the rows have already left 'battle' by
-  // the render where the flip itself is observed (same subscription-update
-  // batch as the Game row write). The toast-firing effect below reads this
-  // ref instead of battleCardEntries directly for exactly that reason.
-  const battleCardEntriesSnapshotRef = useRef<BattleCardLike[]>([]);
-  useEffect(() => {
-    if (gameState.battleState !== '') {
-      battleCardEntriesSnapshotRef.current = battleCardEntries.map((e) => e.like);
-    }
-  }, [battleCardEntries, gameState.battleState]);
-
-  const prevBattleStateRef = useRef(gameState.battleState);
-  useEffect(() => {
-    const prevBattleState = prevBattleStateRef.current;
-    prevBattleStateRef.current = gameState.battleState;
-    if (prevBattleState !== '' && gameState.battleState === '') {
-      showGameToast(battleSummaryToastText(battleCardEntriesSnapshotRef.current), 5000);
-    }
-  }, [gameState.battleState]);
 
   // Brigade soft-check (spec §6): every GE/EE-segment enhancement in the band
   // whose brigade has no match among same-side characters. Order follows
