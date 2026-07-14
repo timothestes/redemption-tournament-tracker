@@ -116,6 +116,7 @@ export function parseMeekStats(strength: string, toughness: string): { strength:
 }
 
 export type InitiativeState =
+  | { kind: 'empty' }
   | { kind: 'waiting-blocker' }
   | { kind: 'no-attacker' }
   | { kind: 'unknown' }
@@ -155,7 +156,11 @@ export function computeInitiative(
   );
 
   if (!attackerHasCharacters) {
-    return defenderHasCharacters ? { kind: 'no-attacker' } : { kind: 'waiting-blocker' };
+    // Neither side has a character yet (band just opened, or only
+    // enhancements/sites are down): there is no fight to assess — callers
+    // suppress the status banner and let the drag-guidance cue do the
+    // talking instead of showing a contradictory "waiting for a blocker".
+    return defenderHasCharacters ? { kind: 'no-attacker' } : { kind: 'empty' };
   }
   if (!defenderHasCharacters) {
     return { kind: 'waiting-blocker' };

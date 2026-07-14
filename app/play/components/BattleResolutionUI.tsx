@@ -65,6 +65,11 @@ interface BattleResolutionUIProps {
   siteAttachedSoulIds: Set<string>;
   /** Forge card-art resolver, for Forge playtest games. */
   forgeResolver?: ForgeResolverMap | null;
+  /** True once the band holds at least one card. Win Battle / Battle Lost are
+   *  confirm-free and consequence-heavy (a misclicked 🏳 with souls at stake
+   *  goes straight into the surrender flow), so they stay hidden over an
+   *  empty band; ↩ End Battle remains the always-available escape hatch. */
+  bandHasCards: boolean;
   /** Both Win Battle and Battle Lost dispatch the same server reducer (resolve_battle) —
    *  the server decides win/loss from caller identity, not from which button was pressed. */
   onResolveBattle: () => void;
@@ -222,6 +227,13 @@ function AwaitingSoulUI({
   }
 
   const title = chooserSeat === attackerSeat ? 'Choose a Lost Soul to rescue' : 'Choose a Lost Soul to surrender';
+  // One line of context so the picker stands on its own for a chooser who
+  // wasn't watching the band (UX review F8): who won, where the soul goes.
+  const attackerName = attackerSeat === mySeat ? myPlayerName : opponentPlayerName;
+  const subtitle =
+    chooserSeat === attackerSeat
+      ? 'You won the battle — the soul you pick moves to your Land of Redemption.'
+      : `${attackerName} won the battle — the soul you pick goes to their Land of Redemption.`;
 
   const handlePick = (cardId: bigint) => {
     if (pendingSoulId !== null) return;
@@ -269,6 +281,17 @@ function AwaitingSoulUI({
         >
           {title}
         </h2>
+        <p
+          style={{
+            margin: '6px 0 0',
+            fontFamily: 'Georgia, serif',
+            fontSize: 12.5,
+            color: 'rgba(196, 149, 90, 0.75)',
+            flexShrink: 0,
+          }}
+        >
+          {subtitle}
+        </p>
 
         {eligibleSouls.length === 0 ? (
           <>
@@ -410,6 +433,7 @@ export default function BattleResolutionUI({
   eligibleSouls,
   siteAttachedSoulIds,
   forgeResolver,
+  bandHasCards,
   onResolveBattle,
   onEndBattle,
   onSurrenderSoul,
@@ -477,10 +501,10 @@ export default function BattleResolutionUI({
           pointerEvents: 'auto',
         }}
       >
-        {isAttacker && (
+        {isAttacker && bandHasCards && (
           <ResolutionButton label={BUTTON_COPY['claim-victory'].label} tone="gold" onClick={onResolveBattle} />
         )}
-        {isDefender && (
+        {isDefender && bandHasCards && (
           <ResolutionButton label={BUTTON_COPY['battle-lost'].label} tone="red" onClick={onResolveBattle} />
         )}
         <ResolutionButton label={BUTTON_COPY['end-battle'].label} tone="neutral" onClick={onEndBattle} />

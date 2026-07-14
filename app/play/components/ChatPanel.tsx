@@ -124,6 +124,13 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   GAME_CREATED: 'created the game',
   REMATCH_REQUESTED: 'wants to play again',
   REMATCH_RESPONSE: 'responded to rematch',
+  // Battle actions carry rich payloads rendered in formatActionType; these
+  // are the payload-parse-failure fallbacks (previously they fell through to
+  // the raw lowercased type: "resolve battle", "surrender soul", …).
+  ENTER_BATTLE: 'moved a card into battle',
+  RESOLVE_BATTLE: 'resolved the battle',
+  SURRENDER_SOUL: 'gave up a lost soul',
+  BATTLE_END: 'ended the battle',
 };
 
 function HoverableCard({ name, img }: { name: string; img?: string }) {
@@ -637,7 +644,50 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
             ? <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to {targetName}&apos;s land of redemption</>
             : <>rescued <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
         }
+        if (data.to === 'battle') {
+          return <>moved {cardEl} into battle</>;
+        }
       }
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'ENTER_BATTLE' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) {
+        return <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> into battle</>;
+      }
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'RESOLVE_BATTLE' && payload) {
+    // Both ⚑ Win Battle (attacker) and 🏳 Battle Lost (defender) dispatch
+    // resolve_battle — the caller's seat tells the log which one happened.
+    try {
+      const data = JSON.parse(payload);
+      if (data.callerSeat && data.attackerSeat) {
+        return data.callerSeat === data.attackerSeat ? 'won the battle' : 'lost the battle';
+      }
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'SURRENDER_SOUL' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) {
+        const cardEl = <HoverableCard name={data.cardName} img={data.cardImgFile} />;
+        // T1: the defender surrenders one of their own souls; T2/Paragon: the
+        // attacker picks the soul they take (actor is also the destination).
+        return actorPlayerId && data.targetOwnerId === actorPlayerId
+          ? <>rescued {cardEl}</>
+          : <>surrendered {cardEl}</>;
+      }
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'BATTLE_END' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const kept: string[] = Array.isArray(data.kept) ? data.kept : [];
+      return kept.length > 0
+        ? `ended the battle — kept in play: ${kept.join(', ')}`
+        : 'ended the battle';
     } catch { /* fall through */ }
   }
   if (actionType === 'MOVE_OPPONENT_CARD' && payload) {

@@ -3864,6 +3864,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             snapBack();
             return;
           }
+          // No Warrior under the drop — if it landed on a non-Warrior
+          // character, the refusal is rules-correct (only Warrior-class
+          // characters carry weapons) but used to be silent: the weapon just
+          // sat in the zone and got discarded at battle end, reading as "the
+          // game ate my sword" (UX review F10). Soft hint only — the move
+          // below still proceeds, nothing is blocked.
+          const nonWarriorCharacters = myHostCards.filter((c) => {
+            if (c.instanceId === card.instanceId) return false;
+            if (c.equippedTo) return false;
+            if (!isCharacterCard({ cardType: c.type })) return false;
+            return !isWarrior(findCard(c.cardName, c.cardSet, c.cardImgFile));
+          });
+          const hitNonWarrior = hitTestWarrior(
+            center.x,
+            center.y,
+            cardWidth,
+            cardHeight,
+            nonWarriorCharacters,
+            card.instanceId,
+          );
+          if (hitNonWarrior) {
+            showGameToast(`${hitNonWarrior.cardName} isn't a Warrior — ${card.cardName} won't attach`, 4000);
+          }
         }
       }
 
@@ -5269,7 +5292,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     const myTotals = mySeatStr ? sideTotals(battleLikes, mySeatStr as BattleSeat) : { str: 0, tgh: 0, hasUnknown: false };
     const oppTotals = oppSeatStr ? sideTotals(battleLikes, oppSeatStr as BattleSeat) : { str: 0, tgh: 0, hasUnknown: false };
 
-    const headerText = `⚔ ${nameForSeat(attackerSeat)} attacking — ${stakesLostSoulCount >= 1 ? 'Rescue attempt' : 'Battle challenge'}`;
+    // No ⚔ prefixes anywhere in this chrome: Konva canvas text gets no emoji
+    // fallback, so U+2694 rendered as a bare "×"-looking glyph (PR #197 UX
+    // review F5). The HTML resolution buttons keep their glyphs — the DOM
+    // renders them fine.
+    const headerText = `${nameForSeat(attackerSeat)} attacking — ${stakesLostSoulCount >= 1 ? 'Rescue attempt' : 'Battle challenge'}`;
 
     const initiative = computeInitiative(
       battleLikes,
@@ -5278,24 +5305,39 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     );
     let bannerMain = '';
     switch (initiative.kind) {
+      case 'empty':
+        // No characters on either side — the drag-guidance cue carries the
+        // instruction; a banner here contradicted it (UX review F2).
+        bannerMain = '';
+        break;
       case 'waiting-blocker':
-        bannerMain = 'Waiting for a blocker…';
+        // Side-neutral: also shown after the only blocker was defeated and
+        // dragged to discard, where "Waiting for a blocker…" wrongly implied
+        // the battle hadn't happened yet (UX review F3).
+        bannerMain = 'No blocker in battle';
         break;
       case 'no-attacker':
         bannerMain = 'No attacker in battle — End Battle?';
         break;
       case 'unknown':
-        bannerMain = '⚔ INITIATIVE: unknown (variable/face-down stats)';
+        bannerMain = 'INITIATIVE: unknown (variable/face-down stats)';
         break;
       case 'initiative': {
         const reasonLabel = initiative.reason === 'mutual-destruction' ? 'mutual destruction' : initiative.reason;
-        bannerMain = `⚔ INITIATIVE: ${nameForSeat(initiative.seat)} — ${reasonLabel}`;
+        bannerMain = `INITIATIVE: ${nameForSeat(initiative.seat)} — ${reasonLabel}`;
         break;
       }
     }
+    // The strip describes the ACTIVE fight. During 'awaiting-soul' it went
+    // stale ("Waiting for a blocker…") and collided with the HTML waiting
+    // pill anchored on the same band-bottom line (UX review F1).
+    if (gameState.battleState !== 'active') bannerMain = '';
 
     const chipWidth = 64 * fsGrowth(11);
     const chipHeight = 20;
+    // Two "0/0" chips over an empty band are noise — chips appear with the
+    // first card in the band (UX review F2).
+    const showChips = battleLikes.length > 0;
 
     return (
       <Group key="battle-chrome" listening={false}>
@@ -5323,38 +5365,42 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             vertically centered). Halves are viewer-relative (spec §3: every
             player plays into their own right half), so the opponent's
             totals sit on my left. */}
-        <Group x={midX - 10 - chipWidth} y={band.y + band.height - 8 - chipHeight}>
-          <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#6496e0" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
-          <Text
-            width={chipWidth}
-            height={chipHeight}
-            text={`⚔ ${oppTotals.str}/${oppTotals.tgh}${oppTotals.hasUnknown ? '?' : ''}`}
-            fontSize={fs(11)}
-            fontStyle="bold"
-            fill="#a3c5e8"
-            align="center"
-            verticalAlign="middle"
-            perfectDrawEnabled={false}
-          />
-        </Group>
+        {showChips && (
+          <Group x={midX - 10 - chipWidth} y={band.y + band.height - 8 - chipHeight}>
+            <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#6496e0" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
+            <Text
+              width={chipWidth}
+              height={chipHeight}
+              text={`${oppTotals.str}/${oppTotals.tgh}${oppTotals.hasUnknown ? '?' : ''}`}
+              fontSize={fs(11)}
+              fontStyle="bold"
+              fill="#a3c5e8"
+              align="center"
+              verticalAlign="middle"
+              perfectDrawEnabled={false}
+            />
+          </Group>
+        )}
 
         {/* My-seat totals chip — flanks the vertical centerline on the
             right, anchored to the BOTTOM of the band, 8px above its bottom
             edge. My cards always render on my own right half. */}
-        <Group x={midX + 10} y={band.y + band.height - 8 - chipHeight}>
-          <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#c4955a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
-          <Text
-            width={chipWidth}
-            height={chipHeight}
-            text={`⚔ ${myTotals.str}/${myTotals.tgh}${myTotals.hasUnknown ? '?' : ''}`}
-            fontSize={fs(11)}
-            fontStyle="bold"
-            fill="#e8d5a3"
-            align="center"
-            verticalAlign="middle"
-            perfectDrawEnabled={false}
-          />
-        </Group>
+        {showChips && (
+          <Group x={midX + 10} y={band.y + band.height - 8 - chipHeight}>
+            <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#c4955a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
+            <Text
+              width={chipWidth}
+              height={chipHeight}
+              text={`${myTotals.str}/${myTotals.tgh}${myTotals.hasUnknown ? '?' : ''}`}
+              fontSize={fs(11)}
+              fontStyle="bold"
+              fill="#e8d5a3"
+              align="center"
+              verticalAlign="middle"
+              perfectDrawEnabled={false}
+            />
+          </Group>
+        )}
 
         {/* Status/initiative strip — horizontally centered, just below the
             band's bottom edge (outside the band; product direction,
@@ -5365,6 +5411,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             but is capped narrow enough to never intersect it (verified by
             measurement at 1366x768 and 1920x1080 — see PR #197). */}
         {(() => {
+          if (!bannerMain) return null;
           const stripY = band.y + band.height + 6;
           const stripHeight = 16;
           const stripText = bannerMain;
@@ -5403,6 +5450,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     mpLayout,
     battleCardEntries,
     stakesLostSoulCount,
+    gameState.battleState,
     gameState.battleAttackerSeat,
     gameState.lastBattlePlayBySeat,
     gameState.myPlayer,
@@ -8211,6 +8259,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           eligibleSouls={stakesLostSoulRows}
           siteAttachedSoulIds={stakesSiteAttachedSoulIds}
           forgeResolver={forgeResolver}
+          bandHasCards={battleCardEntries.length > 0}
           onResolveBattle={gameState.resolveBattle}
           onEndBattle={gameState.endBattle}
           onSurrenderSoul={gameState.surrenderSoul}
