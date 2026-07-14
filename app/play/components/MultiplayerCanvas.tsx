@@ -92,6 +92,7 @@ import {
   computeInitiative,
   brigadeMismatch as computeBrigadeMismatch,
   siteAttachedSoulIds,
+  summarizeAutoReturn,
   type BattleCardLike,
   type BattleSeat,
 } from '../lib/battleMath';
@@ -168,6 +169,24 @@ function isBattleEnhancementSegment(cardType: string): boolean {
  *  stakes Lost Souls for the Rescue-attempt vs. Battle-challenge header. */
 function isBattleLostSoulRow(c: { cardType: string; cardName: string }): boolean {
   return c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
+}
+
+/** Post-battle summary toast copy (spec §8): a short 3-number readout —
+ *  "N characters returned · N enhancements discarded · N kept in play" —
+ *  built from summarizeAutoReturn over the battle-rows snapshot captured
+ *  just before battleState flipped to '' (see battleCardEntriesSnapshotRef
+ *  below). "returned" folds summarizeAutoReturn's toTerritory + toOrigin
+ *  buckets together (both are "the card went back to a visible zone", just
+ *  a different one) rather than reproducing the old confirm dialog's full
+ *  per-bucket breakdown — this replaces that dialog, not mirrors it. */
+function battleSummaryToastText(cards: BattleCardLike[]): string {
+  const s = summarizeAutoReturn(cards);
+  const returned = s.toTerritory + s.toOrigin;
+  return (
+    `Battle ended — ${returned} character${returned === 1 ? '' : 's'} returned · ` +
+    `${s.toDiscard} enhancement${s.toDiscard === 1 ? '' : 's'} discarded · ` +
+    `${s.keptInPlay.length} kept in play`
+  );
 }
 
 /** Build a human-readable fragment for an opponent-action request, used in the
@@ -588,8 +607,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // while no drag is in flight. A flip that arrives mid-drag stays parked in
   // `rawBattleActiveRef` and is flushed by handleCardDragEnd on
   // dragend/drag-cancel — a single-step flip, never a per-frame recompute.
+  // Phase-driven (spec §4): the band is visible whenever the turn player has
+  // set_phase('battle'), OR whenever battleState is non-empty (defensive OR —
+  // covers e.g. a battle still resolving a soul surrender after the phase bar
+  // has moved on, or any state drift between the two signals).
   const rawBattleActive =
-    gameState.game?.battleState === 'active' || gameState.game?.battleState === 'awaiting-soul';
+    gameState.game?.currentPhase === 'battle' || (gameState.game?.battleState ?? '') !== '';
   const rawBattleActiveRef = useRef(rawBattleActive);
   rawBattleActiveRef.current = rawBattleActive;
   const [battleActive, setBattleActive] = useState(rawBattleActive);
@@ -2481,22 +2504,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       // Battle band (Field of Battle) — checked BEFORE the territory loops.
       // Owner 'my' is a formality: the drop path always sends targetOwnerId ''
-      // so ownership never transfers on battle drops (spec §4).
+      // so ownership never transfers on battle drops (spec §4). The band is
+      // now phase-driven (set_phase opens it) — there is no idle divider-proxy
+      // drop that opens a battle anymore; the band must already be visible.
       if (battleActive) {
         if (mpLayout.zones.battle && pointInRect(x, y, mpLayout.zones.battle)) {
-          return { zone: 'battle', owner: 'my' };
-        }
-      } else if (gameStatus === 'playing') {
-        // Idle divider proxy: a thin strip (divider center ± 1.5% of stage
-        // height, play-area width) on the seam between the territories.
-        // Dropping a card here opens a battle via the atomic enter_battle.
-        const divider = mpLayout.zones.divider;
-        const proxyHalf = VIRTUAL_HEIGHT * 0.015;
-        const dividerCenterY = divider.y + divider.height / 2;
-        if (
-          x >= 0 && x <= mpLayout.playAreaWidth &&
-          y >= dividerCenterY - proxyHalf && y <= dividerCenterY + proxyHalf
-        ) {
           return { zone: 'battle', owner: 'my' };
         }
       }
@@ -2525,7 +2537,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       return null;
     },
-    [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect, normalizedFormat, battleActive, gameStatus],
+    [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect, normalizedFormat, battleActive],
   );
 
   // Dragging the Soul Deck pile: capture the top soul's ID at drag-start,
@@ -5117,16 +5129,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   // ---- Battle Zone chrome derived state (spec §5/§6, Task 12) ----
   // BattleCardLike[] built from the live battle rows (my + opponent-owned).
-  // dbY is read straight off posY — already owner-local, no viewer flip
-  // (spec §3). cardRelH uses the layout's UNSCALED mainCard height (not the
-  // cardScale-zoomed `cardHeight` used for actual rendering) so side
-  // derivation stays consistent regardless of either viewer's zoom
-  // preference — both clients compute the same band-relative ratio from the
-  // same mpLayout inputs.
+  // dbX is read straight off posX — already owner-local, no viewer flip
+  // (spec §3: every player plays into their own right half). cardRelW uses
+  // the layout's UNSCALED mainCard width (not the cardScale-zoomed
+  // `cardWidth` used for actual rendering) so side derivation stays
+  // consistent regardless of either viewer's zoom preference — both clients
+  // compute the same band-relative ratio from the same mpLayout inputs.
   const battleCardEntries = useMemo<BattleCardEntry[]>(() => {
     if (!battleActive || !mpLayout?.zones.battle) return [];
     const band = mpLayout.zones.battle;
-    const cardRelH = band.height > 0 ? rawMain.cardHeight / band.height : 0;
+    const cardRelW = band.width > 0 ? rawMain.cardWidth / band.width : 0;
     const mySeat = gameState.myPlayer ? (String(gameState.myPlayer.seat) as BattleSeat) : null;
     const oppSeat = gameState.opponentPlayer ? (String(gameState.opponentPlayer.seat) as BattleSeat) : null;
     const entries: BattleCardEntry[] = [];
@@ -5138,8 +5150,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           owner,
           like: {
             ownerSeat: seat,
-            dbY: parseFloat(row.posY || '0'),
-            cardRelH,
+            dbX: parseFloat(row.posX || '0'),
+            cardRelW,
             strength: row.strength,
             toughness: row.toughness,
             brigade: row.brigade,
@@ -5156,7 +5168,32 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     pushRows(myCards['battle'], 'my', mySeat);
     pushRows(opponentCards['battle'], 'opponent', oppSeat);
     return entries;
-  }, [battleActive, mpLayout, rawMain.cardHeight, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards]);
+  }, [battleActive, mpLayout, rawMain.cardWidth, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards]);
+
+  // Post-battle summary toast (spec §8, replaces the old confirm-summary
+  // dialog): each client derives its own copy from the rows IT saw in the
+  // band, no server round-trip. `battleCardEntriesSnapshotRef` snapshots
+  // battleCardEntries on every render where the battle is still open —
+  // whichever snapshot lands LAST before battleState flips to '' is
+  // necessarily the final one, since the rows have already left 'battle' by
+  // the render where the flip itself is observed (same subscription-update
+  // batch as the Game row write). The toast-firing effect below reads this
+  // ref instead of battleCardEntries directly for exactly that reason.
+  const battleCardEntriesSnapshotRef = useRef<BattleCardLike[]>([]);
+  useEffect(() => {
+    if (gameState.battleState !== '') {
+      battleCardEntriesSnapshotRef.current = battleCardEntries.map((e) => e.like);
+    }
+  }, [battleCardEntries, gameState.battleState]);
+
+  const prevBattleStateRef = useRef(gameState.battleState);
+  useEffect(() => {
+    const prevBattleState = prevBattleStateRef.current;
+    prevBattleStateRef.current = gameState.battleState;
+    if (prevBattleState !== '' && gameState.battleState === '') {
+      showGameToast(battleSummaryToastText(battleCardEntriesSnapshotRef.current), 5000);
+    }
+  }, [gameState.battleState]);
 
   // Brigade soft-check (spec §6): every GE/EE-segment enhancement in the band
   // whose brigade has no match among same-side characters. Order follows
@@ -5238,6 +5275,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const battleChromeNode = useMemo(() => {
     if (!battleActive || gameStatus !== 'playing' || !mpLayout?.zones.battle) return null;
     const band = mpLayout.zones.battle;
+    const midX = band.x + band.width / 2;
     const midY = band.y + band.height / 2;
 
     const mySeatStr = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
@@ -5310,7 +5348,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           perfectDrawEnabled={false}
         />
 
-        {/* Opponent-seat totals chip — top gutter (left edge) */}
+        {/* Opponent-seat totals chip — top-left corner. Halves are
+            viewer-relative (spec §3: every player plays into their own
+            right half), so the opponent's totals sit on my left. */}
         <Group x={band.x + 6} y={band.y + 22}>
           <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#6496e0" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
           <Text
@@ -5326,10 +5366,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           />
         </Group>
 
-        {/* My-seat totals chip — bottom gutter (left edge). Halves are
-            viewer-relative: my cards always render on the bottom half, so
-            my chip anchors to the band's bottom edge. */}
-        <Group x={band.x + 6} y={band.y + band.height - 6 - chipHeight}>
+        {/* My-seat totals chip — top-right corner. My cards always render
+            on my own right half, so my chip anchors to the band's right
+            edge. */}
+        <Group x={band.x + band.width - 6 - chipWidth} y={band.y + 22}>
           <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#c4955a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
           <Text
             width={chipWidth}
@@ -5344,11 +5384,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           />
         </Group>
 
-        {/* Initiative banner — centered on the centerline */}
+        {/* Initiative banner — centered on the vertical centerline (midX);
+            text stays horizontal, nothing rotates. */}
         {(() => {
           const bannerWidth = Math.min(band.width - 24, 360 * fsGrowth(12));
           const bannerHeight = bannerSub ? 40 : 22;
-          const bx = band.x + band.width / 2 - bannerWidth / 2;
+          const bx = midX - bannerWidth / 2;
           const by = midY - bannerHeight / 2;
           return (
             <Group x={bx} y={by}>
@@ -5971,7 +6012,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               ================================================================ */}
           {bandBgVisible && gameStatus === 'playing' && lastBandRectRef.current && (() => {
             const band = lastBandRectRef.current!;
-            const midY = band.y + band.height / 2;
+            const midX = band.x + band.width / 2;
             return (
               <Group key="battle-band-bg" listening={false}>
                 <Rect
@@ -5987,9 +6028,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   opacity={BAND_BG_OPACITY}
                   perfectDrawEnabled={false}
                 />
-                {/* Dashed centerline — placement above/below decides a card's side */}
+                {/* Dashed centerline — placement left/right decides a card's
+                    side (spec §3: every player plays into their own right
+                    half). */}
                 <Line
-                  points={[band.x + 8, midY, band.x + band.width - 8, midY]}
+                  points={[midX, band.y + 8, midX, band.y + band.height - 8]}
                   stroke="#8a5a4a"
                   strokeWidth={1}
                   dash={[10, 8]}
@@ -7973,7 +8016,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         const band = mpLayout.zones.battle;
         const toastCard = mismatchedBattleCards[0];
         // Band-edge-anchored: the band's bottom-right corner, clear of the
-        // header/banner (centered) and the totals chips (left gutter). The
+        // header/banner (centered) and the totals chips (top corners). The
         // 250-unit width is reserved in VIRTUAL space, so both corners go
         // through virtualToScreen and the CSS width is their difference
         // (the dragHoverZone pattern above) — a raw `width: 250` in screen
@@ -8039,10 +8082,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       })()}
 
       {/* ================================================================
-          Battle resolution buttons + confirm summary (spec §8, Task 13),
-          plus the awaiting-soul chooser dialog / waiting pill (Task 14).
-          Mounted here (not client.tsx) because it needs band geometry +
-          scale/offsets, which only live in this component.
+          Battle resolution buttons (spec §8, Task 13) — dispatch
+          IMMEDIATELY on click, no confirm dialog — plus the awaiting-soul
+          chooser dialog / waiting pill (Task 14). Mounted here (not
+          client.tsx) because it needs band geometry + scale/offsets, which
+          only live in this component.
           status==='playing' && battleActive gate mounting here; spectators
           now DO mount (they need the awaiting-soul waiting pill) but pass
           isSpectator=true so BattleResolutionUI never shows them buttons or
@@ -8065,7 +8109,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           format={normalizedFormat}
           myPlayerName={gameState.myPlayer?.displayName || 'Player 1'}
           opponentPlayerName={gameState.opponentPlayer?.displayName || 'Player 2'}
-          cards={battleCardEntries.map((e) => e.like)}
           eligibleSouls={stakesLostSoulRows}
           siteAttachedSoulIds={stakesSiteAttachedSoulIds}
           forgeResolver={forgeResolver}
