@@ -7884,52 +7884,60 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {!isSpectator && battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && mismatchedBattleCards.length > 0 && (() => {
         const band = mpLayout.zones.battle;
         const toastCard = mismatchedBattleCards[0];
-        // Band-edge-anchored: just inside the band's bottom-right corner —
-        // clear of the header/banner (centered) and the totals chips (left
-        // gutter). The 250-unit width is reserved in VIRTUAL space, so both
-        // corners go through virtualToScreen and the CSS width is their
-        // difference (the dragHoverZone pattern above) — a raw `width: 250`
-        // in screen px would exceed the reserved virtual span whenever
-        // scale < 1 (i.e. on essentially every viewport) and overflow past
-        // the band's right edge. Font sizes stay fixed CSS px, matching the
-        // file's other HTML overlays (dragHoverZone labels, GameToast) —
-        // they remain legible at small scales and the box just wraps taller.
+        // Band-edge-anchored: the band's bottom-right corner, clear of the
+        // header/banner (centered) and the totals chips (left gutter). The
+        // 250-unit width is reserved in VIRTUAL space, so both corners go
+        // through virtualToScreen and the CSS width is their difference
+        // (the dragHoverZone pattern above) — a raw `width: 250` in screen
+        // px would exceed the reserved virtual span whenever scale < 1.
+        //
+        // BOTTOM-anchored (translateY(-100%)) with the bottom edge pinned
+        // just inside the band: the box grows UPWARD into the band as its
+        // text wraps, never downward — the resolution buttons / awaiting-
+        // soul pill (BattleResolutionUI) sit just BELOW the band's bottom
+        // edge (band bottom + 6), so a top-anchored box that wrapped taller
+        // at small scales used to spill down and cover them. Fonts/padding
+        // additionally scale with the canvas scale (floored at 0.75 → 9px
+        // minimum font, the legibility floor) so the box shrinks roughly
+        // with the band instead of swallowing it at small scales.
         const toastVirtualWidth = 250;
-        const anchorY = band.y + band.height - 66;
-        const screenTopLeft = virtualToScreen(band.x + band.width - toastVirtualWidth - 8, anchorY, scale, offsetX, offsetY);
+        const anchorY = band.y + band.height - 6;
+        const screenBottomLeft = virtualToScreen(band.x + band.width - toastVirtualWidth - 8, anchorY, scale, offsetX, offsetY);
         const screenRight = virtualToScreen(band.x + band.width - 8, anchorY, scale, offsetX, offsetY);
+        const toastScale = Math.max(0.75, Math.min(1, scale));
         return (
           <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
             <div
               style={{
                 position: 'absolute',
-                left: screenTopLeft.x,
-                top: screenTopLeft.y,
-                width: screenRight.x - screenTopLeft.x,
+                left: screenBottomLeft.x,
+                top: screenBottomLeft.y,
+                transform: 'translateY(-100%)',
+                width: screenRight.x - screenBottomLeft.x,
                 pointerEvents: 'auto',
                 background: 'rgba(14, 10, 6, 0.95)',
                 border: '1px solid rgba(220, 38, 38, 0.5)',
                 borderRadius: 8,
-                padding: '10px 12px',
+                padding: `${10 * toastScale}px ${12 * toastScale}px`,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 8,
+                gap: 8 * toastScale,
                 boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
               }}
             >
-              <div style={{ fontSize: 12, color: '#e8bfbf', fontFamily: 'var(--font-cinzel), Georgia, serif', lineHeight: 1.4 }}>
+              <div style={{ fontSize: 12 * toastScale, color: '#e8bfbf', fontFamily: 'var(--font-cinzel), Georgia, serif', lineHeight: 1.4 }}>
                 No matching brigade in battle — REG says discard it
               </div>
               <button
                 onClick={() => moveCard(toastCard.row.id, 'discard')}
                 style={{
                   alignSelf: 'flex-start',
-                  padding: '6px 14px',
+                  padding: `${6 * toastScale}px ${14 * toastScale}px`,
                   background: '#5a2727',
                   border: '1px solid #8a4242',
                   borderRadius: 6,
                   color: '#e8bfbf',
-                  fontSize: 12,
+                  fontSize: 12 * toastScale,
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                   letterSpacing: '0.05em',
                   cursor: 'pointer',
