@@ -1,22 +1,27 @@
 'use client';
 
-// Battle Zone resolution buttons + confirm summary (design spec §8, Task 13),
-// plus the awaiting-soul chooser dialog / waiting pill (Task 14). HTML
-// overlay, positioned band-relative via the dual-corner virtualToScreen
-// pattern the brigade-mismatch toast established (MultiplayerCanvas.tsx
-// ~7517-7576) — the row is anchored just BELOW the band's bottom-right
-// corner (not inside it) specifically so it never collides with that toast,
-// which occupies the band's own bottom-right corner. Mounted from
+// Battle Zone resolution buttons (design spec §8, Task 13), plus the
+// awaiting-soul chooser dialog / waiting pill (Task 14). HTML overlay,
+// positioned band-relative via the dual-corner virtualToScreen pattern the
+// brigade-mismatch toast established (MultiplayerCanvas.tsx ~7517-7576) —
+// the row is anchored just BELOW the band's bottom-right corner (not
+// inside it) specifically so it never collides with that toast, which
+// occupies the band's own bottom-right corner. Mounted from
 // MultiplayerCanvas (not client.tsx) because it needs band geometry +
 // scale/offsets, which only exist there.
 //
 // battleState === 'active' and 'awaiting-soul' are mutually exclusive, so
 // the resolution-button row and the awaiting-soul pill/modal safely reuse
 // the same anchor geometry below.
+//
+// Every resolution action (Claim Victory / Battle Lost / End Battle)
+// dispatches its reducer IMMEDIATELY on click — no confirm dialog (product
+// direction: the confirm-summary step was cut). The post-battle summary is
+// now a transient toast fired by the caller (MultiplayerCanvas) once the
+// battle actually closes, not a pre-dispatch confirmation here.
 
 import { useEffect, useState } from 'react';
 import { virtualToScreen } from '@/app/shared/layout/virtualCanvas';
-import { summarizeAutoReturn, type BattleCardLike } from '../lib/battleMath';
 import type { ZoneRect } from '../layout/multiplayerLayout';
 import type { CardInstance } from '@/lib/spacetimedb/module_bindings/types';
 import type { DeckFormat } from '@/lib/deck-format';
@@ -49,8 +54,6 @@ interface BattleResolutionUIProps {
    *  so the text reads correctly for spectators too. */
   myPlayerName: string;
   opponentPlayerName: string;
-  /** Every card currently in the battle band (both owners) — feeds the confirm summary. */
-  cards: BattleCardLike[];
   /** Lost Souls at stake for the current battle (server's battleStakesLobLostSouls,
    *  mirrored client-side — see MultiplayerCanvas's stakesLostSoulRows). Only meaningful
    *  while battleState === 'awaiting-soul'. */
@@ -68,10 +71,10 @@ interface BattleResolutionUIProps {
   onSurrenderSoul: (cardInstanceId: bigint) => void;
 }
 
-const BUTTON_COPY: Record<ResolutionAction, { label: string; dialogTitle: string }> = {
-  'claim-victory': { label: '⚑ Claim Victory', dialogTitle: 'Claim Victory?' },
-  'battle-lost': { label: '🏳 Battle Lost', dialogTitle: 'Battle Lost?' },
-  'end-battle': { label: '↩ End Battle', dialogTitle: 'End Battle?' },
+const BUTTON_COPY: Record<ResolutionAction, { label: string }> = {
+  'claim-victory': { label: '⚑ Claim Victory' },
+  'battle-lost': { label: '🏳 Battle Lost' },
+  'end-battle': { label: '↩ End Battle' },
 };
 
 type Tone = 'gold' | 'red' | 'neutral';
@@ -111,26 +114,6 @@ function ResolutionButton({ label, tone, onClick }: { label: string; tone: Tone;
 }
 
 /**
- * "N characters → territory · N cards → return to where they came from ·
- * N enhancements → discard · N souls → Land of Bondage · N weapons stay
- * attached · kept in play: X, Y" — zero segments omitted, names
- * comma-joined. `summarizeAutoReturn` already excludes equipped
- * accessories from the enhancement/discard counts (weaponsAttached is its
- * own bucket), so weapons are never double-counted here.
- */
-function summaryText(cards: BattleCardLike[]): string {
-  const s = summarizeAutoReturn(cards);
-  const segments: string[] = [];
-  if (s.toTerritory > 0) segments.push(`${s.toTerritory} character${s.toTerritory === 1 ? '' : 's'} → territory`);
-  if (s.toOrigin > 0) segments.push(`${s.toOrigin} card${s.toOrigin === 1 ? '' : 's'} → return to where ${s.toOrigin === 1 ? 'it came' : 'they came'} from`);
-  if (s.toDiscard > 0) segments.push(`${s.toDiscard} enhancement${s.toDiscard === 1 ? '' : 's'} → discard`);
-  if (s.toLandOfBondage > 0) segments.push(`${s.toLandOfBondage} soul${s.toLandOfBondage === 1 ? '' : 's'} → Land of Bondage`);
-  if (s.weaponsAttached > 0) segments.push(`${s.weaponsAttached} weapon${s.weaponsAttached === 1 ? '' : 's'} stay attached`);
-  if (s.keptInPlay.length > 0) segments.push(`kept in play: ${s.keptInPlay.join(', ')}`);
-  return segments.length > 0 ? segments.join(' · ') : 'Nothing in the band to auto-return.';
-}
-
-/**
  * Task 14: awaiting-soul UI. Chooser (spec §7: T1 defender / T2 & Paragon
  * attacker — mirrors the server's surrender_soul permission check exactly)
  * sees a compact centered picker of the souls at stake; everyone else
@@ -156,7 +139,6 @@ function AwaitingSoulUI({
   setPendingSoulId,
   onSurrenderSoul,
   onEndBattle,
-  onRequestEndBattle,
 }: {
   topLeft: { x: number; y: number };
   right: { x: number; y: number };
@@ -173,13 +155,9 @@ function AwaitingSoulUI({
   pendingSoulId: bigint | null;
   setPendingSoulId: (id: bigint | null) => void;
   onSurrenderSoul: (cardInstanceId: bigint) => void;
+  /** Bare dispatch (no confirm) — used by both the chooser's own "no souls
+   *  left" button above and the non-chooser's escape-hatch button below. */
   onEndBattle: () => void;
-  /** Opens the shared confirm-summary dialog for End Battle (spec §7 escape
-   *  hatch) — used by the non-chooser player's pill-side button below.
-   *  Distinct from `onEndBattle` (a bare dispatch, used only by the
-   *  chooser's own "no souls left" button above) so this path always goes
-   *  through the confirm dialog first. */
-  onRequestEndBattle: () => void;
 }) {
   // Chooser derivation (spec §7 / server surrender_soul guard): T1 → the
   // defender picks which of their own souls to give up; T2 & Paragon → the
@@ -234,7 +212,7 @@ function AwaitingSoulUI({
             <ResolutionButton
               label={BUTTON_COPY['end-battle'].label}
               tone="neutral"
-              onClick={onRequestEndBattle}
+              onClick={onEndBattle}
             />
           )}
         </div>
@@ -428,7 +406,6 @@ export default function BattleResolutionUI({
   format,
   myPlayerName,
   opponentPlayerName,
-  cards,
   eligibleSouls,
   siteAttachedSoulIds,
   forgeResolver,
@@ -436,7 +413,6 @@ export default function BattleResolutionUI({
   onEndBattle,
   onSurrenderSoul,
 }: BattleResolutionUIProps) {
-  const [confirmAction, setConfirmAction] = useState<ResolutionAction | null>(null);
   // Guards against a double-fire from a fast repeat click while the pick is
   // in flight (self-review requirement, Task 14). Resets whenever the
   // eligible-souls set changes shape (e.g. the defender reloads decks away
@@ -457,146 +433,26 @@ export default function BattleResolutionUI({
   const topLeft = virtualToScreen(band.x + band.width - rowVirtualWidth - 8, band.y + band.height + 6, scale, offsetX, offsetY);
   const right = virtualToScreen(band.x + band.width - 8, band.y + band.height + 6, scale, offsetX, offsetY);
 
-  // Shared End Battle confirm dispatch + dialog — used by BOTH the
-  // active-state button row and the awaiting-soul non-chooser escape hatch
-  // (spec §7), so every End Battle click funnels through the same
-  // confirm-summary dialog rather than a bare dispatch.
-  const dispatch = (action: ResolutionAction) => {
-    setConfirmAction(null);
-    if (action === 'end-battle') onEndBattle();
-    else onResolveBattle();
-  };
-
-  const confirmDialog = confirmAction && (
-    <div
-      onClick={() => setConfirmAction(null)}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 900,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(6, 4, 2, 0.7)',
-        backdropFilter: 'blur(3px)',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'rgba(14, 10, 6, 0.97)',
-          border: '1px solid rgba(107, 78, 39, 0.3)',
-          borderRadius: 10,
-          padding: '28px 32px',
-          textAlign: 'center',
-          maxWidth: 380,
-          width: '100%',
-          boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-        }}
-      >
-        <p
-          style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 11,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: 'rgba(196, 149, 90, 0.5)',
-          }}
-        >
-          Battle Resolution
-        </p>
-        <h2
-          style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 20,
-            fontWeight: 700,
-            color: '#e8d5a3',
-            marginTop: 8,
-            textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-          }}
-        >
-          {BUTTON_COPY[confirmAction].dialogTitle}
-        </h2>
-        <p
-          style={{
-            marginTop: 12,
-            fontFamily: 'Georgia, serif',
-            fontSize: 13,
-            lineHeight: 1.5,
-            color: 'rgba(196, 149, 90, 0.75)',
-          }}
-        >
-          {summaryText(cards)}
-        </p>
-
-        <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
-          <button
-            onClick={() => setConfirmAction(null)}
-            style={{
-              flex: 1,
-              padding: '10px 16px',
-              borderRadius: 4,
-              border: '1px solid rgba(107, 78, 39, 0.3)',
-              background: 'transparent',
-              color: 'rgba(196, 149, 90, 0.6)',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => dispatch(confirmAction)}
-            style={{
-              flex: 1,
-              padding: '10px 16px',
-              borderRadius: 4,
-              border: `1px solid ${TONE_STYLE[confirmAction === 'battle-lost' ? 'red' : confirmAction === 'end-battle' ? 'neutral' : 'gold'].border}`,
-              background: TONE_STYLE[confirmAction === 'battle-lost' ? 'red' : confirmAction === 'end-battle' ? 'neutral' : 'gold'].bg,
-              color: TONE_STYLE[confirmAction === 'battle-lost' ? 'red' : confirmAction === 'end-battle' ? 'neutral' : 'gold'].color,
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-            }}
-          >
-            Confirm
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
   if (battleState === 'awaiting-soul') {
     return (
-      <>
-        <AwaitingSoulUI
-          topLeft={topLeft}
-          right={right}
-          mySeat={mySeat}
-          opponentSeat={opponentSeat}
-          attackerSeat={attackerSeat}
-          isSpectator={isSpectator}
-          format={format}
-          myPlayerName={myPlayerName}
-          opponentPlayerName={opponentPlayerName}
-          eligibleSouls={eligibleSouls}
-          siteAttachedSoulIds={siteAttachedSoulIds}
-          forgeResolver={forgeResolver}
-          pendingSoulId={pendingSoulId}
-          setPendingSoulId={setPendingSoulId}
-          onSurrenderSoul={onSurrenderSoul}
-          onEndBattle={onEndBattle}
-          onRequestEndBattle={() => setConfirmAction('end-battle')}
-        />
-        {confirmDialog}
-      </>
+      <AwaitingSoulUI
+        topLeft={topLeft}
+        right={right}
+        mySeat={mySeat}
+        opponentSeat={opponentSeat}
+        attackerSeat={attackerSeat}
+        isSpectator={isSpectator}
+        format={format}
+        myPlayerName={myPlayerName}
+        opponentPlayerName={opponentPlayerName}
+        eligibleSouls={eligibleSouls}
+        siteAttachedSoulIds={siteAttachedSoulIds}
+        forgeResolver={forgeResolver}
+        pendingSoulId={pendingSoulId}
+        setPendingSoulId={setPendingSoulId}
+        onSurrenderSoul={onSurrenderSoul}
+        onEndBattle={onEndBattle}
+      />
     );
   }
 
@@ -606,31 +462,27 @@ export default function BattleResolutionUI({
   const isDefender = mySeat !== '' && attackerSeat !== '' && mySeat !== attackerSeat;
 
   return (
-    <>
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
-        <div
-          style={{
-            position: 'absolute',
-            left: topLeft.x,
-            top: topLeft.y,
-            width: right.x - topLeft.x,
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 8,
-            pointerEvents: 'auto',
-          }}
-        >
-          {isAttacker && (
-            <ResolutionButton label={BUTTON_COPY['claim-victory'].label} tone="gold" onClick={() => setConfirmAction('claim-victory')} />
-          )}
-          {isDefender && (
-            <ResolutionButton label={BUTTON_COPY['battle-lost'].label} tone="red" onClick={() => setConfirmAction('battle-lost')} />
-          )}
-          <ResolutionButton label={BUTTON_COPY['end-battle'].label} tone="neutral" onClick={() => setConfirmAction('end-battle')} />
-        </div>
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
+      <div
+        style={{
+          position: 'absolute',
+          left: topLeft.x,
+          top: topLeft.y,
+          width: right.x - topLeft.x,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 8,
+          pointerEvents: 'auto',
+        }}
+      >
+        {isAttacker && (
+          <ResolutionButton label={BUTTON_COPY['claim-victory'].label} tone="gold" onClick={onResolveBattle} />
+        )}
+        {isDefender && (
+          <ResolutionButton label={BUTTON_COPY['battle-lost'].label} tone="red" onClick={onResolveBattle} />
+        )}
+        <ResolutionButton label={BUTTON_COPY['end-battle'].label} tone="neutral" onClick={onEndBattle} />
       </div>
-
-      {confirmDialog}
-    </>
+    </div>
   );
 }
