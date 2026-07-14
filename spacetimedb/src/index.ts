@@ -2627,11 +2627,10 @@ export const resolve_battle = spacetimedb.reducer(
 // Chooser permission by format (spec §7): T1 the defender picks which of
 // their own souls to give up; T2/Paragon the attacker picks which soul to
 // take. Transfers via the existing moveLostSoulToLor primitive, always
-// targeting the attacker's Land of Redemption regardless of caller. T1 and
-// Paragon auto-return in the same reducer (never rely on a second client
-// call — a disconnect between calls would strand the state); T2 leaves
-// battleState 'awaiting-soul' for the "Surrender another / Done" flow, where
-// Done calls end_battle.
+// targeting the attacker's Land of Redemption regardless of caller. Every
+// format awards exactly one soul per battle, so the band always auto-returns
+// and closes in this same reducer (never rely on a second client call — a
+// disconnect between calls would strand the state).
 // ---------------------------------------------------------------------------
 export const surrender_soul = spacetimedb.reducer(
   {
@@ -2684,12 +2683,9 @@ export const surrender_soul = spacetimedb.reducer(
       game.turnNumber, game.currentPhase,
     );
 
-    // T1 / Paragon: the band closes in this same reducer. T2: battleState
-    // stays 'awaiting-soul' — the soul dialog's Done button calls
-    // end_battle, whose awaiting-soul path performs auto-return + clear.
-    if (format === 'T1' || format === 'Paragon') {
-      runBattleAutoReturn(ctx, gameId, player.id);
-    }
+    // Every format awards exactly one soul: the band closes in this same
+    // reducer.
+    runBattleAutoReturn(ctx, gameId, player.id);
   },
 );
 

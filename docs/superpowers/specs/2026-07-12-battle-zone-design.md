@@ -241,14 +241,9 @@ No `battleSide` column (derived — §3).
   **`moveLostSoulToLor(ctx, gameId, card, targetOwnerId, game)`** primitive targeted at
   **the attacker's LoR** regardless of caller (it already handles ownership transfer,
   site unlink, LoB compaction, Paragon shared-soul `ownerId 0n`, and `refillSoulDeck`).
-  - **T1 / Paragon:** then auto-return + `battleState=''` **in the same reducer** —
-    never rely on a second client call (a disconnect between calls strands the state).
-  - **T2:** does NOT auto-return — state stays `'awaiting-soul'` and the dialog offers
-    "Surrender another / Done" (multi-hero T2 rescues can award multiple souls; the app
-    doesn't enforce a count — players decide). Done calls `end_battle`, whose
-    awaiting-soul path performs auto-return + clear; that same hatch is the disconnect
-    backstop. **Open question for product owner: confirm REG v11 T2 soul count per
-    multi-hero rescue** — if it is strictly one, collapse T2 into the T1 path.
+  Every format (T1, T2, Paragon) awards exactly one soul per battle, so the reducer then
+  auto-returns + clears `battleState=''` **unconditionally, in the same reducer** — never
+  rely on a second client call (a disconnect between calls strands the state).
 - `end_battle(gameId)`: either player, callable from **both `'active'` and
   `'awaiting-soul'`** — the unconditional escape hatch (defender can `reload_deck` away
   every surrenderable soul, or the picker can disconnect).
@@ -292,8 +287,9 @@ existing unfiltered Game `useTable`.
   aren't picked by accident; "cannot be rescued"-type souls remain table-talk — the
   dialog lists all souls and players self-police. If the LoB empties mid-pick (Dominant
   snipe), the dialog shows an explicit empty state with an inline End Battle button.
-  Pick → soul glides to the attacker's LoR; T1/Paragon auto-return and close; T2 keeps
-  the dialog open ("Surrender another / Done") for multi-hero rescues.
+  Pick → soul glides to the attacker's LoR; the band auto-returns and closes immediately
+  — every format (T1, T2, Paragon) awards exactly one soul per battle, so there is no
+  "surrender another" loop.
 - **End Battle** → no soul dialog, auto-return, band closes (stalemate, declined battle
   challenge, repelled attack, or escape hatch). **Never for unopposed rescues.**
 - **All three buttons first show a confirm summarizing what auto-return will do**,

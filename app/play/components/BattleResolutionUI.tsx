@@ -43,8 +43,7 @@ interface BattleResolutionUIProps {
    *  awaiting-soul picker — only the waiting pill. */
   isSpectator: boolean;
   /** Deck format (normalizeDeckFormat mirror) — drives the awaiting-soul chooser rule
-   *  (spec §7 / server surrender_soul: T1 defender picks, T2 & Paragon attacker picks)
-   *  and whether a "Done" affordance stays up after a pick (T2 only). */
+   *  (spec §7 / server surrender_soul: T1 defender picks, T2 & Paragon attacker picks). */
   format: DeckFormat;
   /** Display names for the pill/modal copy — real player names, not "You"/"Opponent",
    *  so the text reads correctly for spectators too. */
@@ -409,29 +408,6 @@ function AwaitingSoulUI({
                 );
               })}
             </div>
-
-            {format === 'T2' && (
-              <button
-                onClick={onEndBattle}
-                style={{
-                  marginTop: 16,
-                  alignSelf: 'center',
-                  padding: '8px 20px',
-                  borderRadius: 4,
-                  border: '1px solid rgba(107, 78, 39, 0.4)',
-                  background: 'rgba(107, 78, 39, 0.15)',
-                  color: 'rgba(196, 149, 90, 0.9)',
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                }}
-              >
-                Done
-              </button>
-            )}
           </>
         )}
       </div>
@@ -463,9 +439,9 @@ export default function BattleResolutionUI({
   const [confirmAction, setConfirmAction] = useState<ResolutionAction | null>(null);
   // Guards against a double-fire from a fast repeat click while the pick is
   // in flight (self-review requirement, Task 14). Resets whenever the
-  // eligible-souls set changes shape (a successful surrender drops the
-  // picked card from it) or the battle state moves on — covers both the T2
-  // "pick another" loop and a fresh awaiting-soul reopening after reconnect.
+  // eligible-souls set changes shape (e.g. the defender reloads decks away
+  // the last surrenderable soul mid-pick) or the battle state moves on — a
+  // fresh awaiting-soul reopening after reconnect.
   const [pendingSoulId, setPendingSoulId] = useState<bigint | null>(null);
   useEffect(() => {
     setPendingSoulId(null);
