@@ -4,6 +4,7 @@ import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, set
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
+import { isLeavingPlayField } from './playField';
 import {
   getAbilitiesForCard,
   getEffectiveAbilities,
@@ -262,7 +263,14 @@ function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): {
   return {
     notes: leaving ? '' : card.notes,
     outlineColor: leaving ? '' : card.outlineColor,
-    isMeek: leaving ? false : card.isMeek,
+    // isMeek is a lasting hero characteristic (the card's meek-side stats), not
+    // battle-scoped state: a meek hero must stay meek across on-field
+    // relocations — above all the battle round trip (territory -> battle ->
+    // territory). Unlike notes/outline it clears only when the card genuinely
+    // leaves the play field (an off-field destination), so gate it on
+    // isLeavingPlayField rather than `leaving` (which fires on any move off an
+    // on-field zone, including battle <-> territory).
+    isMeek: isLeavingPlayField(fromZone, toZone) ? false : card.isMeek,
     imitatingName: wasImitating ? '' : card.imitatingName,
     cardImgFile: canonicalImg,
     ...battleClears,
