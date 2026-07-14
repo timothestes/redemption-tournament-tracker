@@ -15,8 +15,9 @@ having no mechanized abilities).
 
 ### Goals
 1. Live strength/toughness totals per side, with side membership determined by card
-   *placement* (top half vs bottom half), which transparently handles neutral cards,
-   attacker-chosen blockers, and defender-drafted attackers.
+   *placement* (own right half vs. the opponent's left half — every player plays into
+   their own right, mirrored consistently on both screens), which transparently handles
+   neutral cards, attacker-chosen blockers, and defender-drafted attackers.
 2. Soft brigade-match warning when an enhancement has no matching-brigade character on
    its side (red pulse + toast with one-tap Discard). Never a hard block.
 3. Auto-return after battle: survivors to their pre-battle territory spots, spent
@@ -84,32 +85,48 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   per-side zones, no stored side column.
 - **Mirroring by card owner**, exactly like territories: positions stored owner-local
   (0–1), opponent-owned cards flipped at render (`toScreenPos(..., 'opponent')`, rot 180,
-  bottom-right anchor). This automatically renders each player's cards on their own half
-  on *both* screens with zero new transform code.
+  bottom-right anchor). This automatically renders each player's cards on their own
+  **right** half on *both* screens with zero new transform code — "whoever is attacking
+  is on the right of the person attacking; if I'm defending, I block to the right" (every
+  player plays into their own right half; mirroring renders my cards on my right, theirs
+  on my left, consistently on both screens).
 - **Side is derived, never stored,** from the card's owner-local **center**:
-  `centerY = dbY + cardRelH / 2` (storage is top-left-anchored in the owner frame;
-  rot-180 is render-only); side = `centerY >= 0.5 ? ownerSeat : opponentSeat`. The
-  anchor alone cannot work: write-time clamping caps an own-card anchor at
-  `1 − cardRelH ≈ 0.33` in a 0.19-height band, so an anchor-based `>= 0.5` test would
-  classify every card as opponent-side. `battleSideOf(card, cardRelH)` lives in
-  `app/play/lib/battleMath.ts` (takes band + card heights) and is the single helper
-  used by totals, initiative, and brigade checks. A card dragged past the centerline
-  fights for the other side. Rationale for never storing: intra-zone drags go through
-  `update_card_position`, which would never refresh a stored column.
-- **Half membership is center-point-based** (a mainCard is taller than a half-band;
-  containment clamping degenerates). Cards clamp to the *full band* rect only.
+  `centerX = dbX + cardRelW / 2` (storage is top-left-anchored in the owner frame;
+  rot-180 is render-only); side = `centerX >= 0.5 ? ownerSeat : opponentSeat`. The
+  anchor alone is not equivalent: write-time clamping caps an own-card anchor at
+  `1 − cardRelW`. In the left/right split this clamp is mild — `cardRelW ≈ 0.07` for a
+  mainCard in a full-width band, so the clamped anchor (≈0.93) sits nowhere near the 0.5
+  boundary — but `battleSideOf` still classifies from the center, never the anchor, so
+  the math stays correct regardless of band/card ratio (the old top/bottom split's
+  `cardRelH ≈ 0.67` made the anchor-vs-center distinction load-bearing; left/right just
+  makes it a smaller margin, not a different rule). `battleSideOf(card)` lives in
+  `app/play/lib/battleMath.ts` and is the single helper used by totals, initiative, and
+  brigade checks. A card dragged past the centerline fights for the other side.
+  Rationale for never storing: intra-zone drags go through `update_card_position`, which
+  would never refresh a stored column.
+- **Half membership is center-point-based** (a mainCard can be wider than a half-band at
+  small scales; containment clamping degenerates). Cards clamp to the *full band* rect
+  only.
 
 ## 4. Interaction
 
-- **Hit-testing:** insert the band rect (and, when idle, a ~3%-tall "divider proxy" strip)
-  at the **front** of `findZoneAtPosition`'s check order, before territory rects. Half
-  detection compares drop-center Y to the centerline.
+- **Hit-testing:** insert the band rect at the **front** of `findZoneAtPosition`'s check
+  order, before territory rects — reachable only while the band is visible (phase-driven,
+  see "Starting a battle" below); there is no idle divider-proxy strip. Half detection
+  compares drop-center X to the centerline.
 - **Ownership never transfers on battle drops:** battle drops send `targetOwnerId: ''`.
   (Modeling halves as owner-scoped zones would hand your hero to the opponent — F2.)
-- **Starting a battle:** dragging a card onto the divider proxy (or the toolbar's ⚔
-  button) calls one **atomic** `enter_battle` reducer (open-if-closed + move + stamp);
-  a client-side `startBattle(); moveCard();` pair races the opponent.
-  `battleAttackerSeat` = the seat whose turn it is, not who dragged first.
+- **Starting a battle:** phase-driven, not drag-driven. The turn player calling
+  `set_phase(gameId, 'battle')` opens the band when `battleState===''`: sets
+  `battleState='active'`, `battleAttackerSeat` = the seat whose turn it is (not who
+  drags first), and clears `lastBattlePlayBySeat` — the same open step `enter_battle`
+  used to perform on the first drop. Leaving the battle phase (`set_phase` to any other
+  phase) or ending the turn auto-returns and closes the band, mirroring the existing
+  end_turn hook. The divider-proxy drag-to-open path is REMOVED — the phase bar
+  (`TurnIndicator`) is the only opener. `enter_battle` is retained for two narrower
+  cases where the band is already visible but `battleState===''`: starting a second
+  battle in the same phase after an End Battle close, and modal drops (`useModalCardDrag`)
+  that target the band directly.
 - **Mid-drag safety (the old attempt's killer):**
   - Battle open/close layout flips are **deferred while `isDraggingRef.current`** and
     flushed at dragend (zone rects are recomputed at drop already; the problems are the
@@ -134,17 +151,20 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   Opponent-owned glide targets must bake the `+(cardW, cardH)` rot-180 anchor (PR #176
   lesson). The band background rect alone gets a one-off `Konva.Tween` for the
   "seam opens" visual.
-- **Band chrome (Konva):** centerline rule; per-half totals chips (`⚔ STR/TGH`) anchored
-  in the band's left/right **gutters** — at 1366px the mainCard is 80%+ of band height
-  and cards straddle the centerline, so chips, banner, and buttons all get a backdrop
-  and render **above** card nodes. A header line shows context a reconnecting player or
-  spectator can't get from card positions: "⚔ <attacker name> attacking — Rescue
-  attempt | Battle challenge" (derived from `battleAttackerSeat` + stakes-LoB count).
-  Banner states key on which side is empty **relative to the attacker**: defender side
-  empty → "Waiting for a blocker…" (attacker's view adds "No block? Claim Victory to
-  rescue." while souls are at stake); attacker side empty → "No attacker in battle —
-  End Battle?"; both populated → "⚔ INITIATIVE: <name> — losing / stalemate / mutual
-  destruction".
+- **Band chrome (Konva):** a **vertical** dashed centerline at the band's midX (own
+  right half vs. opponent's left, per §3). Per-half totals chips (`⚔ STR/TGH`) anchor in
+  the band's **top corners** — my chip top-right (my own right half), the opponent's
+  chip top-left — just below the header line. The header line stays **top-center**,
+  spanning the band: "⚔ <attacker name> attacking — Rescue attempt | Battle challenge"
+  (derived from `battleAttackerSeat` + stakes-LoB count). The initiative banner stays
+  **centered on the vertical centerline** (horizontally at midX, vertically centered in
+  the band) — text stays horizontal, nothing rotates. At 1366px the mainCard is 80%+ of
+  band height and cards can straddle the centerline, so chips, banner, and buttons all
+  get a backdrop and render **above** card nodes. Banner states key on which side is
+  empty **relative to the attacker**: defender side empty → "Waiting for a blocker…"
+  (attacker's view adds "No block? Claim Victory to rescue." while souls are at stake);
+  attacker side empty → "No attacker in battle — End Battle?"; both populated →
+  "⚔ INITIATIVE: <name> — losing / stalemate / mutual destruction".
 - **Band buttons (HTML overlay via `virtualToScreen`,** zIndex between drag overlay 450
   and toasts 900): `⚑ Claim Victory` (attacker only), `🏳 Battle Lost` (defender only),
   `↩ End Battle` (both).
@@ -292,17 +312,25 @@ existing unfiltered Game `useTable`.
   "surrender another" loop.
 - **End Battle** → no soul dialog, auto-return, band closes (stalemate, declined battle
   challenge, repelled attack, or escape hatch). **Never for unopposed rescues.**
-- **All three buttons first show a confirm summarizing what auto-return will do**,
-  computed from live rows: "3 characters → territory · 4 enhancements → discard ·
-  1 weapon stays attached". Cancel returns to the band so players can drag the defeated
-  to discard first, then re-press. This is also the mutual-destruction guard — without
-  it, resolving first resurrects every corpse into territory as a "survivor".
-- Defeated characters are dragged to discard manually *before* resolving — the routine
-  only routes what's still in the band. Dialog/confirm visibility is a pure function of
-  `battleState` + format + seat (reconnect-safe). Spectators see a status line
-  ("Waiting for <name> to choose a soul…"), never the modal. **End Turn during
-  `awaiting-soul` gets a client confirm** ("A soul surrender is pending — end turn
-  anyway?"); the server end_turn hook remains the ultimate fallback.
+- **All three buttons (Claim Victory / Battle Lost / End Battle) dispatch their reducer
+  immediately on click — no confirm dialog.** Once the battle actually closes (auto-return
+  has run server-side), each client independently fires a transient (~5s) non-interactive
+  toast summarizing what happened — "Battle ended — 3 characters returned ·
+  2 enhancements discarded · 1 kept in play" — via the existing game-toast mechanism.
+  Built client-side from `summarizeAutoReturn` over a ref snapshot of the rows each
+  client saw in the band immediately before `battleState` flipped to `''` (no server
+  round-trip needed; `battleCardEntries` is already empty by the render where the flip
+  itself lands).
+- Defeated characters must still be dragged to discard manually *before* resolving — the
+  routine only routes what's still in the band, and with no confirm step there is no
+  "cancel and go back" safety net anymore: resolving first resurrects every "defeated"
+  character back into territory as a survivor (also the mutual-destruction guard).
+  Soul-surrender dialog/pill visibility is a pure function of `battleState` + format +
+  seat (reconnect-safe). Spectators see a status line ("Waiting for <name> to choose a
+  soul…"), never the modal; the non-chooser gets an End Battle escape button, also
+  confirm-free. **End Turn during `awaiting-soul` gets a client confirm** ("A soul
+  surrender is pending — end turn anyway?") — this one guards a different mistake and
+  stays; the server end_turn hook remains the ultimate fallback.
 
 ## 9. Edge-case matrix
 
@@ -327,8 +355,8 @@ existing unfiltered Game `useTable`.
 ## 10. Testing
 
 - **Unit (vitest):** `battleMath` (all four initiative-table rows incl. the `<=`/`<`
-  boundaries; center-based side derivation `dbY + cardRelH/2` incl. opponent mirroring
-  AND the anchor-clamp regression — anchors max out at `1 − cardRelH`, so an
+  boundaries; center-based side derivation `dbX + cardRelW/2` incl. opponent mirroring
+  AND the anchor-clamp regression — anchors max out at `1 − cardRelW`, so an
   anchor-based test must fail; neutral placement; face-down exclusion + banner-unknown
   degradation; unparseable stats); layout invariants (sums = 1.0, midline pinned
   **against the same-viewerKind idle layout** — the spectator idle center is 0.485, not
