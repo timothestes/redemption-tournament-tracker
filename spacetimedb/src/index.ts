@@ -3140,6 +3140,12 @@ export const move_card = spacetimedb.reducer(
       // unlinked and stranded behind in its old zone. Mirrors writeBattleEntryMove's
       // identical cascade for the enter_battle path.
       const sendAccessoriesToBattle = toZone === 'battle';
+      // Host retreating from Battle back to Territory — the attached
+      // accessory follows it out with the attachment intact, mirroring the
+      // entry cascade above. Without this the weapon fell into the generic
+      // unlink-in-place else-branch below, stranding it (unattached) in the
+      // closed band, where it would get discarded at the next End Battle.
+      const sendAccessoriesOutOfBattle = fromZone === 'battle' && toZone === 'territory';
       const attachedAccessories = gameCards.filter(
         (c: any) => c.equippedToInstanceId === cardInstanceId
       );
@@ -3184,6 +3190,24 @@ export const move_card = spacetimedb.reducer(
             revealStartedAt: undefined,
             ...leavePlayFieldOverrides(accessory, accessory.zone, 'battle'),
             ...accessoryBattleUpdates,
+          });
+        } else if (sendAccessoriesOutOfBattle) {
+          let terrMaxIdx = -1n;
+          for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+            if (c.ownerId === accessory.ownerId && c.zone === 'territory' && c.zoneIndex > terrMaxIdx) {
+              terrMaxIdx = c.zoneIndex;
+            }
+          }
+          clearCountersIfLeavingPlay(ctx, accessory.id, accessory.zone, 'territory');
+          ctx.db.CardInstance.id.update({
+            ...accessory,
+            zone: 'territory',
+            zoneIndex: terrMaxIdx + 1n,
+            posX,
+            posY,
+            revealExpiresAt: undefined,
+            revealStartedAt: undefined,
+            ...leavePlayFieldOverrides(accessory, accessory.zone, 'territory'),
           });
         } else {
           ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });

@@ -3404,15 +3404,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       // Multi-card drag: rasterize followers into a single ghost image.
       // Follower set: multi-select takes precedence; otherwise, for a warrior
-      // being dragged within my own territory, attached weapons come along.
+      // being dragged within my own territory or battle band, attached
+      // weapons come along.
       const isMultiSelectDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       // A host being dragged carries its attached accessories along.
-      // Only applies to territory warriors (with weapons). LOB souls do NOT
-      // drag their attached sites — when a soul is rescued or otherwise
-      // leaves LoB, the site stays put in LoB (the server's accessory
-      // cascade unlinks it in place).
+      // Applies to territory AND battle warriors (with weapons) — a warrior
+      // dragged out of the band, or repositioned within it, keeps its weapon
+      // attached. LOB souls do NOT drag their attached sites — when a soul is
+      // rescued or otherwise leaves LoB, the site stays put in LoB (the
+      // server's accessory cascade unlinks it in place); 'land-of-bondage' is
+      // a separate zone from 'battle'/'territory' so this doesn't affect it.
       const equipFollowerIds: string[] =
-        !isMultiSelectDrag && card.zone === 'territory' && card.ownerId === 'player1'
+        !isMultiSelectDrag && (card.zone === 'territory' || card.zone === 'battle') && card.ownerId === 'player1'
           ? (myCards[card.zone] ?? [])
               .filter((c) => c.equippedToInstanceId === BigInt(card.instanceId))
               .map((c) => String(c.id))
