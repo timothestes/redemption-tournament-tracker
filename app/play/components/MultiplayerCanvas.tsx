@@ -5276,7 +5276,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (!battleActive || gameStatus !== 'playing' || !mpLayout?.zones.battle) return null;
     const band = mpLayout.zones.battle;
     const midX = band.x + band.width / 2;
-    const midY = band.y + band.height / 2;
 
     const mySeatStr = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
     const oppSeatStr = gameState.opponentPlayer ? String(gameState.opponentPlayer.seat) : '';
@@ -5384,22 +5383,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           />
         </Group>
 
-        {/* Initiative banner — centered on the vertical centerline (midX);
-            text stays horizontal, nothing rotates. */}
+        {/* Initiative banner — a compact single-line strip on the band's TOP
+            edge, directly beneath the header (second row, centered between
+            the totals chips). Previously centered on the band (midX/midY),
+            which sat on top of the cards and was distracting; moved per
+            product direction. bannerSub (attacker-only "no block" hint)
+            folds into the same line via " · " to keep it one row. Width is
+            capped well inside the chip-to-chip gap (verified by measurement
+            at 1366x768 and 1920x1080 — see PR #197) so it never collides
+            with the corner chips. */}
         {(() => {
-          const bannerWidth = Math.min(band.width - 24, 360 * fsGrowth(12));
-          const bannerHeight = bannerSub ? 40 : 22;
-          const bx = midX - bannerWidth / 2;
-          const by = midY - bannerHeight / 2;
+          const stripY = band.y + 18;
+          const stripHeight = 16;
+          const stripText = bannerSub ? `${bannerMain} · ${bannerSub}` : bannerMain;
+          const stripWidth = Math.min(band.width - 2 * (chipWidth + 12), 480 * fsGrowth(10));
+          const sx = midX - stripWidth / 2;
           return (
-            <Group x={bx} y={by}>
-              <Rect width={bannerWidth} height={bannerHeight} fill="rgba(10,5,5,0.85)" stroke="#8a5a4a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
+            <Group x={sx} y={stripY}>
+              <Rect width={stripWidth} height={stripHeight} fill="rgba(10,5,5,0.85)" stroke="#8a5a4a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
               <Text
                 x={4}
-                y={4}
-                width={bannerWidth - 8}
-                text={bannerMain}
-                fontSize={fs(12)}
+                y={2}
+                width={stripWidth - 8}
+                text={stripText}
+                fontSize={fs(10)}
                 fontStyle="bold"
                 fontFamily="Cinzel, Georgia, serif"
                 fill="#f0d9a8"
@@ -5408,20 +5415,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 wrap="none"
                 perfectDrawEnabled={false}
               />
-              {bannerSub && (
-                <Text
-                  x={4}
-                  y={22}
-                  width={bannerWidth - 8}
-                  text={bannerSub}
-                  fontSize={fs(10)}
-                  fill="#c9b896"
-                  align="center"
-                  ellipsis
-                  wrap="none"
-                  perfectDrawEnabled={false}
-                />
-              )}
             </Group>
           );
         })()}

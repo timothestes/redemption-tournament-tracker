@@ -156,9 +156,11 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   the band's **top corners** — my chip top-right (my own right half), the opponent's
   chip top-left — just below the header line. The header line stays **top-center**,
   spanning the band: "⚔ <attacker name> attacking — Rescue attempt | Battle challenge"
-  (derived from `battleAttackerSeat` + stakes-LoB count). The initiative banner stays
-  **centered on the vertical centerline** (horizontally at midX, vertically centered in
-  the band) — text stays horizontal, nothing rotates. At 1366px the mainCard is 80%+ of
+  (derived from `battleAttackerSeat` + stakes-LoB count). The initiative banner renders
+  as a **compact single-line strip on the band's top edge**, directly beneath the header
+  (second row, centered between the totals chips) — moved off the centerline (PR #197)
+  since it originally sat on top of the cards; text stays horizontal, nothing rotates. At
+  1366px the mainCard is 80%+ of
   band height and cards can straddle the centerline, so chips, banner, and buttons all
   get a backdrop and render **above** card nodes. Banner states key on which side is
   empty **relative to the attacker**: defender side empty → "Waiting for a blocker…"
