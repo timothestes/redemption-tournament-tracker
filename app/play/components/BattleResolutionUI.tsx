@@ -155,6 +155,7 @@ function AwaitingSoulUI({
   setPendingSoulId,
   onSurrenderSoul,
   onEndBattle,
+  onRequestEndBattle,
 }: {
   topLeft: { x: number; y: number };
   right: { x: number; y: number };
@@ -172,6 +173,12 @@ function AwaitingSoulUI({
   setPendingSoulId: (id: bigint | null) => void;
   onSurrenderSoul: (cardInstanceId: bigint) => void;
   onEndBattle: () => void;
+  /** Opens the shared confirm-summary dialog for End Battle (spec §7 escape
+   *  hatch) — used by the non-chooser player's pill-side button below.
+   *  Distinct from `onEndBattle` (a bare dispatch, used only by the
+   *  chooser's own "no souls left" button above) so this path always goes
+   *  through the confirm dialog first. */
+  onRequestEndBattle: () => void;
 }) {
   // Chooser derivation (spec §7 / server surrender_soul guard): T1 → the
   // defender picks which of their own souls to give up; T2 & Paragon → the
@@ -185,6 +192,11 @@ function AwaitingSoulUI({
   const chooserName = chooserSeat === mySeat ? myPlayerName : chooserSeat === opponentSeat ? opponentPlayerName : 'Player';
 
   if (!isChooser) {
+    // Spec §7 escape hatch: the server's end_battle reducer deliberately
+    // accepts either player from 'awaiting-soul', but only the chooser had
+    // a way to reach it — a stalling-but-connected chooser otherwise
+    // stranded the non-chooser with nothing to click. Spectators (also
+    // caught by !isChooser) still get the pill only, no button.
     return (
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
         <div
@@ -194,7 +206,10 @@ function AwaitingSoulUI({
             top: topLeft.y,
             width: right.x - topLeft.x,
             display: 'flex',
+            alignItems: 'center',
             justifyContent: 'flex-end',
+            gap: 8,
+            pointerEvents: 'auto',
           }}
         >
           <span
@@ -214,6 +229,13 @@ function AwaitingSoulUI({
           >
             Waiting for {chooserName} to choose a soul…
           </span>
+          {!isSpectator && (
+            <ResolutionButton
+              label={BUTTON_COPY['end-battle'].label}
+              tone="neutral"
+              onClick={onRequestEndBattle}
+            />
+          )}
         </div>
       </div>
     );
@@ -457,26 +479,146 @@ export default function BattleResolutionUI({
   const topLeft = virtualToScreen(band.x + band.width - rowVirtualWidth - 8, band.y + band.height + 6, scale, offsetX, offsetY);
   const right = virtualToScreen(band.x + band.width - 8, band.y + band.height + 6, scale, offsetX, offsetY);
 
+  // Shared End Battle confirm dispatch + dialog — used by BOTH the
+  // active-state button row and the awaiting-soul non-chooser escape hatch
+  // (spec §7), so every End Battle click funnels through the same
+  // confirm-summary dialog rather than a bare dispatch.
+  const dispatch = (action: ResolutionAction) => {
+    setConfirmAction(null);
+    if (action === 'end-battle') onEndBattle();
+    else onResolveBattle();
+  };
+
+  const confirmDialog = confirmAction && (
+    <div
+      onClick={() => setConfirmAction(null)}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 900,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(6, 4, 2, 0.7)',
+        backdropFilter: 'blur(3px)',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'rgba(14, 10, 6, 0.97)',
+          border: '1px solid rgba(107, 78, 39, 0.3)',
+          borderRadius: 10,
+          padding: '28px 32px',
+          textAlign: 'center',
+          maxWidth: 380,
+          width: '100%',
+          boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+        }}
+      >
+        <p
+          style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 11,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'rgba(196, 149, 90, 0.5)',
+          }}
+        >
+          Battle Resolution
+        </p>
+        <h2
+          style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 20,
+            fontWeight: 700,
+            color: '#e8d5a3',
+            marginTop: 8,
+            textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+          }}
+        >
+          {BUTTON_COPY[confirmAction].dialogTitle}
+        </h2>
+        <p
+          style={{
+            marginTop: 12,
+            fontFamily: 'Georgia, serif',
+            fontSize: 13,
+            lineHeight: 1.5,
+            color: 'rgba(196, 149, 90, 0.75)',
+          }}
+        >
+          {summaryText(cards)}
+        </p>
+
+        <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+          <button
+            onClick={() => setConfirmAction(null)}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              borderRadius: 4,
+              border: '1px solid rgba(107, 78, 39, 0.3)',
+              background: 'transparent',
+              color: 'rgba(196, 149, 90, 0.6)',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => dispatch(confirmAction)}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              borderRadius: 4,
+              border: `1px solid ${TONE_STYLE[confirmAction === 'battle-lost' ? 'red' : confirmAction === 'end-battle' ? 'neutral' : 'gold'].border}`,
+              background: TONE_STYLE[confirmAction === 'battle-lost' ? 'red' : confirmAction === 'end-battle' ? 'neutral' : 'gold'].bg,
+              color: TONE_STYLE[confirmAction === 'battle-lost' ? 'red' : confirmAction === 'end-battle' ? 'neutral' : 'gold'].color,
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+            }}
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (battleState === 'awaiting-soul') {
     return (
-      <AwaitingSoulUI
-        topLeft={topLeft}
-        right={right}
-        mySeat={mySeat}
-        opponentSeat={opponentSeat}
-        attackerSeat={attackerSeat}
-        isSpectator={isSpectator}
-        format={format}
-        myPlayerName={myPlayerName}
-        opponentPlayerName={opponentPlayerName}
-        eligibleSouls={eligibleSouls}
-        siteAttachedSoulIds={siteAttachedSoulIds}
-        forgeResolver={forgeResolver}
-        pendingSoulId={pendingSoulId}
-        setPendingSoulId={setPendingSoulId}
-        onSurrenderSoul={onSurrenderSoul}
-        onEndBattle={onEndBattle}
-      />
+      <>
+        <AwaitingSoulUI
+          topLeft={topLeft}
+          right={right}
+          mySeat={mySeat}
+          opponentSeat={opponentSeat}
+          attackerSeat={attackerSeat}
+          isSpectator={isSpectator}
+          format={format}
+          myPlayerName={myPlayerName}
+          opponentPlayerName={opponentPlayerName}
+          eligibleSouls={eligibleSouls}
+          siteAttachedSoulIds={siteAttachedSoulIds}
+          forgeResolver={forgeResolver}
+          pendingSoulId={pendingSoulId}
+          setPendingSoulId={setPendingSoulId}
+          onSurrenderSoul={onSurrenderSoul}
+          onEndBattle={onEndBattle}
+          onRequestEndBattle={() => setConfirmAction('end-battle')}
+        />
+        {confirmDialog}
+      </>
     );
   }
 
@@ -484,12 +626,6 @@ export default function BattleResolutionUI({
 
   const isAttacker = mySeat !== '' && mySeat === attackerSeat;
   const isDefender = mySeat !== '' && attackerSeat !== '' && mySeat !== attackerSeat;
-
-  const dispatch = (action: ResolutionAction) => {
-    setConfirmAction(null);
-    if (action === 'end-battle') onEndBattle();
-    else onResolveBattle();
-  };
 
   return (
     <>
@@ -516,111 +652,7 @@ export default function BattleResolutionUI({
         </div>
       </div>
 
-      {confirmAction && (
-        <div
-          onClick={() => setConfirmAction(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 900,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(6, 4, 2, 0.7)',
-            backdropFilter: 'blur(3px)',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'rgba(14, 10, 6, 0.97)',
-              border: '1px solid rgba(107, 78, 39, 0.3)',
-              borderRadius: 10,
-              padding: '28px 32px',
-              textAlign: 'center',
-              maxWidth: 380,
-              width: '100%',
-              boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-            }}
-          >
-            <p
-              style={{
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 11,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                color: 'rgba(196, 149, 90, 0.5)',
-              }}
-            >
-              Battle Resolution
-            </p>
-            <h2
-              style={{
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 20,
-                fontWeight: 700,
-                color: '#e8d5a3',
-                marginTop: 8,
-                textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-              }}
-            >
-              {BUTTON_COPY[confirmAction].dialogTitle}
-            </h2>
-            <p
-              style={{
-                marginTop: 12,
-                fontFamily: 'Georgia, serif',
-                fontSize: 13,
-                lineHeight: 1.5,
-                color: 'rgba(196, 149, 90, 0.75)',
-              }}
-            >
-              {summaryText(cards)}
-            </p>
-
-            <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
-              <button
-                onClick={() => setConfirmAction(null)}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  borderRadius: 4,
-                  border: '1px solid rgba(107, 78, 39, 0.3)',
-                  background: 'transparent',
-                  color: 'rgba(196, 149, 90, 0.6)',
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => dispatch(confirmAction)}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  borderRadius: 4,
-                  border: `1px solid ${TONE_STYLE[confirmAction === 'battle-lost' ? 'red' : confirmAction === 'end-battle' ? 'neutral' : 'gold'].border}`,
-                  background: TONE_STYLE[confirmAction === 'battle-lost' ? 'red' : confirmAction === 'end-battle' ? 'neutral' : 'gold'].bg,
-                  color: TONE_STYLE[confirmAction === 'battle-lost' ? 'red' : confirmAction === 'end-battle' ? 'neutral' : 'gold'].color,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                }}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {confirmDialog}
     </>
   );
 }
