@@ -2097,7 +2097,7 @@ export const set_phase = spacetimedb.reducer(
   },
   (ctx, { gameId, phase }) => {
     const player = findPlayerBySender(ctx, gameId);
-    const game = ctx.db.Game.id.find(gameId);
+    let game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
     if (player.seat !== game.currentTurn) {
@@ -2109,7 +2109,31 @@ export const set_phase = spacetimedb.reducer(
       throw new SenderError('Invalid phase: ' + phase);
     }
 
-    ctx.db.Game.id.update({ ...game, currentPhase: phase });
+    const oldPhase = game.currentPhase;
+
+    // Leaving the battle phase auto-closes any open battle (spec §7) — same
+    // hook end_turn runs. runBattleAutoReturn does its own Game write
+    // (clearing battleState/battleAttackerSeat/lastBattlePlayBySeat); re-read
+    // before the currentPhase write below or that write would resurrect
+    // battleState by spreading the stale pre-return snapshot.
+    if (oldPhase === 'battle' && phase !== 'battle' && game.battleState !== '') {
+      runBattleAutoReturn(ctx, gameId, player.id);
+      game = ctx.db.Game.id.find(gameId) ?? game;
+    }
+
+    if (phase === 'battle' && oldPhase !== 'battle' && game.battleState === '') {
+      // Entering the battle phase opens the band (spec §4) — the same open
+      // step enter_battle performs when the band starts closed.
+      ctx.db.Game.id.update({
+        ...game,
+        currentPhase: phase,
+        battleState: 'active',
+        battleAttackerSeat: game.currentTurn.toString(),
+        lastBattlePlayBySeat: '',
+      });
+    } else {
+      ctx.db.Game.id.update({ ...game, currentPhase: phase });
+    }
 
     logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase }), game.turnNumber, phase);
   }
