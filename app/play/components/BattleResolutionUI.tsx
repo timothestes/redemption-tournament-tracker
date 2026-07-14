@@ -112,16 +112,18 @@ function ResolutionButton({ label, tone, onClick }: { label: string; tone: Tone;
 }
 
 /**
- * "N characters → territory · N enhancements → discard · N souls → Land of
- * Bondage · N weapons stay attached · kept in play: X, Y" — zero segments
- * omitted, names comma-joined. `summarizeAutoReturn` already excludes
- * equipped accessories from the enhancement/discard counts (weaponsAttached
- * is its own bucket), so weapons are never double-counted here.
+ * "N characters → territory · N cards → return to where they came from ·
+ * N enhancements → discard · N souls → Land of Bondage · N weapons stay
+ * attached · kept in play: X, Y" — zero segments omitted, names
+ * comma-joined. `summarizeAutoReturn` already excludes equipped
+ * accessories from the enhancement/discard counts (weaponsAttached is its
+ * own bucket), so weapons are never double-counted here.
  */
 function summaryText(cards: BattleCardLike[]): string {
   const s = summarizeAutoReturn(cards);
   const segments: string[] = [];
   if (s.toTerritory > 0) segments.push(`${s.toTerritory} character${s.toTerritory === 1 ? '' : 's'} → territory`);
+  if (s.toOrigin > 0) segments.push(`${s.toOrigin} card${s.toOrigin === 1 ? '' : 's'} → return to where ${s.toOrigin === 1 ? 'it came' : 'they came'} from`);
   if (s.toDiscard > 0) segments.push(`${s.toDiscard} enhancement${s.toDiscard === 1 ? '' : 's'} → discard`);
   if (s.toLandOfBondage > 0) segments.push(`${s.toLandOfBondage} soul${s.toLandOfBondage === 1 ? '' : 's'} → Land of Bondage`);
   if (s.weaponsAttached > 0) segments.push(`${s.weaponsAttached} weapon${s.weaponsAttached === 1 ? '' : 's'} stay attached`);

@@ -20,6 +20,11 @@ export interface BattleCardLike {
   // report for why these were added beyond the brief's literal interface.
   cardName: string;
   equippedToInstanceId?: bigint | number;
+  // Stamped origin zone (CardInstance.originZone) — mirrors the server's
+  // runBattleAutoReturn rule 5: catch-all cards (Dominants/Artifacts/
+  // Curses/Fortresses/unknown) return to this zone when set and it isn't
+  // 'territory', instead of landing in territory.
+  originZone?: string;
 }
 
 function otherSeat(seat: BattleSeat): BattleSeat {
@@ -186,6 +191,7 @@ export function brigadeMismatch(enh: BattleCardLike, sameSideCharacters: BattleC
 
 export interface AutoReturnSummary {
   toTerritory: number;
+  toOrigin: number;
   toDiscard: number;
   toLandOfBondage: number;
   keptInPlay: string[];
@@ -226,14 +232,18 @@ function isEnhancementSegment(cardType: string): boolean {
  * dialog. Not a rules engine — just a count-and-name summary of where each
  * card in `cards` (everything currently in the battle band) would land:
  * equipped accessories stay attached (weaponsAttached), Lost Souls go to
- * the Land of Bondage, characters and the catch-all "everything else"
- * (Dominants/Artifacts/Curses/Fortresses/unknown/Forge-blanked types) go to
- * territory, and GE/EE enhancements go to discard unless their
- * specialAbility matches the "place" keep heuristic, in which case they
- * stay in territory and their name is recorded in keptInPlay.
+ * the Land of Bondage, characters go to territory, and GE/EE enhancements
+ * go to discard unless their specialAbility matches the "place" keep
+ * heuristic, in which case they stay in territory and their name is
+ * recorded in keptInPlay. The catch-all "everything else" bucket
+ * (Dominants/Artifacts/Curses/Fortresses/unknown/Forge-blanked types)
+ * mirrors the server's runBattleAutoReturn rule 5: it returns to the
+ * card's stamped originZone when one is set and isn't 'territory' (counted
+ * in toOrigin), otherwise it lands in territory like today (toTerritory).
  */
 export function summarizeAutoReturn(cards: BattleCardLike[]): AutoReturnSummary {
   let toTerritory = 0;
+  let toOrigin = 0;
   let toDiscard = 0;
   let toLandOfBondage = 0;
   let weaponsAttached = 0;
@@ -261,10 +271,17 @@ export function summarizeAutoReturn(cards: BattleCardLike[]): AutoReturnSummary 
       }
       continue;
     }
-    toTerritory++;
+    // Rule 5 catch-all: origin zone wins when stamped and not 'territory'
+    // (or 'battle', defensively — see runBattleAutoReturn) — otherwise
+    // falls back to territory, same as before this bucket existed.
+    if (c.originZone && c.originZone !== 'territory' && c.originZone !== 'battle') {
+      toOrigin++;
+    } else {
+      toTerritory++;
+    }
   }
 
-  return { toTerritory, toDiscard, toLandOfBondage, keptInPlay, weaponsAttached };
+  return { toTerritory, toOrigin, toDiscard, toLandOfBondage, keptInPlay, weaponsAttached };
 }
 
 /**

@@ -5148,6 +5148,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             isFlipped: row.isFlipped,
             cardName: row.cardName,
             equippedToInstanceId: row.equippedToInstanceId,
+            originZone: row.originZone,
           },
         });
       }

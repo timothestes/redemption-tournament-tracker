@@ -353,6 +353,20 @@ describe('summarizeAutoReturn', () => {
     expect(summarizeAutoReturn(cards).toTerritory).toBe(4);
   });
 
+  it('a catch-all card (Dominant) stamped with a non-territory origin (hand) routes to toOrigin', () => {
+    const cards = [mkCard({ cardType: 'Dominant', originZone: 'hand', cardName: 'Some Dominant' })];
+    const summary = summarizeAutoReturn(cards);
+    expect(summary.toOrigin).toBe(1);
+    expect(summary.toTerritory).toBe(0);
+  });
+
+  it('a catch-all card (Fortress) with an empty origin still routes to toTerritory', () => {
+    const cards = [mkCard({ cardType: 'Fortress', originZone: '', cardName: 'Some Fortress' })];
+    const summary = summarizeAutoReturn(cards);
+    expect(summary.toOrigin).toBe(0);
+    expect(summary.toTerritory).toBe(1);
+  });
+
   it('aggregates a mixed battle band into the correct bucket for every card', () => {
     const cards = [
       mkCard({ cardType: 'GE', equippedToInstanceId: 1n }), // weapon, attached
@@ -360,11 +374,12 @@ describe('summarizeAutoReturn', () => {
       mkCard({ cardType: 'Hero' }), // -> territory
       mkCard({ cardType: 'GE', specialAbility: '', cardName: 'Fireball' }), // -> discard
       mkCard({ cardType: 'EE', specialAbility: 'Place in territory.', cardName: 'Curse' }), // -> kept in territory
-      mkCard({ cardType: 'Artifact' }), // -> territory (rule 5)
+      mkCard({ cardType: 'Artifact' }), // -> territory (rule 5, no origin stamped)
     ];
     const summary = summarizeAutoReturn(cards);
     expect(summary).toEqual({
       toTerritory: 3, // Hero + kept Curse + Artifact
+      toOrigin: 0,
       toDiscard: 1, // Fireball
       toLandOfBondage: 1, // Lost Soul (Eve)
       keptInPlay: ['Curse'],
