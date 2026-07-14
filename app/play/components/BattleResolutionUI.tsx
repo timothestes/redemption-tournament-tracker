@@ -189,6 +189,7 @@ function AwaitingSoulUI({
             position: 'absolute',
             left: topLeft.x,
             top: topLeft.y,
+            transform: 'translateY(-100%)',
             width: right.x - topLeft.x,
             display: 'flex',
             alignItems: 'center',
@@ -410,6 +411,34 @@ function AwaitingSoulUI({
                 );
               })}
             </div>
+            {/* Decline (owner direction): the chooser can refuse the pick —
+                dispatches end_battle, so the battle auto-returns with NO
+                soul awarded and the modal closes when battleState clears.
+                Rules-wise a lost rescue owes a soul; this stays consistent
+                with the app's no-hard-enforcement philosophy (the log shows
+                the battle ended without a soul — table talk handles it). */}
+            <button
+              onClick={onEndBattle}
+              disabled={pendingSoulId !== null}
+              style={{
+                marginTop: 14,
+                alignSelf: 'center',
+                padding: '6px 14px',
+                borderRadius: 4,
+                border: '1px solid rgba(107, 78, 39, 0.4)',
+                background: 'transparent',
+                color: 'rgba(196, 149, 90, 0.7)',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                cursor: pendingSoulId !== null ? 'default' : 'pointer',
+                opacity: pendingSoulId !== null ? 0.4 : 1,
+              }}
+            >
+              Decline — end battle without a soul
+            </button>
           </>
         )}
       </div>
@@ -449,15 +478,16 @@ export default function BattleResolutionUI({
   }, [eligibleSouls, battleState]);
 
   // Dual-corner virtualToScreen (width only, height is CSS content-driven) —
-  // same idiom as the brigade toast. Anchored just BELOW the band's bottom
-  // LEFT edge (product direction, PR #197 — previously the right edge,
-  // which overlapped the sidebar's Territory pile at narrower viewports).
+  // same idiom as the brigade toast. Anchored INSIDE the band's bottom-left
+  // corner (owner direction — the below-the-band row floated on top of
+  // territory cards); the row div gets translateY(-100%) so its BOTTOM sits
+  // 8 virtual px above the band's bottom edge, on the dark band background.
   // battleState 'active' and 'awaiting-soul' are mutually exclusive, so the
   // resolution-button row and the awaiting-soul pill safely share this
   // anchor.
   const rowVirtualWidth = 300;
-  const topLeft = virtualToScreen(band.x + 8, band.y + band.height + 6, scale, offsetX, offsetY);
-  const right = virtualToScreen(band.x + 8 + rowVirtualWidth, band.y + band.height + 6, scale, offsetX, offsetY);
+  const topLeft = virtualToScreen(band.x + 8, band.y + band.height - 8, scale, offsetX, offsetY);
+  const right = virtualToScreen(band.x + 8 + rowVirtualWidth, band.y + band.height - 8, scale, offsetX, offsetY);
 
   if (battleState === 'awaiting-soul') {
     return (
@@ -494,6 +524,7 @@ export default function BattleResolutionUI({
           position: 'absolute',
           left: topLeft.x,
           top: topLeft.y,
+          transform: 'translateY(-100%)',
           width: right.x - topLeft.x,
           display: 'flex',
           justifyContent: 'flex-start',
@@ -504,10 +535,16 @@ export default function BattleResolutionUI({
         {isAttacker && bandHasCards && (
           <ResolutionButton label={BUTTON_COPY['claim-victory'].label} tone="gold" onClick={onResolveBattle} />
         )}
+        {/* End Battle is attacker-only (owner direction): two side-by-side
+            actions confused defenders — their one call during a battle is
+            🏳 Battle Lost. The attacker (= turn player) keeps the no-stakes
+            close; phase change / end turn remain the server-side hatches. */}
+        {isAttacker && (
+          <ResolutionButton label={BUTTON_COPY['end-battle'].label} tone="neutral" onClick={onEndBattle} />
+        )}
         {isDefender && bandHasCards && (
           <ResolutionButton label={BUTTON_COPY['battle-lost'].label} tone="red" onClick={onResolveBattle} />
         )}
-        <ResolutionButton label={BUTTON_COPY['end-battle'].label} tone="neutral" onClick={onEndBattle} />
       </div>
     </div>
   );
