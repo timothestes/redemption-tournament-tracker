@@ -174,14 +174,18 @@ function AwaitingSoulUI({
   const defenderSeat = attackerSeat === mySeat ? opponentSeat : attackerSeat === opponentSeat ? mySeat : '';
   const chooserSeat = format === 'T1' ? defenderSeat : attackerSeat;
   const isChooser = !isSpectator && mySeat !== '' && mySeat === chooserSeat;
-  const chooserName = chooserSeat === mySeat ? myPlayerName : chooserSeat === opponentSeat ? opponentPlayerName : 'Player';
 
   if (!isChooser) {
-    // Spec §7 escape hatch: the server's end_battle reducer deliberately
-    // accepts either player from 'awaiting-soul', but only the chooser had
-    // a way to reach it — a stalling-but-connected chooser otherwise
-    // stranded the non-chooser with nothing to click. Spectators (also
-    // caught by !isChooser) still get the pill only, no button.
+    // The "Waiting for <chooser> to choose a soul…" status lives in the
+    // band HEADER now (owner direction — the old pill here read as a second
+    // button and collided with the totals chips). What remains is the
+    // spec §7 escape hatch: the server's end_battle deliberately accepts
+    // either player from 'awaiting-soul' (a stalling-but-connected chooser
+    // otherwise strands the non-chooser), but per the one-button-per-role
+    // direction it renders for the ATTACKER only — never spectators, never
+    // the defender. A T2/Paragon defender waiting on a stalled attacker
+    // still has the server-side end_turn hook as the ultimate fallback.
+    if (isSpectator || mySeat !== attackerSeat) return null;
     return (
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
         <div
@@ -198,30 +202,11 @@ function AwaitingSoulUI({
             pointerEvents: 'auto',
           }}
         >
-          <span
-            style={{
-              padding: '6px 14px',
-              background: 'rgba(14, 10, 6, 0.75)',
-              border: '1px solid rgba(107, 78, 39, 0.4)',
-              borderRadius: 6,
-              color: 'rgba(196, 149, 90, 0.8)',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 12,
-              fontWeight: 600,
-              letterSpacing: '0.03em',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
-            }}
-          >
-            Waiting for {chooserName} to choose a soul…
-          </span>
-          {!isSpectator && (
-            <ResolutionButton
-              label={BUTTON_COPY['end-battle'].label}
-              tone="neutral"
-              onClick={onEndBattle}
-            />
-          )}
+          <ResolutionButton
+            label={BUTTON_COPY['end-battle'].label}
+            tone="neutral"
+            onClick={onEndBattle}
+          />
         </div>
       </div>
     );

@@ -5319,6 +5319,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           break;
         }
       }
+    } else if (gameState.battleState === 'awaiting-soul') {
+      // The soul-pick status lives here too (owner direction) — the old
+      // in-band pill next to the End Battle button read as a second button
+      // and collided with the totals chips. Chooser mirrors the server's
+      // surrender_soul rule: T1 the defender picks, T2/Paragon the attacker.
+      const defenderSeat = attackerSeat === '0' ? '1' : '0';
+      const chooserSeat = normalizedFormat === 'T1' ? defenderSeat : attackerSeat;
+      statusText = `Waiting for ${nameForSeat(chooserSeat)} to choose a soul…`;
     }
     const headerText =
       statusText ||
@@ -5406,6 +5414,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     mpLayout,
     battleCardEntries,
     stakesLostSoulCount,
+    normalizedFormat,
     gameState.battleState,
     gameState.battleAttackerSeat,
     gameState.lastBattlePlayBySeat,
