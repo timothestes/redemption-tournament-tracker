@@ -2730,6 +2730,19 @@ export const surrender_soul = spacetimedb.reducer(
     // Every format awards exactly one soul: the band closes in this same
     // reducer.
     runBattleAutoReturn(ctx, gameId, player.id);
+
+    // The surrender is the battle's natural conclusion — both players
+    // already consented via the resolve/surrender flow, so the phase
+    // advances unconditionally on the caller (unlike end_battle's
+    // turn-player-only escape-hatch gate). Re-read: runBattleAutoReturn
+    // already wrote the Game row (clearing battleState/battleAttackerSeat/
+    // lastBattlePlayBySeat) — spreading the stale pre-return `game` snapshot
+    // here would resurrect battleState. Same idiom as end_battle above.
+    const latestGame = ctx.db.Game.id.find(gameId);
+    if (latestGame && latestGame.currentPhase === 'battle') {
+      ctx.db.Game.id.update({ ...latestGame, currentPhase: 'discard' });
+      logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latestGame.turnNumber, 'discard');
+    }
   },
 );
 
