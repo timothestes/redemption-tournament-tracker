@@ -20,9 +20,10 @@ const DECKLIST_TYPE: Record<AodCountCardProps["deckType"], string> = {
 };
 
 const AOD_TOOLTIP =
-  "Top-9 draw stats over a 10,000-iteration Monte Carlo. Non-Soul: avg non-soul " +
-  "Daniel cards in the top 9. Soul: avg Daniel Lost Souls (they trigger the chain " +
-  "but don't add to the count). Whiff: % of draws with no Daniel in the top 3.";
+  "Top-9 draw stats over a 10,000-iteration Monte Carlo, given a Daniel reference " +
+  "in the top 3. Non-Soul: avg Daniel cards in the top 9 excluding Lost Souls. " +
+  "Soul: the same average counting Daniel Lost Souls too. Whiff: % of draws with " +
+  "no Daniel in the top 3.";
 
 // One labeled figure within the revealed breakdown row.
 function Stat({ label, value }: { label: string; value: string }) {
