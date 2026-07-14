@@ -2414,9 +2414,10 @@ export const end_battle = spacetimedb.reducer(
 // rescue ownership transfers that never apply here (entering battle never
 // changes ownership, and 'battle' is never a token-removal or lost-soul
 // destination). Mirrors move_card's free-form zoneIndex assignment,
-// leavePlayFieldOverrides spread, stampBattleEntry call, and its own-equip /
-// accessory-unlink cascade (~2765-2838) — the minimal single-card write path
-// the brief asks to reuse, without the surrounding routing subtleties.
+// leavePlayFieldOverrides spread, stampBattleEntry call, and its
+// attached-accessory-follows-into-battle cascade — the minimal single-card
+// write path the brief asks to reuse, without the surrounding routing
+// subtleties.
 // ---------------------------------------------------------------------------
 function writeBattleEntryMove(ctx: any, gameId: bigint, card: any, posX: string, posY: string): string {
   const fromZone = card.zone;
@@ -2452,16 +2453,39 @@ function writeBattleEntryMove(ctx: any, gameId: bigint, card: any, posX: string,
     ...battleEntryUpdates,
   });
 
-  // Own-equip cascade (mirrors move_card ~2765-2838): unlink any accessories
-  // that were pointing at this card so a weapon never keeps
-  // equippedToInstanceId aimed at a host that just changed zones out from
-  // under it. Skipped for the defensive already-in-battle case (a
-  // reposition, not a real entry) so an attach_card'd weapon isn't stripped.
+  // Attached-accessory cascade (mirrors move_card's identical Battle-bound
+  // cascade): any accessory pointing at this host follows it into 'battle'
+  // with the attachment intact (spec §7 rule 1), instead of being unlinked
+  // and stranded in the host's old zone. Skipped for the defensive
+  // already-in-battle case (a reposition, not a real entry) so an
+  // attach_card'd weapon already in the band isn't re-stamped. Snapshot
+  // first — mutating while iterating a live query is unsafe per
+  // spacetimedb/CLAUDE.md.
   if (!alreadyInBattle) {
-    for (const accessory of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
-      if (accessory.equippedToInstanceId === card.id) {
-        ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
+    const accessories = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (a: any) => a.equippedToInstanceId === card.id,
+    );
+    for (const accessory of accessories) {
+      const accessoryBattleUpdates: any = {};
+      stampBattleEntry(ctx, gameId, accessory, accessoryBattleUpdates);
+      let accMaxIdx = -1n;
+      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+        if (c.ownerId === accessory.ownerId && c.zone === 'battle' && c.zoneIndex > accMaxIdx) {
+          accMaxIdx = c.zoneIndex;
+        }
       }
+      clearCountersIfLeavingPlay(ctx, accessory.id, accessory.zone, 'battle');
+      ctx.db.CardInstance.id.update({
+        ...accessory,
+        zone: 'battle',
+        zoneIndex: accMaxIdx + 1n,
+        posX,
+        posY,
+        revealExpiresAt: undefined,
+        revealStartedAt: undefined,
+        ...leavePlayFieldOverrides(accessory, accessory.zone, 'battle'),
+        ...accessoryBattleUpdates,
+      });
     }
   }
 
@@ -3071,6 +3095,11 @@ export const move_card = spacetimedb.reducer(
     if (leavingZone) {
       const sendAccessoriesToDiscard =
         fromZone === 'territory' && toZone === 'land-of-bondage';
+      // Host entering Battle — the attached accessory follows it into the
+      // band with the attachment intact (spec §7 rule 1), instead of being
+      // unlinked and stranded behind in its old zone. Mirrors writeBattleEntryMove's
+      // identical cascade for the enter_battle path.
+      const sendAccessoriesToBattle = toZone === 'battle';
       const attachedAccessories = gameCards.filter(
         (c: any) => c.equippedToInstanceId === cardInstanceId
       );
@@ -3094,6 +3123,27 @@ export const move_card = spacetimedb.reducer(
             revealExpiresAt: undefined,
       revealStartedAt: undefined,
             ...leavePlayFieldOverrides(accessory, accessory.zone, 'discard'),
+          });
+        } else if (sendAccessoriesToBattle) {
+          const accessoryBattleUpdates: any = {};
+          stampBattleEntry(ctx, gameId, accessory, accessoryBattleUpdates);
+          let accMaxIdx = -1n;
+          for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+            if (c.ownerId === accessory.ownerId && c.zone === 'battle' && c.zoneIndex > accMaxIdx) {
+              accMaxIdx = c.zoneIndex;
+            }
+          }
+          clearCountersIfLeavingPlay(ctx, accessory.id, accessory.zone, 'battle');
+          ctx.db.CardInstance.id.update({
+            ...accessory,
+            zone: 'battle',
+            zoneIndex: accMaxIdx + 1n,
+            posX,
+            posY,
+            revealExpiresAt: undefined,
+            revealStartedAt: undefined,
+            ...leavePlayFieldOverrides(accessory, accessory.zone, 'battle'),
+            ...accessoryBattleUpdates,
           });
         } else {
           ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
