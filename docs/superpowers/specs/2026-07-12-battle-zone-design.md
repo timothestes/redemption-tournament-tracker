@@ -166,12 +166,13 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   rotates. At 1366px the mainCard is 80%+ of band height and cards can straddle the
   centerline, so chips and the header get a backdrop and render **above** card nodes.
   Banner states key on which side is empty **relative to the attacker**: defender side
-  empty → "Waiting for a blocker…" (attacker's view adds "No block? Claim Victory to
-  rescue." while souls are at stake); attacker side empty → "No attacker in battle — End
+  empty → "Waiting for a blocker…"; attacker side empty → "No attacker in battle — End
   Battle?"; both populated → "⚔ INITIATIVE: <name> — losing / stalemate / mutual
-  destruction".
+  destruction". (The former attacker-only "No block? Claim Victory to rescue." sub-line
+  was removed on product direction.)
 - **Band buttons (HTML overlay via `virtualToScreen`,** zIndex between drag overlay 450
-  and toasts 900): `⚑ Claim Victory` (attacker only), `🏳 Battle Lost` (defender only),
+  and toasts 900): `⚑ Win Battle` (attacker only; the attacker's resolve action —
+  formerly labeled "Claim Victory"), `🏳 Battle Lost` (defender only),
   `↩ End Battle` (both) — anchored just below the band's **bottom-left** corner (PR #197;
   previously bottom-right, where it overlapped the sidebar's Territory pile at narrower
   viewports).

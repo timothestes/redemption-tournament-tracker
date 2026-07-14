@@ -15,7 +15,7 @@
 // the resolution-button row and the awaiting-soul pill/modal safely reuse
 // the same anchor geometry below.
 //
-// Every resolution action (Claim Victory / Battle Lost / End Battle)
+// Every resolution action (Win Battle / Battle Lost / End Battle)
 // dispatches its reducer IMMEDIATELY on click — no confirm dialog (product
 // direction: the confirm-summary step was cut). The post-battle summary is
 // now a transient toast fired by the caller (MultiplayerCanvas) once the
@@ -65,7 +65,7 @@ interface BattleResolutionUIProps {
   siteAttachedSoulIds: Set<string>;
   /** Forge card-art resolver, for Forge playtest games. */
   forgeResolver?: ForgeResolverMap | null;
-  /** Both Claim Victory and Battle Lost dispatch the same server reducer (resolve_battle) —
+  /** Both Win Battle and Battle Lost dispatch the same server reducer (resolve_battle) —
    *  the server decides win/loss from caller identity, not from which button was pressed. */
   onResolveBattle: () => void;
   onEndBattle: () => void;
@@ -73,7 +73,7 @@ interface BattleResolutionUIProps {
 }
 
 const BUTTON_COPY: Record<ResolutionAction, { label: string }> = {
-  'claim-victory': { label: '⚑ Claim Victory' },
+  'claim-victory': { label: '⚑ Win Battle' },
   'battle-lost': { label: '🏳 Battle Lost' },
   'end-battle': { label: '↩ End Battle' },
 };

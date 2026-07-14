@@ -5310,13 +5310,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       (gameState.lastBattlePlayBySeat || '') as BattleSeat | '',
     );
     let bannerMain = '';
-    let bannerSub: string | null = null;
     switch (initiative.kind) {
       case 'waiting-blocker':
         bannerMain = 'Waiting for a blocker…';
-        if (mySeatStr === attackerSeat && stakesLostSoulCount >= 1) {
-          bannerSub = 'No block? Claim Victory to rescue.';
-        }
         break;
       case 'no-attacker':
         bannerMain = 'No attacker in battle — End Battle?';
@@ -5397,16 +5393,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             band's bottom edge (outside the band; product direction,
             PR #197). Previously rendered on the band's top edge beneath
             the header; moved below now that the totals chips converge on
-            the centerline instead of the top corners. bannerSub
-            (attacker-only "no block" hint) folds into the same line via
-            " · " to keep it one row. Shares its y with the resolution
+            the centerline instead of the top corners. Shares its y with the resolution
             button row (BattleResolutionUI, left-anchored below the band)
             but is capped narrow enough to never intersect it (verified by
             measurement at 1366x768 and 1920x1080 — see PR #197). */}
         {(() => {
           const stripY = band.y + band.height + 6;
           const stripHeight = 16;
-          const stripText = bannerSub ? `${bannerMain} · ${bannerSub}` : bannerMain;
+          const stripText = bannerMain;
           const stripWidth = Math.min(band.width - 16, 420 * fsGrowth(10));
           const sx = midX - stripWidth / 2;
           return (
