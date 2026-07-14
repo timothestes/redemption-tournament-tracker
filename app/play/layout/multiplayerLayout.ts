@@ -24,7 +24,8 @@
  *
  * Battle mode (`battleActive`) swaps the Divider row for a "Field of
  * Battle" band, pinned so its vertical midline matches the idle divider's
- * midline exactly (territories shrink to make room; hands/LOBs untouched):
+ * midline exactly (territories shrink to make room; LOBs untouched, hands
+ * shrink slightly too):
  *
  * ┌──────────────────────────────────────────────────────────────┐
  * │ Opponent Hand                              (full width)      │
@@ -149,10 +150,12 @@ function getProfile(virtualWidth: number): LayoutProfile {
 }
 
 // ── Battle-mode row ratios ───────────────────────────────────────────────
-// Battle mode replaces the Divider with a "Field of Battle" band. Hand and
-// LOB ratios are unchanged from the idle profile above (battle never moves
-// or resizes hands/LOBs) — they're listed here anyway so each set's
-// sum-check covers the whole board, matching the idle profiles' style.
+// Battle mode replaces the Divider with a "Field of Battle" band. LOB
+// ratios are unchanged from the idle profile above (battle never moves or
+// resizes LOBs); hand ratios shrink slightly alongside the territories to
+// make room for the band (playerHandRatio .18→.155 Standard, .165→.15
+// Narrow) — they're listed here anyway so each set's sum-check covers the
+// whole board, matching the idle profiles' style.
 // Band midline (oppHand + oppLob + oppTerritory + band/2) is pinned to
 // equal the idle divider's midline (oppHand + oppLob + oppTerritory +
 // divider/2) exactly, by construction.
