@@ -5,6 +5,7 @@ import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
 import { isLeavingPlayField } from './playField';
+import { makeFreeSpotAllocator } from './battlePlacement';
 import {
   getAbilitiesForCard,
   getEffectiveAbilities,
@@ -2276,31 +2277,71 @@ function runBattleAutoReturn(ctx: any, gameId: bigint, actingPlayerId: bigint) {
     return idx;
   };
 
-  // Free-spot auto-fan per owner — mirrors move_cards_batch's territory
-  // auto-fan grid (~2982-2992). Fresh counter for this call only (matching
-  // that reducer's behavior), shared by every branch that needs "a free
-  // Territory spot": surviving characters with a non-Territory origin, kept
-  // enhancements, and the rule-5 fallback.
-  const fanIdx = new Map<string, number>();
-  const nextFreeSpot = (ownerId: bigint): { posX: string; posY: string } => {
-    const key = ownerId.toString();
-    const i = fanIdx.get(key) ?? 0;
-    fanIdx.set(key, i + 1);
-    const cardsPerRow = 10;
-    const col = i % cardsPerRow;
-    const row = Math.floor(i / cardsPerRow);
-    return { posX: String(0.03 + col * 0.04 + row * 0.02), posY: String(0.05 + row * 0.28) };
-  };
-
-  // Lost-soul check per the idiom at index.ts ~4479 (surrender_lost_soul) —
-  // includes TOKEN_LS, unlike the narrower two-part check used inline by the
-  // move reducers' discard/reserve/banish redirect.
+  // Precedence predicates (used by both the occupancy seed below and
+  // computeDestination). Lost-soul check per the idiom at index.ts ~4479
+  // (surrender_lost_soul) — includes TOKEN_LS, unlike the narrower two-part
+  // check used inline by the move reducers' discard/reserve/banish redirect.
   const isLostSoulCard = (c: any): boolean =>
     c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
   const isPlaceKeep = (sa: string): boolean =>
     /\bplace\b/i.test(sa) && !/\bin (the )?place of\b/i.test(sa) && !/take the place of/i.test(sa);
   const enhSegment = (ct: string): boolean =>
     ct.split('/').map((s: string) => s.trim()).some((s: string) => s === 'GE' || s === 'EE');
+
+  // Occupancy-aware free-spot auto-fan per owner. The blind top-left fan this
+  // replaced dropped every non-origin return onto (0.03, 0.05) regardless of
+  // what already sat in the Territory, stacking drafted attackers / kept
+  // enhancements on top of existing cards ("willy-nilly" placement). Seed a
+  // per-owner occupied set with (a) the owner's Territory cards that never
+  // entered the battle and (b) the exact origin spots the origin-Territory
+  // returns will reclaim (deterministic — just their origin fields), then hand
+  // out grid cells that clear both, and clear each other. Grid geometry is
+  // unchanged from the old fan (still mirrors move_cards_batch ~2982-2992);
+  // only the occupancy skip is new.
+  const inBattleIds = new Set(inBattle.map((c: any) => c.id.toString()));
+  const occupied = new Map<string, Array<{ x: number; y: number }>>();
+  const addOccupied = (ownerId: bigint, posX: string, posY: string): void => {
+    const x = parseFloat(posX);
+    const y = parseFloat(posY);
+    if (Number.isNaN(x) || Number.isNaN(y)) return;
+    const key = ownerId.toString();
+    const arr = occupied.get(key);
+    if (arr) arr.push({ x, y });
+    else occupied.set(key, [{ x, y }]);
+  };
+  // (a) Territory cards that stay put through the battle.
+  for (const c of all) {
+    if (c.zone === 'territory' && !inBattleIds.has(c.id.toString())) {
+      addOccupied(c.ownerId, c.posX, c.posY);
+    }
+  }
+  // (b) Battle cards that will reclaim their exact Territory origin spot: a
+  // character with a Territory origin (rule 3) or a rule-5 card with a
+  // Territory origin. Enhancements never reclaim an origin, and accessories
+  // follow their host (pass 2), so neither seeds occupancy here.
+  for (const c of inBattle) {
+    if (c.equippedToInstanceId !== 0n) continue;
+    if (isLostSoulCard(c)) continue;
+    const reclaimsOrigin =
+      c.originZone === 'territory' &&
+      (isCharacterCard({ cardType: c.cardType }) || !enhSegment(c.cardType));
+    if (reclaimsOrigin) addOccupied(c.ownerId, c.originPosX, c.originPosY);
+  }
+
+  // One occupancy-aware allocator per owner, lazily seeded from that owner's
+  // occupied set (grid geometry + collision live in the pure, unit-tested
+  // battlePlacement helper).
+  const allocators = new Map<string, () => { x: number; y: number }>();
+  const nextFreeSpot = (ownerId: bigint): { posX: string; posY: string } => {
+    const key = ownerId.toString();
+    let alloc = allocators.get(key);
+    if (!alloc) {
+      alloc = makeFreeSpotAllocator(occupied.get(key) ?? []);
+      allocators.set(key, alloc);
+    }
+    const spot = alloc();
+    return { posX: String(spot.x), posY: String(spot.y) };
+  };
 
   // Precedence rules 2-5 (rule 1, attached accessories, is handled by the
   // caller routing them in pass 2 below via their host's result instead).
