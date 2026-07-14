@@ -2416,6 +2416,12 @@ function runBattleAutoReturn(ctx: any, gameId: bigint, actingPlayerId: bigint) {
 // battle band from either 'active' or 'awaiting-soul' (e.g. the defender
 // reload_decks away every surrenderable soul, or the soul-picker
 // disconnects mid-choice).
+//
+// Turn-player press also advances the phase (spec §7/§8): with phase-driven
+// band visibility, leaving currentPhase alone would keep the band open
+// (phase still 'battle') for a second battle. Only the turn player's press
+// advances — the non-turn-player press stays an auto-return-only escape
+// hatch so the turn player keeps their battle phase.
 // ---------------------------------------------------------------------------
 export const end_battle = spacetimedb.reducer(
   { gameId: t.u64() },
@@ -2425,7 +2431,21 @@ export const end_battle = spacetimedb.reducer(
     if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
     if (game.battleState === '') throw new SenderError('No battle in progress');
     const player = findPlayerBySender(ctx, gameId); // either player; also blocks spectators
+    const isTurnPlayer = player.seat === game.currentTurn;
+    const wasBattlePhase = game.currentPhase === 'battle';
     runBattleAutoReturn(ctx, gameId, player.id);
+
+    if (isTurnPlayer && wasBattlePhase) {
+      // Re-read: runBattleAutoReturn already wrote the Game row (clearing
+      // battleState/battleAttackerSeat/lastBattlePlayBySeat) — spreading the
+      // stale pre-return `game` snapshot here would resurrect battleState.
+      // Same hazard end_turn/set_phase call out above.
+      const latest = ctx.db.Game.id.find(gameId);
+      if (latest) {
+        ctx.db.Game.id.update({ ...latest, currentPhase: 'discard' });
+        logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latest.turnNumber, 'discard');
+      }
+    }
   }
 );
 

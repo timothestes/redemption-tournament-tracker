@@ -279,7 +279,10 @@ No `battleSide` column (derived — §3).
   rely on a second client call (a disconnect between calls strands the state).
 - `end_battle(gameId)`: either player, callable from **both `'active'` and
   `'awaiting-soul'`** — the unconditional escape hatch (defender can `reload_deck` away
-  every surrenderable soul, or the picker can disconnect).
+  every surrenderable soul, or the picker can disconnect). When the caller is the **turn
+  player**, it also advances `currentPhase` to `'discard'` after the auto-return (band
+  collapses, the game moves on); a non-turn-player press remains auto-return-only and
+  leaves the turn player's battle phase alone.
 - `end_turn`: when `battleState !== ''`, run the auto-return routine first (battles
   cannot span turns).
 
@@ -324,7 +327,9 @@ existing unfiltered Game `useTable`.
   — every format (T1, T2, Paragon) awards exactly one soul per battle, so there is no
   "surrender another" loop.
 - **End Battle** → no soul dialog, auto-return, band closes (stalemate, declined battle
-  challenge, repelled attack, or escape hatch). **Never for unopposed rescues.**
+  challenge, repelled attack, or escape hatch). **Never for unopposed rescues.** The turn
+  player's press also advances the phase to `discard` (band collapses); a non-turn-player
+  press remains an auto-return-only escape hatch.
 - **All three buttons (Claim Victory / Battle Lost / End Battle) dispatch their reducer
   immediately on click — no confirm dialog.** Once the battle actually closes (auto-return
   has run server-side), each client independently fires a transient (~5s) non-interactive
