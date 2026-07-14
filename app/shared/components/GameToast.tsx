@@ -6,14 +6,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface Toast {
   id: number;
   message: string;
+  durationMs: number;
 }
 
 let toastId = 0;
 const listeners: ((toast: Toast) => void)[] = [];
 const clearListeners: (() => void)[] = [];
 
-export function showGameToast(message: string) {
-  const toast: Toast = { id: ++toastId, message };
+export function showGameToast(message: string, durationMs = 2500) {
+  const toast: Toast = { id: ++toastId, message, durationMs };
   listeners.forEach(fn => fn(toast));
 }
 
@@ -29,7 +30,7 @@ export function GameToastContainer() {
       setToasts(prev => [...prev, toast]);
       setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== toast.id));
-      }, 2500);
+      }, toast.durationMs);
     };
     const clearHandler = () => setToasts([]);
     listeners.push(handler);

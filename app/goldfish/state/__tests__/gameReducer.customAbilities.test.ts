@@ -37,6 +37,7 @@ function makeState(cards: GameCard[]): GameState {
   const zones: GameState['zones'] = {
     deck: [], hand: [], reserve: [], discard: [], paragon: [],
     'land-of-bondage': [], 'soul-deck': [], territory: [], 'land-of-redemption': [], banish: [],
+    battle: [],
   };
   for (const c of cards) zones[c.zone].push(c);
   return {

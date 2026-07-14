@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Stage, Layer, Rect, Text, Group, Image as KonvaImage } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Line, Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 
@@ -54,7 +54,7 @@ import { isHeroCard } from '@/lib/cards/cardAbilities';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
-import { getEffectiveAbilities, isLostSoulCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isCharacterCard, isLostSoulCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
@@ -64,6 +64,7 @@ import type { ZoneId } from '@/app/shared/types/gameCard';
 import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLayout';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
+import BattleResolutionUI from './BattleResolutionUI';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
@@ -85,6 +86,16 @@ import { cardInstanceToGameCard } from '../utils/cardAdapter';
 import { resolveCardImageUrl, type ForgeResolverMap } from '../utils/forgeResolver';
 import type { UndoStack, Captured } from '../hooks/useUndoStack';
 import { makeReverseAction, makeBatchReverseAction, reverseIsSafe } from '../hooks/useUndoStack';
+import {
+  battleSideOf,
+  sideTotals,
+  computeInitiative,
+  brigadeMismatch as computeBrigadeMismatch,
+  siteAttachedSoulIds,
+  parseMeekStats,
+  type BattleCardLike,
+  type BattleSeat,
+} from '../lib/battleMath';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -99,6 +110,18 @@ type FreeFormZone = (typeof FREE_FORM_ZONES)[number];
 
 /** Zones where cards are auto-arranged in a horizontal strip. */
 const AUTO_ARRANGE_ZONES = ['land-of-bondage'] as const;
+
+/** Battle-band background Rect opacity — the seam tween's open target. Must
+ *  stay in sync with the Rect's JSX `opacity` (single source of truth for
+ *  both; the tween must never read the Rect's live value as a target). */
+const BAND_BG_OPACITY = 0.75;
+
+/** Drag-target guidance cue pulse — amplitude and one-leg duration. `yoyo`
+ *  doubles the duration for a full up/down cycle (~1.6s here, within the
+ *  1.5-2s "slow gentle pulse" range). */
+const BATTLE_GUIDANCE_CUE_OPACITY_MIN = 0.35;
+const BATTLE_GUIDANCE_CUE_OPACITY_MAX = 0.6;
+const BATTLE_GUIDANCE_CUE_PULSE_DURATION = 0.8;
 
 /** All zone keys that can be a drop target. */
 type DropZoneKey = string;
@@ -117,12 +140,42 @@ function pointInRect(px: number, py: number, rect: ZoneRect): boolean {
 
 /** Determine if a zone key is a free-form zone (cards positioned at arbitrary x/y). */
 function isFreeFormZone(zone: string): boolean {
-  return zone === 'territory';
+  return zone === 'territory' || zone === 'battle';
 }
 
 /** Determine if a zone key is an auto-arrange zone (horizontal strip layout). */
 function isAutoArrangeZone(zone: string): boolean {
   return zone === 'land-of-bondage';
+}
+
+// ---------------------------------------------------------------------------
+// Battle Zone chrome helpers (spec §5/§6, Task 12)
+// ---------------------------------------------------------------------------
+
+/** A battle-band CardInstance row paired with the owner-relative BattleCardLike
+ *  shape battleMath.ts consumes, plus which local rendering "half" it belongs
+ *  to (my cards vs. opponent-owned cards). */
+interface BattleCardEntry {
+  row: CardInstance;
+  owner: 'my' | 'opponent';
+  like: BattleCardLike;
+}
+
+/** Mirrors battleMath.ts's private isEnhancementSegment / the server's
+ *  enhSegment: exact 'GE'/'EE' segment on cardType, split on '/' and
+ *  trimmed — there is no literal "Enhancement" type. */
+function isBattleEnhancementSegment(cardType: string): boolean {
+  return cardType
+    .split('/')
+    .map((s) => s.trim())
+    .some((s) => s === 'GE' || s === 'EE');
+}
+
+/** Mirrors battleMath.ts's private isLostSoulLike / the server's
+ *  isLostSoulRow (battleStakesLobLostSouls): used client-side to count the
+ *  stakes Lost Souls for the Rescue-attempt vs. Battle-challenge header. */
+function isBattleLostSoulRow(c: { cardType: string; cardName: string }): boolean {
+  return c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
 }
 
 /** Build a human-readable fragment for an opponent-action request, used in the
@@ -528,10 +581,116 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Normalize the raw game.format string (e.g. "Paragon Type 1", "Type 2") to
   // the canonical 'T1' | 'T2' | 'Paragon' expected by the layout function.
   const normalizedFormat = normalizeDeckFormat(gameState.game?.format ?? '');
+  // ---- Drag state (isDraggingRef only — declared early so the battle-flip
+  // deferral effect below can read it; the rest of the drag-state refs live
+  // in their usual block further down). ----
+  const isDraggingRef = useRef(false);
+
+  // Field of Battle band stays open through the soul-surrender pick.
+  // Layout flips are deferred while a card drag is in flight (Task 15, spec
+  // §4): a previous attempt at this feature broke because an opponent
+  // opening/closing the band mid-drag reflowed the layout under the dragged
+  // card, teleporting it and dropping it somewhere the cursor never was.
+  // `rawBattleActive` is the live server-derived truth; `battleActive` (the
+  // APPLIED value everything below actually renders from) only follows it
+  // while no drag is in flight. A flip that arrives mid-drag stays parked in
+  // `rawBattleActiveRef` and is flushed by handleCardDragEnd on
+  // dragend/drag-cancel — a single-step flip, never a per-frame recompute.
+  // Phase-driven (spec §4): the band is visible whenever the turn player has
+  // set_phase('battle'), OR whenever battleState is non-empty (defensive OR —
+  // covers e.g. a battle still resolving a soul surrender after the phase bar
+  // has moved on, or any state drift between the two signals).
+  const rawBattleActive =
+    gameState.game?.currentPhase === 'battle' || (gameState.game?.battleState ?? '') !== '';
+  const rawBattleActiveRef = useRef(rawBattleActive);
+  rawBattleActiveRef.current = rawBattleActive;
+  const [battleActive, setBattleActive] = useState(rawBattleActive);
+  useEffect(() => {
+    if (isDraggingRef.current) return; // parked; flushed on dragend/drag-cancel
+    setBattleActive(rawBattleActive);
+  }, [rawBattleActive]);
+  const gameStatus = gameState.game?.status ?? '';
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player'),
-    [virtualWidth, normalizedFormat, viewerKind],
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', battleActive),
+    [virtualWidth, normalizedFormat, viewerKind, battleActive],
   );
+  // Band rect used for battle DROPS. While the band is still closed (a
+  // divider-proxy drop that opens the battle) the current layout has no
+  // battle rect yet, so normalize against the rect the band WILL have once
+  // battleActive flips — that is the frame every client renders after
+  // enter_battle lands.
+  const battleBandRect = useMemo(() => {
+    if (mpLayout?.zones.battle) return mpLayout.zones.battle;
+    return calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', true).zones.battle;
+  }, [mpLayout, virtualWidth, normalizedFormat, viewerKind]);
+
+  // Field of Battle band background lifecycle. OPEN is deliberately NOT
+  // animated: the moment `battleActive` flips, the layout flip compresses the
+  // territories in that same commit and the band region belongs to no zone —
+  // it has no tint rect of its own, so any delay before the dark band Rect
+  // covers it exposes the raw (bright) board art as a visible flash. The old
+  // height/opacity grow-tween made that worse: it re-zeroed the Rect and left
+  // most of the strip uncovered for the full 200ms glide. So the Rect now
+  // renders in the SAME commit as the layout flip (`battleActive` in the JSX
+  // gate below, not just `bandBgVisible`) at its full JSX height/opacity, and
+  // motion comes from the card FLIP glides instead. Only the CLOSE fades:
+  // by then the re-expanded territories already tint the region underneath,
+  // so a fade-out can't expose anything bright.
+  //
+  // `lastBandRectRef` snapshots the last real band rect — once `battleActive`
+  // flips false, mpLayout stops producing `zones.battle` entirely, so the
+  // closing tween needs a frozen rect to animate against. `bandBgVisible`
+  // keeps the Rect mounted a beat past `battleActive` going false so the
+  // closing tween can finish before it actually unmounts. Every transition
+  // destroys the in-flight tween FIRST (a rapid close→open must not leave a
+  // stale close tween driving the rect to 0), and a reopen snaps the
+  // imperatively-mutated height/opacity back to their layout-derived values —
+  // React won't re-apply JSX attrs it doesn't know changed.
+  const lastBandRectRef = useRef<ZoneRect | null>(null);
+  if (mpLayout?.zones.battle) lastBandRectRef.current = mpLayout.zones.battle;
+  const [bandBgVisible, setBandBgVisible] = useState(battleActive);
+  const bandBgRectRef = useRef<Konva.Rect | null>(null);
+  const bandBgTweenRef = useRef<Konva.Tween | null>(null);
+
+  useEffect(() => {
+    bandBgTweenRef.current?.destroy();
+    bandBgTweenRef.current = null;
+    if (battleActive) {
+      setBandBgVisible(true);
+      // Reopen while a close tween was mid-fade: restore the full layout
+      // values it had been dragging toward 0. On a fresh open this is a
+      // no-op — the Rect just mounted with these exact JSX attrs.
+      const rect = bandBgRectRef.current;
+      const band = lastBandRectRef.current;
+      if (rect && band) {
+        rect.height(band.height);
+        rect.opacity(BAND_BG_OPACITY);
+      }
+      return;
+    }
+    const rect = bandBgRectRef.current;
+    if (!rect || !rect.getStage()) {
+      setBandBgVisible(false);
+      return;
+    }
+    const tween = new KonvaLib.Tween({
+      node: rect,
+      duration: 0.2,
+      height: 0,
+      opacity: 0,
+      easing: KonvaLib.Easings.EaseOut,
+      onFinish: () => {
+        bandBgTweenRef.current = null;
+        setBandBgVisible(false);
+      },
+    });
+    bandBgTweenRef.current = tween;
+    tween.play();
+  }, [battleActive]);
+
+  useEffect(() => {
+    return () => { bandBgTweenRef.current?.destroy(); };
+  }, []);
 
   // Card scale preference
   const { cardScale, zoomIn, zoomOut, resetScale, MIN_SCALE, MAX_SCALE, STEP, setCardScale } = useCardScale();
@@ -1285,6 +1444,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     return undefined;
   }, [myCards, opponentCards, sharedCards]);
+  // Render-fresh mirror of findAnyCardById for handleCardDragEnd's
+  // synchronous stale-row check. On the destroy-path dragend (server moved
+  // the dragged row cross-zone → react-konva unmounts the node in the
+  // commit's mutation phase → Konva fires dragend synchronously), the
+  // deleted fiber never received a prop update, so the event runs the
+  // PREVIOUS commit's handleCardDragEnd closure — whose captured
+  // findAnyCardById still sees the card in its source zone, defeating the
+  // check. This render-body assignment lands during the render phase, i.e.
+  // BEFORE that same commit's mutation phase, so reading through the ref
+  // always yields the zone data of the update that triggered the destroy.
+  // (Same pattern as rawBattleActiveRef above.)
+  const findAnyCardByIdRef = useRef(findAnyCardById);
+  findAnyCardByIdRef.current = findAnyCardById;
 
   // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel).
   // Resolve the live card (by instanceId) from the current zone data so fields like
@@ -2202,10 +2374,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const soulDeckDragTopIdRef = useRef<string | null>(null);
 
   // ---- Drag state ----
-  const isDraggingRef = useRef(false);
+  // isDraggingRef is declared earlier (battle-flip deferral, spec §4).
   const dragEndTimeRef = useRef<number>(0);
   const dragSourceZoneRef = useRef<string | null>(null);
   const dragSourceOwnerRef = useRef<'my' | 'opponent' | 'shared' | null>(null);
+  // instanceId of the card currently mid-Konva-drag — used by the mid-drag
+  // zone-change guard below (Task 15 spec §5) to look up its live zone/node.
+  const draggedCardIdRef = useRef<string | null>(null);
+  // Set by the mid-drag zone-change guard right before it calls
+  // node.stopDrag(); tells handleCardDragEnd (fired synchronously by
+  // stopDrag()) to skip drop resolution — there's no user-intended drop here.
+  const dragCancelledRef = useRef(false);
+  // Zone of each FOLLOWER card at drag start (multi-select / equip-follower
+  // drags). handleCardDragEnd's synchronous stale-row check compares each
+  // follower's live zone against this — a follower the server moved
+  // mid-drag is dropped from the batch dispatch (its new position wins).
+  // The lead card's start zone lives in dragSourceZoneRef.
+  const dragStartFollowerZonesRef = useRef<Map<string, string> | null>(null);
   const dragOriginalPosRef = useRef<{ x: number; y: number } | null>(null);
   // Local coords in the original parent (before reparenting to the layer).
   // Used by snapBack to restore the card inside its source Group accurately.
@@ -2290,6 +2475,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         return { zone: 'soul-deck', owner: 'shared' };
       }
 
+      // Battle band (Field of Battle) — checked BEFORE the territory loops.
+      // Owner 'my' is a formality: the drop path always sends targetOwnerId ''
+      // so ownership never transfers on battle drops (spec §4). The band is
+      // now phase-driven (set_phase opens it) — there is no idle divider-proxy
+      // drop that opens a battle anymore; the band must already be visible.
+      if (battleActive) {
+        if (mpLayout.zones.battle && pointInRect(x, y, mpLayout.zones.battle)) {
+          return { zone: 'battle', owner: 'my' };
+        }
+      }
+
       // Check my zones (all: free-form + sidebar piles)
       for (const [key, rect] of Object.entries(myZones)) {
         if (pointInRect(x, y, rect)) {
@@ -2314,7 +2510,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       return null;
     },
-    [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect, normalizedFormat],
+    [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect, normalizedFormat, battleActive],
   );
 
   // Dragging the Soul Deck pile: capture the top soul's ID at drag-start,
@@ -2395,6 +2591,48 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     offsetX,
     offsetY,
     moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) => {
+      // Battle is a single band rect hit-tested as owner 'my' as a formality
+      // (see findZoneForModalDrag) — it is NOT in myZones/opponentZones, so
+      // it can't go through the generic zone-lookup path below. Normalize
+      // against battleBandRect with CARD-OWNER mirroring and the same
+      // enter/move/no-op gating handleCardDragEnd's battle drop path uses,
+      // instead of falling into the else-branch further down and sending
+      // raw virtual pixels as posX/posY (an invisible card at toScreenPos).
+      if (toZone === 'battle') {
+        const battleState = gameState.game?.battleState;
+        const battleNeedsEnter = battleState === '';
+        if (!battleNeedsEnter && battleState !== 'active') {
+          // 'awaiting-soul': band is open but the server refuses new plays
+          // mid-resolution — snap back (no-op), matching handleCardDragEnd.
+          return;
+        }
+        // Card-owner mirroring (spec §3/§4): battle drops never transfer
+        // ownership and mirror by the DRAGGED CARD's owner, not the hit
+        // zone (always 'my'). Shared-owned cards (0n) fold into 'my', same
+        // as handleCardDragEnd's sourceOwner/targetOwner derivation.
+        const sourceInstance = findAnyCardById(id);
+        const sourceOwner: 'my' | 'opponent' | 'shared' =
+          sourceInstance?.ownerId === 0n
+            ? 'shared'
+            : sourceInstance?.ownerId === gameState.opponentPlayer?.id
+            ? 'opponent'
+            : 'my';
+        const targetOwner: 'my' | 'opponent' = sourceOwner === 'opponent' ? 'opponent' : 'my';
+        const execute = () => {
+          if (posX == null || posY == null || !battleBandRect) return;
+          const db = toDbPos(posX, posY, battleBandRect, targetOwner, { cardWidth, cardHeight });
+          if (battleNeedsEnter) {
+            gameState.enterBattle(BigInt(id), String(db.x), String(db.y));
+          } else {
+            gameState.moveCard(BigInt(id), 'battle', undefined, String(db.x), String(db.y), '');
+          }
+        };
+        const card = findMyCardById(id);
+        if (checkReserveProtection(card?.zone, 'battle', execute)) return;
+        execute();
+        return;
+      }
+
       // Determine which player's zone was hit so we can normalize correctly
       const hit = posX != null && posY != null
         ? findZoneAtPosition(posX + cardWidth / 2, posY + cardHeight / 2)
@@ -2420,6 +2658,51 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       execute();
     },
     moveCardsBatch: (ids: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) => {
+      // Battle batch drops: mirror the single-card branch above. Unlike
+      // territory/LOB, the generic path below only special-cases
+      // ('territory' | 'land-of-bondage') for normalization, so 'battle'
+      // fell through to `gameState.moveCardsBatch(ids, toZone)` with NO
+      // positions at all — every card piled at the server's fallback spot.
+      if (toZone === 'battle') {
+        const battleState = gameState.game?.battleState;
+        const battleNeedsEnter = battleState === '';
+        const execute = () => {
+          if (!battleNeedsEnter && battleState !== 'active') {
+            // 'awaiting-soul': no meaningful new plays mid-resolution — no-op.
+            return;
+          }
+          if (!positions || !battleBandRect) {
+            gameState.moveCardsBatch(JSON.stringify(ids), 'battle');
+            return;
+          }
+          // Small per-card fan so a multi-select drop doesn't pile every
+          // card on the exact same point (mirrors the territory/LOB fan
+          // this hook already applies before calling us — battle just
+          // never got one).
+          const BATTLE_FAN_OFFSET = 20;
+          const normalized: Record<string, { posX: string; posY: string }> = {};
+          ids.forEach((id, i) => {
+            const p = positions[id];
+            if (!p) return;
+            const sourceInstance = findAnyCardById(id);
+            const sourceOwner: 'my' | 'opponent' =
+              sourceInstance?.ownerId === gameState.opponentPlayer?.id ? 'opponent' : 'my';
+            const db = toDbPos(p.posX + i * BATTLE_FAN_OFFSET, p.posY, battleBandRect, sourceOwner, { cardWidth, cardHeight });
+            normalized[id] = { posX: String(db.x), posY: String(db.y) };
+          });
+          const leadId = ids[0];
+          if (battleNeedsEnter && leadId && normalized[leadId]) {
+            // Open the battle atomically with the lead card, same as
+            // handleCardDragEnd's group-drag battleNeedsEnter branch.
+            gameState.enterBattle(BigInt(leadId), normalized[leadId].posX, normalized[leadId].posY);
+          }
+          gameState.moveCardsBatch(JSON.stringify(ids), 'battle', JSON.stringify(normalized), '');
+        };
+        if (checkReserveBatchProtection(ids, 'battle', execute)) return;
+        execute();
+        return;
+      }
+
       const execute = () => {
         if (positions && (toZone === 'territory' || toZone === 'land-of-bondage')) {
           const first = positions[ids[0]];
@@ -3020,6 +3303,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const handleCardDragStart = useCallback(
     (card: GameCard) => {
       isDraggingRef.current = true;
+      draggedCardIdRef.current = card.instanceId;
+      dragCancelledRef.current = false;
       if (dragSettleTimerRef.current !== null) {
         clearTimeout(dragSettleTimerRef.current);
         dragSettleTimerRef.current = null;
@@ -3103,15 +3388,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       // Multi-card drag: rasterize followers into a single ghost image.
       // Follower set: multi-select takes precedence; otherwise, for a warrior
-      // being dragged within my own territory, attached weapons come along.
+      // being dragged within my own territory or battle band, attached
+      // weapons come along.
       const isMultiSelectDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       // A host being dragged carries its attached accessories along.
-      // Only applies to territory warriors (with weapons). LOB souls do NOT
-      // drag their attached sites — when a soul is rescued or otherwise
-      // leaves LoB, the site stays put in LoB (the server's accessory
-      // cascade unlinks it in place).
+      // Applies to territory AND battle warriors (with weapons) — a warrior
+      // dragged out of the band, or repositioned within it, keeps its weapon
+      // attached. LOB souls do NOT drag their attached sites — when a soul is
+      // rescued or otherwise leaves LoB, the site stays put in LoB (the
+      // server's accessory cascade unlinks it in place); 'land-of-bondage' is
+      // a separate zone from 'battle'/'territory' so this doesn't affect it.
       const equipFollowerIds: string[] =
-        !isMultiSelectDrag && card.zone === 'territory' && card.ownerId === 'player1'
+        !isMultiSelectDrag && (card.zone === 'territory' || card.zone === 'battle') && card.ownerId === 'player1'
           ? (myCards[card.zone] ?? [])
               .filter((c) => c.equippedToInstanceId === BigInt(card.instanceId))
               .map((c) => String(c.id))
@@ -3119,6 +3407,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const followerIds: string[] = isMultiSelectDrag
         ? Array.from(selectedIds).filter((id) => id !== card.instanceId)
         : equipFollowerIds;
+
+      // Record each follower's zone at drag start — dragend's synchronous
+      // stale-row check drops from the batch any follower the server moved
+      // mid-drag. (Multi-select followers can start in different zones than
+      // the lead, so a per-card snapshot is required; the lead's own start
+      // zone is dragSourceZoneRef.)
+      if (followerIds.length > 0) {
+        const startZones = new Map<string, string>();
+        for (const id of followerIds) {
+          const inst = findAnyCardById(id);
+          if (inst) startZones.set(id, inst.zone);
+        }
+        dragStartFollowerZonesRef.current = startZones;
+      } else {
+        dragStartFollowerZonesRef.current = null;
+      }
 
       if (followerIds.length > 0) {
         const dragNode = cardNodeRefs.current.get(card.instanceId);
@@ -3279,6 +3583,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const originalPos = dragOriginalPosRef.current;
       const originalLocalPos = dragOriginalLocalPosRef.current;
       const sourceZone = dragSourceZoneRef.current;
+      const startFollowerZones = dragStartFollowerZonesRef.current;
       const originalParent = dragOriginalParentRef.current;
       const originalZIndex = dragOriginalZIndexRef.current;
       // Capture the dragged card's actual rendered size before resetting
@@ -3308,6 +3613,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       dragOriginalZIndexRef.current = null;
       dragHoverZoneRef.current = null;
       dragFollowerOffsets.current = null;
+      dragStartFollowerZonesRef.current = null;
       const ghostOffset = dragGhostOffsetRef.current;
       dragGhostOffsetRef.current = null;
       setDragHoverZone(null);
@@ -3340,6 +3646,49 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         });
       }
 
+      // Task 15 spec §4: flush any battle-state flip parked while this drag
+      // was in flight, and release the id the mid-drag zone-change guard
+      // tracks. Runs on every dragend — including the stopDrag()-triggered
+      // cancel path below — so the deferral can never wedge open.
+      draggedCardIdRef.current = null;
+      setBattleActive(rawBattleActiveRef.current);
+
+      if (dragCancelledRef.current) {
+        // The mid-drag zone-change guard (below) already called
+        // node.stopDrag() because the row's zone changed server-side while
+        // this client was still dragging it (e.g. the opponent's End Battle
+        // auto-returned a battle card). There's no drop to resolve — the
+        // row's new zone/position is already authoritative from the server,
+        // and resolving one here would race a stale drop target against it.
+        dragCancelledRef.current = false;
+        return;
+      }
+
+      // SYNCHRONOUS stale-row check (review Critical): for a genuine
+      // cross-zone server move mid-drag (e.g. opponent's End Battle
+      // auto-return), react-konva's removeChild runs in React's commit
+      // mutation phase and Konva's own Node.remove() stops the drag and
+      // fires THIS dragend synchronously — all before the passive effect
+      // guard above ever runs, so dragCancelledRef is still false here.
+      // The guard therefore cannot be the only protection: re-check the
+      // row's live zone right now, inside dragend itself, independent of
+      // what triggered it. Row gone, or zone no longer the drag-start
+      // zone → the server moved the card mid-drag; its position wins.
+      // Dispatch NOTHING (no moveCard, no undo entry) and don't touch the
+      // node — react-konva has already destroyed/remounted it in the new
+      // zone, and destroying a live node here is the ghost-card class.
+      //
+      // MUST read through findAnyCardByIdRef, not the closure: the deleted
+      // fiber never got a prop update, so this destroy-path dragend runs
+      // the PREVIOUS commit's closure, whose captured findAnyCardById still
+      // reports the card in its source zone (re-review finding). The ref is
+      // reassigned in the render body, which precedes the same commit's
+      // mutation phase — it is always fresh when this fires.
+      const liveLeadRow = findAnyCardByIdRef.current(card.instanceId);
+      if (!liveLeadRow || liveLeadRow.zone !== sourceZone) {
+        return;
+      }
+
       const node = e.target;
       const dropX = node.x();
       const dropY = node.y();
@@ -3354,10 +3703,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const hasEquipFollowers =
         !isMultiSelectDrag && followerOffsets !== null && followerOffsets.size > 0;
       const isGroupDrag = isMultiSelectDrag || hasEquipFollowers;
+      // Same stale-row rule applied per FOLLOWER: a follower the server
+      // moved mid-drag (zone differs from its drag-start snapshot, or row
+      // deleted) is dropped from the batch so the group dispatch can't
+      // re-move it. The lead card was already validated above. Reads
+      // through findAnyCardByIdRef for the same stale-closure reason.
+      const followerStillDraggable = (id: string): boolean => {
+        if (id === card.instanceId) return true;
+        const live = findAnyCardByIdRef.current(id);
+        if (!live) return false;
+        const startZone = startFollowerZones?.get(id);
+        return startZone === undefined || live.zone === startZone;
+      };
       // Sort selected card IDs by their current zoneIndex so the server
       // assigns new zoneIndices in the same relative order — prevents
       // card order from getting scrambled during group drags.
-      const cardIds = isMultiSelectDrag
+      const cardIds = (isMultiSelectDrag
         ? Array.from(selectedIds).sort((a, b) => {
             const aCard = findAnyCardById(a);
             const bCard = findAnyCardById(b);
@@ -3365,7 +3726,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           })
         : hasEquipFollowers
         ? [card.instanceId, ...Array.from(followerOffsets!.keys())]
-        : [card.instanceId];
+        : [card.instanceId]
+      ).filter(followerStillDraggable);
       const cardId = BigInt(card.instanceId);
 
       // Helper to snap back to original position and restore to original parent.
@@ -3428,39 +3790,49 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           : card.ownerId === 'player1'
           ? 'my'
           : 'opponent';
-      const isSameZone = targetZone === sourceZone && hit.owner === sourceOwner;
+      // Battle is a single band rect and its hit owner is always 'my', so a
+      // card already in battle re-dropped inside the band is an intra-band
+      // reposition regardless of which player owns the card.
+      const isSameZone = targetZone === sourceZone && (hit.owner === sourceOwner || targetZone === 'battle');
 
       // Equip: if a weapon is dropped on a warrior in the local player's
-      // territory, attach instead of moving. Gated to single-card drags
-      // (group drags are intentional batch moves, not equip intents).
+      // territory OR on a warrior already in the battle band, attach instead
+      // of moving. Gated to single-card drags (group drags are intentional
+      // batch moves, not equip intents). Battle host candidates are drawn
+      // from `myCards['battle']` (card ownership), never `hit.owner` — the
+      // battle band hit-test always reports owner 'my' as a formality (see
+      // findZoneAtPosition), so restricting the candidate pool to my own
+      // battle cards is what keeps this from equipping onto the opponent's
+      // battling warrior.
       //
       // Note: `hitTestWarrior` was written for goldfish where GameCard.posX/posY
       // are pixel coords. In multiplayer they're normalized 0–1 DB values, so
       // we convert each candidate's position to virtual-canvas pixels first.
       if (
         !isGroupDrag &&
-        targetZone === 'territory' &&
+        (targetZone === 'territory' || targetZone === 'battle') &&
         hit.owner === 'my' &&
         card.ownerId === 'player1'
       ) {
         const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
-        const myTerritoryZone = myZones['territory'];
-        if (isWeapon(cardMeta) && myTerritoryZone) {
-          const myTerritoryRaw = myCards['territory'] ?? [];
-          const myTerritoryCards = myTerritoryRaw.map((c) => {
+        const isBattleTarget = targetZone === 'battle';
+        const hostZoneRect = isBattleTarget ? battleBandRect : myZones['territory'];
+        if (isWeapon(cardMeta) && hostZoneRect) {
+          const myHostRaw = isBattleTarget ? myCards['battle'] ?? [] : myCards['territory'] ?? [];
+          const myHostCards = myHostRaw.map((c) => {
             const adapted = cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1', forgeResolver);
             if (adapted.posX !== undefined && adapted.posY !== undefined) {
-              const { x, y } = toScreenPos(adapted.posX, adapted.posY, myTerritoryZone, 'my');
+              const { x, y } = toScreenPos(adapted.posX, adapted.posY, hostZoneRect, 'my');
               return { ...adapted, posX: x, posY: y };
             }
             return adapted;
           });
-          const warriorCandidates = myTerritoryCards.filter((c) => {
+          const warriorCandidates = myHostCards.filter((c) => {
             if (c.instanceId === card.instanceId) return false;
             if (c.equippedTo) return false;
             const meta = findCard(c.cardName, c.cardSet, c.cardImgFile);
             if (!isWarrior(meta)) return false;
-            const attached = myTerritoryCards.filter((x) => x.equippedTo === c.instanceId);
+            const attached = myHostCards.filter((x) => x.equippedTo === c.instanceId);
             return attached.length < MAX_EQUIPPED_WEAPONS_PER_WARRIOR;
           });
           const hitWarrior = hitTestWarrior(
@@ -3475,6 +3847,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             gameState.attachCard(cardId, BigInt(hitWarrior.instanceId));
             snapBack();
             return;
+          }
+          // No Warrior under the drop — if it landed on a non-Warrior
+          // character, the refusal is rules-correct (only Warrior-class
+          // characters carry weapons) but used to be silent: the weapon just
+          // sat in the zone and got discarded at battle end, reading as "the
+          // game ate my sword" (UX review F10). Soft hint only — the move
+          // below still proceeds, nothing is blocked.
+          const nonWarriorCharacters = myHostCards.filter((c) => {
+            if (c.instanceId === card.instanceId) return false;
+            if (c.equippedTo) return false;
+            if (!isCharacterCard({ cardType: c.type })) return false;
+            return !isWarrior(findCard(c.cardName, c.cardSet, c.cardImgFile));
+          });
+          const hitNonWarrior = hitTestWarrior(
+            center.x,
+            center.y,
+            cardWidth,
+            cardHeight,
+            nonWarriorCharacters,
+            card.instanceId,
+          );
+          if (hitNonWarrior) {
+            showGameToast(`${hitNonWarrior.cardName} isn't a Warrior — ${card.cardName} won't attach`, 4000);
           }
         }
       }
@@ -3566,15 +3961,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // (0–1 ratios). This ensures cards render at the correct proportional position
       // regardless of each player's screen/window size.
       const zoneRect =
-        hit.owner === 'my'
+        targetZone === 'battle'
+          ? battleBandRect
+          : hit.owner === 'my'
           ? myZones[targetZone]
           : hit.owner === 'opponent'
           ? opponentZones[targetZone]
           : mpLayout?.zones.sharedLob;
       // Resolve target owner ID — always set to the target zone's owner so
       // cards transfer ownership when moving between players' zones.
+      // Battle: ownership NEVER transfers on battle drops (spec §4) — always
+      // send an empty targetOwnerId regardless of the hit's formal owner.
       const targetOwnerId =
-        hit.owner === 'shared'
+        targetZone === 'battle'
+          ? ''
+          : hit.owner === 'shared'
           ? '0'
           : hit.owner === 'my' && gameState.myPlayer
           ? String(gameState.myPlayer.id)
@@ -3593,14 +3994,41 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // When crossing between them, offset by card dimensions so the visual
       // position stays consistent.
       const sourceIsRotated = sourceOwner === 'opponent' && (isFreeFormZone(sourceZone ?? '') || isAutoArrangeZone(sourceZone ?? '') || SIDEBAR_PILE_ZONES.includes(sourceZone as any));
-      const targetIsRotated = isOpponentTarget && isFreeFormZone(targetZone);
+      // Battle renders by CARD owner (my cards rot 0, opponent-owned rot 180)
+      // — the hit owner is always 'my' and must not drive rotation there.
+      const targetIsRotated =
+        targetZone === 'battle'
+          ? sourceOwner === 'opponent'
+          : isOpponentTarget && isFreeFormZone(targetZone);
       const { x: adjDropX, y: adjDropY } = adjustAnchorForRotationChange(
         dropX, dropY, dragW, dragH, sourceIsRotated, targetIsRotated,
       );
 
-      const targetOwner: 'my' | 'opponent' = isOpponentTarget ? 'opponent' : 'my';
+      // Battle positions mirror by CARD owner ('my'/'opponent' relative to me),
+      // NOT by hit owner, so each player's cards land on their own half on
+      // both screens (spec §3). Shared-owned cards render rot 0 → 'my'.
+      const targetOwner: 'my' | 'opponent' =
+        targetZone === 'battle'
+          ? (sourceOwner === 'opponent' ? 'opponent' : 'my')
+          : isOpponentTarget
+          ? 'opponent'
+          : 'my';
       const clampOpts = isFreeFormZone(targetZone) ? { cardWidth, cardHeight } : undefined;
       const toDb = (px: number, py: number) => toDbPos(px, py, zoneRect!, targetOwner, clampOpts);
+
+      // Battle drops: when the band is closed, opening must be atomic with the
+      // move — a client-side startBattle();moveCard(); pair would race the
+      // opponent (spec §4). enter_battle throws during 'awaiting-soul', but
+      // the server redirects stray move_card battle drops to territory then,
+      // so route non-'active' states through enter_battle only when closed.
+      const battleNeedsEnter = targetZone === 'battle' && gameState.game?.battleState === '';
+      const dropSingleCard = (db: { x: number; y: number }) => {
+        if (battleNeedsEnter) {
+          gameState.enterBattle(cardId, String(db.x), String(db.y));
+        } else {
+          moveCard(cardId, targetZone, '', String(db.x), String(db.y), targetOwnerId);
+        }
+      };
 
       // Same free-form zone: just update position.
       // Restore the node to its original parent Group first — it was reparented
@@ -3734,6 +4162,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         return;
       }
 
+      // Battle drops while the battle is resolving ('awaiting-soul'): the band
+      // is still open, but the server refuses enter_battle and redirects plain
+      // move_card battle drops back to territory. For a territory-origin card
+      // that redirect keeps the row in its SOURCE zone with the same React
+      // key, so the destroy below would orphan it as an invisible ghost node
+      // (same class as the LOB pile-drop guard further down). New plays are
+      // not meaningful mid-resolution — snap everything back instead. The
+      // closed-band proxy path is untouched (battleState '' → enter_battle).
+      if (targetZone === 'battle' && !battleNeedsEnter && gameState.game?.battleState !== 'active') {
+        if (followerOffsets && originalPos) {
+          for (const [id, offset] of followerOffsets) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) {
+              fNode.x(originalPos.x + offset.dx);
+              fNode.y(originalPos.y + offset.dy);
+            }
+          }
+        }
+        snapBack();
+        return;
+      }
+
       // Turn 1 reserve protection — check before executing the move
       if (sourceZone === 'reserve' && targetZone !== 'reserve' && isMyFirstTurn && hasOpponent) {
         const executeDragMove = () => {
@@ -3752,13 +4202,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   positions[id] = { posX: String(fDb.x), posY: String(fDb.y) };
                 }
               }
+              if (battleNeedsEnter) {
+                // Open the battle atomically with the lead card; the batch
+                // executes after it server-side (same-connection reducer
+                // ordering), so the group lands in an already-open band.
+                gameState.enterBattle(cardId, positions[card.instanceId].posX, positions[card.instanceId].posY);
+              }
               moveCardsBatch(JSON.stringify(cardIds), targetZone, JSON.stringify(positions), targetOwnerId);
             } else {
               moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
             }
           } else if (isFreeFormZone(targetZone)) {
             const db = toDb(adjDropX, adjDropY);
-            moveCard(cardId, targetZone, '', String(db.x), String(db.y), targetOwnerId);
+            dropSingleCard(db);
           } else if (isAutoArrangeZone(targetZone)) {
             moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
           } else {
@@ -3976,6 +4432,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               positions[id] = { posX: String(fDb.x), posY: String(fDb.y) };
             }
           }
+          if (battleNeedsEnter) {
+            // Open the battle atomically with the lead card; the batch
+            // executes after it server-side (same-connection reducer
+            // ordering), so the group lands in an already-open band.
+            gameState.enterBattle(cardId, positions[card.instanceId].posX, positions[card.instanceId].posY);
+          }
           moveCardsBatch(
             JSON.stringify(cardIds),
             targetZone,
@@ -3988,7 +4450,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         clearSelection();
       } else if (isFreeFormZone(targetZone)) {
         const db = toDb(adjDropX, adjDropY);
-        moveCard(cardId, targetZone, '', String(db.x), String(db.y), targetOwnerId);
+        dropSingleCard(db);
       } else if (isAutoArrangeZone(targetZone)) {
         // Auto-arrange zone: positions are ignored by rendering
         moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
@@ -4024,6 +4486,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       myZones,
       opponentZones,
       mpLayout,
+      battleBandRect,
       gameState.myPlayer,
       gameState.opponentPlayer,
       scale,
@@ -4037,6 +4500,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       forgeResolver,
     ],
   );
+
+  // Mid-drag zone-change guard (Task 15 spec §4/§5), UX layer: if the row
+  // backing the actively-dragged card moves to a different zone server-side
+  // (e.g. the opponent's End Battle auto-returns a battle card mid-drag) and
+  // the node SURVIVED the commit, stop the Konva drag now rather than letting
+  // the user keep dragging a phantom until pointerup. This effect is NOT the
+  // correctness guarantee: when the server move unmounts the node,
+  // react-konva's removeChild → Konva Node.remove() runs synchronously in
+  // the commit mutation phase, Konva stops the drag itself and fires dragend
+  // — all before this passive effect can run, so dragCancelledRef is never
+  // set on that path. The synchronous stale-row check at the top of
+  // handleCardDragEnd is what actually blocks the stale dispatch in every
+  // case; this effect just ends the drag early when it gets the chance.
+  useEffect(() => {
+    if (!isDraggingRef.current) return;
+    const id = draggedCardIdRef.current;
+    if (!id) return;
+    const liveZone = findAnyCardById(id)?.zone ?? null;
+    if (liveZone === dragSourceZoneRef.current) return;
+    const node = cardNodeRefs.current.get(id);
+    if (node && node.getStage() && node.isDragging()) {
+      dragCancelledRef.current = true;
+      node.stopDrag();
+    }
+  }, [findAnyCardById]);
 
   // Noop handlers for non-draggable cards
   const noopDrag = useCallback((_e: Konva.KonvaEventObject<DragEvent>) => {}, []);
@@ -4463,6 +4951,552 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return result;
   }, [opponentCards, opponentZones, cardWidth, cardHeight, opponentLobLayout]);
 
+  // ---- Derive battle-band weapon offsets (same math as territory, anchored
+  // to the band rect instead) ----
+  // Mirrors by CARD ownership (myCards['battle'] / opponentCards['battle']),
+  // matching the battle render's split — NOT by hit owner, since the battle
+  // hit-test always reports owner 'my' as a formality (see
+  // findZoneAtPosition). No seam tracking: battle doesn't have a detach
+  // ("unlink") affordance yet, so these maps are render-only.
+  const myBattleDerivedWeaponPositions = useMemo(() => {
+    const result = new Map<string, { x: number; y: number }>();
+    const battle = myCards['battle'] ?? [];
+    if (!battleBandRect || battle.length === 0) return result;
+    const byHost = new Map<bigint, CardInstance[]>();
+    for (const c of battle) {
+      if (c.equippedToInstanceId === 0n) continue;
+      const list = byHost.get(c.equippedToInstanceId);
+      if (list) list.push(c);
+      else byHost.set(c.equippedToInstanceId, [c]);
+    }
+    for (const [hostId, accessories] of byHost) {
+      const host = battle.find((c) => c.id === hostId);
+      if (!host || !host.posX) continue;
+      const { x: hostX, y: hostY } = toScreenPos(
+        parseFloat(host.posX),
+        parseFloat(host.posY),
+        battleBandRect,
+        'my',
+      );
+      accessories.forEach((w, i) => {
+        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
+        result.set(String(w.id), { x: hostX + dx, y: hostY + dy });
+      });
+    }
+    return result;
+  }, [myCards, battleBandRect, cardWidth, cardHeight]);
+
+  // Opponent battle accessory offsets are mirror-flipped (the opponent's
+  // half of the band renders rotated 180°) — same convention as
+  // `opponentDerivedWeaponPositions` for territory.
+  const opponentBattleDerivedWeaponPositions = useMemo(() => {
+    const result = new Map<string, { x: number; y: number }>();
+    const battle = opponentCards['battle'] ?? [];
+    if (!battleBandRect || battle.length === 0) return result;
+    const byHost = new Map<bigint, CardInstance[]>();
+    for (const c of battle) {
+      if (c.equippedToInstanceId === 0n) continue;
+      const list = byHost.get(c.equippedToInstanceId);
+      if (list) list.push(c);
+      else byHost.set(c.equippedToInstanceId, [c]);
+    }
+    for (const [hostId, accessories] of byHost) {
+      const host = battle.find((c) => c.id === hostId);
+      if (!host || !host.posX) continue;
+      const { x: hostX, y: hostY } = toScreenPos(
+        parseFloat(host.posX),
+        parseFloat(host.posY),
+        battleBandRect,
+        'opponent',
+      );
+      accessories.forEach((w, i) => {
+        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
+        result.set(String(w.id), { x: hostX - dx, y: hostY - dy });
+      });
+    }
+    return result;
+  }, [opponentCards, battleBandRect, cardWidth, cardHeight]);
+
+  // ---- FLIP glides: territory + battle-band reflows (Task 15 spec §4) ----
+  // Extends the useHandLayoutTween slot-map pattern used above for hand
+  // slots and lobSlots: when the band opens/closes, territories
+  // compress/expand and existing cards reflow to new screen positions — this
+  // glides them instead of snapping. Each slot's x/y/rotation must exactly
+  // match what the render below assigns as GameCardNode props (same
+  // toScreenPos + clamp math, same weapon-offset maps), or the tween's
+  // target would fight the JSX-asserted value on the next render.
+  //
+  // Scope cut: territory<->battle CROSSING moves (a card entering the band
+  // on open, or auto-returning to territory on close) are NOT glided here —
+  // each zone renders its cards inside its own clipped Konva Group, so a
+  // card crossing zones unmounts from one Group and mounts fresh in the
+  // other; there's no single persistent Konva node to tween across that
+  // boundary without restructuring the render into one unclipped group.
+  // Those moves snap — consistent with how a card's first appearance in any
+  // of these slot maps already never tweens (same convention as hand/LOB
+  // deals). Within-zone reflows (territory compress/expand; a battle card
+  // repositioning while others remain) DO glide via the maps below.
+  const territorySlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    const myTerrZone = myZones['territory'];
+    if (myTerrZone) {
+      for (const card of myCards['territory'] ?? []) {
+        if (card.equippedToInstanceId !== 0n) {
+          const derived = myDerivedWeaponPositions.get(String(card.id));
+          if (derived) {
+            m.set(String(card.id), { x: derived.x, y: derived.y, rotation: 0 });
+            continue;
+          }
+        }
+        let x: number, y: number;
+        if (card.posX) {
+          ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), myTerrZone, 'my'));
+        } else {
+          x = myTerrZone.x + 20;
+          y = myTerrZone.y + 24;
+        }
+        y = Math.min(y, myTerrZone.y + myTerrZone.height - cardHeight);
+        m.set(String(card.id), { x, y, rotation: 0 });
+      }
+    }
+    const oppTerrZone = opponentZones['territory'];
+    if (oppTerrZone) {
+      for (const card of opponentCards['territory'] ?? []) {
+        if (card.equippedToInstanceId !== 0n) {
+          const derived = opponentDerivedWeaponPositions.get(String(card.id));
+          if (derived) {
+            m.set(String(card.id), { x: derived.x, y: derived.y, rotation: 180 });
+            continue;
+          }
+        }
+        const { x: rawX, y: rawY } = toScreenPos(
+          card.posX ? parseFloat(card.posX) : 0,
+          card.posY ? parseFloat(card.posY) : 0,
+          oppTerrZone,
+          'opponent',
+        );
+        const y = Math.max(rawY, oppTerrZone.y + cardHeight);
+        m.set(String(card.id), { x: rawX, y, rotation: 180 });
+      }
+    }
+    return m;
+  }, [myCards, opponentCards, myZones, opponentZones, cardHeight, myDerivedWeaponPositions, opponentDerivedWeaponPositions]);
+  useHandLayoutTween(territorySlots, cardNodeRefs);
+
+  const battleSlots = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; rotation: number }>();
+    const band = mpLayout?.zones.battle;
+    if (!band) return m;
+    for (const card of myCards['battle'] ?? []) {
+      if (card.equippedToInstanceId !== 0n) {
+        const derived = myBattleDerivedWeaponPositions.get(String(card.id));
+        if (derived) {
+          m.set(String(card.id), { x: derived.x, y: derived.y, rotation: 0 });
+          continue;
+        }
+      }
+      let x: number, y: number;
+      if (card.posX) {
+        ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), band, 'my'));
+      } else {
+        x = band.x + 20;
+        y = band.y + 24;
+      }
+      y = Math.min(y, band.y + band.height - cardHeight);
+      m.set(String(card.id), { x, y, rotation: 0 });
+    }
+    for (const card of opponentCards['battle'] ?? []) {
+      if (card.equippedToInstanceId !== 0n) {
+        const derived = opponentBattleDerivedWeaponPositions.get(String(card.id));
+        if (derived) {
+          m.set(String(card.id), { x: derived.x, y: derived.y, rotation: 180 });
+          continue;
+        }
+      }
+      const { x: rawX, y: rawY } = toScreenPos(
+        card.posX ? parseFloat(card.posX) : 0,
+        card.posY ? parseFloat(card.posY) : 0,
+        band,
+        'opponent',
+      );
+      const y = Math.max(rawY, band.y + cardHeight);
+      m.set(String(card.id), { x: rawX, y, rotation: 180 });
+    }
+    return m;
+  }, [myCards, opponentCards, mpLayout, cardHeight, myBattleDerivedWeaponPositions, opponentBattleDerivedWeaponPositions]);
+  useHandLayoutTween(battleSlots, cardNodeRefs);
+
+  // ---- Battle Zone chrome derived state (spec §5/§6, Task 12) ----
+  // BattleCardLike[] built from the live battle rows (my + opponent-owned).
+  // dbX is read straight off posX — already owner-local, no viewer flip
+  // (spec §3: every player plays into their own right half). cardRelW uses
+  // the layout's UNSCALED mainCard width (not the cardScale-zoomed
+  // `cardWidth` used for actual rendering) so side derivation stays
+  // consistent regardless of either viewer's zoom preference — both clients
+  // compute the same band-relative ratio from the same mpLayout inputs.
+  const battleCardEntries = useMemo<BattleCardEntry[]>(() => {
+    if (!battleActive || !mpLayout?.zones.battle) return [];
+    const band = mpLayout.zones.battle;
+    const cardRelW = band.width > 0 ? rawMain.cardWidth / band.width : 0;
+    const mySeat = gameState.myPlayer ? (String(gameState.myPlayer.seat) as BattleSeat) : null;
+    const oppSeat = gameState.opponentPlayer ? (String(gameState.opponentPlayer.seat) as BattleSeat) : null;
+    const entries: BattleCardEntry[] = [];
+    const pushRows = (rows: CardInstance[] | undefined, owner: 'my' | 'opponent', seat: BattleSeat | null) => {
+      if (!seat || !rows) return;
+      for (const row of rows) {
+        // Meek hero/character in battle must count its meek-side power/
+        // toughness, not its normal-side stats (spec: Matthias converted to
+        // meek is 7/7). The meek value lives in the row's own strength/
+        // toughness string ("<normal>(<meek>)") — see parseMeekStats. Falls
+        // through to the normal-side string unchanged when unresolvable
+        // (non-meek card, blanked Forge field), matching existing ? handling.
+        const meekStats = row.isMeek ? parseMeekStats(row.strength, row.toughness) : null;
+        entries.push({
+          row,
+          owner,
+          like: {
+            ownerSeat: seat,
+            dbX: parseFloat(row.posX || '0'),
+            cardRelW,
+            strength: meekStats ? String(meekStats.strength) : row.strength,
+            toughness: meekStats ? String(meekStats.toughness) : row.toughness,
+            brigade: row.brigade,
+            cardType: row.cardType,
+            specialAbility: row.specialAbility,
+            isFlipped: row.isFlipped,
+            cardName: row.cardName,
+            equippedToInstanceId: row.equippedToInstanceId,
+            originZone: row.originZone,
+          },
+        });
+      }
+    };
+    pushRows(myCards['battle'], 'my', mySeat);
+    pushRows(opponentCards['battle'], 'opponent', oppSeat);
+    return entries;
+  }, [battleActive, mpLayout, rawMain.cardWidth, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards]);
+
+  // Brigade soft-check (spec §6): every GE/EE-segment enhancement in the band
+  // whose brigade has no match among same-side characters. Order follows
+  // battleCardEntries (my cards, then opponent cards) so "show the first" is
+  // deterministic; the full list drives the red glow on every mismatched
+  // card, while only mismatchedBattleCards[0] gets the one interactive toast.
+  const mismatchedBattleCards = useMemo(() => {
+    if (battleCardEntries.length === 0) return [] as BattleCardEntry[];
+    const result: BattleCardEntry[] = [];
+    for (const entry of battleCardEntries) {
+      if (!isBattleEnhancementSegment(entry.like.cardType)) continue;
+      const side = battleSideOf(entry.like);
+      const sameSideCharacters = battleCardEntries
+        .filter((e) => e !== entry && battleSideOf(e.like) === side && isCharacterCard({ cardType: e.like.cardType }))
+        .map((e) => e.like);
+      if (computeBrigadeMismatch(entry.like, sameSideCharacters)) {
+        result.push(entry);
+      }
+    }
+    return result;
+  }, [battleCardEntries]);
+
+  const mismatchedBattleCardIds = useMemo(
+    () => new Set(mismatchedBattleCards.map((e) => String(e.row.id))),
+    [mismatchedBattleCards],
+  );
+
+  // Stakes Lost Soul rows (spec §5 header: Rescue attempt vs. Battle
+  // challenge; spec §7/§8: Task 14's awaiting-soul picker eligibility).
+  // Mirrors the server's battleStakesLobLostSouls exactly: T1/T2 use the
+  // DEFENDER's land-of-bondage; Paragon uses the shared LoB. Single source
+  // of truth for both the header count and the surrender-dialog grid so
+  // they can never drift apart.
+  const stakesLostSoulRows = useMemo<CardInstance[]>(() => {
+    if (!battleActive) return [];
+    if (normalizedFormat === 'Paragon') {
+      return (sharedCards['land-of-bondage'] ?? []).filter(isBattleLostSoulRow);
+    }
+    const attackerSeat = gameState.battleAttackerSeat;
+    if (!attackerSeat) return [];
+    const mySeatStr = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
+    const oppSeatStr = gameState.opponentPlayer ? String(gameState.opponentPlayer.seat) : '';
+    const defenderRows =
+      attackerSeat === mySeatStr ? (opponentCards['land-of-bondage'] ?? [])
+      : attackerSeat === oppSeatStr ? (myCards['land-of-bondage'] ?? [])
+      : [];
+    return defenderRows.filter(isBattleLostSoulRow);
+  }, [battleActive, normalizedFormat, sharedCards, gameState.battleAttackerSeat, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards]);
+
+  const stakesLostSoulCount = stakesLostSoulRows.length;
+
+  // Which stakes souls have a Site attached — for the surrender picker's
+  // "⚑ in Site" badge. The attachment link lives on the ACCESSORY row
+  // (attach_card writes equippedToInstanceId on the Site, pointing at the
+  // soul; a soul's own equippedToInstanceId is always 0n), so membership is
+  // derived by scanning every card row for one pointing at a stakes soul.
+  const stakesSiteAttachedSoulIds = useMemo<Set<string>>(() => {
+    if (stakesLostSoulRows.length === 0) return new Set<string>();
+    const allRows: CardInstance[] = [];
+    for (const rows of Object.values(myCards)) allRows.push(...rows);
+    for (const rows of Object.values(opponentCards)) allRows.push(...rows);
+    for (const rows of Object.values(sharedCards)) allRows.push(...rows);
+    return siteAttachedSoulIds(stakesLostSoulRows, allRows);
+  }, [stakesLostSoulRows, myCards, opponentCards, sharedCards]);
+
+  // Field of Battle band — chrome (Task 12, spec §5/§6): totals chips,
+  // header line, initiative banner. Rendered AFTER the battle card groups
+  // (below, in JSX) so it sits above card art. listening={false}
+  // throughout — nothing here is clickable (drags must pass through); the
+  // one interactive element (the brigade-mismatch Discard toast) is a
+  // separate HTML overlay, not part of this Konva group. Gates on
+  // status==='playing' && battleActive, same as the background block.
+  //
+  // Wrapped in useMemo (not an inline IIFE), matching every other derived
+  // battle/layout value in this component (myZones, derivedWeaponPositions,
+  // battleCardEntries, etc.) — avoids rebuilding ~15 Konva primitives on
+  // unrelated re-renders, e.g. the per-frame ticks MultiplayerCanvas gets
+  // from useRevealTick while any card's post-draw reveal flash is active.
+  const battleChromeNode = useMemo(() => {
+    if (!battleActive || gameStatus !== 'playing' || !mpLayout?.zones.battle) return null;
+    const band = mpLayout.zones.battle;
+    const midX = band.x + band.width / 2;
+
+    const mySeatStr = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
+    const oppSeatStr = gameState.opponentPlayer ? String(gameState.opponentPlayer.seat) : '';
+    const attackerSeat = gameState.battleAttackerSeat;
+    // Defensive — the server always stamps battleAttackerSeat before
+    // battleState flips to 'active' (spec §7), so this should never be
+    // empty while battleActive is true.
+    if (!attackerSeat) return null;
+
+    const nameForSeat = (seat: string): string => {
+      if (seat === mySeatStr) return gameState.myPlayer?.displayName || 'You';
+      if (seat === oppSeatStr) return gameState.opponentPlayer?.displayName || 'Opponent';
+      return 'Player';
+    };
+
+    const battleLikes = battleCardEntries.map((e) => e.like);
+    const myTotals = mySeatStr ? sideTotals(battleLikes, mySeatStr as BattleSeat) : { str: 0, tgh: 0, hasUnknown: false };
+    const oppTotals = oppSeatStr ? sideTotals(battleLikes, oppSeatStr as BattleSeat) : { str: 0, tgh: 0, hasUnknown: false };
+
+    // No ⚔ prefixes anywhere in this chrome: Konva canvas text gets no emoji
+    // fallback, so U+2694 rendered as a bare "×"-looking glyph (PR #197 UX
+    // review F5). The HTML resolution buttons keep their glyphs — the DOM
+    // renders them fine.
+    //
+    // ONE adaptive header line (owner direction, replacing the floating
+    // status strip that used to render below the band — it sat on top of
+    // territory cards and competed with the header + chips for attention).
+    // The live status REPLACES the base "<attacker> attacking — <stakes>"
+    // line (appending both read too wordy — owner feedback); the base line
+    // only shows while there's no status to report: band just opened
+    // (kind 'empty') or during 'awaiting-soul' (the pill/picker carries
+    // that state), which also keeps reconnecting players and spectators
+    // oriented.
+    const initiative = computeInitiative(
+      battleLikes,
+      attackerSeat as BattleSeat,
+      (gameState.lastBattlePlayBySeat || '') as BattleSeat | '',
+    );
+    let statusText = '';
+    if (gameState.battleState === 'active') {
+      switch (initiative.kind) {
+        case 'empty':
+          // No characters on either side — the drag-guidance cue carries
+          // the instruction (UX review F2).
+          break;
+        case 'waiting-blocker':
+          // Side-neutral: also shown after the only blocker was defeated
+          // and dragged to discard (UX review F3).
+          statusText = 'No blocker in battle';
+          break;
+        case 'no-attacker':
+          statusText = 'No attacker in battle';
+          break;
+        case 'unknown':
+          statusText = 'Initiative unknown (face-down/variable stats)';
+          break;
+        case 'initiative': {
+          const reasonLabel = initiative.reason === 'mutual-destruction' ? 'mutual destruction' : initiative.reason;
+          statusText = `Initiative: ${nameForSeat(initiative.seat)} (${reasonLabel})`;
+          break;
+        }
+      }
+    } else if (gameState.battleState === 'awaiting-soul') {
+      // The soul-pick status lives here too (owner direction) — the old
+      // in-band pill next to the End Battle button read as a second button
+      // and collided with the totals chips. Chooser mirrors the server's
+      // surrender_soul rule: T1 the defender picks, T2/Paragon the attacker.
+      const defenderSeat = attackerSeat === '0' ? '1' : '0';
+      const chooserSeat = normalizedFormat === 'T1' ? defenderSeat : attackerSeat;
+      statusText = `Waiting for ${nameForSeat(chooserSeat)} to choose a soul…`;
+    }
+    const headerText =
+      statusText ||
+      `${nameForSeat(attackerSeat)} attacking — ${stakesLostSoulCount >= 1 ? 'Rescue attempt' : 'Battle challenge'}`;
+
+    const chipWidth = 64 * fsGrowth(11);
+    const chipHeight = 20;
+    // Two "0/0" chips over an empty band are noise — chips appear with the
+    // first card in the band (UX review F2).
+    const showChips = battleLikes.length > 0;
+
+    return (
+      <Group key="battle-chrome" listening={false}>
+        {/* Header — attacker + stakes type, top edge of the band */}
+        <Rect x={band.x} y={band.y} width={band.width} height={18} fill="rgba(10,5,5,0.72)" perfectDrawEnabled={false} />
+        <Text
+          x={band.x + 4}
+          y={band.y + 2}
+          width={band.width - 8}
+          text={headerText}
+          fontSize={fs(12)}
+          fontFamily="Cinzel, Georgia, serif"
+          fontStyle="bold"
+          fill="#e8b3a3"
+          align="center"
+          letterSpacing={1}
+          ellipsis
+          wrap="none"
+          perfectDrawEnabled={false}
+        />
+
+        {/* Opponent-seat totals chip — flanks the vertical centerline on
+            the left, anchored to the BOTTOM of the band (product direction,
+            PR #197: "move the numbers to the bottom of the band"; previously
+            vertically centered). Halves are viewer-relative (spec §3: every
+            player plays into their own right half), so the opponent's
+            totals sit on my left. */}
+        {showChips && (
+          <Group x={midX - 10 - chipWidth} y={band.y + band.height - 8 - chipHeight}>
+            <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#6496e0" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
+            <Text
+              width={chipWidth}
+              height={chipHeight}
+              text={`${oppTotals.str}/${oppTotals.tgh}${oppTotals.hasUnknown ? '?' : ''}`}
+              fontSize={fs(11)}
+              fontStyle="bold"
+              fill="#a3c5e8"
+              align="center"
+              verticalAlign="middle"
+              perfectDrawEnabled={false}
+            />
+          </Group>
+        )}
+
+        {/* My-seat totals chip — flanks the vertical centerline on the
+            right, anchored to the BOTTOM of the band, 8px above its bottom
+            edge. My cards always render on my own right half. */}
+        {showChips && (
+          <Group x={midX + 10} y={band.y + band.height - 8 - chipHeight}>
+            <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#c4955a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
+            <Text
+              width={chipWidth}
+              height={chipHeight}
+              text={`${myTotals.str}/${myTotals.tgh}${myTotals.hasUnknown ? '?' : ''}`}
+              fontSize={fs(11)}
+              fontStyle="bold"
+              fill="#e8d5a3"
+              align="center"
+              verticalAlign="middle"
+              perfectDrawEnabled={false}
+            />
+          </Group>
+        )}
+
+      </Group>
+    );
+    // fs/fsGrowth are derived purely from `scale` (see their definitions
+    // near the top of the component) — depending on `scale` directly keeps
+    // this memo correct across window resizes without needing to list the
+    // fs/fsGrowth closures themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    battleActive,
+    gameStatus,
+    mpLayout,
+    battleCardEntries,
+    stakesLostSoulCount,
+    normalizedFormat,
+    gameState.battleState,
+    gameState.battleAttackerSeat,
+    gameState.lastBattlePlayBySeat,
+    gameState.myPlayer,
+    gameState.opponentPlayer,
+    scale,
+  ]);
+
+  // Drag-target guidance cue (PR #197 product direction: "if it's the
+  // player's turn, make it obvious what zone they should be dragging into;
+  // if they are defending, also make it obvious the same way"). Every
+  // player plays into their own RIGHT half (spec §3), so the cue always
+  // renders on the viewer's own right half — never re-derive side
+  // membership, reuse `battleSideOf` + `isCharacterCard` exactly like the
+  // same-side-character scan above (mismatchedBattleCards) and the
+  // empty-side checks inside computeInitiative. Text-only memo (not the
+  // Konva nodes themselves) — the actual Group is rendered as a plain
+  // conditional near the band background (below card nodes in z-order),
+  // with its pulse tween lifecycle managed by a separate effect, the same
+  // split used for the band-bg seam tween above.
+  const battleGuidanceCueText = useMemo((): string | null => {
+    if (!battleActive || gameStatus !== 'playing' || isSpectator) return null;
+    if (gameState.battleState === 'awaiting-soul') return null;
+    const attackerSeat = gameState.battleAttackerSeat;
+    const mySeatStr = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
+    if (!attackerSeat || !mySeatStr) return null;
+
+    const battleLikes = battleCardEntries.map((e) => e.like);
+    const sideHasCharacters = (seat: string) =>
+      battleLikes.some((c) => battleSideOf(c) === seat && isCharacterCard({ cardType: c.cardType }));
+
+    if (sideHasCharacters(mySeatStr)) return null; // my side already has a character — cue's job is done
+
+    if (mySeatStr === attackerSeat) return 'Drag attackers here';
+    // Defending: only cue once there's actually something to block.
+    return sideHasCharacters(attackerSeat) ? 'Drag a blocker here' : null;
+  }, [
+    battleActive,
+    gameStatus,
+    isSpectator,
+    gameState.battleState,
+    gameState.battleAttackerSeat,
+    gameState.myPlayer,
+    battleCardEntries,
+  ]);
+
+  // Pulse tween for the guidance cue — same ref-lifecycle discipline as the
+  // band-bg seam tween (bandBgTweenRef above): destroy on EVERY transition
+  // before deciding whether to start a new one, and destroy again on
+  // unmount/hide so a detached node never keeps ticking. Amplitude/cycle
+  // are layout-independent constants, not live values.
+  const battleGuidanceCueRef = useRef<Konva.Group | null>(null);
+  const battleGuidanceCueTweenRef = useRef<Konva.Tween | null>(null);
+  useEffect(() => {
+    battleGuidanceCueTweenRef.current?.destroy();
+    battleGuidanceCueTweenRef.current = null;
+    if (!battleGuidanceCueText) return;
+    const node = battleGuidanceCueRef.current;
+    if (!node) return;
+    node.opacity(BATTLE_GUIDANCE_CUE_OPACITY_MIN);
+    const startPulse = () => {
+      const tween = new KonvaLib.Tween({
+        node,
+        duration: BATTLE_GUIDANCE_CUE_PULSE_DURATION,
+        opacity: BATTLE_GUIDANCE_CUE_OPACITY_MAX,
+        yoyo: true,
+        easing: KonvaLib.Easings.EaseInOut,
+        onFinish: () => {
+          battleGuidanceCueTweenRef.current = null;
+          startPulse();
+        },
+      });
+      battleGuidanceCueTweenRef.current = tween;
+      tween.play();
+    };
+    startPulse();
+    return () => {
+      battleGuidanceCueTweenRef.current?.destroy();
+      battleGuidanceCueTweenRef.current = null;
+    };
+  }, [battleGuidanceCueText]);
+
   // ---- Card bounds for marquee selection (my + opponent free-form, LOB, hand cards) ----
   const allCardBounds = useMemo((): CardBound[] => {
     if (!mpLayout || !myHandRect) return [];
@@ -4504,6 +5538,48 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           zone, 'opponent',
         );
         // Rotation=180 means anchor is bottom-right corner; bounding box is (anchor-w, anchor-h) to (anchor)
+        bounds.push({
+          instanceId: String(card.id),
+          x: anchorX - cardWidth,
+          y: anchorY - cardHeight,
+          width: cardWidth,
+          height: cardHeight,
+          rotation: 180,
+          owner: 'opponent',
+        });
+      }
+    }
+
+    // Battle band cards — my half (rot 0) and opponent-owned half (rot 180).
+    // Both mirror against the FULL band rect by card owner (spec §3). The
+    // rect only exists while a battle is open, which gates this naturally.
+    if (mpLayout.zones.battle) {
+      const band = mpLayout.zones.battle;
+      for (const card of myCards['battle'] ?? []) {
+        let x: number, y: number;
+        if (card.posX) {
+          ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), band, 'my'));
+        } else {
+          x = band.x + 20;
+          y = band.y + 24;
+        }
+        bounds.push({
+          instanceId: String(card.id),
+          x,
+          y,
+          width: cardWidth,
+          height: cardHeight,
+          rotation: 0,
+          owner: 'my',
+        });
+      }
+      for (const card of opponentCards['battle'] ?? []) {
+        const { x: anchorX, y: anchorY } = toScreenPos(
+          card.posX ? parseFloat(card.posX) : 0,
+          card.posY ? parseFloat(card.posY) : 0,
+          band, 'opponent',
+        );
+        // Rotation=180: anchor is the bottom-right corner.
         bounds.push({
           instanceId: String(card.id),
           x: anchorX - cardWidth,
@@ -4773,6 +5849,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   if (normalizedFormat === 'Paragon' && mpLayout?.zones.sharedLob) {
     allZoneRects.push({ key: 'shared:land-of-bondage', rect: mpLayout.zones.sharedLob, owner: 'shared' });
   }
+  if (battleActive && mpLayout?.zones.battle) {
+    // Keyed 'my:battle' to match findZoneAtPosition's hit owner so the hover
+    // glow and source-zone suppression follow the `${owner}:${zone}` convention.
+    allZoneRects.push({ key: 'my:battle', rect: mpLayout.zones.battle, owner: 'my' });
+  }
 
   return (
     <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} onContextMenu={(e) => e.preventDefault()}>
@@ -4972,6 +6053,112 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               </Group>
             );
           })}
+
+          {/* ================================================================
+              Field of Battle band — static background (band rect + dashed
+              centerline). Rendered ONLY while a battle is open AND the game
+              is still playing (spec: "all battle UI gates on
+              status === 'playing'" — battle columns are left dangling after
+              resign/finish). The "FIELD OF BATTLE" label is superseded by
+              the dynamic header line in the Task 12 chrome group below.
+              ================================================================ */}
+          {/* Gate on battleActive OR bandBgVisible: battleActive mounts the
+              Rect in the SAME commit as the battle layout flip (waiting for
+              the bandBgVisible effect leaves the untinted band region flashing
+              bright for a frame); bandBgVisible keeps it mounted through the
+              close fade after battleActive drops. */}
+          {(battleActive || bandBgVisible) && gameStatus === 'playing' && lastBandRectRef.current && (() => {
+            const band = lastBandRectRef.current!;
+            const midX = band.x + band.width / 2;
+            return (
+              <Group key="battle-band-bg" listening={false}>
+                <Rect
+                  ref={bandBgRectRef}
+                  x={band.x}
+                  y={band.y}
+                  width={band.width}
+                  height={band.height}
+                  fill="#1a0d0d"
+                  stroke="#6b2f27"
+                  strokeWidth={1}
+                  cornerRadius={3}
+                  opacity={BAND_BG_OPACITY}
+                  perfectDrawEnabled={false}
+                />
+                {/* Dashed centerline — placement left/right decides a card's
+                    side (spec §3: every player plays into their own right
+                    half). */}
+                <Line
+                  points={[midX, band.y + 8, midX, band.y + band.height - 8]}
+                  stroke="#8a5a4a"
+                  strokeWidth={1}
+                  dash={[10, 8]}
+                  opacity={0.6}
+                  perfectDrawEnabled={false}
+                />
+              </Group>
+            );
+          })()}
+
+          {/* ================================================================
+              Drag-target guidance cue (PR #197) — highlights the viewer's
+              own right half when it's their move (attacking into an empty
+              side, or defending one that already has a character down).
+              Rendered here, BEFORE the battle card groups below, so it sits
+              BELOW card art in z-order (unlike the chips/header chrome group,
+              which renders after cards and stays above them). listening=
+              false throughout — must never intercept drags. Text/visibility
+              come from battleGuidanceCueText (memoized above); the pulse
+              opacity is driven imperatively by battleGuidanceCueTweenRef, so
+              the Group's own `opacity` JSX attr is a constant (never
+              re-applied by React after mount) and never fights the tween —
+              same discipline as the band-bg seam tween.
+              ================================================================ */}
+          {battleGuidanceCueText && mpLayout?.zones.battle && (() => {
+            const band = mpLayout.zones.battle;
+            const midX = band.x + band.width / 2;
+            const inset = 6;
+            const cueX = midX + inset;
+            const cueY = band.y + inset;
+            const cueWidth = band.x + band.width - cueX - inset;
+            const cueHeight = band.height - inset * 2;
+            return (
+              <Group
+                key="battle-guidance-cue"
+                ref={battleGuidanceCueRef}
+                listening={false}
+                opacity={BATTLE_GUIDANCE_CUE_OPACITY_MIN}
+              >
+                <Rect
+                  x={cueX}
+                  y={cueY}
+                  width={cueWidth}
+                  height={cueHeight}
+                  cornerRadius={6}
+                  fill="rgba(196,149,90,0.07)"
+                  stroke="#c4955a"
+                  strokeWidth={1.5}
+                  dash={[8, 6]}
+                  perfectDrawEnabled={false}
+                />
+                <Text
+                  x={cueX}
+                  y={cueY}
+                  width={cueWidth}
+                  height={cueHeight}
+                  text={battleGuidanceCueText}
+                  fontSize={fs(13)}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fontStyle="bold"
+                  fill="#e8d5a3"
+                  align="center"
+                  verticalAlign="middle"
+                  letterSpacing={1}
+                  perfectDrawEnabled={false}
+                />
+              </Group>
+            );
+          })()}
 
           {/* ================================================================
               Hand zone backgrounds
@@ -5210,6 +6397,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 x = (myZone?.x ?? 0) + 20;
                 y = (myZone?.y ?? 0) + 24;
               }
+              // Render-time bottom clamp (spec §2): battle mode compresses the
+              // territories, so positions write-clamped against the taller idle
+              // zone can otherwise park a card's bottom outside the clip rect.
+              if (myZone) y = Math.min(y, myZone.y + myZone.height - cardHeight);
               return (
                 <GameCardNode
                   key={String(card.id)}
@@ -5286,6 +6477,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   'opponent',
                 ));
               }
+              // Mirrored render-time clamp (spec §2): the rot-180 anchor is the
+              // visual bottom-right — keep the anchor at least a card-height
+              // below the zone top so the VISUAL card stays inside.
+              y = Math.max(y, oppZone.y + cardHeight);
               return (
                 <GameCardNode
                   key={String(card.id)}
@@ -5335,6 +6530,119 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               </Group>
             );
           })}
+
+          {/* ================================================================
+              Cards in the Field of Battle band — one clip Group over the full
+              band with two owner groups inside: my cards (rot 0, 'my' mirror)
+              and opponent-owned cards (rot 180, 'opponent' mirror, bottom-right
+              anchor) — the same conventions as the territory groups. Mirroring
+              is by CARD owner, so each player's cards render on their own half
+              on BOTH screens (spec §3). Battle rows only exist while
+              battleState is 'active'/'awaiting-soul' — the server auto-returns
+              cards when a battle closes, so nothing renders here when the band
+              is closed (defensive: stray rows in 'battle' while inactive would
+              be invisible; acceptable, the server guarantees the invariant).
+              Attached weapons render offset from their host via
+              myBattleDerivedWeaponPositions / opponentBattleDerivedWeaponPositions,
+              same convention as the territory groups.
+              ================================================================ */}
+          {battleActive && mpLayout?.zones.battle && (() => {
+            const band = mpLayout.zones.battle;
+            const myBattle = myCards['battle'] ?? [];
+            const oppBattle = opponentCards['battle'] ?? [];
+            if (myBattle.length === 0 && oppBattle.length === 0) return null;
+            const renderBattleCard = (owner: 'my' | 'opponent') => {
+              const adaptedOwner = owner === 'my' ? 'player1' : 'player2';
+              return (card: CardInstance, overridePos?: { x: number; y: number }) => {
+                const gameCard = adaptCard(card, adaptedOwner);
+                let x: number, y: number;
+                if (overridePos) {
+                  x = overridePos.x;
+                  y = overridePos.y;
+                } else if (card.posX) {
+                  ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), band, owner));
+                } else if (owner === 'my') {
+                  x = band.x + 20;
+                  y = band.y + 24;
+                } else {
+                  ({ x, y } = toScreenPos(0, 0, band, 'opponent'));
+                }
+                // Render-time clamp (spec §2): own cards clamp the bottom edge;
+                // opponent-owned rot-180 anchors are the visual bottom-right, so
+                // keep the anchor a card-height below the band top instead.
+                if (owner === 'my') {
+                  y = Math.min(y, band.y + band.height - cardHeight);
+                } else {
+                  y = Math.max(y, band.y + cardHeight);
+                }
+                return (
+                  <GameCardNode
+                    key={String(card.id)}
+                    card={gameCard}
+                    x={x}
+                    y={y}
+                    rotation={owner === 'my' ? 0 : 180}
+                    cardWidth={cardWidth}
+                    cardHeight={cardHeight}
+                    image={getCardImage(card)}
+                    {...(getTargetingProps(gameCard) ?? {})}
+                    isSelected={isSelected(String(card.id))}
+                    isDraggable={!isSpectator}
+                    hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                    brigadeMismatch={mismatchedBattleCardIds.has(String(card.id))}
+                    nodeRef={registerCardNode}
+                    onClick={handleCardClick}
+                    onDragStart={handleCardDragStart}
+                    onDragMove={handleCardDragMove}
+                    onDragEnd={handleCardDragEnd}
+                    onContextMenu={handleCardContextMenu}
+                    onDblClick={owner === 'my' ? handleDblClick : noopDblClick}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                  />
+                );
+              };
+            };
+            // Two-pass cluster render (weapons behind their hosts), mirroring
+            // the territory groups. Attached weapons render at their derived
+            // offset (peeking out from behind their host) instead of their
+            // own raw posX/posY.
+            const buildBattleNodes = (
+              cards: CardInstance[],
+              render: (card: CardInstance, overridePos?: { x: number; y: number }) => React.ReactNode,
+              derivedPositions: Map<string, { x: number; y: number }>,
+            ) => {
+              const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+              const unequipped = sorted.filter((c) => c.equippedToInstanceId === 0n);
+              return unequipped.flatMap((card) => {
+                const attachedWeapons = sorted.filter((w) => w.equippedToInstanceId === card.id);
+                const nodes: React.ReactNode[] = [];
+                for (const weapon of attachedWeapons) {
+                  nodes.push(render(weapon, derivedPositions.get(String(weapon.id))));
+                }
+                nodes.push(render(card));
+                return nodes;
+              });
+            };
+            return (
+              <Group
+                key="battle-band-cards"
+                clipX={band.x}
+                clipY={band.y}
+                clipWidth={band.width}
+                clipHeight={band.height}
+              >
+                <Group key="battle-my">
+                  {buildBattleNodes(myBattle, renderBattleCard('my'), myBattleDerivedWeaponPositions)}
+                </Group>
+                <Group key="battle-opp">
+                  {buildBattleNodes(oppBattle, renderBattleCard('opponent'), opponentBattleDerivedWeaponPositions)}
+                </Group>
+              </Group>
+            );
+          })()}
+
+          {battleChromeNode}
 
           {/* ================================================================
               Cards in auto-arrange zones — My LOB (draggable, horizontal strip).
@@ -6807,6 +8115,125 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             );
           })}
         </div>
+      )}
+
+      {/* ================================================================
+          Brigade-mismatch toast (Battle Zone soft-check, spec §6, Task 12).
+          Every existing overlay (game toasts, emote overlay, request
+          banners) is pointerEvents:none and top/bottom-anchored — none can
+          host a button, so this gets its own band-edge-anchored container
+          with pointer events enabled. zIndex 600 sits between the drag
+          overlay (450) and GameToast (900). One toast at a time (the first
+          mismatched card, by battleCardEntries order); it disappears on its
+          own once that card leaves the band or the mismatch resolves, since
+          it's a pure function of live battle state — no local dismiss state
+          needed. Never rendered for spectators.
+          ================================================================ */}
+      {!isSpectator && battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && mismatchedBattleCards.length > 0 && (() => {
+        const band = mpLayout.zones.battle;
+        const toastCard = mismatchedBattleCards[0];
+        // Band-edge-anchored: the band's bottom-right corner, clear of the
+        // header/banner (centered) and the totals chips (top corners). The
+        // 250-unit width is reserved in VIRTUAL space, so both corners go
+        // through virtualToScreen and the CSS width is their difference
+        // (the dragHoverZone pattern above) — a raw `width: 250` in screen
+        // px would exceed the reserved virtual span whenever scale < 1.
+        //
+        // BOTTOM-anchored (translateY(-100%)) with the bottom edge pinned
+        // just inside the band: the box grows UPWARD into the band as its
+        // text wraps, never downward — the resolution buttons / awaiting-
+        // soul pill (BattleResolutionUI) sit just BELOW the band's bottom
+        // edge (band bottom + 6), so a top-anchored box that wrapped taller
+        // at small scales used to spill down and cover them. Fonts/padding
+        // additionally scale with the canvas scale (floored at 0.75 → 9px
+        // minimum font, the legibility floor) so the box shrinks roughly
+        // with the band instead of swallowing it at small scales.
+        const toastVirtualWidth = 250;
+        const anchorY = band.y + band.height - 6;
+        const screenBottomLeft = virtualToScreen(band.x + band.width - toastVirtualWidth - 8, anchorY, scale, offsetX, offsetY);
+        const screenRight = virtualToScreen(band.x + band.width - 8, anchorY, scale, offsetX, offsetY);
+        const toastScale = Math.max(0.75, Math.min(1, scale));
+        return (
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
+            <div
+              style={{
+                position: 'absolute',
+                left: screenBottomLeft.x,
+                top: screenBottomLeft.y,
+                transform: 'translateY(-100%)',
+                width: screenRight.x - screenBottomLeft.x,
+                pointerEvents: 'auto',
+                background: 'rgba(14, 10, 6, 0.95)',
+                border: '1px solid rgba(220, 38, 38, 0.5)',
+                borderRadius: 8,
+                padding: `${10 * toastScale}px ${12 * toastScale}px`,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8 * toastScale,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
+              }}
+            >
+              <div style={{ fontSize: 12 * toastScale, color: '#e8bfbf', fontFamily: 'var(--font-cinzel), Georgia, serif', lineHeight: 1.4 }}>
+                No matching brigade in battle — REG says discard it
+              </div>
+              <button
+                onClick={() => moveCard(toastCard.row.id, 'discard')}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: `${6 * toastScale}px ${14 * toastScale}px`,
+                  background: '#5a2727',
+                  border: '1px solid #8a4242',
+                  borderRadius: 6,
+                  color: '#e8bfbf',
+                  fontSize: 12 * toastScale,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ================================================================
+          Battle resolution buttons (spec §8, Task 13) — dispatch
+          IMMEDIATELY on click, no confirm dialog — plus the awaiting-soul
+          chooser dialog / waiting pill (Task 14). Mounted here (not
+          client.tsx) because it needs band geometry + scale/offsets, which
+          only live in this component.
+          status==='playing' && battleActive gate mounting here; spectators
+          now DO mount (they need the awaiting-soul waiting pill) but pass
+          isSpectator=true so BattleResolutionUI never shows them buttons or
+          the soul picker. mySeat/opponentSeat are always the two real
+          players' seats (even for the spectator viewer's canvas-compat
+          "myPlayer"=seat0) — isSpectator is what keeps a spectator from
+          ever being treated as attacker/defender/chooser.
+          ================================================================ */}
+      {battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && (
+        <BattleResolutionUI
+          band={mpLayout.zones.battle}
+          scale={scale}
+          offsetX={offsetX}
+          offsetY={offsetY}
+          battleState={gameState.battleState}
+          mySeat={gameState.myPlayer ? String(gameState.myPlayer.seat) : ''}
+          opponentSeat={gameState.opponentPlayer ? String(gameState.opponentPlayer.seat) : ''}
+          attackerSeat={gameState.battleAttackerSeat}
+          isSpectator={isSpectator}
+          format={normalizedFormat}
+          myPlayerName={gameState.myPlayer?.displayName || 'Player 1'}
+          opponentPlayerName={gameState.opponentPlayer?.displayName || 'Player 2'}
+          eligibleSouls={stakesLostSoulRows}
+          siteAttachedSoulIds={stakesSiteAttachedSoulIds}
+          forgeResolver={forgeResolver}
+          bandHasCards={battleCardEntries.length > 0}
+          onResolveBattle={gameState.resolveBattle}
+          onEndBattle={gameState.endBattle}
+          onSurrenderSoul={gameState.surrenderSoul}
+        />
       )}
 
       {/* ================================================================

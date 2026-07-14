@@ -27,6 +27,12 @@ const AUTO_REVEAL_HAND_MICROS = 10_000_000n; // 10 seconds
 // in goldfish/multiplayer UIs (HAND_LIMIT). Auto-draws stop short of this.
 const HAND_LIMIT = 16;
 
+// Zones an ability's source card may fire from by default (the "in play"
+// zones plus Land of Redemption, where redeemed souls can still trigger
+// abilities). Shared across every ability-source gate below; per-ability
+// explicit sourceZones overrides are untouched by this list.
+const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption', 'battle'];
+
 // ---------------------------------------------------------------------------
 // Forge playtest games (Phase 2.3)
 // ---------------------------------------------------------------------------
@@ -217,13 +223,13 @@ function compactLobIndices(
 // ---------------------------------------------------------------------------
 // Helper: clearCountersIfLeavingPlay
 // Counters reflect in-play state (damage, charges, generic markers). When a
-// card leaves Territory or Land of Bondage for any other zone, drop all
-// CardCounter rows for it so they don't follow the card into deck/hand/discard
-// or persist when it later returns to play.
+// card leaves Territory, Land of Bondage, or Battle for any other zone, drop
+// all CardCounter rows for it so they don't follow the card into
+// deck/hand/discard or persist when it later returns to play.
 // ---------------------------------------------------------------------------
 function clearCountersIfLeavingPlay(ctx: any, cardId: bigint, fromZone: string, toZone: string) {
   if (fromZone === toZone) return;
-  if (fromZone !== 'territory' && fromZone !== 'land-of-bondage') return;
+  if (fromZone !== 'territory' && fromZone !== 'land-of-bondage' && fromZone !== 'battle') return;
   for (const counter of [...ctx.db.CardCounter.card_counter_card_instance_id.filter(cardId)]) {
     ctx.db.CardCounter.id.delete(counter.id);
   }
@@ -233,13 +239,16 @@ function clearCountersIfLeavingPlay(ctx: any, cardId: bigint, fromZone: string, 
 // Helper: leavePlayFieldOverrides
 // Player-attached annotations (notes, Three Woes Choose Good/Evil outline) and
 // the meek conversion are in-play state and shouldn't ride along when the card
-// leaves Territory or Land of Bondage. Returns the override map to spread into
-// a CardInstance update; preserves the existing values for moves that aren't
-// leave-play.
+// leaves Territory, Land of Bondage, or Battle. Returns the override map to
+// spread into a CardInstance update; preserves the existing values for moves
+// that aren't leave-play. Also centralizes clearing the battle-origin fields
+// (originZone/originPosX/originPosY) whenever the destination isn't 'battle'
+// — this is the ONLY place those fields get cleared, so every move reducer's
+// completing write path picks it up via the shared spread.
 // ---------------------------------------------------------------------------
-function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string; isMeek: boolean; imitatingName: string; cardImgFile: string } {
+function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string; isMeek: boolean; imitatingName: string; cardImgFile: string; originZone?: string; originPosX?: string; originPosY?: string } {
   const leaving =
-    fromZone !== toZone && (fromZone === 'territory' || fromZone === 'land-of-bondage');
+    fromZone !== toZone && (fromZone === 'territory' || fromZone === 'land-of-bondage' || fromZone === 'battle');
   // When an Imitate Lost Soul leaves play (rescued, shuffled, banished, etc.),
   // drop the imitation and restore its canonical art. Pre-existing cardImgFile
   // is returned unchanged for non-imitating cards so this is a no-op write.
@@ -247,13 +256,37 @@ function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): {
   const canonicalImg = wasImitating
     ? (IMITATE_ORIGINAL_IMG[card.cardName] ?? card.cardImgFile)
     : card.cardImgFile;
+  const battleClears = toZone !== 'battle'
+    ? { originZone: '', originPosX: '', originPosY: '' }
+    : {};
   return {
     notes: leaving ? '' : card.notes,
     outlineColor: leaving ? '' : card.outlineColor,
     isMeek: leaving ? false : card.isMeek,
     imitatingName: wasImitating ? '' : card.imitatingName,
     cardImgFile: canonicalImg,
+    ...battleClears,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Helper: stampBattleEntry
+// Battle entry: stamp origin (pre-move zone/pos) + last-play seat (card
+// owner, not sender — courtesy drags must not steal initiative). Mutates
+// `updates` in place so callers spread it into their CardInstance update.
+// Never re-stamps a card already in 'battle' (intra-band repositions keep
+// their original origin). Spec §7.
+// ---------------------------------------------------------------------------
+function stampBattleEntry(ctx: any, gameId: bigint, card: any, updates: any) {
+  if (card.zone === 'battle') return; // intra-band repositions never re-stamp
+  updates.originZone = card.zone;
+  updates.originPosX = card.posX;
+  updates.originPosY = card.posY;
+  const owner = ctx.db.Player.id.find(card.ownerId);
+  const game = ctx.db.Game.id.find(gameId);
+  if (owner && game) {
+    ctx.db.Game.id.update({ ...game, lastBattlePlayBySeat: owner.seat.toString() });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -377,6 +410,9 @@ function insertCardsShuffleDraw(
       isToken: false,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      originZone: '',
+      originPosX: '',
+      originPosY: '',
       outlineColor: '',
       imitatingName: '',
     });
@@ -479,6 +515,9 @@ function initializeSoulDeck(ctx: any, game: any) {
       isToken: false,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      originZone: '',
+      originPosX: '',
+      originPosY: '',
       outlineColor: '',
       imitatingName: '',
     });
@@ -635,6 +674,9 @@ function createGameCore(
     pauseRequestType: '',
     pauseStartedAtMicros: 0n,
     totalPausedMicros: 0n,
+    battleState: '',
+    battleAttackerSeat: '',
+    lastBattlePlayBySeat: '',
   });
   if (isForge) ctx.db.ForgeGame.insert({ gameId: game.id });
 
@@ -1422,6 +1464,9 @@ export const respond_rematch = spacetimedb.reducer(
         rematchParagon1: '',
         rematchResponse: '',
         rematchCode: '',
+        battleState: '',
+        battleAttackerSeat: '',
+        lastBattlePlayBySeat: '',
         choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
         playingStartedAtMicros: 0n,
       });
@@ -2052,7 +2097,7 @@ export const set_phase = spacetimedb.reducer(
   },
   (ctx, { gameId, phase }) => {
     const player = findPlayerBySender(ctx, gameId);
-    const game = ctx.db.Game.id.find(gameId);
+    let game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
     if (player.seat !== game.currentTurn) {
@@ -2064,7 +2109,31 @@ export const set_phase = spacetimedb.reducer(
       throw new SenderError('Invalid phase: ' + phase);
     }
 
-    ctx.db.Game.id.update({ ...game, currentPhase: phase });
+    const oldPhase = game.currentPhase;
+
+    // Leaving the battle phase auto-closes any open battle (spec §7) — same
+    // hook end_turn runs. runBattleAutoReturn does its own Game write
+    // (clearing battleState/battleAttackerSeat/lastBattlePlayBySeat); re-read
+    // before the currentPhase write below or that write would resurrect
+    // battleState by spreading the stale pre-return snapshot.
+    if (oldPhase === 'battle' && phase !== 'battle' && game.battleState !== '') {
+      runBattleAutoReturn(ctx, gameId, player.id);
+      game = ctx.db.Game.id.find(gameId) ?? game;
+    }
+
+    if (phase === 'battle' && oldPhase !== 'battle' && game.battleState === '') {
+      // Entering the battle phase opens the band (spec §4) — the same open
+      // step enter_battle performs when the band starts closed.
+      ctx.db.Game.id.update({
+        ...game,
+        currentPhase: phase,
+        battleState: 'active',
+        battleAttackerSeat: game.currentTurn.toString(),
+        lastBattlePlayBySeat: '',
+      });
+    } else {
+      ctx.db.Game.id.update({ ...game, currentPhase: phase });
+    }
 
     logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase }), game.turnNumber, phase);
   }
@@ -2079,11 +2148,21 @@ export const end_turn = spacetimedb.reducer(
   },
   (ctx, { gameId }) => {
     const player = findPlayerBySender(ctx, gameId);
-    const game = ctx.db.Game.id.find(gameId);
+    let game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
     if (player.seat !== game.currentTurn) {
       throw new SenderError('Not your turn');
+    }
+
+    // Battles cannot span turns (spec §7): auto-return before this reducer's
+    // own Game write below. runBattleAutoReturn mutates the Game row (clears
+    // battleState/battleAttackerSeat/lastBattlePlayBySeat), so re-read
+    // afterward — spreading the stale pre-return `game` snapshot into the
+    // write below would resurrect battleState.
+    if (game.battleState !== '') {
+      runBattleAutoReturn(ctx, gameId, player.id);
+      game = ctx.db.Game.id.find(gameId) ?? game;
     }
 
     const nextSeat = game.currentTurn === 0n ? 1n : 0n;
@@ -2118,6 +2197,553 @@ export const end_turn = spacetimedb.reducer(
 
     logAction(ctx, gameId, player.id, 'END_TURN', JSON.stringify({ newTurn: newTurnNumber.toString() }), newTurnNumber, 'draw');
   }
+);
+
+// ---------------------------------------------------------------------------
+// Helper: runBattleAutoReturn
+// End-of-battle card routing (spec §7). Snapshot-first: materializes every
+// CardInstance row for the game ONCE before any mutation (mutating while
+// iterating a live query is unsafe per spacetimedb/CLAUDE.md), then routes
+// every row currently in zone 'battle' — never a remembered id list, since
+// e.g. reload_deck may have deleted some of them mid-battle — by REG-derived
+// precedence:
+//   1. Attached accessories (equippedToInstanceId !== 0n) are skipped in the
+//      main pass and follow their host's routed destination in pass 2,
+//      attachment preserved.
+//   2. Lost Souls -> the deck owner's Land of Bondage (mirrors the existing
+//      lost-soul redirect in move_card/move_cards_batch).
+//   3. Characters (isCharacterCard — handles duals + tokens) -> Territory:
+//      the stamped origin position when they entered from Territory,
+//      otherwise a free Territory spot. Hand/reserve/discard-origin
+//      survivors never go back to a hidden zone per REG.
+//   4. Enhancements (exact 'GE'/'EE' segment on cardType, split on '/' and
+//      trimmed — there is no literal "Enhancement" type) -> owner's Discard,
+//      unless the "keep in play" heuristic matches: `specialAbility`
+//      contains "place" wording that ISN'T "in place of" / "take the place
+//      of" -> a free Territory spot, and the card's name is recorded for the
+//      BATTLE_END log.
+//   5. Everything else — Dominants, Artifacts, Curses, Fortresses, unknown
+//      types, and Forge cards (whose specialAbility is blanked on the public
+//      row, so the rule-4 keep heuristic can never match them) -> the card's
+//      stamped origin zone/position when set and isn't 'battle' itself,
+//      otherwise a free Territory spot. NEVER discard — that's the one
+//      destructive branch and rule 5 stays out of it.
+// Tokens whose COMPUTED destination (whichever rule actually fired) is a
+// removal zone (deck/hand/discard/reserve/banish) are deleted via
+// deleteTokenWithCounters instead of moved.
+// Every completing write clears in-play state (counters, notes, outline,
+// meek) and the origin fields via the shared
+// `leavePlayFieldOverrides('battle', toZone)` spread — the same idiom every
+// other move reducer's write path uses.
+// ---------------------------------------------------------------------------
+function runBattleAutoReturn(ctx: any, gameId: bigint, actingPlayerId: bigint) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game || game.battleState === '') return;
+
+  const all = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+  const inBattle = all.filter((c: any) => c.zone === 'battle');
+  const keptNames: string[] = [];
+
+  // Local per-(owner,zone) zoneIndex counters. Lazily seeded from the
+  // pre-mutation snapshot (`all`) the first time a given owner+zone is
+  // touched, then incremented locally for every further card routed to that
+  // same owner+zone in this call — generalizes move_cards_batch's
+  // `nextFreeFormIndex` seeding (~2755-2778, "max existing index + 1, then
+  // increment per placement") across every destination zone/owner instead of
+  // a single batch target. Max-based seeding is equivalent to the codebase's
+  // count-based LOB/hand idioms here because compaction keeps those zones'
+  // indices gap-free, so one scheme safely covers all destinations.
+  const nextIdx = new Map<string, bigint>();
+  const nextIndexFor = (ownerId: bigint, zone: string): bigint => {
+    const key = `${ownerId.toString()}:${zone}`;
+    if (!nextIdx.has(key)) {
+      let maxIdx = -1n;
+      for (const c of all) {
+        if (c.ownerId === ownerId && c.zone === zone && c.zoneIndex > maxIdx) maxIdx = c.zoneIndex;
+      }
+      nextIdx.set(key, maxIdx + 1n);
+    }
+    const idx = nextIdx.get(key)!;
+    nextIdx.set(key, idx + 1n);
+    return idx;
+  };
+
+  // Free-spot auto-fan per owner — mirrors move_cards_batch's territory
+  // auto-fan grid (~2982-2992). Fresh counter for this call only (matching
+  // that reducer's behavior), shared by every branch that needs "a free
+  // Territory spot": surviving characters with a non-Territory origin, kept
+  // enhancements, and the rule-5 fallback.
+  const fanIdx = new Map<string, number>();
+  const nextFreeSpot = (ownerId: bigint): { posX: string; posY: string } => {
+    const key = ownerId.toString();
+    const i = fanIdx.get(key) ?? 0;
+    fanIdx.set(key, i + 1);
+    const cardsPerRow = 10;
+    const col = i % cardsPerRow;
+    const row = Math.floor(i / cardsPerRow);
+    return { posX: String(0.03 + col * 0.04 + row * 0.02), posY: String(0.05 + row * 0.28) };
+  };
+
+  // Lost-soul check per the idiom at index.ts ~4479 (surrender_lost_soul) —
+  // includes TOKEN_LS, unlike the narrower two-part check used inline by the
+  // move reducers' discard/reserve/banish redirect.
+  const isLostSoulCard = (c: any): boolean =>
+    c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
+  const isPlaceKeep = (sa: string): boolean =>
+    /\bplace\b/i.test(sa) && !/\bin (the )?place of\b/i.test(sa) && !/take the place of/i.test(sa);
+  const enhSegment = (ct: string): boolean =>
+    ct.split('/').map((s: string) => s.trim()).some((s: string) => s === 'GE' || s === 'EE');
+
+  // Precedence rules 2-5 (rule 1, attached accessories, is handled by the
+  // caller routing them in pass 2 below via their host's result instead).
+  const computeDestination = (c: any): { toZone: string; posX: string; posY: string; toOwnerId: bigint } => {
+    if (isLostSoulCard(c)) {
+      // Lost Souls always go to the deck owner's LoB — same rule as the
+      // move_card/move_cards_batch redirect, even if currently owned by an
+      // opponent (e.g. mid-capture) while sitting in the battle band.
+      const lobOwnerId = c.originalOwnerId !== 0n ? c.originalOwnerId : c.ownerId;
+      return { toZone: 'land-of-bondage', posX: '', posY: '', toOwnerId: lobOwnerId };
+    }
+    if (isCharacterCard({ cardType: c.cardType })) {
+      if (c.originZone === 'territory') {
+        return { toZone: 'territory', posX: c.originPosX, posY: c.originPosY, toOwnerId: c.ownerId };
+      }
+      const spot = nextFreeSpot(c.ownerId);
+      return { toZone: 'territory', posX: spot.posX, posY: spot.posY, toOwnerId: c.ownerId };
+    }
+    if (enhSegment(c.cardType)) {
+      if (isPlaceKeep(c.specialAbility)) {
+        keptNames.push(c.cardName);
+        const spot = nextFreeSpot(c.ownerId);
+        return { toZone: 'territory', posX: spot.posX, posY: spot.posY, toOwnerId: c.ownerId };
+      }
+      return { toZone: 'discard', posX: '', posY: '', toOwnerId: c.ownerId };
+    }
+    // Rule 5: Dominants/Artifacts/Curses/Fortresses/unknown/Forge-blanked —
+    // origin if set and not 'battle' itself (defensive; stampBattleEntry
+    // never stamps a card already in battle, so this shouldn't occur), else
+    // a free Territory spot. Never discard.
+    if (c.originZone !== '' && c.originZone !== 'battle') {
+      return { toZone: c.originZone, posX: c.originPosX, posY: c.originPosY, toOwnerId: c.ownerId };
+    }
+    const spot = nextFreeSpot(c.ownerId);
+    return { toZone: 'territory', posX: spot.posX, posY: spot.posY, toOwnerId: c.ownerId };
+  };
+
+  // Routes a single unattached card per the precedence above (token-delete
+  // check runs against the COMPUTED destination, since a card can be both a
+  // token and, say, an enhancement — what matters is where the rule that
+  // fired actually sent it). Returns the routed {zone,pos,owner} for hosts to
+  // report to their accessories in pass 2, or null when the card was deleted.
+  const routeCard = (c: any): { zone: string; posX: string; posY: string; ownerId: bigint } | null => {
+    const { toZone, posX, posY, toOwnerId } = computeDestination(c);
+    if (c.isToken && ['deck', 'hand', 'discard', 'reserve', 'banish'].includes(toZone)) {
+      deleteTokenWithCounters(ctx, c);
+      return null;
+    }
+    const zoneIndex = nextIndexFor(toOwnerId, toZone);
+    const isFlipped = toZone === 'land-of-bondage'
+      ? false
+      : (toZone === 'deck' || toZone === 'soul-deck') ? true : c.isFlipped;
+    clearCountersIfLeavingPlay(ctx, c.id, 'battle', toZone);
+    ctx.db.CardInstance.id.update({
+      ...c,
+      zone: toZone,
+      zoneIndex,
+      posX,
+      posY,
+      isFlipped,
+      ownerId: toOwnerId,
+      equippedToInstanceId: 0n,
+      ...leavePlayFieldOverrides(c, 'battle', toZone),
+    });
+    return { zone: toZone, posX, posY, ownerId: toOwnerId };
+  };
+
+  const hosts = new Map<string, { zone: string; posX: string; posY: string; ownerId: bigint }>();
+
+  for (const c of inBattle) {
+    if (c.equippedToInstanceId !== 0n) continue; // pass 2 below
+    const routed = routeCard(c);
+    if (routed) hosts.set(c.id.toString(), routed);
+  }
+
+  // Pass 2: attached accessories follow their host's routed destination,
+  // attachment preserved. Position inherits the host's only in Territory
+  // (mirrors attach_card's `inheritPos`, ~4673) since that's the only
+  // destination a host — always a character, rule 3 — can land in while
+  // still carrying an attached accessory.
+  for (const c of inBattle) {
+    if (c.equippedToInstanceId === 0n) continue;
+    const host = hosts.get(c.equippedToInstanceId.toString());
+    if (!host) {
+      // Defensive: a host is always a character, which rule 3 always routes
+      // to Territory, so this should be unreachable. Never leave a card
+      // stranded in the closed 'battle' zone though — route the orphaned
+      // accessory itself (routeCard already clears equippedToInstanceId).
+      routeCard(c);
+      continue;
+    }
+    const destZone = host.zone;
+    const zoneIndex = nextIndexFor(host.ownerId, destZone);
+    clearCountersIfLeavingPlay(ctx, c.id, 'battle', destZone);
+    ctx.db.CardInstance.id.update({
+      ...c,
+      zone: destZone,
+      zoneIndex,
+      posX: destZone === 'territory' ? host.posX : '',
+      posY: destZone === 'territory' ? host.posY : '',
+      ownerId: host.ownerId,
+      ...leavePlayFieldOverrides(c, 'battle', destZone),
+    });
+  }
+
+  logAction(
+    ctx, gameId, actingPlayerId, 'BATTLE_END',
+    JSON.stringify({ kept: keptNames }),
+    game.turnNumber, game.currentPhase,
+  );
+
+  const g2 = ctx.db.Game.id.find(gameId);
+  if (g2) {
+    ctx.db.Game.id.update({ ...g2, battleState: '', battleAttackerSeat: '', lastBattlePlayBySeat: '' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: end_battle
+// Unconditional escape hatch (spec §7/§8): either player may close the
+// battle band from either 'active' or 'awaiting-soul' (e.g. the defender
+// reload_decks away every surrenderable soul, or the soul-picker
+// disconnects mid-choice).
+//
+// Turn-player press also advances the phase (spec §7/§8): with phase-driven
+// band visibility, leaving currentPhase alone would keep the band open
+// (phase still 'battle') for a second battle. Only the turn player's press
+// advances — the non-turn-player press stays an auto-return-only escape
+// hatch so the turn player keeps their battle phase.
+// ---------------------------------------------------------------------------
+export const end_battle = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+    if (game.battleState === '') throw new SenderError('No battle in progress');
+    const player = findPlayerBySender(ctx, gameId); // either player; also blocks spectators
+    const isTurnPlayer = player.seat === game.currentTurn;
+    const wasBattlePhase = game.currentPhase === 'battle';
+    runBattleAutoReturn(ctx, gameId, player.id);
+
+    if (isTurnPlayer && wasBattlePhase) {
+      // Re-read: runBattleAutoReturn already wrote the Game row (clearing
+      // battleState/battleAttackerSeat/lastBattlePlayBySeat) — spreading the
+      // stale pre-return `game` snapshot here would resurrect battleState.
+      // Same hazard end_turn/set_phase call out above.
+      const latest = ctx.db.Game.id.find(gameId);
+      if (latest) {
+        ctx.db.Game.id.update({ ...latest, currentPhase: 'discard' });
+        logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latest.turnNumber, 'discard');
+      }
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Helper: writeBattleEntryMove
+// Single-card write for a card entering the 'battle' zone (enter_battle).
+// Deliberately NOT a call into move_card's monolithic branch: move_card's
+// zone/pos/zoneIndex/ownership machinery is generic across every destination
+// zone and entangled with lost-soul redirects, token cleanup, and Paragon
+// rescue ownership transfers that never apply here (entering battle never
+// changes ownership, and 'battle' is never a token-removal or lost-soul
+// destination). Mirrors move_card's free-form zoneIndex assignment,
+// leavePlayFieldOverrides spread, stampBattleEntry call, and its
+// attached-accessory-follows-into-battle cascade — the minimal single-card
+// write path the brief asks to reuse, without the surrounding routing
+// subtleties.
+// ---------------------------------------------------------------------------
+function writeBattleEntryMove(ctx: any, gameId: bigint, card: any, posX: string, posY: string): string {
+  const fromZone = card.zone;
+  const alreadyInBattle = fromZone === 'battle';
+
+  // Free-form zoneIndex: highest existing index for this owner's battle
+  // cards + 1, same idiom move_card uses for territory (~2707-2717).
+  let maxIdx = -1n;
+  for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+    if (c.ownerId === card.ownerId && c.zone === 'battle' && c.zoneIndex > maxIdx) maxIdx = c.zoneIndex;
+  }
+  const finalZoneIndex = maxIdx + 1n;
+
+  // Leaving deck/reserve/soul-deck reveals the card, matching move_card's
+  // generic isFlipped rule; 'battle' is never a face-down destination itself.
+  const isFlipped = (fromZone === 'deck' || fromZone === 'reserve' || fromZone === 'soul-deck') ? false : card.isFlipped;
+
+  const battleEntryUpdates: any = {};
+  stampBattleEntry(ctx, gameId, card, battleEntryUpdates); // no-op if already in battle
+  clearCountersIfLeavingPlay(ctx, card.id, fromZone, 'battle');
+
+  ctx.db.CardInstance.id.update({
+    ...card,
+    zone: 'battle',
+    zoneIndex: finalZoneIndex,
+    posX,
+    posY,
+    isFlipped,
+    equippedToInstanceId: alreadyInBattle ? card.equippedToInstanceId : 0n,
+    revealExpiresAt: undefined,
+    revealStartedAt: undefined,
+    ...leavePlayFieldOverrides(card, fromZone, 'battle'),
+    ...battleEntryUpdates,
+  });
+
+  // Attached-accessory cascade (mirrors move_card's identical Battle-bound
+  // cascade): any accessory pointing at this host follows it into 'battle'
+  // with the attachment intact (spec §7 rule 1), instead of being unlinked
+  // and stranded in the host's old zone. Skipped for the defensive
+  // already-in-battle case (a reposition, not a real entry) so an
+  // attach_card'd weapon already in the band isn't re-stamped. Snapshot
+  // first — mutating while iterating a live query is unsafe per
+  // spacetimedb/CLAUDE.md.
+  if (!alreadyInBattle) {
+    const accessories = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (a: any) => a.equippedToInstanceId === card.id,
+    );
+    for (const accessory of accessories) {
+      const accessoryBattleUpdates: any = {};
+      stampBattleEntry(ctx, gameId, accessory, accessoryBattleUpdates);
+      let accMaxIdx = -1n;
+      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+        if (c.ownerId === accessory.ownerId && c.zone === 'battle' && c.zoneIndex > accMaxIdx) {
+          accMaxIdx = c.zoneIndex;
+        }
+      }
+      clearCountersIfLeavingPlay(ctx, accessory.id, accessory.zone, 'battle');
+      ctx.db.CardInstance.id.update({
+        ...accessory,
+        zone: 'battle',
+        zoneIndex: accMaxIdx + 1n,
+        posX,
+        posY,
+        revealExpiresAt: undefined,
+        revealStartedAt: undefined,
+        ...leavePlayFieldOverrides(accessory, accessory.zone, 'battle'),
+        ...accessoryBattleUpdates,
+      });
+    }
+  }
+
+  return fromZone;
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: enter_battle
+// Atomic open+move (spec §4/§7): opens the battle band if it isn't already
+// open (attacker = whoever's turn it is, NOT who dragged — a courtesy drag
+// of your card during the opponent's turn doesn't make you the attacker),
+// then performs the single-card move into 'battle' with stamping. Two
+// players dragging into an empty band near-simultaneously both succeed:
+// whichever call lands first opens the band, the second just moves its own
+// card into the now-active band (spec §9 race note).
+// ---------------------------------------------------------------------------
+export const enter_battle = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    posX: t.string(),
+    posY: t.string(),
+  },
+  (ctx, { gameId, cardInstanceId, posX, posY }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+    // Courtesy drags of an opponent's card go through the ordinary move flow —
+    // enter_battle only ever sends the caller's own cards into the band.
+    if (card.ownerId !== player.id) throw new SenderError('You can only send your own cards into battle');
+
+    if (game.battleState === 'awaiting-soul') {
+      throw new SenderError('Battle is resolving a soul surrender');
+    }
+    if (game.battleState === '') {
+      ctx.db.Game.id.update({
+        ...game,
+        battleState: 'active',
+        battleAttackerSeat: game.currentTurn.toString(),
+        lastBattlePlayBySeat: '',
+      });
+    }
+    // battleState === 'active': band already open — just move+stamp below.
+
+    const fromZone = writeBattleEntryMove(ctx, gameId, card, posX, posY);
+
+    logAction(
+      ctx, gameId, player.id, 'ENTER_BATTLE',
+      JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, from: fromZone }),
+      game.turnNumber, game.currentPhase,
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Helper: isLostSoulRow
+// Same three-part check used elsewhere (surrender_lost_soul, rescue_lost_soul,
+// runBattleAutoReturn's local isLostSoulCard) — shared here between
+// resolve_battle and surrender_soul, which both need to identify Lost Souls
+// sitting in a battle's stakes LoB.
+// ---------------------------------------------------------------------------
+function isLostSoulRow(c: any): boolean {
+  return c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
+}
+
+// ---------------------------------------------------------------------------
+// Helper: battleStakesLobLostSouls
+// The Lost Souls "at stake" for the battle currently in progress: the
+// defender's (non-attacker-seat player's) Land of Bondage for T1/T2, or the
+// shared Paragon Land of Bondage (ownerId 0n) for Paragon. Used by both
+// resolve_battle (to decide active -> awaiting-soul vs. auto-return) and
+// surrender_soul (to validate the chosen card is actually at stake).
+// ---------------------------------------------------------------------------
+function battleStakesLobLostSouls(ctx: any, gameId: bigint, format: 'T1' | 'T2' | 'Paragon', attackerSeat: string): any[] {
+  const all = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+  if (format === 'Paragon') {
+    return all.filter((c: any) => c.ownerId === 0n && c.zone === 'land-of-bondage' && isLostSoulRow(c));
+  }
+  const defender = [...ctx.db.Player.player_game_id.filter(gameId)].find(
+    (p: any) => p.seat.toString() !== attackerSeat,
+  );
+  if (!defender) return [];
+  return all.filter((c: any) => c.ownerId === defender.id && c.zone === 'land-of-bondage' && isLostSoulRow(c));
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: resolve_battle
+// Either combatant may resolve (Claim Victory / Battle Lost hit this same
+// logic — with exactly two seats, "caller is the attacker" and "caller is
+// the other seat" together cover every player, so no extra permission guard
+// is needed beyond findPlayerBySender already excluding spectators). Paragon
+// refills the shared LoB first so a transient-empty LoB (the last soul was
+// just rescued) can't misclassify a live rescue as a challenge with nothing
+// at stake. >=1 Lost Soul in the stakes LoB -> awaiting-soul; otherwise the
+// battle auto-returns immediately (spec §7: "Unopposed rescues resolve HERE,
+// not via end_battle").
+// ---------------------------------------------------------------------------
+export const resolve_battle = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+    if (game.battleState !== 'active') throw new SenderError('No battle in progress');
+
+    const format = normalizeFormat(game.format);
+    if (format === 'Paragon') {
+      refillSoulDeck(ctx, gameId);
+    }
+
+    const stakesLostSouls = battleStakesLobLostSouls(ctx, gameId, format, game.battleAttackerSeat);
+
+    logAction(
+      ctx, gameId, player.id, 'RESOLVE_BATTLE',
+      JSON.stringify({
+        callerSeat: player.seat.toString(),
+        attackerSeat: game.battleAttackerSeat,
+        lostSoulsAtStake: stakesLostSouls.length,
+      }),
+      game.turnNumber, game.currentPhase,
+    );
+
+    if (stakesLostSouls.length > 0) {
+      ctx.db.Game.id.update({ ...game, battleState: 'awaiting-soul' });
+    } else {
+      runBattleAutoReturn(ctx, gameId, player.id);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: surrender_soul
+// Chooser permission by format (spec §7): T1 the defender picks which of
+// their own souls to give up; T2/Paragon the attacker picks which soul to
+// take. Transfers via the existing moveLostSoulToLor primitive, always
+// targeting the attacker's Land of Redemption regardless of caller. Every
+// format awards exactly one soul per battle, so the band always auto-returns
+// and closes in this same reducer (never rely on a second client call — a
+// disconnect between calls would strand the state).
+// ---------------------------------------------------------------------------
+export const surrender_soul = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+    if (game.battleState !== 'awaiting-soul') throw new SenderError('No soul surrender is pending');
+
+    const format = normalizeFormat(game.format);
+    const callerIsAttacker = player.seat.toString() === game.battleAttackerSeat;
+    if (format === 'T1' && callerIsAttacker) {
+      throw new SenderError('Only the defender chooses which soul to surrender');
+    }
+    if (format !== 'T1' && !callerIsAttacker) {
+      throw new SenderError('Only the attacker chooses which soul to surrender');
+    }
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+    if (!isLostSoulRow(card)) throw new SenderError('Card is not a Lost Soul');
+
+    const stakesLostSouls = battleStakesLobLostSouls(ctx, gameId, format, game.battleAttackerSeat);
+    if (!stakesLostSouls.some((c: any) => c.id === card.id)) {
+      throw new SenderError('Card is not an eligible soul for this battle');
+    }
+
+    const attacker = [...ctx.db.Player.player_game_id.filter(gameId)].find(
+      (p: any) => p.seat.toString() === game.battleAttackerSeat,
+    );
+    if (!attacker) throw new SenderError('Attacker not found');
+
+    const fromOwnerId = card.ownerId;
+    moveLostSoulToLor(ctx, gameId, card, attacker.id, game);
+
+    logAction(
+      ctx, gameId, player.id, 'SURRENDER_SOUL',
+      JSON.stringify({
+        cardInstanceId: cardInstanceId.toString(),
+        cardName: card.cardName,
+        cardImgFile: card.cardImgFile,
+        fromOwnerId: fromOwnerId.toString(),
+        targetOwnerId: attacker.id.toString(),
+      }),
+      game.turnNumber, game.currentPhase,
+    );
+
+    // Every format awards exactly one soul: the band closes in this same
+    // reducer.
+    runBattleAutoReturn(ctx, gameId, player.id);
+
+    // The surrender is the battle's natural conclusion — both players
+    // already consented via the resolve/surrender flow, so the phase
+    // advances unconditionally on the caller (unlike end_battle's
+    // turn-player-only escape-hatch gate). Re-read: runBattleAutoReturn
+    // already wrote the Game row (clearing battleState/battleAttackerSeat/
+    // lastBattlePlayBySeat) — spreading the stale pre-return `game` snapshot
+    // here would resurrect battleState. Same idiom as end_battle above.
+    const latestGame = ctx.db.Game.id.find(gameId);
+    if (latestGame && latestGame.currentPhase === 'battle') {
+      ctx.db.Game.id.update({ ...latestGame, currentPhase: 'discard' });
+      logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latestGame.turnNumber, 'discard');
+    }
+  },
 );
 
 // ===========================================================================
@@ -2185,7 +2811,6 @@ export const matthew_draw_brigades = spacetimedb.reducer(
     if (!source) throw new SenderError('Card not found');
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
     if (source.ownerId !== player.id) throw new SenderError('Not your card');
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -2247,6 +2872,15 @@ export const move_card = spacetimedb.reducer(
     const fromZone = card.zone;
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+
+    // Battle is a closed band: an entry only completes while combat is
+    // actually active. Redirect to Territory (mirroring the lost-soul
+    // redirect below) instead of creating an invisible card when a
+    // stale/replayed move targets 'battle' after the band already closed.
+    // Spec §7.
+    if (toZone === 'battle' && game.battleState !== 'active') {
+      toZone = 'territory';
+    }
 
     // Materialize the game's CardInstance rows once. Reused for the various
     // zoneIndex / accessory / hand-count lookups below instead of issuing a
@@ -2491,6 +3125,10 @@ export const move_card = spacetimedb.reducer(
       : undefined;
     const newRevealStartedAt = autoReveal ? ctx.timestamp : undefined;
 
+    const battleEntryUpdates: any = {};
+    if (toZone === 'battle') {
+      stampBattleEntry(ctx, gameId, card, battleEntryUpdates);
+    }
     clearCountersIfLeavingPlay(ctx, card.id, fromZone, toZone);
     ctx.db.CardInstance.id.update({
       ...card,
@@ -2504,11 +3142,23 @@ export const move_card = spacetimedb.reducer(
       revealExpiresAt: newRevealExpiresAt,
       revealStartedAt: newRevealStartedAt,
       ...leavePlayFieldOverrides(card, fromZone, toZone),
+      ...battleEntryUpdates,
     });
 
     if (leavingZone) {
       const sendAccessoriesToDiscard =
         fromZone === 'territory' && toZone === 'land-of-bondage';
+      // Host entering Battle — the attached accessory follows it into the
+      // band with the attachment intact (spec §7 rule 1), instead of being
+      // unlinked and stranded behind in its old zone. Mirrors writeBattleEntryMove's
+      // identical cascade for the enter_battle path.
+      const sendAccessoriesToBattle = toZone === 'battle';
+      // Host retreating from Battle back to Territory — the attached
+      // accessory follows it out with the attachment intact, mirroring the
+      // entry cascade above. Without this the weapon fell into the generic
+      // unlink-in-place else-branch below, stranding it (unattached) in the
+      // closed band, where it would get discarded at the next End Battle.
+      const sendAccessoriesOutOfBattle = fromZone === 'battle' && toZone === 'territory';
       const attachedAccessories = gameCards.filter(
         (c: any) => c.equippedToInstanceId === cardInstanceId
       );
@@ -2532,6 +3182,45 @@ export const move_card = spacetimedb.reducer(
             revealExpiresAt: undefined,
       revealStartedAt: undefined,
             ...leavePlayFieldOverrides(accessory, accessory.zone, 'discard'),
+          });
+        } else if (sendAccessoriesToBattle) {
+          const accessoryBattleUpdates: any = {};
+          stampBattleEntry(ctx, gameId, accessory, accessoryBattleUpdates);
+          let accMaxIdx = -1n;
+          for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+            if (c.ownerId === accessory.ownerId && c.zone === 'battle' && c.zoneIndex > accMaxIdx) {
+              accMaxIdx = c.zoneIndex;
+            }
+          }
+          clearCountersIfLeavingPlay(ctx, accessory.id, accessory.zone, 'battle');
+          ctx.db.CardInstance.id.update({
+            ...accessory,
+            zone: 'battle',
+            zoneIndex: accMaxIdx + 1n,
+            posX,
+            posY,
+            revealExpiresAt: undefined,
+            revealStartedAt: undefined,
+            ...leavePlayFieldOverrides(accessory, accessory.zone, 'battle'),
+            ...accessoryBattleUpdates,
+          });
+        } else if (sendAccessoriesOutOfBattle) {
+          let terrMaxIdx = -1n;
+          for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+            if (c.ownerId === accessory.ownerId && c.zone === 'territory' && c.zoneIndex > terrMaxIdx) {
+              terrMaxIdx = c.zoneIndex;
+            }
+          }
+          clearCountersIfLeavingPlay(ctx, accessory.id, accessory.zone, 'territory');
+          ctx.db.CardInstance.id.update({
+            ...accessory,
+            zone: 'territory',
+            zoneIndex: terrMaxIdx + 1n,
+            posX,
+            posY,
+            revealExpiresAt: undefined,
+            revealStartedAt: undefined,
+            ...leavePlayFieldOverrides(accessory, accessory.zone, 'territory'),
           });
         } else {
           ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
@@ -2623,6 +3312,13 @@ export const move_cards_batch = spacetimedb.reducer(
 
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+
+    // Battle is a closed band — see move_card's identical redirect. One
+    // toZone is shared by the whole batch, so this redirects every card in
+    // the request at once. Spec §7.
+    if (toZone === 'battle' && game.battleState !== 'active') {
+      toZone = 'territory';
+    }
 
     // When drawing from the acting player's own deck into hand, we need to
     // replicate the top-of-deck auto-route behavior: a drawn Lost Soul (with
@@ -2806,6 +3502,7 @@ export const move_cards_batch = spacetimedb.reducer(
             (c: any) => c.ownerId === homeOwnerId && c.zone === 'land-of-bondage'
           ).length
         );
+        clearCountersIfLeavingPlay(ctx, card.id, card.zone, 'land-of-bondage');
         ctx.db.CardInstance.id.update({
           ...card,
           zone: 'land-of-bondage',
@@ -2814,6 +3511,7 @@ export const move_cards_batch = spacetimedb.reducer(
           posY: '',
           isFlipped: false,
           ownerId: homeOwnerId,
+          ...leavePlayFieldOverrides(card, card.zone, 'land-of-bondage'),
         });
         redirectedLostSouls.push({ name: logName, img: logImg });
         // Queue a replacement from the same end of the deck. Append to `ids`
@@ -3005,6 +3703,10 @@ export const move_cards_batch = spacetimedb.reducer(
         continue;
       }
 
+      const battleEntryUpdates: any = {};
+      if (cardFinalZone === 'battle') {
+        stampBattleEntry(ctx, gameId, card, battleEntryUpdates);
+      }
       clearCountersIfLeavingPlay(ctx, card.id, card.zone, cardFinalZone);
       ctx.db.CardInstance.id.update({
         ...card,
@@ -3018,6 +3720,7 @@ export const move_cards_batch = spacetimedb.reducer(
         revealExpiresAt: newRevealExpiresAt,
         revealStartedAt: newRevealStartedAt,
         ...leavePlayFieldOverrides(card, card.zone, cardFinalZone),
+        ...battleEntryUpdates,
       });
     }
 
@@ -3276,6 +3979,9 @@ function spawnTokenImpl(
       reference: tokenData.reference,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      originZone: '',
+      originPosX: '',
+      originPosY: '',
       outlineColor: '',
       imitatingName: '',
     });
@@ -3954,7 +4660,6 @@ export const execute_card_ability = spacetimedb.reducer(
     // Abilities only fire when the source card is in play. Matches the
     // client-side menu gate but the server enforces independently.
     // LoR included so resting Heroes (Angel of the Harvest, etc.) can spawn.
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -4074,7 +4779,6 @@ export const execute_card_ability_with_count = spacetimedb.reducer(
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
     if (source.ownerId !== player.id) throw new SenderError('Not your card');
 
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -4123,7 +4827,6 @@ export const resurrect_heroes = spacetimedb.reducer(
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
     if (source.ownerId !== player.id) throw new SenderError('Not your card');
 
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -4231,7 +4934,6 @@ export const imitate_lost_soul = spacetimedb.reducer(
     if (!(source.cardName in IMITATE_ORIGINAL_IMG)) {
       throw new SenderError('Source is not an Imitate Lost Soul');
     }
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -4534,16 +5236,22 @@ export const attach_card = spacetimedb.reducer(
     const accessoryType = accessory.cardType.toLowerCase();
     const accessoryIsSite =
       accessoryType.includes('site') || accessoryType.includes('city');
-    const attachZone: string = accessoryIsSite ? 'land-of-bondage' : 'territory';
+    // A host already in Battle keeps the attachment inside the band — the
+    // weapon/site joins the host in 'battle' instead of its normal home zone.
+    // Spec §4.
+    const attachZone: string =
+      host.zone === 'battle' ? 'battle' : accessoryIsSite ? 'land-of-bondage' : 'territory';
 
     // Host must be coming from a sensible zone (Territory, LOB, Hand, Reserve,
-    // LOR). We'll move the host to the attach zone if it's not already there.
+    // LOR, or already in Battle). We'll move the host to the attach zone if
+    // it's not already there.
     const validSourceZones = new Set([
       'territory',
       'land-of-bondage',
       'land-of-redemption',
       'hand',
       'reserve',
+      'battle',
     ]);
     if (!validSourceZones.has(host.zone)) {
       throw new SenderError('Host not in a valid zone to attach');
@@ -4586,18 +5294,26 @@ export const attach_card = spacetimedb.reducer(
     }
 
     // Move the ACCESSORY to the attach zone (inheriting host's position in
-    // Territory; cleared in LOB).
+    // Territory/Battle; cleared in LOB).
     let accMaxIdx = -1n;
     for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
       if (c.ownerId === player.id && c.zone === attachZone && c.zoneIndex > accMaxIdx) {
         accMaxIdx = c.zoneIndex;
       }
     }
-    const inheritPos = attachZone === 'territory';
+    const inheritPos = attachZone === 'territory' || attachZone === 'battle';
     // Re-read host in case we just updated it, to get fresh posX/posY.
     const hostNow = ctx.db.CardInstance.id.find(warriorInstanceId);
     const hostPosX = hostNow?.posX ?? host.posX;
     const hostPosY = hostNow?.posY ?? host.posY;
+    // Stamp the weapon's own battle-origin fields when it's joining a host
+    // already in Battle. Uses the accessory's pre-move zone/pos (its own
+    // origin, not the host's) and no-ops if the accessory is already in
+    // 'battle'. Spec §4.
+    const accessoryBattleUpdates: any = {};
+    if (attachZone === 'battle') {
+      stampBattleEntry(ctx, gameId, accessory, accessoryBattleUpdates);
+    }
     ctx.db.CardInstance.id.update({
       ...accessory,
       zone: attachZone,
@@ -4606,6 +5322,7 @@ export const attach_card = spacetimedb.reducer(
       posY: inheritPos ? hostPosY : '',
       isFlipped: false,
       equippedToInstanceId: warriorInstanceId,
+      ...accessoryBattleUpdates,
     });
     if (accessoryFromZone === 'hand') compactOwners.hand.add(player.id);
     if (accessoryFromZone === 'land-of-bondage' && attachZone !== 'land-of-bondage') {
@@ -4854,6 +5571,7 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
     // Route into the original owner's deck so a taken opponent card
     // shuffles back into the opponent's deck, not the controller's.
     const deckOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+    clearCountersIfLeavingPlay(ctx, card.id, fromZone, 'deck');
     ctx.db.CardInstance.id.update({
       ...card,
       zone: 'deck',
@@ -4861,6 +5579,7 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
       isFlipped: true,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      ...leavePlayFieldOverrides(card, fromZone, 'deck'),
     });
 
     // Now shuffle the deck owner's entire deck (same logic as shuffle_deck)
@@ -5321,7 +6040,6 @@ export const discard_reserve_characters_execute = spacetimedb.reducer(
     // requester. No-op if it moved/was negated mid-flight; leave request
     // cleanup to complete_zone_search (client responsibility).
     const source = ctx.db.CardInstance.id.find(sourceInstanceId);
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (
       !source ||
       source.gameId !== gameId ||
@@ -6233,6 +6951,9 @@ export const spawn_lost_soul = spacetimedb.reducer(
       isToken: true,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      originZone: '',
+      originPosX: '',
+      originPosY: '',
       outlineColor: '',
       imitatingName: '',
     });
@@ -6945,6 +7666,13 @@ export const move_opponent_card = spacetimedb.reducer(
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
+    // Battle entry must be stamped and owner-consented; a requester acting on
+    // an opponent's zone-search approval must not be able to drop their card
+    // into the closed battle band. Spec §7.
+    if (toZone === 'battle') {
+      throw new SenderError('Cannot move cards into battle for the opponent');
+    }
+
     const fromZone = card.zone;
     // Moving to deck/soul-deck = face-down; leaving deck, reserve, or soul-deck = face-up; otherwise preserve
     const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (fromZone === 'deck' || fromZone === 'reserve' || fromZone === 'soul-deck') ? false : card.isFlipped;
@@ -6982,6 +7710,7 @@ export const move_opponent_card = spacetimedb.reducer(
       finalZoneIndex = maxIdx + 1n;
     }
 
+    clearCountersIfLeavingPlay(ctx, card.id, fromZone, toZone);
     ctx.db.CardInstance.id.update({
       ...card,
       ownerId: finalOwnerId,
@@ -6990,6 +7719,7 @@ export const move_opponent_card = spacetimedb.reducer(
       posX,
       posY,
       isFlipped,
+      ...leavePlayFieldOverrides(card, fromZone, toZone),
     });
 
     // Compact hand indices if card left hand

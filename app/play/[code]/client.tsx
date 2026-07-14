@@ -146,6 +146,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [showReloadDeckPicker, setShowReloadDeckPicker] = useState(false);
   const [reloadDeckConfirm, setReloadDeckConfirm] = useState<{ deckId: string; deckName: string; deckData: string; paragon: string } | null>(null);
 
+  // End Turn guard (spec §8) — state only here; the wrapped handler is
+  // defined below once `gameState` exists (see requestEndTurn).
+  const [showBattleEndTurnConfirm, setShowBattleEndTurnConfirm] = useState(false);
+
   // Practice-mode deck swap state — separate from in-game reload because the
   // pregame swap calls a different reducer (pregame_change_deck) that updates
   // pendingDeckData rather than dealing a fresh hand.
@@ -283,6 +287,21 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Must be declared before the reducer effect so isGamesReady is available
   // in the dependency array (which is evaluated during render).
   const gameState = useGameState(gameId ?? BigInt(0), forgeResolver);
+
+  // End Turn guard (spec §8): TurnIndicator's onEndTurn, GameToolbar's
+  // onEndTurn, and the Enter-key hotkey (onAdvancePhase below) all dispatch
+  // gameState.endTurn from here, so the confirm lives at this shared level
+  // rather than inside any one caller — neither TurnIndicator nor
+  // GameToolbar has its own End Turn confirm idiom (TurnIndicator's
+  // showConcedeConfirm is local to Concede only). Reuses the
+  // reloadDeckConfirm modal's visual idiom, rendered near it below.
+  const requestEndTurn = useCallback(() => {
+    if (gameState.game?.battleState === 'awaiting-soul') {
+      setShowBattleEndTurnConfirm(true);
+    } else {
+      gameState.endTurn();
+    }
+  }, [gameState.game?.battleState, gameState.endTurn]);
 
   const isForge = gameParams?.isForge === true || gameState.isForgeGame;
 
@@ -531,7 +550,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     onRollDice: () => gameState.rollDice(BigInt(20)),
     onToggleSpreadHand: toggleSpreadHand,
     onToggleLoupe: toggleLoupe,
-    onAdvancePhase: gameState.endTurn,
+    onAdvancePhase: requestEndTurn,
     onUndo: handleUndo,
   });
 
@@ -1636,7 +1655,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             opponentConnectionStatus={gameState.opponentConnectionStatus}
             isMyTurn={gameState.isMyTurn}
             onSetPhase={gameState.setPhase}
-            onEndTurn={gameState.endTurn}
+            onEndTurn={requestEndTurn}
             onConcede={gameState.resignGame}
             onRequestPriority={() => gameState.requestZoneSearch('action-priority')}
             hasPendingPriority={gameState.zoneSearchRequests.some(
@@ -1691,7 +1710,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onShowToast={showGameToast}
             onUndo={handleUndo}
             undoCount={undoStack.count}
-            onEndTurn={gameState.endTurn}
+            onEndTurn={requestEndTurn}
             onRequestPriority={() => gameState.requestZoneSearch('action-priority')}
             hasPendingPriority={gameState.zoneSearchRequests.some(
               (r: any) => r.zone === 'action-priority' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
@@ -1805,6 +1824,80 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 }}
               >
                 Load Deck
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* End Turn during a pending soul surrender (spec §8) — the server's
+          end_turn hook auto-returns as the ultimate fallback either way, but
+          this stops an accidental End Turn from cutting off the pick. */}
+      {showBattleEndTurnConfirm && (
+        <div
+          onClick={() => setShowBattleEndTurnConfirm(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(14, 10, 6, 0.97)',
+              border: '1px solid rgba(107, 78, 39, 0.3)',
+              borderRadius: 8,
+              padding: '20px 28px',
+              maxWidth: 320,
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+            }}
+          >
+            <p style={{
+              fontFamily: 'Georgia, serif',
+              color: '#e8d5a3',
+              fontSize: 13,
+              lineHeight: 1.5,
+            }}>
+              A soul surrender is pending — end turn anyway?
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
+              <button
+                onClick={() => setShowBattleEndTurnConfirm(false)}
+                style={{
+                  padding: '7px 18px',
+                  background: 'transparent',
+                  border: '1px solid rgba(107, 78, 39, 0.3)',
+                  borderRadius: 4,
+                  color: 'rgba(196, 149, 90, 0.6)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontFamily: 'Georgia, serif',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowBattleEndTurnConfirm(false);
+                  gameState.endTurn();
+                }}
+                style={{
+                  padding: '7px 18px',
+                  background: 'rgba(196, 149, 90, 0.15)',
+                  border: '1px solid rgba(196, 149, 90, 0.45)',
+                  borderRadius: 4,
+                  color: '#e8d5a3',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontFamily: 'Georgia, serif',
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                End Turn
               </button>
             </div>
           </div>

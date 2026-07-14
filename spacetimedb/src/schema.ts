@@ -50,6 +50,9 @@ export const Game = table(
     pauseRequestType: t.string().default(''),     // '' | 'pause' | 'resume'
     pauseStartedAtMicros: t.u64().default(0n),    // when current active pause began; 0 when not paused
     totalPausedMicros: t.u64().default(0n),       // accumulated paused time across the game
+    battleState: t.string().default(''),        // '' | 'active' | 'awaiting-soul'
+    battleAttackerSeat: t.string().default(''), // '' | '0' | '1'
+    lastBattlePlayBySeat: t.string().default(''), // '' | '0' | '1' — REG stalemate/mutual tiebreak
   }
 );
 
@@ -138,6 +141,11 @@ export const CardInstance = table(
     // correct fraction regardless of whether the reveal was a 10s auto or a
     // 30s manual flash. Cleared alongside revealExpiresAt.
     revealStartedAt: t.timestamp().optional(),
+    // Stamped when the card enters zone 'battle'; cleared by leavePlayFieldOverrides
+    // whenever it leaves. Drives end-of-battle auto-return (survivors → origin).
+    originZone: t.string().default(''),
+    originPosX: t.string().default(''),
+    originPosY: t.string().default(''),
     // Visual outline marker set by `set_card_outline` abilities (e.g. Three
     // Woes "Choose Good"/"Choose Evil"). '' = no outline; 'good' renders
     // green, 'evil' renders red. Cleared when the card leaves Territory.

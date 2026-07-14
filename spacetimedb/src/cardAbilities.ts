@@ -20,7 +20,7 @@ type ZoneId = string;
 type AbilityBase = { sourceZones?: ZoneId[] };
 
 export const DEFAULT_ABILITY_SOURCE_ZONES: ReadonlyArray<ZoneId> = [
-  'territory', 'land-of-bondage', 'land-of-redemption',
+  'territory', 'land-of-bondage', 'land-of-redemption', 'battle',
 ];
 
 export type CardAbility = AbilityBase & (
