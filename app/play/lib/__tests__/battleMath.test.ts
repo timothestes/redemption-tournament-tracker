@@ -218,8 +218,8 @@ describe('computeInitiative — empty-side and unknown-stat states', () => {
     expect(computeInitiative(cards, '0', '')).toEqual({ kind: 'no-attacker' });
   });
 
-  it('both sides empty of characters -> waiting-blocker (band just opened)', () => {
-    expect(computeInitiative([], '0', '')).toEqual({ kind: 'waiting-blocker' });
+  it('both sides empty of characters -> empty (band just opened; no banner)', () => {
+    expect(computeInitiative([], '0', '')).toEqual({ kind: 'empty' });
   });
 
   it('non-character cards on both sides (e.g. Sites/Enhancements) still count as empty', () => {
@@ -227,7 +227,7 @@ describe('computeInitiative — empty-side and unknown-stat states', () => {
       mkCard({ ownerSeat: '0', cardType: 'GE', strength: '', toughness: '' }),
       mkCard({ ownerSeat: '1', cardType: 'Site', strength: '', toughness: '' }),
     ];
-    expect(computeInitiative(cards, '0', '')).toEqual({ kind: 'waiting-blocker' });
+    expect(computeInitiative(cards, '0', '')).toEqual({ kind: 'empty' });
   });
 
   it('either side hasUnknown (face-down card) -> unknown even with both sides populated', () => {
