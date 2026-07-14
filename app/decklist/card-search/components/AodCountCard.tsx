@@ -20,11 +20,28 @@ const DECKLIST_TYPE: Record<AodCountCardProps["deckType"], string> = {
 };
 
 const AOD_TOOLTIP =
-  "Average number of Daniel-reference cards in the top 9, given at least one appears in the top 3 (10,000-iteration Monte Carlo).";
+  "Top-9 draw stats over a 10,000-iteration Monte Carlo. Non-Soul: avg non-soul " +
+  "Daniel cards in the top 9. Soul: avg Daniel Lost Souls (they trigger the chain " +
+  "but don't add to the count). Whiff: % of draws with no Daniel in the top 3.";
+
+// One labeled figure within the revealed breakdown row.
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-lg font-bold tabular-nums leading-tight">{value}</div>
+      <div className="text-[10px] uppercase tracking-wide opacity-70 leading-tight truncate">
+        {label}
+      </div>
+    </div>
+  );
+}
 
 export default function AodCountCard({ deck, deckType }: AodCountCardProps) {
   const [status, setStatus] = useState<Status>("idle");
-  const [count, setCount] = useState(0); // animated display value
+  // Animated display values for the three breakdown figures.
+  const [nonSoul, setNonSoul] = useState(0);
+  const [soul, setSoul] = useState(0);
+  const [whiff, setWhiff] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
 
@@ -53,7 +70,9 @@ export default function AodCountCard({ deck, deckType }: AodCountCardProps) {
     // Invalidate the previous result whenever the deck changes.
     requestId.current += 1;
     setStatus("idle");
-    setCount(0);
+    setNonSoul(0);
+    setSoul(0);
+    setWhiff(0);
     setError(null);
   }, [mainSignature]);
 
@@ -71,6 +90,7 @@ export default function AodCountCard({ deck, deckType }: AodCountCardProps) {
           body: JSON.stringify({
             decklist: generateDeckText(deck),
             decklist_type: DECKLIST_TYPE[deckType],
+            include_breakdown: true,
           }),
         }
       );
@@ -82,13 +102,14 @@ export default function AodCountCard({ deck, deckType }: AodCountCardProps) {
         throw new Error(data?.message || "Couldn't calculate AoD count");
       }
 
-      const value = Number(data?.data?.aod_count ?? 0);
+      const nonSoulValue = Number(data?.data?.aod_count ?? 0);
+      const soulValue = Number(data?.data?.soul_aod_count ?? 0);
+      const whiffValue = Number(data?.data?.whiff_percentage ?? 0);
       setStatus("done");
-      animate(0, value, {
-        duration: 0.9,
-        ease: "easeOut",
-        onUpdate: (v) => setCount(v),
-      });
+      const opts = { duration: 0.9, ease: "easeOut" } as const;
+      animate(0, nonSoulValue, { ...opts, onUpdate: (v) => setNonSoul(v) });
+      animate(0, soulValue, { ...opts, onUpdate: (v) => setSoul(v) });
+      animate(0, whiffValue, { ...opts, onUpdate: (v) => setWhiff(v) });
     } catch (err) {
       if (id !== requestId.current) return;
       setStatus("error");
@@ -109,16 +130,20 @@ export default function AodCountCard({ deck, deckType }: AodCountCardProps) {
         title="Tap to recalculate"
         className={`group p-3 rounded-lg border-2 text-left transition-all hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 ${lionTheme}`}
       >
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide mb-1">
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide mb-1.5">
           <GiLion className="w-4 h-4 shrink-0" />
           <span>AoD Count</span>
           <span title={AOD_TOOLTIP} className="cursor-help opacity-60 leading-none">
             &#9432;
           </span>
         </div>
-        <div className="text-2xl font-bold tabular-nums">{count.toFixed(2)}</div>
+        <div className="grid grid-cols-3 gap-1.5">
+          <Stat label="Non-Soul" value={nonSoul.toFixed(2)} />
+          <Stat label="Soul" value={soul.toFixed(2)} />
+          <Stat label="Whiff" value={`${whiff.toFixed(1)}%`} />
+        </div>
         {tooFewCards && (
-          <div className="text-[10px] mt-0.5 opacity-70">Needs 9+ main cards</div>
+          <div className="text-[10px] mt-1 opacity-70">Needs 9+ main cards</div>
         )}
       </button>
     );
