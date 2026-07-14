@@ -10,17 +10,17 @@ import {
 } from '../battleMath';
 
 // Card factory. Defaults land the card on its OWNER's own half
-// (dbY=0.6, cardRelH=0.1 -> centerY=0.65 >= 0.5) so most totals/initiative
+// (dbX=0.6, cardRelW=0.1 -> centerX=0.65 >= 0.5) so most totals/initiative
 // tests can just set `ownerSeat` to place a card on a given battle side.
-// dbY is stored owner-local (spec §3), so a card's side-derivation math is
+// dbX is stored owner-local (spec §3), so a card's side-derivation math is
 // identical regardless of which player owns it or which client is
 // rendering it -- no separate "opponent-owned" variant is needed for these
 // tests; battleSideOf's own describe block below covers the geometry.
 function mkCard(overrides: Partial<BattleCardLike> = {}): BattleCardLike {
   return {
     ownerSeat: '0',
-    dbY: 0.6,
-    cardRelH: 0.1,
+    dbX: 0.6,
+    cardRelW: 0.1,
     strength: '5',
     toughness: '5',
     brigade: '',
@@ -33,33 +33,48 @@ function mkCard(overrides: Partial<BattleCardLike> = {}): BattleCardLike {
 }
 
 describe('battleSideOf', () => {
-  it('centerY >= 0.5 puts the card on its owner side', () => {
-    const c = mkCard({ ownerSeat: '0', dbY: 0.5, cardRelH: 0.1 }); // center 0.55
+  it('centerX >= 0.5 puts the card on its owner side', () => {
+    const c = mkCard({ ownerSeat: '0', dbX: 0.5, cardRelW: 0.1 }); // center 0.55
     expect(battleSideOf(c)).toBe('0');
   });
 
-  it('centerY < 0.5 puts the card on the opponent side (dragged across the centerline)', () => {
-    const c = mkCard({ ownerSeat: '0', dbY: 0.1, cardRelH: 0.1 }); // center 0.15
+  it('centerX < 0.5 puts the card on the opponent side (dragged across the centerline)', () => {
+    const c = mkCard({ ownerSeat: '0', dbX: 0.1, cardRelW: 0.1 }); // center 0.15
     expect(battleSideOf(c)).toBe('1');
   });
 
-  it('centerY exactly 0.5 is inclusive (>=), stays on owner side', () => {
-    const c = mkCard({ ownerSeat: '0', dbY: 0.4, cardRelH: 0.2 }); // center exactly 0.5
+  it('centerX exactly 0.5 is inclusive (>=), stays on owner side', () => {
+    const c = mkCard({ ownerSeat: '0', dbX: 0.4, cardRelW: 0.2 }); // center exactly 0.5
     expect(battleSideOf(c)).toBe('0');
   });
 
   it('works symmetrically for seat 1 as owner', () => {
-    const c = mkCard({ ownerSeat: '1', dbY: 0.6, cardRelH: 0.1 }); // center 0.65
+    const c = mkCard({ ownerSeat: '1', dbX: 0.6, cardRelW: 0.1 }); // center 0.65
     expect(battleSideOf(c)).toBe('1');
   });
 
-  it('anchor-clamp regression: dbY=0.33, cardRelH=0.67 (max clamped anchor) is OWN side', () => {
-    // Write-time clamping caps an own-card anchor at 1 - cardRelH within a
-    // 0.19-height band, so dbY alone can sit at 0.33 even for a card that's
-    // fully on the owner's half. centerY = 0.33 + 0.67/2 = 0.665 >= 0.5.
-    // An anchor-only `dbY >= 0.5` test would wrongly classify this as
+  it('anchor-clamp regression: dbX=0.33, cardRelW=0.67 (max clamped anchor) is OWN side', () => {
+    // Write-time clamping caps an own-card anchor at 1 - cardRelW within a
+    // 0.19-width band, so dbX alone can sit at 0.33 even for a card that's
+    // fully on the owner's half. centerX = 0.33 + 0.67/2 = 0.665 >= 0.5.
+    // An anchor-only `dbX >= 0.5` test would wrongly classify this as
     // opponent-side (0.33 < 0.5) -- this is the regression this lib guards.
-    const c = mkCard({ ownerSeat: '0', dbY: 0.33, cardRelH: 0.67 });
+    const c = mkCard({ ownerSeat: '0', dbX: 0.33, cardRelW: 0.67 });
+    expect(battleSideOf(c)).toBe('0');
+  });
+
+  it('anchor-clamp regression at the realistic scale: cardRelW ≈ 0.07 in a full-width band '
+    + 'makes the clamp mild -- an anchor alone at the clamp limit (0.93) with a center just '
+    + 'past 0.5 still classifies as OWN side', () => {
+    // A full-width band with ~14 card slots gives cardRelW ≈ 1/14 ≈ 0.0714.
+    // The write-time clamp caps an own-card anchor at 1 - cardRelW ≈ 0.9286.
+    // centerX = 0.9286 + 0.0714/2 ≈ 0.9643 >= 0.5, so the clamped anchor is
+    // nowhere near the 0.5 boundary at this scale -- included as a
+    // regression guard that the ANCHOR-alone view (0.9286, which reads as
+    // "own side" too under a naive anchor-only check) doesn't mask a real
+    // center-based classification bug.
+    const cardRelW = 0.0714;
+    const c = mkCard({ ownerSeat: '0', dbX: 1 - cardRelW, cardRelW });
     expect(battleSideOf(c)).toBe('0');
   });
 });

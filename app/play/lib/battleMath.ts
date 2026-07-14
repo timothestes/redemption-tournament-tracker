@@ -7,8 +7,8 @@ export type BattleSeat = '0' | '1';
 
 export interface BattleCardLike {
   ownerSeat: BattleSeat;
-  dbY: number;
-  cardRelH: number;
+  dbX: number;
+  cardRelW: number;
   strength: string;
   toughness: string;
   brigade: string;
@@ -33,15 +33,18 @@ function otherSeat(seat: BattleSeat): BattleSeat {
 
 /**
  * Side is derived, never stored, from the card's owner-local CENTER, not its
- * top-left anchor: centerY = dbY + cardRelH / 2. Write-time clamping caps an
- * own-card anchor at `1 - cardRelH`, so an anchor-only `dbY >= 0.5` check
- * would misclassify a legitimately-own-side card as opponent-side. A card
- * whose center crosses the 0.5 line (dragged across the divider) fights for
- * the opponent's side instead.
+ * top-left anchor: centerX = dbX + cardRelW / 2. Write-time clamping caps an
+ * own-card anchor at `1 - cardRelW`, so an anchor-only `dbX >= 0.5` check
+ * would misclassify a legitimately-own-side card as opponent-side. Every
+ * player plays into their OWN right half (centerX >= 0.5 = own side) — owner-
+ * local mirroring means each client renders its own cards on its own right
+ * and the opponent's on its left, consistently on both screens. A card whose
+ * center crosses the 0.5 line (dragged across the centerline) fights for the
+ * opponent's side instead.
  */
 export function battleSideOf(c: BattleCardLike): BattleSeat {
-  const centerY = c.dbY + c.cardRelH / 2;
-  return centerY >= 0.5 ? c.ownerSeat : otherSeat(c.ownerSeat);
+  const centerX = c.dbX + c.cardRelW / 2;
+  return centerX >= 0.5 ? c.ownerSeat : otherSeat(c.ownerSeat);
 }
 
 export interface SideTotals {
