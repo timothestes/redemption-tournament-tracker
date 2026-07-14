@@ -21,6 +21,7 @@ import CollectionCheckModal from "../card-search/components/CollectionCheckModal
 import { aggregateOwnedByName } from "../card-search/utils/collectionCheck";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
+import AodCountCard from "../card-search/components/AodCountCard";
 import { Deck as DeckType } from "../card-search/types/deck";
 import { generateDeckText } from "../card-search/utils/deckImportExport";
 import { compareCardsDefault, compareTypeGroups, type SortableCard } from "@/lib/cards/defaultSort";
@@ -1276,6 +1277,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     );
                   });
                 })()}
+                <AodCountCard
+                  deck={deckForModal}
+                  deckType={formatDeckType(deck.format) as "T1" | "T2" | "Paragon"}
+                />
               </div>
             </div>
 
