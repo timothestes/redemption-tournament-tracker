@@ -5284,16 +5284,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // ONE adaptive header line (owner direction, replacing the floating
     // status strip that used to render below the band — it sat on top of
     // territory cards and competed with the header + chips for attention).
-    // The base "<attacker> attacking — <stakes>" gains a live status suffix
-    // while the fight is ACTIVE; during 'awaiting-soul' the suffix drops
-    // (the HTML waiting pill / picker carries that state) and the base line
-    // stays for reconnecting players and spectators.
+    // The live status REPLACES the base "<attacker> attacking — <stakes>"
+    // line (appending both read too wordy — owner feedback); the base line
+    // only shows while there's no status to report: band just opened
+    // (kind 'empty') or during 'awaiting-soul' (the pill/picker carries
+    // that state), which also keeps reconnecting players and spectators
+    // oriented.
     const initiative = computeInitiative(
       battleLikes,
       attackerSeat as BattleSeat,
       (gameState.lastBattlePlayBySeat || '') as BattleSeat | '',
     );
-    let statusSuffix = '';
+    let statusText = '';
     if (gameState.battleState === 'active') {
       switch (initiative.kind) {
         case 'empty':
@@ -5303,22 +5305,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         case 'waiting-blocker':
           // Side-neutral: also shown after the only blocker was defeated
           // and dragged to discard (UX review F3).
-          statusSuffix = ' · No blocker in battle';
+          statusText = 'No blocker in battle';
           break;
         case 'no-attacker':
-          statusSuffix = ' · No attacker in battle';
+          statusText = 'No attacker in battle';
           break;
         case 'unknown':
-          statusSuffix = ' · Initiative unknown (face-down/variable stats)';
+          statusText = 'Initiative unknown (face-down/variable stats)';
           break;
         case 'initiative': {
           const reasonLabel = initiative.reason === 'mutual-destruction' ? 'mutual destruction' : initiative.reason;
-          statusSuffix = ` · Initiative: ${nameForSeat(initiative.seat)} (${reasonLabel})`;
+          statusText = `Initiative: ${nameForSeat(initiative.seat)} (${reasonLabel})`;
           break;
         }
       }
     }
-    const headerText = `${nameForSeat(attackerSeat)} attacking — ${stakesLostSoulCount >= 1 ? 'Rescue attempt' : 'Battle challenge'}${statusSuffix}`;
+    const headerText =
+      statusText ||
+      `${nameForSeat(attackerSeat)} attacking — ${stakesLostSoulCount >= 1 ? 'Rescue attempt' : 'Battle challenge'}`;
 
     const chipWidth = 64 * fsGrowth(11);
     const chipHeight = 20;
