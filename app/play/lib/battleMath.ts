@@ -88,6 +88,33 @@ export function sideTotals(cards: BattleCardLike[], side: BattleSeat): SideTotal
   return { str, tgh, hasUnknown };
 }
 
+/**
+ * Extracts the meek-side stat from a raw CardInstance strength/toughness
+ * string. Redemption printings that support a Meek conversion encode both
+ * stats in one field, "<normal>(<meek>)" — e.g. Matthias (GoC): strength
+ * "X(7)", toughness "3(7)" both carry a meek side of 7. CardInstance rows
+ * copy these strings verbatim from card data at deal time and the
+ * meek_card/unmeek_card reducers only flip the isMeek boolean (never touch
+ * strength/toughness), so the meek value is always sitting in the row's
+ * existing field — no separate data source or card lookup needed. Returns
+ * null when there's no parenthesized meek value to read (plain "7", a
+ * blanked Forge field, a non-meek card), so callers can fall back to their
+ * existing "unknown" handling.
+ */
+function parseMeekStatValue(raw: string): number | null {
+  const match = raw.match(/\((-?\d+)\)\s*$/);
+  if (!match) return null;
+  const n = parseInt(match[1], 10);
+  return Number.isNaN(n) ? null : n;
+}
+
+export function parseMeekStats(strength: string, toughness: string): { strength: number; toughness: number } | null {
+  const s = parseMeekStatValue(strength);
+  const t = parseMeekStatValue(toughness);
+  if (s === null || t === null) return null;
+  return { strength: s, toughness: t };
+}
+
 export type InitiativeState =
   | { kind: 'waiting-blocker' }
   | { kind: 'no-attacker' }

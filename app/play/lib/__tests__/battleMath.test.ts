@@ -6,6 +6,7 @@ import {
   brigadeMismatch,
   summarizeAutoReturn,
   siteAttachedSoulIds,
+  parseMeekStats,
   type BattleCardLike,
 } from '../battleMath';
 
@@ -116,6 +117,22 @@ describe('sideTotals', () => {
   it('an empty side returns zero totals with no unknown flag', () => {
     const cards = [mkCard({ ownerSeat: '1' })];
     expect(sideTotals(cards, '0')).toEqual({ str: 0, tgh: 0, hasUnknown: false });
+  });
+});
+
+describe('parseMeekStats', () => {
+  it('reads the meek side out of a "normal(meek)" stat string (Matthias (GoC): X(7) / 3(7) -> 7/7)', () => {
+    expect(parseMeekStats('X(7)', '3(7)')).toEqual({ strength: 7, toughness: 7 });
+  });
+
+  it('handles a space before the parenthesized meek value', () => {
+    expect(parseMeekStats('11 (7)', '7 (11)')).toEqual({ strength: 7, toughness: 11 });
+  });
+
+  it('returns null when either side has no parenthesized meek value', () => {
+    expect(parseMeekStats('7', '7')).toBeNull();
+    expect(parseMeekStats('7', '3(7)')).toBeNull();
+    expect(parseMeekStats('', '')).toBeNull();
   });
 });
 

@@ -92,6 +92,7 @@ import {
   computeInitiative,
   brigadeMismatch as computeBrigadeMismatch,
   siteAttachedSoulIds,
+  parseMeekStats,
   type BattleCardLike,
   type BattleSeat,
 } from '../lib/battleMath';
@@ -5133,6 +5134,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     const pushRows = (rows: CardInstance[] | undefined, owner: 'my' | 'opponent', seat: BattleSeat | null) => {
       if (!seat || !rows) return;
       for (const row of rows) {
+        // Meek hero/character in battle must count its meek-side power/
+        // toughness, not its normal-side stats (spec: Matthias converted to
+        // meek is 7/7). The meek value lives in the row's own strength/
+        // toughness string ("<normal>(<meek>)") — see parseMeekStats. Falls
+        // through to the normal-side string unchanged when unresolvable
+        // (non-meek card, blanked Forge field), matching existing ? handling.
+        const meekStats = row.isMeek ? parseMeekStats(row.strength, row.toughness) : null;
         entries.push({
           row,
           owner,
@@ -5140,8 +5148,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             ownerSeat: seat,
             dbX: parseFloat(row.posX || '0'),
             cardRelW,
-            strength: row.strength,
-            toughness: row.toughness,
+            strength: meekStats ? String(meekStats.strength) : row.strength,
+            toughness: meekStats ? String(meekStats.toughness) : row.toughness,
             brigade: row.brigade,
             cardType: row.cardType,
             specialAbility: row.specialAbility,
