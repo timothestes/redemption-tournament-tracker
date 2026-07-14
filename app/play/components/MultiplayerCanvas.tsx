@@ -2606,6 +2606,48 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     offsetX,
     offsetY,
     moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) => {
+      // Battle is a single band rect hit-tested as owner 'my' as a formality
+      // (see findZoneForModalDrag) — it is NOT in myZones/opponentZones, so
+      // it can't go through the generic zone-lookup path below. Normalize
+      // against battleBandRect with CARD-OWNER mirroring and the same
+      // enter/move/no-op gating handleCardDragEnd's battle drop path uses,
+      // instead of falling into the else-branch further down and sending
+      // raw virtual pixels as posX/posY (an invisible card at toScreenPos).
+      if (toZone === 'battle') {
+        const battleState = gameState.game?.battleState;
+        const battleNeedsEnter = battleState === '';
+        if (!battleNeedsEnter && battleState !== 'active') {
+          // 'awaiting-soul': band is open but the server refuses new plays
+          // mid-resolution — snap back (no-op), matching handleCardDragEnd.
+          return;
+        }
+        // Card-owner mirroring (spec §3/§4): battle drops never transfer
+        // ownership and mirror by the DRAGGED CARD's owner, not the hit
+        // zone (always 'my'). Shared-owned cards (0n) fold into 'my', same
+        // as handleCardDragEnd's sourceOwner/targetOwner derivation.
+        const sourceInstance = findAnyCardById(id);
+        const sourceOwner: 'my' | 'opponent' | 'shared' =
+          sourceInstance?.ownerId === 0n
+            ? 'shared'
+            : sourceInstance?.ownerId === gameState.opponentPlayer?.id
+            ? 'opponent'
+            : 'my';
+        const targetOwner: 'my' | 'opponent' = sourceOwner === 'opponent' ? 'opponent' : 'my';
+        const execute = () => {
+          if (posX == null || posY == null || !battleBandRect) return;
+          const db = toDbPos(posX, posY, battleBandRect, targetOwner, { cardWidth, cardHeight });
+          if (battleNeedsEnter) {
+            gameState.enterBattle(BigInt(id), String(db.x), String(db.y));
+          } else {
+            gameState.moveCard(BigInt(id), 'battle', undefined, String(db.x), String(db.y), '');
+          }
+        };
+        const card = findMyCardById(id);
+        if (checkReserveProtection(card?.zone, 'battle', execute)) return;
+        execute();
+        return;
+      }
+
       // Determine which player's zone was hit so we can normalize correctly
       const hit = posX != null && posY != null
         ? findZoneAtPosition(posX + cardWidth / 2, posY + cardHeight / 2)
@@ -2631,6 +2673,51 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       execute();
     },
     moveCardsBatch: (ids: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) => {
+      // Battle batch drops: mirror the single-card branch above. Unlike
+      // territory/LOB, the generic path below only special-cases
+      // ('territory' | 'land-of-bondage') for normalization, so 'battle'
+      // fell through to `gameState.moveCardsBatch(ids, toZone)` with NO
+      // positions at all — every card piled at the server's fallback spot.
+      if (toZone === 'battle') {
+        const battleState = gameState.game?.battleState;
+        const battleNeedsEnter = battleState === '';
+        const execute = () => {
+          if (!battleNeedsEnter && battleState !== 'active') {
+            // 'awaiting-soul': no meaningful new plays mid-resolution — no-op.
+            return;
+          }
+          if (!positions || !battleBandRect) {
+            gameState.moveCardsBatch(JSON.stringify(ids), 'battle');
+            return;
+          }
+          // Small per-card fan so a multi-select drop doesn't pile every
+          // card on the exact same point (mirrors the territory/LOB fan
+          // this hook already applies before calling us — battle just
+          // never got one).
+          const BATTLE_FAN_OFFSET = 20;
+          const normalized: Record<string, { posX: string; posY: string }> = {};
+          ids.forEach((id, i) => {
+            const p = positions[id];
+            if (!p) return;
+            const sourceInstance = findAnyCardById(id);
+            const sourceOwner: 'my' | 'opponent' =
+              sourceInstance?.ownerId === gameState.opponentPlayer?.id ? 'opponent' : 'my';
+            const db = toDbPos(p.posX + i * BATTLE_FAN_OFFSET, p.posY, battleBandRect, sourceOwner, { cardWidth, cardHeight });
+            normalized[id] = { posX: String(db.x), posY: String(db.y) };
+          });
+          const leadId = ids[0];
+          if (battleNeedsEnter && leadId && normalized[leadId]) {
+            // Open the battle atomically with the lead card, same as
+            // handleCardDragEnd's group-drag battleNeedsEnter branch.
+            gameState.enterBattle(BigInt(leadId), normalized[leadId].posX, normalized[leadId].posY);
+          }
+          gameState.moveCardsBatch(JSON.stringify(ids), 'battle', JSON.stringify(normalized), '');
+        };
+        if (checkReserveBatchProtection(ids, 'battle', execute)) return;
+        execute();
+        return;
+      }
+
       const execute = () => {
         if (positions && (toZone === 'territory' || toZone === 'land-of-bondage')) {
           const first = positions[ids[0]];
