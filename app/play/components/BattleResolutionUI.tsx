@@ -83,7 +83,7 @@ type Tone = 'gold' | 'red' | 'neutral';
 const TONE_STYLE: Record<Tone, { border: string; bg: string; bgHover: string; color: string }> = {
   gold: { border: 'rgba(196, 149, 90, 0.5)', bg: 'rgba(196, 149, 90, 0.15)', bgHover: 'rgba(196, 149, 90, 0.3)', color: '#e8d5a3' },
   red: { border: 'rgba(180, 60, 60, 0.5)', bg: 'rgba(60, 10, 10, 0.35)', bgHover: 'rgba(60, 10, 10, 0.55)', color: '#dc7878' },
-  neutral: { border: 'rgba(107, 78, 39, 0.4)', bg: 'rgba(14, 10, 6, 0.6)', bgHover: 'rgba(107, 78, 39, 0.25)', color: 'rgba(196, 149, 90, 0.8)' },
+  neutral: { border: 'rgba(196, 149, 90, 0.45)', bg: 'rgba(14, 10, 6, 0.6)', bgHover: 'rgba(107, 78, 39, 0.35)', color: '#e8d5a3' },
 };
 
 function ResolutionButton({ label, tone, onClick }: { label: string; tone: Tone; onClick: () => void }) {
