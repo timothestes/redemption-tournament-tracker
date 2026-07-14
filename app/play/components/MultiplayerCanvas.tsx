@@ -116,6 +116,13 @@ const AUTO_ARRANGE_ZONES = ['land-of-bondage'] as const;
  *  both; the tween must never read the Rect's live value as a target). */
 const BAND_BG_OPACITY = 0.75;
 
+/** Drag-target guidance cue pulse — amplitude and one-leg duration. `yoyo`
+ *  doubles the duration for a full up/down cycle (~1.6s here, within the
+ *  1.5-2s "slow gentle pulse" range). */
+const BATTLE_GUIDANCE_CUE_OPACITY_MIN = 0.35;
+const BATTLE_GUIDANCE_CUE_OPACITY_MAX = 0.6;
+const BATTLE_GUIDANCE_CUE_PULSE_DURATION = 0.8;
+
 /** All zone keys that can be a drop target. */
 type DropZoneKey = string;
 
@@ -5348,11 +5355,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
 
         {/* Opponent-seat totals chip — flanks the vertical centerline on
-            the left, vertically centered in the band (product direction,
-            PR #197: "move the numbers to be in the middle"). Halves are
-            viewer-relative (spec §3: every player plays into their own
-            right half), so the opponent's totals sit on my left. */}
-        <Group x={midX - 10 - chipWidth} y={band.y + band.height / 2 - chipHeight / 2}>
+            the left, anchored to the BOTTOM of the band (product direction,
+            PR #197: "move the numbers to the bottom of the band"; previously
+            vertically centered). Halves are viewer-relative (spec §3: every
+            player plays into their own right half), so the opponent's
+            totals sit on my left. */}
+        <Group x={midX - 10 - chipWidth} y={band.y + band.height - 8 - chipHeight}>
           <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#6496e0" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
           <Text
             width={chipWidth}
@@ -5368,9 +5376,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         </Group>
 
         {/* My-seat totals chip — flanks the vertical centerline on the
-            right, vertically centered in the band. My cards always render
-            on my own right half. */}
-        <Group x={midX + 10} y={band.y + band.height / 2 - chipHeight / 2}>
+            right, anchored to the BOTTOM of the band, 8px above its bottom
+            edge. My cards always render on my own right half. */}
+        <Group x={midX + 10} y={band.y + band.height - 8 - chipHeight}>
           <Rect width={chipWidth} height={chipHeight} fill="rgba(10,5,5,0.82)" stroke="#c4955a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
           <Text
             width={chipWidth}
@@ -5440,6 +5448,80 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     gameState.opponentPlayer,
     scale,
   ]);
+
+  // Drag-target guidance cue (PR #197 product direction: "if it's the
+  // player's turn, make it obvious what zone they should be dragging into;
+  // if they are defending, also make it obvious the same way"). Every
+  // player plays into their own RIGHT half (spec §3), so the cue always
+  // renders on the viewer's own right half — never re-derive side
+  // membership, reuse `battleSideOf` + `isCharacterCard` exactly like the
+  // same-side-character scan above (mismatchedBattleCards) and the
+  // empty-side checks inside computeInitiative. Text-only memo (not the
+  // Konva nodes themselves) — the actual Group is rendered as a plain
+  // conditional near the band background (below card nodes in z-order),
+  // with its pulse tween lifecycle managed by a separate effect, the same
+  // split used for the band-bg seam tween above.
+  const battleGuidanceCueText = useMemo((): string | null => {
+    if (!battleActive || gameStatus !== 'playing' || isSpectator) return null;
+    if (gameState.battleState === 'awaiting-soul') return null;
+    const attackerSeat = gameState.battleAttackerSeat;
+    const mySeatStr = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
+    if (!attackerSeat || !mySeatStr) return null;
+
+    const battleLikes = battleCardEntries.map((e) => e.like);
+    const sideHasCharacters = (seat: string) =>
+      battleLikes.some((c) => battleSideOf(c) === seat && isCharacterCard({ cardType: c.cardType }));
+
+    if (sideHasCharacters(mySeatStr)) return null; // my side already has a character — cue's job is done
+
+    if (mySeatStr === attackerSeat) return 'Drag attackers here';
+    // Defending: only cue once there's actually something to block.
+    return sideHasCharacters(attackerSeat) ? 'Drag a blocker here' : null;
+  }, [
+    battleActive,
+    gameStatus,
+    isSpectator,
+    gameState.battleState,
+    gameState.battleAttackerSeat,
+    gameState.myPlayer,
+    battleCardEntries,
+  ]);
+
+  // Pulse tween for the guidance cue — same ref-lifecycle discipline as the
+  // band-bg seam tween (bandBgTweenRef above): destroy on EVERY transition
+  // before deciding whether to start a new one, and destroy again on
+  // unmount/hide so a detached node never keeps ticking. Amplitude/cycle
+  // are layout-independent constants, not live values.
+  const battleGuidanceCueRef = useRef<Konva.Group | null>(null);
+  const battleGuidanceCueTweenRef = useRef<Konva.Tween | null>(null);
+  useEffect(() => {
+    battleGuidanceCueTweenRef.current?.destroy();
+    battleGuidanceCueTweenRef.current = null;
+    if (!battleGuidanceCueText) return;
+    const node = battleGuidanceCueRef.current;
+    if (!node) return;
+    node.opacity(BATTLE_GUIDANCE_CUE_OPACITY_MIN);
+    const startPulse = () => {
+      const tween = new KonvaLib.Tween({
+        node,
+        duration: BATTLE_GUIDANCE_CUE_PULSE_DURATION,
+        opacity: BATTLE_GUIDANCE_CUE_OPACITY_MAX,
+        yoyo: true,
+        easing: KonvaLib.Easings.EaseInOut,
+        onFinish: () => {
+          battleGuidanceCueTweenRef.current = null;
+          startPulse();
+        },
+      });
+      battleGuidanceCueTweenRef.current = tween;
+      tween.play();
+    };
+    startPulse();
+    return () => {
+      battleGuidanceCueTweenRef.current?.destroy();
+      battleGuidanceCueTweenRef.current = null;
+    };
+  }, [battleGuidanceCueText]);
 
   // ---- Card bounds for marquee selection (my + opponent free-form, LOB, hand cards) ----
   const allCardBounds = useMemo((): CardBound[] => {
@@ -6033,6 +6115,66 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   strokeWidth={1}
                   dash={[10, 8]}
                   opacity={0.6}
+                  perfectDrawEnabled={false}
+                />
+              </Group>
+            );
+          })()}
+
+          {/* ================================================================
+              Drag-target guidance cue (PR #197) — highlights the viewer's
+              own right half when it's their move (attacking into an empty
+              side, or defending one that already has a character down).
+              Rendered here, BEFORE the battle card groups below, so it sits
+              BELOW card art in z-order (unlike the chips/header chrome group,
+              which renders after cards and stays above them). listening=
+              false throughout — must never intercept drags. Text/visibility
+              come from battleGuidanceCueText (memoized above); the pulse
+              opacity is driven imperatively by battleGuidanceCueTweenRef, so
+              the Group's own `opacity` JSX attr is a constant (never
+              re-applied by React after mount) and never fights the tween —
+              same discipline as the band-bg seam tween.
+              ================================================================ */}
+          {battleGuidanceCueText && mpLayout?.zones.battle && (() => {
+            const band = mpLayout.zones.battle;
+            const midX = band.x + band.width / 2;
+            const inset = 6;
+            const cueX = midX + inset;
+            const cueY = band.y + inset;
+            const cueWidth = band.x + band.width - cueX - inset;
+            const cueHeight = band.height - inset * 2;
+            return (
+              <Group
+                key="battle-guidance-cue"
+                ref={battleGuidanceCueRef}
+                listening={false}
+                opacity={BATTLE_GUIDANCE_CUE_OPACITY_MIN}
+              >
+                <Rect
+                  x={cueX}
+                  y={cueY}
+                  width={cueWidth}
+                  height={cueHeight}
+                  cornerRadius={6}
+                  fill="rgba(196,149,90,0.07)"
+                  stroke="#c4955a"
+                  strokeWidth={1.5}
+                  dash={[8, 6]}
+                  perfectDrawEnabled={false}
+                />
+                <Text
+                  x={cueX}
+                  y={cueY}
+                  width={cueWidth}
+                  height={cueHeight}
+                  text={battleGuidanceCueText}
+                  fontSize={fs(13)}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fontStyle="bold"
+                  fill="#e8d5a3"
+                  align="center"
+                  verticalAlign="middle"
+                  letterSpacing={1}
                   perfectDrawEnabled={false}
                 />
               </Group>

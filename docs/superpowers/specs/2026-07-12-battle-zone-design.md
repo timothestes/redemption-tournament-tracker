@@ -153,8 +153,9 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   "seam opens" visual.
 - **Band chrome (Konva):** a **vertical** dashed centerline at the band's midX (own
   right half vs. opponent's left, per §3). Per-half totals chips (`⚔ STR/TGH`) **flank
-  the centerline, vertically centered in the band** (PR #197 — "move the numbers to be
-  in the middle") — the opponent's chip just left of midX, my chip just right of it. The
+  the centerline at the BOTTOM of the band**, 8px above its bottom edge (PR #197 —
+  "move the numbers to the bottom of the band"; previously vertically centered) — the
+  opponent's chip just left of midX, my chip just right of it. The
   header line stays **top-center**, spanning the band: "⚔ <attacker name> attacking —
   Rescue attempt | Battle challenge" (derived from `battleAttackerSeat` + stakes-LoB
   count). The initiative/status banner renders as a **compact single-line strip
@@ -179,6 +180,11 @@ write-time-clamped only), add a **render-time clamp** for free-form zones:
   Brigade-mismatch toasts (which carry a tappable **Discard** button) render in a NEW
   dedicated band-edge-anchored container with pointer events enabled, zIndex between
   the drag overlay (450) and toasts (900).
+- **Drag-target guidance cue (PR #197):** while it's a player's move — their own side
+  empty and either they're attacking or they're defending against an attacker who
+  already has a character down, never during `awaiting-soul`, never for spectators — a
+  dashed/tinted panel with ghosted "Drag attackers here" / "Drag a blocker here" text
+  pulses gently on the viewer's own right half, below card nodes in z-order.
 
 ## 6. Battle math (client, pure lib + tests)
 
