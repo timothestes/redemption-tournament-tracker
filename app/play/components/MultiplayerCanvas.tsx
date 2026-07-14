@@ -5280,42 +5280,45 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // fallback, so U+2694 rendered as a bare "×"-looking glyph (PR #197 UX
     // review F5). The HTML resolution buttons keep their glyphs — the DOM
     // renders them fine.
-    const headerText = `${nameForSeat(attackerSeat)} attacking — ${stakesLostSoulCount >= 1 ? 'Rescue attempt' : 'Battle challenge'}`;
-
+    //
+    // ONE adaptive header line (owner direction, replacing the floating
+    // status strip that used to render below the band — it sat on top of
+    // territory cards and competed with the header + chips for attention).
+    // The base "<attacker> attacking — <stakes>" gains a live status suffix
+    // while the fight is ACTIVE; during 'awaiting-soul' the suffix drops
+    // (the HTML waiting pill / picker carries that state) and the base line
+    // stays for reconnecting players and spectators.
     const initiative = computeInitiative(
       battleLikes,
       attackerSeat as BattleSeat,
       (gameState.lastBattlePlayBySeat || '') as BattleSeat | '',
     );
-    let bannerMain = '';
-    switch (initiative.kind) {
-      case 'empty':
-        // No characters on either side — the drag-guidance cue carries the
-        // instruction; a banner here contradicted it (UX review F2).
-        bannerMain = '';
-        break;
-      case 'waiting-blocker':
-        // Side-neutral: also shown after the only blocker was defeated and
-        // dragged to discard, where "Waiting for a blocker…" wrongly implied
-        // the battle hadn't happened yet (UX review F3).
-        bannerMain = 'No blocker in battle';
-        break;
-      case 'no-attacker':
-        bannerMain = 'No attacker in battle — End Battle?';
-        break;
-      case 'unknown':
-        bannerMain = 'INITIATIVE: unknown (variable/face-down stats)';
-        break;
-      case 'initiative': {
-        const reasonLabel = initiative.reason === 'mutual-destruction' ? 'mutual destruction' : initiative.reason;
-        bannerMain = `INITIATIVE: ${nameForSeat(initiative.seat)} — ${reasonLabel}`;
-        break;
+    let statusSuffix = '';
+    if (gameState.battleState === 'active') {
+      switch (initiative.kind) {
+        case 'empty':
+          // No characters on either side — the drag-guidance cue carries
+          // the instruction (UX review F2).
+          break;
+        case 'waiting-blocker':
+          // Side-neutral: also shown after the only blocker was defeated
+          // and dragged to discard (UX review F3).
+          statusSuffix = ' · No blocker in battle';
+          break;
+        case 'no-attacker':
+          statusSuffix = ' · No attacker in battle';
+          break;
+        case 'unknown':
+          statusSuffix = ' · Initiative unknown (face-down/variable stats)';
+          break;
+        case 'initiative': {
+          const reasonLabel = initiative.reason === 'mutual-destruction' ? 'mutual destruction' : initiative.reason;
+          statusSuffix = ` · Initiative: ${nameForSeat(initiative.seat)} (${reasonLabel})`;
+          break;
+        }
       }
     }
-    // The strip describes the ACTIVE fight. During 'awaiting-soul' it went
-    // stale ("Waiting for a blocker…") and collided with the HTML waiting
-    // pill anchored on the same band-bottom line (UX review F1).
-    if (gameState.battleState !== 'active') bannerMain = '';
+    const headerText = `${nameForSeat(attackerSeat)} attacking — ${stakesLostSoulCount >= 1 ? 'Rescue attempt' : 'Battle challenge'}${statusSuffix}`;
 
     const chipWidth = 64 * fsGrowth(11);
     const chipHeight = 20;
@@ -5386,41 +5389,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           </Group>
         )}
 
-        {/* Status/initiative strip — horizontally centered, just below the
-            band's bottom edge (outside the band; product direction,
-            PR #197). Previously rendered on the band's top edge beneath
-            the header; moved below now that the totals chips converge on
-            the centerline instead of the top corners. Shares its y with the resolution
-            button row (BattleResolutionUI, left-anchored below the band)
-            but is capped narrow enough to never intersect it (verified by
-            measurement at 1366x768 and 1920x1080 — see PR #197). */}
-        {(() => {
-          if (!bannerMain) return null;
-          const stripY = band.y + band.height + 6;
-          const stripHeight = 16;
-          const stripText = bannerMain;
-          const stripWidth = Math.min(band.width - 16, 420 * fsGrowth(10));
-          const sx = midX - stripWidth / 2;
-          return (
-            <Group x={sx} y={stripY}>
-              <Rect width={stripWidth} height={stripHeight} fill="rgba(10,5,5,0.85)" stroke="#8a5a4a" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} />
-              <Text
-                x={4}
-                y={2}
-                width={stripWidth - 8}
-                text={stripText}
-                fontSize={fs(10)}
-                fontStyle="bold"
-                fontFamily="Cinzel, Georgia, serif"
-                fill="#f0d9a8"
-                align="center"
-                ellipsis
-                wrap="none"
-                perfectDrawEnabled={false}
-              />
-            </Group>
-          );
-        })()}
       </Group>
     );
     // fs/fsGrowth are derived purely from `scale` (see their definitions
