@@ -1,5 +1,5 @@
 import { DeckCardData } from "../actions";
-import { compareCardsDefault, type SortableCard } from "@/lib/cards/defaultSort";
+import { compareCardsByType, type SortableCard } from "@/lib/cards/defaultSort";
 
 export function cardKey(c: DeckCardData): string {
   return `${c.card_name}|${c.card_set ?? ""}|${c.card_img_file ?? ""}`;
@@ -26,7 +26,7 @@ export async function buildSortInfo(list: DeckCardData[]): Promise<Record<string
   return info;
 }
 
-// Canonical default order over deck rows, backed by a buildSortInfo map.
+// Classic by-type deck order over deck rows, backed by a buildSortInfo map.
 // Before the map loads (or on a lookup miss) cards degrade to name-only
 // sortables, which the comparator still orders alphabetically.
 export function compareDeckCards(
@@ -36,5 +36,5 @@ export function compareDeckCards(
 ): number {
   const sa = info[cardKey(a)] ?? { name: a.card_name, type: "" };
   const sb = info[cardKey(b)] ?? { name: b.card_name, type: "" };
-  return compareCardsDefault(sa, sb);
+  return compareCardsByType(sa, sb);
 }

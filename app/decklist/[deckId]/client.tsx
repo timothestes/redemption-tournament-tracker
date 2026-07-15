@@ -24,7 +24,7 @@ import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageM
 import AodCountCard from "../card-search/components/AodCountCard";
 import { Deck as DeckType } from "../card-search/types/deck";
 import { generateDeckText } from "../card-search/utils/deckImportExport";
-import { compareCardsDefault, compareTypeGroups, type SortableCard } from "@/lib/cards/defaultSort";
+import { compareCardsByType, compareCardsDefault, compareTypeGroups, type SortableCard } from "@/lib/cards/defaultSort";
 
 interface PublicDeckData {
   id: string;
@@ -419,11 +419,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   }, [mainCards, groupBy]);
 
   const sortedReserveCards = useMemo(() => {
-    return [...reserveCards].sort((a, b) => compareCardsDefault(toSortable(a), toSortable(b)));
+    return [...reserveCards].sort((a, b) => compareCardsByType(toSortable(a), toSortable(b)));
   }, [reserveCards]);
 
   const sortedMaybeboardCards = useMemo(() => {
-    return [...maybeboardCards].sort((a, b) => compareCardsDefault(toSortable(a), toSortable(b)));
+    return [...maybeboardCards].sort((a, b) => compareCardsByType(toSortable(a), toSortable(b)));
   }, [maybeboardCards]);
 
   // Build flat list of Card objects for modal navigation (main + reserve + maybeboard)
@@ -1819,9 +1819,9 @@ function groupAndSortCards(
     grouped[key].push(card);
   }
 
-  // Sort within each group with the canonical default order
+  // Sort within each group by type, alignment, brigade, then name
   for (const key of Object.keys(grouped)) {
-    grouped[key].sort((a, b) => compareCardsDefault(toSortable(a), toSortable(b)));
+    grouped[key].sort((a, b) => compareCardsByType(toSortable(a), toSortable(b)));
   }
 
   // Order the groups

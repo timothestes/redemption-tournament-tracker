@@ -1,6 +1,6 @@
 import { Card } from "../utils";
 import { Deck, DeckCard, DeckZone, ImportResult } from "../types/deck";
-import { compareCardsDefault } from "@/lib/cards/defaultSort";
+import { compareCardsByType } from "@/lib/cards/defaultSort";
 
 /**
  * Normalize card name for comparison by replacing various apostrophe types with standard apostrophe
@@ -253,9 +253,9 @@ export function generateDeckText(deck: Deck): string {
 
   const lines: string[] = [];
 
-  // Canonical default sort (sections → brigades → strength → name)
+  // Classic deck order (type → alignment → brigade → name)
   const sortCards = (a: DeckCard, b: DeckCard) =>
-    compareCardsDefault(a.card, b.card);
+    compareCardsByType(a.card, b.card);
 
   // Add main deck cards
   mainCards.sort(sortCards).forEach((dc) => {
