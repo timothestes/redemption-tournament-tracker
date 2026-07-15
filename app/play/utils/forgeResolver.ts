@@ -27,6 +27,25 @@ export function resolveCardImageUrl(imgFile: string, resolver?: ForgeResolverMap
   return getCardImageUrl(imgFile);
 }
 
+// Re-hydrate the battle-math fields the leak spine blanked on a forge
+// CardInstance row (name/brigade/strength/toughness), from the viewer's
+// granted resolver. Deliberately NOT specialAbility: the auto-return summary
+// must predict the server's routing, and the server only ever sees the
+// blanked row (a forge "place" enhancement goes to discard server-side, so
+// the client summary has to say the same). Ungranted forge rows come back
+// unchanged — blank stats read as "unknown" in the band, fail-closed.
+export function resolveBattleRowFields(
+  row: { cardImgFile: string; cardName: string; brigade: string; strength: string; toughness: string },
+  resolver?: ForgeResolverMap | null,
+): { cardName: string; brigade: string; strength: string; toughness: string } {
+  const forgeId = forgeCardIdFromImgFile(row.cardImgFile);
+  const e = forgeId ? resolver?.get(forgeId) : undefined;
+  if (!e) {
+    return { cardName: row.cardName, brigade: row.brigade, strength: row.strength, toughness: row.toughness };
+  }
+  return { cardName: e.name, brigade: e.brigade, strength: e.strength, toughness: e.toughness };
+}
+
 export function mergeForgeDeckData(cards: GameCardData[], resolver?: ForgeResolverMap | null): GameCardData[] {
   if (!resolver || resolver.size === 0) return cards;
   return cards.map((c) => {

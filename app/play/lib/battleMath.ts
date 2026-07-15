@@ -198,6 +198,10 @@ function brigadeTokens(brigade: string): string[] {
   return brigade
     .split('/')
     .map((s) => s.trim())
+    // Forge brigades keep good/evil gold distinct ("Good Gold"/"Evil Gold");
+    // official card data writes plain "Gold" for both. Fold them together so
+    // a forge/official pair isn't flagged over the naming gap.
+    .map((s) => (s === 'Good Gold' || s === 'Evil Gold' ? 'Gold' : s))
     .filter((s) => s.length > 0);
 }
 

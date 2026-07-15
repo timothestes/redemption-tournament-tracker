@@ -83,7 +83,7 @@ import { LostSoulDealLayer, type SoulDeal } from '@/app/shared/components/LostSo
 import { computeDealFlight } from '@/app/shared/utils/lostSoulDeal';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { cardInstanceToGameCard } from '../utils/cardAdapter';
-import { resolveCardImageUrl, type ForgeResolverMap } from '../utils/forgeResolver';
+import { resolveCardImageUrl, resolveBattleRowFields, type ForgeResolverMap } from '../utils/forgeResolver';
 import type { UndoStack, Captured } from '../hooks/useUndoStack';
 import { makeReverseAction, makeBatchReverseAction, reverseIsSafe } from '../hooks/useUndoStack';
 import {
@@ -5144,13 +5144,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     const pushRows = (rows: CardInstance[] | undefined, owner: 'my' | 'opponent', seat: BattleSeat | null) => {
       if (!seat || !rows) return;
       for (const row of rows) {
+        // Forge rows carry blanked name/brigade/stats (leak spine) — the
+        // viewer's granted resolver re-hydrates them here or forge cards
+        // read as unknown stats and false brigade mismatches in the band.
+        // specialAbility stays the raw row value on purpose: the auto-return
+        // summary must predict the server, which only sees the blanked row
+        // (see resolveBattleRowFields).
+        const resolved = resolveBattleRowFields(row, forgeResolver);
         // Meek hero/character in battle must count its meek-side power/
         // toughness, not its normal-side stats (spec: Matthias converted to
         // meek is 7/7). The meek value lives in the row's own strength/
         // toughness string ("<normal>(<meek>)") — see parseMeekStats. Falls
         // through to the normal-side string unchanged when unresolvable
         // (non-meek card, blanked Forge field), matching existing ? handling.
-        const meekStats = row.isMeek ? parseMeekStats(row.strength, row.toughness) : null;
+        const meekStats = row.isMeek ? parseMeekStats(resolved.strength, resolved.toughness) : null;
         entries.push({
           row,
           owner,
@@ -5158,13 +5165,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             ownerSeat: seat,
             dbX: parseFloat(row.posX || '0'),
             cardRelW,
-            strength: meekStats ? String(meekStats.strength) : row.strength,
-            toughness: meekStats ? String(meekStats.toughness) : row.toughness,
-            brigade: row.brigade,
+            strength: meekStats ? String(meekStats.strength) : resolved.strength,
+            toughness: meekStats ? String(meekStats.toughness) : resolved.toughness,
+            brigade: resolved.brigade,
             cardType: row.cardType,
             specialAbility: row.specialAbility,
             isFlipped: row.isFlipped,
-            cardName: row.cardName,
+            cardName: resolved.cardName,
             equippedToInstanceId: row.equippedToInstanceId,
             originZone: row.originZone,
           },
@@ -5174,7 +5181,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     pushRows(myCards['battle'], 'my', mySeat);
     pushRows(opponentCards['battle'], 'opponent', oppSeat);
     return entries;
-  }, [battleActive, mpLayout, rawMain.cardWidth, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards]);
+  }, [battleActive, mpLayout, rawMain.cardWidth, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards, forgeResolver]);
 
   // Brigade soft-check (spec §6): every GE/EE-segment enhancement in the band
   // whose brigade has no match among same-side characters. Order follows
