@@ -118,6 +118,48 @@ describe('sideTotals', () => {
     const cards = [mkCard({ ownerSeat: '1' })];
     expect(sideTotals(cards, '0')).toEqual({ str: 0, tgh: 0, hasUnknown: false });
   });
+
+  it('a stat-less enhancement (blank strength/toughness) counts as 0/0 without setting hasUnknown', () => {
+    // Death of Unrighteous (Pat/FoM) prints no numbers — its Roots reprint
+    // prints the same card as 0/0. 524 official enhancements are stat-less;
+    // they must not poison the band totals with "?".
+    const cards = [
+      mkCard({ ownerSeat: '0', cardType: 'Evil Character', strength: '2', toughness: '1' }),
+      mkCard({ ownerSeat: '0', cardType: 'EE', strength: '', toughness: '' }),
+    ];
+    expect(sideTotals(cards, '0')).toEqual({ str: 2, tgh: 1, hasUnknown: false });
+  });
+
+  it('stat-less non-characters generally (Dominant/Artifact in the band) count as 0/0, no unknown', () => {
+    const cards = [
+      mkCard({ ownerSeat: '0', cardType: 'Hero', strength: '5', toughness: '5' }),
+      mkCard({ ownerSeat: '0', cardType: 'Dominant', strength: '', toughness: '' }),
+      mkCard({ ownerSeat: '0', cardType: 'Artifact', strength: '', toughness: '' }),
+    ];
+    expect(sideTotals(cards, '0')).toEqual({ str: 5, tgh: 5, hasUnknown: false });
+  });
+
+  it('a variable-stat enhancement ("X"/"*") still sets hasUnknown', () => {
+    const cards = [mkCard({ ownerSeat: '0', cardType: 'GE', strength: 'X', toughness: '*' })];
+    expect(sideTotals(cards, '0').hasUnknown).toBe(true);
+  });
+
+  it('a blank-stat CHARACTER still sets hasUnknown (hidden/ungranted forge row)', () => {
+    const cards = [mkCard({ ownerSeat: '0', cardType: 'Hero', strength: '', toughness: '' })];
+    expect(sideTotals(cards, '0').hasUnknown).toBe(true);
+  });
+
+  it('initiative resolves (not "unknown") with a stat-less enhancement in the band', () => {
+    // Screenshot repro: EC 2/1 + stat-less EE vs Heroes 17/9 — the blank EE
+    // must not force the "Initiative unknown" banner.
+    const cards = [
+      mkCard({ ownerSeat: '0', cardType: 'Evil Character', strength: '2', toughness: '1' }),
+      mkCard({ ownerSeat: '0', cardType: 'EE', strength: '', toughness: '' }),
+      mkCard({ ownerSeat: '1', cardType: 'Hero', strength: '17', toughness: '9' }),
+    ];
+    const result = computeInitiative(cards, '1', '');
+    expect(result).toEqual({ kind: 'initiative', seat: '0', reason: 'losing' });
+  });
 });
 
 describe('parseMeekStats', () => {

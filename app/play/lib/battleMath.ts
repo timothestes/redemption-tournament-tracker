@@ -54,11 +54,31 @@ export interface SideTotals {
 }
 
 /**
- * Sums strength/toughness for every card on `side`. Unparseable stat strings
- * ('', '*', 'X', ...) contribute 0 and set hasUnknown. Face-down cards are
- * excluded from the sum entirely (their stats are hidden information) and
- * also set hasUnknown, so the caller never asserts a rules conclusion from a
- * band with hidden cards in it.
+ * Parses one stat string for the band totals. A BLANK stat on a
+ * non-character means the card simply has no printed numbers — 524 official
+ * enhancements ship that way (Death of Unrighteous's Roots reprint prints
+ * the very same card as 0/0), and Dominants/Artifacts never have stats — so
+ * it counts as 0. A blank stat on a CHARACTER is hidden information (an
+ * ungranted forge row; official characters always print numbers) and a
+ * non-blank unparseable stat ('*', 'X') is genuinely variable — both return
+ * null so the caller sets hasUnknown.
+ */
+function parseBattleStat(raw: string, cardType: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    return isCharacterType(cardType) ? null : 0;
+  }
+  const n = parseInt(trimmed, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
+/**
+ * Sums strength/toughness for every card on `side`. Variable stat strings
+ * ('*', 'X', ...) contribute 0 and set hasUnknown; blank stats only do so on
+ * characters (see parseBattleStat). Face-down cards are excluded from the
+ * sum entirely (their stats are hidden information) and also set hasUnknown,
+ * so the caller never asserts a rules conclusion from a band with hidden
+ * cards in it.
  */
 export function sideTotals(cards: BattleCardLike[], side: BattleSeat): SideTotals {
   let str = 0;
@@ -71,14 +91,14 @@ export function sideTotals(cards: BattleCardLike[], side: BattleSeat): SideTotal
       hasUnknown = true;
       continue;
     }
-    const s = parseInt(c.strength, 10);
-    const t = parseInt(c.toughness, 10);
-    if (Number.isNaN(s)) {
+    const s = parseBattleStat(c.strength, c.cardType);
+    const t = parseBattleStat(c.toughness, c.cardType);
+    if (s === null) {
       hasUnknown = true;
     } else {
       str += s;
     }
-    if (Number.isNaN(t)) {
+    if (t === null) {
       hasUnknown = true;
     } else {
       tgh += t;
