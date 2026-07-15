@@ -303,6 +303,21 @@ describe('brigadeMismatch', () => {
     const enh = mkCard({ brigade: '' });
     expect(brigadeMismatch(enh, [])).toBe(false);
   });
+
+  it('forge "Good Gold" enhancement matches an official plain "Gold" character', () => {
+    // Official card data writes plain "Gold" for both good and evil gold;
+    // forge brigades keep them distinct ("Good Gold"/"Evil Gold"). The
+    // soft-check must not flag a forge/official pair over that naming gap.
+    const enh = mkCard({ brigade: 'Good Gold' });
+    const chars = [mkCard({ brigade: 'Gold' })];
+    expect(brigadeMismatch(enh, chars)).toBe(false);
+  });
+
+  it('official plain "Gold" enhancement matches a forge "Evil Gold" character', () => {
+    const enh = mkCard({ brigade: 'Gold' });
+    const chars = [mkCard({ brigade: 'Evil Gold' })];
+    expect(brigadeMismatch(enh, chars)).toBe(false);
+  });
 });
 
 describe('summarizeAutoReturn', () => {

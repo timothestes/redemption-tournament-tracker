@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { forgeCardIdFromImgFile, forgeProxyUrl, resolveCardImageUrl, mergeForgeDeckData } from "../forgeResolver";
+import { forgeCardIdFromImgFile, forgeProxyUrl, resolveCardImageUrl, mergeForgeDeckData, resolveBattleRowFields } from "../forgeResolver";
 import { getCardImageUrl, getCardImageUrlOrNull } from "@/app/shared/utils/cardImageUrl";
 
 const ID = "11111111-2222-3333-4444-555555555555";
@@ -63,5 +63,35 @@ describe("forge image seams", () => {
     expect(merged[0].toughness).toBe("6");
     expect(merged[0].identifier).toBe("Demon");
     expect(merged[0].reference).toBe("Revelation 8:11");
+  });
+});
+
+describe("resolveBattleRowFields", () => {
+  // Battle-zone math (totals/initiative/brigade soft-check) reads CardInstance
+  // rows whose text fields the leak spine blanked for forge cards. The viewer's
+  // granted resolver must re-hydrate name/brigade/stats or forge cards read as
+  // unknown stats and false brigade mismatches.
+  const blankRow = { cardImgFile: `forge:${ID}`, cardName: "", brigade: "", strength: "", toughness: "" };
+
+  it("re-hydrates a granted forge row's name/brigade/stats", () => {
+    expect(resolveBattleRowFields(blankRow, resolver)).toEqual({
+      cardName: "Test Hero", brigade: "Blue", strength: "5", toughness: "4",
+    });
+  });
+
+  it("leaves an ungranted forge row blank (fail-closed)", () => {
+    expect(resolveBattleRowFields(blankRow, new Map())).toEqual({
+      cardName: "", brigade: "", strength: "", toughness: "",
+    });
+    expect(resolveBattleRowFields(blankRow, null)).toEqual({
+      cardName: "", brigade: "", strength: "", toughness: "",
+    });
+  });
+
+  it("passes public rows through untouched", () => {
+    const pub = { cardImgFile: "Moses.jpg", cardName: "Moses", brigade: "Blue", strength: "10", toughness: "10" };
+    expect(resolveBattleRowFields(pub, resolver)).toEqual({
+      cardName: "Moses", brigade: "Blue", strength: "10", toughness: "10",
+    });
   });
 });
