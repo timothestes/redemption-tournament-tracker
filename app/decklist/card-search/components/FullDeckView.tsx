@@ -10,7 +10,7 @@ import { createGlobalTagAction } from "../../../admin/tags/actions";
 import { HexColorPicker } from "react-colorful";
 import { useIsAdmin } from "../../../../hooks/useIsAdmin";
 import { useCardPrices } from "../hooks/useCardPrices";
-import { compareCardsDefault, compareTypeGroups } from "@/lib/cards/defaultSort";
+import { compareCardsByType, compareTypeGroups } from "@/lib/cards/defaultSort";
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -151,9 +151,9 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
   const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
   const maybeboardCards = deck.cards.filter((dc) => dc.zone === 'maybeboard');
 
-  // Canonical default sort (sections → brigades → strength → name)
+  // Classic deck order (type → alignment → brigade → name)
   const sortCards = (cards: typeof deck.cards) => {
-    return [...cards].sort((a, b) => compareCardsDefault(a.card, b.card));
+    return [...cards].sort((a, b) => compareCardsByType(a.card, b.card));
   };
 
   // Group cards by the selected grouping method

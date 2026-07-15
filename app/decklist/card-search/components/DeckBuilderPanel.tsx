@@ -25,7 +25,7 @@ import FullDeckView from "./FullDeckView";
 import DragGhost from "./DragGhost";
 import { Switch } from "@headlessui/react";
 import { Card, normalizeBrigadeField } from "../utils";
-import { compareCardsDefault, compareTypeGroups } from "@/lib/cards/defaultSort";
+import { compareCardsByType, compareCardsDefault, compareTypeGroups } from "@/lib/cards/defaultSort";
 import { validateDeck } from "../utils/deckValidation";
 import GeneratePDFModal from "./GeneratePDFModal";
 import AodCountCard from "./AodCountCard";
@@ -793,8 +793,8 @@ export default function DeckBuilderPanel({
       .sort(compareTypeGroups)
       .map((type) => ({
         type,
-        // Sort cards within each type with the canonical default order
-        cards: grouped[type].sort((a, b) => compareCardsDefault(a.card, b.card)),
+        // Sort cards within each type by alignment, brigade, then name
+        cards: grouped[type].sort((a, b) => compareCardsByType(a.card, b.card)),
         count: grouped[type].reduce((sum, dc) => sum + dc.quantity, 0),
       }));
   };
@@ -822,8 +822,8 @@ export default function DeckBuilderPanel({
       })
       .map((alignment) => ({
         type: alignment,
-        // Sort cards within each alignment with the canonical default order
-        cards: grouped[alignment].sort((a, b) => compareCardsDefault(a.card, b.card)),
+        // Sort cards within each alignment by type, brigade, then name
+        cards: grouped[alignment].sort((a, b) => compareCardsByType(a.card, b.card)),
         count: grouped[alignment].reduce((sum, dc) => sum + dc.quantity, 0),
       }));
   };

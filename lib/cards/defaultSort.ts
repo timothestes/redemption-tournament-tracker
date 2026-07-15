@@ -325,3 +325,32 @@ export function compareTypeGroups(a: string, b: string): number {
   if (diff !== 0) return diff;
   return a.localeCompare(b);
 }
+
+// ---------------------------------------------------------------------------
+// "By type" deck-presentation order
+// ---------------------------------------------------------------------------
+
+function alignmentRank(alignment: string | undefined): number {
+  const a = alignment ?? "";
+  if (a === "Good") return 0;
+  if (a === "Evil") return 1;
+  if (a === "Neutral" || a === "") return 2;
+  return 3;
+}
+
+/**
+ * Classic decklist order for viewing whole decks: raw type alphabetically,
+ * then alignment (Good > Evil > Neutral), then brigade, then name. Mirrors
+ * the sister API's ["type", "alignment", "brigade", "name"] sort used for
+ * PDF/image output. Card-browsing surfaces (search results, collection,
+ * Forge set browser, play-area reserve browsing) use compareCardsDefault.
+ */
+export function compareCardsByType(a: SortableCard, b: SortableCard): number {
+  const typeDiff = (a.type ?? "").localeCompare(b.type ?? "");
+  if (typeDiff !== 0) return typeDiff;
+  const alignDiff = alignmentRank(a.alignment) - alignmentRank(b.alignment);
+  if (alignDiff !== 0) return alignDiff;
+  const brigadeDiff = (a.brigade ?? "").localeCompare(b.brigade ?? "");
+  if (brigadeDiff !== 0) return brigadeDiff;
+  return (a.name ?? "").toLowerCase().localeCompare((b.name ?? "").toLowerCase());
+}

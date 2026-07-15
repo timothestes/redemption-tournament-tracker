@@ -91,7 +91,7 @@ describe("grouping and sorting", () => {
     expect(getGroupDisplayName("Lost Soul")).toBe("Lost Souls");
   });
 
-  it("orders main-item groups canonically and known brigades before unknown within a group", () => {
+  it("orders main-item groups canonically and Good before Evil within a group", () => {
     const catalog = [
       publicCard("Zeal", "I", "GE", "Good", "Silver"),
       publicCard("Guard", "I", "Hero", "Good", "Silver"),
@@ -104,7 +104,7 @@ describe("grouping and sorting", () => {
     const groups = groupMainItems(resolveDeckEntries([], entries, catalog));
     expect(groups.map(([g]) => g)).toEqual(["Hero", "Good Enhancement", "Evil Character"]);
     const heroes = groups.find(([g]) => g === "Hero")![1];
-    // Silver is a known good brigade; Brown isn't, so it sorts after.
+    // Same type → Good alignment before Evil.
     expect(heroes.map((i) => i.name)).toEqual(["Guard", "Mixed"]);
   });
 
@@ -132,10 +132,10 @@ describe("grouping and sorting", () => {
     }));
     const groups = groupMainItems(resolveDeckEntries([], entries, catalog), "none");
     expect(groups.map(([g]) => g)).toEqual(["All Cards"]);
-    expect(groups[0][1].map((i) => i.name)).toEqual(["Guard", "Demon"]); // Good before Evil
+    expect(groups[0][1].map((i) => i.name)).toEqual(["Demon", "Guard"]); // "EC" before "Hero" by type
   });
 
-  it("sorts side items in the canonical default order and counts quantities", () => {
+  it("sorts side items in the classic deck order and counts quantities", () => {
     const catalog = [
       publicCard("Bravery", "I", "GE"),
       publicCard("Axe", "I", "EE"),
@@ -145,7 +145,7 @@ describe("grouping and sorting", () => {
       { source: "public", name: "Axe", set: "I", qty: 1, zone: "reserve" },
     ];
     const items = sortSideItems(resolveDeckEntries([], entries, catalog));
-    expect(items.map((i) => i.name)).toEqual(["Bravery", "Axe"]); // Good section before Evil
+    expect(items.map((i) => i.name)).toEqual(["Axe", "Bravery"]); // "EE" before "GE" by type
     expect(countItems(items)).toBe(3);
   });
 });

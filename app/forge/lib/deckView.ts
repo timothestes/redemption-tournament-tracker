@@ -13,7 +13,7 @@ import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
 import type { ForgeDeckEntry } from "@/app/forge/lib/deckTypes";
 import { designCardToCard } from "@/app/forge/lib/deckAdapter";
 import { ALL_CARDS } from "@/app/decklist/card-search/data/cardIndex";
-import { compareCardsDefault, compareTypeGroups } from "@/lib/cards/defaultSort";
+import { compareCardsByType, compareTypeGroups } from "@/lib/cards/defaultSort";
 
 export type ResolvedDeckItem = {
   key: string;
@@ -132,9 +132,9 @@ export function resolveDeckEntries(
 export type DeckGroupBy = "type" | "alignment" | "none";
 
 // Group main-deck items by display group, sorted within each group by the
-// canonical default card order. Type groups follow the canonical bucket order
-// (Dominants, Artifacts, Fortresses, …); alignment groups follow the
-// Good > Evil > Neutral order.
+// classic deck order (type → alignment → brigade → name). Type groups follow
+// the canonical bucket order (Dominants, Artifacts, Fortresses, …); alignment
+// groups follow the Good > Evil > Neutral order.
 export function groupMainItems(
   items: ResolvedDeckItem[],
   groupBy: DeckGroupBy = "type",
@@ -151,7 +151,7 @@ export function groupMainItems(
     else grouped.set(key, [item]);
   }
   for (const bucket of grouped.values()) {
-    bucket.sort(compareCardsDefault);
+    bucket.sort(compareCardsByType);
   }
   return [...grouped.entries()].sort(([a], [b]) => {
     if (groupBy === "alignment") {
@@ -198,9 +198,9 @@ export function splitStack(items: ResolvedDeckItem[], maxPerColumn = 17): Resolv
   return columns;
 }
 
-// Reserve/maybeboard: flat, in the canonical default order (public page semantics).
+// Reserve/maybeboard: flat, in the classic deck order (public page semantics).
 export function sortSideItems(items: ResolvedDeckItem[]): ResolvedDeckItem[] {
-  return [...items].sort(compareCardsDefault);
+  return [...items].sort(compareCardsByType);
 }
 
 export function countItems(items: ResolvedDeckItem[]): number {

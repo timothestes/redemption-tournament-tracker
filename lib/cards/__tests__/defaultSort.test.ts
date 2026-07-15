@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   compareCardsDefault,
+  compareCardsByType,
   compareTypeGroups,
   defaultTypeGroupRank,
   GOOD_BRIGADE_ORDER,
@@ -297,5 +298,50 @@ describe("grouped views — bucket ordering", () => {
     expect(defaultTypeGroupRank("Lost Soul Token")).toBe(9);
     expect(defaultTypeGroupRank("Hero Token")).toBe(9);
     expect(defaultTypeGroupRank("Lost Soul")).toBe(3);
+  });
+});
+
+describe("compareCardsByType", () => {
+  const sortByType = (cards: SortableCard[]): string[] =>
+    [...cards].sort(compareCardsByType).map((c) => c.name);
+
+  it("sorts by raw type alphabetically first", () => {
+    const cards = [
+      card({ name: "Soul", type: "Lost Soul" }),
+      card({ name: "HeroA", type: "Hero", brigade: "Blue", alignment: "Good" }),
+      card({ name: "EnhA", type: "GE", brigade: "Blue", alignment: "Good" }),
+      card({ name: "Dom", type: "Dominant", alignment: "Good" }),
+      card({ name: "Art", type: "Artifact" }),
+    ];
+    // Artifact < Dominant < GE < Hero < Lost Soul
+    expect(sortByType(cards)).toEqual(["Art", "Dom", "EnhA", "HeroA", "Soul"]);
+  });
+
+  it("breaks type ties by alignment Good > Evil > Neutral", () => {
+    const cards = [
+      card({ name: "Neutral", type: "Dominant", alignment: "Neutral" }),
+      card({ name: "Evil", type: "Dominant", alignment: "Evil" }),
+      card({ name: "Good", type: "Dominant", alignment: "Good" }),
+      card({ name: "Blank", type: "Dominant" }),
+    ];
+    // Missing alignment ranks with Neutral; "Blank" < "Neutral" by name
+    expect(sortByType(cards)).toEqual(["Good", "Evil", "Blank", "Neutral"]);
+  });
+
+  it("breaks alignment ties by brigade, then name case-insensitively", () => {
+    const cards = [
+      card({ name: "RedHero", type: "Hero", brigade: "Red", alignment: "Good" }),
+      card({ name: "blueB", type: "Hero", brigade: "Blue", alignment: "Good" }),
+      card({ name: "BlueA", type: "Hero", brigade: "Blue", alignment: "Good" }),
+    ];
+    expect(sortByType(cards)).toEqual(["BlueA", "blueB", "RedHero"]);
+  });
+
+  it("orders name-only sortables alphabetically within a type", () => {
+    const cards = [
+      card({ name: "Zeta", type: "" }),
+      card({ name: "Alpha", type: "" }),
+    ];
+    expect(sortByType(cards)).toEqual(["Alpha", "Zeta"]);
   });
 });
