@@ -168,7 +168,8 @@ export const printTournamentPairings = (
   byes: any[],
   roundNumber: number,
   startingTableNumber: number = 1,
-  tournamentName?: string | null
+  tournamentName?: string | null,
+  numberingMode: 'tables' | 'seats' = 'tables',
 ): void => {
   const heading = tournamentName || 'Tournament';
   const pageTitle = tournamentName
@@ -179,17 +180,31 @@ export const printTournamentPairings = (
   // CSS multi-columns (newspaper order) so a whole large-tournament round fits on a
   // single projected screen without scrolling and is easy to scan by table number.
   const pairingsHtml = (matches || [])
-    .map(
-      (match, index) => `
+    .map((match, index) => {
+      const table = match.table_number ?? index + startingTableNumber;
+      if (numberingMode === 'seats') {
+        // Per-chair numbers replace the single table badge.
+        return `
+        <li class="pair pair-seats">
+          <span class="names">
+            <span class="seat">${2 * table - 1}</span>
+            <span class="p">${escapeHtml(match.player1_id?.name)}</span>
+            <span class="vs">vs</span>
+            <span class="seat">${2 * table}</span>
+            <span class="p">${escapeHtml(match.player2_id?.name)}</span>
+          </span>
+        </li>`;
+      }
+      return `
         <li class="pair">
-          <span class="t">${index + startingTableNumber}</span>
+          <span class="t">${table}</span>
           <span class="names">
             <span class="p">${escapeHtml(match.player1_id?.name)}</span>
             <span class="vs">vs</span>
             <span class="p">${escapeHtml(match.player2_id?.name)}</span>
           </span>
-        </li>`
-    )
+        </li>`;
+    })
     .join('');
 
   // Byes render as a single compact strip below the pairings rather than a
@@ -260,6 +275,11 @@ export const printTournamentPairings = (
           .pair .names { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
           .pair .p { font-weight: 600; }
           .pair .vs { color: #9ca3af; font-size: 12px; font-weight: 500; }
+          .pair.pair-seats { grid-template-columns: 1fr; }
+          .pair .seat {
+            font-weight: 800; color: #555;
+            font-variant-numeric: tabular-nums; font-size: 13px;
+          }
 
           .byes {
             margin-top: 16px; padding-top: 10px; border-top: 1px solid #ddd;
@@ -313,23 +333,29 @@ export const printMatchSlips = (
   matches: any[],
   roundNumber: number,
   startingTableNumber: number = 1,
-  tournamentName?: string | null
+  tournamentName?: string | null,
+  numberingMode: 'tables' | 'seats' = 'tables',
 ): void => {
   const pageTitle = tournamentName
     ? `${tournamentName} - Round ${roundNumber} Match Slips`
     : `Round ${roundNumber} Match Slips`;
-  
+
   // Generate a match slip for each match
   const matchSlipsHtml = matches.map((match, index) => {
-    const tableNumber = index + startingTableNumber;
+    const tableNumber = match.table_number ?? index + startingTableNumber;
+    const locationLabel = numberingMode === 'seats'
+      ? `Seats ${2 * tableNumber - 1} &amp; ${2 * tableNumber}`
+      : `Table ${tableNumber}`;
+    const p1Seat = numberingMode === 'seats' ? `<span class="slip-seat">${2 * tableNumber - 1}</span> ` : '';
+    const p2Seat = numberingMode === 'seats' ? `<span class="slip-seat">${2 * tableNumber}</span> ` : '';
     const isLastSlip = index === matches.length - 1;
-    
+
     return `
       <div class="match-slip">
         <div class="match-header">
-          <strong>${tournamentName || 'Tournament'}</strong> - Round ${roundNumber} - Table ${tableNumber}
+          <strong>${escapeHtml(tournamentName || 'Tournament')}</strong> - Round ${roundNumber} - ${locationLabel}
         </div>
-        
+
         <table class="players-table">
           <thead>
             <tr class="header-row">
@@ -340,18 +366,18 @@ export const printMatchSlips = (
           </thead>
           <tbody>
             <tr class="player-row">
-              <td class="player-name">${match.player1_id.name}</td>
+              <td class="player-name">${p1Seat}${escapeHtml(match.player1_id?.name)}</td>
               <td class="score-cell"><div class="score-box"></div></td>
               <td class="signature-cell"><div class="signature-line"></div></td>
             </tr>
             <tr class="player-row">
-              <td class="player-name">${match.player2_id.name}</td>
+              <td class="player-name">${p2Seat}${escapeHtml(match.player2_id?.name)}</td>
               <td class="score-cell"><div class="score-box"></div></td>
               <td class="signature-cell"><div class="signature-line"></div></td>
             </tr>
           </tbody>
         </table>
-        
+
         <div class="instructions">Please fill in match score, have both players sign, and return to tournament organizer</div>
         ${!isLastSlip ? '<div class="cut-line"></div>' : ''}
       </div>
@@ -476,7 +502,9 @@ export const printMatchSlips = (
             text-align: left;
             vertical-align: middle;
           }
-          
+
+          .slip-seat { color: #888; font-weight: normal; }
+
           .score-cell {
             text-align: center;
             padding: 4px;

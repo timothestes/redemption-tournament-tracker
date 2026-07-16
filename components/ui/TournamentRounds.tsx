@@ -839,11 +839,12 @@ export default function TournamentRounds({
 
   const handlePrintPairings = () => {
     printTournamentPairings(
-      matches, 
-      byes, 
-      currentPage, 
+      matches,
+      byes,
+      currentPage,
       tournamentInfo.starting_table_number || 1,
-      tournamentName || tournamentInfo.name // Use prop value first if available
+      tournamentName || tournamentInfo.name, // Use prop value first if available
+      tournamentInfo.numbering_mode === "seats" ? "seats" : "tables",
     );
   };
 
@@ -852,7 +853,8 @@ export default function TournamentRounds({
       matches,
       currentPage,
       tournamentInfo.starting_table_number || 1,
-      tournamentName || tournamentInfo.name
+      tournamentName || tournamentInfo.name,
+      tournamentInfo.numbering_mode === "seats" ? "seats" : "tables",
     );
   };
   
