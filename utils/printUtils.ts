@@ -23,6 +23,13 @@ const openPrintWindow = (html: string): void => {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
 
+/** Escape user-provided text (player names) so it can't break the print layout or inject markup. */
+const escapeHtml = (value: unknown): string =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
 /**
  * Prints the final standings of a tournament in a printer-friendly format
  *
@@ -163,94 +170,129 @@ export const printTournamentPairings = (
   startingTableNumber: number = 1,
   tournamentName?: string | null
 ): void => {
+  const heading = tournamentName || 'Tournament';
   const pageTitle = tournamentName
     ? `${tournamentName} - Round ${roundNumber} Pairings`
     : `Round ${roundNumber} Pairings`;
-  
-  // Create the print content HTML header
-  let printContent = `
+
+  // One compact line per table: [table #] Player 1 vs Player 2. These flow into
+  // CSS multi-columns (newspaper order) so a whole large-tournament round fits on a
+  // single projected screen without scrolling and is easy to scan by table number.
+  const pairingsHtml = (matches || [])
+    .map(
+      (match, index) => `
+        <li class="pair">
+          <span class="t">${index + startingTableNumber}</span>
+          <span class="names">
+            <span class="p">${escapeHtml(match.player1_id?.name)}</span>
+            <span class="vs">vs</span>
+            <span class="p">${escapeHtml(match.player2_id?.name)}</span>
+          </span>
+        </li>`
+    )
+    .join('');
+
+  // Byes render as a single compact strip below the pairings rather than a
+  // second full table, so they don't push the pairings off-screen.
+  const byesHtml =
+    byes && byes.length > 0
+      ? `
+        <div class="byes">
+          <span class="byes-label">Byes</span>
+          ${byes
+            .map((bye) => `<span class="bye-name">${escapeHtml(bye.participant_id?.name)}</span>`)
+            .join('')}
+        </div>`
+      : '';
+
+  const printContent = `
+    <!doctype html>
     <html>
       <head>
-        <title>${pageTitle}</title>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(pageTitle)}</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { text-align: center; margin-bottom: 20px; }
-          .logo { max-width: 150px; margin: 0 auto 20px; display: block; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-          th { background-color: #f2f2f2; padding: 8px; text-align: left; border-bottom: 2px solid #ddd; }
-          td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-          .bye { background-color: #f8f8f8; }
+          *, *::before, *::after { box-sizing: border-box; }
+          html, body { margin: 0; }
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #111;
+            padding: 14px 22px 22px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          /* Slim header: small logo, tournament name, round badge. Keeps the
+             vertical budget for the pairings themselves. */
+          .header {
+            display: flex; align-items: center; gap: 14px;
+            border-bottom: 3px solid #111;
+            padding-bottom: 8px; margin-bottom: 14px;
+            padding-right: 96px; /* reserve room for the fixed Print button */
+          }
+          .header .logo { height: 30px; width: auto; }
+          .header .title { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1; }
+          .header .round {
+            margin-left: auto; white-space: nowrap;
+            font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+            background: #111; color: #fff; padding: 5px 12px; border-radius: 4px;
+          }
+
+          /* Newspaper columns: the browser fits as many ~340px columns as the
+             screen allows, so the same markup fills a 4:3 projector or a wide
+             display. Table order flows down each column, then to the next. */
+          .pairings {
+            list-style: none; margin: 0; padding: 0;
+            column-width: 340px; column-gap: 30px;
+          }
+          .pair {
+            break-inside: avoid;
+            display: grid; grid-template-columns: 30px 1fr; align-items: baseline; gap: 10px;
+            padding: 5px 8px;
+            font-size: 16px; line-height: 1.25;
+            border-radius: 4px;
+          }
+          .pair:nth-child(odd) { background: #f4f4f5; }
+          .pair .t {
+            font-weight: 800; text-align: right; color: #555;
+            font-variant-numeric: tabular-nums; font-size: 14px;
+          }
+          .pair .names { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+          .pair .p { font-weight: 600; }
+          .pair .vs { color: #9ca3af; font-size: 12px; font-weight: 500; }
+
+          .byes {
+            margin-top: 16px; padding-top: 10px; border-top: 1px solid #ddd;
+            display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; font-size: 14px;
+          }
+          .byes-label { font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #555; font-size: 12px; }
+          .bye-name { font-weight: 600; }
+          .bye-name:not(:last-child)::after { content: "·"; color: #bbb; margin-left: 14px; }
+
+          .print-btn {
+            position: fixed; top: 12px; right: 14px; z-index: 10;
+            padding: 9px 18px; background: #16a34a; color: #fff;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 700;
+          }
+
           @media print {
-            button { display: none; }
-            @page { margin: 0.5cm; }
+            body { padding: 0; }
+            .print-btn { display: none; }
+            .header { padding-right: 0; } /* button hidden in print, reclaim the space */
+            .pair:nth-child(odd) { background: #f4f4f5 !important; }
+            @page { margin: 0.4cm; }
           }
         </style>
       </head>
       <body>
-        <img src="${window.location.origin}/lightmode_redemptionccgapp.webp" alt="RedemptionCCG App Logo" class="logo" />
-        <h1>${pageTitle}</h1>
-        <button onclick="window.print();return false;" style="padding:10px 20px; margin:10px 0; background:#4a90e2; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
-  `;
-
-  // Add matches table
-  if (matches && matches.length > 0) {
-    printContent += `
-      <table>
-        <thead>
-          <tr>
-            <th>Table</th>
-            <th>Seat 1</th>
-            <th>Seat 2</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-    
-    matches.forEach((match, index) => {
-      printContent += `
-        <tr>
-          <td>${index + startingTableNumber}</td>
-          <td>${match.player1_id.name}</td>
-          <td>${match.player2_id.name}</td>
-        </tr>
-      `;
-    });
-    
-    printContent += `
-        </tbody>
-      </table>
-    `;
-  }
-  
-  // Add byes table if any
-  if (byes && byes.length > 0) {
-    printContent += `
-      <h2>Byes</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Player</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-    
-    byes.forEach((bye) => {
-      printContent += `
-        <tr class="bye">
-          <td>${bye.participant_id.name}</td>
-        </tr>
-      `;
-    });
-    
-    printContent += `
-        </tbody>
-      </table>
-    `;
-  }
-  
-  // Close the HTML content
-  printContent += `
+        <button class="print-btn" onclick="window.print();return false;">Print</button>
+        <div class="header">
+          <img src="${window.location.origin}/lightmode_redemptionccgapp.webp" alt="" class="logo" />
+          <div class="title">${escapeHtml(heading)}</div>
+          <div class="round">Round ${roundNumber}</div>
+        </div>
+        <ol class="pairings">${pairingsHtml}</ol>
+        ${byesHtml}
       </body>
     </html>
   `;
