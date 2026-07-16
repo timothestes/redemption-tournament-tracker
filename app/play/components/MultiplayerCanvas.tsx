@@ -116,6 +116,13 @@ const AUTO_ARRANGE_ZONES = ['land-of-bondage'] as const;
  *  both; the tween must never read the Rect's live value as a target). */
 const BAND_BG_OPACITY = 0.75;
 
+/** Field-of-Battle open/close fade timings (ms). Open only fades the chrome IN
+ *  (the background is placed opaque from frame 0 — flash-safe); close fades the
+ *  whole band OUT. Close matches the 200ms card-reflow glide so nothing is out
+ *  of step; the open wash is a touch quicker. */
+const BAND_CHROME_FADE_MS = 160;
+const BAND_CLOSE_FADE_MS = 200;
+
 /** Drag-target guidance cue pulse — amplitude and one-leg duration. `yoyo`
  *  doubles the duration for a full up/down cycle (~1.6s here, within the
  *  1.5-2s "slow gentle pulse" range). */
@@ -649,34 +656,102 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const lastBandRectRef = useRef<ZoneRect | null>(null);
   if (mpLayout?.zones.battle) lastBandRectRef.current = mpLayout.zones.battle;
   const [bandBgVisible, setBandBgVisible] = useState(battleActive);
+  // Refs to the two band-presentation Groups: `bg` (background rect + dashed
+  // centerline, rendered below card art) and `chrome` (header + totals chips,
+  // rendered above card art). Their opacity is driven imperatively by the
+  // tweens below; each Group's JSX `opacity` prop is a CONSTANT React never
+  // re-applies (same discipline as the guidance-cue tween), so a re-render
+  // can't fight an in-flight fade.
+  const bandBgGroupRef = useRef<Konva.Group | null>(null);
   const bandBgRectRef = useRef<Konva.Rect | null>(null);
+  const bandChromeRef = useRef<Konva.Group | null>(null);
   const bandBgTweenRef = useRef<Konva.Tween | null>(null);
+  const bandChromeTweenRef = useRef<Konva.Tween | null>(null);
 
+  // Whole-band open/close animation. OPEN: the background rect "settles" from
+  // fully opaque down to its resting BAND_BG_OPACITY while the chrome washes
+  // IN — the bg is only ever MORE opaque than rest during the settle, so it
+  // can never expose raw board art (the flash the old grow-tween caused; see
+  // the BAND_BG_OPACITY note). CLOSE fades BOTH groups out together, so the
+  // dashed centerline no longer hangs at full strength while everything else
+  // dissolves. Every transition destroys the in-flight tweens FIRST so a rapid
+  // open⇄close can't leave a stale fade driving a node toward 0. `bandBgTweenRef`
+  // holds whichever bg animation is live (open = rect settle, close = group
+  // fade) — the two branches are mutually exclusive so they never overlap.
+  // Reduced motion: skip every tween and snap to the end state (mirrors
+  // useHandLayoutTween, which gates the territory/battle card glides the same
+  // way).
   useEffect(() => {
     bandBgTweenRef.current?.destroy();
     bandBgTweenRef.current = null;
+    bandChromeTweenRef.current?.destroy();
+    bandChromeTweenRef.current = null;
+    const bg = bandBgGroupRef.current;
+    const rect = bandBgRectRef.current;
+    const chrome = bandChromeRef.current;
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      !!window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (battleActive) {
       setBandBgVisible(true);
-      // Reopen while a close tween was mid-fade: restore the full layout
-      // values it had been dragging toward 0. On a fresh open this is a
-      // no-op — the Rect just mounted with these exact JSX attrs.
-      const rect = bandBgRectRef.current;
-      const band = lastBandRectRef.current;
-      if (rect && band) {
-        rect.height(band.height);
-        rect.opacity(BAND_BG_OPACITY);
+      // Group opacity at full immediately (a reopen mid-close snaps it back
+      // from a fade the close tween had driven toward 0).
+      bg?.opacity(1);
+      if (reduceMotion) {
+        rect?.opacity(BAND_BG_OPACITY);
+        chrome?.opacity(1);
+        return;
+      }
+      // BG settle: materialize from fully opaque to resting opacity.
+      if (rect) {
+        rect.opacity(1);
+        const rt = new KonvaLib.Tween({
+          node: rect,
+          duration: BAND_CHROME_FADE_MS / 1000,
+          opacity: BAND_BG_OPACITY,
+          easing: KonvaLib.Easings.EaseOut,
+          onFinish: () => { bandBgTweenRef.current = null; },
+        });
+        bandBgTweenRef.current = rt;
+        rt.play();
+      }
+      // Chrome washes in from transparent so header/chips don't pop.
+      if (chrome) {
+        chrome.opacity(0);
+        const t = new KonvaLib.Tween({
+          node: chrome,
+          duration: BAND_CHROME_FADE_MS / 1000,
+          opacity: 1,
+          easing: KonvaLib.Easings.EaseOut,
+          onFinish: () => { bandChromeTweenRef.current = null; },
+        });
+        bandChromeTweenRef.current = t;
+        t.play();
       }
       return;
     }
-    const rect = bandBgRectRef.current;
-    if (!rect || !rect.getStage()) {
+    // CLOSE — fade both groups out, then unmount once the bg fade lands.
+    if (reduceMotion || !bg || !bg.getStage()) {
+      chrome?.opacity(0);
+      bg?.opacity(0);
       setBandBgVisible(false);
       return;
     }
+    if (chrome) {
+      const ct = new KonvaLib.Tween({
+        node: chrome,
+        duration: BAND_CLOSE_FADE_MS / 1000,
+        opacity: 0,
+        easing: KonvaLib.Easings.EaseOut,
+        onFinish: () => { bandChromeTweenRef.current = null; },
+      });
+      bandChromeTweenRef.current = ct;
+      ct.play();
+    }
     const tween = new KonvaLib.Tween({
-      node: rect,
-      duration: 0.2,
-      height: 0,
+      node: bg,
+      duration: BAND_CLOSE_FADE_MS / 1000,
       opacity: 0,
       easing: KonvaLib.Easings.EaseOut,
       onFinish: () => {
@@ -689,7 +764,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }, [battleActive]);
 
   useEffect(() => {
-    return () => { bandBgTweenRef.current?.destroy(); };
+    return () => {
+      bandBgTweenRef.current?.destroy();
+      bandChromeTweenRef.current?.destroy();
+    };
   }, []);
 
   // Card scale preference
@@ -3653,6 +3731,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       draggedCardIdRef.current = null;
       setBattleActive(rawBattleActiveRef.current);
 
+      // Destroy a reparented drag node that react-konva failed to clean up.
+      // At drag-start the dragged card is lifted out of its clipped zone Group
+      // onto the game layer (handleCardDragStart: node.moveTo(layer)). Both
+      // early returns below fire when the card's row left its drag-start zone
+      // server-side mid-drag; normally react-konva destroys this node as it
+      // remounts the card in the new zone. But a battle "courtesy drag" (the
+      // opponent moving the very card you're dragging) can desync react-konva's
+      // child bookkeeping so the reparented node SURVIVES on the layer while a
+      // fresh authoritative node mounts in the new zone — a client-only
+      // duplicate the user can nudge within the zone but never re-zone. Destroy
+      // the survivor, but ONLY when a DIFFERENT live node is registered for this
+      // id (authoritative node confirmed present elsewhere); destroying the sole
+      // node for an id is the ghost-card class — see
+      // reference_konva_destroy_ghost_cards.
+      const destroyOrphanedDragNode = () => {
+        const dragNode: Konva.Node = e.target;
+        // react-konva already destroyed it → getStage() is null, nothing to do.
+        if (!dragNode || dragNode.getStage() == null) return;
+        const authoritative: Konva.Node | undefined = cardNodeRefs.current.get(card.instanceId);
+        if (authoritative && authoritative !== dragNode) {
+          dragNode.destroy();
+          gameLayerRef.current?.batchDraw();
+        }
+      };
+
       if (dragCancelledRef.current) {
         // The mid-drag zone-change guard (below) already called
         // node.stopDrag() because the row's zone changed server-side while
@@ -3661,6 +3764,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         // row's new zone/position is already authoritative from the server,
         // and resolving one here would race a stale drop target against it.
         dragCancelledRef.current = false;
+        destroyOrphanedDragNode();
         return;
       }
 
@@ -3686,6 +3790,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // mutation phase — it is always fresh when this fires.
       const liveLeadRow = findAnyCardByIdRef.current(card.instanceId);
       if (!liveLeadRow || liveLeadRow.zone !== sourceZone) {
+        destroyOrphanedDragNode();
         return;
       }
 
@@ -5260,8 +5365,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // battleCardEntries, etc.) — avoids rebuilding ~15 Konva primitives on
   // unrelated re-renders, e.g. the per-frame ticks MultiplayerCanvas gets
   // from useRevealTick while any card's post-draw reveal flash is active.
+  // Snapshot of the last rendered chrome element, replayed verbatim during the
+  // close fade: once battleActive drops the battle rows are gone (totals would
+  // read 0/0) and mpLayout has no battle rect, but the fade tween needs a
+  // stable node to animate. The cached element carries the same "battle-chrome"
+  // key, so react-konva keeps the same Konva node and the tween runs on it.
+  const lastBattleChromeRef = useRef<React.ReactNode>(null);
   const battleChromeNode = useMemo(() => {
-    if (!battleActive || gameStatus !== 'playing' || !mpLayout?.zones.battle) return null;
+    if (gameStatus !== 'playing') return null;
+    // Closing fade: replay the last snapshot while bandBgVisible keeps the
+    // band mounted; otherwise there's nothing to show.
+    if (!battleActive || !mpLayout?.zones.battle) {
+      return bandBgVisible ? lastBattleChromeRef.current : null;
+    }
     const band = mpLayout.zones.battle;
     const midX = band.x + band.width / 2;
 
@@ -5345,8 +5461,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // first card in the band (UX review F2).
     const showChips = battleLikes.length > 0;
 
-    return (
-      <Group key="battle-chrome" listening={false}>
+    // opacity={0} is a CONSTANT — the fade tweens (in on open, out on close)
+    // mutate the Group's opacity imperatively; React never re-applies this
+    // literal, so it can't fight an in-flight fade (guidance-cue discipline).
+    const node = (
+      <Group key="battle-chrome" ref={bandChromeRef} opacity={0} listening={false}>
         {/* Header — attacker + stakes type, top edge of the band */}
         <Rect x={band.x} y={band.y} width={band.width} height={18} fill="rgba(10,5,5,0.72)" perfectDrawEnabled={false} />
         <Text
@@ -5410,6 +5529,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       </Group>
     );
+    lastBattleChromeRef.current = node;
+    return node;
     // fs/fsGrowth are derived purely from `scale` (see their definitions
     // near the top of the component) — depending on `scale` directly keeps
     // this memo correct across window resizes without needing to list the
@@ -5417,6 +5538,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     battleActive,
+    bandBgVisible,
     gameStatus,
     mpLayout,
     battleCardEntries,
@@ -6077,8 +6199,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           {(battleActive || bandBgVisible) && gameStatus === 'playing' && lastBandRectRef.current && (() => {
             const band = lastBandRectRef.current!;
             const midX = band.x + band.width / 2;
+            // opacity={1} is a CONSTANT — the close-fade tween mutates the
+            // Group's opacity imperatively; React never re-applies this literal,
+            // so it can't fight the fade (guidance-cue discipline). The Rect
+            // keeps its own resting BAND_BG_OPACITY, which the Group opacity
+            // multiplies down to 0 on close.
             return (
-              <Group key="battle-band-bg" listening={false}>
+              <Group key="battle-band-bg" ref={bandBgGroupRef} opacity={1} listening={false}>
                 <Rect
                   ref={bandBgRectRef}
                   x={band.x}
