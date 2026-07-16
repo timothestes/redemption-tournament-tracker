@@ -3731,6 +3731,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       draggedCardIdRef.current = null;
       setBattleActive(rawBattleActiveRef.current);
 
+      // Destroy a reparented drag node that react-konva failed to clean up.
+      // At drag-start the dragged card is lifted out of its clipped zone Group
+      // onto the game layer (handleCardDragStart: node.moveTo(layer)). Both
+      // early returns below fire when the card's row left its drag-start zone
+      // server-side mid-drag; normally react-konva destroys this node as it
+      // remounts the card in the new zone. But a battle "courtesy drag" (the
+      // opponent moving the very card you're dragging) can desync react-konva's
+      // child bookkeeping so the reparented node SURVIVES on the layer while a
+      // fresh authoritative node mounts in the new zone — a client-only
+      // duplicate the user can nudge within the zone but never re-zone. Destroy
+      // the survivor, but ONLY when a DIFFERENT live node is registered for this
+      // id (authoritative node confirmed present elsewhere); destroying the sole
+      // node for an id is the ghost-card class — see
+      // reference_konva_destroy_ghost_cards.
+      const destroyOrphanedDragNode = () => {
+        const dragNode: Konva.Node = e.target;
+        // react-konva already destroyed it → getStage() is null, nothing to do.
+        if (!dragNode || dragNode.getStage() == null) return;
+        const authoritative: Konva.Node | undefined = cardNodeRefs.current.get(card.instanceId);
+        if (authoritative && authoritative !== dragNode) {
+          dragNode.destroy();
+          gameLayerRef.current?.batchDraw();
+        }
+      };
+
       if (dragCancelledRef.current) {
         // The mid-drag zone-change guard (below) already called
         // node.stopDrag() because the row's zone changed server-side while
@@ -3739,6 +3764,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         // row's new zone/position is already authoritative from the server,
         // and resolving one here would race a stale drop target against it.
         dragCancelledRef.current = false;
+        destroyOrphanedDragNode();
         return;
       }
 
@@ -3764,6 +3790,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // mutation phase — it is always fresh when this fires.
       const liveLeadRow = findAnyCardByIdRef.current(card.instanceId);
       if (!liveLeadRow || liveLeadRow.zone !== sourceZone) {
+        destroyOrphanedDragNode();
         return;
       }
 

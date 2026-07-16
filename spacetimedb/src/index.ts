@@ -262,7 +262,13 @@ function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): {
     ? { originZone: '', originPosX: '', originPosY: '' }
     : {};
   return {
-    notes: leaving ? '' : card.notes,
+    // notes are manual player annotations on the card while it's in play: like
+    // isMeek they must survive on-field relocations — above all the battle round
+    // trip (territory -> battle -> territory) — and clear only when the card
+    // genuinely leaves the play field. Gate on isLeavingPlayField rather than
+    // `leaving` (which fires on any move off an on-field zone, incl. battle <->
+    // territory).
+    notes: isLeavingPlayField(fromZone, toZone) ? '' : card.notes,
     outlineColor: leaving ? '' : card.outlineColor,
     // isMeek is a lasting hero characteristic (the card's meek-side stats), not
     // battle-scoped state: a meek hero must stay meek across on-field

@@ -9,7 +9,7 @@ import { isLeavingPlayField } from '../src/playField';
 // discard, reserve, banish, soul-deck, land-of-redemption). Relocations that
 // keep the card in play — most importantly the battle-zone round trip — are
 // NOT leaving play. This predicate gates clearing the lasting `isMeek`
-// characteristic in leavePlayFieldOverrides.
+// characteristic and manual `notes` in leavePlayFieldOverrides.
 describe('isLeavingPlayField', () => {
   it('does not count the battle round trip as leaving play (the meek bug)', () => {
     // Entering battle from territory, and returning battle -> territory, keep
