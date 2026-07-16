@@ -9,6 +9,7 @@
 import { createClient } from "../supabase/client";
 import { rngForRound } from "../../lib/tournament/rng";
 import { pairFirstRound, pairLaterRound } from "../../lib/tournament/pairing";
+import { assignTables } from "../../lib/tournament/tableAssignment";
 import { buildStateFromSupabase } from "./stateAdapter";
 
 type AnyClient = {
@@ -35,7 +36,13 @@ async function persistBye(
 async function persistMatches(
   client: AnyClient,
   tournamentId: string,
-  matches: Array<{ round: number; player1Id: string; player2Id: string; matchOrder: number }>,
+  matches: Array<{
+    round: number;
+    player1Id: string;
+    player2Id: string;
+    matchOrder: number;
+    tableNumber: number;
+  }>,
 ) {
   if (matches.length === 0) return;
   const rows = matches.map(m => ({
@@ -46,6 +53,7 @@ async function persistMatches(
     player1_score: null,
     player2_score: null,
     match_order: m.matchOrder,
+    table_number: m.tableNumber,
   }));
   await client.from("matches").insert(rows);
 }
@@ -86,7 +94,20 @@ export const createPairing = async (
     if (result.bye) {
       await persistBye(client, tournamentId, round, result.bye);
     }
-    await persistMatches(client, tournamentId, result.matches);
+
+    // Static seats: place each match at a physical table, honoring pins.
+    // Chair-side swaps (seats mode) happen here, before insert, while the
+    // match has no scores. Spec: 2026-07-15-static-seats-design.md
+    const pins = new Map<string, number>();
+    for (const p of state.participants) {
+      if (!p.droppedOut && p.assignedSeat != null) pins.set(p.id, p.assignedSeat);
+    }
+    const assigned = assignTables(result.matches, pins, {
+      startingTableNumber: state.startingTableNumber ?? 1,
+      mode: state.numberingMode ?? "tables",
+    });
+
+    await persistMatches(client, tournamentId, assigned.matches);
     await ensureRoundRow(client, tournamentId, round);
     return true;
   } catch (error) {
