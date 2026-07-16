@@ -106,6 +106,7 @@ interface TournamentInfo {
   max_score: number | null;
   starting_table_number: number | null;
   name: string | null;
+  numbering_mode: string | null;
 }
 
 interface RoundInfo {
@@ -146,6 +147,7 @@ export default function TournamentRounds({
     max_score: null,
     starting_table_number: 1,
     name: tournamentName || null,
+    numbering_mode: null,
   });
   // Tracks whether we've completed the initial tournament fetch and synced
   // currentPage to tournamentInfo.current_round. Used as a render gate so the
@@ -260,7 +262,7 @@ export default function TournamentRounds({
       const [tournamentResult, roundResult] = await Promise.all([
         client
           .from("tournaments")
-          .select("id, n_rounds, current_round, has_ended, max_score, starting_table_number, name")
+          .select("id, n_rounds, current_round, has_ended, max_score, starting_table_number, name, numbering_mode")
           .eq("id", tournamentId)
           .single(),
         client
@@ -403,10 +405,11 @@ export default function TournamentRounds({
     const { data, error } = await client
       .from("matches")
       .select(
-        "id, match_order, player1_match_points, player2_match_points, differential, differential2, player1_id:participants!matches_player1_id_fkey(name,id), player2_id:participants!matches_player2_id_fkey(name,id), player1_score, player2_score"
+        "id, match_order, table_number, player1_match_points, player2_match_points, differential, differential2, player1_id:participants!matches_player1_id_fkey(name,id,assigned_seat), player2_id:participants!matches_player2_id_fkey(name,id,assigned_seat), player1_score, player2_score"
       )
       .eq("tournament_id", tournamentId)
       .eq("round", currentPage)
+      .order("table_number", { ascending: true, nullsFirst: true })
       .order("match_order", { ascending: true });
     
     if (error) console.log(error);
@@ -903,6 +906,22 @@ export default function TournamentRounds({
     currentPage === tournamentInfo.current_round &&
     (!roundInfo.started_at || noScoresEntered);
 
+  const isSeatsMode = tournamentInfo.numbering_mode === "seats";
+
+  /** Persisted table with legacy fallback to positional numbering. */
+  const displayTable = (match: any, index: number): number =>
+    match.table_number ?? index + (tournamentInfo.starting_table_number || 1);
+
+  /** True when a player's static pin was not honored this round. */
+  const pinOverridden = (match: any, side: 1 | 2, tableNum: number): boolean => {
+    const pin = side === 1 ? match.player1_id?.assigned_seat : match.player2_id?.assigned_seat;
+    if (pin == null || match.table_number == null) return false;
+    if (isSeatsMode) {
+      return pin !== (side === 1 ? 2 * tableNum - 1 : 2 * tableNum);
+    }
+    return pin !== tableNum;
+  };
+
   // In repair mode player names read as click-to-swap links — primary color
   // with an underline — without changing the row size. The selected source is
   // bold with a solid underline; the other selectable players get a dotted
@@ -1096,7 +1115,9 @@ export default function TournamentRounds({
                             <Fragment key={match.id}>
                               <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
                                 <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                  {index + (tournamentInfo.starting_table_number || 1)}
+                                  {isSeatsMode
+                                    ? `${2 * displayTable(match, index) - 1}·${2 * displayTable(match, index)}`
+                                    : displayTable(match, index)}
                                 </td>
                                 <td
                                   className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"} ${
@@ -1106,13 +1127,27 @@ export default function TournamentRounds({
                                   role={repairMode ? "button" : undefined}
                                   tabIndex={repairMode ? 0 : undefined}
                                 >
-                                  {repairMode ? (
-                                    <span className={swapTargetClass(repairSourceMatch?.match?.id === match.id && !repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)}>
-                                      {match.player1_id.name}
-                                    </span>
-                                  ) : (
-                                    match.player1_id.name
-                                  )}
+                                  <span className="inline-flex items-center justify-center gap-1">
+                                    {isSeatsMode && (
+                                      <span className="text-xs text-muted-foreground tabular-nums">
+                                        {2 * displayTable(match, index) - 1}
+                                      </span>
+                                    )}
+                                    {repairMode ? (
+                                      <span className={swapTargetClass(repairSourceMatch?.match?.id === match.id && !repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)}>
+                                        {match.player1_id.name}
+                                      </span>
+                                    ) : (
+                                      <span>{match.player1_id.name}</span>
+                                    )}
+                                    {pinOverridden(match, 1, displayTable(match, index)) && (
+                                      <span
+                                        title="Static seat not honored this round (conflicting pins)"
+                                        className="text-amber-500 text-xs flex-shrink-0"
+                                        aria-label="Static seat not honored this round"
+                                      >⚠</span>
+                                    )}
+                                  </span>
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                   {hasResult ? (
@@ -1131,13 +1166,27 @@ export default function TournamentRounds({
                                   role={repairMode ? "button" : undefined}
                                   tabIndex={repairMode ? 0 : undefined}
                                 >
-                                  {repairMode ? (
-                                    <span className={swapTargetClass(repairSourceMatch?.match?.id === match.id && repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)}>
-                                      {match.player2_id.name}
-                                    </span>
-                                  ) : (
-                                    match.player2_id.name
-                                  )}
+                                  <span className="inline-flex items-center justify-center gap-1">
+                                    {isSeatsMode && (
+                                      <span className="text-xs text-muted-foreground tabular-nums">
+                                        {2 * displayTable(match, index)}
+                                      </span>
+                                    )}
+                                    {repairMode ? (
+                                      <span className={swapTargetClass(repairSourceMatch?.match?.id === match.id && repairSourceMatch?.isPlayer2 && !repairSourceMatch?.isBye)}>
+                                        {match.player2_id.name}
+                                      </span>
+                                    ) : (
+                                      <span>{match.player2_id.name}</span>
+                                    )}
+                                    {pinOverridden(match, 2, displayTable(match, index)) && (
+                                      <span
+                                        title="Static seat not honored this round (conflicting pins)"
+                                        className="text-amber-500 text-xs flex-shrink-0"
+                                        aria-label="Static seat not honored this round"
+                                      >⚠</span>
+                                    )}
+                                  </span>
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                   {perRound ? `${perRound.p1Mp} / ${perRound.p2Mp}` : "N/A"}
@@ -1273,7 +1322,8 @@ export default function TournamentRounds({
                     <div className="md:hidden space-y-2">
                       {matches.map((match, index) => {
                         const isError = matchErrorIndex.includes(index);
-                        const tableNum = index + (tournamentInfo.starting_table_number || 1);
+                        const tableNum = displayTable(match, index);
+                        const tableLabel = isSeatsMode ? `Seats ${2 * tableNum - 1}·${2 * tableNum}` : `Table ${tableNum}`;
                         const repairEnabled = canRepairCurrentRound;
                         const perRound = perRoundScores(match, tournamentInfo.max_score ?? 5);
                         const isP1Selected =
@@ -1307,7 +1357,7 @@ export default function TournamentRounds({
                           >
                             <div className="flex items-center justify-between gap-2 mb-2">
                               <span className="text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
-                                Table {tableNum}
+                                {tableLabel}
                               </span>
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 {/* See desktop note: hide the disabled edit
@@ -1352,8 +1402,20 @@ export default function TournamentRounds({
                             <div className="space-y-2">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-foreground truncate">
-                                    {match.player1_id.name}
+                                  <p className="font-medium text-foreground flex items-center gap-1">
+                                    {isSeatsMode && (
+                                      <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
+                                        {2 * displayTable(match, index) - 1}
+                                      </span>
+                                    )}
+                                    <span className="truncate min-w-0">{match.player1_id.name}</span>
+                                    {pinOverridden(match, 1, displayTable(match, index)) && (
+                                      <span
+                                        title="Static seat not honored this round (conflicting pins)"
+                                        className="text-amber-500 text-xs flex-shrink-0"
+                                        aria-label="Static seat not honored this round"
+                                      >⚠</span>
+                                    )}
                                   </p>
                                   <p className="text-xs text-muted-foreground tabular-nums">
                                     Match Pts {perRound ? perRound.p1Mp : "N/A"} · Diff {perRound ? perRound.p1Diff : "N/A"}
@@ -1374,8 +1436,20 @@ export default function TournamentRounds({
                               </div>
                               <div className="flex items-center gap-2 pt-2 border-t border-border">
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-foreground truncate">
-                                    {match.player2_id.name}
+                                  <p className="font-medium text-foreground flex items-center gap-1">
+                                    {isSeatsMode && (
+                                      <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
+                                        {2 * displayTable(match, index)}
+                                      </span>
+                                    )}
+                                    <span className="truncate min-w-0">{match.player2_id.name}</span>
+                                    {pinOverridden(match, 2, displayTable(match, index)) && (
+                                      <span
+                                        title="Static seat not honored this round (conflicting pins)"
+                                        className="text-amber-500 text-xs flex-shrink-0"
+                                        aria-label="Static seat not honored this round"
+                                      >⚠</span>
+                                    )}
                                   </p>
                                   <p className="text-xs text-muted-foreground tabular-nums">
                                     Match Pts {perRound ? perRound.p2Mp : "N/A"} · Diff {perRound ? perRound.p2Diff : "N/A"}
