@@ -25,7 +25,7 @@ CREATE UNIQUE INDEX participants_assigned_seat_unique
 
 ALTER TABLE matches ADD COLUMN table_number integer;
 
--- Redefine the regenerate RPC (body from migration 036) with table_number
+-- Redefine the regenerate RPC (body from migration 038) with table_number
 -- added to the INSERT. ->> yields NULL when the key is absent, so old
 -- callers keep working.
 CREATE OR REPLACE FUNCTION regenerate_current_round_pairings(
@@ -116,6 +116,10 @@ BEGIN
       p_tournament_id, v_current_rnd, p_bye_id, 3, 0
     );
   END IF;
+
+  -- Recompute participant totals from the new match + bye state. Without this,
+  -- participants who lost or gained a bye in the re-pair keep stale totals.
+  PERFORM recompute_participant_totals(p_tournament_id);
 
   RETURN jsonb_build_object(
     'tournament_id', p_tournament_id,
