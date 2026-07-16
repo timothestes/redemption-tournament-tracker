@@ -14,6 +14,7 @@ interface TournamentInfo {
   bye_differential: number | null;
   starting_table_number: number | null;
   sound_notifications: boolean | null;
+  numbering_mode: string | null;
   has_started: boolean | null;
   has_ended: boolean | null;
 }
@@ -34,6 +35,7 @@ const EMPTY_INFO: TournamentInfo = {
   bye_differential: null,
   starting_table_number: null,
   sound_notifications: null,
+  numbering_mode: "tables",
   has_started: null,
   has_ended: null,
 };
@@ -47,6 +49,7 @@ const EDITABLE_KEYS = [
   "bye_points",
   "bye_differential",
   "sound_notifications",
+  "numbering_mode",
 ] as const;
 
 export default function TournamentSettings({
@@ -57,6 +60,7 @@ export default function TournamentSettings({
   // Baseline reflecting what's persisted in the DB, used for dirty tracking.
   const [savedInfo, setSavedInfo] = useState<TournamentInfo>(EMPTY_INFO);
   const [round1Started, setRound1Started] = useState(false);
+  const [pinnedCount, setPinnedCount] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -70,7 +74,7 @@ export default function TournamentSettings({
       const { data, error } = await client
         .from("tournaments")
         .select(
-          "n_rounds, current_round, round_length, max_score, bye_points, bye_differential, starting_table_number, sound_notifications, has_started, has_ended",
+          "n_rounds, current_round, round_length, max_score, bye_points, bye_differential, starting_table_number, sound_notifications, has_started, has_ended, numbering_mode",
         )
         .eq("id", tournamentId)
         .single();
@@ -90,6 +94,13 @@ export default function TournamentSettings({
         .eq("round_number", 1)
         .maybeSingle();
       setRound1Started(!!round1?.started_at);
+
+      const { count } = await client
+        .from("participants")
+        .select("id", { count: "exact", head: true })
+        .eq("tournament_id", tournamentId)
+        .not("assigned_seat", "is", null);
+      setPinnedCount(count ?? 0);
     };
 
     fetchTournamentInfo();
@@ -394,6 +405,30 @@ export default function TournamentSettings({
                 <option value="4">+4</option>
                 <option value="5">+5</option>
               </select>
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-foreground mb-1.5 block">
+                Numbering
+              </span>
+              <select
+                value={tournamentInfo.numbering_mode ?? "tables"}
+                onChange={(e) =>
+                  setTournamentInfo((prev) => ({ ...prev, numbering_mode: e.target.value }))
+                }
+                disabled={editingDisabled}
+                className={inputClasses}
+              >
+                <option value="tables">Tables — one number per match</option>
+                <option value="seats">Seats — numbered chairs, two per table</option>
+              </select>
+              {pinnedCount > 0 && tournamentInfo.numbering_mode !== savedInfo.numbering_mode && (
+                <p className="text-xs text-amber-500 mt-1">
+                  {pinnedCount} player{pinnedCount === 1 ? " has" : "s have"} a static
+                  assignment — the number keeps its value but is reinterpreted under the
+                  new mode. Review assignments after saving.
+                </p>
+              )}
             </label>
           </div>
 
