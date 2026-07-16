@@ -48,6 +48,7 @@ interface TournamentTabsProps {
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
   isHost?: boolean;
+  numberingMode: "tables" | "seats";
   onRepairCompleted?: () => void;
   matchesRefreshNonce?: number;
   onRoundEnded?: () => void | Promise<void>;
@@ -85,6 +86,7 @@ export default function TournamentTabs({
   decklists,
   onDecklistsChange,
   isHost = false,
+  numberingMode,
   onRepairCompleted,
   matchesRefreshNonce,
   onRoundEnded,
@@ -237,6 +239,7 @@ export default function TournamentTabs({
               tournamentId={tournamentId}
               decklists={decklists}
               onDecklistsChange={onDecklistsChange}
+              numberingMode={numberingMode}
             />
           </div>
         )}

@@ -13,6 +13,7 @@ interface Participant {
   match_points: number;
   differential: number;
   dropped_out: boolean;
+  assigned_seat?: number | null;
 }
 
 interface ParticipantTableProps {
@@ -26,6 +27,7 @@ interface ParticipantTableProps {
   tournamentId: string;
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
+  numberingMode: "tables" | "seats";
 }
 
 const ParticipantTable: React.FC<ParticipantTableProps> = ({
@@ -39,6 +41,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
   tournamentId,
   decklists,
   onDecklistsChange,
+  numberingMode,
 }) => {
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
   const [attachTarget, setAttachTarget] = useState<Participant | null>(null);
@@ -209,6 +212,15 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                         Dropped
                       </span>
                     )}
+                    {participant.assigned_seat != null && (
+                      <span
+                        className="text-[11px] font-semibold tabular-nums rounded px-1.5 py-0.5 bg-muted text-muted-foreground border border-border flex-shrink-0"
+                        title={`Static ${numberingMode === "seats" ? "seat" : "table"} ${participant.assigned_seat}`}
+                      >
+                        {numberingMode === "seats" ? "S" : "T"}
+                        {participant.assigned_seat}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-2">{renderDeckCell(participant)}</div>
                 </div>
@@ -267,6 +279,15 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                       <span className="truncate">{participant.name}</span>
                       {participant.dropped_out && (
                         <span className="text-destructive text-[11px] flex-shrink-0 uppercase tracking-wide">Dropped</span>
+                      )}
+                      {participant.assigned_seat != null && (
+                        <span
+                          className="text-[11px] font-semibold tabular-nums rounded px-1.5 py-0.5 bg-muted text-muted-foreground border border-border flex-shrink-0"
+                          title={`Static ${numberingMode === "seats" ? "seat" : "table"} ${participant.assigned_seat}`}
+                        >
+                          {numberingMode === "seats" ? "S" : "T"}
+                          {participant.assigned_seat}
+                        </span>
                       )}
                     </div>
                   </Table.Cell>

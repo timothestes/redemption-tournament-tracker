@@ -47,6 +47,7 @@ export default function TournamentPage({
   const [tournament, setTournament] = useState<any>(null);
   const [currentParticipant, setCurrentParticipant] = useState<any>(null);
   const [newParticipantName, setNewParticipantName] = useState<string>("");
+  const [newParticipantSeat, setNewParticipantSeat] = useState<string>("");
   const [isEditTournamentModalOpen, setIsEditTournamentModalOpen] =
     useState<boolean>(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -184,15 +185,27 @@ export default function TournamentPage({
 
   const updateParticipant = async () => {
     if (!currentParticipant || !newParticipantName.trim()) return;
-
+    const trimmedSeat = newParticipantSeat.trim();
+    const seatNum = trimmedSeat === "" ? null : Number(trimmedSeat);
+    if (seatNum !== null && (!Number.isInteger(seatNum) || seatNum < 1)) {
+      showToast("Static assignment must be a positive whole number.", "error");
+      return;
+    }
     try {
       const { error } = await supabase
         .from("participants")
-        .update({ name: newParticipantName })
+        .update({ name: newParticipantName, assigned_seat: seatNum })
         .eq("id", currentParticipant.id);
-
-      if (error) throw error;
-
+      if (error) {
+        if ((error as { code?: string }).code === "23505") {
+          showToast(
+            `${numberingMode === "seats" ? "Seat" : "Table"} ${seatNum} is already assigned to another player.`,
+            "error",
+          );
+          return;
+        }
+        throw error;
+      }
       fetchParticipants();
       setIsEditParticipantModalOpen(false);
       showToast("Participant updated successfully!", "success");
@@ -646,6 +659,8 @@ export default function TournamentPage({
   }, [id]);
 
   const isHost = !!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId);
+  const numberingMode: "tables" | "seats" =
+    tournament?.numbering_mode === "seats" ? "seats" : "tables";
 
   return (
     <div className="flex min-h-screen px-3 sm:px-5 w-full jayden-gradient-bg">
@@ -899,10 +914,12 @@ export default function TournamentPage({
             isModalOpen={isModalOpen}
             setIsModalOpen={setIsModalOpen}
             isHost={isHost}
+            numberingMode={numberingMode}
             onAddParticipant={handleAddParticipant}
             onEdit={(participant) => {
               setCurrentParticipant(participant);
               setNewParticipantName(participant.name);
+              setNewParticipantSeat(participant.assigned_seat != null ? String(participant.assigned_seat) : "");
               setIsEditParticipantModalOpen(true);
             }}
             setLatestRound={setLatestRound}
@@ -1074,6 +1091,9 @@ export default function TournamentPage({
           onSave={updateParticipant}
           newParticipantName={newParticipantName}
           setNewParticipantName={setNewParticipantName}
+          numberingMode={numberingMode}
+          seatValue={newParticipantSeat}
+          setSeatValue={setNewParticipantSeat}
         />
         <TournamentStartModal
           isOpen={showStartModal}
