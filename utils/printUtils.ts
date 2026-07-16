@@ -388,7 +388,7 @@ export const printMatchSlips = (
   const printContent = `
     <html>
       <head>
-        <title>${pageTitle}</title>
+        <title>${escapeHtml(pageTitle)}</title>
         <style>
           @media print {
             @page {
