@@ -6,6 +6,7 @@ import { createClient } from "../../utils/supabase/client";
 import { recomputeTotalsFromHistory } from "../../lib/tournament/results";
 import { gameScoreForMatch, differentialForMatch } from "../../lib/tournament/standingsScoring";
 import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
+import { reassignRoundTables } from "../../utils/tournament/reassignTables";
 import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
 import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, Printer } from "lucide-react";
@@ -713,8 +714,10 @@ export default function TournamentRounds({
         }).eq("id", sourceMatch.id);
       }
 
+      await reassignRoundTables(client, tournamentId, currentPage);
+
       await fetchCurrentRoundData();
-      
+
     } catch (error) {
       console.error("Error swapping players:", error);
       showToast("Error swapping players. Please try again.", "error");
@@ -819,6 +822,8 @@ export default function TournamentRounds({
         { p_tournament_id: tournamentId },
       );
       if (recomputeError) throw recomputeError;
+
+      await reassignRoundTables(client, tournamentId, currentPage);
 
       await fetchCurrentRoundData();
     } catch (error) {
