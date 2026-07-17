@@ -1303,7 +1303,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [resurrectReq, setResurrectReq] = useState<{ sourceInstanceId: string; abilityIndex: number } | null>(null);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notePopover, setNotePopover] = useState<{
-    cardId: string;
+    cardIds: string[];
     x: number;
     y: number;
     initialValue: string;
@@ -8419,7 +8419,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           }
           onEditNote={(card) => {
             setNotePopover({
-              cardId: card.instanceId,
+              cardIds: [card.instanceId],
               x: contextMenu.x,
               y: contextMenu.y,
               initialValue: card.notes ?? '',
@@ -8478,18 +8478,33 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             actions={{ ...multiplayerActions, ...(sharedSoulActions ?? {}) }}
             onClose={() => setMultiCardContextMenu(null)}
             onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
+            onEditNotes={(cardIds) => {
+              setNotePopover({
+                cardIds,
+                x: multiCardContextMenu.x,
+                y: multiCardContextMenu.y,
+                initialValue: '',
+              });
+            }}
             zones={allZonesForContextMenu as any}
           />
         );
       })()}
 
-      {notePopover && (
+      {!isSpectator && notePopover && (
         <CardNotePopover
           x={notePopover.x}
           y={notePopover.y}
           initialValue={notePopover.initialValue}
           onSave={(text) => {
-            gameState.setNote(BigInt(notePopover.cardId), text);
+            // Empty text from the multi-card path is a click-away cancel, not a
+            // bulk clear — "Clear All Notes" is the explicit affordance for that.
+            // Single-card keeps the clear-by-emptying flow.
+            if (text !== '' || notePopover.cardIds.length === 1) {
+              for (const id of notePopover.cardIds) {
+                gameState.setNote(BigInt(id), text);
+              }
+            }
             setNotePopover(null);
           }}
           onCancel={() => setNotePopover(null)}
