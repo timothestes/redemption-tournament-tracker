@@ -1079,7 +1079,7 @@ export default function TournamentRounds({
                     <thead className="sticky top-0 z-10 text-xs uppercase font-normal text-foreground bg-muted border-b-2 border-border rounded-t-lg">
                       <tr>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Table
+                          {isSeatsMode ? "Seats" : "Table"}
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
                           Player 1
@@ -1546,7 +1546,7 @@ export default function TournamentRounds({
                       <thead className="text-xs uppercase font-normal text-foreground bg-muted border-b-2 border-border rounded-t-lg">
                         <tr>
                           <th scope="col" className="px-4 py-2 text-center">
-                            Table
+                            {isSeatsMode ? "Seats" : "Table"}
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
                             Name
