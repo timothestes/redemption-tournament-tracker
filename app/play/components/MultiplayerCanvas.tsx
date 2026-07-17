@@ -325,14 +325,15 @@ export function isFaceDownInPlayCardVisible(
 }
 
 /**
- * Whether a double-click may toggle "meek" on a card. Only a player acting on
- * their own card ('player1') may — spectators are strictly read-only.
+ * Whether a double-click may toggle "meek" on a card. Any player may — meek can
+ * be set on your own card OR an opponent's (e.g. a hero you've taken control
+ * of); the server's meek_card/unmeek_card reducers don't gate on ownership
+ * either. Spectators are strictly read-only.
  */
 export function canViewerToggleMeek(
   viewerKind: 'player' | 'spectator',
-  ownerId: string,
 ): boolean {
-  return viewerKind === 'player' && ownerId === 'player1';
+  return viewerKind === 'player';
 }
 
 // ---------------------------------------------------------------------------
@@ -4721,11 +4722,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     },
     [stopHoverAnimation, selectedIds, clearSelection],
   );
-  // Double-click toggles meek on your own cards
+  // Double-click toggles meek on any card (yours or an opponent's you control)
   const handleDblClick = useCallback((card: GameCard) => {
     if (leftClicksSinceContextMenuRef.current < 2) return;
-    // Only a player acting on their own card may toggle meek (spectators read-only).
-    if (!canViewerToggleMeek(isSpectator ? 'spectator' : 'player', card.ownerId)) return;
+    // Any player may toggle meek; spectators are read-only.
+    if (!canViewerToggleMeek(isSpectator ? 'spectator' : 'player')) return;
     const willBeMeek = !card.isMeek;
     if (card.isMeek) {
       multiplayerActions.unmeekCard(card.instanceId);
@@ -6635,7 +6636,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragMove={handleCardDragMove}
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
-                  onDblClick={noopDblClick}
+                  onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
                 />
@@ -6730,7 +6731,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     onDragMove={handleCardDragMove}
                     onDragEnd={handleCardDragEnd}
                     onContextMenu={handleCardContextMenu}
-                    onDblClick={owner === 'my' ? handleDblClick : noopDblClick}
+                    onDblClick={handleDblClick}
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                   />

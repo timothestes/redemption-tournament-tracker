@@ -268,20 +268,16 @@ describe('isFaceDownInPlayCardVisible', () => {
 });
 
 // ---------------------------------------------------------------------------
-// canViewerToggleMeek — only a player acting on their own card may toggle meek.
+// canViewerToggleMeek — any player may toggle meek (own or opponent's card);
+// spectators are read-only.
 // ---------------------------------------------------------------------------
 
 describe('canViewerToggleMeek', () => {
-  it('allows a player on their own card (player1)', () => {
-    expect(canViewerToggleMeek('player', 'player1')).toBe(true);
+  it('allows a player (their own or an opponent card)', () => {
+    expect(canViewerToggleMeek('player')).toBe(true);
   });
 
-  it("forbids a player on the opponent's card (player2)", () => {
-    expect(canViewerToggleMeek('player', 'player2')).toBe(false);
-  });
-
-  it('forbids a spectator on either card (read-only)', () => {
-    expect(canViewerToggleMeek('spectator', 'player1')).toBe(false);
-    expect(canViewerToggleMeek('spectator', 'player2')).toBe(false);
+  it('forbids a spectator (read-only)', () => {
+    expect(canViewerToggleMeek('spectator')).toBe(false);
   });
 });
