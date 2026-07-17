@@ -150,6 +150,7 @@ export default function TournamentSettings({
 
   const editingDisabled = !!tournamentInfo.has_ended;
   const maxScoreLocked = round1Started || editingDisabled;
+  const numberingModeLocked = !!tournamentInfo.has_started || editingDisabled;
   const minRounds = Math.max(1, tournamentInfo.current_round || 1);
 
   const inputClasses =
@@ -408,20 +409,28 @@ export default function TournamentSettings({
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-foreground mb-1.5 block">
+              <span className="text-sm font-medium text-foreground mb-1.5 flex items-center gap-1.5">
                 Numbering
+                {numberingModeLocked && !editingDisabled && (
+                  <Lock className="w-3.5 h-3.5 text-muted-foreground" aria-label="Locked" />
+                )}
               </span>
               <select
                 value={tournamentInfo.numbering_mode ?? "tables"}
                 onChange={(e) =>
                   setTournamentInfo((prev) => ({ ...prev, numbering_mode: e.target.value }))
                 }
-                disabled={editingDisabled}
+                disabled={numberingModeLocked}
                 className={inputClasses}
               >
                 <option value="tables">Tables — one number per match</option>
                 <option value="seats">Seats — numbered chairs, two per table</option>
               </select>
+              {numberingModeLocked && !editingDisabled && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Locked once the tournament starts.
+                </p>
+              )}
               {pinnedCount > 0 && tournamentInfo.numbering_mode !== savedInfo.numbering_mode && (
                 <p className="text-xs text-amber-500 mt-1">
                   {pinnedCount} player{pinnedCount === 1 ? " has" : "s have"} a static
