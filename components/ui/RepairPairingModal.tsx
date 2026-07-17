@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { ArrowUpDown } from "lucide-react";
 import { createClient } from "../../utils/supabase/client";
+import { reassignRoundTables } from "../../utils/tournament/reassignTables";
 import { Button } from "./button";
 import {
   Dialog,
@@ -188,6 +189,8 @@ export default function RepairPairingModal({
           differential: (otherPlayer.differential || 0) + tournament.bye_differential,
         });
       }
+
+      await reassignRoundTables(client, tournamentId, roundNumber);
 
       fetchCurrentRoundData();
       onClose();

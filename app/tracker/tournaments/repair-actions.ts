@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { buildStateFromSupabase } from "@/utils/tournament/stateAdapter";
 import { pairFirstRound, pairLaterRound } from "@/lib/tournament/pairing";
 import { mulberry32 } from "@/lib/tournament/rng";
+import { assignTables } from "@/lib/tournament/tableAssignment";
 
 export interface RepairResult {
   ok: boolean;
@@ -67,10 +68,27 @@ export async function regenerateCurrentRoundPairingsAction(input: {
       ? pairFirstRound(state.participants.filter((p) => !p.droppedOut), rng)
       : pairLaterRound(state, round, rng);
 
-  const pairings = result.matches.map((m, idx) => ({
+  // Static seats: honor pins when placing regenerated matches (spec
+  // 2026-07-15-static-seats-design.md).
+  const pins = new Map<string, number>();
+  for (const p of state.participants) {
+    if (!p.droppedOut && p.assignedSeat != null) pins.set(p.id, p.assignedSeat);
+  }
+  const assigned = assignTables(result.matches, pins, {
+    startingTableNumber: state.startingTableNumber ?? 1,
+    mode: state.numberingMode ?? "tables",
+  });
+
+  // Persist the override decision now — it must not be re-derived later
+  // from a pin that may have changed since (spec: "Overridden pins" §).
+  const overridden = new Set(assigned.overriddenPins);
+  const pairings = assigned.matches.map((m, idx) => ({
     player1_id: m.player1Id,
     player2_id: m.player2Id,
     match_order: m.matchOrder ?? idx + 1,
+    table_number: m.tableNumber,
+    player1_pin_overridden: overridden.has(m.player1Id),
+    player2_pin_overridden: overridden.has(m.player2Id),
   }));
 
   const { data, error } = await supabase.rpc("regenerate_current_round_pairings", {

@@ -28,6 +28,8 @@ export interface Participant {
   droppedOut: boolean;
   /** Round at which the drop took effect (this round's result still counted). */
   dropAfterRound?: number;
+  /** Static table (tables mode) or seat (seats mode) pin. Undefined = none. */
+  assignedSeat?: number;
 }
 
 export interface MatchResult {
@@ -53,6 +55,10 @@ export interface Bye {
   round: number;
 }
 
+/** How a tournament numbers physical locations: one number per match
+ * ('tables') or one number per chair, two per table ('seats'). */
+export type NumberingMode = "tables" | "seats";
+
 export interface TournamentState {
   id: TournamentId;
   nRounds: number;
@@ -70,6 +76,11 @@ export interface TournamentState {
    * excluded. Optional for back-compat with hand-built test states — when
    * absent, all byes count (the pre-Option-C behavior). */
   startedRounds?: number[];
+  /** First table number used by unpinned fill. Optional for back-compat with
+   * hand-built test states; defaults to 1. */
+  startingTableNumber?: number;
+  /** Defaults to 'tables' when absent. */
+  numberingMode?: NumberingMode;
 }
 
 /** Per-participant aggregate computed from match history. */

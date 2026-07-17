@@ -50,7 +50,7 @@ export async function buildStateFromSupabase(
 ): Promise<TournamentState | null> {
   const { data: t } = await client
     .from("tournaments")
-    .select("id, n_rounds, current_round, max_score, has_started, has_ended")
+    .select("id, n_rounds, current_round, max_score, has_started, has_ended, starting_table_number, numbering_mode")
     .eq("id", tournamentId)
     .single();
   if (!t) return null;
@@ -58,13 +58,14 @@ export async function buildStateFromSupabase(
 
   const { data: parts } = await client
     .from("participants")
-    .select("id, name, joined_at, dropped_out")
+    .select("id, name, joined_at, dropped_out, assigned_seat")
     .eq("tournament_id", tournamentId);
   const participants: Participant[] = (parts || []).map((p: any) => ({
     id: p.id,
     name: p.name ?? "",
     joinedAt: p.joined_at ?? new Date(0).toISOString(),
     droppedOut: !!p.dropped_out,
+    assignedSeat: p.assigned_seat ?? undefined,
   }));
 
   const { data: matchRows } = await client
@@ -111,5 +112,7 @@ export async function buildStateFromSupabase(
     matches,
     byes,
     startedRounds,
+    startingTableNumber: t.starting_table_number ?? 1,
+    numberingMode: t.numbering_mode === "seats" ? "seats" : "tables",
   };
 }

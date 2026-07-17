@@ -16,6 +16,9 @@ interface EditParticipantModalProps {
   onSave: () => void;
   newParticipantName: string;
   setNewParticipantName: (name: string) => void;
+  numberingMode: "tables" | "seats";
+  seatValue: string;
+  setSeatValue: (v: string) => void;
 }
 
 const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
@@ -25,6 +28,9 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
   onSave,
   newParticipantName,
   setNewParticipantName,
+  numberingMode,
+  seatValue,
+  setSeatValue,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -61,6 +67,27 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
                 ref={inputRef}
                 className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none"
               />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="assigned-seat" className="text-sm font-medium text-foreground">
+                Static {numberingMode === "seats" ? "seat" : "table"} #{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <input
+                id="assigned-seat"
+                name="assigned-seat"
+                type="number"
+                min={1}
+                step={1}
+                value={seatValue}
+                onChange={(e) => setSeatValue(e.target.value)}
+                placeholder="None"
+                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                Always placed at this {numberingMode === "seats" ? "seat" : "table"} when
+                pairings are generated. Leave empty for automatic placement.
+              </p>
             </div>
           </DialogBody>
           <DialogFooter className="justify-end">
