@@ -178,6 +178,22 @@ function isBattleEnhancementSegment(cardType: string): boolean {
     .some((s) => s === 'GE' || s === 'EE');
 }
 
+/**
+ * Whether the Field of Battle band should be open. Phase-driven (spec §4): open
+ * while the turn player is in the 'battle' phase, OR whenever battleState is
+ * non-empty (covers a battle still resolving a soul surrender, or drift between
+ * the two signals). Gated on a live game: a finished game (e.g. a concede
+ * mid-battle, which only flips status to 'finished' without clearing the phase
+ * or battleState) — or a waiting one — never shows the band.
+ */
+export function isBattleBandActive(
+  status: string,
+  currentPhase: string,
+  battleState: string,
+): boolean {
+  return status === 'playing' && (currentPhase === 'battle' || battleState !== '');
+}
+
 /** Mirrors battleMath.ts's private isLostSoulLike / the server's
  *  isLostSoulRow (battleStakesLobLostSouls): used client-side to count the
  *  stakes Lost Souls for the Rescue-attempt vs. Battle-challenge header. */
@@ -607,9 +623,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Phase-driven (spec §4): the band is visible whenever the turn player has
   // set_phase('battle'), OR whenever battleState is non-empty (defensive OR —
   // covers e.g. a battle still resolving a soul surrender after the phase bar
-  // has moved on, or any state drift between the two signals).
-  const rawBattleActive =
-    gameState.game?.currentPhase === 'battle' || (gameState.game?.battleState ?? '') !== '';
+  // has moved on, or any state drift between the two signals). Gated on a live
+  // game so a concede mid-battle (status -> 'finished' without clearing the
+  // phase/battleState) closes the band instead of leaving it open. See
+  // isBattleBandActive.
+  const rawBattleActive = isBattleBandActive(
+    gameState.game?.status ?? '',
+    gameState.game?.currentPhase ?? '',
+    gameState.game?.battleState ?? '',
+  );
   const rawBattleActiveRef = useRef(rawBattleActive);
   rawBattleActiveRef.current = rawBattleActive;
   const [battleActive, setBattleActive] = useState(rawBattleActive);
