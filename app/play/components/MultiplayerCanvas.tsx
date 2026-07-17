@@ -5470,7 +5470,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           statusText = 'No attacker in battle';
           break;
         case 'unknown':
-          statusText = 'Initiative unknown (face-down/variable stats)';
+          statusText = 'Initiative unknown (variable stats)';
           break;
         case 'initiative': {
           const reasonLabel = initiative.reason === 'mutual-destruction' ? 'mutual destruction' : initiative.reason;
