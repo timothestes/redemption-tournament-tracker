@@ -360,6 +360,32 @@ describe('brigadeMismatch', () => {
     const chars = [mkCard({ brigade: 'Evil Gold' })];
     expect(brigadeMismatch(enh, chars)).toBe(false);
   });
+
+  it('meek-notation character brigade "White (Clay)" matches a White enhancement', () => {
+    // Mary, Holy Virgin (GoC) stores "White (Clay)" (White normally, Clay when
+    // meek). The Child is Born (GoC) is "Silver/White" — its White matches her.
+    const enh = mkCard({ brigade: 'Silver/White' });
+    const chars = [mkCard({ brigade: 'White (Clay)' })];
+    expect(brigadeMismatch(enh, chars)).toBe(false);
+  });
+
+  it('meek-notation sub brigade also counts for matching', () => {
+    const enh = mkCard({ brigade: 'Clay' });
+    const chars = [mkCard({ brigade: 'White (Clay)' })];
+    expect(brigadeMismatch(enh, chars)).toBe(false);
+  });
+
+  it('multi-word brigade inside the parenthetical is not split on whitespace', () => {
+    const enh = mkCard({ brigade: 'Pale Green' });
+    const chars = [mkCard({ brigade: 'Green (Pale Green)' })];
+    expect(brigadeMismatch(enh, chars)).toBe(false);
+  });
+
+  it('meek-notation character still mismatches an unrelated enhancement brigade', () => {
+    const enh = mkCard({ brigade: 'Gold' });
+    const chars = [mkCard({ brigade: 'White (Clay)' })];
+    expect(brigadeMismatch(enh, chars)).toBe(true);
+  });
 });
 
 describe('summarizeAutoReturn', () => {

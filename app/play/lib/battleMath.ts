@@ -215,8 +215,19 @@ export function computeInitiative(
 const BRIGADE_WILDCARDS = new Set(['Multi', 'Good Multi', 'Evil Multi']);
 
 function brigadeTokens(brigade: string): string[] {
-  return brigade
-    .split('/')
+  // A brigade string can carry a parenthetical: the meek brigade on a
+  // character ("White (Clay)" — White normally, Clay when meek) or the
+  // character-side brigade on a dual GE/character card ("Green (Crimson)").
+  // Both the main and the parenthetical brigades count for matching, so pull
+  // the parens apart. Each part is a '/'-separated list; brigade names may
+  // themselves contain spaces ("Pale Green"), so we never split on whitespace.
+  const parenIdx = brigade.indexOf('(');
+  const parts =
+    parenIdx === -1
+      ? [brigade]
+      : [brigade.slice(0, parenIdx), brigade.slice(parenIdx + 1).replace(')', '')];
+  return parts
+    .flatMap((p) => p.split('/'))
     .map((s) => s.trim())
     // Forge brigades keep good/evil gold distinct ("Good Gold"/"Evil Gold");
     // official card data writes plain "Gold" for both. Fold them together so
