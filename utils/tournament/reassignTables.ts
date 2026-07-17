@@ -24,6 +24,7 @@ export async function reassignRoundTables(
       .from("participants")
       .select("id, assigned_seat")
       .eq("tournament_id", tournamentId)
+      .eq("dropped_out", false)
       .not("assigned_seat", "is", null),
     client
       .from("matches")
@@ -31,7 +32,8 @@ export async function reassignRoundTables(
         "id, player1_id, player2_id, match_order, player1_match_points, player2_match_points, differential, differential2",
       )
       .eq("tournament_id", tournamentId)
-      .eq("round", round),
+      .eq("round", round)
+      .order("match_order", { ascending: true }),
   ]);
   if (!t || !ms || ms.length === 0) return;
 
@@ -46,16 +48,25 @@ export async function reassignRoundTables(
   }));
   const byId = new Map<string, any>((ms || []).map((m: any) => [m.id as string, m]));
 
-  const { matches: assigned } = assignTables(rows, pins, {
+  const { matches: assigned, overriddenPins } = assignTables(rows, pins, {
     startingTableNumber: t.starting_table_number ?? 1,
     mode: t.numbering_mode === "seats" ? "seats" : "tables",
   });
+  const overridden = new Set(overriddenPins);
 
   for (const m of assigned) {
     const orig = byId.get((m as any).id);
     if (!orig) continue;
     const swapped = orig.player1_id !== m.player1Id;
-    const patch: Record<string, unknown> = { table_number: m.tableNumber };
+    // Pin-override flags are recomputed fresh here and always written — not
+    // just on a chair swap — because the override decision must reflect
+    // this reassignment, not linger from whatever was persisted before it
+    // (spec: "Overridden pins" §).
+    const patch: Record<string, unknown> = {
+      table_number: m.tableNumber,
+      player1_pin_overridden: overridden.has(m.player1Id),
+      player2_pin_overridden: overridden.has(m.player2Id),
+    };
     if (swapped) {
       // Chair-side swap: mirror handleSwapPlayers' same-match flip — swap the
       // per-side sibling columns along with the ids. Scores are null here

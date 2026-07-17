@@ -42,6 +42,8 @@ async function persistMatches(
     player2Id: string;
     matchOrder: number;
     tableNumber: number;
+    player1PinOverridden: boolean;
+    player2PinOverridden: boolean;
   }>,
 ) {
   if (matches.length === 0) return;
@@ -54,6 +56,8 @@ async function persistMatches(
     player2_score: null,
     match_order: m.matchOrder,
     table_number: m.tableNumber,
+    player1_pin_overridden: m.player1PinOverridden,
+    player2_pin_overridden: m.player2PinOverridden,
   }));
   await client.from("matches").insert(rows);
 }
@@ -107,7 +111,16 @@ export const createPairing = async (
       mode: state.numberingMode ?? "tables",
     });
 
-    await persistMatches(client, tournamentId, assigned.matches);
+    // Persist the override decision now — it must not be re-derived later
+    // from a pin that may have changed since (spec: "Overridden pins" §).
+    const overridden = new Set(assigned.overriddenPins);
+    const matchesToPersist = assigned.matches.map(m => ({
+      ...m,
+      player1PinOverridden: overridden.has(m.player1Id),
+      player2PinOverridden: overridden.has(m.player2Id),
+    }));
+
+    await persistMatches(client, tournamentId, matchesToPersist);
     await ensureRoundRow(client, tournamentId, round);
     return true;
   } catch (error) {

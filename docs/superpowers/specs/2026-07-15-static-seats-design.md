@@ -125,10 +125,20 @@ where unpinned fill begins.
    nothing that round. Pins of dropped players stay stored (dormant) and
    resume if the player is restored.
 
-**Overridden pins are derivable, not stored**: any view can compare a
-player's `assigned_seat` to their match's actual table/seat and badge the
-mismatch. `overriddenPins` in the return value exists for tests and for
-potential toast messaging at generation time.
+**Overridden pins are persisted, not derived**: `matches.player1_pin_overridden`
+/ `player2_pin_overridden` (migration 079) record the override decision at
+the moment `assignTables` runs, from its `overriddenPins` return value. Every
+write path (`createPairing`, regenerate, repair's `reassignRoundTables`) sets
+both flags on every match it writes — not only when a side swaps — so a
+round's flags always reflect the placement that produced it. The rounds view
+badges directly from these columns instead of comparing a match's
+`table_number` to the participant's *current* `assigned_seat`. Why: a pin
+comparison is only correct at generation time; if the host edits a pin after
+the round is placed, a live comparison drifts and produces a false "not
+honored" badge (or hides a real one) for the rest of the round — caught in
+adversarial review of the first implementation. Legacy rounds and rounds
+paired before migration 079 default both flags to `false`, so no badge shows
+— correct, since no override was ever computed for them.
 
 ## Write paths (3)
 
@@ -196,7 +206,7 @@ regenerate, or repair — never retroactively to an already-placed round.
 | 8 | Pinned player drops out | Pin dormant; resumes if restored |
 | 9 | Legacy matches (`table_number` null) | Display falls back to index math — pixel-identical to today |
 | 10 | Pin edited mid-round | Current round untouched; applies at next generation/regenerate/repair |
-| 11 | Numbering mode switched while pins exist | Pin values are reinterpreted under the new mode (table 5 → seat 5). Settings toggle shows an inline warning listing how many players have pins ("3 players have static assignments — review them after switching"); no auto-conversion, no blocking |
+| 11 | Numbering mode switched while pins exist | Only possible pre-start: the Numbering select locks once `tournaments.has_started` is true, so mode is fixed for the rest of the tournament. Before start, switching reinterprets pin values under the new mode (table 5 → seat 5); the settings toggle shows an inline warning listing how many players have pins ("3 players have static assignments — review them after switching"); no auto-conversion, no blocking |
 
 ## Testing
 

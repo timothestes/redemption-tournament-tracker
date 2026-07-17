@@ -79,11 +79,16 @@ export async function regenerateCurrentRoundPairingsAction(input: {
     mode: state.numberingMode ?? "tables",
   });
 
+  // Persist the override decision now — it must not be re-derived later
+  // from a pin that may have changed since (spec: "Overridden pins" §).
+  const overridden = new Set(assigned.overriddenPins);
   const pairings = assigned.matches.map((m, idx) => ({
     player1_id: m.player1Id,
     player2_id: m.player2Id,
     match_order: m.matchOrder ?? idx + 1,
     table_number: m.tableNumber,
+    player1_pin_overridden: overridden.has(m.player1Id),
+    player2_pin_overridden: overridden.has(m.player2Id),
   }));
 
   const { data, error } = await supabase.rpc("regenerate_current_round_pairings", {

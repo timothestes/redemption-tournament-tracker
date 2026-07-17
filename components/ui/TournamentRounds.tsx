@@ -405,7 +405,7 @@ export default function TournamentRounds({
     const { data, error } = await client
       .from("matches")
       .select(
-        "id, match_order, table_number, player1_match_points, player2_match_points, differential, differential2, player1_id:participants!matches_player1_id_fkey(name,id,assigned_seat), player2_id:participants!matches_player2_id_fkey(name,id,assigned_seat), player1_score, player2_score"
+        "id, match_order, table_number, player1_pin_overridden, player2_pin_overridden, player1_match_points, player2_match_points, differential, differential2, player1_id:participants!matches_player1_id_fkey(name,id,assigned_seat), player2_id:participants!matches_player2_id_fkey(name,id,assigned_seat), player1_score, player2_score"
       )
       .eq("tournament_id", tournamentId)
       .eq("round", currentPage)
@@ -914,15 +914,14 @@ export default function TournamentRounds({
   const displayTable = (match: any, index: number): number =>
     match.table_number ?? index + (tournamentInfo.starting_table_number || 1);
 
-  /** True when a player's static pin was not honored this round. */
-  const pinOverridden = (match: any, side: 1 | 2, tableNum: number): boolean => {
-    const pin = side === 1 ? match.player1_id?.assigned_seat : match.player2_id?.assigned_seat;
-    if (pin == null || match.table_number == null) return false;
-    if (isSeatsMode) {
-      return pin !== (side === 1 ? 2 * tableNum - 1 : 2 * tableNum);
-    }
-    return pin !== tableNum;
-  };
+  /**
+   * True when a player's static pin was not honored this round. Reads the
+   * flag persisted at generation time (assignTables' overriddenPins), not a
+   * live comparison against the current pin — a pin edited mid-round would
+   * otherwise produce a false badge here (spec: "Overridden pins" §).
+   */
+  const pinOverridden = (match: any, side: 1 | 2): boolean =>
+    side === 1 ? !!match.player1_pin_overridden : !!match.player2_pin_overridden;
 
   // In repair mode player names read as click-to-swap links — primary color
   // with an underline — without changing the row size. The selected source is
@@ -1142,11 +1141,11 @@ export default function TournamentRounds({
                                     ) : (
                                       <span>{match.player1_id.name}</span>
                                     )}
-                                    {pinOverridden(match, 1, displayTable(match, index)) && (
+                                    {pinOverridden(match, 1) && (
                                       <span
-                                        title="Static seat not honored this round (conflicting pins)"
+                                        title="Static assignment couldn't be honored this round"
                                         className="text-amber-500 text-xs flex-shrink-0"
-                                        aria-label="Static seat not honored this round"
+                                        aria-label="Static assignment couldn't be honored this round"
                                       >⚠</span>
                                     )}
                                   </span>
@@ -1181,11 +1180,11 @@ export default function TournamentRounds({
                                     ) : (
                                       <span>{match.player2_id.name}</span>
                                     )}
-                                    {pinOverridden(match, 2, displayTable(match, index)) && (
+                                    {pinOverridden(match, 2) && (
                                       <span
-                                        title="Static seat not honored this round (conflicting pins)"
+                                        title="Static assignment couldn't be honored this round"
                                         className="text-amber-500 text-xs flex-shrink-0"
-                                        aria-label="Static seat not honored this round"
+                                        aria-label="Static assignment couldn't be honored this round"
                                       >⚠</span>
                                     )}
                                   </span>
@@ -1411,11 +1410,11 @@ export default function TournamentRounds({
                                       </span>
                                     )}
                                     <span className="truncate min-w-0">{match.player1_id.name}</span>
-                                    {pinOverridden(match, 1, displayTable(match, index)) && (
+                                    {pinOverridden(match, 1) && (
                                       <span
-                                        title="Static seat not honored this round (conflicting pins)"
+                                        title="Static assignment couldn't be honored this round"
                                         className="text-amber-500 text-xs flex-shrink-0"
-                                        aria-label="Static seat not honored this round"
+                                        aria-label="Static assignment couldn't be honored this round"
                                       >⚠</span>
                                     )}
                                   </p>
@@ -1445,11 +1444,11 @@ export default function TournamentRounds({
                                       </span>
                                     )}
                                     <span className="truncate min-w-0">{match.player2_id.name}</span>
-                                    {pinOverridden(match, 2, displayTable(match, index)) && (
+                                    {pinOverridden(match, 2) && (
                                       <span
-                                        title="Static seat not honored this round (conflicting pins)"
+                                        title="Static assignment couldn't be honored this round"
                                         className="text-amber-500 text-xs flex-shrink-0"
-                                        aria-label="Static seat not honored this round"
+                                        aria-label="Static assignment couldn't be honored this round"
                                       >⚠</span>
                                     )}
                                   </p>
