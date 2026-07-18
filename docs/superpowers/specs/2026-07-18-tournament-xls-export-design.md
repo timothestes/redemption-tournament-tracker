@@ -53,9 +53,10 @@ Patching rules — so committing a re-converted template later is safe.
 
 ## UI
 
-- **Button:** "Export to Excel" in `components/ui/TournamentTabs.tsx`, next to the
-  existing "Print Final Standings" button. Visible to the host, enabled once the
-  tournament has started (`has_started`). Works mid-tournament and after end.
+- **Button:** "Export to Excel" in `components/ui/TournamentTabs.tsx`, in the
+  Standings tab header row (where "Print Final Standings" appears once the tournament
+  ends). Host-only, rendered once the tournament has started (`tournamentStarted`
+  prop). Works mid-tournament and after end.
 - **Blockers** (error toast, no download):
   - `n_rounds > 10` (sheet maximum),
   - more than 200 participants,
@@ -70,8 +71,19 @@ Patching rules — so committing a re-converted template later is safe.
 
 ## Data mapping (sheet `2-Player (1)`; all refs are Excel A1, rows 3–202)
 
-Data source: the host page's already-loaded state (participants, matches, byes,
-tournament). No new API surface; export runs fully client-side.
+Data source: the host page does **not** hold byes or past-round scores in memory, so
+on click the exporter calls `buildStateFromSupabase(createClient(), tournamentId)`
+(`utils/tournament/stateAdapter.ts`) — client-safe, returns participants (incl.
+dropped), all matches with scores, byes with round numbers, started rounds, and
+tournament config. The tournament display name comes from the `tournamentName` prop.
+Guard with `supabase.auth.getUser()` first: per project convention, expired-token
+client reads silently return empty and would otherwise export a blank tracker.
+Still fully client-side; no new API surface.
+
+A match counts as **played** iff both `player1_score` and `player2_score` are
+non-null — the same predicate `stateAdapter` uses (`winner_id`/`is_tie` may be null
+on legacy rows). A 0-0 auto-scored double-drop is stored as a tie by the app and
+exports as `0/0` (the tracker also scores diff 0 as a tie — consistent).
 
 ### Config cells
 
@@ -85,15 +97,20 @@ are the Switch-Rows button inputs, not configuration.
 
 ### Row order
 
-- **Ended tournament:** all participants (including dropped) in final standings order.
-  No `Bye` row is added.
-- **Tournament in progress:** dropped participants are **omitted** (the macro would
-  otherwise pair them; their names persist harmlessly inside opponents' historical
-  cells). Rows are ordered so the **current round's pairings are row-adjacent**
-  (match 1 → rows 3–4, match 2 → rows 5–6, …), because `scoreBye`, row coloring, and
-  Switch Rows all assume pair adjacency. If the current round has a bye, the recipient
-  is the last participant row and a literal `Bye` row follows it.
-  Completed rounds don't care about row order (the macros re-sort by score on demand).
+- **Ended tournament:** all participants, active ones first in final standings order
+  (`computeFinalStandings` — there is no stored `place`), then dropped players
+  appended (match points desc, differential desc). Order is cosmetic post-end (the
+  macros re-sort by score on demand). No `Bye` row is added.
+- **Tournament in progress:** unpaired dropped participants are **omitted** (the
+  macro would otherwise pair them; their names persist harmlessly inside opponents'
+  historical cells) — but a dropped player who appears in the current round's
+  pairings (or holds its bye) **is included**, otherwise their opponent is orphaned
+  and pair parity shifts for every later row. Rows are ordered so the **current
+  round's pairings are row-adjacent** (match 1 → rows 3–4, match 2 → rows 5–6, …),
+  because `scoreBye`, row coloring, and Switch Rows all assume pair adjacency. If the
+  current round has a bye, the recipient is the last participant row and a literal
+  `Bye` row follows it.
+  Completed rounds don't care about row order.
 
 ### Per-round column groups (5 columns per round, rounds 1–10)
 
@@ -104,24 +121,32 @@ For each participant row and each round 1..current:
   `Bye`.
 - **Player Score / Opponent Score** (entry cells): the recorded souls-rescued values,
   capped at `max_score` (uncapped values trigger the tracker's correction prompts).
-  **Unplayed matches keep both cells empty** — a match counts as played only if
-  `winner_id` is set or `is_tie` is true; writing `0/0` would fabricate a 1.5-point tie.
+  **Unplayed matches keep both cells empty** (played = both scores non-null, see
+  above); writing `0/0` for an unplayed match would fabricate a 1.5-point tie.
 - **Byes — native tracker convention** (mirrors `scoreBye` exactly):
   - recipient: Player Score = `-4 + (number of byes received in rounds 1..K)`, clamped
     to ≤ 0 (first bye `-3`, second `-2`, …), Opponent Score = `0`. The sheet's formula
     turns `-3` into 3 game points via `ABS`.
-  - the `Bye` row itself (current-round bye only): Player Score `0`, Opponent Score
-    `max_score + 4`.
+  - the `Bye` row itself (current-round bye only): `B` cell exactly `Bye`, its
+    current-round Opponent Name cell = the recipient's exact name, Player Score `0`,
+    Opponent Score `max_score + 4`. Its past-round columns stay empty (verified
+    harmless in the Excel smoke test — bye detection is keyed on name strings, not
+    row history).
 - Round Score, Round LS Differential, Total points, Total LS Differential: **never
   written** — template formulas recompute them on load.
 
 ### Column visibility
 
-The tracker natively shows only the current round ("Next" hides prior rounds). Patch
-the sheet's `<cols>` accordingly:
+The tracker natively shows only the current round ("Next" hides prior rounds). Round
+K occupies 1-based columns `6+5(K−1)` … `10+5(K−1)` (F–J, K–O, … AY–BC). Patch the
+sheet's `<cols>`: normalize any `<col>` range spanning a group boundary into
+per-column entries (preserving `width`/`style`/`customWidth`), then set `hidden` so:
 
 - in progress → Game Summary + current round visible; completed and future rounds hidden;
 - ended → rounds 1..`n_rounds` visible, unused rounds hidden.
+
+Leave the template's other column states untouched: helper `C` and `BE`–`BJ` hidden,
+`BD` (Overall Rank) and `BK`/`BL` (table/chair) as-template.
 
 ## Fidelity caveats (surfaced in the warnings modal)
 
@@ -130,11 +155,15 @@ the sheet's `<cols>` accordingly:
    the app awards a flat 3 points / 0 differential. We write the tracker's own
    convention so the file is internally consistent; one caveat line appears whenever
    the tournament has byes.
-2. **Unrepresentable results.** For each match, the exporter predicts the game points
-   the tracker formula will compute from the written soul counts; if that differs from
-   the app's awarded points (forfeits, opponent-forfeit credits, manual point edits),
-   the match is listed in the modal. The soul counts are still exported as recorded.
-3. **Name collisions.** Duplicate participant names get a ` (2)`-style suffix (macro
+2. **Round-trip invariant check.** In this codebase, forfeits are already encoded as
+   soul scores (0 vs `max_score`) and match points are always derived from scores, so
+   the tracker formulas should reproduce the app's points exactly. As a cheap
+   invariant, the exporter still predicts the points the tracker will compute per
+   match and lists any mismatch in the modal; this should near-never fire.
+3. **Staged-round byes.** A bye in a staged-but-not-started round doesn't score in the
+   app yet, but the exported sentinel makes Excel score it immediately; when this
+   applies, a caveat line notes the expected totals difference.
+4. **Name collisions.** Duplicate participant names get a ` (2)`-style suffix (macro
    pairing history is keyed on exact strings); a participant literally named `Bye` is
    renamed `Bye (player)` with a warning. Names are trimmed; the same exact string is
    used in `B` and in every opponent cell.
