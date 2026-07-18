@@ -9082,6 +9082,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
             readOnly={isSpectator}
+            onRequestCardMenu={(card, clientX, clientY) => {
+              setBrowseMyZone(null);
+              setContextMenu({ card, x: clientX, y: clientY });
+            }}
           />
         )}
 

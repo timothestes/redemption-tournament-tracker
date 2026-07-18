@@ -10,6 +10,7 @@ import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
 import { DraggableTitleBar } from './DraggableTitleBar';
 import { compareCardsDefault } from '@/lib/cards/defaultSort';
+import { hasUsableAbilityInZone } from '@/lib/cards/cardAbilities';
 
 const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'hand', label: 'Hand' },
@@ -145,9 +146,15 @@ interface ZoneBrowseModalProps {
   didDragRef?: React.MutableRefObject<boolean>;
   isDragActive?: boolean;
   readOnly?: boolean;
+  /** When provided, right-clicking a card that has a right-click ability usable
+   *  from its current zone (e.g. a Lost Soul "Harvest" in the Land of
+   *  Redemption) defers to the canvas's full card menu — which surfaces the
+   *  ability — instead of this modal's move-only popup. Receives viewport
+   *  coordinates. */
+  onRequestCardMenu?: (card: GameCard, clientX: number, clientY: number) => void;
 }
 
-export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly }: ZoneBrowseModalProps) {
+export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly, onRequestCardMenu }: ZoneBrowseModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck } = actions;
@@ -254,6 +261,15 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     e.preventDefault();
     if (readOnly) return;
     onCardMouseLeave();
+    // A card with a right-click ability usable from this zone (e.g. a Lost Soul
+    // "Harvest" in the Land of Redemption) defers to the canvas's full card
+    // menu so the ability is reachable. Multi-selections keep the batch-move
+    // popup below.
+    const isMultiSelected = selectedIds.has(card.instanceId) && selectedIds.size > 1;
+    if (onRequestCardMenu && !isMultiSelected && hasUsableAbilityInZone(card)) {
+      onRequestCardMenu(card, e.clientX, e.clientY);
+      return;
+    }
     setContextCard({ card, x: e.clientX, y: e.clientY });
     // Re-set the loupe preview so it keeps showing the right-clicked card
     setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek });

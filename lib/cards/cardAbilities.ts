@@ -450,6 +450,24 @@ export function getEffectiveAbilities(card: { cardName: string; imitatingName?: 
   return [...base, ...imitated];
 }
 
+/**
+ * True when `card` has at least one right-click ability activatable from the
+ * zone it currently occupies. Mirrors the per-ability zone gate in
+ * CardContextMenu, but collapsed to "any usable ability". Used by the pile
+ * browse modal to decide whether to surface the full card menu (with ability
+ * options) instead of the move-only popup — e.g. a rescued Lost Soul "Harvest"
+ * sitting in the Land of Redemption.
+ */
+export function hasUsableAbilityInZone(card: {
+  cardName: string;
+  imitatingName?: string;
+  zone: ZoneId;
+}): boolean {
+  return getEffectiveAbilities(card).some((a) =>
+    (a.sourceZones ?? DEFAULT_ABILITY_SOURCE_ZONES).includes(card.zone),
+  );
+}
+
 export function abilityLabel(a: CardAbility): string {
   switch (a.type) {
     case 'spawn_token': {

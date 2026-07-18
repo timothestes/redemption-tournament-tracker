@@ -16,6 +16,7 @@ import {
   isCharacterCard,
   isHeroCard,
   getEffectiveAbilities,
+  hasUsableAbilityInZone,
 } from '../cardAbilities';
 import {
   IMITATE_SOUL_IMAGES as serverImitateImages,
@@ -333,6 +334,43 @@ describe('simplifyLostSoulName', () => {
 
   it('strips "Lost Soul " prefix when neither quoted nor parenthetical exists', () => {
     expect(simplifyLostSoulName('Lost Soul Romans 3:23')).toBe('Romans 3:23');
+  });
+});
+
+describe('hasUsableAbilityInZone', () => {
+  it('true for Lost Soul "Harvest" resting in the Land of Redemption', () => {
+    // spawn_token has no explicit sourceZones → DEFAULT (which includes LoR).
+    expect(hasUsableAbilityInZone({
+      cardName: 'Lost Soul "Harvest" [John 4:35]',
+      zone: 'land-of-redemption',
+    })).toBe(true);
+  });
+
+  it('false for the same soul in a pile zone abilities cannot fire from (reserve)', () => {
+    expect(hasUsableAbilityInZone({
+      cardName: 'Lost Soul "Harvest" [John 4:35]',
+      zone: 'reserve',
+    })).toBe(false);
+  });
+
+  it('false for a card with no registered ability', () => {
+    expect(hasUsableAbilityInZone({
+      cardName: 'Lost Soul Romans 3:23',
+      zone: 'land-of-redemption',
+    })).toBe(false);
+  });
+
+  it('respects explicit sourceZones (Virgin Birth is usable from hand, not reserve)', () => {
+    expect(hasUsableAbilityInZone({ cardName: 'Virgin Birth', zone: 'hand' })).toBe(true);
+    expect(hasUsableAbilityInZone({ cardName: 'Virgin Birth', zone: 'reserve' })).toBe(false);
+  });
+
+  it('sees inherited abilities from an imitated soul (Imitate → Lawless in LoR)', () => {
+    expect(hasUsableAbilityInZone({
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      imitatingName: 'Lost Soul "Lawless" [Hebrews 12:8]',
+      zone: 'land-of-redemption',
+    })).toBe(true);
   });
 });
 
