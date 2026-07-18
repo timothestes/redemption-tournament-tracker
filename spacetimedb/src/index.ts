@@ -6542,18 +6542,23 @@ export const set_note = spacetimedb.reducer(
     const previousNote = card.notes;
     ctx.db.CardInstance.id.update({ ...card, notes: trimmed });
 
+    // The note pill is public, but a face-down or in-hand card's identity is
+    // not — omit it from the log (mirrors flip_card/meek_card).
+    const notePayload: Record<string, string> = {
+      cardInstanceId: cardInstanceId.toString(),
+      note: trimmed,
+      previousNote,
+    };
+    if (!card.isFlipped && card.zone !== 'hand') {
+      notePayload.cardName = card.cardName;
+      notePayload.cardImgFile = card.cardImgFile;
+    }
     logAction(
       ctx,
       gameId,
       player.id,
       'SET_NOTE',
-      JSON.stringify({
-        cardInstanceId: cardInstanceId.toString(),
-        cardName: card.cardName,
-        cardImgFile: card.cardImgFile,
-        note: trimmed,
-        previousNote,
-      }),
+      JSON.stringify(notePayload),
       game.turnNumber,
       game.currentPhase,
     );
