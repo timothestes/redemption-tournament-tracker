@@ -10,6 +10,11 @@ public/tracker/Redemption-Tracker-2.6.v1.xlsm
 
 Until it exists, the export button shows a "template not installed" error.
 
+> **Current template:** converted 2026-07-18 from the pristine Tracker 2.6
+> `.xls` in Microsoft Excel. Verified by
+> `lib/tournament/__tests__/trackerTemplate.integration.test.ts`, which runs
+> the full patch pipeline against this file (and skips if it's absent).
+
 ## One-time conversion checklist (requires real Microsoft Excel)
 
 1. Open the pristine `Redemption-CCG-Tournament-Tracker-2.6.xls` in Excel and
