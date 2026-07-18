@@ -43,6 +43,14 @@ const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemptio
 // secrets), so baking it into the open-source module is safe.
 const FORGE_OWNER_IDENTITY_HEX = 'c200ef2bfc5cef33a94336bbe1a899210d380990823cc5d2a47256b3556f4d12';
 
+// Identity of SPACETIMEDB_SERVER_TOKEN (one token shared by .env.local and
+// Vercel production/preview). Used when ForgeConfig is empty — e.g. right after
+// a --clear republish — so a wipe can't silently break seat auth (the
+// 2026-07-14 PT outage). If the server token is ever rotated, update this
+// constant in the same change; a ForgeConfig row set via
+// set_forge_server_identity overrides it either way.
+const FORGE_SERVER_IDENTITY_HEX_DEFAULT = 'c200c2ac41b9b91c641f0e40c14298b88f16978e456ff232926822af4eeaec63';
+
 const FORGE_AUTH_TTL_MICROS = 600_000_000n; // 10 minutes
 
 function isForgeGame(ctx: any, gameId: bigint): boolean {
@@ -55,7 +63,7 @@ function isForgeGame(ctx: any, gameId: bigint): boolean {
 
 function forgeServerIdentityHex(ctx: any): string {
   const cfg = ctx.db.ForgeConfig.id.find(0n);
-  return cfg ? cfg.serverIdentityHex : '';
+  return cfg ? cfg.serverIdentityHex : FORGE_SERVER_IDENTITY_HEX_DEFAULT;
 }
 
 // Single-use: consumes a fresh seat authorization for (ctx.sender, code).
@@ -885,15 +893,16 @@ export const set_forge_server_identity = spacetimedb.reducer(
   (ctx, { identityHex }) => {
     const senderHex = ctx.sender.toHexString();
     const cfg = ctx.db.ForgeConfig.id.find(0n);
+    // With the baked-in default there is no first-set-wins window: an empty
+    // table means the default identity is in charge, so only it (or the owner)
+    // may set the row.
+    const current = cfg ? cfg.serverIdentityHex : FORGE_SERVER_IDENTITY_HEX_DEFAULT;
+    if (senderHex !== current && senderHex !== FORGE_OWNER_IDENTITY_HEX) {
+      throw new SenderError('Not authorized');
+    }
     if (cfg) {
-      if (senderHex !== cfg.serverIdentityHex && senderHex !== FORGE_OWNER_IDENTITY_HEX) {
-        throw new SenderError('Not authorized');
-      }
       ctx.db.ForgeConfig.id.update({ ...cfg, serverIdentityHex: identityHex });
     } else {
-      // First-set-wins: the deploy procedure calls this immediately after any
-      // publish that reset the DB; the owner override above makes a lost race
-      // recoverable without a republish.
       ctx.db.ForgeConfig.insert({ id: 0n, serverIdentityHex: identityHex });
     }
   }
@@ -6533,18 +6542,23 @@ export const set_note = spacetimedb.reducer(
     const previousNote = card.notes;
     ctx.db.CardInstance.id.update({ ...card, notes: trimmed });
 
+    // The note pill is public, but a face-down or in-hand card's identity is
+    // not — omit it from the log (mirrors flip_card/meek_card).
+    const notePayload: Record<string, string> = {
+      cardInstanceId: cardInstanceId.toString(),
+      note: trimmed,
+      previousNote,
+    };
+    if (!card.isFlipped && card.zone !== 'hand') {
+      notePayload.cardName = card.cardName;
+      notePayload.cardImgFile = card.cardImgFile;
+    }
     logAction(
       ctx,
       gameId,
       player.id,
       'SET_NOTE',
-      JSON.stringify({
-        cardInstanceId: cardInstanceId.toString(),
-        cardName: card.cardName,
-        cardImgFile: card.cardImgFile,
-        note: trimmed,
-        previousNote,
-      }),
+      JSON.stringify(notePayload),
       game.turnNumber,
       game.currentPhase,
     );

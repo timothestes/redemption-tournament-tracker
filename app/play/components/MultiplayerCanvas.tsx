@@ -194,6 +194,19 @@ export function isBattleBandActive(
   return status === 'playing' && (currentPhase === 'battle' || battleState !== '');
 }
 
+/**
+ * Whether a battle card should get the enhancement brigade soft-check. A dual
+ * GE/Character card (e.g. Fire Foxes, "GE/Evil Character") can be played as its
+ * CHARACTER side — a being in the band, not an enhancement on a character — so
+ * the enhancement brigade rule doesn't apply. Exclude anything that is also a
+ * character to avoid false "no matching brigade, discard it" flags. (Downside:
+ * a dual card played AS an enhancement with a mismatched brigade won't be
+ * flagged — acceptable for a soft advisory, since the mode isn't tracked.)
+ */
+export function isBrigadeCheckableEnhancement(cardType: string): boolean {
+  return isBattleEnhancementSegment(cardType) && !isCharacterCard({ cardType });
+}
+
 /** Mirrors battleMath.ts's private isLostSoulLike / the server's
  *  isLostSoulRow (battleStakesLobLostSouls): used client-side to count the
  *  stakes Lost Souls for the Rescue-attempt vs. Battle-challenge header. */
@@ -1325,7 +1338,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [resurrectReq, setResurrectReq] = useState<{ sourceInstanceId: string; abilityIndex: number } | null>(null);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notePopover, setNotePopover] = useState<{
-    cardId: string;
+    cardIds: string[];
     x: number;
     y: number;
     initialValue: string;
@@ -5320,7 +5333,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (battleCardEntries.length === 0) return [] as BattleCardEntry[];
     const result: BattleCardEntry[] = [];
     for (const entry of battleCardEntries) {
-      if (!isBattleEnhancementSegment(entry.like.cardType)) continue;
+      if (!isBrigadeCheckableEnhancement(entry.like.cardType)) continue;
       const side = battleSideOf(entry.like);
       const sameSideCharacters = battleCardEntries
         .filter((e) => e !== entry && battleSideOf(e.like) === side && isCharacterCard({ cardType: e.like.cardType }))
@@ -8441,7 +8454,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           }
           onEditNote={(card) => {
             setNotePopover({
-              cardId: card.instanceId,
+              cardIds: [card.instanceId],
               x: contextMenu.x,
               y: contextMenu.y,
               initialValue: card.notes ?? '',
@@ -8500,18 +8513,33 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             actions={{ ...multiplayerActions, ...(sharedSoulActions ?? {}) }}
             onClose={() => setMultiCardContextMenu(null)}
             onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
+            onEditNotes={(cardIds) => {
+              setNotePopover({
+                cardIds,
+                x: multiCardContextMenu.x,
+                y: multiCardContextMenu.y,
+                initialValue: '',
+              });
+            }}
             zones={allZonesForContextMenu as any}
           />
         );
       })()}
 
-      {notePopover && (
+      {!isSpectator && notePopover && (
         <CardNotePopover
           x={notePopover.x}
           y={notePopover.y}
           initialValue={notePopover.initialValue}
           onSave={(text) => {
-            gameState.setNote(BigInt(notePopover.cardId), text);
+            // Empty text from the multi-card path is a click-away cancel, not a
+            // bulk clear — "Clear All Notes" is the explicit affordance for that.
+            // Single-card keeps the clear-by-emptying flow.
+            if (text !== '' || notePopover.cardIds.length === 1) {
+              for (const id of notePopover.cardIds) {
+                gameState.setNote(BigInt(id), text);
+              }
+            }
             setNotePopover(null);
           }}
           onCancel={() => setNotePopover(null)}

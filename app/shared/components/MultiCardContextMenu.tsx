@@ -28,11 +28,13 @@ interface MultiCardContextMenuProps {
   onClose: () => void;
   onClearSelection: () => void;
   onExchange?: (cardIds: string[]) => void;
+  /** Opens a note editor applying the entered text to every selected card */
+  onEditNotes?: (cardIds: string[]) => void;
   /** Live zone state for resolving selected card data */
   zones?: Record<ZoneId, GameCard[]>;
 }
 
-export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onClearSelection, onExchange, zones }: MultiCardContextMenuProps) {
+export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onClearSelection, onExchange, onEditNotes, zones }: MultiCardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
 
@@ -250,6 +252,44 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
         >
           Flip All Face-Up
         </button>
+      )}
+
+      {onEditNotes && (
+        <>
+          <div style={separatorStyle} />
+          <div style={labelStyle}>Note</div>
+          <button
+            style={itemStyle}
+            onClick={() => doAction(() => {
+              for (const id of selectedIds) actions.setNote(id, 'Negated');
+            })}
+            {...hoverHandlers}
+          >
+            Mark All &ldquo;Negated&rdquo;
+          </button>
+          {/* Captures ids at click time — the popover outlives the menu and any
+              selection clearing (same pattern as Exchange with Deck). */}
+          <button
+            style={itemStyle}
+            onClick={() => { onClose(); onEditNotes(selectedIds); }}
+            {...hoverHandlers}
+          >
+            Add Note to All...
+          </button>
+          {selectedCards.some(c => c.notes) && (
+            <button
+              style={itemStyle}
+              onClick={() => doAction(() => {
+                for (const card of selectedCards) {
+                  if (card.notes) actions.setNote(card.instanceId, '');
+                }
+              })}
+              {...hoverHandlers}
+            >
+              Clear All Notes
+            </button>
+          )}
+        </>
       )}
 
       <div style={separatorStyle} />
