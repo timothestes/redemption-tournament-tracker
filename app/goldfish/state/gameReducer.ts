@@ -121,6 +121,13 @@ function spawnTokenInState(
   // thematically belong in LoB).
   const targetZone: ZoneId = ability.defaultZone ?? 'territory';
 
+  // Whose zone the token lands in. `spawnForOpponent` (Harvest-style souls that
+  // "create a token in an opponent's Land of Bondage") places it in the
+  // opponent's copy of the zone, owned by the opponent side.
+  const tokenOwnerId = ability.spawnForOpponent
+    ? (source.ownerId === 'player1' ? 'player2' : 'player1')
+    : source.ownerId;
+
   // Stagger each token relative to the source's position IF the source is
   // already in territory. Otherwise use a reasonable default near the
   // center-ish area so tokens appear together and visible.
@@ -148,7 +155,7 @@ function spawnTokenInState(
   const occupied: Array<{ x: number; y: number }> =
     targetZone === 'territory'
       ? state.zones[targetZone]
-          .filter(c => c.ownerId === source.ownerId)
+          .filter(c => c.ownerId === tokenOwnerId)
           .map(c => ({ x: Number(c.posX), y: Number(c.posY) }))
           .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
       : [];
@@ -173,7 +180,7 @@ function spawnTokenInState(
     isFlipped: false,
     isToken: true,
     zone: targetZone,
-    ownerId: source.ownerId,
+    ownerId: tokenOwnerId,
     notes: '',
     posX: targetZone === 'territory' ? slots[i].x : undefined,
     posY: targetZone === 'territory' ? slots[i].y : undefined,
