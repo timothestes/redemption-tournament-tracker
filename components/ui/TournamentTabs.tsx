@@ -16,6 +16,7 @@ import { GiCardPickup } from "react-icons/gi";
 import { HiOutlineChartBar } from "react-icons/hi2";
 import { printFinalStandings } from "../../utils/printUtils";
 import { Button } from "./button";
+import ExportTrackerButton from "./ExportTrackerButton";
 import { AuditLogPanel } from "./AuditLogPanel";
 import type { TournamentDecklistRow } from "../../app/tracker/tournaments/actions";
 
@@ -285,16 +286,24 @@ export default function TournamentTabs({
       {tournamentStarted && (
         <Tabs.Item title="Standings" icon={HiOutlineChartBar}>
           <div className="w-full max-w-[800px] mx-auto overflow-x-auto">
-            {tournamentEnded && (
-              <div className="flex justify-end mb-4">
-                <Button
-                  onClick={() => printFinalStandings(participants, tournamentName || "Tournament")}
-                  variant="accent"
-                  size="sm"
-                >
-                  <span className="hidden sm:inline">Print Final Standings</span>
-                  <span className="sm:hidden">Print</span>
-                </Button>
+            {(tournamentEnded || isHost) && (
+              <div className="flex justify-end gap-2 mb-4">
+                {isHost && (
+                  <ExportTrackerButton
+                    tournamentId={tournamentId}
+                    tournamentName={tournamentName || "Tournament"}
+                  />
+                )}
+                {tournamentEnded && (
+                  <Button
+                    onClick={() => printFinalStandings(participants, tournamentName || "Tournament")}
+                    variant="accent"
+                    size="sm"
+                  >
+                    <span className="hidden sm:inline">Print Final Standings</span>
+                    <span className="sm:hidden">Print</span>
+                  </Button>
+                )}
               </div>
             )}
             <StandingsTable
