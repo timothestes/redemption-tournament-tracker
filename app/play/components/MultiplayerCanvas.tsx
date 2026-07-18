@@ -178,6 +178,19 @@ function isBattleEnhancementSegment(cardType: string): boolean {
     .some((s) => s === 'GE' || s === 'EE');
 }
 
+/**
+ * Whether a battle card should get the enhancement brigade soft-check. A dual
+ * GE/Character card (e.g. Fire Foxes, "GE/Evil Character") can be played as its
+ * CHARACTER side — a being in the band, not an enhancement on a character — so
+ * the enhancement brigade rule doesn't apply. Exclude anything that is also a
+ * character to avoid false "no matching brigade, discard it" flags. (Downside:
+ * a dual card played AS an enhancement with a mismatched brigade won't be
+ * flagged — acceptable for a soft advisory, since the mode isn't tracked.)
+ */
+export function isBrigadeCheckableEnhancement(cardType: string): boolean {
+  return isBattleEnhancementSegment(cardType) && !isCharacterCard({ cardType });
+}
+
 /** Mirrors battleMath.ts's private isLostSoulLike / the server's
  *  isLostSoulRow (battleStakesLobLostSouls): used client-side to count the
  *  stakes Lost Souls for the Rescue-attempt vs. Battle-challenge header. */
@@ -5298,7 +5311,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (battleCardEntries.length === 0) return [] as BattleCardEntry[];
     const result: BattleCardEntry[] = [];
     for (const entry of battleCardEntries) {
-      if (!isBattleEnhancementSegment(entry.like.cardType)) continue;
+      if (!isBrigadeCheckableEnhancement(entry.like.cardType)) continue;
       const side = battleSideOf(entry.like);
       const sameSideCharacters = battleCardEntries
         .filter((e) => e !== entry && battleSideOf(e.like) === side && isCharacterCard({ cardType: e.like.cardType }))
