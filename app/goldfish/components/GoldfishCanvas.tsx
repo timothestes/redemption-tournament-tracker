@@ -214,7 +214,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       // (Star) abilities fired from hand — flash the source card so the implicit
       // "reveal from hand" cost is visible (parity with multiplayer behavior).
       if (source && source.zone === 'hand') revealCardInHand(source.instanceId);
-      setPeekState({ cardIds: ids, title });
+      // Bottom/random reveals must not relocate cards to the top on dismiss.
+      setPeekState({ cardIds: ids, title, preserveOnDismiss: position !== 'top' });
     },
     [state.zones, revealCardInHand],
   );
@@ -402,7 +403,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [soulDeckMenu, setSoulDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [browseSoulDeck, setBrowseSoulDeck] = useState(false);
-  const [peekState, setPeekState] = useState<{ cardIds: string[]; title: string; sourceZone?: ZoneId } | null>(null);
+  const [peekState, setPeekState] = useState<{ cardIds: string[]; title: string; sourceZone?: ZoneId; preserveOnDismiss?: boolean } | null>(null);
   const [lookState, setLookState] = useState<{ cardIds: string[]; title: string; sourceZone?: ZoneId } | null>(null);
   const [deckDropPopup, setDeckDropPopup] = useState<{ cardInstanceId: string; x: number; y: number } | null>(null);
   const [soulDeckDropPopup, setSoulDeckDropPopup] = useState<{ cardInstanceId: string; batchIds?: string[]; x: number; y: number } | null>(null);
@@ -1360,7 +1361,9 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         : mode === 'bottom'
           ? `Bottom ${count} of Soul Deck`
           : `Random ${count} from Soul Deck`;
-      setPeekState({ cardIds: ids, title, sourceZone: 'soul-deck' });
+      // Dismissing a soul-deck reveal should leave the soul deck untouched, not
+      // relocate cards to the main deck's top.
+      setPeekState({ cardIds: ids, title, sourceZone: 'soul-deck', preserveOnDismiss: true });
     },
     [state.zones, pickSoulDeckIds],
   );
@@ -2824,7 +2827,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (deck.length === 0) { showGameToast('Deck is empty'); return; }
             const n = Math.min(count, deck.length);
             const ids = deck.slice(-n).map(c => c.instanceId);
-            setPeekState({ cardIds: ids, title: `Bottom ${n} of Deck` });
+            setPeekState({ cardIds: ids, title: `Bottom ${n} of Deck`, preserveOnDismiss: true });
           }}
           onDiscardBottom={(count) => {
             setDeckMenu(null);
@@ -2878,7 +2881,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             }
             const n = Math.min(count, deck.length);
             const ids = shuffled.slice(0, n).map(c => c.instanceId);
-            setPeekState({ cardIds: ids, title: `Random ${n} from Deck` });
+            setPeekState({ cardIds: ids, title: `Random ${n} from Deck`, preserveOnDismiss: true });
           }}
           onDiscardRandom={(count) => {
             setDeckMenu(null);
@@ -2986,6 +2989,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
             sourceZone={peekState.sourceZone}
+            preserveOnDismiss={peekState.preserveOnDismiss}
           />
         )}
 
