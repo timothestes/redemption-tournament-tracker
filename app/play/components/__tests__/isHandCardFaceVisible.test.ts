@@ -18,6 +18,7 @@ import {
   isHandCardFaceVisible,
   isFaceDownInPlayCardVisible,
   canViewerToggleMeek,
+  isBattleBandActive,
   isBrigadeCheckableEnhancement,
 } from '../MultiplayerCanvas';
 
@@ -280,6 +281,34 @@ describe('canViewerToggleMeek', () => {
 
   it('forbids a spectator (read-only)', () => {
     expect(canViewerToggleMeek('spectator')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isBattleBandActive — the Field of Battle band only opens during a live game.
+// A concede mid-battle flips status to 'finished' without clearing the phase or
+// battleState, so the status gate is what closes the band.
+// ---------------------------------------------------------------------------
+
+describe('isBattleBandActive', () => {
+  it('open while playing and in the battle phase', () => {
+    expect(isBattleBandActive('playing', 'battle', '')).toBe(true);
+  });
+
+  it('open while playing and a battle is resolving (battleState set, phase moved on)', () => {
+    expect(isBattleBandActive('playing', 'main', 'awaiting-soul')).toBe(true);
+  });
+
+  it('closed while playing with no battle', () => {
+    expect(isBattleBandActive('playing', 'main', '')).toBe(false);
+  });
+
+  it('closed once finished even if phase/battleState were never cleared (concede mid-battle)', () => {
+    expect(isBattleBandActive('finished', 'battle', 'active')).toBe(false);
+  });
+
+  it('closed while waiting (pre-game)', () => {
+    expect(isBattleBandActive('waiting', 'battle', 'active')).toBe(false);
   });
 });
 
