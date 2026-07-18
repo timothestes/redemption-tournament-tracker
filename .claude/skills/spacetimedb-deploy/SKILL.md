@@ -59,8 +59,42 @@ echo "y" | spacetime publish redemption-multiplayer --clear-database -y --module
 echo "y" | spacetime publish redemption-multiplayer-dev --clear-database -y --module-path "$(pwd)/spacetimedb" --no-config --server maincloud
 ```
 
+⚠️ **After every `--clear` publish, run the step-1b verification** — `--clear`
+wipes `forge_config` (this silently broke all Forge/PT games on 2026-07-14 with
+"Could not authorize your seat — try again"; the module now carries a baked-in
+default identity so seat auth survives the wipe, but verify anyway).
+
 **Default behavior:** Publish to **both** production and dev databases unless the
 user specifies one. Always publish dev first to catch migration issues early.
+
+### 1b. After ANY `--clear` publish: verify Forge seat auth
+
+`--clear` wipes `forge_config` (the trusted-server-identity singleton). The module
+falls back to `FORGE_SERVER_IDENTITY_HEX_DEFAULT` (in `spacetimedb/src/index.ts`)
+when the row is absent, so seat auth keeps working — **as long as that constant
+matches the live `SPACETIMEDB_SERVER_TOKEN`**. There is ONE token everywhere:
+Vercel production/preview holds a copy of `.env.local`'s token (identity
+`c200c2ac41b9b91c641f0e40c14298b88f16978e456ff232926822af4eeaec63`).
+
+Verify after a `--clear` (dev needs `--no-config --server maincloud` —
+`spacetime.json` otherwise mangles the db name into a SQL parser error):
+
+```bash
+spacetime sql redemption-multiplayer "SELECT * FROM forge_config"   # empty = default identity in charge (fine)
+spacetime logs redemption-multiplayer | grep "forge_authorize_seat" | tail -5   # no fresh "Not authorized"
+```
+
+**If the server token is rotated:** update `FORGE_SERVER_IDENTITY_HEX_DEFAULT` in
+the module (republish) AND set the row at runtime. Derive the hex from the token's
+JWT payload (`hex_identity` claim):
+
+```bash
+python3 -c "import base64,json;p=input('token: ').split('.')[1];print(json.loads(base64.urlsafe_b64decode(p+'='*(-len(p)%4)))['hex_identity'])"
+# Arg is a bare JSON string, NOT a JSON array (array form fails with
+# "trailing characters" on CLI v2.3.0). Owner CLI is always authorized.
+spacetime call redemption-multiplayer set_forge_server_identity '"<new-identity-hex>"'
+spacetime call --no-config --server maincloud redemption-multiplayer-dev set_forge_server_identity '"<new-identity-hex>"'
+```
 
 ### 2. Regenerate client bindings
 ```bash
@@ -98,3 +132,4 @@ npx tsc --noEmit 2>&1 | head -10
 | `Adding a column X requires a default value` | Existing rows can't auto-migrate with new column | Use `--clear-database -y` to wipe and republish, or add `.default()` to schema column |
 | `No database target matches 'X'` | `spacetime.json` restricts to a single db name | Use `--no-config --server maincloud` with absolute `--module-path` |
 | BSATN `RangeError: Tried to read N byte(s)` | Client bindings don't match deployed module schema | Republish the correct database (check `NEXT_PUBLIC_SPACETIMEDB_DB_NAME` in `.env.local`) + regenerate bindings |
+| PT games: "Could not authorize your seat — try again" / `forge_authorize_seat: Not authorized` in `spacetime logs` | Server identity mismatch: `forge_config` row (or the baked-in default when empty) doesn't match the live `SPACETIMEDB_SERVER_TOKEN` — e.g. token rotated, or a stale pre-fallback module | Run step 1b (verify, and `set_forge_server_identity` with the token's real identity) |
