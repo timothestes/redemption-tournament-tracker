@@ -152,9 +152,17 @@ interface DeckPeekModalProps {
   isPrivateLook?: boolean;
   /** Zone to look up peeked cards in. Defaults to 'deck'. */
   sourceZone?: ZoneId;
+  /**
+   * When true, dismissing the modal (X / Escape / click-away) leaves the deck
+   * order untouched instead of returning the revealed cards to the top. Callers
+   * that reveal from the bottom or a random position pass this so a revealed
+   * bottom card isn't silently relocated to the top (and drawn next). The
+   * explicit footer buttons still reorder.
+   */
+  preserveOnDismiss?: boolean;
 }
 
-export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, isPrivateLook, sourceZone = 'deck' }: DeckPeekModalProps) {
+export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, isPrivateLook, sourceZone = 'deck', preserveOnDismiss = false }: DeckPeekModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, shuffleCardIntoDeck } = actions;
@@ -266,13 +274,22 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     onClose();
   };
 
+  // Dismissing without an explicit choice (X / Escape / click-away). For a
+  // bottom or random reveal, returning cards to the top would relocate the
+  // revealed bottom card and cause it to be drawn next — so those callers pass
+  // preserveOnDismiss to leave the deck untouched.
+  const handleDismiss = () => {
+    if (preserveOnDismiss) { onClose?.(); return; }
+    handleCloseAction('top');
+  };
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (selectedIds.size > 0) {
           setSelectedIds(new Set());
         } else {
-          handleCloseAction('top');
+          handleDismiss();
         }
       }
     };
@@ -294,7 +311,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     const handleMouseDown = (e: MouseEvent) => {
       if (isInside(e.target)) return;
       if (e.button === 0 && readyForClose && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
-        handleCloseAction('top');
+        handleDismiss();
       }
     };
     const handleContextMenu = (e: MouseEvent) => {
@@ -461,7 +478,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
         <DraggableTitleBar
           dragHandleProps={dragHandleProps}
           title={title}
-          onClose={onClose ? () => handleCloseAction('top') : undefined}
+          onClose={onClose ? handleDismiss : undefined}
         >
           {selectedIds.size > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
