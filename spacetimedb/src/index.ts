@@ -3977,13 +3977,25 @@ function spawnTokenImpl(
   // visible main play area. Registry can override via ability.defaultZone.
   const targetZone = ability.defaultZone ?? 'territory';
 
-  // Compute starting zoneIndex based on existing cards for (targetZone, ownerId).
+  // Whose zone the token lands in. `spawnForOpponent` (Harvest-style souls that
+  // "create a token in an opponent's Land of Bondage") places it in the
+  // opponent's copy of the zone, owned by the opponent. Falls back to the
+  // caster if no opponent row exists.
+  let tokenOwnerId = source.ownerId;
+  if (ability.spawnForOpponent) {
+    const opponent = [...ctx.db.Player.player_game_id.filter(gameId)].find(
+      (p: any) => p.id !== source.ownerId,
+    );
+    if (opponent) tokenOwnerId = opponent.id;
+  }
+
+  // Compute starting zoneIndex based on existing cards for (targetZone, tokenOwnerId).
   // In the same pass, collect occupied territory positions so spawned tokens
   // can cascade past them instead of stacking invisibly on a previous batch.
   let maxIdx = -1n;
   const occupied: Array<{ x: number; y: number }> = [];
   for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
-    if (c.ownerId === source.ownerId && c.zone === targetZone) {
+    if (c.ownerId === tokenOwnerId && c.zone === targetZone) {
       if (c.zoneIndex > maxIdx) maxIdx = c.zoneIndex;
       const x = c.posX ? Number(c.posX) : NaN;
       const y = c.posY ? Number(c.posY) : NaN;
@@ -4018,8 +4030,8 @@ function spawnTokenImpl(
     ctx.db.CardInstance.insert({
       id: 0n,
       gameId,
-      ownerId: source.ownerId,
-      originalOwnerId: source.ownerId,
+      ownerId: tokenOwnerId,
+      originalOwnerId: tokenOwnerId,
       zone: targetZone,
       zoneIndex: maxIdx,
       posX,

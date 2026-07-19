@@ -25,7 +25,10 @@ export type CardAbility = AbilityBase & (
   // spawning `tokenName` (count-based: 0→first, 1→second, …). Everyone else
   // gets the normal `tokenName`. The cycle index is derived from how many of
   // those tokens the player already has in play, so no extra state is stored.
-  | { type: 'spawn_token'; tokenName: string; count?: number; defaultZone?: ZoneId; cyclingTokenNames?: string[]; cyclingAllowedUsers?: string[] }
+  // `spawnForOpponent` places the token(s) in the OPPONENT's copy of
+  // `defaultZone` (owned by the opponent) instead of the caster's — e.g. Lost
+  // Soul "Harvest" creates its token in an opponent's Land of Bondage.
+  | { type: 'spawn_token'; tokenName: string; count?: number; defaultZone?: ZoneId; spawnForOpponent?: boolean; cyclingTokenNames?: string[]; cyclingAllowedUsers?: string[] }
   | { type: 'shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'all_players_shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
@@ -77,8 +80,8 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'The Heavenly Host (GoC)':                             [{ type: 'spawn_token', tokenName: 'Heavenly Host Token', cyclingTokenNames: ['Heavenly Host Token (Blue)', 'Heavenly Host Token (Purple)', 'Heavenly Host Token (Silver)'], cyclingAllowedUsers: ['jaychambers'] }],
   'Kingdom of the Divine':                               [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
   'Kingdom of the Divine [T2C AB]':                      [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
-  'Lost Soul "Harvest" [John 4:35]':                     [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
-  'Lost Soul "Harvest" [John 4:35] [2023 - 2nd Place]':  [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
+  'Lost Soul "Harvest" [John 4:35]':                     [{ type: 'spawn_token', tokenName: 'Harvest Soul Token', defaultZone: 'land-of-bondage', spawnForOpponent: true }],
+  'Lost Soul "Harvest" [John 4:35] [2023 - 2nd Place]':  [{ type: 'spawn_token', tokenName: 'Harvest Soul Token', defaultZone: 'land-of-bondage', spawnForOpponent: true }],
   'Lost Soul "Imitate" [III John 1:11]':                 [{ type: 'imitate_lost_soul' }],
   'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]':     [{ type: 'imitate_lost_soul' }],
   'Lost Soul "The First" [Luke 13:30]':                  [{ type: 'draw_and_topdeck_self' }],
@@ -448,6 +451,24 @@ export function getEffectiveAbilities(card: { cardName: string; imitatingName?: 
   if (!card.imitatingName) return base;
   const imitated = getAbilitiesForCard(card.imitatingName).filter(a => a.type !== 'imitate_lost_soul');
   return [...base, ...imitated];
+}
+
+/**
+ * True when `card` has at least one right-click ability activatable from the
+ * zone it currently occupies. Mirrors the per-ability zone gate in
+ * CardContextMenu, but collapsed to "any usable ability". Used by the pile
+ * browse modal to decide whether to surface the full card menu (with ability
+ * options) instead of the move-only popup — e.g. a rescued Lost Soul "Harvest"
+ * sitting in the Land of Redemption.
+ */
+export function hasUsableAbilityInZone(card: {
+  cardName: string;
+  imitatingName?: string;
+  zone: ZoneId;
+}): boolean {
+  return getEffectiveAbilities(card).some((a) =>
+    (a.sourceZones ?? DEFAULT_ABILITY_SOURCE_ZONES).includes(card.zone),
+  );
 }
 
 export function abilityLabel(a: CardAbility): string {

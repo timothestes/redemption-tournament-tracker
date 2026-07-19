@@ -2954,6 +2954,15 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+            onRequestCardMenu={(card, clientX, clientY) => {
+              const container = stageRef.current?.container().getBoundingClientRect();
+              setBrowseZone(null);
+              setContextMenu({
+                card,
+                x: clientX - (container?.left ?? 0),
+                y: clientY - (container?.top ?? 0),
+              });
+            }}
           />
         )}
 
