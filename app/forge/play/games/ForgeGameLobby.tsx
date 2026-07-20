@@ -1,8 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { useTable } from "spacetimedb/react";
+import { Button } from "@/components/ui/button";
 import { tables } from "@/lib/spacetimedb/module_bindings";
 import { useSpacetimeConnection } from "@/app/play/hooks/useSpacetimeConnection";
 import { SpacetimeProvider } from "@/app/play/lib/spacetimedb-provider";
@@ -16,6 +19,7 @@ function LobbyInner({ decks, sharedDecks, displayName, userId, initialJoinCode }
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(decks[0]?.id ?? sharedDecks[0]?.id ?? null);
   const [joinCode, setJoinCode] = useState(initialJoinCode ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   // Selection resolves across both your decks and shared decks; stash() only
   // needs id/name/format, which both summary shapes carry.
   const selected =
@@ -53,6 +57,7 @@ function LobbyInner({ decks, sharedDecks, displayName, userId, initialJoinCode }
   function handleCreate() {
     const code = Math.random().toString(36).slice(2, 6).toUpperCase();
     if (!stash(code, "create")) return;
+    setIsCreating(true);
     router.push(`/play/${code}`);
   }
 
@@ -80,7 +85,16 @@ function LobbyInner({ decks, sharedDecks, displayName, userId, initialJoinCode }
       <section className="space-y-2">
         <h2 className="text-sm font-medium">Deck</h2>
         {decks.length === 0 && sharedDecks.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No Forge decks yet — build one first.</p>
+          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            No Forge decks yet.{" "}
+            <Link
+              href="/forge/play/decks/new"
+              className="font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              Build one
+            </Link>{" "}
+            to start playtesting.
+          </div>
         ) : (
           <ForgeDeckPicker
             decks={decks}
@@ -91,10 +105,20 @@ function LobbyInner({ decks, sharedDecks, displayName, userId, initialJoinCode }
         )}
       </section>
       <section className="grid gap-3 sm:grid-cols-2">
-        <button onClick={handleCreate} disabled={!selected} className="rounded-lg border p-4 text-left hover:bg-muted/50 disabled:opacity-50 [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
+        <div className="flex flex-col gap-2 rounded-lg border p-4 [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
           <div className="font-medium">Host a game</div>
           <div className="text-sm text-muted-foreground">Get a code to share with another playtester.</div>
-        </button>
+          <Button onClick={handleCreate} disabled={!selected || isCreating} className="mt-1 w-full">
+            {isCreating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading deck…
+              </>
+            ) : (
+              "Create game"
+            )}
+          </Button>
+        </div>
         <div className="rounded-lg border p-4 [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
           <div className="font-medium">Join by code</div>
           <div className="mt-2 flex gap-2">
@@ -105,7 +129,14 @@ function LobbyInner({ decks, sharedDecks, displayName, userId, initialJoinCode }
               placeholder="CODE"
               className="w-24 rounded-md border bg-background p-2 text-sm uppercase tracking-widest"
             />
-            <button onClick={() => handleJoin(joinCode)} disabled={!selected || joinCode.trim().length !== 4} className="rounded-md border px-3 text-sm hover:bg-muted/50 disabled:opacity-50">Join</button>
+            <Button
+              variant="outline"
+              onClick={() => handleJoin(joinCode)}
+              disabled={!selected || joinCode.trim().length !== 4}
+              className="h-10 shrink-0 px-4"
+            >
+              Join
+            </Button>
           </div>
         </div>
       </section>
@@ -114,14 +145,16 @@ function LobbyInner({ decks, sharedDecks, displayName, userId, initialJoinCode }
         {openGames.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nobody is waiting right now.</p>
         ) : (
-          <ul className="divide-y rounded-lg border [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
+          <ul className="max-w-md divide-y rounded-lg border [.jayden_&]:bg-card/80 [.jayden_&]:backdrop-blur-sm [.jayden_&]:border-primary/20">
             {openGames.map((g) => (
               <li key={String(g.id)} className="flex items-center justify-between gap-2 p-3">
                 <div>
                   <div className="text-sm font-medium">{g.createdByName || "Playtester"}</div>
                   <div className="text-xs text-muted-foreground">{g.format} · code {g.code}</div>
                 </div>
-                <button onClick={() => handleJoin(g.code)} disabled={!selected} className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted/50 disabled:opacity-50">Join</button>
+                <Button variant="outline" size="sm" onClick={() => handleJoin(g.code)} disabled={!selected}>
+                  Join
+                </Button>
               </li>
             ))}
           </ul>
