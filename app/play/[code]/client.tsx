@@ -1278,7 +1278,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   fontSize: 13,
                   lineHeight: 1.5,
                 }}>
-                  Swap your game deck to <strong>{practiceDeckConfirm.deckName}</strong>?
+                  Change your game deck to <strong>{practiceDeckConfirm.deckName}</strong>?
                   <br />
                   <span style={{ fontSize: 11, color: 'rgba(196, 149, 90, 0.7)' }}>
                     Your practice game will reset and your opponent will see the new deck once they join.
@@ -1339,7 +1339,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                       fontWeight: 600,
                     }}
                   >
-                    Swap Deck
+                    Change deck
                   </button>
                 </div>
               </div>
