@@ -31,26 +31,36 @@ interface GameOverOverlayProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function deriveEndReason(gameActions: any[], myPlayer: any): { label: string; winnerName: string } {
+function deriveEndReason(
+  gameActions: any[],
+  myPlayer: any,
+): { label: string; winnerName: string; outcome: 'won' | 'lost' | 'ended' } {
   for (let i = gameActions.length - 1; i >= 0; i--) {
     const action = gameActions[i];
     const actionType: string = (action.actionType ?? '').toUpperCase();
 
+    if (actionType === 'WIN') {
+      const winnerId = action.playerId ?? action.actorId;
+      const iWon = myPlayer?.id !== undefined && winnerId === myPlayer.id;
+      return iWon
+        ? { label: 'You won', winnerName: myPlayer?.displayName ?? 'You', outcome: 'won' }
+        : { label: 'You lost', winnerName: '', outcome: 'lost' };
+    }
+
     if (actionType === 'RESIGN') {
       const actorId = action.playerId ?? action.actorId;
-      const myId = myPlayer?.id;
-      if (myId !== undefined && actorId !== undefined && actorId === myId) {
-        return { label: 'You resigned', winnerName: '' };
-      }
-      return { label: 'Opponent resigned', winnerName: myPlayer?.displayName ?? 'You' };
+      const iResigned = myPlayer?.id !== undefined && actorId === myPlayer.id;
+      return iResigned
+        ? { label: 'You resigned', winnerName: '', outcome: 'lost' }
+        : { label: 'Opponent resigned', winnerName: myPlayer?.displayName ?? 'You', outcome: 'won' };
     }
 
     if (actionType === 'TIMEOUT') {
-      return { label: 'Opponent disconnected', winnerName: myPlayer?.displayName ?? 'You' };
+      return { label: 'Opponent disconnected', winnerName: myPlayer?.displayName ?? 'You', outcome: 'won' };
     }
   }
 
-  return { label: 'Game ended', winnerName: '' };
+  return { label: 'Game ended', winnerName: '', outcome: 'ended' };
 }
 
 // ---------------------------------------------------------------------------
@@ -69,14 +79,13 @@ export default function GameOverOverlay({
   myDeckId,
 }: GameOverOverlayProps) {
   const { isLoupeVisible } = useCardPreview();
-  const { label, winnerName } = deriveEndReason(gameActions, myPlayer);
+  const { label, outcome } = deriveEndReason(gameActions, myPlayer);
   const oppName: string = opponentPlayer?.displayName ?? 'Opponent';
   const mySeat = myPlayer?.seat?.toString() ?? '0';
 
-  // Determine if the game ended because of opponent action (resign/disconnect)
-  const isOpponentResigned = label === 'Opponent resigned';
-  const isOpponentDisconnected = label === 'Opponent disconnected';
-  const isOpponentLeft = isOpponentResigned || isOpponentDisconnected;
+  // Both players get a persistent result screen — winner and loser alike.
+  const didWin = outcome === 'won';
+  const showResultModal = didWin || outcome === 'lost';
 
   // Rematch state from game (derived before effects that use it)
   const rematchRequestedBy = game?.rematchRequestedBy ?? '';
@@ -89,12 +98,13 @@ export default function GameOverOverlay({
   // Modal dismissed state
   const [modalDismissed, setModalDismissed] = useState(false);
 
-  // Auto-dismiss toast after 4 seconds (only when not showing modal)
+  // Auto-dismiss toast after 4 seconds — only the generic "Game ended"
+  // fallback uses a toast; wins and losses use the persistent modal.
   useEffect(() => {
-    if (isOpponentLeft) return;
+    if (outcome !== 'ended') return;
     const timer = setTimeout(() => setToastVisible(false), 4000);
     return () => clearTimeout(timer);
-  }, [isOpponentLeft]);
+  }, [outcome]);
 
   // Open deck picker when Play Again is triggered from TurnIndicator. Forge
   // games skip the picker entirely — the same authorized deck is reused.
@@ -168,12 +178,12 @@ export default function GameOverOverlay({
 
   return (
     <>
-      {/* Opponent left/resigned — blocking modal */}
-      {isOpponentLeft && !modalDismissed && (
-        <OpponentLeftModal
-          isOpponentResigned={isOpponentResigned}
-          oppName={oppName}
+      {/* Persistent result modal — both winner and loser get one */}
+      {showResultModal && !modalDismissed && (
+        <GameOverModal
+          didWin={didWin}
           label={label}
+          oppName={oppName}
           isLoupeVisible={isLoupeVisible}
           onPlayAgain={() => {
             setModalDismissed(true);
@@ -188,8 +198,8 @@ export default function GameOverOverlay({
         />
       )}
 
-      {/* Temporary toast — auto-dismisses (for self-resign / generic end) */}
-      {!isOpponentLeft && toastVisible && (() => {
+      {/* Temporary toast — auto-dismisses (generic/unknown end only) */}
+      {outcome === 'ended' && toastVisible && (() => {
         const isWin = label === 'Opponent resigned' || label === 'Opponent disconnected';
         const isLoss = label === 'You resigned';
         const accent = isWin
@@ -308,21 +318,22 @@ export default function GameOverOverlay({
 // ---------------------------------------------------------------------------
 
 /**
- * Blocking modal shown when the opponent resigns/disconnects. Dismiss is the
+ * Persistent blocking result modal shown to BOTH players when the game ends —
+ * a win or a loss (rescue win, resign, or disconnect). Dismiss is the
  * affirmative default (Enter); Escape also dismisses. Highest priority so it
  * wins the keyboard over any lingering banner.
  */
-function OpponentLeftModal({
-  isOpponentResigned,
-  oppName,
+function GameOverModal({
+  didWin,
   label,
+  oppName,
   isLoupeVisible,
   onPlayAgain,
   onDismiss,
 }: {
-  isOpponentResigned: boolean;
-  oppName: string;
+  didWin: boolean;
   label: string;
+  oppName: string;
   isLoupeVisible: boolean;
   onPlayAgain: () => void;
   onDismiss: () => void;
@@ -337,6 +348,24 @@ function OpponentLeftModal({
 
   const playAgainFocused = focusedIndex === 0;
   const dismissFocused = focusedIndex === 1;
+
+  const eyebrow = didWin ? 'Victory' : 'Defeat';
+  const title = didWin
+    ? (label === 'Opponent resigned'
+        ? `${oppName} Conceded`
+        : label === 'Opponent disconnected'
+          ? `${oppName} Left`
+          : 'You Won')
+    : (label === 'You resigned' ? 'You Resigned' : 'You Lost');
+  const subtitle = didWin
+    ? (label === 'Opponent resigned'
+        ? 'Your opponent has surrendered the game.'
+        : label === 'Opponent disconnected'
+          ? 'Your opponent has left the game.'
+          : 'You rescued enough Lost Souls to win.')
+    : (label === 'You resigned'
+        ? 'You surrendered the game.'
+        : 'Your opponent rescued enough Lost Souls to win.');
 
   return (
     <div
@@ -354,7 +383,7 @@ function OpponentLeftModal({
     >
       <div style={{
         background: 'rgba(14, 10, 6, 0.97)',
-        border: `1px solid ${isOpponentResigned ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
+        border: `1px solid ${didWin ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
         borderRadius: 10,
         padding: '32px 36px',
         textAlign: 'center',
@@ -367,8 +396,8 @@ function OpponentLeftModal({
           fontSize: 10,
           letterSpacing: '0.18em',
           textTransform: 'uppercase',
-          color: isOpponentResigned ? 'rgba(196, 149, 90, 0.7)' : 'rgba(196, 149, 90, 0.5)',
-        }}>{isOpponentResigned ? 'Victory' : 'Game Over'}</p>
+          color: didWin ? 'rgba(196, 149, 90, 0.7)' : 'rgba(196, 149, 90, 0.5)',
+        }}>{eyebrow}</p>
         <h2 style={{
           fontFamily: 'var(--font-cinzel), Georgia, serif',
           fontSize: 18,
@@ -376,13 +405,13 @@ function OpponentLeftModal({
           color: '#e8d5a3',
           marginTop: 8,
           textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-        }}>{isOpponentResigned ? `${oppName} Conceded` : label}</h2>
+        }}>{title}</h2>
         <p style={{
           marginTop: 8,
           fontFamily: 'Georgia, serif',
           fontSize: 13,
           color: 'rgba(196, 149, 90, 0.5)',
-        }}>{isOpponentResigned ? 'Your opponent has surrendered the game.' : 'The game has ended.'}</p>
+        }}>{subtitle}</p>
 
         <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
           <button
