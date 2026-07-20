@@ -928,6 +928,41 @@ export function checkBannedCards(
   return issues;
 }
 
+// ---------------------------------------------------------------------------
+// TEMPORARY: Roots 2 legality gate
+// ---------------------------------------------------------------------------
+
+// Roots 2 set markers: set code "RR2" (carddata column 2) and the official
+// set name, matched case-insensitively against ResolvedCard.set.
+const ROOTS_2_SETS = new Set(["rr2", "roots 2"]);
+
+/**
+ * Rule: roots2-not-yet-legal — Roots 2 cards are not yet tournament legal.
+ *
+ * TEMPORARY: remove this function, its call in each validate*Rules entry
+ * point, and its tests once Roots 2 becomes tournament legal.
+ */
+export function checkRoots2NotYetLegal(
+  mainDeckCards: ResolvedCard[],
+  reserveCards: ResolvedCard[]
+): DeckCheckIssue[] {
+  const issues: DeckCheckIssue[] = [];
+
+  for (const card of [...mainDeckCards, ...reserveCards]) {
+    if (card.quantity === 0) continue;
+    if (ROOTS_2_SETS.has(card.set.toLowerCase())) {
+      issues.push({
+        type: "error",
+        rule: "roots2-not-yet-legal",
+        message: `"${card.name}" is from Roots 2, which is not yet tournament legal.`,
+        cards: [card.name],
+      });
+    }
+  }
+
+  return issues;
+}
+
 /**
  * Helper: check if a card matches one of the special exception cards.
  */
@@ -1063,6 +1098,9 @@ export function validateT1Rules(
   // Banned cards
   issues.push(...checkBannedCards(mainDeckCards, reserveCards));
 
+  // TEMPORARY: Roots 2 not yet tournament legal
+  issues.push(...checkRoots2NotYetLegal(mainDeckCards, reserveCards));
+
   // Special card exceptions
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
 
@@ -1144,6 +1182,9 @@ export function validateParagonRules(
 
   // Banned cards
   issues.push(...checkBannedCards(mainDeckCards, reserveCards));
+
+  // TEMPORARY: Roots 2 not yet tournament legal
+  issues.push(...checkRoots2NotYetLegal(mainDeckCards, reserveCards));
 
   // Special card exceptions
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
@@ -1628,6 +1669,9 @@ export function validateT2Rules(
   issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
   issues.push(...checkBannedCards(mainDeckCards, reserveCards));
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
+
+  // TEMPORARY: Roots 2 not yet tournament legal
+  issues.push(...checkRoots2NotYetLegal(mainDeckCards, reserveCards));
 
   // Character alias checks (dual-alignment characters with different names)
   issues.push(
