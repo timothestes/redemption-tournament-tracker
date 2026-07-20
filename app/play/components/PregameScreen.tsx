@@ -49,6 +49,26 @@ function OpponentDisconnectBanner({ connectionStatus }: { connectionStatus: 'con
 }
 
 // ---------------------------------------------------------------------------
+// OpponentJoinedToast — brief host-side beat when the ceremony starts, so the
+// jump out of the waiting room / practice mode isn't a cold cut (WS-3 §3).
+// ---------------------------------------------------------------------------
+
+export function OpponentJoinedToast({ name }: { name: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="absolute top-16 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-amber-200/20 bg-black/85 backdrop-blur-sm px-4 py-2.5 pointer-events-none"
+    >
+      <p className="font-cinzel text-sm text-amber-200/90 tracking-wide whitespace-nowrap">
+        ⚔️ {name} joined — rolling for first player…
+      </p>
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 

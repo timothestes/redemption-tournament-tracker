@@ -26,7 +26,7 @@ import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
 import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext';
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
-import PregameScreen, { PregameCeremonyOverlay } from '../components/PregameScreen';
+import PregameScreen, { PregameCeremonyOverlay, OpponentJoinedToast } from '../components/PregameScreen';
 import { ImageLoadingGate } from '../components/ImageLoadingGate';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerImagePreloader';
@@ -185,6 +185,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [formatMismatch, setFormatMismatch] = useState<{ host: string; joiner: string } | null>(null);
   const [isSelfJoin, setIsSelfJoin] = useState(false);
   const [isPracticing, setIsPracticing] = useState(false);
+  // WS-3 §3: transient "{name} joined" toast for the host when the opponent's
+  // join yanks them out of the waiting room (or practice) into the ceremony.
+  const JOINED_TOAST_MS = 2500;
+  const [justJoinedToast, setJustJoinedToast] = useState<string | null>(null);
   // Guards against a visual flash: once the user chooses to leave, we freeze the
   // render on a transition overlay so that subsequent SpacetimeDB state updates
   // (which re-derive `lifecycle` and can fall through to the game canvas) can't
@@ -917,6 +921,30 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const gameStateRef = useRef(gameState);
   gameStateRef.current = gameState;
 
+  // WS-3 §3: the host was in the waiting room (possibly practicing) and the
+  // opponent's join moves the game straight into the roll ceremony — announce
+  // it. Reading the opponent name via gameStateRef (not a dep) is deliberate:
+  // gameState is a fresh object every render, and this must fire once per
+  // lifecycle change only. Joiners (prev 'joining') initiated the join;
+  // rematches (prev 'finished') and refreshes (prev 'creating') aren't a join.
+  const prevLifecycleForToastRef = useRef<LifecycleState>('creating');
+  useEffect(() => {
+    const prev = prevLifecycleForToastRef.current;
+    prevLifecycleForToastRef.current = lifecycle;
+    if (lifecycle === 'pregame' && prev === 'waiting') {
+      setIsPracticing(false);
+      setJustJoinedToast(gameStateRef.current.opponentPlayer?.displayName || 'Opponent');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lifecycle]);
+
+  useEffect(() => {
+    if (!justJoinedToast) return;
+    const timer = setTimeout(() => setJustJoinedToast(null), JOINED_TOAST_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justJoinedToast]);
+
   // Track whether the page is being unloaded (refresh / tab close) so we can
   // skip the synchronous leave_game on unmount in that case. Refreshes fire
   // React's useEffect cleanup BEFORE the page tears down, and calling
@@ -1437,6 +1465,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
+            {justJoinedToast && <OpponentJoinedToast name={justJoinedToast} />}
             {/* Suppress the load gate during the pregame ceremony — its 30s
                 choose-first timer is server-anchored and ticks regardless of
                 client preloading, so we don't want a full-screen loader
