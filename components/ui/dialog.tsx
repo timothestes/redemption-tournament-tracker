@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -37,8 +38,14 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
   }, [open]);
 
   if (!open) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
+  // Portal to <body>: an ancestor with transform/filter/backdrop-filter (e.g.
+  // the pregame panel's backdrop-blur) becomes the containing block for fixed
+  // descendants, which would confine the overlay to that ancestor's box —
+  // clicks outside it never reach the overlay, so outside-click dismissal
+  // silently breaks. Rendering from <body> keeps inset-0 viewport-sized.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={handleClose}
@@ -46,7 +53,8 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
       aria-modal="true"
     >
       {children}
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface MobileDrawerProps {
@@ -20,7 +21,12 @@ export function MobileDrawer({ isOpen, onClose, children, title }: MobileDrawerP
     }
   }, [isOpen]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  // Portal to <body> so an ancestor with transform/filter/backdrop-filter
+  // can't become the containing block for the fixed backdrop/sheet and
+  // confine them to its own box (breaking backdrop-tap dismissal).
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -63,6 +69,7 @@ export function MobileDrawer({ isOpen, onClose, children, title }: MobileDrawerP
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
