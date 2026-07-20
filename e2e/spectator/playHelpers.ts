@@ -47,20 +47,12 @@ export async function joinGame(page: Page, code: string) {
 }
 
 /**
- * Drive both players from the waiting/pregame state into `playing`:
- *  - both "Ready up" (deck_select)
+ * Drive both players from the pregame ceremony into `playing`:
  *  - the roll winner clicks "I'll go first" (the loser auto-acks; the reveal
  *    auto-acks) — both pages attempt it, only the winner's button exists.
  * Resolves once both player pages have left the pregame UI (board mounted).
  */
 export async function bothReachPlaying(host: Page, joiner: Page) {
-  // deck_select — ready up if offered (button may read "Loading cards…" first,
-  // and readiness can auto-resolve before we get here).
-  for (const p of [host, joiner]) {
-    try {
-      await p.getByRole("button", { name: /ready up/i }).click({ timeout: 20_000 });
-    } catch { /* already past deck_select */ }
-  }
   // choosing — the roll winner picks first; only the winner's page has the button
   // (and even that auto-resolves on a timer).
   for (const p of [host, joiner]) {

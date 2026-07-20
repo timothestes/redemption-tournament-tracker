@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '@/components/ui/button';
 import TopNav from '@/components/top-nav';
 import { DeckPickerModal } from './DeckPickerModal';
 import { ForgeDeckPickerModal } from '@/app/forge/play/games/ForgeDeckPicker';
@@ -64,11 +63,6 @@ interface PregameScreenProps {
   onBackToLobby: () => void;
   onUpdateMessage?: (message: string) => void;
   onTogglePublic?: (isPublic: boolean) => void;
-  // True once this client's own deck images are preloaded (or the safety
-  // timer has expired). When false, the Ready button is disabled so the
-  // server-anchored choose-first countdown can't start while a slow-wifi
-  // player is still downloading card images.
-  canReady: boolean;
   // True for Forge playtest games — "Change deck" opens the Forge deck picker
   // and swaps go through loadForgeDeckForGame (sanitized deckData + paragon).
   isForge?: boolean;
@@ -93,13 +87,12 @@ export default function PregameScreen({
   onBackToLobby,
   onUpdateMessage,
   onTogglePublic,
-  canReady,
   isForge,
   onDeckChanged,
 }: PregameScreenProps) {
   const { game, myPlayer, opponentPlayer } = gameState;
 
-  const phase = game?.pregamePhase ?? 'deck_select';
+  const phase = game?.pregamePhase ?? '';
   const isWaiting = lifecycle === 'waiting';
 
   // During pregame, if there's no myPlayer, show spectator view
@@ -162,9 +155,7 @@ export default function PregameScreen({
             phase={phase}
             myDisplayName={myPlayer?.displayName ?? myDisplayName}
             myDeckName={myDeckName}
-            myReady={myReady}
             opponentName={opponentName}
-            opponentReady={opponentReady}
             hasOpponent={!!opponentPlayer}
             myRoll={myRoll}
             opponentRoll={opponentRoll}
@@ -172,7 +163,6 @@ export default function PregameScreen({
             myPlayer={myPlayer}
             gameState={gameState}
             showDice={phase === 'rolling' || phase === 'choosing' || phase === 'revealing'}
-            canReady={canReady}
             isForge={isForge}
             onDeckChanged={onDeckChanged}
           />
@@ -187,16 +177,6 @@ export default function PregameScreen({
                 isPublic={game?.isPublic ?? true}
                 onTogglePublic={onTogglePublic}
               />
-            ) : phase === 'deck_select' ? (
-              // Nothing extra — player cards have the ready button
-              myReady && !opponentReady ? (
-                <>
-                  <OpponentDisconnectBanner connectionStatus={gameState.opponentConnectionStatus} />
-                  <p className="text-xs text-amber-200/40 font-cinzel tracking-wide">
-                    Waiting for opponent to ready up...
-                  </p>
-                </>
-              ) : null
             ) : phase === 'rolling' || phase === 'choosing' ? (
               <>
                 <OpponentDisconnectBanner connectionStatus={gameState.opponentConnectionStatus} />
@@ -225,7 +205,7 @@ export default function PregameScreen({
 
       <DebugOverlay
         tone="amber"
-        text={`code: ${code} · gameId: ${gameId === null ? 'none' : String(gameId)} · phase: ${lifecycle}${phase !== 'deck_select' ? `/${phase}` : ''} · players: ${(myPlayer ? 1 : 0) + (opponentPlayer ? 1 : 0)}/2 · spectators: ${gameState.spectators?.length ?? 0} · ready: ${myReady ? 'me' : '—'}${opponentReady ? '+opp' : ''}`}
+        text={`code: ${code} · gameId: ${gameId === null ? 'none' : String(gameId)} · phase: ${lifecycle}${phase ? `/${phase}` : ''} · players: ${(myPlayer ? 1 : 0) + (opponentPlayer ? 1 : 0)}/2 · spectators: ${gameState.spectators?.length ?? 0} · ready: ${myReady ? 'me' : '—'}${opponentReady ? '+opp' : ''}`}
       />
     </>
   );
@@ -291,9 +271,7 @@ function PlayerCards({
   phase,
   myDisplayName,
   myDeckName,
-  myReady,
   opponentName,
-  opponentReady,
   hasOpponent,
   myRoll,
   opponentRoll,
@@ -301,7 +279,6 @@ function PlayerCards({
   myPlayer,
   gameState,
   showDice,
-  canReady,
   isForge,
   onDeckChanged,
 }: {
@@ -309,9 +286,7 @@ function PlayerCards({
   phase: string;
   myDisplayName: string;
   myDeckName?: string;
-  myReady: boolean;
   opponentName: string;
-  opponentReady: boolean;
   hasOpponent: boolean;
   myRoll: number;
   opponentRoll: number;
@@ -319,7 +294,6 @@ function PlayerCards({
   myPlayer: any;
   gameState: GameState;
   showDice: boolean;
-  canReady: boolean;
   isForge?: boolean;
   onDeckChanged?: (next: { deckId: string; deckName: string; deckData: string; paragon: string }) => void;
 }) {
@@ -368,12 +342,6 @@ function PlayerCards({
     }
   };
 
-  const handleToggleReady = () => {
-    gameState.pregameReady(!myReady);
-  };
-
-  const isDeckSelect = phase === 'deck_select' && !isWaiting;
-
   // Die animation state — track whether dice have been revealed for this session
   const [diceRevealed, setDiceRevealed] = useState(false);
   const [diceSkipped, setDiceSkipped] = useState(false);
@@ -405,12 +373,6 @@ function PlayerCards({
               )}
             </div>
           )}
-          {isDeckSelect && (
-            <p className="text-[10px] text-amber-200/40 mt-0.5 truncate">
-              {myPlayer?.deckId ? (myDeckName || 'Deck selected') : 'No deck'}
-            </p>
-          )}
-
           {/* Dice during rolling+ phases */}
           {showDice && (
             <div className="mt-2 flex justify-center">
@@ -421,37 +383,6 @@ function PlayerCards({
                 revealed={diceRevealed}
                 skipAnimation={diceSkipped}
               />
-            </div>
-          )}
-
-          {/* Ready button in deck_select */}
-          {isDeckSelect && (
-            <div className="mt-2 flex flex-col gap-1.5">
-              {!myReady && (
-                <button
-                  onClick={() => setPickerOpen(true)}
-                  disabled={isChangingDeck}
-                  className="text-[10px] text-amber-200/40 hover:text-amber-200/70 transition-colors disabled:opacity-50"
-                >
-                  {isChangingDeck ? 'Loading...' : 'Change deck'}
-                </button>
-              )}
-              {changeError && (
-                <p className="text-[10px] text-red-400/80">{changeError}</p>
-              )}
-              <Button
-                variant={myReady ? 'outline' : 'default'}
-                size="sm"
-                onClick={handleToggleReady}
-                disabled={!canReady && !myReady}
-                title={!canReady && !myReady ? 'Loading card images...' : undefined}
-                className={myReady
-                  ? 'h-7 text-xs border-[#c4955a]/30 text-[#c4955a]/70 bg-[#c4955a]/10 hover:bg-[#c4955a]/20'
-                  : 'h-7 text-xs bg-[#c4955a]/80 text-black hover:bg-[#c4955a] disabled:opacity-60 disabled:cursor-wait'
-                }
-              >
-                {myReady ? 'Ready' : canReady ? 'Ready up' : 'Loading cards...'}
-              </Button>
             </div>
           )}
         </div>
@@ -470,11 +401,6 @@ function PlayerCards({
           ) : (
             <>
               <p className="text-xs font-cinzel text-[#4a7ab5] truncate">{opponentName}</p>
-              {isDeckSelect && (
-                <p className="text-[10px] text-amber-200/40 mt-0.5">
-                  {opponentReady ? 'Ready' : 'Selecting deck...'}
-                </p>
-              )}
 
               {/* Dice during rolling+ phases */}
               {showDice && (
@@ -486,14 +412,6 @@ function PlayerCards({
                     revealed={diceRevealed}
                     skipAnimation={diceSkipped}
                   />
-                </div>
-              )}
-
-              {isDeckSelect && opponentReady && (
-                <div className="mt-2">
-                  <span className="inline-block text-[10px] font-medium text-[#4a7ab5]/70 px-2 py-0.5 rounded-full bg-[#4a7ab5]/10">
-                    Ready
-                  </span>
                 </div>
               )}
             </>
@@ -719,8 +637,6 @@ export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) 
           phase={phase}
           myDisplayName={myPlayer.displayName}
           opponentName={opponentName}
-          myReady={isSeat0 ? game.pregameReady0 : game.pregameReady1}
-          opponentReady={isSeat0 ? game.pregameReady1 : game.pregameReady0}
           hasOpponent={!!opponentPlayer}
           myRoll={myRoll}
           opponentRoll={opponentRoll}
@@ -728,7 +644,6 @@ export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) 
           myPlayer={myPlayer}
           gameState={gameState}
           showDice={true}
-          canReady={true}
         />
 
         {/* Action area */}
@@ -1278,24 +1193,11 @@ export function SpectatorPregameView({ game }: { game: any }) {
     <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full">
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-cinzel">Spectating</p>
       <h2 className="text-2xl font-bold font-cinzel mt-2">
-        {phase === 'deck_select' && 'Players Preparing...'}
         {phase === 'rolling' && 'Rolling for First Player...'}
         {phase === 'choosing' && 'Choosing Who Goes First...'}
         {phase === 'revealing' && 'First Player Chosen'}
+        {phase !== 'rolling' && phase !== 'choosing' && phase !== 'revealing' && 'Waiting for Players...'}
       </h2>
-
-      {phase === 'deck_select' && (
-        <div className="mt-6 space-y-2">
-          <div className="p-3 rounded-lg border border-border">
-            <span className="text-sm">Player 1: </span>
-            <span className="text-sm font-medium">{game.pregameReady0 ? 'Ready' : 'Selecting deck...'}</span>
-          </div>
-          <div className="p-3 rounded-lg border border-border">
-            <span className="text-sm">Player 2: </span>
-            <span className="text-sm font-medium">{game.pregameReady1 ? 'Ready' : 'Selecting deck...'}</span>
-          </div>
-        </div>
-      )}
 
       {phase === 'rolling' && (
         <div className="mt-6 flex justify-center gap-8">
