@@ -1844,7 +1844,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Intercept modal-driven abilities (reveal_own_deck) client-side — the
       // server reducer throws SenderError for these. setPeekState → existing
       // useEffect broadcasts via revealCards so the opponent sees the reveal.
-      const source = findMyCardById(sourceInstanceId);
+      // findAnyCardById (not findMyCardById) so abilities fired on an opponent's
+      // card also dispatch client-side — effects route to the local activator.
+      const source = findAnyCardById(sourceInstanceId);
       // Use effective abilities so imitated souls' right-click abilities (e.g.
       // Lawless reveal-top-6 on an Imitate) dispatch correctly. Mirrors the
       // server's execute_card_ability dispatcher and the goldfish path.
@@ -2089,7 +2091,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // look_at_own_deck_choose is a private, client-side look (like
       // look_at_own_deck) — open the look modal with the player-chosen count
       // (capped at the ability limit) instead of routing through the server.
-      const source = findMyCardById(sourceInstanceId);
+      const source = findAnyCardById(sourceInstanceId);
       const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
       if (ability?.type === 'look_at_own_deck_choose') {
         const n = Math.min(count, ability.maxCount);
@@ -2101,7 +2103,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     },
     beginCountPrompt: (req) => setCountPrompt(req),
     beginResurrectPrompt: (sourceInstanceId, abilityIndex) => setResurrectReq({ sourceInstanceId, abilityIndex }),
-  }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts, isMyFirstTurn, isOpponentFirstTurn, hasOpponent]);
+  }), [gameState, findAnyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts, isMyFirstTurn, isOpponentFirstTurn, hasOpponent]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({

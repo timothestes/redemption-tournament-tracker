@@ -172,10 +172,10 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   // Effective abilities = card's own + inherited from imitated soul (if any).
   // abilityIndex in the dispatch path lines up with this list.
   const abilities = getEffectiveAbilities(card);
-  // Only the local player (player1) can fire abilities on their own cards. The
-  // server enforces this too, but hiding the menu items avoids a confusing
-  // click-then-fail flow when right-clicking opponent cards in multiplayer.
-  // Goldfish is single-player so every card is owned by player1 — no change there.
+  // True when the local player controls this card. Abilities are NOT gated on
+  // this — either player may fire any card's right-click ability and the effect
+  // routes to whoever clicks (the server enforces the same). Still used below to
+  // gate hand-reveal / surrender / rescue, which stay owner-relative.
   const isOwnedByLocalPlayer = card.ownerId === 'player1';
   // Each ability decides which zones it can fire from. Default is in-play
   // (territory + both lands). (Star) abilities like Virgin Birth's
@@ -258,9 +258,10 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
 
-      {/* Card abilities from CARD_ABILITIES registry. Rendered disabled when
-          the local player doesn't own the card, or when the card isn't in a
-          valid source zone — the server would reject these anyway. */}
+      {/* Card abilities from CARD_ABILITIES registry. Either player may fire an
+          ability on any card (effects route to the activator). Rendered disabled
+          only when the card isn't in a valid source zone, or when a brigade-draw
+          needs the opponent's hand revealed — the server would reject those. */}
       {hasAbilities && (
         <>
           {abilities.map((ability, index) => {
@@ -270,12 +271,10 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
             // disable when the opponent isn't currently revealing.
             const needsOpponentReveal = ability.type === 'draw_brigades';
             const opponentRevealMissing = needsOpponentReveal && !opponentHandRevealed;
-            const disabled = !isOwnedByLocalPlayer || !isInAbilityZone || opponentRevealMissing;
-            const disabledReason = !isOwnedByLocalPlayer
-              ? "You don't control this card"
-              : opponentRevealMissing
-                ? "Opponent's hand isn't revealed"
-                : undefined;
+            const disabled = !isInAbilityZone || opponentRevealMissing;
+            const disabledReason = opponentRevealMissing
+              ? "Opponent's hand isn't revealed"
+              : undefined;
             return (
               <button
                 key={index}

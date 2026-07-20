@@ -2874,7 +2874,8 @@ export const matthew_draw_brigades = spacetimedb.reducer(
     const source = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!source) throw new SenderError('Card not found');
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
-    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+    // Ownership intentionally not enforced — either player may activate a
+    // card's right-click ability; effects route to the activator (player).
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
     }
@@ -3955,7 +3956,7 @@ function spawnTokenImpl(
     let inPlay = 0;
     for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
       if (
-        c.ownerId === source.ownerId &&
+        c.ownerId === player.id &&
         c.zone === 'territory' &&
         c.isToken &&
         cyclingDisplayNames.has(c.cardName)
@@ -3977,14 +3978,15 @@ function spawnTokenImpl(
   // visible main play area. Registry can override via ability.defaultZone.
   const targetZone = ability.defaultZone ?? 'territory';
 
-  // Whose zone the token lands in. `spawnForOpponent` (Harvest-style souls that
-  // "create a token in an opponent's Land of Bondage") places it in the
-  // opponent's copy of the zone, owned by the opponent. Falls back to the
-  // caster if no opponent row exists.
-  let tokenOwnerId = source.ownerId;
+  // Whose zone the token lands in. Defaults to the activator (player) — either
+  // player may fire the ability and the token lands on their side.
+  // `spawnForOpponent` (Harvest-style souls that "create a token in an
+  // opponent's Land of Bondage") places it in the activator's opponent's copy
+  // of the zone instead. Falls back to the caster if no opponent row exists.
+  let tokenOwnerId = player.id;
   if (ability.spawnForOpponent) {
     const opponent = [...ctx.db.Player.player_game_id.filter(gameId)].find(
-      (p: any) => p.id !== source.ownerId,
+      (p: any) => p.id !== player.id,
     );
     if (opponent) tokenOwnerId = opponent.id;
   }
@@ -4731,7 +4733,8 @@ export const execute_card_ability = spacetimedb.reducer(
     const source = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!source) throw new SenderError('Card not found');
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
-    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+    // Ownership intentionally not enforced — either player may activate a
+    // card's right-click ability; effects route to the activator (player).
 
     // Abilities only fire when the source card is in play. Matches the
     // client-side menu gate but the server enforces independently.
@@ -4853,7 +4856,8 @@ export const execute_card_ability_with_count = spacetimedb.reducer(
     const source = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!source) throw new SenderError('Card not found');
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
-    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+    // Ownership intentionally not enforced — either player may activate a
+    // card's right-click ability; effects route to the activator (player).
 
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
@@ -4901,7 +4905,8 @@ export const resurrect_heroes = spacetimedb.reducer(
     const source = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!source) throw new SenderError('Card not found');
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
-    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+    // Ownership intentionally not enforced — either player may activate a
+    // card's right-click ability; effects route to the activator (player).
 
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
       throw new SenderError('Source card must be in play');
@@ -5006,7 +5011,8 @@ export const imitate_lost_soul = spacetimedb.reducer(
     const source = ctx.db.CardInstance.id.find(sourceInstanceId);
     if (!source) throw new SenderError('Source card not found');
     if (source.gameId !== gameId) throw new SenderError('Source not in this game');
-    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+    // Ownership intentionally not enforced — either player may activate a
+    // card's right-click ability; effects route to the activator (player).
     if (!(source.cardName in IMITATE_ORIGINAL_IMG)) {
       throw new SenderError('Source is not an Imitate Lost Soul');
     }
@@ -5075,7 +5081,8 @@ export const stop_imitating_lost_soul = spacetimedb.reducer(
     const source = ctx.db.CardInstance.id.find(sourceInstanceId);
     if (!source) throw new SenderError('Source card not found');
     if (source.gameId !== gameId) throw new SenderError('Source not in this game');
-    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+    // Ownership intentionally not enforced — either player may activate a
+    // card's right-click ability; effects route to the activator (player).
 
     const original = IMITATE_ORIGINAL_IMG[source.cardName];
     if (!original) throw new SenderError('Source is not an Imitate Lost Soul');
