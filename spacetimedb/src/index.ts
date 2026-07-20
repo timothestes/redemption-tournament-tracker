@@ -2736,6 +2736,33 @@ function isLostSoulRow(c: any): boolean {
   return c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || c.cardName.toLowerCase().includes('lost soul');
 }
 
+// Rescue-win detection. A player wins by rescuing their Nth Lost Soul into
+// land-of-redemption (5 for T1/Paragon, 7 for T2). Called after any movement
+// of a soul into LoR (the moveLostSoulToLor primitive + the move_card /
+// move_cards_batch drag paths). Idempotent: fires only while the game is still
+// playing, and re-reads the Game row because callers may hold a stale snapshot.
+function checkAndApplyWin(ctx: any, gameId: bigint) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game || game.status !== 'playing') return;
+  const goal = normalizeFormat(game.format) === 'T2' ? 7 : 5;
+  const rows = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+  for (const player of ctx.db.Player.player_game_id.filter(gameId)) {
+    let count = 0;
+    for (const c of rows) {
+      if (c.ownerId === player.id && c.zone === 'land-of-redemption' && isLostSoulRow(c)) count++;
+    }
+    if (count >= goal) {
+      ctx.db.Game.id.update({ ...game, status: 'finished' });
+      logAction(
+        ctx, gameId, player.id, 'WIN',
+        JSON.stringify({ winnerName: player.displayName, soulCount: count, format: normalizeFormat(game.format) }),
+        game.turnNumber, game.currentPhase,
+      );
+      return;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helper: battleStakesLobLostSouls
 // The Lost Souls "at stake" for the battle currently in progress: the
@@ -3394,6 +3421,11 @@ export const move_card = spacetimedb.reducer(
     if (triggeredRefill) {
       refillSoulDeck(ctx, game.id);
     }
+
+    // Rescue win: a soul dragged into land-of-redemption may complete the goal.
+    if (toZone === 'land-of-redemption') {
+      checkAndApplyWin(ctx, gameId);
+    }
   }
 );
 
@@ -3859,6 +3891,11 @@ export const move_cards_batch = spacetimedb.reducer(
         ...leavePlayFieldOverrides(card, card.zone, cardFinalZone),
         ...battleEntryUpdates,
       });
+      // Rescue win: a soul batch-dragged into land-of-redemption may complete
+      // the goal. Idempotent, so a per-card call in the loop is safe.
+      if (cardFinalZone === 'land-of-redemption') {
+        checkAndApplyWin(ctx, gameId);
+      }
     }
 
     // Accessory cascade post-pass: for each mover that actually changed zone,
@@ -5241,6 +5278,9 @@ function moveLostSoulToLor(
   if (triggeredRefill) {
     refillSoulDeck(ctx, gameId);
   }
+
+  // Rescue win: this soul just landed in someone's land-of-redemption.
+  checkAndApplyWin(ctx, gameId);
 }
 
 // ---------------------------------------------------------------------------
