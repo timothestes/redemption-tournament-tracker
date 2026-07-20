@@ -1101,17 +1101,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }, [opponentCards, opponentHandRevealed, opponentHandRevealSnapshotRaw, viewerKind, gameState.opponentPlayer?.shareHandWithSpectators]);
 
   // ---- Reserve privacy for spectators ----
-  // A player's reserve (its top-card face and the click-to-browse modal) stays
-  // hidden from spectators until that player shares their hand with spectators —
-  // the same consent flag that reveals the hand. When sharing is on, spectators
-  // may open the reserve read-only (no actions; see readOnly on ZoneBrowseModal).
-  // Player-side rules are unchanged: a player always sees their own reserve, and
-  // an opponent's reserve stays gated by reserveRevealed.
+  // A player's reserve (its top-card face and the click-to-browse modal) becomes
+  // visible to spectators when that player either reveals their reserve (the 👁
+  // toggle — a public game action, already shown to the opponent) or shares their
+  // hand with spectators. Spectators open the reserve read-only (no actions; see
+  // readOnly on ZoneBrowseModal). Player-side rules are unchanged: a player always
+  // sees their own reserve, and an opponent's reserve stays gated by reserveRevealed.
   const myShareHand = gameState.myPlayer?.shareHandWithSpectators ?? false;
   const oppShareHand = gameState.opponentPlayer?.shareHandWithSpectators ?? false;
-  const canViewMyReserve = !isSpectator || myShareHand;
+  const canViewMyReserve =
+    !isSpectator || myShareHand || (gameState.myPlayer?.reserveRevealed ?? false);
   const canViewOppReserve = isSpectator
-    ? oppShareHand
+    ? (oppShareHand || (gameState.opponentPlayer?.reserveRevealed ?? false))
     : (gameState.opponentPlayer?.reserveRevealed ?? false);
 
   // ---- Stage ref ----
@@ -7678,7 +7679,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const topCard = revealedReserveCard ?? cards[cards.length - 1];
             const topReserveCardRevealed = !!revealedReserveCard;
             const showFace = ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') && topCard && !topCard.isFlipped)
-              || (zoneKey === 'reserve' && topCard && (isSpectator ? oppShareHand : (oppReserveRevealed || topReserveCardRevealed)));
+              || (zoneKey === 'reserve' && topCard && (oppReserveRevealed || topReserveCardRevealed || (isSpectator && oppShareHand)));
 
             return (
               <Group
