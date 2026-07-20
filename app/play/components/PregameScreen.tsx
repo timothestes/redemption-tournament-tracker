@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeftRight } from 'lucide-react';
 import TopNav from '@/components/top-nav';
 import { DeckPickerModal } from './DeckPickerModal';
 import { ForgeDeckPickerModal } from '@/app/forge/play/games/ForgeDeckPicker';
@@ -359,14 +360,17 @@ function PlayerCards({
         <div className="rounded-lg border border-[#c4955a]/30 bg-black/40 p-3 text-left">
           <p className="text-xs font-cinzel text-[#c4955a] truncate">{myDisplayName}</p>
           {isWaiting && (
-            <div className="mt-1 flex flex-col items-start gap-0.5">
-              <p className="text-[10px] text-[#c4955a]/50 font-cinzel tracking-wide">Ready</p>
+            <div className="mt-1 flex flex-col items-start gap-1.5">
+              <p className="text-[10px] text-amber-200/40 truncate max-w-full" title={myDeckName}>
+                {myDeckName || 'Deck selected'}
+              </p>
               <button
                 onClick={() => setPickerOpen(true)}
                 disabled={isChangingDeck}
-                className="text-[10px] text-amber-200/40 hover:text-amber-200/70 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded border border-amber-200/20 text-[11px] text-amber-200/70 hover:bg-amber-200/5 hover:text-amber-200/90 transition-colors disabled:opacity-50"
               >
-                {isChangingDeck ? 'Loading...' : 'Change deck'}
+                <ArrowLeftRight className="h-3 w-3" />
+                {isChangingDeck ? 'Loading…' : 'Change deck'}
               </button>
               {changeError && (
                 <p className="text-[10px] text-red-400/80">{changeError}</p>
