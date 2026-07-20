@@ -73,3 +73,14 @@ Driven with the `verify` skill (2-player Playwright, `baboonytim` host + `landof
 - Clicking "Skip" during the roll lands the dice instantly and advances (loser acks / winner sees choose buttons now); the reveal can be skipped too. Choosing still requires a real click.
 - Joiner sees "Connected — starting game…" once through.
 - Module publishes clean (bindings regen diff = the removed `pregame_ready` files); `tsc --noEmit` clean; a full 2-player roll→play still works end-to-end.
+
+## Scoping addendum (2026-07-20, post-inventory)
+
+A full dead-code inventory pass (separate session, same day) confirmed §1/§7 and adds:
+
+- `e2e/spectator/playHelpers.ts:57-63` — the "ready up if offered" loop targets the dead button and already burns its 20s timeout per page on every run. Delete it and fix the docblock.
+- `SpectatorPregameView` loses its `deck_select` branches; give the title a fallback (`Waiting for Players...`) so a `''`-phase spectator isn't left blank.
+- The `Button` import in `PregameScreen.tsx` becomes unused after §1 (the ready button was its only consumer) — remove it.
+- §2 compose: in the old fake-"Ready" slot, show the real deck name (`myDeckName`, fallback "Deck selected") — true information in the same footprint.
+- Safety list (must NOT touch): `pregameReady0/1` + `pregamePhase` fields and every roll/reveal-ack consumer (`PregameScreen.tsx:722-723,879,1011`, `client.tsx:1171`, server ack reducers); `myDeckImageUrls` (feeds the live board preloader via `allImageUrls`); unrelated image/connection `isReady` usages.
+- `pregame_change_deck`'s dead `deck_select` sub-guard (`index.ts:1326-1328`) stays as-is — outside §7's surgical scope; the reducer is live for waiting-room swaps.
