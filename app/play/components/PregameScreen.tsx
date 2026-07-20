@@ -889,15 +889,20 @@ function RollAndChooseArea({
     return () => clearTimeout(timer);
   }, []);
 
-  // Auto-acknowledge roll for the loser (after tumble + display time)
+  // Auto-acknowledge roll for the loser (after tumble + display time).
+  // Depend on the *stable* reducer callback (useCallback in useGameState), not
+  // the whole gameState object — gameState is a fresh literal every render, so
+  // depending on it resets this timer on every re-render (e.g. board/presence
+  // churn behind the ceremony overlay) and the auto-ack can stall indefinitely.
+  const acknowledgeRoll = gameState.pregameAcknowledgeRoll;
   useEffect(() => {
     if (iWonRoll || myRollAcked) return;
     if (phase !== 'rolling') return;
     const timer = setTimeout(() => {
-      gameState.pregameAcknowledgeRoll();
+      acknowledgeRoll();
     }, RITUAL_TUMBLE_MS + ROLLING_RESULT_DISPLAY_MS);
     return () => clearTimeout(timer);
-  }, [iWonRoll, myRollAcked, phase, gameState]);
+  }, [iWonRoll, myRollAcked, phase, acknowledgeRoll]);
 
   // Countdown timer — synced to server deadline
   useEffect(() => {
@@ -1018,14 +1023,21 @@ function RevealArea({
       : `${opponentName} chose to go first`;
   }
 
-  // Auto-acknowledge after display time
+  // Auto-acknowledge after display time. Depend on the *stable* reducer
+  // callback, not the whole gameState object: gameState is recreated every
+  // render, so depending on it makes any re-render behind the ceremony overlay
+  // (opponent presence/heartbeat, reconnect blips, card/counter/chat updates)
+  // clear and restart this 1.5s timer. If updates arrive faster than that, the
+  // ack never fires and the "Starting game…" screen lingers until the churn
+  // happens to pause. The server-side handle_reveal_timeout is the backstop.
+  const acknowledgeFirst = gameState.pregameAcknowledgeFirst;
   useEffect(() => {
     if (alreadyAcked) return;
     const timer = setTimeout(() => {
-      gameState.pregameAcknowledgeFirst();
+      acknowledgeFirst();
     }, REVEAL_AUTO_ACK_MS);
     return () => clearTimeout(timer);
-  }, [alreadyAcked, gameState]);
+  }, [alreadyAcked, acknowledgeFirst]);
 
   return (
     <motion.div

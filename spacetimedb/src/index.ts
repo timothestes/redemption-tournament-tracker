@@ -1,6 +1,6 @@
 import spacetimedb from './schema';
 export default spacetimedb;
-import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer } from './schema';
+import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, RevealTimeout, setRevealTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
@@ -1148,8 +1148,74 @@ export const pregame_choose_first = spacetimedb.reducer(
       pregameReady0: false,
       pregameReady1: false,
     });
+
+    // Arm the server-side backstop so a stalled client ack can't hang the game.
+    scheduleRevealTimeout(ctx, gameId);
   }
 );
+
+// ---------------------------------------------------------------------------
+// Reveal-phase backstop helpers
+//
+// The 'revealing' phase normally ends when both clients call
+// pregame_acknowledge_first (~1.5s auto-ack). Unlike the 'choosing' phase, it
+// has no natural server-side deadline, so a client whose auto-ack never fires
+// would hang the game on "Starting game…" indefinitely. scheduleRevealTimeout
+// arms an 8s server-side backstop whenever we enter 'revealing';
+// handle_reveal_timeout force-starts the game if the acks never arrive.
+// ---------------------------------------------------------------------------
+const REVEAL_TIMEOUT_MICROS = 8_000_000n; // 8 seconds
+
+function scheduleRevealTimeout(ctx: any, gameId: bigint): void {
+  // Clear any prior backstop for this game first (idempotent across re-entries).
+  for (const timeout of ctx.db.RevealTimeout.reveal_timeout_game_id.filter(gameId)) {
+    ctx.db.RevealTimeout.scheduledId.delete(timeout.scheduledId);
+  }
+  ctx.db.RevealTimeout.insert({
+    scheduledId: 0n,
+    scheduledAt: ScheduleAt.time(ctx.timestamp.microsSinceUnixEpoch + REVEAL_TIMEOUT_MICROS),
+    gameId,
+  });
+}
+
+// Shared "start the game" transition, used by both the both-players-acked path
+// (pregame_acknowledge_first) and the server-side backstop
+// (handle_reveal_timeout). Assumes `game` is in the 'revealing' phase with
+// currentTurn already set to the chosen first-seat. Mirrors the original
+// inline both-ready logic so the two paths can't diverge.
+function startGameFromReveal(ctx: any, game: any, fallbackWinnerPlayerId: bigint): void {
+  const gameId = game.id;
+  const chosenSeat = game.currentTurn;
+  const winnerSeat = game.rollWinner === '0' ? 0n : 1n;
+  let chosenName = 'Player ' + (Number(chosenSeat) + 1);
+  let winnerPlayerId = fallbackWinnerPlayerId;
+  for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
+    if (p.seat === chosenSeat) chosenName = p.displayName;
+    if (p.seat === winnerSeat) winnerPlayerId = p.id;
+  }
+
+  // Paragon: soul deck is normally initialized earlier in the pregame (see
+  // pregame_acknowledge_roll and pregame_skip_to_reveal). Call again here as a
+  // final fallback; initializeSoulDeck is idempotent.
+  if (normalizeFormat(game.format) === 'Paragon') {
+    initializeSoulDeck(ctx, game);
+  }
+
+  ctx.db.Game.id.update({
+    ...game,
+    pregameReady0: true,
+    pregameReady1: true,
+    status: 'playing',
+    pregamePhase: '',
+    currentPhase: 'draw',
+    turnNumber: 1n,
+    playingStartedAtMicros: ctx.timestamp.microsSinceUnixEpoch,
+  });
+
+  logAction(ctx, gameId, winnerPlayerId, 'GAME_STARTED',
+    JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
+    1n, 'draw');
+}
 
 // ---------------------------------------------------------------------------
 // Reducer: pregame_acknowledge_first
@@ -1181,35 +1247,11 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
     const bothReady = updatedGame.pregameReady0 && updatedGame.pregameReady1;
 
     if (bothReady) {
-      // Both players acknowledged — start the game
-      const chosenSeat = game.currentTurn;
-      const winnerSeat = game.rollWinner === '0' ? 0n : 1n;
-      let chosenName = 'Player ' + (Number(chosenSeat) + 1);
-      let winnerPlayerId = player.id;
-      for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
-        if (p.seat === chosenSeat) chosenName = p.displayName;
-        if (p.seat === winnerSeat) winnerPlayerId = p.id;
+      // Both players acknowledged — cancel the server-side backstop and start.
+      for (const timeout of ctx.db.RevealTimeout.reveal_timeout_game_id.filter(gameId)) {
+        ctx.db.RevealTimeout.scheduledId.delete(timeout.scheduledId);
       }
-
-      // Paragon: soul deck is normally initialized earlier in the pregame
-      // (see pregame_acknowledge_roll and pregame_skip_to_reveal). Call
-      // again here as a final fallback; initializeSoulDeck is idempotent.
-      if (normalizeFormat(game.format) === 'Paragon') {
-        initializeSoulDeck(ctx, game);
-      }
-
-      ctx.db.Game.id.update({
-        ...updatedGame,
-        status: 'playing',
-        pregamePhase: '',
-        currentPhase: 'draw',
-        turnNumber: 1n,
-        playingStartedAtMicros: ctx.timestamp.microsSinceUnixEpoch,
-      });
-
-      logAction(ctx, gameId, winnerPlayerId, 'GAME_STARTED',
-        JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
-        1n, 'draw');
+      startGameFromReveal(ctx, updatedGame, player.id);
     } else {
       // Only one player acknowledged so far — wait for the other
       ctx.db.Game.id.update(updatedGame);
@@ -1250,6 +1292,9 @@ export const pregame_skip_to_reveal = spacetimedb.reducer(
       pregameReady0: false,
       pregameReady1: false,
     });
+
+    // Arm the server-side backstop so a stalled client ack can't hang the game.
+    scheduleRevealTimeout(ctx, gameId);
 
     // Paragon: populate the shared soul deck + 3 LoB souls now so they're
     // already visible when the reveal overlay dismisses.
@@ -2011,10 +2056,37 @@ export const handle_choose_first_timeout = spacetimedb.reducer(
       pregameReady0: false,
       pregameReady1: false,
     });
+
+    // Arm the server-side backstop so a stalled client ack can't hang the game.
+    scheduleRevealTimeout(ctx, arg.gameId);
   }
 );
 
 setChooseFirstTimeoutReducer(handle_choose_first_timeout);
+
+// ---------------------------------------------------------------------------
+// Scheduled reducer: handle_reveal_timeout
+// Backstop for the 'revealing' phase. Both clients normally auto-ack
+// (pregame_acknowledge_first) ~1.5s after the reveal to start the game; if an
+// ack never arrives, this force-starts the game so "Starting game…" can't
+// linger indefinitely. The choice of who goes first (game.currentTurn) was
+// already decided and stored when we entered 'revealing', so force-starting
+// only skips the cosmetic reveal delay — it changes no game state.
+// ---------------------------------------------------------------------------
+export const handle_reveal_timeout = spacetimedb.reducer(
+  { arg: RevealTimeout.rowType },
+  (ctx, { arg }) => {
+    const game = ctx.db.Game.id.find(arg.gameId);
+    if (!game) return;
+
+    // Only act if the game is still stuck in the revealing phase.
+    if (game.status !== 'pregame' || game.pregamePhase !== 'revealing') return;
+
+    startGameFromReveal(ctx, game, 0n);
+  }
+);
+
+setRevealTimeoutReducer(handle_reveal_timeout);
 
 // ---------------------------------------------------------------------------
 // Scheduled reducer: cleanup_stale_games

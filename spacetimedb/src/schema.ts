@@ -402,6 +402,35 @@ export const ChooseFirstTimeout = table(
 );
 
 // ---------------------------------------------------------------------------
+// 10b. RevealTimeout (scheduled table)
+//     Server-side backstop for the 'revealing' phase. Both clients auto-ack
+//     (pregame_acknowledge_first) ~1.5s after the reveal to start the game; if
+//     an ack never arrives (e.g. a client whose auto-ack timer stalled), this
+//     force-starts the game so "Starting game…" can't linger indefinitely.
+// ---------------------------------------------------------------------------
+
+let _handleRevealTimeout: any;
+export const setRevealTimeoutReducer = (reducer: any) => {
+  _handleRevealTimeout = reducer;
+};
+
+export const RevealTimeout = table(
+  {
+    name: 'reveal_timeout',
+    public: true,
+    scheduled: () => _handleRevealTimeout,
+    indexes: [
+      { accessor: 'reveal_timeout_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+    ],
+  },
+  {
+    scheduledId: t.u64().primaryKey().autoInc(),
+    scheduledAt: t.scheduleAt(),
+    gameId: t.u64(),
+  }
+);
+
+// ---------------------------------------------------------------------------
 // 11. Emote — ephemeral player emotes (e.g. thumbs_up). Public so opponent
 // and spectators can render the animation.
 // ---------------------------------------------------------------------------
@@ -502,6 +531,7 @@ const spacetimedb = schema({
   DisconnectTimeout,
   ZoneSearchRequest,
   ChooseFirstTimeout,
+  RevealTimeout,
   Emote,
   ForgeGame,
   ForgeConfig,
