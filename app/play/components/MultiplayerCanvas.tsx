@@ -5496,6 +5496,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // Two "0/0" chips over an empty band are noise — chips appear with the
     // first card in the band (UX review F2).
     const showChips = battleLikes.length > 0;
+    // Per-side card-count badges in the header bar — same idiom as the
+    // territory zone label badges. Side membership via battleSideOf (position,
+    // not ownership) so the counts agree with the totals chips; opponent's
+    // badge sits at the left end, mine at the right, mirroring the chip
+    // halves. Hidden while the band is empty, same rationale as showChips.
+    const countBadgeW = 24;
+    const myCardCount = mySeatStr
+      ? battleLikes.filter((c) => battleSideOf(c) === mySeatStr).length
+      : 0;
+    const oppCardCount = oppSeatStr
+      ? battleLikes.filter((c) => battleSideOf(c) === oppSeatStr).length
+      : 0;
 
     // opacity={0} is a CONSTANT — the fade tweens (in on open, out on close)
     // mutate the Group's opacity imperatively; React never re-applies this
@@ -5505,9 +5517,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         {/* Header — attacker + stakes type, top edge of the band */}
         <Rect x={band.x} y={band.y} width={band.width} height={18} fill="rgba(10,5,5,0.72)" perfectDrawEnabled={false} />
         <Text
-          x={band.x + 4}
+          x={band.x + countBadgeW + 8}
           y={band.y + 2}
-          width={band.width - 8}
+          width={band.width - 2 * (countBadgeW + 8)}
           text={headerText}
           fontSize={fs(12)}
           fontFamily="Cinzel, Georgia, serif"
@@ -5519,6 +5531,54 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           wrap="none"
           perfectDrawEnabled={false}
         />
+        {showChips && (
+          <>
+            {/* Opponent side count — left end of the header bar (their half). */}
+            <Rect
+              x={band.x + 4}
+              y={band.y + 2}
+              width={countBadgeW}
+              height={14}
+              fill="rgba(100, 149, 237, 0.25)"
+              cornerRadius={3}
+              stroke="rgba(100, 149, 237, 0.5)"
+              strokeWidth={0.5}
+              perfectDrawEnabled={false}
+            />
+            <Text
+              x={band.x + 4}
+              y={band.y + 3}
+              width={countBadgeW}
+              text={String(oppCardCount)}
+              fontSize={fs(11)}
+              fill="#a3c5e8"
+              align="center"
+              perfectDrawEnabled={false}
+            />
+            {/* My side count — right end of the header bar (my half). */}
+            <Rect
+              x={band.x + band.width - countBadgeW - 4}
+              y={band.y + 2}
+              width={countBadgeW}
+              height={14}
+              fill="rgba(196, 149, 90, 0.25)"
+              cornerRadius={3}
+              stroke="rgba(196, 149, 90, 0.5)"
+              strokeWidth={0.5}
+              perfectDrawEnabled={false}
+            />
+            <Text
+              x={band.x + band.width - countBadgeW - 4}
+              y={band.y + 3}
+              width={countBadgeW}
+              text={String(myCardCount)}
+              fontSize={fs(11)}
+              fill="#e8d5a3"
+              align="center"
+              perfectDrawEnabled={false}
+            />
+          </>
+        )}
 
         {/* Opponent-seat totals chip — flanks the vertical centerline on
             the left, anchored to the BOTTOM of the band (product direction,
@@ -6073,6 +6133,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             />
           )}
           {Object.entries(myZones).map(([key, zone]) => {
+            // Paragon collapses the per-seat LoB rects to zero-height
+            // placeholders (multiplayerLayout) — a stroked Rect still paints
+            // its outline at height 0 (a stray hairline over the board), so
+            // skip collapsed zones entirely.
+            if (zone.height === 0) return null;
             // LOB + territory zones get their label+badge rendered as an overlay after cards
             const isLob = isAutoArrangeZone(key);
             const isFreeForm = isFreeFormZone(key);
@@ -6151,6 +6216,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               Zone backgrounds — Opponent zones
               ================================================================ */}
           {Object.entries(opponentZones).map(([key, zone]) => {
+            // Same zero-height guard as the myZones loop above (Paragon
+            // collapsed LoB placeholders).
+            if (zone.height === 0) return null;
             const isLob = isAutoArrangeZone(key);
             const isFreeForm = isFreeFormZone(key);
             const skipLabel = isLob || isFreeForm;
