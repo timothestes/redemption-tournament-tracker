@@ -25,6 +25,7 @@ import {
   checkVanillaLimit,
   checkSitesCitiesLimit,
   checkBannedCards,
+  checkRoots2NotYetLegal,
   checkSpecialCards,
   validateT1Rules,
 } from "../rules";
@@ -1611,6 +1612,45 @@ describe("Rule: checkBannedCards (t1-banned-card)", () => {
       makeCard({ name: "Aaron", set: "Priests" }),
     ];
     expect(checkBannedCards(cards, [])).toHaveLength(0);
+  });
+});
+
+// TEMPORARY: remove alongside checkRoots2NotYetLegal once Roots 2 is legal.
+describe("Rule: checkRoots2NotYetLegal (roots2-not-yet-legal)", () => {
+  it("flags a Roots 2 card in the main deck by set code", () => {
+    const card = makeCard({ name: "A New Creation [RR2]", set: "RR2" });
+    const issues = checkRoots2NotYetLegal([card], []);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].rule).toBe("roots2-not-yet-legal");
+    expect(issues[0].type).toBe("error");
+    expect(issues[0].message).toContain("A New Creation [RR2]");
+    expect(issues[0].message).toContain("not yet tournament legal");
+  });
+
+  it("flags a Roots 2 card by official set name", () => {
+    const card = makeCard({ name: "Timothy", set: "Roots 2" });
+    expect(checkRoots2NotYetLegal([card], [])).toHaveLength(1);
+  });
+
+  it("flags a Roots 2 card in the reserve", () => {
+    const card = makeCard({ name: "Seth", set: "RR2", isReserve: true });
+    expect(checkRoots2NotYetLegal([], [card])).toHaveLength(1);
+  });
+
+  it("does NOT flag original Roots cards", () => {
+    const card = makeCard({ name: "David (Roots)", set: "Roots" });
+    expect(checkRoots2NotYetLegal([card], [])).toHaveLength(0);
+  });
+
+  it("skips cards with quantity 0", () => {
+    const card = makeCard({ name: "Seth", set: "RR2", quantity: 0 });
+    expect(checkRoots2NotYetLegal([card], [])).toHaveLength(0);
+  });
+
+  it("is surfaced by validateT1Rules", () => {
+    const mainDeck = [makeCard({ name: "Timothy", set: "RR2" })];
+    const issues = validateT1Rules(mainDeck, [], []);
+    expect(issues.some((i) => i.rule === "roots2-not-yet-legal")).toBe(true);
   });
 });
 

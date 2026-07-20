@@ -1792,4 +1792,18 @@ describe("validateT2Rules", () => {
     );
     expect(quantityErrors).toHaveLength(1);
   });
+
+  // TEMPORARY: remove alongside checkRoots2NotYetLegal once Roots 2 is legal.
+  it("flags Roots 2 cards as not yet tournament legal", () => {
+    const roots2Card = makeCard({ name: "Timothy", set: "RR2" });
+    const mainDeck = makeValidMainDeck(100, [roots2Card]);
+    const cardGroups = [makeGroup("Timothy", [roots2Card])];
+
+    const issues = validateT2Rules(mainDeck, [], cardGroups);
+    expect(
+      issues.some(
+        (i) => i.rule === "roots2-not-yet-legal" && i.type === "error"
+      )
+    ).toBe(true);
+  });
 });
