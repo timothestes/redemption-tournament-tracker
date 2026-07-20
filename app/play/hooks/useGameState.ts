@@ -370,8 +370,10 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
 
   // Souls rescued — count cards in "land-of-redemption" zone per player
   const soulsRescued = useMemo(() => {
-    const myLor = myCards['land-of-redemption'] ?? [];
-    const oppLor = opponentCards['land-of-redemption'] ?? [];
+    const isLS = (c: any) =>
+      c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || (c.cardName ?? '').toLowerCase().includes('lost soul');
+    const myLor = (myCards['land-of-redemption'] ?? []).filter(isLS);
+    const oppLor = (opponentCards['land-of-redemption'] ?? []).filter(isLS);
     return { me: myLor.length, opponent: oppLor.length };
   }, [myCards, opponentCards]);
 
@@ -1206,8 +1208,10 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
   );
 
   const soulsRescued = useMemo(() => {
-    const myLor = myCards['land-of-redemption'] ?? [];
-    const oppLor = opponentCards['land-of-redemption'] ?? [];
+    const isLS = (c: any) =>
+      c.cardType === 'LS' || c.cardType === 'TOKEN_LS' || (c.cardName ?? '').toLowerCase().includes('lost soul');
+    const myLor = (myCards['land-of-redemption'] ?? []).filter(isLS);
+    const oppLor = (opponentCards['land-of-redemption'] ?? []).filter(isLS);
     return { me: myLor.length, opponent: oppLor.length };
   }, [myCards, opponentCards]);
 
