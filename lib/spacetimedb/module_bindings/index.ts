@@ -146,6 +146,7 @@ import ForgeGameRow from "./forge_game_table";
 import GameRow from "./game_table";
 import GameActionRow from "./game_action_table";
 import PlayerRow from "./player_table";
+import RevealTimeoutRow from "./reveal_timeout_table";
 import SpectatorRow from "./spectator_table";
 import SpectatorBanRow from "./spectator_ban_table";
 import SpectatorHandRequestRow from "./spectator_hand_request_table";
@@ -313,6 +314,20 @@ const tablesSchema = __schema({
       { name: 'player_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PlayerRow),
+  RevealTimeout: __table({
+    name: 'reveal_timeout',
+    indexes: [
+      { accessor: 'reveal_timeout_game_id', name: 'reveal_timeout_game_id_idx_btree', algorithm: 'btree', columns: [
+        'gameId',
+      ] },
+      { accessor: 'scheduledId', name: 'reveal_timeout_scheduled_id_idx_btree', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'reveal_timeout_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, RevealTimeoutRow),
   Spectator: __table({
     name: 'spectator',
     indexes: [

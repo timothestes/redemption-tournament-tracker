@@ -187,6 +187,13 @@ export const Player = __t.object("Player", {
 });
 export type Player = __Infer<typeof Player>;
 
+export const RevealTimeout = __t.object("RevealTimeout", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  gameId: __t.u64(),
+});
+export type RevealTimeout = __Infer<typeof RevealTimeout>;
+
 export const Spectator = __t.object("Spectator", {
   id: __t.u64(),
   gameId: __t.u64(),
