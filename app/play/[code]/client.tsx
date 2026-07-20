@@ -1439,8 +1439,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               isMyTurn={false}
               onSetPhase={() => {}}
               onEndTurn={() => {}}
-              myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
-              opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+              myScore={gameState.soulsRescued.me}
+              opponentScore={gameState.soulsRescued.opponent}
               timerDisplay={gameTimer.formatted}
               timerPaused={isSearchModalOpen}
               timerVisible={gameTimer.isTimerVisible}
@@ -1495,8 +1495,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               isMyTurn={false}
               onSetPhase={() => {}}
               onEndTurn={() => {}}
-              myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
-              opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+              myScore={gameState.soulsRescued.me}
+              opponentScore={gameState.soulsRescued.opponent}
               timerDisplay={gameTimer.formatted}
               timerPaused={isSearchModalOpen}
               timerVisible={gameTimer.isTimerVisible}
@@ -1559,8 +1559,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
                 onBackToLobby={opponentDisconnected ? handleReturnToLobby : undefined}
                 rematchPending={rematchPending}
-                myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
-                opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+                myScore={gameState.soulsRescued.me}
+                opponentScore={gameState.soulsRescued.opponent}
                 timerDisplay={gameTimer.formatted}
                 timerPaused={isSearchModalOpen}
                 timerVisible={gameTimer.isTimerVisible}
@@ -1742,8 +1742,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
               onBackToLobby={opponentDisconnected ? handleReturnToLobby : undefined}
               rematchPending={rematchPending}
-              myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
-              opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+              myScore={gameState.soulsRescued.me}
+              opponentScore={gameState.soulsRescued.opponent}
               timerDisplay={gameTimer.formatted}
               timerPaused={isSearchModalOpen}
               timerVisible={gameTimer.isTimerVisible}
@@ -1791,8 +1791,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             hasPendingPriority={gameState.zoneSearchRequests.some(
               (r: any) => r.zone === 'action-priority' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
             )}
-            myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
-            opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+            myScore={gameState.soulsRescued.me}
+            opponentScore={gameState.soulsRescued.opponent}
             disconnectTimeoutFired={gameState.disconnectTimeoutFired}
             onClaimVictory={gameState.claimTimeoutVictory}
             timerDisplay={gameTimer.formatted}
