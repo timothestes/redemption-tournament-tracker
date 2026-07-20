@@ -80,7 +80,6 @@ import PregameAcknowledgeFirstReducer from "./pregame_acknowledge_first_reducer"
 import PregameAcknowledgeRollReducer from "./pregame_acknowledge_roll_reducer";
 import PregameChangeDeckReducer from "./pregame_change_deck_reducer";
 import PregameChooseFirstReducer from "./pregame_choose_first_reducer";
-import PregameReadyReducer from "./pregame_ready_reducer";
 import PregameSkipToRevealReducer from "./pregame_skip_to_reveal_reducer";
 import RandomHandToZoneReducer from "./random_hand_to_zone_reducer";
 import RandomOpponentHandToZoneReducer from "./random_opponent_hand_to_zone_reducer";
@@ -448,7 +447,6 @@ const reducersSchema = __reducers(
   __reducerSchema("pregame_acknowledge_roll", PregameAcknowledgeRollReducer),
   __reducerSchema("pregame_change_deck", PregameChangeDeckReducer),
   __reducerSchema("pregame_choose_first", PregameChooseFirstReducer),
-  __reducerSchema("pregame_ready", PregameReadyReducer),
   __reducerSchema("pregame_skip_to_reveal", PregameSkipToRevealReducer),
   __reducerSchema("random_hand_to_zone", RandomHandToZoneReducer),
   __reducerSchema("random_opponent_hand_to_zone", RandomOpponentHandToZoneReducer),
