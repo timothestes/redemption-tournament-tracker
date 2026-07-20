@@ -5,8 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import TopNav from '@/components/top-nav';
 import { DeckPickerModal } from './DeckPickerModal';
+import { ForgeDeckPickerModal } from '@/app/forge/play/games/ForgeDeckPicker';
 import type { DeckOption } from './DeckPickerCard';
 import { loadDeckForGame } from '../actions';
+import { loadForgeDeckForGame } from '@/app/forge/lib/playDecks';
 import type { GameState } from '../hooks/useGameState';
 import { DebugOverlay } from './DebugOverlay';
 
@@ -67,10 +69,12 @@ interface PregameScreenProps {
   // server-anchored choose-first countdown can't start while a slow-wifi
   // player is still downloading card images.
   canReady: boolean;
-  // True for Forge playtest games — the deck was authorized at join time and
-  // the server hard-rejects mid-pregame deck changes, so the "Change deck"
-  // control is hidden.
+  // True for Forge playtest games — "Change deck" opens the Forge deck picker
+  // and swaps go through loadForgeDeckForGame (sanitized deckData + paragon).
   isForge?: boolean;
+  // Called after a successful pregame deck swap so the owner can keep local
+  // deck state (gameParams, sessionStorage, practice goldfish deck) in sync.
+  onDeckChanged?: (next: { deckId: string; deckName: string; deckData: string; paragon: string }) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +95,7 @@ export default function PregameScreen({
   onTogglePublic,
   canReady,
   isForge,
+  onDeckChanged,
 }: PregameScreenProps) {
   const { game, myPlayer, opponentPlayer } = gameState;
 
@@ -169,6 +174,7 @@ export default function PregameScreen({
             showDice={phase === 'rolling' || phase === 'choosing' || phase === 'revealing'}
             canReady={canReady}
             isForge={isForge}
+            onDeckChanged={onDeckChanged}
           />
 
           {/* Action area — contextual */}
@@ -297,6 +303,7 @@ function PlayerCards({
   showDice,
   canReady,
   isForge,
+  onDeckChanged,
 }: {
   isWaiting: boolean;
   phase: string;
@@ -314,18 +321,48 @@ function PlayerCards({
   showDice: boolean;
   canReady: boolean;
   isForge?: boolean;
+  onDeckChanged?: (next: { deckId: string; deckName: string; deckData: string; paragon: string }) => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isChangingDeck, setIsChangingDeck] = useState(false);
+  const [changeError, setChangeError] = useState<string | null>(null);
 
   const handleDeckSelected = async (deck: DeckOption) => {
     setPickerOpen(false);
     setIsChangingDeck(true);
+    setChangeError(null);
     try {
       const result = await loadDeckForGame(deck.id);
-      gameState.pregameChangeDeck(deck.id, JSON.stringify(result.deckData));
+      const deckData = JSON.stringify(result.deckData);
+      const paragon = deck.paragon || '';
+      gameState.pregameChangeDeck(deck.id, deckData, paragon);
+      onDeckChanged?.({ deckId: deck.id, deckName: deck.name, deckData, paragon });
     } catch (e) {
       console.error('Failed to change deck:', e);
+      setChangeError('Failed to load deck.');
+    } finally {
+      setIsChangingDeck(false);
+    }
+  };
+
+  // Forge swap — deckData/paragon must come from loadForgeDeckForGame (the
+  // sanitized server action), never assembled client-side.
+  const handleForgeDeckSelected = async (deckId: string) => {
+    setPickerOpen(false);
+    setIsChangingDeck(true);
+    setChangeError(null);
+    try {
+      const r = await loadForgeDeckForGame(deckId);
+      if (r.ok === false) {
+        setChangeError(r.error);
+        return;
+      }
+      const deckData = JSON.stringify(r.deckData);
+      gameState.pregameChangeDeck(r.deck.id, deckData, r.deck.paragon);
+      onDeckChanged?.({ deckId: r.deck.id, deckName: r.deck.name, deckData, paragon: r.deck.paragon });
+    } catch (e) {
+      console.error('Failed to change deck:', e);
+      setChangeError('Failed to load deck.');
     } finally {
       setIsChangingDeck(false);
     }
@@ -354,7 +391,19 @@ function PlayerCards({
         <div className="rounded-lg border border-[#c4955a]/30 bg-black/40 p-3 text-left">
           <p className="text-xs font-cinzel text-[#c4955a] truncate">{myDisplayName}</p>
           {isWaiting && (
-            <p className="text-[10px] text-[#c4955a]/50 mt-1 font-cinzel tracking-wide">Ready</p>
+            <div className="mt-1 flex flex-col items-start gap-0.5">
+              <p className="text-[10px] text-[#c4955a]/50 font-cinzel tracking-wide">Ready</p>
+              <button
+                onClick={() => setPickerOpen(true)}
+                disabled={isChangingDeck}
+                className="text-[10px] text-amber-200/40 hover:text-amber-200/70 transition-colors disabled:opacity-50"
+              >
+                {isChangingDeck ? 'Loading...' : 'Change deck'}
+              </button>
+              {changeError && (
+                <p className="text-[10px] text-red-400/80">{changeError}</p>
+              )}
+            </div>
           )}
           {isDeckSelect && (
             <p className="text-[10px] text-amber-200/40 mt-0.5 truncate">
@@ -378,7 +427,7 @@ function PlayerCards({
           {/* Ready button in deck_select */}
           {isDeckSelect && (
             <div className="mt-2 flex flex-col gap-1.5">
-              {!myReady && !isForge && (
+              {!myReady && (
                 <button
                   onClick={() => setPickerOpen(true)}
                   disabled={isChangingDeck}
@@ -386,6 +435,9 @@ function PlayerCards({
                 >
                   {isChangingDeck ? 'Loading...' : 'Change deck'}
                 </button>
+              )}
+              {changeError && (
+                <p className="text-[10px] text-red-400/80">{changeError}</p>
               )}
               <Button
                 variant={myReady ? 'outline' : 'default'}
@@ -449,12 +501,21 @@ function PlayerCards({
         </div>
       </div>
 
-      <DeckPickerModal
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        onSelect={handleDeckSelected}
-        selectedDeckId={myPlayer?.deckId}
-      />
+      {isForge ? (
+        <ForgeDeckPickerModal
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onSelect={handleForgeDeckSelected}
+          selectedDeckId={myPlayer?.deckId}
+        />
+      ) : (
+        <DeckPickerModal
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onSelect={handleDeckSelected}
+          selectedDeckId={myPlayer?.deckId}
+        />
+      )}
     </>
   );
 }

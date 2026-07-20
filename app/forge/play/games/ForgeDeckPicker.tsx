@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from "@/
 import { MobileDrawer } from "@/components/ui/mobile-drawer";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
+import { listForgeDecks, listSharedForgeDecks } from "@/app/forge/lib/forgeDecks";
 import type { ForgeDeckSummary, SharedForgeDeckSummary } from "@/app/forge/lib/deckTypes";
 
 // The picker only needs these fields; both summary shapes structurally satisfy
@@ -80,6 +81,81 @@ export function ForgeDeckPicker({ decks, sharedDecks, selectedDeckId, onSelect }
         </MobileDrawer>
       )}
     </>
+  );
+}
+
+// Standalone dialog variant for in-game deck switching (gear menu / pregame).
+// Unlike ForgeDeckPicker it owns no trigger button and fetches the deck lists
+// itself on first open, so game surfaces don't need the lists threaded in.
+export function ForgeDeckPickerModal({
+  open,
+  onOpenChange,
+  onSelect,
+  selectedDeckId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (deckId: string) => void;
+  selectedDeckId?: string | null;
+}) {
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [decks, setDecks] = useState<ForgeDeckSummary[] | null>(null);
+  const [sharedDecks, setSharedDecks] = useState<SharedForgeDeckSummary[]>([]);
+  const [loadError, setLoadError] = useState(false);
+
+  // Fetch once on first open; a failed fetch retries on the next open.
+  useEffect(() => {
+    if (!open || decks !== null) return;
+    let cancelled = false;
+    setLoadError(false);
+    Promise.all([listForgeDecks(), listSharedForgeDecks()])
+      .then(([mine, shared]) => {
+        if (cancelled) return;
+        setDecks(mine);
+        setSharedDecks(shared);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, decks]);
+
+  const body =
+    decks === null ? (
+      <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+        {loadError ? "Could not load your Forge decks — close and try again." : "Loading decks…"}
+      </p>
+    ) : (
+      <PickerBody
+        decks={decks}
+        sharedDecks={sharedDecks}
+        selectedDeckId={selectedDeckId ?? null}
+        onPick={(id) => {
+          onSelect(id);
+          onOpenChange(false);
+        }}
+      />
+    );
+
+  if (isDesktop) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent size="md" className="max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Choose a deck</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="flex-1 overflow-hidden flex flex-col gap-3 p-4">{body}</DialogBody>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <MobileDrawer isOpen={open} onClose={() => onOpenChange(false)} title="Choose a deck">
+      <div className="flex h-full flex-col gap-3 overflow-hidden px-4 pb-4">{body}</div>
+    </MobileDrawer>
   );
 }
 
