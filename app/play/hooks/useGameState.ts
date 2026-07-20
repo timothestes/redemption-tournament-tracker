@@ -142,7 +142,7 @@ export interface GameState {
   pregameChooseFirst: (chosenSeat: bigint) => void;
   pregameAcknowledgeFirst: () => void;
   pregameSkipToReveal: (chosenSeat: bigint) => void;
-  pregameChangeDeck: (deckId: string, deckData: string) => void;
+  pregameChangeDeck: (deckId: string, deckData: string, paragon: string) => void;
   // Rematch actions
   requestRematch: (deckId: string, deckData: string, paragon: string, format: string) => void;
   respondRematch: (accepted: boolean, deckId: string, deckData: string, paragon: string, format: string) => void;
@@ -793,8 +793,8 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     conn?.reducers.pregameSkipToReveal({ gameId, chosenSeat });
   }, [conn, gameId]);
 
-  const pregameChangeDeck = useCallback((deckId: string, deckData: string) => {
-    conn?.reducers.pregameChangeDeck({ gameId, deckId, deckData });
+  const pregameChangeDeck = useCallback((deckId: string, deckData: string, paragon: string) => {
+    conn?.reducers.pregameChangeDeck({ gameId, deckId, deckData, paragon });
   }, [conn, gameId]);
 
   const requestRematch = useCallback((deckId: string, deckData: string, paragon: string, format: string) => {
@@ -1327,7 +1327,7 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     pregameChooseFirst: noopBigint,
     pregameAcknowledgeFirst: noop,
     pregameSkipToReveal: noopBigint,
-    pregameChangeDeck: useCallback((_deckId: string, _deckData: string) => {}, []),
+    pregameChangeDeck: useCallback((_deckId: string, _deckData: string, _paragon: string) => {}, []),
     requestRematch: useCallback((_deckId: string, _deckData: string, _paragon: string, _format: string) => {}, []),
     respondRematch: useCallback((_accepted: boolean, _deckId: string, _deckData: string, _paragon: string, _format: string) => {}, []),
     revealCards: useCallback((_cardIds: string, _context?: string) => {}, []),

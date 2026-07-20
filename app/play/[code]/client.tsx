@@ -32,6 +32,7 @@ import { DebugOverlay } from '../components/DebugOverlay';
 import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerImagePreloader';
 import { buildPrioritizedImageUrls, buildCriticalImageUrls } from '@/app/play/lib/multiplayerImageUrls';
 import { DeckPickerModal } from '../components/DeckPickerModal';
+import { ForgeDeckPickerModal } from '@/app/forge/play/games/ForgeDeckPicker';
 import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages';
 import { ArrowLeft } from 'lucide-react';
 import { loadDeckForGame } from '../actions';
@@ -73,6 +74,58 @@ interface GameParams {
 // ---------------------------------------------------------------------------
 interface GameClientProps {
   code: string;
+}
+
+// ---------------------------------------------------------------------------
+// ForgeSwapErrorDialog — shown when a forge switch-deck load fails (deck no
+// longer shared, network). Styled to match the amber confirm dialogs below.
+// ---------------------------------------------------------------------------
+function ForgeSwapErrorDialog({ error, onClose }: { error: string | null; onClose: () => void }) {
+  if (!error) return null;
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }}>
+      <div style={{
+        background: 'rgba(14, 10, 6, 0.97)',
+        border: '1px solid rgba(107, 78, 39, 0.3)',
+        borderRadius: 8,
+        padding: '20px 28px',
+        maxWidth: 340,
+        width: '100%',
+        textAlign: 'center',
+        boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+      }}>
+        <p style={{
+          fontFamily: 'Georgia, serif',
+          color: '#e8d5a3',
+          fontSize: 13,
+          lineHeight: 1.5,
+        }}>
+          {error}
+        </p>
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: 18,
+            padding: '7px 18px',
+            background: 'rgba(196, 149, 90, 0.15)',
+            border: '1px solid rgba(196, 149, 90, 0.45)',
+            borderRadius: 4,
+            color: '#e8d5a3',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontFamily: 'Georgia, serif',
+            fontWeight: 600,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +208,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // pendingDeckData rather than dealing a fresh hand.
   const [showPracticeDeckPicker, setShowPracticeDeckPicker] = useState(false);
   const [practiceDeckConfirm, setPracticeDeckConfirm] = useState<{ deckId: string; deckName: string; deckData: string; paragon: string; format: string } | null>(null);
+
+  // Forge switch-deck failure (deck no longer shared, network) — the picker has
+  // already closed by the time the server action resolves, so surface it in a
+  // dedicated dialog rather than failing silently.
+  const [forgeSwapError, setForgeSwapError] = useState<string | null>(null);
 
   // Image preload gate — keeps the board obscured until the tier-1 (visible)
   // card images have loaded, so slow-wifi users aren't dropped into a board
@@ -325,6 +383,40 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       .catch(() => { if (!cancelled) setForgeResolver(new Map()); });
     return () => { cancelled = true; };
   }, [isForge, forgeResolver]);
+
+  // Forge switch-deck selection handlers. Both go through loadForgeDeckForGame
+  // so the deckData that reaches a reducer is always the sanitized server-action
+  // output (leak spine) — never client-assembled. The already-fetched
+  // forgeResolver covers any deck the viewer can load (it's grant-scoped, not
+  // per-deck), so no resolver refresh is needed after a swap.
+  const handleForgeReloadSelect = useCallback(async (deckId: string) => {
+    setShowReloadDeckPicker(false);
+    try {
+      const r = await loadForgeDeckForGame(deckId);
+      if (r.ok === false) { setForgeSwapError(r.error); return; }
+      setReloadDeckConfirm({ deckId: r.deck.id, deckName: r.deck.name, deckData: JSON.stringify(r.deckData), paragon: r.deck.paragon });
+    } catch {
+      setForgeSwapError('Failed to load deck.');
+    }
+  }, []);
+
+  const handleForgePracticeSelect = useCallback(async (deckId: string) => {
+    setShowPracticeDeckPicker(false);
+    if (!gameParams || deckId === gameParams.deckId) return;
+    try {
+      const r = await loadForgeDeckForGame(deckId);
+      if (r.ok === false) { setForgeSwapError(r.error); return; }
+      setPracticeDeckConfirm({
+        deckId: r.deck.id,
+        deckName: r.deck.name,
+        deckData: JSON.stringify(r.deckData),
+        paragon: r.deck.paragon,
+        format: r.deck.format || gameParams.format || 'Type 1',
+      });
+    } catch {
+      setForgeSwapError('Failed to load deck.');
+    }
+  }, [gameParams]);
 
   // ---- Image preload — hoisted from MultiplayerCanvas so the cache survives
   // the canvas remounts that happen at every lifecycle transition.
@@ -1128,32 +1220,42 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             <WaitingRoomGoldfish
               deck={goldfishDeck}
               username={gameParams?.displayName}
-              onLoadDeck={isForge ? undefined : () => setShowPracticeDeckPicker(true)}
+              onLoadDeck={() => setShowPracticeDeckPicker(true)}
             />
           </div>
 
           {/* Practice deck picker — opens from the gear menu in practice mode */}
-          <DeckPickerModal
-            open={showPracticeDeckPicker}
-            onOpenChange={setShowPracticeDeckPicker}
-            onSelect={async (deck) => {
-              setShowPracticeDeckPicker(false);
-              if (!gameParams || deck.id === gameParams.deckId) return;
-              try {
-                const result = await loadDeckForGame(deck.id);
-                setPracticeDeckConfirm({
-                  deckId: deck.id,
-                  deckName: deck.name,
-                  deckData: JSON.stringify(result.deckData),
-                  paragon: deck.paragon || '',
-                  format: deck.format || gameParams.format || 'Type 1',
-                });
-              } catch (err) {
-                console.error('Failed to load deck for practice swap:', err);
-              }
-            }}
-            selectedDeckId={gameParams?.deckId}
-          />
+          {isForge ? (
+            <ForgeDeckPickerModal
+              open={showPracticeDeckPicker}
+              onOpenChange={setShowPracticeDeckPicker}
+              onSelect={handleForgePracticeSelect}
+              selectedDeckId={gameParams?.deckId}
+            />
+          ) : (
+            <DeckPickerModal
+              open={showPracticeDeckPicker}
+              onOpenChange={setShowPracticeDeckPicker}
+              onSelect={async (deck) => {
+                setShowPracticeDeckPicker(false);
+                if (!gameParams || deck.id === gameParams.deckId) return;
+                try {
+                  const result = await loadDeckForGame(deck.id);
+                  setPracticeDeckConfirm({
+                    deckId: deck.id,
+                    deckName: deck.name,
+                    deckData: JSON.stringify(result.deckData),
+                    paragon: deck.paragon || '',
+                    format: deck.format || gameParams.format || 'Type 1',
+                  });
+                } catch (err) {
+                  console.error('Failed to load deck for practice swap:', err);
+                }
+              }}
+              selectedDeckId={gameParams?.deckId}
+            />
+          )}
+          <ForgeSwapErrorDialog error={forgeSwapError} onClose={() => setForgeSwapError(null)} />
 
           {practiceDeckConfirm && (
             <div style={{
@@ -1204,7 +1306,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                       setPracticeDeckConfirm(null);
                       // Tell SpacetimeDB about the new deck so it gets used when
                       // the actual game starts.
-                      gameState.pregameChangeDeck(next.deckId, next.deckData);
+                      gameState.pregameChangeDeck(next.deckId, next.deckData, next.paragon);
                       // Update local state so practice rebuilds with new deck.
                       // Persist to sessionStorage so a refresh keeps the swap.
                       setGameParams((prev) => {
@@ -1266,6 +1368,25 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         } : undefined}
         canReady={canReady}
         isForge={isForge}
+        onDeckChanged={(next) => {
+          // Mirror the practice-swap bookkeeping: keep gameParams/sessionStorage
+          // and the local deckData (which feeds practice goldfish + image
+          // preload) in sync with what the server now has in pendingDeckData.
+          setGameParams((prev) => {
+            if (!prev) return prev;
+            const updated = {
+              ...prev,
+              deckId: next.deckId,
+              deckName: next.deckName,
+              paragon: next.paragon,
+            };
+            try {
+              sessionStorage.setItem(`${SESSION_KEY_PREFIX}${code}`, JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
+          setDeckData(next.deckData);
+        }}
       />
     );
   }
@@ -1330,7 +1451,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={isForge ? undefined : () => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
             {/* Suppress the load gate during the pregame ceremony — its 30s
@@ -1386,7 +1507,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={isForge ? undefined : () => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
             )}
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
@@ -1449,7 +1570,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={isForge ? undefined : () => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
               {/* Bottom toolbar — stays active for draw/shuffle, end turn disabled */}
               <GameToolbar
                 actions={{
@@ -1515,15 +1636,24 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           <ParagonDrawer paragons={paragonEntries} />
 
           {/* Deck reload picker (available after game ends for rematch/practice) */}
-          <DeckPickerModal
-            open={showReloadDeckPicker}
-            onOpenChange={(open) => setShowReloadDeckPicker(open)}
-            onSelect={async (deck) => {
-              const result = await loadDeckForGame(deck.id);
-              setShowReloadDeckPicker(false);
-              setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData), paragon: deck.paragon || '' });
-            }}
-          />
+          {isForge ? (
+            <ForgeDeckPickerModal
+              open={showReloadDeckPicker}
+              onOpenChange={setShowReloadDeckPicker}
+              onSelect={handleForgeReloadSelect}
+            />
+          ) : (
+            <DeckPickerModal
+              open={showReloadDeckPicker}
+              onOpenChange={(open) => setShowReloadDeckPicker(open)}
+              onSelect={async (deck) => {
+                const result = await loadDeckForGame(deck.id);
+                setShowReloadDeckPicker(false);
+                setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData), paragon: deck.paragon || '' });
+              }}
+            />
+          )}
+          <ForgeSwapErrorDialog error={forgeSwapError} onClose={() => setForgeSwapError(null)} />
 
           {/* Deck reload confirmation dialog */}
           {reloadDeckConfirm && (
@@ -1675,7 +1805,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} onLoadDeck={isForge ? undefined : () => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
+            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
           )}
           <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
           {/* Quick action toolbar — floating above hand area */}
@@ -1754,15 +1884,24 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       <ParagonDrawer paragons={paragonEntries} />
 
       {/* Deck reload picker */}
-      <DeckPickerModal
-        open={showReloadDeckPicker}
-        onOpenChange={(open) => setShowReloadDeckPicker(open)}
-        onSelect={async (deck) => {
-          const result = await loadDeckForGame(deck.id);
-          setShowReloadDeckPicker(false);
-          setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData), paragon: deck.paragon || '' });
-        }}
-      />
+      {isForge ? (
+        <ForgeDeckPickerModal
+          open={showReloadDeckPicker}
+          onOpenChange={setShowReloadDeckPicker}
+          onSelect={handleForgeReloadSelect}
+        />
+      ) : (
+        <DeckPickerModal
+          open={showReloadDeckPicker}
+          onOpenChange={(open) => setShowReloadDeckPicker(open)}
+          onSelect={async (deck) => {
+            const result = await loadDeckForGame(deck.id);
+            setShowReloadDeckPicker(false);
+            setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData), paragon: deck.paragon || '' });
+          }}
+        />
+      )}
+      <ForgeSwapErrorDialog error={forgeSwapError} onClose={() => setForgeSwapError(null)} />
 
       {/* Deck reload confirmation dialog */}
       {reloadDeckConfirm && (

@@ -1267,11 +1267,11 @@ export const pregame_change_deck = spacetimedb.reducer(
     gameId: t.u64(),
     deckId: t.string(),
     deckData: t.string(),
+    paragon: t.string(),
   },
-  (ctx, { gameId, deckId, deckData }) => {
+  (ctx, { gameId, deckId, deckData, paragon }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
-    if (isForgeGame(ctx, gameId)) throw new SenderError('Deck change is disabled in playtest games');
     // Allow swap while waiting for opponent (status='waiting') OR during the
     // pregame deck-select phase. Both states are pre-shuffle, so swapping
     // pendingDeckData is safe.
@@ -1294,7 +1294,7 @@ export const pregame_change_deck = spacetimedb.reducer(
       throw new SenderError('Invalid deck data');
     }
 
-    ctx.db.Player.id.update({ ...player, deckId, pendingDeckData: deckData });
+    ctx.db.Player.id.update({ ...player, deckId, paragon, pendingDeckData: deckData });
 
     logAction(ctx, gameId, player.id, 'PREGAME_DECK_CHANGE',
       JSON.stringify({ seat: player.seat.toString(), newDeckId: deckId }),
@@ -6246,7 +6246,6 @@ export const reload_deck = spacetimedb.reducer(
   (ctx, { gameId, deckId, deckData, paragon }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
-    if (isForgeGame(ctx, gameId)) throw new SenderError('Deck reload is disabled in playtest games');
     if (game.status !== 'playing' && game.status !== 'finished') throw new SenderError('Game is not in progress');
 
     const player = findPlayerBySender(ctx, gameId);
