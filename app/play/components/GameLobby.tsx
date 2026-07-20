@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Pencil, ArrowLeftRight } from 'lucide-react';
+import { Loader2, Pencil, ArrowLeftRight, Eye } from 'lucide-react';
 import { getCardImageUrl } from '@/lib/card-images';
 import { getCardImageUrl as getBlobCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useSpacetimeConnection } from '../hooks/useSpacetimeConnection';
@@ -316,6 +316,9 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                       {selectedDeck.card_count} cards
                     </span>
                   )}
+                  {selectedDeck.id === decks[0]?.id && selectedDeck.last_played_at && (
+                    <span className="text-xs text-muted-foreground/80">· Last played</span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -334,7 +337,7 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                   onClick={() => setPickerOpen(true)}
                 >
                   <ArrowLeftRight className="h-4 w-4" />
-                  Swap
+                  Change deck
                 </Button>
               </div>
             </div>
@@ -521,12 +524,15 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                   variant="outline"
                   onClick={() => handleJoinGame()}
                   disabled={isJoining || isCreating || gameCode.length !== 4 || (!isSpectate && !selectedDeck)}
-                  className="shrink-0 h-12 w-20"
+                  className="shrink-0 h-12 w-24"
                 >
                   {isJoining ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : isSpectate ? (
-                    'Watch'
+                    <>
+                      <Eye className="mr-1.5 h-4 w-4" />
+                      Watch
+                    </>
                   ) : (
                     'Join'
                   )}
@@ -553,6 +559,11 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                   />
                 </button>
               </div>
+              {isSpectate && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Spectating — you&apos;ll watch this game, not play.
+                </p>
+              )}
             </div>
           </div>
 
