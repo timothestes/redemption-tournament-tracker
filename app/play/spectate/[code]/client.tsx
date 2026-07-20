@@ -24,6 +24,8 @@ import { useChatScale } from '@/app/shared/hooks/useChatScale';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import TopNav from '@/components/top-nav';
 import { DebugOverlay } from '@/app/play/components/DebugOverlay';
+import { ParagonDrawer } from '@/app/shared/components/ParagonDrawer';
+import { buildParagonEntries } from '@/app/shared/utils/paragonEntries';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -328,6 +330,22 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     return map;
   }, [gameState.myPlayer, gameState.opponentPlayer]);
 
+  // Build paragon entries for the ParagonDrawer overlay (0-2 entries).
+  // Neither seat is the viewer, so both entries keep their real names.
+  const paragonEntries = useMemo(() => {
+    const players: Array<{ id: string; displayName: string; paragonName: string | null; isSelf: boolean }> = [];
+    for (const p of [gameState.myPlayer, gameState.opponentPlayer]) {
+      if (!p) continue;
+      players.push({
+        id: String(p.id),
+        displayName: p.displayName,
+        paragonName: p.paragon || null,
+        isSelf: false,
+      });
+    }
+    return buildParagonEntries({ players });
+  }, [gameState.myPlayer, gameState.opponentPlayer]);
+
   // Game timer — anchored to server-recorded playingStartedAtMicros so
   // elapsed time survives navigating away and back. Matches player client.
   const gameTimer = useGameTimer(
@@ -548,6 +566,9 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
               unreadChatCount={unreadChatCount}
               chatDisabled
             />
+            {/* Paragon drawer — self-hides when paragons list is empty. Rendered
+                as a DOM sibling to the Konva canvas, not inside. */}
+            <ParagonDrawer paragons={paragonEntries} />
           </div>
         )}
       </div>
