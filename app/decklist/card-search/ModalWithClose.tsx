@@ -211,29 +211,185 @@ function AddRulingInline({ cardName, onSaved, onCancel }: { cardName: string; on
 }
 
 /* ------------------------------------------------------------------ */
-/*  Versions Bottom Sheet (mobile) — drag-to-dismiss                   */
+/*  Versions section content (mobile) — rendered inside combined sheet */
 /* ------------------------------------------------------------------ */
 
-function MobileVersionsSheet({
+function VersionsSectionContent({
   siblings,
   visibleCards,
   allCards,
-  onClose,
   onNavigate,
 }: {
   siblings: import('@/lib/duplicateCards').DuplicateSibling[];
   visibleCards: Card[];
   allCards?: Card[];
-  onClose: () => void;
   onNavigate: (card: Card) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 px-4 pt-3 pb-2 text-sm font-semibold text-foreground">
+        <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+        </svg>
+        Also Known As ({siblings.length})
+      </div>
+      <DuplicateCardsMobile
+        siblings={siblings}
+        visibleCards={visibleCards}
+        allCards={allCards}
+        onNavigate={onNavigate}
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Rulings section content (mobile) — rendered inside combined sheet  */
+/* ------------------------------------------------------------------ */
+
+function RulingsSectionContent({
+  rulings,
+  canManageRulings,
+  onAddRuling,
+  editingRulingId,
+  setEditingRulingId,
+  deletingRulingId,
+  setDeletingRulingId,
+  refetchRulings,
+}: {
+  rulings: CardRuling[];
+  canManageRulings: boolean;
+  onAddRuling: () => void;
+  editingRulingId: string | null;
+  setEditingRulingId: (id: string | null) => void;
+  deletingRulingId: string | null;
+  setDeletingRulingId: (id: string | null) => void;
+  refetchRulings: () => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 px-4 pt-3 pb-2 text-sm font-semibold text-foreground">
+        <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+        </svg>
+        Rulings ({rulings.length})
+      </div>
+      <div className="px-4 pb-3 space-y-3">
+        {rulings.map((ruling) => (
+          <div key={ruling.id}>
+            {editingRulingId === ruling.id ? (
+              <EditRulingInline
+                ruling={ruling}
+                onSaved={() => { refetchRulings(); setEditingRulingId(null); }}
+                onCancel={() => setEditingRulingId(null)}
+              />
+            ) : (
+              <div className="text-sm border-l-2 border-muted-foreground/20 pl-3">
+                <p className="text-foreground">
+                  <span className="font-semibold text-muted-foreground">Q:</span> {ruling.question}
+                </p>
+                <p className="text-muted-foreground mt-0.5">
+                  <span className="font-semibold">A:</span> {ruling.answer}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  {ruling.ruling_date && (
+                    <span className="text-xs text-muted-foreground/60">{ruling.ruling_date}</span>
+                  )}
+                  {/* Admin controls — always visible on mobile (no hover) */}
+                  {canManageRulings && (
+                    <span className="flex items-center gap-1 ml-auto">
+                      <button
+                        onClick={() => setEditingRulingId(ruling.id)}
+                        className="p-1.5 rounded text-muted-foreground/50 active:text-foreground transition-colors"
+                        title="Edit ruling"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setDeletingRulingId(ruling.id);
+                          await deleteRuling(ruling.id);
+                          refetchRulings();
+                          setDeletingRulingId(null);
+                        }}
+                        disabled={deletingRulingId === ruling.id}
+                        className="p-1.5 rounded text-muted-foreground/50 active:text-red-500 transition-colors disabled:opacity-40"
+                        title="Delete ruling"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                      </button>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {canManageRulings && (
+          <button
+            onClick={onAddRuling}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground active:text-foreground transition-colors"
+          >
+            + Add ruling
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Combined Card Details Bottom Sheet (mobile) — versions + rulings   */
+/* ------------------------------------------------------------------ */
+
+function MobileCardDetailsSheet({
+  open,
+  onClose,
+  siblings,
+  visibleCards,
+  allCards,
+  onNavigateVersion,
+  rulings,
+  canManageRulings,
+  onAddRuling,
+  editingRulingId,
+  setEditingRulingId,
+  deletingRulingId,
+  setDeletingRulingId,
+  refetchRulings,
+}: {
+  open: boolean;
+  onClose: () => void;
+  siblings: import('@/lib/duplicateCards').DuplicateSibling[];
+  visibleCards: Card[];
+  allCards?: Card[];
+  onNavigateVersion: (card: Card) => void;
+  rulings: CardRuling[];
+  canManageRulings: boolean;
+  onAddRuling: () => void;
+  editingRulingId: string | null;
+  setEditingRulingId: (id: string | null) => void;
+  deletingRulingId: string | null;
+  setDeletingRulingId: (id: string | null) => void;
+  refetchRulings: () => void;
 }) {
   const sheetRef = React.useRef<HTMLDivElement>(null);
   const dragStartRef = React.useRef<{ y: number } | null>(null);
   const [dragOffset, setDragOffset] = React.useState(0);
 
+  // Reset drag when opening/closing
+  React.useEffect(() => {
+    if (open) setDragOffset(0);
+  }, [open]);
+
   const handleDragStart = React.useCallback((e: React.TouchEvent) => {
     const sheet = sheetRef.current;
     if (!sheet) return;
+    // Only start drag from the handle area (top 48px)
     const rect = sheet.getBoundingClientRect();
     if (e.touches[0].clientY - rect.top > 48) return;
     dragStartRef.current = { y: e.touches[0].clientY };
@@ -251,130 +407,22 @@ function MobileVersionsSheet({
     dragStartRef.current = null;
   }, [dragOffset, onClose]);
 
-  return (
-    <>
-      <div className="absolute inset-0 bg-black/40 z-10" onClick={onClose} />
-      <div
-        ref={sheetRef}
-        className="absolute left-0 right-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 bg-card rounded-t-xl shadow-lg"
-        style={{
-          maxHeight: '60vh',
-          transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
-          transition: dragOffset > 0 ? 'none' : undefined,
-        }}
-        onTouchStart={handleDragStart}
-        onTouchMove={handleDragMove}
-        onTouchEnd={handleDragEnd}
-      >
-        <div className="flex justify-center pt-2.5 pb-1 cursor-grab">
-          <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-        <div className="flex items-center justify-between px-4 pb-2 border-b border-border">
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-            </svg>
-            Also Known As ({siblings.length})
-          </span>
-          <button onClick={onClose} className="p-1.5 -mr-1 text-muted-foreground active:text-foreground">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(60vh - 3.5rem)' }}>
-          <DuplicateCardsMobile
-            siblings={siblings}
-            visibleCards={visibleCards}
-            allCards={allCards}
-            onNavigate={onNavigate}
-          />
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Rulings Bottom Sheet (mobile)                                      */
-/* ------------------------------------------------------------------ */
-
-function MobileRulingsSheet({
-  rulings,
-  open,
-  onClose,
-  cardName,
-  canManageRulings,
-  onAddRuling,
-  editingRulingId,
-  setEditingRulingId,
-  deletingRulingId,
-  setDeletingRulingId,
-  refetchRulings,
-}: {
-  rulings: CardRuling[];
-  open: boolean;
-  onClose: () => void;
-  cardName: string;
-  canManageRulings: boolean;
-  onAddRuling: () => void;
-  editingRulingId: string | null;
-  setEditingRulingId: (id: string | null) => void;
-  deletingRulingId: string | null;
-  setDeletingRulingId: (id: string | null) => void;
-  refetchRulings: () => void;
-}) {
-  const sheetRef = React.useRef<HTMLDivElement>(null);
-  const dragStartRef = React.useRef<{ y: number; sheetY: number } | null>(null);
-  const [dragOffset, setDragOffset] = React.useState(0);
-
-  // Reset drag when opening/closing
-  React.useEffect(() => {
-    if (open) setDragOffset(0);
-  }, [open]);
-
-  const handleDragStart = React.useCallback((e: React.TouchEvent) => {
-    const sheet = sheetRef.current;
-    if (!sheet) return;
-    // Only start drag from the handle area (top 40px)
-    const rect = sheet.getBoundingClientRect();
-    const touchY = e.touches[0].clientY;
-    if (touchY - rect.top > 48) return;
-    dragStartRef.current = { y: e.touches[0].clientY, sheetY: 0 };
-  }, []);
-
-  const handleDragMove = React.useCallback((e: React.TouchEvent) => {
-    if (!dragStartRef.current) return;
-    const delta = e.touches[0].clientY - dragStartRef.current.y;
-    // Only allow dragging downward
-    setDragOffset(Math.max(0, delta));
-  }, []);
-
-  const handleDragEnd = React.useCallback(() => {
-    if (!dragStartRef.current) return;
-    // Dismiss if dragged more than 80px down
-    if (dragOffset > 80) {
-      onClose();
-    }
-    setDragOffset(0);
-    dragStartRef.current = null;
-  }, [dragOffset, onClose]);
-
   if (!open) return null;
+
+  const hasVersions = siblings.length > 0;
+  const hasRulings = rulings.length > 0 || canManageRulings;
+  if (!hasVersions && !hasRulings) return null;
 
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 z-10"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/40 z-10" onClick={onClose} />
       {/* Sheet */}
       <div
         ref={sheetRef}
         className="absolute left-0 right-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 bg-card rounded-t-xl shadow-lg"
         style={{
-          maxHeight: '70vh',
+          maxHeight: '75vh',
           transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
           transition: dragOffset > 0 ? 'none' : undefined,
         }}
@@ -388,81 +436,36 @@ function MobileRulingsSheet({
         </div>
         {/* Header */}
         <div className="flex items-center justify-between px-4 pb-2 border-b border-border">
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-            </svg>
-            Rulings ({rulings.length})
-          </span>
+          <span className="text-sm font-semibold text-foreground">Card details</span>
           <button onClick={onClose} className="p-1.5 -mr-1 text-muted-foreground active:text-foreground">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-        {/* Rulings list */}
-        <div className="overflow-y-auto px-4 py-3 space-y-3" style={{ maxHeight: 'calc(70vh - 5rem)' }}>
-          {rulings.map((ruling) => (
-            <div key={ruling.id}>
-              {editingRulingId === ruling.id ? (
-                <EditRulingInline
-                  ruling={ruling}
-                  onSaved={() => { refetchRulings(); setEditingRulingId(null); }}
-                  onCancel={() => setEditingRulingId(null)}
-                />
-              ) : (
-                <div className="text-sm border-l-2 border-muted-foreground/20 pl-3">
-                  <p className="text-foreground">
-                    <span className="font-semibold text-muted-foreground">Q:</span> {ruling.question}
-                  </p>
-                  <p className="text-muted-foreground mt-0.5">
-                    <span className="font-semibold">A:</span> {ruling.answer}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {ruling.ruling_date && (
-                      <span className="text-xs text-muted-foreground/60">{ruling.ruling_date}</span>
-                    )}
-                    {/* Admin controls — always visible on mobile (no hover) */}
-                    {canManageRulings && (
-                      <span className="flex items-center gap-1 ml-auto">
-                        <button
-                          onClick={() => setEditingRulingId(ruling.id)}
-                          className="p-1.5 rounded text-muted-foreground/50 active:text-foreground transition-colors"
-                          title="Edit ruling"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={async () => {
-                            setDeletingRulingId(ruling.id);
-                            await deleteRuling(ruling.id);
-                            refetchRulings();
-                            setDeletingRulingId(null);
-                          }}
-                          disabled={deletingRulingId === ruling.id}
-                          className="p-1.5 rounded text-muted-foreground/50 active:text-red-500 transition-colors disabled:opacity-40"
-                          title="Delete ruling"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                          </svg>
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
+        {/* Sections */}
+        <div className="overflow-y-auto pb-2" style={{ maxHeight: 'calc(75vh - 5rem)' }}>
+          {hasVersions && (
+            <div className={hasRulings ? 'border-b border-border pb-1' : ''}>
+              <VersionsSectionContent
+                siblings={siblings}
+                visibleCards={visibleCards}
+                allCards={allCards}
+                onNavigate={onNavigateVersion}
+              />
             </div>
-          ))}
-          {canManageRulings && (
-            <button
-              onClick={onAddRuling}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground active:text-foreground transition-colors"
-            >
-              + Add ruling
-            </button>
+          )}
+          {hasRulings && (
+            <RulingsSectionContent
+              rulings={rulings}
+              canManageRulings={canManageRulings}
+              onAddRuling={onAddRuling}
+              editingRulingId={editingRulingId}
+              setEditingRulingId={setEditingRulingId}
+              deletingRulingId={deletingRulingId}
+              setDeletingRulingId={setDeletingRulingId}
+              refetchRulings={refetchRulings}
+            />
           )}
         </div>
       </div>
@@ -564,16 +567,14 @@ export default function ModalWithClose({
   const [showMenu, setShowMenu] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
-  const [rulingsSheetOpen, setRulingsSheetOpen] = React.useState(false);
-  const [versionsSheetOpen, setVersionsSheetOpen] = React.useState(false);
+  const [detailsSheetOpen, setDetailsSheetOpen] = React.useState(false);
   const [addRulingMode, setAddRulingMode] = React.useState(false);
   const [editingRulingId, setEditingRulingId] = React.useState<string | null>(null);
   const [deletingRulingId, setDeletingRulingId] = React.useState<string | null>(null);
 
-  // Reset rulings/versions state when card changes
+  // Reset details sheet / add-ruling state when card changes
   React.useEffect(() => {
-    setRulingsSheetOpen(false);
-    setVersionsSheetOpen(false);
+    setDetailsSheetOpen(false);
     setAddRulingMode(false);
     setEditingRulingId(null);
   }, [modalCard?.name]);
@@ -808,11 +809,12 @@ export default function ModalWithClose({
   const quantityInDeck = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, 'main') : 0;
   const quantityInReserve = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, 'reserve') : 0;
 
-  // Mobile footer needs row 2 when: has rulings, is admin, minus buttons showing, or has duplicates
+  // Mobile footer needs row 2 when minus buttons are showing or the collection stepper is present.
+  // Versions/rulings moved to the header details sheet, so they no longer force a taller footer.
   const hasMinusButtons = quantityInDeck > 0 || quantityInReserve > 0;
   const hasDuplicates = duplicateSiblings && duplicateSiblings.length > 0;
   const hasCollection = !!(collectionQuantities && onAdjustCollection);
-  const needsFooterRow2 = ((rulings.length > 0 || canManageRulings) && !addRulingMode) || hasMinusButtons || hasDuplicates || hasCollection;
+  const needsFooterRow2 = hasMinusButtons || hasCollection;
 
   return (
     <div
@@ -869,6 +871,18 @@ export default function ModalWithClose({
               </div>
             );
           })()}
+          {/* Card details (versions + rulings) — only when there is secondary content */}
+          {(hasDuplicates || rulings.length > 0 || canManageRulings) && (
+            <button
+              className="flex-shrink-0 w-10 h-10 mr-1.5 flex items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground active:bg-muted"
+              aria-label="Card details"
+              onClick={() => setDetailsSheetOpen(true)}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+            </button>
+          )}
           <button
             className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-muted-foreground active:bg-muted"
             aria-label="Close modal"
@@ -954,34 +968,26 @@ export default function ModalWithClose({
 
         </div>
 
-        {/* Mobile Rulings Bottom Sheet */}
-        <MobileRulingsSheet
+        {/* Mobile Card Details Bottom Sheet (versions + rulings) */}
+        <MobileCardDetailsSheet
+          open={detailsSheetOpen && !addRulingMode}
+          onClose={() => setDetailsSheetOpen(false)}
+          siblings={duplicateSiblings ?? []}
+          visibleCards={visibleCards}
+          allCards={allCards}
+          onNavigateVersion={(card) => {
+            setDetailsSheetOpen(false);
+            setModalCard(card);
+          }}
           rulings={rulings}
-          open={rulingsSheetOpen && !addRulingMode}
-          onClose={() => setRulingsSheetOpen(false)}
-          cardName={modalCard?.name ?? ""}
           canManageRulings={canManageRulings}
-          onAddRuling={() => { setRulingsSheetOpen(false); setAddRulingMode(true); }}
+          onAddRuling={() => { setDetailsSheetOpen(false); setAddRulingMode(true); }}
           editingRulingId={editingRulingId}
           setEditingRulingId={setEditingRulingId}
           deletingRulingId={deletingRulingId}
           setDeletingRulingId={setDeletingRulingId}
           refetchRulings={refetchRulings}
         />
-
-        {/* Mobile Versions Bottom Sheet */}
-        {versionsSheetOpen && hasDuplicates && (
-          <MobileVersionsSheet
-            siblings={duplicateSiblings!}
-            visibleCards={visibleCards}
-            allCards={allCards}
-            onClose={() => setVersionsSheetOpen(false)}
-            onNavigate={(card) => {
-              setVersionsSheetOpen(false);
-              setModalCard(card);
-            }}
-          />
-        )}
 
         {/* Mobile Add Ruling Form — bottom sheet style */}
         {addRulingMode && (
@@ -1145,7 +1151,7 @@ export default function ModalWithClose({
               );
             })()}
           </div>
-          {/* Row 2: Rulings + Shop — when rulings/admin exist or minus buttons need space */}
+          {/* Row 2: Collection stepper + Shop — when minus buttons show or collection is tracked */}
           {needsFooterRow2 && (
             <div className="flex items-center justify-between mt-1.5">
               <div className="flex items-center gap-2">
@@ -1178,39 +1184,6 @@ export default function ModalWithClose({
                     </div>
                   );
                 })()}
-                {/* Rulings button */}
-                {rulings.length > 0 && (
-                  <button
-                    onClick={() => setRulingsSheetOpen(true)}
-                    className="h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium border border-border bg-muted/50 text-foreground active:bg-muted transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                    </svg>
-                    {rulings.length}
-                  </button>
-                )}
-                {/* Admin: add ruling when none exist */}
-                {rulings.length === 0 && canManageRulings && (
-                  <button
-                    onClick={() => setAddRulingMode(true)}
-                    className="h-9 px-3 rounded-lg flex items-center gap-1 text-xs border border-border bg-muted/50 text-muted-foreground active:bg-muted transition-colors"
-                  >
-                    + Ruling
-                  </button>
-                )}
-                {/* Versions button */}
-                {hasDuplicates && (
-                  <button
-                    onClick={() => setVersionsSheetOpen(true)}
-                    className="h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium whitespace-nowrap border border-border bg-muted/50 text-foreground active:bg-muted transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                    </svg>
-                    {duplicateSiblings!.length}
-                  </button>
-                )}
               </div>
               {/* Shop button */}
               {(() => {
