@@ -5,9 +5,13 @@ import type { CountPromptRequest } from '../types/gameActions';
 
 interface CountPromptDialogProps {
   req: CountPromptRequest;
+  /** Screen-px X (relative to the positioned canvas container) to center on —
+   *  the play mat's midline. Defaults to the container's own midline, which
+   *  includes the sidebar piles and so sits right of the board. */
+  centerX?: number;
 }
 
-export function CountPromptDialog({ req }: CountPromptDialogProps) {
+export function CountPromptDialog({ req, centerX }: CountPromptDialogProps) {
   const [count, setCount] = useState(req.defaultCount);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -37,7 +41,7 @@ export function CountPromptDialog({ req }: CountPromptDialogProps) {
       style={{
         position: 'absolute',
         top: '50%',
-        left: '50%',
+        left: centerX ?? '50%',
         transform: 'translate(-50%, -50%)',
         zIndex: 900,
         pointerEvents: 'auto',

@@ -633,6 +633,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', battleActive),
     [virtualWidth, normalizedFormat, viewerKind, battleActive],
   );
+  // Horizontal midline of the play mat (play area sans sidebar piles) in
+  // screen px — dialogs that float over the board center on this rather than
+  // the viewport/container midline, both of which sit visibly right of the
+  // board (sidebar piles + chat column all live on the right).
+  const playCenterScreenX = virtualToScreen(mpLayout.playAreaWidth / 2, 0, scale, offsetX, offsetY).x;
   // Band rect used for battle DROPS. While the band is still closed (a
   // divider-proxy drop that opens the battle) the current layout has no
   // battle rect yet, so normalize against the rect the band WILL have once
@@ -9357,15 +9362,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             position: 'fixed',
             inset: 0,
             zIndex: 950,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             background: 'rgba(0,0,0,0.4)',
           }}
           onClick={() => dismissPendingReserveMove(pendingReserveMove, false)}
         >
           <div
             style={{
+              position: 'absolute',
+              left: playCenterScreenX,
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
               background: 'var(--gf-bg, #1a1510)',
               border: '1px solid var(--gf-border, #3a3428)',
               borderRadius: 10,
@@ -9536,6 +9542,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       {countPrompt && (
         <CountPromptDialog
+          centerX={playCenterScreenX}
           req={{
             ...countPrompt,
             onConfirm: (count) => {

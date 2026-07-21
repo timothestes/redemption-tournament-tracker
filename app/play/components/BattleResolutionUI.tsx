@@ -127,10 +127,15 @@ function ResolutionButton({ label, tone, onClick }: { label: string; tone: Tone;
  * the picker. No opaque full-screen backdrop — the picker's own bounds are
  * kept small (max-height + scroll) specifically so it doesn't block the
  * chooser's view of the band behind it (spec §8).
+ *
+ * The picker centers on `centerX` — the band's horizontal midline in screen
+ * px, i.e. the middle of the play mat. Viewport centering sat visibly right
+ * of the board (the sidebar piles + chat column all live on the right).
  */
 function AwaitingSoulUI({
   topLeft,
   right,
+  centerX,
   mySeat,
   opponentSeat,
   attackerSeat,
@@ -148,6 +153,8 @@ function AwaitingSoulUI({
 }: {
   topLeft: { x: number; y: number };
   right: { x: number; y: number };
+  /** Horizontal midline of the battle band (= the play mat) in screen px. */
+  centerX: number;
   mySeat: string;
   opponentSeat: string;
   attackerSeat: string;
@@ -230,17 +237,18 @@ function AwaitingSoulUI({
   return (
     <div
       style={{
-        position: 'fixed',
+        position: 'absolute',
         inset: 0,
         zIndex: 900,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
         pointerEvents: 'none',
       }}
     >
       <div
         style={{
+          position: 'absolute',
+          left: centerX,
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
           pointerEvents: 'auto',
           background: 'rgba(14, 10, 6, 0.97)',
           border: '1px solid rgba(107, 78, 39, 0.3)',
@@ -473,12 +481,16 @@ export default function BattleResolutionUI({
   const rowVirtualWidth = 300;
   const topLeft = virtualToScreen(band.x + 8, band.y + band.height - 8, scale, offsetX, offsetY);
   const right = virtualToScreen(band.x + 8 + rowVirtualWidth, band.y + band.height - 8, scale, offsetX, offsetY);
+  // Band horizontal midline = play-mat midline (the band spans the play area
+  // edge to edge) — the soul picker centers on this, not the viewport.
+  const bandCenterX = virtualToScreen(band.x + band.width / 2, band.y, scale, offsetX, offsetY).x;
 
   if (battleState === 'awaiting-soul') {
     return (
       <AwaitingSoulUI
         topLeft={topLeft}
         right={right}
+        centerX={bandCenterX}
         mySeat={mySeat}
         opponentSeat={opponentSeat}
         attackerSeat={attackerSeat}
