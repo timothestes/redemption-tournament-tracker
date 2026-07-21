@@ -108,11 +108,16 @@ export default function GameOverOverlay({
 
   // Play Again from TurnIndicator — one-tap run-it-back with the last deck
   // (both normal and Forge). "Change deck" lives on the result modal / banner.
+  // If the opponent has already requested a rematch, "play again" means
+  // accept it — requesting on top of theirs is a server error.
   useEffect(() => {
-    if (playAgainTriggered && !rematchRequestedBy) {
+    if (!playAgainTriggered) return;
+    if (!rematchRequestedBy) {
       void handleOneTapRematch('request');
-      onPlayAgainHandled?.();
+    } else if (opponentRequested && !rematchResponse) {
+      void handleOneTapRematch('respond');
     }
+    onPlayAgainHandled?.();
   }, [playAgainTriggered, rematchRequestedBy, onPlayAgainHandled, isForge]);
 
   // Deck picker state
@@ -192,7 +197,10 @@ export default function GameOverOverlay({
   };
 
   // Show opponent's rematch request as a persistent banner
-  const showRematchBanner = opponentRequested && !rematchResponse;
+  // Hidden while the picker is open — the banner (z-800) would float above
+  // the body-portaled dialog (z-50) and steal clicks in its footprint. It
+  // returns if the picker is dismissed without a selection.
+  const showRematchBanner = opponentRequested && !rematchResponse && !pickerOpen;
   // Show waiting status
   const showWaitingStatus = iRequested && !rematchResponse;
   // Show rematch result
@@ -207,15 +215,18 @@ export default function GameOverOverlay({
           label={label}
           oppName={oppName}
           isLoupeVisible={isLoupeVisible}
+          // If the opponent already requested a rematch while this modal was
+          // up, "play again" / "change deck" must RESPOND to their request —
+          // firing a second request is a server error.
           onPlayAgain={() => {
             setModalDismissed(true);
-            void handleOneTapRematch('request');
+            void handleOneTapRematch(opponentRequested ? 'respond' : 'request');
           }}
           // Normal games can swap decks between rematches; Forge decks are
           // seat-locked, so the escape hatch is hidden there.
           onChangeDeck={isForge ? undefined : () => {
             setModalDismissed(true);
-            handleChangeDeck('request');
+            handleChangeDeck(opponentRequested ? 'respond' : 'request');
           }}
           onDismiss={() => setModalDismissed(true)}
         />
@@ -340,16 +351,17 @@ export default function GameOverOverlay({
         </div>
       )}
 
-      {/* Deck picker — renders above everything */}
+      {/* Deck picker. Rendered bare like every other DeckPickerModal site —
+          its Dialog portals to document.body (PR #219), so a positioned
+          wrapper here never contains it; a fixed inset-0 wrapper just sits
+          above the portaled dialog and swallows its clicks. */}
       {pickerOpen && (
-        <div style={{ position: 'fixed', inset: 0, right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px', zIndex: 950 }}>
-          <DeckPickerModal
-            open={pickerOpen}
-            onOpenChange={setPickerOpen}
-            onSelect={handleDeckSelected}
-            selectedDeckId={myPlayer?.deckId}
-          />
-        </div>
+        <DeckPickerModal
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onSelect={handleDeckSelected}
+          selectedDeckId={myPlayer?.deckId}
+        />
       )}
 
       {/* Inline CSS animation */}
