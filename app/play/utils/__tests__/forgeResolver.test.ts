@@ -67,10 +67,10 @@ describe("forge image seams", () => {
 });
 
 describe("resolveBattleRowFields", () => {
-  // Battle-zone math (totals/initiative/brigade soft-check) reads CardInstance
-  // rows whose text fields the leak spine blanked for forge cards. The viewer's
-  // granted resolver must re-hydrate name/brigade/stats or forge cards read as
-  // unknown stats and false brigade mismatches.
+  // Battle-zone math (totals/initiative) reads CardInstance rows whose text
+  // fields the leak spine blanked for forge cards. The viewer's granted
+  // resolver must re-hydrate name/brigade/stats or forge cards read as unknown
+  // stats.
   const blankRow = { cardImgFile: `forge:${ID}`, cardName: "", brigade: "", strength: "", toughness: "" };
 
   it("re-hydrates a granted forge row's name/brigade/stats", () => {

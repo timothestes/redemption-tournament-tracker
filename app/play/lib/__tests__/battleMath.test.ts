@@ -3,7 +3,6 @@ import {
   battleSideOf,
   sideTotals,
   computeInitiative,
-  brigadeMismatch,
   summarizeAutoReturn,
   siteAttachedSoulIds,
   parseMeekStats,
@@ -296,95 +295,6 @@ describe('computeInitiative — empty-side and unknown-stat states', () => {
     // Both sides populated with real characters -> falls through to the REG table,
     // not waiting-blocker/no-attacker.
     expect(computeInitiative(cards, '0', '')).toEqual({ kind: 'initiative', seat: '0', reason: 'losing' });
-  });
-});
-
-describe('brigadeMismatch', () => {
-  it('exact single-brigade match -> no mismatch', () => {
-    const enh = mkCard({ brigade: 'Good Gold' });
-    const chars = [mkCard({ brigade: 'Good Gold' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('no matching brigade among same-side characters -> mismatch', () => {
-    const enh = mkCard({ brigade: 'Good Gold' });
-    const chars = [mkCard({ brigade: 'Evil Brown' })];
-    expect(brigadeMismatch(enh, chars)).toBe(true);
-  });
-
-  it('"Multi" on the enhancement matches anything', () => {
-    const enh = mkCard({ brigade: 'Multi' });
-    const chars = [mkCard({ brigade: 'Evil Brown' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('"Good Multi" / "Evil Multi" on a character matches any enhancement brigade', () => {
-    const enh = mkCard({ brigade: 'Good Gold' });
-    const chars = [mkCard({ brigade: 'Evil Multi' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('empty/neutral brigade on the enhancement matches anything', () => {
-    const enh = mkCard({ brigade: '' });
-    const chars = [mkCard({ brigade: 'Evil Brown' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('"Good Gold/Evil Gold" splits on "/" and matches a character with just "Evil Gold"', () => {
-    const enh = mkCard({ brigade: 'Good Gold/Evil Gold' });
-    const chars = [mkCard({ brigade: 'Evil Gold' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('no same-side characters present + a real enhancement brigade -> mismatch', () => {
-    const enh = mkCard({ brigade: 'Good Gold' });
-    expect(brigadeMismatch(enh, [])).toBe(true);
-  });
-
-  it('no same-side characters present + neutral enhancement brigade -> still no mismatch', () => {
-    const enh = mkCard({ brigade: '' });
-    expect(brigadeMismatch(enh, [])).toBe(false);
-  });
-
-  it('forge "Good Gold" enhancement matches an official plain "Gold" character', () => {
-    // Official card data writes plain "Gold" for both good and evil gold;
-    // forge brigades keep them distinct ("Good Gold"/"Evil Gold"). The
-    // soft-check must not flag a forge/official pair over that naming gap.
-    const enh = mkCard({ brigade: 'Good Gold' });
-    const chars = [mkCard({ brigade: 'Gold' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('official plain "Gold" enhancement matches a forge "Evil Gold" character', () => {
-    const enh = mkCard({ brigade: 'Gold' });
-    const chars = [mkCard({ brigade: 'Evil Gold' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('meek-notation character brigade "White (Clay)" matches a White enhancement', () => {
-    // Mary, Holy Virgin (GoC) stores "White (Clay)" (White normally, Clay when
-    // meek). The Child is Born (GoC) is "Silver/White" — its White matches her.
-    const enh = mkCard({ brigade: 'Silver/White' });
-    const chars = [mkCard({ brigade: 'White (Clay)' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('meek-notation sub brigade also counts for matching', () => {
-    const enh = mkCard({ brigade: 'Clay' });
-    const chars = [mkCard({ brigade: 'White (Clay)' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('multi-word brigade inside the parenthetical is not split on whitespace', () => {
-    const enh = mkCard({ brigade: 'Pale Green' });
-    const chars = [mkCard({ brigade: 'Green (Pale Green)' })];
-    expect(brigadeMismatch(enh, chars)).toBe(false);
-  });
-
-  it('meek-notation character still mismatches an unrelated enhancement brigade', () => {
-    const enh = mkCard({ brigade: 'Gold' });
-    const chars = [mkCard({ brigade: 'White (Clay)' })];
-    expect(brigadeMismatch(enh, chars)).toBe(true);
   });
 });
 

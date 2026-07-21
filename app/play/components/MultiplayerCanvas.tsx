@@ -90,7 +90,6 @@ import {
   battleSideOf,
   sideTotals,
   computeInitiative,
-  brigadeMismatch as computeBrigadeMismatch,
   siteAttachedSoulIds,
   parseMeekStats,
   type BattleCardLike,
@@ -168,16 +167,6 @@ interface BattleCardEntry {
   like: BattleCardLike;
 }
 
-/** Mirrors battleMath.ts's private isEnhancementSegment / the server's
- *  enhSegment: exact 'GE'/'EE' segment on cardType, split on '/' and
- *  trimmed — there is no literal "Enhancement" type. */
-function isBattleEnhancementSegment(cardType: string): boolean {
-  return cardType
-    .split('/')
-    .map((s) => s.trim())
-    .some((s) => s === 'GE' || s === 'EE');
-}
-
 /**
  * Whether the Field of Battle band should be open. Phase-driven (spec §4): open
  * while the turn player is in the 'battle' phase, OR whenever battleState is
@@ -192,19 +181,6 @@ export function isBattleBandActive(
   battleState: string,
 ): boolean {
   return status === 'playing' && (currentPhase === 'battle' || battleState !== '');
-}
-
-/**
- * Whether a battle card should get the enhancement brigade soft-check. A dual
- * GE/Character card (e.g. Fire Foxes, "GE/Evil Character") can be played as its
- * CHARACTER side — a being in the band, not an enhancement on a character — so
- * the enhancement brigade rule doesn't apply. Exclude anything that is also a
- * character to avoid false "no matching brigade, discard it" flags. (Downside:
- * a dual card played AS an enhancement with a mismatched brigade won't be
- * flagged — acceptable for a soft advisory, since the mode isn't tracked.)
- */
-export function isBrigadeCheckableEnhancement(cardType: string): boolean {
-  return isBattleEnhancementSegment(cardType) && !isCharacterCard({ cardType });
 }
 
 /** Mirrors battleMath.ts's private isLostSoulLike / the server's
@@ -5327,32 +5303,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return entries;
   }, [battleActive, mpLayout, rawMain.cardWidth, gameState.myPlayer, gameState.opponentPlayer, myCards, opponentCards, forgeResolver]);
 
-  // Brigade soft-check (spec §6): every GE/EE-segment enhancement in the band
-  // whose brigade has no match among same-side characters. Order follows
-  // battleCardEntries (my cards, then opponent cards) so "show the first" is
-  // deterministic; the full list drives the red glow on every mismatched
-  // card, while only mismatchedBattleCards[0] gets the one interactive toast.
-  const mismatchedBattleCards = useMemo(() => {
-    if (battleCardEntries.length === 0) return [] as BattleCardEntry[];
-    const result: BattleCardEntry[] = [];
-    for (const entry of battleCardEntries) {
-      if (!isBrigadeCheckableEnhancement(entry.like.cardType)) continue;
-      const side = battleSideOf(entry.like);
-      const sameSideCharacters = battleCardEntries
-        .filter((e) => e !== entry && battleSideOf(e.like) === side && isCharacterCard({ cardType: e.like.cardType }))
-        .map((e) => e.like);
-      if (computeBrigadeMismatch(entry.like, sameSideCharacters)) {
-        result.push(entry);
-      }
-    }
-    return result;
-  }, [battleCardEntries]);
-
-  const mismatchedBattleCardIds = useMemo(
-    () => new Set(mismatchedBattleCards.map((e) => String(e.row.id))),
-    [mismatchedBattleCards],
-  );
-
   // Stakes Lost Soul rows (spec §5 header: Rescue attempt vs. Battle
   // challenge; spec §7/§8: Task 14's awaiting-soul picker eligibility).
   // Mirrors the server's battleStakesLobLostSouls exactly: T1/T2 use the
@@ -5657,7 +5607,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // player plays into their own RIGHT half (spec §3), so the cue always
   // renders on the viewer's own right half — never re-derive side
   // membership, reuse `battleSideOf` + `isCharacterCard` exactly like the
-  // same-side-character scan above (mismatchedBattleCards) and the
   // empty-side checks inside computeInitiative. Text-only memo (not the
   // Konva nodes themselves) — the actual Group is rendered as a plain
   // conditional near the band background (below card nodes in z-order),
@@ -6830,7 +6779,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     isSelected={isSelected(String(card.id))}
                     isDraggable={!isSpectator}
                     hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
-                    brigadeMismatch={mismatchedBattleCardIds.has(String(card.id))}
                     nodeRef={registerCardNode}
                     onClick={handleCardClick}
                     onDragStart={handleCardDragStart}
@@ -8357,87 +8305,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           })}
         </div>
       )}
-
-      {/* ================================================================
-          Brigade-mismatch toast (Battle Zone soft-check, spec §6, Task 12).
-          Every existing overlay (game toasts, emote overlay, request
-          banners) is pointerEvents:none and top/bottom-anchored — none can
-          host a button, so this gets its own band-edge-anchored container
-          with pointer events enabled. zIndex 600 sits between the drag
-          overlay (450) and GameToast (900). One toast at a time (the first
-          mismatched card, by battleCardEntries order); it disappears on its
-          own once that card leaves the band or the mismatch resolves, since
-          it's a pure function of live battle state — no local dismiss state
-          needed. Never rendered for spectators.
-          ================================================================ */}
-      {!isSpectator && battleActive && gameStatus === 'playing' && mpLayout?.zones.battle && mismatchedBattleCards.length > 0 && (() => {
-        const band = mpLayout.zones.battle;
-        const toastCard = mismatchedBattleCards[0];
-        // Band-edge-anchored: the band's bottom-right corner, clear of the
-        // header/banner (centered) and the totals chips (top corners). The
-        // 250-unit width is reserved in VIRTUAL space, so both corners go
-        // through virtualToScreen and the CSS width is their difference
-        // (the dragHoverZone pattern above) — a raw `width: 250` in screen
-        // px would exceed the reserved virtual span whenever scale < 1.
-        //
-        // BOTTOM-anchored (translateY(-100%)) with the bottom edge pinned
-        // just inside the band: the box grows UPWARD into the band as its
-        // text wraps, never downward — the resolution buttons / awaiting-
-        // soul pill (BattleResolutionUI) sit just BELOW the band's bottom
-        // edge (band bottom + 6), so a top-anchored box that wrapped taller
-        // at small scales used to spill down and cover them. Fonts/padding
-        // additionally scale with the canvas scale (floored at 0.75 → 9px
-        // minimum font, the legibility floor) so the box shrinks roughly
-        // with the band instead of swallowing it at small scales.
-        const toastVirtualWidth = 250;
-        const anchorY = band.y + band.height - 6;
-        const screenBottomLeft = virtualToScreen(band.x + band.width - toastVirtualWidth - 8, anchorY, scale, offsetX, offsetY);
-        const screenRight = virtualToScreen(band.x + band.width - 8, anchorY, scale, offsetX, offsetY);
-        const toastScale = Math.max(0.75, Math.min(1, scale));
-        return (
-          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
-            <div
-              style={{
-                position: 'absolute',
-                left: screenBottomLeft.x,
-                top: screenBottomLeft.y,
-                transform: 'translateY(-100%)',
-                width: screenRight.x - screenBottomLeft.x,
-                pointerEvents: 'auto',
-                background: 'rgba(14, 10, 6, 0.95)',
-                border: '1px solid rgba(220, 38, 38, 0.5)',
-                borderRadius: 8,
-                padding: `${10 * toastScale}px ${12 * toastScale}px`,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8 * toastScale,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
-              }}
-            >
-              <div style={{ fontSize: 12 * toastScale, color: '#e8bfbf', fontFamily: 'var(--font-cinzel), Georgia, serif', lineHeight: 1.4 }}>
-                No matching brigade in battle — REG says discard it
-              </div>
-              <button
-                onClick={() => moveCard(toastCard.row.id, 'discard')}
-                style={{
-                  alignSelf: 'flex-start',
-                  padding: `${6 * toastScale}px ${14 * toastScale}px`,
-                  background: '#5a2727',
-                  border: '1px solid #8a4242',
-                  borderRadius: 6,
-                  color: '#e8bfbf',
-                  fontSize: 12 * toastScale,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  letterSpacing: '0.05em',
-                  cursor: 'pointer',
-                }}
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ================================================================
           Battle resolution buttons (spec §8, Task 13) — dispatch
