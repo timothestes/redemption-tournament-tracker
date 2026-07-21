@@ -1456,6 +1456,43 @@ export const respond_rematch = spacetimedb.reducer(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Reducer: cancel_rematch — requester retracts their own pending rematch
+// request. Only the seat in rematchRequestedBy may cancel, and only while the
+// request is still unanswered. Clears the same fields as the decline branch.
+// ---------------------------------------------------------------------------
+export const cancel_rematch = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'finished') throw new SenderError('Game is not finished');
+    if (game.rematchRequestedBy === '') throw new SenderError('No rematch requested');
+    if (game.rematchResponse !== '') throw new SenderError('Rematch already resolved');
+
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.seat.toString() !== game.rematchRequestedBy) {
+      throw new SenderError('Only the requester can cancel the rematch');
+    }
+
+    ctx.db.Game.id.update({
+      ...game,
+      rematchRequestedBy: '',
+      rematchDeckId0: '',
+      rematchDeckData0: '',
+      rematchDeckId1: '',
+      rematchDeckData1: '',
+      rematchParagon0: '',
+      rematchParagon1: '',
+      rematchResponse: '',
+      rematchCode: '',
+    });
+    logAction(ctx, gameId, player.id, 'REMATCH_CANCELLED',
+      JSON.stringify({ seat: player.seat.toString() }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
 // ===========================================================================
 // Pause reducers (mutually-agreed, honor-system pause)
 // ===========================================================================

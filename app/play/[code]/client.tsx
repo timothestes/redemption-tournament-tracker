@@ -1571,6 +1571,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
                 onBackToLobby={opponentDisconnected ? handleReturnToLobby : undefined}
                 rematchPending={rematchPending}
+                onCancelRematch={gameState.cancelRematch}
                 myScore={gameState.soulsRescued.me}
                 opponentScore={gameState.soulsRescued.opponent}
                 timerDisplay={gameTimer.formatted}
@@ -1754,6 +1755,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
               onBackToLobby={opponentDisconnected ? handleReturnToLobby : undefined}
               rematchPending={rematchPending}
+              onCancelRematch={gameState.cancelRematch}
               myScore={gameState.soulsRescued.me}
               opponentScore={gameState.soulsRescued.opponent}
               timerDisplay={gameTimer.formatted}

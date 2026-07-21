@@ -22,7 +22,7 @@ interface GameOverOverlayProps {
   playAgainTriggered?: boolean;
   onPlayAgainHandled?: () => void;
   // Forge playtest games skip the deck picker for rematches — the same
-  // authorized deck is reused automatically (see handleForgeRematch below).
+  // authorized deck is reused automatically (see handleOneTapRematch below).
   isForge?: boolean;
   myDeckId?: string;
 }
@@ -106,16 +106,11 @@ export default function GameOverOverlay({
     return () => clearTimeout(timer);
   }, [outcome]);
 
-  // Open deck picker when Play Again is triggered from TurnIndicator. Forge
-  // games skip the picker entirely — the same authorized deck is reused.
+  // Play Again from TurnIndicator — one-tap run-it-back with the last deck
+  // (both normal and Forge). "Change deck" lives on the result modal / banner.
   useEffect(() => {
     if (playAgainTriggered && !rematchRequestedBy) {
-      if (isForge) {
-        void handleForgeRematch('request');
-      } else {
-        setPickerMode('request');
-        setPickerOpen(true);
-      }
+      void handleOneTapRematch('request');
       onPlayAgainHandled?.();
     }
   }, [playAgainTriggered, rematchRequestedBy, onPlayAgainHandled, isForge]);
@@ -129,23 +124,50 @@ export default function GameOverOverlay({
   // The game status changes from 'finished' to 'pregame/rolling' automatically
   // via SpacetimeDB subscription — no navigation needed.
 
-  // Forge rematch handler — reuses the same authorized deck (myDeckId) instead
-  // of opening the deck picker. Forge decks are authorized once per seat at
-  // create/join time; request_rematch/respond_rematch don't re-check that
-  // authorization, so this is the only place enforcing "same deck" for forge
-  // rematches.
-  const handleForgeRematch = async (mode: 'request' | 'respond') => {
-    if (!myDeckId) return;
+  // One-tap rematch — reuse the deck the player last played (myDeckId), no
+  // picker. This is the primary "run it back" path for both normal and Forge
+  // games. Forge decks are authorized once per seat at create/join time and
+  // reload via loadForgeDeckForGame; normal decks reload via loadDeckForGame
+  // and carry the player's current paragon. If the deck can't be loaded we fall
+  // back to the picker (normal only) so the player is never stuck on a dead
+  // button. request_rematch/respond_rematch don't re-check deck authorization,
+  // so this is the only place enforcing "same deck" for a one-tap rematch.
+  const handleOneTapRematch = async (mode: 'request' | 'respond') => {
+    if (!myDeckId) {
+      // No known last deck — fall back to the picker (shouldn't happen for Forge).
+      handleChangeDeck(mode);
+      return;
+    }
     setIsLoading(true);
     try {
-      const r = await loadForgeDeckForGame(myDeckId);
-      if (r.ok === false) { console.error('Forge rematch deck load failed:', r.error); return; }
-      const deckData = JSON.stringify(r.deckData);
-      if (mode === 'request') gameState.requestRematch(myDeckId, deckData, r.deck.paragon, r.deck.format || 'Type 1');
-      else gameState.respondRematch(true, myDeckId, deckData, r.deck.paragon, r.deck.format || 'Type 1');
+      if (isForge) {
+        const r = await loadForgeDeckForGame(myDeckId);
+        if (r.ok === false) { console.error('Forge rematch deck load failed:', r.error); return; }
+        const deckData = JSON.stringify(r.deckData);
+        if (mode === 'request') gameState.requestRematch(myDeckId, deckData, r.deck.paragon, r.deck.format || 'Type 1');
+        else gameState.respondRematch(true, myDeckId, deckData, r.deck.paragon, r.deck.format || 'Type 1');
+      } else {
+        const result = await loadDeckForGame(myDeckId);
+        const deckData = JSON.stringify(result.deckData);
+        const paragon = myPlayer?.paragon ?? '';
+        const format = result.deck.format || 'Type 1';
+        if (mode === 'request') gameState.requestRematch(myDeckId, deckData, paragon, format);
+        else gameState.respondRematch(true, myDeckId, deckData, paragon, format);
+      }
+    } catch (e) {
+      console.error('Rematch deck load failed:', e);
+      if (!isForge) handleChangeDeck(mode); // don't strand the player on a dead button
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Change deck (normal only) — open the picker; handleDeckSelected fires the
+  // request/respond using pickerMode. Forge decks are seat-locked, so Forge
+  // never surfaces this escape hatch.
+  const handleChangeDeck = (mode: 'request' | 'respond') => {
+    setPickerMode(mode);
+    setPickerOpen(true);
   };
 
   // Deck selected handler
@@ -187,12 +209,13 @@ export default function GameOverOverlay({
           isLoupeVisible={isLoupeVisible}
           onPlayAgain={() => {
             setModalDismissed(true);
-            if (isForge) {
-              void handleForgeRematch('request');
-            } else {
-              setPickerMode('request');
-              setPickerOpen(true);
-            }
+            void handleOneTapRematch('request');
+          }}
+          // Normal games can swap decks between rematches; Forge decks are
+          // seat-locked, so the escape hatch is hidden there.
+          onChangeDeck={isForge ? undefined : () => {
+            setModalDismissed(true);
+            handleChangeDeck('request');
           }}
           onDismiss={() => setModalDismissed(true)}
         />
@@ -241,19 +264,15 @@ export default function GameOverOverlay({
         <RematchRequestBanner
           oppName={oppName}
           isLoading={isLoading}
-          onAccept={() => {
-            if (isForge) {
-              void handleForgeRematch('respond');
-            } else {
-              setPickerMode('respond');
-              setPickerOpen(true);
-            }
-          }}
+          onAccept={() => void handleOneTapRematch('respond')}
+          // Normal games can accept with a different deck; Forge is seat-locked.
+          onChangeDeck={isForge ? undefined : () => handleChangeDeck('respond')}
           onDecline={() => gameState.respondRematch(false, '', '', '', '')}
         />
       )}
 
-      {/* Waiting/result status toast */}
+      {/* Waiting/result status toast. While waiting for the opponent, the
+          requester can cancel and retract the pending rematch. */}
       {(showWaitingStatus || showRematchResult) && (
         <div style={{
           position: 'absolute',
@@ -265,6 +284,9 @@ export default function GameOverOverlay({
           border: `1px solid ${rematchResponse === 'declined' ? 'rgba(180, 60, 60, 0.3)' : 'rgba(107, 78, 39, 0.4)'}`,
           borderRadius: 8,
           padding: '10px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
           boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
         }}>
           <p style={{
@@ -275,6 +297,7 @@ export default function GameOverOverlay({
               : rematchResponse === 'accepted'
                 ? 'rgba(196, 149, 90, 0.7)'
                 : 'rgba(196, 149, 90, 0.5)',
+            whiteSpace: 'nowrap',
           }}>
             {rematchResponse === 'declined'
               ? (iRequested ? 'Opponent declined.' : 'You declined.')
@@ -282,6 +305,38 @@ export default function GameOverOverlay({
                 ? 'Setting up rematch...'
                 : 'Waiting for opponent...'}
           </p>
+          {showWaitingStatus && (
+            <button
+              onClick={() => gameState.cancelRematch()}
+              style={{
+                padding: '5px 12px',
+                borderRadius: 4,
+                border: '1px solid rgba(107, 78, 39, 0.4)',
+                background: 'transparent',
+                color: 'rgba(196, 149, 90, 0.6)',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.14s, color 0.14s, border-color 0.14s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(196, 149, 90, 0.12)';
+                e.currentTarget.style.color = 'rgba(196, 149, 90, 0.85)';
+                e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = 'rgba(196, 149, 90, 0.6)';
+                e.currentTarget.style.borderColor = 'rgba(107, 78, 39, 0.4)';
+              }}
+            >
+              Cancel
+            </button>
+          )}
         </div>
       )}
 
@@ -329,6 +384,7 @@ function GameOverModal({
   oppName,
   isLoupeVisible,
   onPlayAgain,
+  onChangeDeck,
   onDismiss,
 }: {
   didWin: boolean;
@@ -336,6 +392,8 @@ function GameOverModal({
   oppName: string;
   isLoupeVisible: boolean;
   onPlayAgain: () => void;
+  /** Normal games only — open the deck picker instead of one-tap reuse. */
+  onChangeDeck?: () => void;
   onDismiss: () => void;
 }) {
   const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
@@ -459,6 +517,31 @@ function GameOverModal({
             Dismiss
           </button>
         </div>
+
+        {/* Change deck — quiet secondary escape hatch (normal games only). */}
+        {onChangeDeck && (
+          <button
+            onClick={onChangeDeck}
+            style={{
+              marginTop: 14,
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              color: 'rgba(196, 149, 90, 0.5)',
+              fontFamily: 'Georgia, serif',
+              fontSize: 12,
+              letterSpacing: '0.04em',
+              textDecoration: 'underline',
+              textUnderlineOffset: 3,
+              cursor: 'pointer',
+              transition: 'color 0.14s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(196, 149, 90, 0.85)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(196, 149, 90, 0.5)'; }}
+          >
+            Change deck
+          </button>
+        )}
       </div>
     </div>
   );
@@ -472,11 +555,14 @@ function RematchRequestBanner({
   oppName,
   isLoading,
   onAccept,
+  onChangeDeck,
   onDecline,
 }: {
   oppName: string;
   isLoading: boolean;
   onAccept: () => void;
+  /** Normal games only — accept the rematch with a different deck. */
+  onChangeDeck?: () => void;
   onDecline: () => void;
 }) {
   const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
@@ -558,6 +644,31 @@ function RematchRequestBanner({
       >
         Decline
       </button>
+      {/* Change deck — quiet secondary escape hatch (normal games only). */}
+      {onChangeDeck && (
+        <button
+          onClick={onChangeDeck}
+          disabled={isLoading}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            color: 'rgba(196, 149, 90, 0.5)',
+            fontFamily: 'Georgia, serif',
+            fontSize: 12,
+            letterSpacing: '0.04em',
+            textDecoration: 'underline',
+            textUnderlineOffset: 3,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            transition: 'color 0.14s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(196, 149, 90, 0.85)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(196, 149, 90, 0.5)'; }}
+        >
+          Change deck
+        </button>
+      )}
     </div>
   );
 }
