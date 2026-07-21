@@ -303,7 +303,6 @@ function PlayerCards({
   myPlayer,
   gameState,
   showDice,
-  skipped,
   isForge,
   onDeckChanged,
 }: {
@@ -319,7 +318,6 @@ function PlayerCards({
   myPlayer: any;
   gameState: GameState;
   showDice: boolean;
-  skipped?: boolean;
   isForge?: boolean;
   onDeckChanged?: (next: { deckId: string; deckName: string; deckData: string; paragon: string }) => void;
 }) {
@@ -370,21 +368,12 @@ function PlayerCards({
 
   // Die animation state — track whether dice have been revealed for this session
   const [diceRevealed, setDiceRevealed] = useState(false);
-  const [diceSkipped, setDiceSkipped] = useState(false);
   useEffect(() => {
     if (!showDice) return;
     // Start tumbling after a brief pause
     const timer = setTimeout(() => setDiceRevealed(true), 600);
     return () => clearTimeout(timer);
   }, [showDice]);
-
-  // Click-to-skip — land the dice on the known result immediately.
-  useEffect(() => {
-    if (skipped) {
-      setDiceSkipped(true);
-      setDiceRevealed(true);
-    }
-  }, [skipped]);
 
   return (
     <>
@@ -418,7 +407,6 @@ function PlayerCards({
                 accentColor="#c4955a"
                 isWinner={iWonRoll}
                 revealed={diceRevealed}
-                skipAnimation={diceSkipped}
               />
             </div>
           )}
@@ -447,7 +435,6 @@ function PlayerCards({
                     accentColor="#4a7ab5"
                     isWinner={!iWonRoll}
                     revealed={diceRevealed}
-                    skipAnimation={diceSkipped}
                   />
                 </div>
               )}
@@ -484,29 +471,23 @@ export function InlineDie({
   accentColor,
   isWinner,
   revealed,
-  skipAnimation,
 }: {
   finalValue: number;
   accentColor: string;
   isWinner: boolean;
   revealed: boolean;
-  skipAnimation?: boolean;
 }) {
   // Only reveal the "Winner" label after the die has actually landed,
   // otherwise the result is spoiled before the tumble animation finishes.
   const [landed, setLanded] = useState(false);
   useEffect(() => {
-    if (skipAnimation) {
-      setLanded(true);
-      return;
-    }
     if (!revealed) {
       setLanded(false);
       return;
     }
     const timer = setTimeout(() => setLanded(true), RITUAL_TUMBLE_MS);
     return () => clearTimeout(timer);
-  }, [revealed, skipAnimation]);
+  }, [revealed]);
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -516,7 +497,6 @@ export function InlineDie({
         size={56}
         isWinner={isWinner}
         revealed={revealed}
-        skipAnimation={skipAnimation}
       />
       {isWinner && landed && (
         <motion.span
@@ -656,10 +636,6 @@ function WaitingActions({
 
 export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) {
   const { game, myPlayer, opponentPlayer } = gameState;
-  // The roll result is server-authoritative (rollResult0/1, rollWinner) — the
-  // tumble is pure client theater, so skipping just races the local view to
-  // the known outcome and fires the pending auto-acks early (WS-3 §4).
-  const [skipped, setSkipped] = useState(false);
   if (!game || !myPlayer) return null;
 
   const phase = game.pregamePhase;
@@ -685,7 +661,6 @@ export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) 
           myPlayer={myPlayer}
           gameState={gameState}
           showDice={true}
-          skipped={skipped}
         />
 
         {/* Action area */}
@@ -697,7 +672,6 @@ export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) 
               iWonRoll={iWonRoll}
               opponentName={opponentName}
               myPlayer={myPlayer}
-              skipped={skipped}
             />
           ) : phase === 'revealing' ? (
             <RevealArea
@@ -705,20 +679,9 @@ export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) 
               myPlayer={myPlayer}
               opponentName={opponentName}
               iWonRoll={iWonRoll}
-              skipped={skipped}
             />
           ) : null}
         </div>
-
-        {/* Skip — reveals the outcome instantly; choosing stays a real click */}
-        {!skipped && (phase === 'rolling' || phase === 'revealing') && (
-          <button
-            onClick={() => setSkipped(true)}
-            className="mt-4 text-[11px] text-amber-200/40 hover:text-amber-200/70 font-cinzel tracking-widest uppercase transition-colors"
-          >
-            Skip ▸
-          </button>
-        )}
       </div>
     </div>
   );
@@ -826,14 +789,12 @@ function RollAndChooseArea({
   iWonRoll,
   opponentName,
   myPlayer,
-  skipped,
 }: {
   gameState: GameState;
   phase: string;
   iWonRoll: boolean;
   opponentName: string;
   myPlayer: any;
-  skipped?: boolean;
 }) {
   const { game } = gameState;
   const hasChosenRef = useRef(false);
@@ -855,14 +816,10 @@ function RollAndChooseArea({
   // Show results = dice have landed (we track this via a brief delay)
   const [showResults, setShowResults] = useState(false);
   useEffect(() => {
-    if (skipped) {
-      setShowResults(true);
-      return;
-    }
     // Show results after tumble animation completes
     const timer = setTimeout(() => setShowResults(true), RITUAL_TUMBLE_MS + 700);
     return () => clearTimeout(timer);
-  }, [skipped]);
+  }, []);
 
   // Auto-acknowledge roll for the loser (after tumble + display time).
   // Depend on the *stable* reducer callback (useCallback in useGameState), not
@@ -873,15 +830,11 @@ function RollAndChooseArea({
   useEffect(() => {
     if (iWonRoll || myRollAcked) return;
     if (phase !== 'rolling') return;
-    if (skipped) {
-      acknowledgeRoll();
-      return;
-    }
     const timer = setTimeout(() => {
       acknowledgeRoll();
     }, RITUAL_TUMBLE_MS + ROLLING_RESULT_DISPLAY_MS);
     return () => clearTimeout(timer);
-  }, [iWonRoll, myRollAcked, phase, acknowledgeRoll, skipped]);
+  }, [iWonRoll, myRollAcked, phase, acknowledgeRoll]);
 
   // Countdown timer — synced to server deadline
   useEffect(() => {
@@ -977,13 +930,11 @@ function RevealArea({
   myPlayer,
   opponentName,
   iWonRoll,
-  skipped,
 }: {
   gameState: GameState;
   myPlayer: any;
   opponentName: string;
   iWonRoll: boolean;
-  skipped?: boolean;
 }) {
   const { game } = gameState;
   if (!game || !myPlayer) return null;
@@ -1014,15 +965,11 @@ function RevealArea({
   const acknowledgeFirst = gameState.pregameAcknowledgeFirst;
   useEffect(() => {
     if (alreadyAcked) return;
-    if (skipped) {
-      acknowledgeFirst();
-      return;
-    }
     const timer = setTimeout(() => {
       acknowledgeFirst();
     }, REVEAL_AUTO_ACK_MS);
     return () => clearTimeout(timer);
-  }, [alreadyAcked, acknowledgeFirst, skipped]);
+  }, [alreadyAcked, acknowledgeFirst]);
 
   return (
     <motion.div
@@ -1151,31 +1098,20 @@ function RitualDie({
   size,
   isWinner,
   revealed,
-  skipAnimation,
 }: {
   finalValue: number;
   accentColor: string;
   size: number;
   isWinner: boolean;
   revealed: boolean;
-  skipAnimation?: boolean;
 }) {
   const [displayValue, setDisplayValue] = useState<number | '?'>('?');
   const [isTumbling, setIsTumbling] = useState(false);
   const [showSparks, setShowSparks] = useState(false);
 
-  // Skip: immediately land on final value
   useEffect(() => {
-    if (skipAnimation && displayValue !== finalValue) {
-      setIsTumbling(false);
-      setDisplayValue(finalValue);
-      setShowSparks(true);
-    }
-  }, [skipAnimation, finalValue, displayValue]);
-
-  useEffect(() => {
-    if (!revealed || skipAnimation) {
-      if (!skipAnimation) setDisplayValue('?');
+    if (!revealed) {
+      setDisplayValue('?');
       return;
     }
 
@@ -1194,7 +1130,7 @@ function RitualDie({
     }, RITUAL_TUMBLE_MS / RITUAL_TUMBLE_FRAMES);
 
     return () => clearInterval(interval);
-  }, [revealed, finalValue, skipAnimation]);
+  }, [revealed, finalValue]);
 
   return (
     <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
