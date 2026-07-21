@@ -56,10 +56,13 @@ function OpponentDisconnectBanner({ connectionStatus }: { connectionStatus: 'con
 export function OpponentJoinedToast({ name }: { name: string }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
+      // Horizontal centering lives in framer's x, not a Tailwind translate
+      // class — motion.div owns the inline transform and would clobber
+      // -translate-x-1/2, leaving the toast hanging right of center.
+      initial={{ opacity: 0, y: -8, x: '-50%' }}
+      animate={{ opacity: 1, y: 0, x: '-50%' }}
       transition={{ duration: 0.25 }}
-      className="absolute top-16 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-amber-200/20 bg-black/85 backdrop-blur-sm px-4 py-2.5 pointer-events-none"
+      className="absolute top-16 left-1/2 z-50 rounded-lg border border-amber-200/20 bg-black/85 backdrop-blur-sm px-4 py-2.5 pointer-events-none"
     >
       <p className="font-cinzel text-sm text-amber-200/90 tracking-wide whitespace-nowrap">
         ⚔️ {name} joined — rolling for first player…
