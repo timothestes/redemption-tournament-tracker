@@ -26,7 +26,7 @@ import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
 import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext';
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
-import PregameScreen, { PregameCeremonyOverlay } from '../components/PregameScreen';
+import PregameScreen, { PregameCeremonyOverlay, OpponentJoinedToast } from '../components/PregameScreen';
 import { ImageLoadingGate } from '../components/ImageLoadingGate';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerImagePreloader';
@@ -185,6 +185,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [formatMismatch, setFormatMismatch] = useState<{ host: string; joiner: string } | null>(null);
   const [isSelfJoin, setIsSelfJoin] = useState(false);
   const [isPracticing, setIsPracticing] = useState(false);
+  // WS-3 §3: transient "{name} joined" toast for the host when the opponent's
+  // join yanks them out of the waiting room (or practice) into the ceremony.
+  const JOINED_TOAST_MS = 2500;
+  const [justJoinedToast, setJustJoinedToast] = useState<string | null>(null);
   // Guards against a visual flash: once the user chooses to leave, we freeze the
   // render on a transition overlay so that subsequent SpacetimeDB state updates
   // (which re-derive `lifecycle` and can fall through to the game canvas) can't
@@ -480,22 +484,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       }
     };
   }, [imagesGateOpen, gameId]);
-
-  // Gate the pregame "Ready up" button on this client's own deck images
-  // being preloaded. Otherwise a slow-wifi player can mark themselves ready
-  // while still downloading cards, and the server-anchored choose-first
-  // countdown burns against them. Same 8s safety fallback as the board gate
-  // so a truly-offline user is never blocked forever.
-  const myDeckImagesPreloaded =
-    myDeckImageUrls.length > 0 && areUrlsLoaded(myDeckImageUrls);
-  const [deckPreloadFallback, setDeckPreloadFallback] = useState(false);
-  useEffect(() => {
-    if (myDeckImageUrls.length === 0) return;
-    if (myDeckImagesPreloaded) return;
-    const timer = setTimeout(() => setDeckPreloadFallback(true), IMAGE_GATE_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [myDeckImageUrls.length, myDeckImagesPreloaded]);
-  const canReady = myDeckImagesPreloaded || deckPreloadFallback;
 
   // Game timer — anchored to server-recorded playingStartedAtMicros so elapsed
   // time survives navigating away and back to the game. Server-authoritative
@@ -933,6 +921,30 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const gameStateRef = useRef(gameState);
   gameStateRef.current = gameState;
 
+  // WS-3 §3: the host was in the waiting room (possibly practicing) and the
+  // opponent's join moves the game straight into the roll ceremony — announce
+  // it. Reading the opponent name via gameStateRef (not a dep) is deliberate:
+  // gameState is a fresh object every render, and this must fire once per
+  // lifecycle change only. Joiners (prev 'joining') initiated the join;
+  // rematches (prev 'finished') and refreshes (prev 'creating') aren't a join.
+  const prevLifecycleForToastRef = useRef<LifecycleState>('creating');
+  useEffect(() => {
+    const prev = prevLifecycleForToastRef.current;
+    prevLifecycleForToastRef.current = lifecycle;
+    if (lifecycle === 'pregame' && prev === 'waiting') {
+      setIsPracticing(false);
+      setJustJoinedToast(gameStateRef.current.opponentPlayer?.displayName || 'Opponent');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lifecycle]);
+
+  useEffect(() => {
+    if (!justJoinedToast) return;
+    const timer = setTimeout(() => setJustJoinedToast(null), JOINED_TOAST_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justJoinedToast]);
+
   // Track whether the page is being unloaded (refresh / tab close) so we can
   // skip the synchronous leave_game on unmount in that case. Refreshes fire
   // React's useEffect cleanup BEFORE the page tears down, and calling
@@ -1147,7 +1159,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         />
         <div className="relative z-10 text-center">
           <p className="font-cinzel text-xl tracking-wide text-amber-200/90 mb-6">
-            {loadingMessage}
+            {lifecycle === 'joining' && isConnected ? 'Connected — starting game…' : loadingMessage}
           </p>
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-amber-200/50 border-t-transparent mx-auto" />
         </div>
@@ -1366,7 +1378,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         onTogglePublic={isForge ? undefined : gameId && conn ? (isPublic: boolean) => {
           conn.reducers.setGamePublic({ gameId, isPublic });
         } : undefined}
-        canReady={canReady}
         isForge={isForge}
         onDeckChanged={(next) => {
           // Mirror the practice-swap bookkeeping: keep gameParams/sessionStorage
@@ -1454,6 +1465,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
+            {justJoinedToast && <OpponentJoinedToast name={justJoinedToast} />}
             {/* Suppress the load gate during the pregame ceremony — its 30s
                 choose-first timer is server-anchored and ticks regardless of
                 client preloading, so we don't want a full-screen loader

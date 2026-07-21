@@ -27,7 +27,7 @@ export const Game = table(
     isPublic: t.bool(),
     lobbyMessage: t.string(),
     createdByName: t.string(),
-    pregamePhase: t.string(),     // "" | "deck_select" | "rolling" | "choosing"
+    pregamePhase: t.string(),     // "" | "rolling" | "choosing" | "revealing"
     pregameReady0: t.bool(),      // seat 0 ready (reused for roll ack)
     pregameReady1: t.bool(),      // seat 1 ready (reused for roll ack)
     rollWinner: t.string(),       // "" | "0" | "1" — string to avoid 0n ambiguity

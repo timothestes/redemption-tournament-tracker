@@ -137,7 +137,6 @@ export interface GameState {
   leaveGame: () => void;
   claimTimeoutVictory: () => void;
   // Pregame ceremony actions
-  pregameReady: (ready: boolean) => void;
   pregameAcknowledgeRoll: () => void;
   pregameChooseFirst: (chosenSeat: bigint) => void;
   pregameAcknowledgeFirst: () => void;
@@ -775,10 +774,6 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     conn.reducers.claimTimeoutVictory({ gameId });
   }, [conn, gameId]);
 
-  const pregameReady = useCallback((ready: boolean) => {
-    conn?.reducers.pregameReady({ gameId, ready });
-  }, [conn, gameId]);
-
   const pregameAcknowledgeRoll = useCallback(() => {
     conn?.reducers.pregameAcknowledgeRoll({ gameId });
   }, [conn, gameId]);
@@ -1014,7 +1009,6 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     resignGame,
     leaveGame,
     claimTimeoutVictory,
-    pregameReady,
     pregameAcknowledgeRoll,
     pregameChooseFirst,
     pregameAcknowledgeFirst,
@@ -1326,7 +1320,6 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     resignGame: noop,
     leaveGame: noop,
     claimTimeoutVictory: noop,
-    pregameReady: noopBool,
     pregameAcknowledgeRoll: noop,
     pregameChooseFirst: noopBigint,
     pregameAcknowledgeFirst: noop,
