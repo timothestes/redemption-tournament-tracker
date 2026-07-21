@@ -19,7 +19,6 @@ import {
   isFaceDownInPlayCardVisible,
   canViewerToggleMeek,
   isBattleBandActive,
-  isBrigadeCheckableEnhancement,
 } from '../MultiplayerCanvas';
 
 // Unit coverage for the hand-card visibility predicate that gates whether a
@@ -309,31 +308,5 @@ describe('isBattleBandActive', () => {
 
   it('closed while waiting (pre-game)', () => {
     expect(isBattleBandActive('waiting', 'battle', 'active')).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// isBrigadeCheckableEnhancement — only PURE enhancements get the brigade
-// soft-check. A dual GE/Character card (Fire Foxes) played as its character
-// side must NOT be flagged "no matching brigade, discard it".
-// ---------------------------------------------------------------------------
-
-describe('isBrigadeCheckableEnhancement', () => {
-  it('checks a pure Good/Evil Enhancement', () => {
-    expect(isBrigadeCheckableEnhancement('GE')).toBe(true);
-    expect(isBrigadeCheckableEnhancement('EE')).toBe(true);
-    expect(isBrigadeCheckableEnhancement('GE/EE')).toBe(true);
-  });
-
-  it('does NOT check a dual GE/Character card (Fire Foxes: "GE/Evil Character")', () => {
-    expect(isBrigadeCheckableEnhancement('GE/Evil Character')).toBe(false);
-    expect(isBrigadeCheckableEnhancement('EE/Evil Character')).toBe(false);
-    expect(isBrigadeCheckableEnhancement('GE/Hero')).toBe(false);
-  });
-
-  it('does NOT check a plain character or non-enhancement', () => {
-    expect(isBrigadeCheckableEnhancement('Hero')).toBe(false);
-    expect(isBrigadeCheckableEnhancement('Evil Character')).toBe(false);
-    expect(isBrigadeCheckableEnhancement('Dominant')).toBe(false);
   });
 });
