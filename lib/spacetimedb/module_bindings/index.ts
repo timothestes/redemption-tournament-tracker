@@ -38,6 +38,7 @@ import AddCounterReducer from "./add_counter_reducer";
 import ApproveZoneSearchReducer from "./approve_zone_search_reducer";
 import AttachCardReducer from "./attach_card_reducer";
 import CancelPauseRequestReducer from "./cancel_pause_request_reducer";
+import CancelRematchReducer from "./cancel_rematch_reducer";
 import ClaimTimeoutVictoryReducer from "./claim_timeout_victory_reducer";
 import ClearRevealedCardsReducer from "./clear_revealed_cards_reducer";
 import CompleteZoneSearchReducer from "./complete_zone_search_reducer";
@@ -405,6 +406,7 @@ const reducersSchema = __reducers(
   __reducerSchema("approve_zone_search", ApproveZoneSearchReducer),
   __reducerSchema("attach_card", AttachCardReducer),
   __reducerSchema("cancel_pause_request", CancelPauseRequestReducer),
+  __reducerSchema("cancel_rematch", CancelRematchReducer),
   __reducerSchema("claim_timeout_victory", ClaimTimeoutVictoryReducer),
   __reducerSchema("clear_revealed_cards", ClearRevealedCardsReducer),
   __reducerSchema("complete_zone_search", CompleteZoneSearchReducer),
