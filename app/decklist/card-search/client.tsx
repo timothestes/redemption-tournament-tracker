@@ -1720,7 +1720,7 @@ export default function CardSearchClient({
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="bg-background text-foreground transition-colors duration-200 flex-1 flex flex-col overflow-auto md:overflow-hidden">
+        <div className="bg-background text-foreground transition-colors duration-200 flex-1 flex flex-col overflow-y-auto overflow-x-hidden md:overflow-hidden">
           <div className="p-1.5 md:p-2 flex flex-col items-center md:sticky md:top-0 z-40 bg-background text-foreground border-b border-border shadow-sm">
         <div className="relative w-full px-1 md:px-2 flex flex-col items-center justify-center gap-1.5 md:gap-2">
           <div className="w-full flex flex-col gap-1.5 md:gap-2 text-center">
@@ -2218,7 +2218,7 @@ export default function CardSearchClient({
         )}
       </div>
       {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
-      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-between px-3 py-1.5 bg-background border-b border-border`}>
+      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row flex-wrap items-center justify-between gap-y-1.5 px-3 py-1.5 bg-background border-b border-border`}>
         <div className="flex items-center gap-1.5">
           <label htmlFor="card-sort-mobile" className="text-xs text-muted-foreground font-medium">Sort:</label>
           <select
