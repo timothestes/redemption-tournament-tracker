@@ -145,6 +145,7 @@ export interface GameState {
   // Rematch actions
   requestRematch: (deckId: string, deckData: string, paragon: string, format: string) => void;
   respondRematch: (accepted: boolean, deckId: string, deckData: string, paragon: string, format: string) => void;
+  cancelRematch: () => void;
   revealCards: (cardIds: string, context?: string) => void;
   clearRevealedCards: () => void;
   logSearchDeck: () => void;
@@ -802,6 +803,10 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     conn?.reducers.respondRematch({ gameId, accepted, deckId, deckData, paragon, format });
   }, [conn, gameId]);
 
+  const cancelRematch = useCallback(() => {
+    conn?.reducers.cancelRematch({ gameId });
+  }, [conn, gameId]);
+
   const logSearchDeck = useCallback(() => {
     conn?.reducers.logSearchDeck({ gameId });
   }, [conn, gameId]);
@@ -1016,6 +1021,7 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     pregameChangeDeck,
     requestRematch,
     respondRematch,
+    cancelRematch,
     zoneSearchRequests,
     incomingSearchRequest,
     approvedSearchRequest,
@@ -1327,6 +1333,7 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     pregameChangeDeck: useCallback((_deckId: string, _deckData: string, _paragon: string) => {}, []),
     requestRematch: useCallback((_deckId: string, _deckData: string, _paragon: string, _format: string) => {}, []),
     respondRematch: useCallback((_accepted: boolean, _deckId: string, _deckData: string, _paragon: string, _format: string) => {}, []),
+    cancelRematch: useCallback(() => {}, []),
     revealCards: useCallback((_cardIds: string, _context?: string) => {}, []),
     clearRevealedCards: noop,
     logSearchDeck: noop,

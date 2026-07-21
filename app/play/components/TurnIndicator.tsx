@@ -140,6 +140,8 @@ interface TurnIndicatorProps {
   timerVisible?: boolean;
   /** Whether a rematch request has been sent and we're waiting for the opponent. */
   rematchPending?: boolean;
+  /** Retract a locally-initiated pending rematch request. */
+  onCancelRematch?: () => void;
   /** Send a pause request to the opponent. */
   onRequestPause?: () => void;
   /** Send a resume request to the opponent. */
@@ -180,6 +182,7 @@ export default function TurnIndicator({
   timerPaused = false,
   timerVisible = true,
   rematchPending = false,
+  onCancelRematch,
   onRequestPause,
   onRequestResume,
   onCancelPauseRequest,
@@ -746,36 +749,69 @@ export default function TurnIndicator({
           minWidth: 0,
         }}
       >
-        {isFinished && onPlayAgain && (
+        {/* While a rematch request is pending, the button retracts it; otherwise
+            it starts a one-tap rematch. The "Waiting for opponent…" copy lives on
+            the GameOverOverlay toast, so this slot just offers the action. */}
+        {isFinished && onPlayAgain && rematchPending && (
           <button
-            onClick={rematchPending ? undefined : onPlayAgain}
-            disabled={rematchPending}
+            onClick={onCancelRematch}
+            disabled={!onCancelRematch}
+            title="Cancel the pending rematch request"
             style={{
               padding: '5px 12px',
-              background: rematchPending ? 'rgba(107, 78, 39, 0.1)' : 'rgba(196, 149, 90, 0.15)',
-              border: `1px solid ${rematchPending ? 'rgba(107, 78, 39, 0.25)' : 'rgba(196, 149, 90, 0.45)'}`,
+              background: 'transparent',
+              border: '1px solid rgba(107, 78, 39, 0.4)',
               borderRadius: 4,
-              cursor: rematchPending ? 'default' : 'pointer',
+              cursor: onCancelRematch ? 'pointer' : 'default',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               fontSize: FZ.ui,
               letterSpacing: '0.07em',
               textTransform: 'uppercase',
-              color: rematchPending ? 'rgba(196, 149, 90, 0.35)' : '#e8d5a3',
+              color: 'rgba(196, 149, 90, 0.6)',
               transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-              opacity: rematchPending ? 0.7 : 1,
             }}
             onMouseEnter={(e) => {
-              if (rematchPending) return;
+              if (!onCancelRematch) return;
+              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.12)';
+              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.4)';
+              e.currentTarget.style.color = 'rgba(196, 149, 90, 0.85)';
+            }}
+            onMouseLeave={(e) => {
+              if (!onCancelRematch) return;
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'rgba(107, 78, 39, 0.4)';
+              e.currentTarget.style.color = 'rgba(196, 149, 90, 0.6)';
+            }}
+          >
+            Cancel
+          </button>
+        )}
+        {isFinished && onPlayAgain && !rematchPending && (
+          <button
+            onClick={onPlayAgain}
+            style={{
+              padding: '5px 12px',
+              background: 'rgba(196, 149, 90, 0.15)',
+              border: '1px solid rgba(196, 149, 90, 0.45)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: FZ.ui,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: '#e8d5a3',
+              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
               e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
             }}
             onMouseLeave={(e) => {
-              if (rematchPending) return;
               e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
               e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
             }}
           >
-            {rematchPending ? 'Waiting...' : 'Play Again'}
+            Play Again
           </button>
         )}
         {isFinished && !onPlayAgain && onBackToLobby && (
