@@ -1306,7 +1306,7 @@ export default function AdminRegistrationsPage() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-border bg-muted/30">
-                      <td className="px-4 py-3 text-sm text-right font-semibold" colSpan={11}>
+                      <td className="px-4 py-3 text-sm text-right font-semibold" colSpan={12}>
                         Total ({filteredRegistrations.length} {filteredRegistrations.length === 1 ? 'registrant' : 'registrants'})
                       </td>
                       <td className="px-4 py-3 text-sm">
