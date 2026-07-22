@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
@@ -199,6 +199,16 @@ export default function AdminRegistrationsPage() {
     paidFilter,
     lunchFormFilter,
   ]);
+
+  // Entry number = position in chronological (registration) order, independent of filters/sort.
+  const entryNumberMap = useMemo(() => {
+    const chronological = [...registrations].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    const map = new Map<string, number>();
+    chronological.forEach((reg, index) => map.set(reg.id, index + 1));
+    return map;
+  }, [registrations]);
 
   const handleDelete = (id: string, name: string) => {
     setDeletingRegistration({ id, name });
@@ -587,6 +597,7 @@ export default function AdminRegistrationsPage() {
     };
 
     const headers = [
+      "Entry #",
       "First Name",
       "Last Name",
       "Email",
@@ -613,6 +624,7 @@ export default function AdminRegistrationsPage() {
     ];
 
     const rows = filteredRegistrations.map((reg) => [
+      entryNumberMap.get(reg.id) ?? "",
       reg.first_name,
       reg.last_name,
       reg.email,
@@ -1040,6 +1052,7 @@ export default function AdminRegistrationsPage() {
                           )}
                         </button>
                       </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">#</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Name</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Photo</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
@@ -1073,6 +1086,9 @@ export default function AdminRegistrationsPage() {
                               </svg>
                             )}
                           </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">
+                          {entryNumberMap.get(reg.id)}
                         </td>
                         <td className="px-4 py-3 text-sm max-w-[150px] truncate" title={`${reg.first_name} ${reg.last_name}`}>
                           {reg.first_name} {reg.last_name}
@@ -1290,7 +1306,7 @@ export default function AdminRegistrationsPage() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-border bg-muted/30">
-                      <td className="px-4 py-3 text-sm text-right font-semibold" colSpan={11}>
+                      <td className="px-4 py-3 text-sm text-right font-semibold" colSpan={12}>
                         Total ({filteredRegistrations.length} {filteredRegistrations.length === 1 ? 'registrant' : 'registrants'})
                       </td>
                       <td className="px-4 py-3 text-sm">
