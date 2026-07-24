@@ -114,6 +114,49 @@ export default function RnrsClient({ data }: { data: NormalizedData }) {
     setView("lookup");
   };
 
+  const onExportCsv = () => {
+    if (sortedRows.length === 0) return;
+
+    const escapeCsv = (value: string | number): string => {
+      const str = String(value ?? "");
+      return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+
+    const headers = [
+      "Rank",
+      "Player",
+      "State",
+      "Region",
+      ...LEVELS.map((l) => LEVEL_LABELS[l]),
+      "Total",
+    ];
+
+    const rows = sortedRows.map((row, i) => [
+      i + 1,
+      row.displayName,
+      row.state,
+      row.region,
+      ...LEVELS.map((l) => row.levels[l].counted),
+      row.total,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCsv).join(","))
+      .join("\r\n");
+
+    // Prepend a BOM so Excel reads it as UTF-8
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const formatPart = format === "all" ? "all-formats" : format;
+    a.download = `rnrs-points-${season}-${formatPart}-${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
   const sortButtons: { label: string; key: SortKey }[] = [
     { label: "Total pts", key: "total" },
     { label: "Name", key: "name" },
@@ -298,6 +341,15 @@ export default function RnrsClient({ data }: { data: NormalizedData }) {
             <span className="ml-auto text-xs text-muted-foreground tabular-nums">
               {sortedRows.length} player{sortedRows.length !== 1 ? "s" : ""}
             </span>
+
+            <button
+              type="button"
+              onClick={onExportCsv}
+              disabled={sortedRows.length === 0}
+              className={`${controlClass} disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              Export CSV
+            </button>
           </div>
 
           <RnrsLeaderboard
