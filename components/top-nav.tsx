@@ -204,7 +204,8 @@ const TopNav: React.FC = () => {
 
           {/* Desktop Navigation - Center */}
           <div className="hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center">
-            {navLinks.slice(0, 1).map((link) => {
+            {/* Highlighted lead link (e.g. Nationals registration) — only when present */}
+            {navLinks.filter((link) => link.highlight).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -387,8 +388,8 @@ const TopNav: React.FC = () => {
               )}
             </div>
 
-            {/* Rest of nav links */}
-            {navLinks.slice(2).map((link) => {
+            {/* Rest of nav links (Play is rendered separately above, so exclude it) */}
+            {navLinks.filter((link) => !link.highlight && link.href !== "/play").map((link) => {
               if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
