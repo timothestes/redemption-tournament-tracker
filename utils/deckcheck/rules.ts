@@ -1,4 +1,5 @@
 import { ResolvedCard, DeckCheckIssue, CardGroup } from "./types";
+import { FormatDef, PARAGON_EXCLUDED_SETS } from "@/lib/formats";
 
 // ---------------------------------------------------------------------------
 // Helper predicates
@@ -85,67 +86,6 @@ export function getMaxPerFifty(
 function pluralize(name: string): string {
   if (/(?:s|x|z|sh|ch)$/i.test(name)) return `${name}es`;
   return `${name}s`;
-}
-
-// ---------------------------------------------------------------------------
-// Banned card definitions
-// ---------------------------------------------------------------------------
-
-interface BannedCardDef {
-  name: string;
-  set?: string;
-  reference?: string;
-  note: string;
-}
-
-const BANNED_CARDS: BannedCardDef[] = [
-  { name: "Daniel", set: "Cloud of Witnesses", note: "Daniel (Cloud of Witnesses)" },
-  {
-    name: "Endless Treasures",
-    set: "Prophecies of Christ",
-    note: "Endless Treasures (Prophecies of Christ)",
-  },
-  {
-    name: "Ephesian Widow",
-    set: "Persecuted Church",
-    note: "Ephesian Widow (Persecuted Church)",
-  },
-  {
-    reference: "Proverbs 22:14",
-    name: "Lost Soul",
-    note: 'Lost Soul "Proverbs 22:14" (all versions)',
-  },
-  {
-    name: "Mourn and Weep",
-    set: "Prophecies of Christ",
-    note: "Mourn and Weep (Prophecies of Christ)",
-  },
-  {
-    name: "Samuel",
-    set: "Rock of Ages 2011",
-    note: "Samuel (Rock of Ages 2011)",
-  },
-  {
-    name: "The Foretelling Angel",
-    set: "Persecuted Church",
-    note: "The Foretelling Angel (Persecuted Church)",
-  },
-];
-
-function matchesBannedCard(card: ResolvedCard, ban: BannedCardDef): boolean {
-  // Reference-based match (Lost Soul Proverbs 22:14)
-  if (ban.reference) {
-    return card.reference === ban.reference;
-  }
-  // Name + set match (using canonicalName for version tolerance)
-  const nameMatch =
-    card.name.toLowerCase() === ban.name.toLowerCase() ||
-    (card.canonicalName ?? "").toLowerCase() === ban.name.toLowerCase();
-  if (!nameMatch) return false;
-  if (ban.set) {
-    return card.set.toLowerCase() === ban.set.toLowerCase();
-  }
-  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -351,24 +291,29 @@ function sharesAlignment(a: ResolvedCard, b: ResolvedCard): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Rule: t1-deck-size — Main deck must be 50-154 cards.
+ * Rule: t1-deck-size — Main deck size must fall within [min, max].
+ * Defaults to the T1 (Limited/Unlimited) range of 50-70.
  */
-export function checkDeckSize(mainDeckCards: ResolvedCard[]): DeckCheckIssue[] {
+export function checkDeckSize(
+  mainDeckCards: ResolvedCard[],
+  min = 50,
+  max = 70
+): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
   const size = mainDeckCards.reduce((sum, c) => sum + c.quantity, 0);
 
-  if (size < 50) {
+  if (size < min) {
     issues.push({
       type: "error",
       rule: "t1-deck-size",
-      message: `Main deck has ${size} cards — minimum is 50.`,
+      message: `Main deck has ${size} cards — minimum is ${min}.`,
     });
   }
-  if (size > 154) {
+  if (size > max) {
     issues.push({
       type: "error",
       rule: "t1-deck-size",
-      message: `Main deck has ${size} cards — maximum is 154.`,
+      message: `Main deck has ${size} cards — maximum is ${max}.`,
     });
   }
 
@@ -411,19 +356,20 @@ export function checkLostSoulCount(
 }
 
 /**
- * Rule: t1-reserve-size — Reserve may have 0-10 cards.
+ * Rule: t1-reserve-size — Reserve may have 0-max cards (default max 10).
  */
 export function checkReserveSize(
-  reserveCards: ResolvedCard[]
+  reserveCards: ResolvedCard[],
+  max = 10
 ): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
   const size = reserveCards.reduce((sum, c) => sum + c.quantity, 0);
 
-  if (size > 10) {
+  if (size > max) {
     issues.push({
       type: "error",
       rule: "t1-reserve-size",
-      message: `Reserve has ${size} cards — maximum is 10.`,
+      message: `Reserve has ${size} cards — maximum is ${max}.`,
     });
   }
 
@@ -902,36 +848,42 @@ export function checkSitesCitiesLimit(
 }
 
 /**
- * Rule: t1-banned-card — Certain cards are banned in Type 1.
+ * Rule: pool-legality — every card must belong to the format's card pool.
+ * First-ever pool enforcement (previously search-filter only, spec §4).
  */
-export function checkBannedCards(
+export function checkPoolLegality(
+  def: FormatDef,
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[]
 ): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
-  const allCards = [...mainDeckCards, ...reserveCards];
-
-  for (const card of allCards) {
+  if (def.pool === "all") return issues;
+  for (const card of [...mainDeckCards, ...reserveCards]) {
     if (card.quantity === 0) continue;
-    for (const ban of BANNED_CARDS) {
-      if (matchesBannedCard(card, ban)) {
-        issues.push({
-          type: "error",
-          rule: "t1-banned-card",
-          message: `"${card.name}" (${card.set}) is banned in Type 1: ${ban.note}.`,
-          cards: [card.name],
-        });
-      }
+    if (card.type === "") continue; // card-not-found stub — card-not-found warning already fired
+    if (def.pool === "rotation" && card.legality !== "Rotation") {
+      issues.push({
+        type: "error",
+        rule: "pool-legality",
+        message: `"${card.name}" (${card.set}) is not in the ${def.label} card pool.`,
+        cards: [card.name],
+      });
+    } else if (def.pool === "paragon" && PARAGON_EXCLUDED_SETS.has(card.officialSet)) {
+      issues.push({
+        type: "error",
+        rule: "pool-legality",
+        message: `"${card.name}" (${card.set}) is from a set that is not Paragon legal.`,
+        cards: [card.name],
+      });
     }
   }
-
   return issues;
 }
 
 /**
  * Helper: check if a card matches one of the special exception cards.
  */
-function isSpecialExceptionCard(card: ResolvedCard): boolean {
+export function isSpecialExceptionCard(card: ResolvedCard): boolean {
   for (const spec of SPECIAL_CARDS) {
     if (matchesSpecialCard(card, spec)) return true;
   }
@@ -1020,12 +972,14 @@ export function checkSpecialCards(
 /**
  * Validate a deck against all Type 1 rules.
  *
+ * @param def            - The format definition (Limited or Unlimited)
  * @param mainDeckCards  - Resolved cards in the main deck
  * @param reserveCards   - Resolved cards in the reserve
  * @param cardGroups     - Cards grouped by canonical name (across all versions)
  * @returns All issues found
  */
 export function validateT1Rules(
+  def: FormatDef,
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[],
   cardGroups: CardGroup[]
@@ -1033,9 +987,9 @@ export function validateT1Rules(
   const issues: DeckCheckIssue[] = [];
 
   // Structural rules
-  issues.push(...checkDeckSize(mainDeckCards));
+  issues.push(...checkDeckSize(mainDeckCards, def.main.min, def.main.max));
   issues.push(...checkLostSoulCount(mainDeckCards));
-  issues.push(...checkReserveSize(reserveCards));
+  issues.push(...checkReserveSize(reserveCards, def.reserveMax));
   issues.push(...checkReserveContents(reserveCards));
 
   // Dominant rules
@@ -1060,8 +1014,8 @@ export function validateT1Rules(
   // Sites + Cities
   issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
 
-  // Banned cards
-  issues.push(...checkBannedCards(mainDeckCards, reserveCards));
+  // Pool legality
+  issues.push(...checkPoolLegality(def, mainDeckCards, reserveCards));
 
   // Special card exceptions
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
@@ -1108,9 +1062,10 @@ export function checkParagonDeckSize(mainDeckCards: ResolvedCard[]): DeckCheckIs
  *
  * Paragon skips: Lost Soul count check, Dominant-vs-Lost-Soul limit.
  * Paragon keeps: deck size (40 exact), reserve size/contents, dominant uniqueness,
- *                mutual exclusion, quantity rules, banned cards, etc.
+ *                mutual exclusion, quantity rules, pool legality, etc.
  */
 export function validateParagonRules(
+  def: FormatDef,
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[],
   cardGroups: CardGroup[]
@@ -1121,7 +1076,7 @@ export function validateParagonRules(
   issues.push(...checkParagonDeckSize(mainDeckCards));
 
   // Reserve rules (same as T1: max 10, no Dominants/LS in reserve)
-  issues.push(...checkReserveSize(reserveCards));
+  issues.push(...checkReserveSize(reserveCards, def.reserveMax));
   issues.push(...checkReserveContents(reserveCards));
 
   // Dominant uniqueness (max 1 copy of each — still applies)
@@ -1142,8 +1097,8 @@ export function validateParagonRules(
   // Sites + Cities
   issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
 
-  // Banned cards
-  issues.push(...checkBannedCards(mainDeckCards, reserveCards));
+  // Pool legality
+  issues.push(...checkPoolLegality(def, mainDeckCards, reserveCards));
 
   // Special card exceptions
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
@@ -1597,12 +1552,15 @@ export function checkGoodEvilBalance(
 /**
  * Validate a deck against all Type 2 rules.
  *
+ * @param def            - The T2 format definition (unused for now — T2's
+ *                         internals are parameterized in a later task)
  * @param mainDeckCards  - Resolved cards in the main deck
  * @param reserveCards   - Resolved cards in the reserve
  * @param cardGroups     - Cards grouped by canonical name (across all versions)
  * @returns All issues found
  */
 export function validateT2Rules(
+  def: FormatDef,
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[],
   cardGroups: CardGroup[]
@@ -1626,7 +1584,6 @@ export function validateT2Rules(
   issues.push(...checkDominantUnique(mainDeckCards, reserveCards, cardGroups));
   issues.push(...checkMutualExclusion(mainDeckCards, reserveCards));
   issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
-  issues.push(...checkBannedCards(mainDeckCards, reserveCards));
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
 
   // Character alias checks (dual-alignment characters with different names)

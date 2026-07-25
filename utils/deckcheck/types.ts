@@ -30,6 +30,8 @@ export interface ResolvedCard {
   alignment: string; // Good, Evil, Good/Evil, Neutral
   reference: string;
   imgFile: string;
+  legality: string; // e.g. "Rotation", "Banned", "" — from CardData
+  officialSet: string; // canonical set name — from CardData
   // Same-card identity
   duplicateGroupId?: number; // from duplicate_card_groups table
   canonicalName?: string; // canonical name from the group

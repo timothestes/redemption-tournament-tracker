@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ResolvedCard, CardGroup } from "../types";
+import { FORMATS } from "@/lib/formats";
 import {
   isLostSoul,
   isHopperLostSoul,
@@ -38,6 +39,8 @@ function makeCard(overrides: Partial<ResolvedCard> = {}): ResolvedCard {
     alignment: "Good",
     reference: "",
     imgFile: "test-card.jpg",
+    legality: "",
+    officialSet: "",
     ...overrides,
   };
 }
@@ -1625,7 +1628,7 @@ describe("validateT2Rules", () => {
       ([name, cards]) => makeGroup(name, cards)
     );
 
-    const issues = validateT2Rules(mainDeck, reserve, cardGroups);
+    const issues = validateT2Rules(FORMATS.T2, mainDeck, reserve, cardGroups);
     const errors = issues.filter((i) => i.type === "error");
     expect(errors).toHaveLength(0);
   });
@@ -1665,7 +1668,7 @@ describe("validateT2Rules", () => {
       ([name, cards]) => makeGroup(name, cards)
     );
 
-    const issues = validateT2Rules(mainDeck, [], cardGroups);
+    const issues = validateT2Rules(FORMATS.T2, mainDeck, [], cardGroups);
     const errors = issues.filter((i) => i.type === "error");
 
     // Should detect at least: deck size, LS count, good/evil balance
@@ -1707,7 +1710,7 @@ describe("validateT2Rules", () => {
       ([name, cards]) => makeGroup(name, cards)
     );
 
-    const issues = validateT2Rules(mainDeck, reserve, cardGroups);
+    const issues = validateT2Rules(FORMATS.T2, mainDeck, reserve, cardGroups);
     const errors = issues.filter((i) => i.type === "error");
     expect(errors).toHaveLength(0);
   });
@@ -1736,7 +1739,7 @@ describe("validateT2Rules", () => {
       ([name, cards]) => makeGroup(name, cards)
     );
 
-    const issues = validateT2Rules(mainDeck, reserve, cardGroups);
+    const issues = validateT2Rules(FORMATS.T2, mainDeck, reserve, cardGroups);
     const balanceErrors = issues.filter(
       (i) => i.rule === "t2-good-evil-balance" && i.type === "error"
     );
@@ -1767,7 +1770,7 @@ describe("validateT2Rules", () => {
       ([name, cards]) => makeGroup(name, cards)
     );
 
-    const issues = validateT2Rules(mainDeck, reserve, cardGroups);
+    const issues = validateT2Rules(FORMATS.T2, mainDeck, reserve, cardGroups);
     const sizeErrors = issues.filter(
       (i) => i.rule === "t2-reserve-size" && i.type === "error"
     );
@@ -1785,7 +1788,7 @@ describe("validateT2Rules", () => {
     const mainDeck = makeValidMainDeck(100, [overLimitCard]);
     const cardGroups = [makeGroup("Moses", [overLimitCard])];
 
-    const issues = validateT2Rules(mainDeck, [], cardGroups);
+    const issues = validateT2Rules(FORMATS.T2, mainDeck, [], cardGroups);
     const quantityErrors = issues.filter(
       (i) =>
         i.rule === "t2-quantity-character-enhancement" && i.type === "error"

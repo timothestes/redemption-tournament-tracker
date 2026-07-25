@@ -7,6 +7,7 @@ import {
 } from "./types";
 import { findCard } from "./cardDatabase";
 import { resolveCardIdentity } from "./sameCard";
+import { getFormatDef } from "@/lib/formats";
 import {
   validateT1Rules,
   validateT2Rules,
@@ -60,6 +61,8 @@ async function resolveCard(
       alignment: cardData.alignment,
       reference: cardData.reference,
       imgFile: card.imgFile ?? cardData.imgFile,
+      legality: cardData.legality,
+      officialSet: cardData.officialSet,
     };
   } else {
     // Card not found — create a stub with empty fields and emit a warning
@@ -78,6 +81,8 @@ async function resolveCard(
       alignment: "",
       reference: "",
       imgFile: card.imgFile ?? "",
+      legality: "",
+      officialSet: "",
     };
 
     warning = {
@@ -261,7 +266,7 @@ export async function checkDeck(
   reserve: DeckCheckCard[],
   format?: string
 ): Promise<DeckCheckResult> {
-  const resolvedFormat = format ?? "Type 1";
+  const def = getFormatDef(format);
   const issues: DeckCheckIssue[] = [];
 
   // Step 1 & 2: Resolve all cards (database lookup + same-card identity)
@@ -288,14 +293,12 @@ export async function checkDeck(
   const cardGroups = buildCardGroups(allResolvedCards);
 
   // Step 4: Run rules based on format
-  const fmtLower = resolvedFormat.toLowerCase();
-  const isT2 = fmtLower.includes("type 2");
-  const isParagon = fmtLower.includes("paragon");
-  const ruleIssues = isParagon
-    ? validateParagonRules(mainDeckCards, reserveCards, cardGroups)
-    : isT2
-      ? validateT2Rules(mainDeckCards, reserveCards, cardGroups)
-      : validateT1Rules(mainDeckCards, reserveCards, cardGroups);
+  const ruleIssues =
+    def.family === "Paragon"
+      ? validateParagonRules(def, mainDeckCards, reserveCards, cardGroups)
+      : def.family === "T2"
+        ? validateT2Rules(def, mainDeckCards, reserveCards, cardGroups)
+        : validateT1Rules(def, mainDeckCards, reserveCards, cardGroups);
   issues.push(...ruleIssues);
 
   // Step 5: Build stats
@@ -306,9 +309,10 @@ export async function checkDeck(
     .filter((c) => isLostSoul(c))
     .reduce((sum, c) => sum + c.quantity, 0);
 
-  const requiredLostSouls = isT2
-    ? getT2RequiredLostSouls(mainDeckSize)
-    : getRequiredLostSouls(mainDeckSize);
+  const requiredLostSouls =
+    def.family === "T2"
+      ? getT2RequiredLostSouls(mainDeckSize)
+      : getRequiredLostSouls(mainDeckSize);
 
   const dominantCount = allResolvedCards
     .filter((c) => isDominant(c))
@@ -322,7 +326,7 @@ export async function checkDeck(
 
   return {
     valid: !hasErrors,
-    format: resolvedFormat,
+    format: def.id,
     issues,
     stats: {
       mainDeckSize,
