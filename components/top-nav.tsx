@@ -17,7 +17,8 @@ import { createClient } from "../utils/supabase/client";
 import { getUserSafe } from "../utils/supabase/getUserSafe";
 import { signOutAction } from "../app/actions";
 import { useIsAdmin } from "../hooks/useIsAdmin";
-import { NATIONALS_CONFIG } from "../app/config/nationals";
+// Hidden until Nationals 2026 registration reopens next year — see commented nav link below.
+// import { NATIONALS_CONFIG } from "../app/config/nationals";
 
 // @supabase/ssr's createBrowserClient is already a singleton in the browser,
 // but binding the result to a module-level const keeps the JS reference stable
@@ -127,7 +128,8 @@ const TopNav: React.FC = () => {
   type NavLink = { href: string; label: string; icon: IconType; highlight?: boolean; authRequired?: boolean; isNew?: boolean };
 
   const navLinks: NavLink[] = [
-    { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
+    // Hidden until Nationals 2026 registration reopens next year — re-enable this link and the NATIONALS_CONFIG import above.
+    // { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
     { href: "/play", label: "Play", icon: GiCrossedSwords },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
