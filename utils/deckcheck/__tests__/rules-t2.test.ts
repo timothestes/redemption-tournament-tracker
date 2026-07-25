@@ -13,7 +13,10 @@ import {
   checkT2DeckSize,
   checkT2LostSoulCount,
   checkT2ReserveSize,
-  checkT2QuantityLimits,
+  checkT2CopyLimit,
+  checkLostSoulAbilityLimit,
+  checkDominantUnique,
+  checkSpecialCards,
   checkGoodEvilBalance,
   validateT2Rules,
 } from "../rules";
@@ -39,7 +42,7 @@ function makeCard(overrides: Partial<ResolvedCard> = {}): ResolvedCard {
     alignment: "Good",
     reference: "",
     imgFile: "test-card.jpg",
-    legality: "",
+    legality: "Rotation",
     officialSet: "",
     ...overrides,
   };
@@ -161,8 +164,8 @@ function makeValidMainDeck(
 }
 
 /**
- * Spread `total` across multiple unique cards, each with quantity <= 4,
- * to stay within T2 quantity limits.
+ * Spread `total` across multiple unique cards, each with quantity <= 2,
+ * to stay within the T2 flat 2-copy limit.
  */
 function makeFillerCards(
   total: number,
@@ -175,7 +178,7 @@ function makeFillerCards(
   let remaining = total;
   let idx = 0;
   while (remaining > 0) {
-    const qty = Math.min(4, remaining);
+    const qty = Math.min(2, remaining);
     cards.push(
       makeCard({
         name: `${prefix} ${idx}`,
@@ -493,20 +496,20 @@ describe("checkT2DeckSize", () => {
     expect(issues).toHaveLength(0);
   });
 
-  it("passes for 200-card deck (mid range)", () => {
-    const deck = [makeCard({ name: "Big Deck", quantity: 200 })];
+  it("passes for 120-card deck (mid range)", () => {
+    const deck = [makeCard({ name: "Mid Deck", quantity: 120 })];
     const issues = checkT2DeckSize(deck);
     expect(issues).toHaveLength(0);
   });
 
-  it("passes for 252-card deck (maximum)", () => {
-    const deck = [makeCard({ name: "Max Deck", quantity: 252 })];
+  it("passes for 140-card deck (maximum)", () => {
+    const deck = [makeCard({ name: "Max Deck", quantity: 140 })];
     const issues = checkT2DeckSize(deck);
     expect(issues).toHaveLength(0);
   });
 
-  it("errors for 253-card deck (above maximum)", () => {
-    const deck = [makeCard({ name: "Too Big", quantity: 253 })];
+  it("errors for 141-card deck (above maximum)", () => {
+    const deck = [makeCard({ name: "Too Big", quantity: 141 })];
     const issues = checkT2DeckSize(deck);
     expect(issues).toHaveLength(1);
     expect(issues[0].type).toBe("error");
@@ -649,16 +652,16 @@ describe("checkT2ReserveSize", () => {
     expect(issues).toHaveLength(0);
   });
 
-  it("passes for 15 reserve cards (maximum)", () => {
-    const reserve = Array.from({ length: 15 }, (_, i) =>
+  it("passes for 20 reserve cards (maximum)", () => {
+    const reserve = Array.from({ length: 20 }, (_, i) =>
       makeCard({ name: `Reserve Card ${i}`, identifier: `r-${i}`, isReserve: true })
     );
     const issues = checkT2ReserveSize(reserve);
     expect(issues).toHaveLength(0);
   });
 
-  it("errors for 16 reserve cards (above maximum)", () => {
-    const reserve = Array.from({ length: 16 }, (_, i) =>
+  it("errors for 21 reserve cards (above maximum)", () => {
+    const reserve = Array.from({ length: 21 }, (_, i) =>
       makeCard({ name: `Reserve Card ${i}`, identifier: `r-${i}`, isReserve: true })
     );
     const issues = checkT2ReserveSize(reserve);
@@ -677,586 +680,122 @@ describe("checkT2ReserveSize", () => {
 });
 
 // ===========================================================================
-// E. T2 Quantity Limits
+// E. T2 Copy Limit / Ability Souls / Sizes
 // ===========================================================================
 
-describe("checkT2QuantityLimits", () => {
-  // ---- Max 1: 3+ brigades ----
-
-  describe("3+ brigade cards (max 1)", () => {
-    it("errors when a 3-brigade card has 2 copies", () => {
-      const card = makeCard({
-        name: "Triple Brigade Hero",
-        brigade: "Blue/Red/Green",
-        type: "Hero",
-        quantity: 2,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Triple Brigade Hero", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-3plus-brigade"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
+describe("t2-copy-limit (flat 2)", () => {
+  it("rejects 3 copies of any ordinary card", () => {
+    const card = makeCard({
+      name: "Ordinary Hero",
+      type: "Hero",
+      brigade: "Blue",
+      alignment: "Good",
+      quantity: 3,
     });
-
-    it("passes when a 3-brigade card has 1 copy", () => {
-      const card = makeCard({
-        name: "Triple Brigade Hero",
-        brigade: "Blue/Red/Green",
-        type: "Hero",
-        quantity: 1,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Triple Brigade Hero", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-3plus-brigade"
-      );
-      expect(relevant).toHaveLength(0);
-    });
+    const groups = [makeGroup("Ordinary Hero", [card])];
+    const issues = checkT2CopyLimit(groups);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].type).toBe("error");
+    expect(issues[0].rule).toBe("t2-copy-limit");
   });
 
-  // ---- Max 1: Multi brigade ----
-
-  describe("Multi brigade cards (max 1)", () => {
-    it("errors when a Multi brigade card has 2 copies", () => {
-      const card = makeCard({
-        name: "Multi Hero",
-        brigade: "Multi",
-        type: "Hero",
-        quantity: 2,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Multi Hero", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-3plus-brigade"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
+  it("allows 2 copies of a 3-brigade card (old tier capped at 1)", () => {
+    const card = makeCard({
+      name: "Triple Brigade Hero",
+      type: "Hero",
+      brigade: "Blue/Red/Green",
+      alignment: "Good",
+      quantity: 2,
     });
-
-    it("passes when a Multi brigade card has 1 copy", () => {
-      const card = makeCard({
-        name: "Multi Hero",
-        brigade: "Multi",
-        type: "Hero",
-        quantity: 1,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Multi Hero", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-3plus-brigade"
-      );
-      expect(relevant).toHaveLength(0);
-    });
+    const groups = [makeGroup("Triple Brigade Hero", [card])];
+    const issues = checkT2CopyLimit(groups);
+    expect(issues).toHaveLength(0);
   });
 
-  // Note: Dominant uniqueness (max 1) is tested via checkDominantUnique in rules.test.ts
-  // It's not duplicated in checkT2QuantityLimits.
+  it("skips dominants (own rule)", () => {
+    const dominant = makeDominant({ name: "Son of God", quantity: 2 });
+    const groups = [makeGroup("Son of God", [dominant])];
 
-  // ---- Max 2: 2-brigade cards ----
+    const copyIssues = checkT2CopyLimit(groups);
+    expect(copyIssues).toHaveLength(0);
 
-  describe("2-brigade cards (max 2)", () => {
-    it("passes when a 2-brigade card has 2 copies", () => {
-      const card = makeCard({
-        name: "Dual Brigade Hero",
-        brigade: "Blue/Red",
-        type: "Hero",
-        quantity: 2,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Dual Brigade Hero", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-2-brigade"
-      );
-      expect(relevant).toHaveLength(0);
-    });
-
-    it("errors when a 2-brigade card has 3 copies", () => {
-      const card = makeCard({
-        name: "Dual Brigade Hero",
-        brigade: "Blue/Red",
-        type: "Hero",
-        quantity: 3,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Dual Brigade Hero", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-2-brigade"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
-    });
+    const dominantIssues = checkDominantUnique([dominant], [], groups);
+    expect(
+      dominantIssues.some((i) => i.rule === "t1-dominant-unique")
+    ).toBe(true);
   });
 
-  // ---- Max 2: SA Lost Soul ----
-
-  describe("Lost Souls with special ability (max 2)", () => {
-    it("passes when an SA Lost Soul has 2 copies", () => {
-      const card = makeLostSoul({
-        name: "Lost Soul (Wanderer)",
-        specialAbility: "When this Lost Soul is rescued, you may search your deck.",
-        quantity: 2,
-        identifier: "ls-wanderer",
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Lost Soul (Wanderer)", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-ls-ability"
-      );
-      expect(relevant).toHaveLength(0);
+  it("skips special exception cards", () => {
+    // Locust from the Pit (RoJ): checkSpecialCards allows up to 10 at 100
+    // cards (5 per 50). The old tiers only exempted exceptions from the
+    // 3+-brigade tier, so a single-brigade Locust would have been wrongly
+    // capped at 4 by "t2-quantity-vanilla-site"-style tiers. The flat
+    // t2-copy-limit rule must exempt it entirely, deferring to checkSpecialCards.
+    const locust = makeCard({
+      name: "Locust from the Pit",
+      type: "Evil Character",
+      brigade: "Black",
+      alignment: "Evil",
+      set: "RoJ",
+      quantity: 8,
     });
+    const mainDeck = makeValidMainDeck(100, [locust]);
+    const groups = [makeGroup("Locust from the Pit", [locust])];
 
-    it("errors when an SA Lost Soul has 3 copies", () => {
-      const card = makeLostSoul({
-        name: "Lost Soul (Wanderer)",
-        specialAbility: "When this Lost Soul is rescued, you may search your deck.",
-        quantity: 3,
-        identifier: "ls-wanderer",
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Lost Soul (Wanderer)", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-ls-ability"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
+    const copyIssues = checkT2CopyLimit(groups);
+    expect(copyIssues).toHaveLength(0);
+
+    const specialIssues = checkSpecialCards(mainDeck, [], groups);
+    expect(
+      specialIssues.filter((i) => i.rule === "t1-special-card")
+    ).toHaveLength(0);
+  });
+});
+
+describe("t2-ls-ability (max 1)", () => {
+  it("rejects 2 copies of an ability soul", () => {
+    const card = makeLostSoul({
+      name: "Lost Soul (Wanderer)",
+      specialAbility: "When this Lost Soul is rescued, you may search your deck.",
+      reference: "Isaiah 42:18",
+      quantity: 2,
+      identifier: "ls-wanderer",
     });
+    const issues = checkLostSoulAbilityLimit([card], [], [], 1, "t2-ls-ability");
+    expect(issues).toHaveLength(1);
+    expect(issues[0].rule).toBe("t2-ls-ability");
   });
 
-  // ---- Max 2: SA Site/City with 1 brigade ----
+  it("allows multiple no-ability souls", () => {
+    const souls = makeLostSouls(4); // no specialAbility — exempt from this rule
+    const issues = checkLostSoulAbilityLimit(souls, [], [], 1, "t2-ls-ability");
+    expect(issues.filter((i) => i.rule === "t2-ls-ability")).toHaveLength(0);
+  });
+});
 
-  describe("SA Sites/Cities with 1 brigade (max 2)", () => {
-    it("passes when an SA Site with 1 brigade has 2 copies", () => {
-      const card = makeCard({
-        name: "Bethlehem",
-        type: "Site",
-        brigade: "Purple",
-        specialAbility: "Some special ability text.",
-        alignment: "Neutral",
-        quantity: 2,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Bethlehem", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-sa-site-city"
-      );
-      expect(relevant).toHaveLength(0);
-    });
-
-    it("errors when an SA Site with 1 brigade has 3 copies", () => {
-      const card = makeCard({
-        name: "Bethlehem",
-        type: "Site",
-        brigade: "Purple",
-        specialAbility: "Some special ability text.",
-        alignment: "Neutral",
-        quantity: 3,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Bethlehem", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-sa-site-city"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
-    });
+describe("t2 sizes", () => {
+  it("rejects 141+ main", () => {
+    const deck = [makeCard({ name: "Too Big", quantity: 141 })];
+    const issues = checkT2DeckSize(deck);
+    expect(issues.some((i) => i.rule === "t2-deck-size")).toBe(true);
   });
 
-  // ---- Max 3: Artifact/Fortress/Covenant/Curse with 1 brigade ----
-
-  describe("Artifacts/Fortresses/Covenants/Curses with 1 brigade (max 3)", () => {
-    it("passes when an Artifact with 1 brigade has 3 copies", () => {
-      const card = makeCard({
-        name: "Ark of the Covenant",
-        type: "Artifact",
-        brigade: "Gold",
-        alignment: "Good",
-        quantity: 3,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Ark of the Covenant", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-artifact-fortress"
-      );
-      expect(relevant).toHaveLength(0);
-    });
-
-    it("errors when an Artifact with 1 brigade has 4 copies", () => {
-      const card = makeCard({
-        name: "Ark of the Covenant",
-        type: "Artifact",
-        brigade: "Gold",
-        alignment: "Good",
-        quantity: 4,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Ark of the Covenant", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-artifact-fortress"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
-    });
-
-    it("passes when a Fortress with 1 brigade has 3 copies", () => {
-      const card = makeCard({
-        name: "Fortified City",
-        type: "Fortress",
-        brigade: "Black",
-        alignment: "Evil",
-        quantity: 3,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Fortified City", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-artifact-fortress"
-      );
-      expect(relevant).toHaveLength(0);
-    });
-
-    it("errors when a Fortress with 1 brigade has 4 copies", () => {
-      const card = makeCard({
-        name: "Fortified City",
-        type: "Fortress",
-        brigade: "Black",
-        alignment: "Evil",
-        quantity: 4,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Fortified City", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-artifact-fortress"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
-    });
+  it("rejects 21 reserve", () => {
+    const reserve = [
+      makeCard({ name: "Reserve Batch", quantity: 21, isReserve: true }),
+    ];
+    const issues = checkT2ReserveSize(reserve);
+    expect(issues.some((i) => i.rule === "t2-reserve-size")).toBe(true);
   });
 
-  // ---- Max 4: Characters with 1 brigade ----
-
-  describe("Characters with 1 brigade (max 4)", () => {
-    it("passes when a Hero with 1 brigade has 4 copies", () => {
-      const card = makeCard({
-        name: "Moses",
-        type: "Hero",
-        brigade: "Blue",
-        alignment: "Good",
-        quantity: 4,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Moses", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-character-enhancement"
-      );
-      expect(relevant).toHaveLength(0);
-    });
-
-    it("errors when a Hero with 1 brigade has 5 copies", () => {
-      const card = makeCard({
-        name: "Moses",
-        type: "Hero",
-        brigade: "Blue",
-        alignment: "Good",
-        quantity: 5,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Moses", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-character-enhancement"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
-    });
-  });
-
-  // ---- Max 4: Enhancements with 1 brigade ----
-
-  describe("Enhancements with 1 brigade (max 4)", () => {
-    it("passes when a Good Enhancement with 1 brigade has 4 copies", () => {
-      const card = makeCard({
-        name: "Faith",
-        type: "Good Enhancement",
-        brigade: "Blue",
-        alignment: "Good",
-        quantity: 4,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Faith", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-character-enhancement"
-      );
-      expect(relevant).toHaveLength(0);
-    });
-
-    it("errors when a Good Enhancement with 1 brigade has 5 copies", () => {
-      const card = makeCard({
-        name: "Faith",
-        type: "Good Enhancement",
-        brigade: "Blue",
-        alignment: "Good",
-        quantity: 5,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Faith", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-character-enhancement"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
-    });
-  });
-
-  // ---- Max 4: Non-SA Sites with 1 brigade ----
-
-  describe("Non-SA Sites/Cities with 1 brigade (max 4)", () => {
-    it("passes when a non-SA Site with 1 brigade has 4 copies", () => {
-      const card = makeCard({
-        name: "Jerusalem",
-        type: "Site",
-        brigade: "Purple",
-        alignment: "Neutral",
-        specialAbility: "",
-        quantity: 4,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Jerusalem", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-vanilla-site"
-      );
-      expect(relevant).toHaveLength(0);
-    });
-
-    it("errors when a non-SA Site with 1 brigade has 5 copies", () => {
-      const card = makeCard({
-        name: "Jerusalem",
-        type: "Site",
-        brigade: "Purple",
-        alignment: "Neutral",
-        specialAbility: "",
-        quantity: 5,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Jerusalem", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-vanilla-site"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
-    });
-  });
-
-  // ---- Colorless / 0-brigade cards follow type tier ----
-
-  describe("0-brigade (colorless) cards follow type tier", () => {
-    it("allows 4 copies of a colorless Hero (max 4, character tier)", () => {
-      const card = makeCard({
-        name: "Colorless Hero",
-        type: "Hero",
-        brigade: "",
-        alignment: "Good",
-        quantity: 4,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Colorless Hero", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) =>
-          i.rule === "t2-quantity-character-enhancement" &&
-          i.cards?.includes("Colorless Hero")
-      );
-      expect(relevant).toHaveLength(0);
-    });
-
-    it("allows 3 copies of a colorless Artifact (max 3, artifact tier)", () => {
-      const card = makeCard({
-        name: "Colorless Artifact",
-        type: "Artifact",
-        brigade: "Colorless",
-        alignment: "Neutral",
-        quantity: 3,
-      });
-      const mainDeck = makeValidMainDeck(100, [card]);
-      const groups = [makeGroup("Colorless Artifact", [card])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      const relevant = issues.filter(
-        (i) =>
-          i.rule === "t2-quantity-artifact-fortress" &&
-          i.cards?.includes("Colorless Artifact")
-      );
-      expect(relevant).toHaveLength(0);
-    });
-  });
-
-  // ---- Cross main + reserve counting ----
-
-  describe("quantity counts across main deck and reserve", () => {
-    it("errors when total quantity across main and reserve exceeds limit", () => {
-      const mainCard = makeCard({
-        name: "Moses",
-        type: "Hero",
-        brigade: "Blue",
-        alignment: "Good",
-        quantity: 3,
-      });
-      const reserveCard = makeCard({
-        name: "Moses",
-        type: "Hero",
-        brigade: "Blue",
-        alignment: "Good",
-        quantity: 2,
-        isReserve: true,
-      });
-      const mainDeck = makeValidMainDeck(100, [mainCard]);
-      const reserve = [reserveCard];
-      const groups = [makeGroup("Moses", [mainCard, reserveCard])];
-      const issues = checkT2QuantityLimits(mainDeck, reserve, groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-character-enhancement"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
-    });
-  });
-
-  // ---- Same-card groups with mixed-brigade printings (combined cap) ----
-
-  describe("authoritative same-card groups (duplicate_card_groups)", () => {
-    // Mirrors the real "Daniel" group (id 537): single-brigade and multicolor
-    // printings of the same character intentionally share a groupId. They share
-    // ONE copy pool sized to the most PERMISSIVE printing (single-brigade = 4),
-    // while each printing still respects its own brigade limit (multicolor ≤ 2).
-    function makeSameCardGroup(
-      canonicalName: string,
-      cards: ResolvedCard[]
-    ): CardGroup {
-      return {
-        canonicalName,
-        groupId: 537,
-        cards,
-        totalQuantity: cards.reduce((sum, c) => sum + c.quantity, 0),
-      };
-    }
-
-    it("errors when the pooled total exceeds the most permissive cap (4)", () => {
-      // Real deck: 4 mono White Daniel + 1 Green/White Daniel = 5 of "the same
-      // card". Each printing is individually legal (mono 4 ≤ 4, multi 1 ≤ 2),
-      // but the shared pool of 4 is exceeded.
-      const white = makeCard({
-        name: "Daniel, the Treasured",
-        type: "Hero",
-        brigade: "White",
-        alignment: "Good",
-        quantity: 4,
-      });
-      const multicolor = makeCard({
-        name: "Daniel, the Apocalyptist",
-        type: "Hero",
-        brigade: "Green/White",
-        alignment: "Good",
-        quantity: 1,
-        isReserve: true,
-      });
-      const mainDeck = makeValidMainDeck(100, [white]);
-      const reserve = [multicolor];
-      const groups = [makeSameCardGroup("Daniel", [white, multicolor])];
-      const issues = checkT2QuantityLimits(mainDeck, reserve, groups);
-      const relevant = issues.filter(
-        (i) => i.rule === "t2-quantity-same-card-combined"
-      );
-      expect(relevant).toHaveLength(1);
-      expect(relevant[0].type).toBe("error");
-      expect(relevant[0].message).toContain("max 4");
-      expect(relevant[0].message).toContain("found 5");
-    });
-
-    it("passes 3 mono + 1 multicolor (4 total, exactly the pooled cap)", () => {
-      // The user's canonical legal example.
-      const white = makeCard({
-        name: "Daniel, the Treasured",
-        type: "Hero",
-        brigade: "White",
-        alignment: "Good",
-        quantity: 3,
-      });
-      const multicolor = makeCard({
-        name: "Daniel, the Apocalyptist",
-        type: "Hero",
-        brigade: "Green/White",
-        alignment: "Good",
-        quantity: 1,
-        isReserve: true,
-      });
-      const mainDeck = makeValidMainDeck(100, [white]);
-      const reserve = [multicolor];
-      const groups = [makeSameCardGroup("Daniel", [white, multicolor])];
-      const issues = checkT2QuantityLimits(mainDeck, reserve, groups);
-      expect(
-        issues.filter((i) => i.rule?.startsWith("t2-quantity")).length
-      ).toBe(0);
-    });
-
-    it("still caps a printing by its own brigade limit even within the pool", () => {
-      // 1 mono + 3 multicolor = 4 total (within the pool of 4), but a 2-brigade
-      // printing may never exceed 2 copies → per-tier 2-brigade error.
-      const white = makeCard({
-        name: "Daniel, the Treasured",
-        type: "Hero",
-        brigade: "White",
-        alignment: "Good",
-        quantity: 1,
-      });
-      const multicolor = makeCard({
-        name: "Daniel, the Apocalyptist",
-        type: "Hero",
-        brigade: "Green/White",
-        alignment: "Good",
-        quantity: 3,
-      });
-      const mainDeck = makeValidMainDeck(100, [white, multicolor]);
-      const groups = [makeSameCardGroup("Daniel", [white, multicolor])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      expect(
-        issues.filter((i) => i.rule === "t2-quantity-2-brigade")
-      ).toHaveLength(1);
-    });
-
-    it("passes a homogeneous same-card group within its single-tier cap", () => {
-      // 4 White Daniels, all single brigade, max 4 → legal.
-      const white = makeCard({
-        name: "Daniel, the Treasured",
-        type: "Hero",
-        brigade: "White",
-        alignment: "Good",
-        quantity: 4,
-      });
-      const mainDeck = makeValidMainDeck(100, [white]);
-      const groups = [makeSameCardGroup("Daniel", [white])];
-      const issues = checkT2QuantityLimits(mainDeck, [], groups);
-      expect(
-        issues.filter((i) => i.rule?.startsWith("t2-quantity")).length
-      ).toBe(0);
-    });
+  it("accepts reserve of 20", () => {
+    const reserve = [
+      makeCard({ name: "Reserve Batch", quantity: 20, isReserve: true }),
+    ];
+    const issues = checkT2ReserveSize(reserve);
+    expect(
+      issues.filter((i) => i.rule === "t2-reserve-size")
+    ).toHaveLength(0);
   });
 });
 
@@ -1687,7 +1226,7 @@ describe("validateT2Rules", () => {
         type: "Hero",
         brigade: "Blue",
         alignment: "Good",
-        quantity: 3,
+        quantity: 2,
         isReserve: true,
       }),
       makeCard({
@@ -1695,7 +1234,7 @@ describe("validateT2Rules", () => {
         type: "Evil Character",
         brigade: "Black",
         alignment: "Evil",
-        quantity: 3,
+        quantity: 2,
         isReserve: true,
       }),
     ];
@@ -1748,7 +1287,7 @@ describe("validateT2Rules", () => {
 
   it("catches oversized reserve", () => {
     const mainDeck = makeSimpleBalancedDeck(100);
-    const reserve = Array.from({ length: 16 }, (_, i) =>
+    const reserve = Array.from({ length: 21 }, (_, i) =>
       makeCard({
         name: `Reserve Card ${i}`,
         identifier: `r-${i}`,
@@ -1783,15 +1322,14 @@ describe("validateT2Rules", () => {
       type: "Hero",
       brigade: "Blue",
       alignment: "Good",
-      quantity: 5,
+      quantity: 3,
     });
     const mainDeck = makeValidMainDeck(100, [overLimitCard]);
     const cardGroups = [makeGroup("Moses", [overLimitCard])];
 
     const issues = validateT2Rules(FORMATS.T2, mainDeck, [], cardGroups);
     const quantityErrors = issues.filter(
-      (i) =>
-        i.rule === "t2-quantity-character-enhancement" && i.type === "error"
+      (i) => i.rule === "t2-copy-limit" && i.type === "error"
     );
     expect(quantityErrors).toHaveLength(1);
   });

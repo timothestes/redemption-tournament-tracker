@@ -560,7 +560,9 @@ export function extractLsAbilityName(card: ResolvedCard): string | null {
 }
 
 /**
- * Rule: t1-quantity-ls-ability — Lost Souls with a special ability are limited to 1 copy each.
+ * Rule: t1-quantity-ls-ability — Lost Souls with a special ability are limited to
+ * `maxCopies` copies each (default 1). T2 calls this with maxCopies=1 and its own
+ * rule id "t2-ls-ability" (spec §4).
  *
  * Per Deck Building Rules v1.3: "Lost Souls with the same reference have the same name"
  * So we group LS by reference, not just by CardGroup identity.
@@ -573,7 +575,9 @@ export function extractLsAbilityName(card: ResolvedCard): string | null {
 export function checkLostSoulAbilityLimit(
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[],
-  _cardGroups: CardGroup[]
+  _cardGroups: CardGroup[],
+  maxCopies = 1,
+  rule = "t1-quantity-ls-ability"
 ): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
   const allCards = [...mainDeckCards, ...reserveCards];
@@ -643,13 +647,13 @@ export function checkLostSoulAbilityLimit(
   // Step 3: Check each group
   for (const [refKey, group] of byReference) {
     if (merged.has(refKey)) continue; // skip merged groups
-    if (group.totalQty > 1) {
+    if (group.totalQty > maxCopies) {
       const names = [...new Set(group.cards.map((c) => c.name))];
       const displayName = names.length === 1 ? names[0] : names.join(" / ");
       issues.push({
         type: "error",
-        rule: "t1-quantity-ls-ability",
-        message: `"${displayName}" is a Lost Soul with a special ability — max 1 copy allowed, found ${group.totalQty}.`,
+        rule,
+        message: `"${displayName}" is a Lost Soul with a special ability — max ${maxCopies} cop${maxCopies === 1 ? "y" : "ies"} allowed, found ${group.totalQty}.`,
         cards: names,
       });
     }
@@ -1202,7 +1206,7 @@ export function getT2RequiredLostSouls(mainDeckSize: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Rule: t2-deck-size — Main deck must be 100-252 cards.
+ * Rule: t2-deck-size — Main deck must be 100-140 cards.
  */
 export function checkT2DeckSize(mainDeckCards: ResolvedCard[]): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
@@ -1215,11 +1219,11 @@ export function checkT2DeckSize(mainDeckCards: ResolvedCard[]): DeckCheckIssue[]
       message: `Main deck has ${size} cards — minimum is 100.`,
     });
   }
-  if (size > 252) {
+  if (size > 140) {
     issues.push({
       type: "error",
       rule: "t2-deck-size",
-      message: `Main deck has ${size} cards — maximum is 252.`,
+      message: `Main deck has ${size} cards — maximum is 140.`,
     });
   }
 
@@ -1260,7 +1264,7 @@ export function checkT2LostSoulCount(
 }
 
 /**
- * Rule: t2-reserve-size — Reserve may have 0-15 cards.
+ * Rule: t2-reserve-size — Reserve may have 0-20 cards.
  */
 export function checkT2ReserveSize(
   reserveCards: ResolvedCard[]
@@ -1268,11 +1272,11 @@ export function checkT2ReserveSize(
   const issues: DeckCheckIssue[] = [];
   const size = reserveCards.reduce((sum, c) => sum + c.quantity, 0);
 
-  if (size > 15) {
+  if (size > 20) {
     issues.push({
       type: "error",
       rule: "t2-reserve-size",
-      message: `Reserve has ${size} cards — maximum is 15.`,
+      message: `Reserve has ${size} cards — maximum is 20.`,
     });
   }
 
@@ -1280,219 +1284,31 @@ export function checkT2ReserveSize(
 }
 
 /**
- * Per-card T2 copy limit based on the same 4-tier system used below.
- * Returns the max copies allowed for a single card, or null when the card is
- * not subject to a brigade/type tier here (Dominants — handled by
- * checkDominantUnique; non-SA Lost Souls — handled by the LS count rules;
- * Colorless / no-brigade cards — uncapped by these tiers).
- *
- * Mirrors the tiers in checkT2QuantityLimits exactly so the two stay in sync.
+ * Rule: t2-copy-limit — flat max 2 copies per card (same-card groups).
+ * Skips Dominants (checkDominantUnique), ALL Lost Souls (t2-ls-ability /
+ * exempt generics), and special exception cards (checkSpecialCards) — each
+ * governed by its own rule. NOTE (spec §4): the exception carve-out is a
+ * deliberate fix — the old tiers only excluded exceptions from the
+ * 3+-brigade tier, capping Locust at 4 and Faithful Witness at 2 in
+ * contradiction of checkSpecialCards. Do not copy the old tier exclusions.
  */
-function getT2CardCopyLimit(card: ResolvedCard): number | null {
-  if (isDominant(card)) return null;
-  if (isLostSoul(card)) return hasSpecialAbility(card) ? 2 : null;
-
-  const brigades = getBrigadeCount(card);
-  if (brigades >= 3) return isSpecialExceptionCard(card) ? null : 1;
-  if (brigades === 2) return 2;
-  if (brigades === 1) {
-    if (isSiteOrCity(card)) return hasSpecialAbility(card) ? 2 : 4;
-    if (isArtifactFortressCovCurse(card)) return 3;
-    if (isCharacter(card) || isEnhancement(card)) return 4;
-  }
-  return null;
-}
-
-/**
- * Rule: t2-quantity-limits — The 4-tier quantity system for Type 2.
- *
- * Max 1: 3+ brigades (getBrigadeCount >= 3), or Dominant (handled by checkDominantUnique)
- * Max 2: 2 brigades, or (LS with SA), or (Site/City with SA and single brigade)
- * Max 3: Artifact/Fortress/Covenant/Curse with single brigade
- * Max 4: Character/Enhancement with single brigade, or non-SA Site/City with single brigade
- *
- * Cards with no brigade or "Colorless" are not subject to brigade-based limits.
- * Dominants are handled by checkDominantUnique, so skip them here.
- */
-export function checkT2QuantityLimits(
-  _mainDeckCards: ResolvedCard[],
-  _reserveCards: ResolvedCard[],
-  cardGroups: CardGroup[]
-): DeckCheckIssue[] {
+export function checkT2CopyLimit(cardGroups: CardGroup[]): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
-
   for (const group of cardGroups) {
-    const issueCountBeforeGroup = issues.length;
-
-    // Note: Dominant uniqueness (max 1) is handled by checkDominantUnique,
-    // which is called separately in validateT2Rules. Don't duplicate it here.
-
-    // --- Tier: Max 1 (3+ brigades, excluding Dominants) ---
-    const tripleBrigadeCards = group.cards.filter(
-      (c) => !isDominant(c) && !isLostSoul(c) && !isSpecialExceptionCard(c) && getBrigadeCount(c) >= 3
+    const capped = group.cards.filter(
+      (c) => !isDominant(c) && !isLostSoul(c) && !isSpecialExceptionCard(c)
     );
-    if (tripleBrigadeCards.length > 0) {
-      const totalQty = tripleBrigadeCards.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 1) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-3plus-brigade",
-          message: `"${group.canonicalName}" has 3+ brigades — max 1 copy allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 2 (2 brigades, non-Site/City, non-LS) ---
-    const dualBrigadeCards = group.cards.filter(
-      (c) =>
-        !isDominant(c) &&
-        !isLostSoul(c) &&
-        !isSiteOrCity(c) &&
-        getBrigadeCount(c) === 2
-    );
-    if (dualBrigadeCards.length > 0) {
-      const totalQty = dualBrigadeCards.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 2) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-2-brigade",
-          message: `"${group.canonicalName}" has 2 brigades — max 2 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 2 (Lost Soul with special ability) ---
-    const lsWithAbility = group.cards.filter(
-      (c) => isLostSoul(c) && hasSpecialAbility(c)
-    );
-    if (lsWithAbility.length > 0) {
-      const totalQty = lsWithAbility.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 2) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-ls-ability",
-          message: `"${group.canonicalName}" is a Lost Soul with a special ability — max 2 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 2 (Site/City with SA and single brigade) ---
-    const siteWithSA = group.cards.filter(
-      (c) => isSiteOrCity(c) && hasSpecialAbility(c) && getBrigadeCount(c) === 1
-    );
-    if (siteWithSA.length > 0) {
-      const totalQty = siteWithSA.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 2) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-sa-site-city",
-          message: `"${group.canonicalName}" is a Site/City with a special ability — max 2 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 2 (Site/City with 2 brigades) ---
-    const siteDualBrigade = group.cards.filter(
-      (c) => isSiteOrCity(c) && getBrigadeCount(c) === 2
-    );
-    if (siteDualBrigade.length > 0) {
-      const totalQty = siteDualBrigade.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 2) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-2-brigade-site",
-          message: `"${group.canonicalName}" is a Site/City with 2 brigades — max 2 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 3 (Artifact/Fortress/Covenant/Curse with single brigade) ---
-    const artifactSingle = group.cards.filter(
-      (c) => isArtifactFortressCovCurse(c) && getBrigadeCount(c) === 1
-    );
-    if (artifactSingle.length > 0) {
-      const totalQty = artifactSingle.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 3) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-artifact-fortress",
-          message: `"${group.canonicalName}" is an Artifact/Fortress/Covenant/Curse with a single brigade — max 3 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 4 (Character/Enhancement with single brigade) ---
-    // Per rules: "Any character, Enhancement ... with one brigade" — SA doesn't matter for these types
-    const charEnhSingle = group.cards.filter(
-      (c) =>
-        (isCharacter(c) || isEnhancement(c)) &&
-        getBrigadeCount(c) === 1
-    );
-    if (charEnhSingle.length > 0) {
-      const totalQty = charEnhSingle.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 4) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-character-enhancement",
-          message: `"${group.canonicalName}" (single-brigade Character/Enhancement) — max 4 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 4 (non-SA Site/City with single brigade) ---
-    const siteNoSA = group.cards.filter(
-      (c) => isSiteOrCity(c) && !hasSpecialAbility(c) && getBrigadeCount(c) === 1
-    );
-    if (siteNoSA.length > 0) {
-      const totalQty = siteNoSA.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 4) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-vanilla-site",
-          message: `"${group.canonicalName}" (non-SA Site/City, single-brigade) — max 4 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Combined pool cap for authoritative same-card groups ---
-    // Cards in a duplicate_card_groups group (groupId set) are the same card,
-    // even across brigade printings — e.g. "Daniel, the Treasured" [White] and
-    // "Daniel, the Apocalyptist" [Green/White] share group 537. They share ONE
-    // copy pool sized to the most PERMISSIVE printing (single-brigade = 4), so
-    // 3 mono + 1 multicolor (4 total) is legal but a 5th copy is not. The
-    // per-tier checks above still cap each printing by its own brigade limit
-    // (so the multicolor copies can't exceed 2). Only flag the pool here when
-    // every printing is individually legal but the shared pool is exceeded —
-    // otherwise a per-tier error above already covers this group.
-    if (group.groupId != null && issues.length === issueCountBeforeGroup) {
-      const capped = group.cards
-        .map((c) => ({ card: c, limit: getT2CardCopyLimit(c) }))
-        .filter((x): x is { card: ResolvedCard; limit: number } => x.limit != null);
-
-      if (capped.length > 0) {
-        const poolLimit = Math.max(...capped.map((x) => x.limit));
-        const totalQty = capped.reduce((sum, x) => sum + x.card.quantity, 0);
-        if (totalQty > poolLimit) {
-          const names = [...new Set(capped.map((x) => x.card.name))];
-          issues.push({
-            type: "error",
-            rule: "t2-quantity-same-card-combined",
-            message: `"${group.canonicalName}" — these printings count as the same card, max ${poolLimit} copies total, found ${totalQty}.`,
-            cards: names,
-          });
-        }
-      }
+    if (capped.length === 0) continue;
+    const totalQty = capped.reduce((sum, c) => sum + c.quantity, 0);
+    if (totalQty > 2) {
+      issues.push({
+        type: "error",
+        rule: "t2-copy-limit",
+        message: `"${group.canonicalName}" — max 2 copies per card in T2, found ${totalQty}.`,
+        cards: [...new Set(capped.map((c) => c.name))],
+      });
     }
   }
-
   return issues;
 }
 
@@ -1552,8 +1368,7 @@ export function checkGoodEvilBalance(
 /**
  * Validate a deck against all Type 2 rules.
  *
- * @param def            - The T2 format definition (unused for now — T2's
- *                         internals are parameterized in a later task)
+ * @param def            - The T2 format definition (main size, reserve size, pool)
  * @param mainDeckCards  - Resolved cards in the main deck
  * @param reserveCards   - Resolved cards in the reserve
  * @param cardGroups     - Cards grouped by canonical name (across all versions)
@@ -1572,8 +1387,11 @@ export function validateT2Rules(
   issues.push(...checkT2LostSoulCount(mainDeckCards));
   issues.push(...checkT2ReserveSize(reserveCards));
 
-  // T2-specific quantity rules (includes LS with SA limit of 2)
-  issues.push(...checkT2QuantityLimits(mainDeckCards, reserveCards, cardGroups));
+  // T2-specific quantity rules — flat 2-copy cap, ability souls max 1
+  issues.push(...checkT2CopyLimit(cardGroups));
+  issues.push(
+    ...checkLostSoulAbilityLimit(mainDeckCards, reserveCards, cardGroups, 1, "t2-ls-ability")
+  );
 
   // T2-specific good/evil balance
   issues.push(...checkGoodEvilBalance(mainDeckCards, reserveCards));
@@ -1585,6 +1403,9 @@ export function validateT2Rules(
   issues.push(...checkMutualExclusion(mainDeckCards, reserveCards));
   issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
+
+  // Pool legality
+  issues.push(...checkPoolLegality(def, mainDeckCards, reserveCards));
 
   // Character alias checks (dual-alignment characters with different names)
   issues.push(
