@@ -2,6 +2,7 @@
 
 import { DeckCheckResult, DeckCheckIssue } from "@/utils/deckcheck/types";
 import { DeckValidation } from "../utils/deckValidation";
+import { normalizeFormat } from "@/lib/formats";
 
 interface DeckLegalityChecklistProps {
   clientValidation: DeckValidation;
@@ -9,6 +10,7 @@ interface DeckLegalityChecklistProps {
   isChecking: boolean;
   totalCards: number;
   format?: string;
+  onDeckFormatChange?: (format: string) => void;
 }
 
 const T1_RULE_CATEGORIES = [
@@ -40,9 +42,9 @@ const T1_RULE_CATEGORIES = [
     ],
   },
   {
-    id: "banned",
-    label: "Banned Cards",
-    ruleIds: ["t1-banned-card"],
+    id: "pool",
+    label: "Card Pool",
+    ruleIds: ["pool-legality"],
   },
   {
     id: "sites-cities",
@@ -71,14 +73,8 @@ const T2_RULE_CATEGORIES = [
     id: "quantities",
     label: "Card Quantities",
     ruleIds: [
-      "t2-quantity-3plus-brigade",
-      "t2-quantity-2-brigade",
-      "t2-quantity-ls-ability",
-      "t2-quantity-sa-site-city",
-      "t2-quantity-artifact-fortress",
-      "t2-quantity-character-enhancement",
-      "t2-quantity-vanilla-site",
-      "t2-quantity-same-card-combined",
+      "t2-copy-limit",
+      "t2-ls-ability",
       "t1-special-card",
       "t1-character-alias",
     ],
@@ -89,9 +85,9 @@ const T2_RULE_CATEGORIES = [
     ruleIds: ["t2-good-evil-balance"],
   },
   {
-    id: "banned",
-    label: "Banned Cards",
-    ruleIds: ["t1-banned-card"],
+    id: "pool",
+    label: "Card Pool",
+    ruleIds: ["pool-legality"],
   },
   {
     id: "sites-cities",
@@ -151,9 +147,11 @@ export default function DeckLegalityChecklist({
   isChecking,
   totalCards,
   format,
+  onDeckFormatChange,
 }: DeckLegalityChecklistProps) {
-  const isT2 = format?.toLowerCase().includes("type 2");
+  const isT2 = normalizeFormat(format) === "T2";
   const categories = isT2 ? T2_RULE_CATEGORIES : T1_RULE_CATEGORIES;
+  const isLimited = normalizeFormat(format) === "Limited";
 
   if (totalCards === 0) {
     return (
@@ -263,6 +261,20 @@ export default function DeckLegalityChecklist({
                   </p>
                 ))}
               </div>
+              {cat.id === "pool" && isLimited && (
+                <div className="ml-5 mt-2 flex items-center justify-between gap-2">
+                  <p className="text-xs leading-snug text-muted-foreground">
+                    These cards are outside the Limited pool — switch this deck to Unlimited to keep them.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onDeckFormatChange?.("Unlimited")}
+                    className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted/70 transition-colors"
+                  >
+                    Switch to Unlimited
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

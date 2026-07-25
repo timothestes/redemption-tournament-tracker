@@ -3255,6 +3255,7 @@ export default function DeckBuilderPanel({
                 isChecking={isDeckChecking ?? false}
                 totalCards={validation.stats.totalCards}
                 format={deck.format}
+                onDeckFormatChange={onDeckFormatChange}
               />
             )}
 
