@@ -5,7 +5,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { checkDeck } from "@/utils/deckcheck";
 import type { DeckCheckCard, DeckCheckResult } from "@/utils/deckcheck/types";
 import type { DeckZone } from "./card-search/types/deck";
-import { normalizeFormat } from "@/lib/formats";
+import { deckFormatFilterFor } from "@/lib/api/cache";
 
 // Three-state deck visibility. Mirrors the `visibility` column on `decks`.
 //   private  -> owner only
@@ -1374,17 +1374,13 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
     }
 
     if (format) {
-      const norm = normalizeFormat(format);
-      if (norm === "Limited") {
-        // Decks with null format default to Limited in the UI, so include them here
-        query = query.or("format.is.null,format.in.(Type 1,Limited)");
-      } else if (norm === "T2") {
-        query = query.in("format", ["Type 2", "T2"]);
-      } else if (norm === "Unlimited") {
-        query = query.in("format", ["Unlimited", "Classic"]);
-      } else {
-        query = query.eq("format", "Paragon");
-      }
+      // Shared with lib/api/cache.ts's v1 API so both sites apply the exact
+      // same PostgREST filter shape — see that file's __tests__/cache.test.ts
+      // for the byte-for-byte proof of the raw or() clause's encoding.
+      const filter = deckFormatFilterFor(format);
+      if (filter.kind === "or") query = query.or(filter.clause);
+      else if (filter.kind === "in") query = query.in("format", filter.values);
+      else query = query.eq("format", filter.value);
     }
 
     if (excludeFullSize) {
