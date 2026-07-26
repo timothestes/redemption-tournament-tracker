@@ -25,6 +25,7 @@ import AodCountCard from "../card-search/components/AodCountCard";
 import { Deck as DeckType } from "../card-search/types/deck";
 import { generateDeckText } from "../card-search/utils/deckImportExport";
 import { compareCardsByType, compareCardsDefault, compareTypeGroups, type SortableCard } from "@/lib/cards/defaultSort";
+import { getFormatDef } from "@/lib/formats";
 
 interface PublicDeckData {
   id: string;
@@ -131,11 +132,7 @@ function getGroupDisplayName(group: string): string {
 }
 
 function formatDeckType(format?: string): string {
-  if (!format) return "T1";
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt === "t2") return "T2";
-  return "T1";
+  return getFormatDef(format).id;
 }
 
 function getDeckTypeBadgeClasses(format?: string): string {
@@ -1279,7 +1276,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 })()}
                 <AodCountCard
                   deck={deckForModal}
-                  deckType={formatDeckType(deck.format) as "T1" | "T2" | "Paragon"}
+                  deckType={getFormatDef(deck.format).family}
                 />
               </div>
             </div>

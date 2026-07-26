@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getCardImageUrl } from "@/lib/card-images";
+import { getFormatDef } from "@/lib/formats";
 
 export type DeckOption = {
   id: string;
@@ -24,12 +25,7 @@ interface DeckPickerCardProps {
 }
 
 function formatDeckType(format: string | null): string {
-  if (!format) return "T1";
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt.includes("multi") || fmt === "t2")
-    return "T2";
-  return "T1";
+  return getFormatDef(format).id;
 }
 
 export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps) {

@@ -11,7 +11,7 @@ import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageM
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
 import { getCardImageUrlOrNull as getCardImageUrl } from '../../shared/utils/cardImageUrl';
-import { normalizeFormat } from "@/lib/formats";
+import { normalizeFormat, getFormatDef } from "@/lib/formats";
 
 interface DeckTag { id: string; name: string; color: string; }
 
@@ -51,11 +51,7 @@ function getContrastColor(hex: string): string {
 }
 
 function formatDeckType(format?: string): string {
-  if (!format) return "T1";
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt === "t2") return "T2";
-  return "T1";
+  return getFormatDef(format).id;
 }
 
 function getDeckTypeBadgeClasses(format?: string): string {

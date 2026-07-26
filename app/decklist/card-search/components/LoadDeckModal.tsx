@@ -9,14 +9,11 @@ import {
   DialogHeader,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { getFormatDef } from "@/lib/formats";
 
 // Helper function to normalize deck format display
 function formatDeckType(format?: string): string {
-  if (!format) return "T1";
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt === "t2") return "T2";
-  return "T1";
+  return getFormatDef(format).id;
 }
 
 // Helper function to get badge colors based on deck type
@@ -38,7 +35,7 @@ interface LoadDeckModalProps {
   title?: string;
   /** Sub-heading text (defaults to "Select a deck to load into the builder"). */
   subtitle?: string;
-  /** When set, only decks of the same normalized type (T1/T2/Paragon) are shown. */
+  /** When set, only decks of the same normalized type (Limited/Unlimited/T2/Paragon) are shown. */
   matchFormat?: string;
   /** Override the deck list source (defaults to the public `loadUserDecksAction`). */
   listDecks?: () => Promise<DeckListItem[]>;

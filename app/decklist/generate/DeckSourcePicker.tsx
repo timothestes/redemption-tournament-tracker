@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { loadUserDecksAction, loadDeckByIdAction, DeckData, DeckCardData } from "../actions";
 import { createClient } from "@/utils/supabase/client";
 import { getUserSafe } from "@/utils/supabase/getUserSafe";
+import { getFormatDef } from "@/lib/formats";
 
 /**
  * Convert DeckCardData[] from the database into Lackey-format text.
@@ -30,22 +31,20 @@ function deckCardsToLackeyText(cards: DeckCardData[]): string {
   return lines.join("\n");
 }
 
-/** Map deck format string to the generate page's deckType value */
+/**
+ * Map deck format string to the generate page's deckType value. This talks to the
+ * sister decklist API, whose `decklist_type` wire values are still `type_1`/`type_2`/
+ * `paragon` (Limited and Unlimited both collapse to `type_1` there — see
+ * GeneratePDFModal/GenerateDeckImageModal for the same mapping).
+ */
 function formatToDeckType(format?: string): string | null {
   if (!format) return null;
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "paragon";
-  if (fmt.includes("type 2") || fmt === "t2") return "type_2";
-  if (fmt.includes("type 1") || fmt === "t1") return "type_1";
-  return null;
+  const fam = getFormatDef(format).family;
+  return fam === "T2" ? "type_2" : fam === "Paragon" ? "paragon" : "type_1";
 }
 
 function formatDeckType(format?: string): string {
-  if (!format) return "T1";
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt === "t2") return "T2";
-  return "T1";
+  return getFormatDef(format).id;
 }
 
 function getDeckTypeBadgeClasses(format?: string): string {
