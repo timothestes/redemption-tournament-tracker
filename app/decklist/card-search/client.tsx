@@ -17,6 +17,7 @@ import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG, BuilderConfigProvider } from 
 import { readStickyFilters, writeStickyFilters, type AltArtMode } from "./stickyFilters";
 import { hasAbReprint } from "@/lib/cards/lookup";
 import { compareCardsDefault } from "@/lib/cards/defaultSort";
+import { normalizeFormat } from "@/lib/formats";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
@@ -1394,11 +1395,12 @@ export default function CardSearchClient({
   // Handle deck format change - also update legality mode filter
   function handleDeckFormatChange(format: string) {
     setDeckFormat(format);
-    // If format is Paragon, automatically set legality filter to Paragon
-    if (format.toLowerCase().includes('paragon')) {
+    const canonical = normalizeFormat(format);
+    if (canonical === 'Paragon') {
       setLegalityMode('Paragon');
-    } else if (legalityMode === 'Paragon') {
-      // Switching away from Paragon — reset filter back to Rotation
+    } else if (canonical === 'Unlimited') {
+      setLegalityMode('Classic');
+    } else {
       setLegalityMode('Rotation');
     }
   }
