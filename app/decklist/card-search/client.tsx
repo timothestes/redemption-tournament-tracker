@@ -17,7 +17,7 @@ import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG, BuilderConfigProvider } from 
 import { readStickyFilters, writeStickyFilters, type AltArtMode } from "./stickyFilters";
 import { hasAbReprint } from "@/lib/cards/lookup";
 import { compareCardsDefault } from "@/lib/cards/defaultSort";
-import { normalizeFormat } from "@/lib/formats";
+import { normalizeFormat, PARAGON_EXCLUDED_SETS } from "@/lib/formats";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
@@ -82,6 +82,16 @@ function alignmentPillClass(mode: string): string {
     mode === 'Evil' ? PILL_STYLES.alignmentEvil :
     PILL_STYLES.alignmentNeutral;
   return `${PILL_BASE} ${variant}`;
+}
+
+// Legality mode names as stored in URLs: 'Rotation'/'Classic' were the old
+// pool-mode identifiers, renamed to 'Limited'/'Unlimited'. Normalize old
+// values read from a saved/shared URL so they still resolve correctly.
+function normalizeLegalityMode(mode: string | null): 'Limited'|'Unlimited'|'Banned'|'Scrolls'|'Paragon' {
+  if (mode === 'Rotation') return 'Limited';
+  if (mode === 'Classic') return 'Unlimited';
+  if (mode === 'Unlimited' || mode === 'Banned' || mode === 'Scrolls' || mode === 'Paragon') return mode;
+  return 'Limited';
 }
 
 // Helper component for rename form in new deck modal
@@ -195,8 +205,8 @@ export default function CardSearchClient({
   const [toughnessFilter, setToughnessFilter] = useState<number | null>(null);
   const [toughnessOp, setToughnessOp] = useState<string>('eq');
   const [cards, setCards] = useState<Card[]>([]);
-  // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned), Paragon
-  const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'|'Paragon'>('Rotation');
+  // Card legality filter mode: Limited (rotation pool), Unlimited (all), Banned, Scrolls (not Rotation or Banned), Paragon
+  const [legalityMode, setLegalityMode] = useState<'Limited'|'Unlimited'|'Banned'|'Scrolls'|'Paragon'>('Limited');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
   const [sortBy, setSortBy] = useState<'default' | 'name' | 'set' | 'strength' | 'toughness' | 'type' | 'brigade'>('default');
 
@@ -584,7 +594,7 @@ export default function CardSearchClient({
       params.set('q', activeQueries[0].text); // For now, only save first query to URL
       if (activeQueries[0].field !== 'everything') params.set('field', activeQueries[0].field);
     }
-    if (filters.legalityMode !== 'Rotation') params.set('legality', filters.legalityMode);
+    if (filters.legalityMode !== 'Limited') params.set('legality', filters.legalityMode);
     if (filters.iconFilterMode !== 'AND') params.set('iconMode', filters.iconFilterMode);
     if (filters.selectedIconFilters.length > 0) {
       // Save icon filters with their operators as JSON
@@ -673,7 +683,7 @@ export default function CardSearchClient({
       const urlQuery = searchParams.get('q') || '';
       const urlField = searchParams.get('field') || 'everything';
       setQueries(urlQuery ? [{text: urlQuery, field: urlField, operator: "AND"}] : [{text: "", field: "everything", operator: "AND"}]);
-      setLegalityMode((searchParams.get('legality') as any) || 'Rotation');
+      setLegalityMode(normalizeLegalityMode(searchParams.get('legality')));
       setIconFilterMode((searchParams.get('iconMode') as any) || 'AND');
       
       // Load icon filters from URL (try JSON first for new format, fall back to CSV for old format)
@@ -1013,7 +1023,9 @@ export default function CardSearchClient({
         })
         // Legality mode filter
         .filter((c) => {
-          if (legalityMode === 'Classic') return true;
+          if (legalityMode === 'Unlimited') return true;
+          if (legalityMode === 'Limited') return c.legality === 'Rotation';
+          if (legalityMode === 'Banned') return c.legality === 'Banned';
           if (legalityMode === 'Scrolls') return c.legality !== 'Rotation' && c.legality !== 'Banned';
           if (legalityMode === 'Paragon') {
             // Paragon format: exclude Lost Souls (not allowed in Paragon)
@@ -1021,46 +1033,9 @@ export default function CardSearchClient({
               return false;
             }
             // Paragon format: exclude non-legal sets (easier to maintain than include list)
-            const paragonExcludedSets = [
-              '10th Anniversary',
-              '1st Edition',
-              '1st Edition Unlimited',
-              '2nd Edition',
-              '2nd Edition Revised',
-              '3rd Edition',
-              'Angel Wars',
-              'Apostles',
-              'Cloud of Witnesses',
-              'Cloud of Witnesses (Alternate Border)',
-              'Disciples',
-              'Early Church',
-              'Faith of Our Fathers',
-              'Fall of Man',
-              'Fundraiser',
-              'Gospel of Christ',
-              'Gospel of Christ Token',
-              'Kings',
-              'Lineage of Christ',
-              'Main',
-              'Main Unlimited',
-              'Patriarchs',
-              'Persecuted Church',
-              'Priests',
-              'Promo',
-              'Promo Token',
-              'Prophecies of Christ',
-              'Prophecies of Christ Token',
-              'Prophets',
-              'Revelation of John',
-              'Revelation of John (Alternate Border)',
-              'Rock of Ages',
-              'Thesaurus ex Preteritus',
-              'Warriors',
-              'Women'
-            ];
-            return !paragonExcludedSets.includes(c.officialSet);
+            return !PARAGON_EXCLUDED_SETS.has(c.officialSet);
           }
-          return c.legality === legalityMode;
+          return false;
         })
         // Alignment filters (OR across selected filters)
         .filter((c) => {
@@ -1268,7 +1243,7 @@ export default function CardSearchClient({
       demonOnly || 
       danielOnly || 
       postexilicOnly ||
-      legalityMode !== 'Rotation';
+      legalityMode !== 'Limited';
     
     if (hasActiveFilters) {
       setVisibleCount(BATCH_SIZE);
@@ -1312,7 +1287,7 @@ export default function CardSearchClient({
 
   // Whether any filter pills should be shown in the summary bar
   const hasActiveFilters = queries.some(q => q.text.trim()) ||
-    legalityMode !== 'Rotation' ||
+    legalityMode !== 'Limited' ||
     selectedAlignmentFilters.length > 0 ||
     selectedRarityFilters.length > 0 ||
     selectedIconFilters.length > 0 ||
@@ -1399,9 +1374,9 @@ export default function CardSearchClient({
     if (canonical === 'Paragon') {
       setLegalityMode('Paragon');
     } else if (canonical === 'Unlimited') {
-      setLegalityMode('Classic');
+      setLegalityMode('Unlimited');
     } else {
-      setLegalityMode('Rotation');
+      setLegalityMode('Limited');
     }
   }
 
@@ -1409,8 +1384,8 @@ export default function CardSearchClient({
   function handleResetFilters() {
     setQueries([{text: "", field: "everything", operator: "AND"}]);
     setSelectedIconFilters([]);
-    // Keep current legality mode when resetting (don't reset to Rotation)
-    // setLegalityMode('Rotation');
+    // Keep current legality mode when resetting (don't reset to Limited)
+    // setLegalityMode('Limited');
     setIconFilterMode('AND');
     setSelectedAlignmentFilters([]);
     setSelectedRarityFilters([]);
@@ -2046,8 +2021,8 @@ export default function CardSearchClient({
           );
         })}
         {/* Legality */}
-        {legalityMode !== 'Rotation' && (
-          <span className={`${PILL_BASE} ${PILL_STYLES.legality}`} onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
+        {legalityMode !== 'Limited' && (
+          <span className={`${PILL_BASE} ${PILL_STYLES.legality}`} onClick={() => setLegalityMode('Limited')} tabIndex={0} role="button" aria-label="Remove Legality filter">
             {legalityMode}
             <span className="ml-1">×</span>
           </span>

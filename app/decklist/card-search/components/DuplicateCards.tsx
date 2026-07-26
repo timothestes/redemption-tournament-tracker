@@ -3,6 +3,7 @@
 import React from 'react';
 import type { DuplicateSibling } from '@/lib/duplicateCards';
 import type { Card } from '../utils';
+import { PARAGON_EXCLUDED_SETS } from '@/lib/formats';
 
 interface DuplicateCardsProps {
   siblings: DuplicateSibling[];
@@ -23,27 +24,15 @@ interface DuplicateCardsProps {
  * Mirrors the logic in client.tsx lines 795-842.
  */
 function passesLegalityFilter(card: Card, mode: string): boolean {
-  if (mode === 'Classic') return true;
+  if (mode === 'Unlimited') return true;
+  if (mode === 'Limited') return card.legality === 'Rotation';
+  if (mode === 'Banned') return card.legality === 'Banned';
   if (mode === 'Scrolls') return card.legality !== 'Rotation' && card.legality !== 'Banned';
   if (mode === 'Paragon') {
     if (card.type.toLowerCase().includes('lost soul')) return false;
-    const paragonExcludedSets = [
-      '10th Anniversary', '1st Edition', '1st Edition Unlimited',
-      '2nd Edition', '2nd Edition Revised', '3rd Edition',
-      'Angel Wars', 'Apostles', 'Cloud of Witnesses',
-      'Cloud of Witnesses (Alternate Border)', 'Disciples', 'Early Church',
-      'Faith of Our Fathers', 'Fall of Man', 'Fundraiser',
-      'Gospel of Christ', 'Gospel of Christ Token', 'Kings',
-      'Lineage of Christ', 'Main', 'Main Unlimited', 'Patriarchs',
-      'Persecuted Church', 'Priests', 'Promo', 'Promo Token',
-      'Prophecies of Christ', 'Prophecies of Christ Token', 'Prophets',
-      'Revelation of John', 'Revelation of John (Alternate Border)',
-      'Rock of Ages', 'Thesaurus ex Preteritus', 'Warriors', 'Women',
-    ];
-    return !paragonExcludedSets.includes(card.officialSet);
+    return !PARAGON_EXCLUDED_SETS.has(card.officialSet);
   }
-  // Default (Rotation, Banned, etc.): exact match
-  return card.legality === mode;
+  return false;
 }
 
 /** Normalize for matching: lowercase, strip commas before "the", normalize quotes */
