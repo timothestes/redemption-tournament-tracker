@@ -189,7 +189,8 @@ export default function FilterGrid({
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
           <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Legality</span>
           <div className="flex flex-wrap gap-1">
-            {['Limited','Unlimited','Banned','Scrolls','Paragon'].map((mode) => (
+            {/* 'Scrolls' hidden per Tim 2026-07-25 — filter logic kept; re-add to this list to restore */}
+            {['Limited','Unlimited','Banned','Paragon'].map((mode) => (
               <button
                 key={mode}
                 className={clsx(
