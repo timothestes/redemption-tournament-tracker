@@ -271,8 +271,9 @@ function DeckPickerContent({
               className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
             >
               <option value="">All Formats</option>
-              <option value="Type 1">Type 1</option>
-              <option value="Type 2">Type 2</option>
+              <option value="Limited">Limited</option>
+              <option value="Unlimited">Unlimited</option>
+              <option value="T2">T2</option>
               <option value="Paragon">Paragon</option>
             </select>
             <select
@@ -297,8 +298,9 @@ function DeckPickerContent({
               className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
             >
               <option value="">All Formats</option>
-              <option value="Type 1">Type 1</option>
-              <option value="Type 2">Type 2</option>
+              <option value="Limited">Limited</option>
+              <option value="Unlimited">Unlimited</option>
+              <option value="T2">T2</option>
               <option value="Paragon">Paragon</option>
             </select>
             <select

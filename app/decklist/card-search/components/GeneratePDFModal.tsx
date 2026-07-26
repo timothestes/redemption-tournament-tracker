@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Deck } from "../types/deck";
 import { generateDeckText } from "../utils/deckImportExport";
 import { decklistPdfDownloadUrl } from "../utils/pdfDownloadUrl";
+import { getFormatDef } from "@/lib/formats";
 import {
   Dialog,
   DialogContent,
@@ -18,11 +19,8 @@ interface GeneratePDFModalProps {
 }
 
 export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDFModalProps) {
-  const initialDeckType = deck.format?.toLowerCase().includes("paragon")
-    ? "paragon"
-    : deck.format?.toLowerCase().includes("type 2")
-    ? "type_2"
-    : "type_1";
+  const fam = getFormatDef(deck.format).family;
+  const initialDeckType = fam === "T2" ? "type_2" : fam === "Paragon" ? "paragon" : "type_1";
 
   const [deckType, setDeckType] = useState(initialDeckType);
   const [name, setName] = useState("");

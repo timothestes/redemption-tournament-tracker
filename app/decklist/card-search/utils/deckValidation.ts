@@ -1,6 +1,7 @@
 import { Deck, DeckCard } from "../types/deck";
 import { Card } from "../utils";
 import { getParagonByName, ParagonData } from "../data/paragons";
+import { getFormatDef, normalizeFormat } from "@/lib/formats";
 
 export interface ValidationIssue {
   type: "error" | "warning" | "info";
@@ -42,8 +43,8 @@ export interface DeckValidation {
  * Redemption CCG Deck Building Rules Summary (as checked HERE):
  *
  * 1. Deck Size:
- *    - Type 1: 50-154 cards
- *    - Type 2: 100-252 cards
+ *    - Type 1: 50-70 cards
+ *    - Type 2: 100-140 cards
  *    - Paragon: 40 cards (exact)
  *
  * 2. Lost Soul Requirements: Based on Main Deck size ONLY (not including Reserve)
@@ -54,7 +55,7 @@ export interface DeckValidation {
  *
  * 3. Reserve Limits:
  *    - Type 1: Maximum 10 cards
- *    - Type 2: Maximum 15 cards
+ *    - Type 2: Maximum 20 cards
  *    - Paragon: Maximum 10 cards
  *    - Dominants and Lost Souls CANNOT be in Reserve
  *
@@ -143,33 +144,21 @@ function isDominant(card: Card): boolean {
  * Get minimum deck size based on format
  */
 function getMinimumDeckSize(format?: string): number {
-  const fmt = format?.toLowerCase();
-  if (fmt?.includes("paragon")) return 40;
-  if (fmt?.includes("type 2")) return 100;
-  if (fmt?.includes("type 1") || fmt?.includes("single")) return 50;
-  if (fmt?.includes("draft") || fmt?.includes("sealed")) return 40;
-  return 50; // Default to Type 1 minimum
+  return getFormatDef(format).main.min;
 }
 
 /**
  * Get maximum deck size based on format
  */
 function getMaximumDeckSize(format?: string): number {
-  const fmt = format?.toLowerCase();
-  if (fmt?.includes("paragon")) return 40;
-  if (fmt?.includes("type 2")) return 252;
-  if (fmt?.includes("type 1") || fmt?.includes("single")) return 154;
-  return 154; // Default to Type 1 maximum
+  return getFormatDef(format).main.max;
 }
 
 /**
  * Get maximum reserve size based on format
  */
 function getMaximumReserveSize(format?: string): number {
-  const fmt = format?.toLowerCase();
-  if (fmt?.includes("type 2")) return 15;
-  if (fmt?.includes("paragon")) return 10;
-  return 10; // Type 1 and default
+  return getFormatDef(format).reserveMax;
 }
 
 /**
@@ -387,7 +376,7 @@ export function validateDeck(deck: Deck): DeckValidation {
   }
   
   // Validation: Lost Soul requirement (based on Main Deck size only)
-  const isParagon = deck.format?.toLowerCase().includes("paragon");
+  const isParagon = normalizeFormat(deck.format) === 'Paragon';
   
   if (isParagon) {
     // Paragon format: No Lost Souls allowed
@@ -487,7 +476,7 @@ export function validateDeck(deck: Deck): DeckValidation {
   }
   
   // Validation: Type 2 requires equal Good and Evil cards (in both main deck and reserve)
-  const isType2 = deck.format?.toLowerCase().includes("type 2");
+  const isType2 = normalizeFormat(deck.format) === 'T2';
   if (isType2) {
     // Check Main Deck - INCLUDE Lost Souls and Dominants in alignment check
     const mainGoodCards = deck.cards
@@ -566,10 +555,10 @@ export function validateDeck(deck: Deck): DeckValidation {
     }
   }
   
-  // Validation: Type 2 allows maximum 2 copies of each Lost Soul
+  // Validation: Type 2 allows maximum 1 copy of each Lost Soul with a special ability
   // Exception: Lost Souls with no special ability can have unlimited copies
   if (isType2) {
-    // Find Lost Souls with more than 2 copies (excluding those with no special ability).
+    // Find Lost Souls with more than 1 copy (excluding those with no special ability).
     // Maybeboard is a scratchpad — never counts toward legality.
     const lostSoulCounts = deck.cards
       .filter((dc) => {
@@ -587,15 +576,15 @@ export function validateDeck(deck: Deck): DeckValidation {
         acc[key].count += dc.quantity;
         return acc;
       }, {} as Record<string, { name: string; count: number }>);
-    
-    const excessLostSouls = Object.values(lostSoulCounts).filter(ls => ls.count > 2);
-    
+
+    const excessLostSouls = Object.values(lostSoulCounts).filter(ls => ls.count > 1);
+
     if (excessLostSouls.length > 0) {
       excessLostSouls.forEach(ls => {
         issues.push({
           type: "error",
           category: "souls",
-          message: `Type 2 allows maximum 2 copies of each Lost Soul with special abilities: "${ls.name}" appears ${ls.count} times (max 2)`,
+          message: `Type 2 allows maximum 1 copy of each Lost Soul with special abilities: "${ls.name}" appears ${ls.count} times (max 1)`,
         });
       });
     }
@@ -612,7 +601,7 @@ export function validateDeck(deck: Deck): DeckValidation {
   
   // Paragon format validation
   let paragonStats: ParagonBrigadeStats | undefined;
-  const isParagonFormat = deck.format?.toLowerCase().includes("paragon");
+  const isParagonFormat = normalizeFormat(deck.format) === 'Paragon';
   
   if (isParagonFormat && deck.paragon) {
     const paragonData = getParagonByName(deck.paragon);

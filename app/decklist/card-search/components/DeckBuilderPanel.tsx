@@ -26,6 +26,7 @@ import DragGhost from "./DragGhost";
 import { Switch } from "@headlessui/react";
 import { Card, normalizeBrigadeField } from "../utils";
 import { compareCardsByType, compareCardsDefault, compareTypeGroups } from "@/lib/cards/defaultSort";
+import { FormatId, FORMAT_IDS, FORMATS, normalizeFormat } from "@/lib/formats";
 import { validateDeck } from "../utils/deckValidation";
 import GeneratePDFModal from "./GeneratePDFModal";
 import AodCountCard from "./AodCountCard";
@@ -61,6 +62,14 @@ function getTagContrastColor(hex: string): string {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? "#1f2937" : "#ffffff";
+}
+
+// Active-state color for a format toggle button, by format family. Both
+// Limited and Unlimited (family 'T1') share the old T1 accent color.
+function formatActiveClass(family: 'T1' | 'T2' | 'Paragon'): string {
+  if (family === 'T2') return 'bg-purple-600 dark:bg-purple-500 text-white';
+  if (family === 'Paragon') return 'bg-amber-600 dark:bg-amber-500 text-white';
+  return 'bg-accent text-accent-foreground';
 }
 
 export type TabType = "main" | "reserve" | "maybe" | "info" | "cover";
@@ -566,25 +575,11 @@ export default function DeckBuilderPanel({
   const [disableHoverPreview, setDisableHoverPreview] = useState(forceDisableHoverPreview);
   
   // Initialize deck type based on deck.format
-  const [deckType, setDeckType] = useState<'T1' | 'T2' | 'Paragon'>(() => {
-    const format = deck.format?.toLowerCase();
-    if (format?.includes('paragon')) return 'Paragon';
-    if (format?.includes('type 2')) return 'T2';
-    return 'T1';
-  });
+  const [deckType, setDeckType] = useState<FormatId>(() => normalizeFormat(deck.format));
 
   // Sync deckType with deck.format when deck changes (e.g., when loading a deck)
   useEffect(() => {
-    const format = deck.format?.toLowerCase();
-    let newType: 'T1' | 'T2' | 'Paragon';
-    if (format?.includes('paragon')) {
-      newType = 'Paragon';
-    } else if (format?.includes('type 2')) {
-      newType = 'T2';
-    } else {
-      newType = 'T1';
-    }
-    setDeckType(newType);
+    setDeckType(normalizeFormat(deck.format));
   }, [deck.format]);
 
   // Calculate validation
@@ -615,13 +610,9 @@ export default function DeckBuilderPanel({
   };
 
   // Handle deck type change
-  const handleDeckTypeChange = (newType: 'T1' | 'T2' | 'Paragon') => {
+  const handleDeckTypeChange = (newType: FormatId) => {
     setDeckType(newType);
-    let newFormat: string;
-    if (newType === 'T2') newFormat = 'Type 2';
-    else if (newType === 'Paragon') newFormat = 'Paragon';
-    else newFormat = 'Type 1';
-    onDeckFormatChange?.(newFormat);
+    onDeckFormatChange?.(newType);
   };
 
   // Notify parent when tab changes
@@ -1041,38 +1032,25 @@ export default function DeckBuilderPanel({
 
         {/* Mobile: Unified toolbar — format selector left, actions right */}
         <div className="md:hidden mt-1.5 flex items-center gap-1.5">
-          {/* Format Selector (T1/T2/Paragon) */}
+          {/* Format Selector (L/U/T2/P) */}
           <div className="flex items-center bg-muted rounded-full p-0.5">
-            <button
-              onClick={() => handleDeckTypeChange('T1')}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                deckType === 'T1'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground cursor-pointer'
-              }`}
-            >
-              T1
-            </button>
-            <button
-              onClick={() => handleDeckTypeChange('T2')}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                deckType === 'T2'
-                  ? 'bg-purple-600 dark:bg-purple-500 text-white'
-                  : 'text-muted-foreground cursor-pointer'
-              }`}
-            >
-              T2
-            </button>
-            <button
-              onClick={() => handleDeckTypeChange('Paragon')}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                deckType === 'Paragon'
-                  ? 'bg-amber-600 dark:bg-amber-500 text-white'
-                  : 'text-muted-foreground cursor-pointer'
-              }`}
-            >
-              P
-            </button>
+            {FORMAT_IDS.map((id) => {
+              const def = FORMATS[id];
+              return (
+                <button
+                  key={id}
+                  onClick={() => handleDeckTypeChange(id)}
+                  title={def.label}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    deckType === id
+                      ? formatActiveClass(def.family)
+                      : 'text-muted-foreground cursor-pointer'
+                  }`}
+                >
+                  {def.badge}
+                </button>
+              );
+            })}
           </div>
 
           {/* Spacer */}
@@ -1260,7 +1238,7 @@ export default function DeckBuilderPanel({
                       Load Deck
                     </button>
                   )}
-                  {onReplaceGood && isAuthenticated && deck.format?.toLowerCase().includes("type 2") && (
+                  {onReplaceGood && isAuthenticated && deckType === 'T2' && (
                     <button
                       onClick={() => { setShowReplaceGoodModal(true); setShowMenu(false); }}
                       className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
@@ -1271,7 +1249,7 @@ export default function DeckBuilderPanel({
                       Replace Good…
                     </button>
                   )}
-                  {onReplaceEvil && isAuthenticated && deck.format?.toLowerCase().includes("type 2") && (
+                  {onReplaceEvil && isAuthenticated && deckType === 'T2' && (
                     <button
                       onClick={() => { setShowReplaceEvilModal(true); setShowMenu(false); }}
                       className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
@@ -1446,38 +1424,25 @@ export default function DeckBuilderPanel({
         {/* Card Count and Menu Button Row — desktop only */}
         <div className="deck-header-row hidden md:flex mt-2 flex-col md:flex-row md:flex-wrap md:items-center md:justify-between gap-3 min-w-0">
           <div className="flex items-center gap-2 md:gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
-            {/* Desktop: Format Selector (T1/T2/Paragon) */}
+            {/* Desktop: Format Selector (L/U/T2/P) */}
             <div className="hidden md:flex items-center gap-1 bg-muted rounded-full p-0.5">
-              <button
-                onClick={() => handleDeckTypeChange('T1')}
-                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                  deckType === 'T1'
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:text-foreground cursor-pointer'
-                }`}
-              >
-                T1
-              </button>
-              <button
-                onClick={() => handleDeckTypeChange('T2')}
-                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                  deckType === 'T2'
-                    ? 'bg-purple-600 dark:bg-purple-500 text-white'
-                    : 'text-muted-foreground hover:text-foreground cursor-pointer'
-                }`}
-              >
-                T2
-              </button>
-              <button
-                onClick={() => handleDeckTypeChange('Paragon')}
-                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                  deckType === 'Paragon'
-                    ? 'bg-amber-600 dark:bg-amber-500 text-white'
-                    : 'text-muted-foreground hover:text-foreground cursor-pointer'
-                }`}
-              >
-                Paragon
-              </button>
+              {FORMAT_IDS.map((id) => {
+                const def = FORMATS[id];
+                return (
+                  <button
+                    key={id}
+                    onClick={() => handleDeckTypeChange(id)}
+                    title={def.label}
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                      deckType === id
+                        ? formatActiveClass(def.family)
+                        : 'text-muted-foreground hover:text-foreground cursor-pointer'
+                    }`}
+                  >
+                    {def.badge}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Desktop: Paragon Selector (only show for Paragon format) */}
@@ -1790,7 +1755,7 @@ export default function DeckBuilderPanel({
                   Load Deck
                 </button>
               )}
-              {onReplaceGood && isAuthenticated && deck.format?.toLowerCase().includes("type 2") && (
+              {onReplaceGood && isAuthenticated && deckType === 'T2' && (
                 <button
                   onClick={() => { setShowReplaceGoodModal(true); setShowMenu(false); }}
                   className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
@@ -1801,7 +1766,7 @@ export default function DeckBuilderPanel({
                   Replace Good…
                 </button>
               )}
-              {onReplaceEvil && isAuthenticated && deck.format?.toLowerCase().includes("type 2") && (
+              {onReplaceEvil && isAuthenticated && deckType === 'T2' && (
                 <button
                   onClick={() => { setShowReplaceEvilModal(true); setShowMenu(false); }}
                   className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
@@ -2051,7 +2016,7 @@ export default function DeckBuilderPanel({
             const errCount = deckCheckResult
               ? deckCheckResult.issues.filter(i => i.type === "error").length
               : validation.issues.filter(i => i.type === "error").length;
-            const isT2Fmt = deck.format?.toLowerCase().includes("type 2");
+            const isT2Fmt = deckType === 'T2';
             const label = valid
               ? "Tournament Legal"
               : `${errCount} issue${errCount !== 1 ? "s" : ""} found`;
@@ -3265,7 +3230,7 @@ export default function DeckBuilderPanel({
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 {(() => {
-                  const isT2Format = deck.format?.toLowerCase().includes("type 2");
+                  const isT2Format = deckType === 'T2';
 
                   // Calculate raw alignment counts. Maybeboard is a scratchpad
                   // and never rolls into deck composition.
@@ -3332,7 +3297,7 @@ export default function DeckBuilderPanel({
                     );
                   });
                 })()}
-                <AodCountCard deck={deck} deckType={deckType} />
+                <AodCountCard deck={deck} deckType={FORMATS[deckType].family} />
               </div>
             </div>
 

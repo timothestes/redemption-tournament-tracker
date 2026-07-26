@@ -5,8 +5,8 @@ import type { AltArtMode } from "../stickyFilters";
 
 interface FilterGridProps {
   // Legality & Alignment
-  legalityMode: 'Rotation' | 'Classic' | 'Banned' | 'Scrolls' | 'Paragon';
-  setLegalityMode: (mode: 'Rotation' | 'Classic' | 'Banned' | 'Scrolls' | 'Paragon') => void;
+  legalityMode: 'Limited' | 'Unlimited' | 'Banned' | 'Scrolls' | 'Paragon';
+  setLegalityMode: (mode: 'Limited' | 'Unlimited' | 'Banned' | 'Scrolls' | 'Paragon') => void;
   selectedAlignmentFilters: string[];
   toggleAlignmentFilter: (value: string) => void;
   selectedRarityFilters: string[];
@@ -189,7 +189,7 @@ export default function FilterGrid({
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
           <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Legality</span>
           <div className="flex flex-wrap gap-1">
-            {['Rotation','Classic','Banned','Scrolls','Paragon'].map((mode) => (
+            {['Limited','Unlimited','Banned','Scrolls','Paragon'].map((mode) => (
               <button
                 key={mode}
                 className={clsx(

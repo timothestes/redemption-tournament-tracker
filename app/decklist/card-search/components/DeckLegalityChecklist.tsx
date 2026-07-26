@@ -2,6 +2,7 @@
 
 import { DeckCheckResult, DeckCheckIssue } from "@/utils/deckcheck/types";
 import { DeckValidation } from "../utils/deckValidation";
+import { normalizeFormat } from "@/lib/formats";
 
 interface DeckLegalityChecklistProps {
   clientValidation: DeckValidation;
@@ -40,9 +41,14 @@ const T1_RULE_CATEGORIES = [
     ],
   },
   {
+    id: "pool",
+    label: "Card Pool",
+    ruleIds: ["pool-legality"],
+  },
+  {
     id: "banned",
     label: "Banned Cards",
-    ruleIds: ["t1-banned-card"],
+    ruleIds: ["banned-card"],
   },
   {
     id: "sites-cities",
@@ -71,14 +77,8 @@ const T2_RULE_CATEGORIES = [
     id: "quantities",
     label: "Card Quantities",
     ruleIds: [
-      "t2-quantity-3plus-brigade",
-      "t2-quantity-2-brigade",
-      "t2-quantity-ls-ability",
-      "t2-quantity-sa-site-city",
-      "t2-quantity-artifact-fortress",
-      "t2-quantity-character-enhancement",
-      "t2-quantity-vanilla-site",
-      "t2-quantity-same-card-combined",
+      "t2-copy-limit",
+      "t2-ls-ability",
       "t1-special-card",
       "t1-character-alias",
     ],
@@ -89,9 +89,9 @@ const T2_RULE_CATEGORIES = [
     ruleIds: ["t2-good-evil-balance"],
   },
   {
-    id: "banned",
-    label: "Banned Cards",
-    ruleIds: ["t1-banned-card"],
+    id: "pool",
+    label: "Card Pool",
+    ruleIds: ["pool-legality"],
   },
   {
     id: "sites-cities",
@@ -152,7 +152,7 @@ export default function DeckLegalityChecklist({
   totalCards,
   format,
 }: DeckLegalityChecklistProps) {
-  const isT2 = format?.toLowerCase().includes("type 2");
+  const isT2 = normalizeFormat(format) === "T2";
   const categories = isT2 ? T2_RULE_CATEGORIES : T1_RULE_CATEGORIES;
 
   if (totalCards === 0) {

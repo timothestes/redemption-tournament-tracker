@@ -28,12 +28,10 @@ import {
 import { getPublicImageUrl } from "@/app/decklist/card-search/hooks/useCardImageUrl";
 import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 import ForgeShareDeckModal from "@/app/forge/components/ForgeShareDeckModal";
+import { getFormatDef } from "@/lib/formats";
 
 function formatDeckType(format: string): string {
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt === "t2") return "T2";
-  return "T1";
+  return getFormatDef(format).id;
 }
 
 function deckTypeBadgeClasses(format: string): string {

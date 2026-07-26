@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ResolvedCard, CardGroup } from "../types";
+import { FORMATS } from "@/lib/formats";
 import {
   isLostSoul,
   isDominant,
@@ -24,7 +25,8 @@ import {
   checkCharacterAliasLimit,
   checkVanillaLimit,
   checkSitesCitiesLimit,
-  checkBannedCards,
+  checkPoolLegality,
+  checkFormatBanList,
   checkSpecialCards,
   validateT1Rules,
 } from "../rules";
@@ -50,6 +52,8 @@ function makeCard(overrides: Partial<ResolvedCard> = {}): ResolvedCard {
     alignment: "Good",
     reference: "",
     imgFile: "test-card.jpg",
+    legality: "",
+    officialSet: "",
     ...overrides,
   };
 }
@@ -526,23 +530,23 @@ describe("Rule: checkDeckSize (t1-deck-size)", () => {
     expect(checkDeckSize(cards)).toHaveLength(0);
   });
 
-  it("passes for 100-card deck", () => {
-    const cards = [makeCard({ quantity: 100 })];
+  it("passes for 60-card deck", () => {
+    const cards = [makeCard({ quantity: 60 })];
     expect(checkDeckSize(cards)).toHaveLength(0);
   });
 
-  it("passes for 154-card deck (maximum)", () => {
-    const cards = [makeCard({ quantity: 154 })];
+  it("passes for 70-card deck (maximum)", () => {
+    const cards = [makeCard({ quantity: 70 })];
     expect(checkDeckSize(cards)).toHaveLength(0);
   });
 
-  it("returns error for deck larger than 154 cards", () => {
-    const cards = [makeCard({ quantity: 155 })];
+  it("returns error for deck larger than 70 cards", () => {
+    const cards = [makeCard({ quantity: 71 })];
     const issues = checkDeckSize(cards);
     expect(issues).toHaveLength(1);
     expect(issues[0].rule).toBe("t1-deck-size");
-    expect(issues[0].message).toContain("155");
-    expect(issues[0].message).toContain("maximum is 154");
+    expect(issues[0].message).toContain("71");
+    expect(issues[0].message).toContain("maximum is 70");
   });
 
   it("sums quantities across multiple card entries", () => {
@@ -555,6 +559,15 @@ describe("Rule: checkDeckSize (t1-deck-size)", () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].rule).toBe("t1-deck-size");
     expect(issues[0].message).toContain("0");
+  });
+
+  it("respects custom min/max params (e.g. T2's 100-140)", () => {
+    const small = [makeCard({ quantity: 99 })];
+    const big = [makeCard({ quantity: 141 })];
+    const ok = [makeCard({ quantity: 120 })];
+    expect(checkDeckSize(small, 100, 140)[0]?.message).toContain("minimum is 100");
+    expect(checkDeckSize(big, 100, 140)[0]?.message).toContain("maximum is 140");
+    expect(checkDeckSize(ok, 100, 140)).toHaveLength(0);
   });
 });
 
@@ -1485,135 +1498,6 @@ describe("Rule: checkSitesCitiesLimit (t1-sites-cities)", () => {
   });
 });
 
-describe("Rule: checkBannedCards (t1-banned-card)", () => {
-  it("detects Daniel (Cloud of Witnesses)", () => {
-    const card = makeCard({
-      name: "Daniel",
-      set: "Cloud of Witnesses",
-    });
-    const issues = checkBannedCards([card], []);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].rule).toBe("t1-banned-card");
-    expect(issues[0].message).toContain("Daniel");
-    expect(issues[0].message).toContain("banned");
-  });
-
-  it("detects Endless Treasures (Prophecies of Christ)", () => {
-    const card = makeCard({
-      name: "Endless Treasures",
-      set: "Prophecies of Christ",
-    });
-    const issues = checkBannedCards([card], []);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].message).toContain("Endless Treasures");
-  });
-
-  it("detects Ephesian Widow (Persecuted Church)", () => {
-    const card = makeCard({
-      name: "Ephesian Widow",
-      set: "Persecuted Church",
-    });
-    const issues = checkBannedCards([card], []);
-    expect(issues).toHaveLength(1);
-  });
-
-  it("detects Lost Soul Proverbs 22:14 by reference", () => {
-    const card = makeLostSoul({ reference: "Proverbs 22:14" });
-    const issues = checkBannedCards([card], []);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].message).toContain("Proverbs 22:14");
-  });
-
-  it("detects Mourn and Weep (Prophecies of Christ)", () => {
-    const card = makeCard({
-      name: "Mourn and Weep",
-      set: "Prophecies of Christ",
-    });
-    const issues = checkBannedCards([card], []);
-    expect(issues).toHaveLength(1);
-  });
-
-  it("detects Samuel (Rock of Ages 2011)", () => {
-    const card = makeCard({
-      name: "Samuel",
-      set: "Rock of Ages 2011",
-    });
-    const issues = checkBannedCards([card], []);
-    expect(issues).toHaveLength(1);
-  });
-
-  it("detects The Foretelling Angel (Persecuted Church)", () => {
-    const card = makeCard({
-      name: "The Foretelling Angel",
-      set: "Persecuted Church",
-    });
-    const issues = checkBannedCards([card], []);
-    expect(issues).toHaveLength(1);
-  });
-
-  it("does NOT flag Daniel from a different set", () => {
-    const card = makeCard({
-      name: "Daniel",
-      set: "Patriarchs",
-    });
-    expect(checkBannedCards([card], [])).toHaveLength(0);
-  });
-
-  it("does NOT flag Samuel from a different set", () => {
-    const card = makeCard({
-      name: "Samuel",
-      set: "Kings",
-    });
-    expect(checkBannedCards([card], [])).toHaveLength(0);
-  });
-
-  it("detects banned card in reserve", () => {
-    const card = makeCard({
-      name: "Daniel",
-      set: "Cloud of Witnesses",
-      isReserve: true,
-    });
-    const issues = checkBannedCards([], [card]);
-    expect(issues).toHaveLength(1);
-  });
-
-  it("skips cards with quantity 0", () => {
-    const card = makeCard({
-      name: "Daniel",
-      set: "Cloud of Witnesses",
-      quantity: 0,
-    });
-    expect(checkBannedCards([card], [])).toHaveLength(0);
-  });
-
-  it("is case-insensitive on card name", () => {
-    const card = makeCard({
-      name: "daniel",
-      set: "Cloud of Witnesses",
-    });
-    const issues = checkBannedCards([card], []);
-    expect(issues).toHaveLength(1);
-  });
-
-  it("matches banned card via canonicalName", () => {
-    const card = makeCard({
-      name: "Daniel, the Treasured",
-      set: "Cloud of Witnesses",
-      canonicalName: "Daniel",
-    });
-    const issues = checkBannedCards([card], []);
-    expect(issues).toHaveLength(1);
-  });
-
-  it("passes for a deck with no banned cards", () => {
-    const cards = [
-      makeCard({ name: "Moses", set: "Patriarchs" }),
-      makeCard({ name: "Aaron", set: "Priests" }),
-    ];
-    expect(checkBannedCards(cards, [])).toHaveLength(0);
-  });
-});
-
 describe("Rule: checkSpecialCards (t1-special-card)", () => {
   describe("Faithful Witness (Revelation of John)", () => {
     it("passes at 4 copies (flat max, not per-50)", () => {
@@ -1999,18 +1883,6 @@ describe("Integration: Real decklist structure (Big Nativity v11)", () => {
     expect(lsIssues).toHaveLength(0);
   });
 
-  it("detects mutation: adding a banned card", () => {
-    const { mainDeck, reserve } = buildIntegrationDeck();
-    const bannedCard = makeCard({
-      name: "Daniel",
-      set: "Cloud of Witnesses",
-    });
-    const mutated = [...mainDeck, bannedCard];
-    const issues = checkBannedCards(mutated, reserve);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].rule).toBe("t1-banned-card");
-  });
-
   it("detects mutation: adding mutual exclusion pair", () => {
     const { mainDeck, reserve } = buildIntegrationDeck();
     // The deck already has Son of God; add The Second Coming too
@@ -2170,7 +2042,9 @@ describe("validateT1Rules (full pipeline)", () => {
       makeGroup(c.name, [c])
     );
 
-    const issues = validateT1Rules(allMain, [], groups);
+    // Unlimited (pool: 'all') keeps this test focused on deck-construction
+    // rules rather than the pool-legality rule (fixture cards have no legality set).
+    const issues = validateT1Rules(FORMATS.Unlimited, allMain, [], groups);
 
     // Filter out only errors (not warnings)
     const errors = issues.filter((i) => i.type === "error");
@@ -2178,13 +2052,9 @@ describe("validateT1Rules (full pipeline)", () => {
   });
 
   it("catches multiple simultaneous violations", () => {
-    // Deck that's too small, has banned cards, and has mutual exclusion
+    // Deck that's too small and has mutual exclusion
     const mainDeck = [
       makeCard({ quantity: 30 }),
-      makeCard({
-        name: "Daniel",
-        set: "Cloud of Witnesses",
-      }),
       makeDominant({ name: "Son of God" }),
       makeDominant({ name: "Chariot of Fire" }),
       makeDominant({ name: "New Jerusalem" }),
@@ -2192,24 +2062,22 @@ describe("validateT1Rules (full pipeline)", () => {
     ];
 
     const groups = mainDeck.map((c) => makeGroup(c.name, [c]));
-    const issues = validateT1Rules(mainDeck, [], groups);
+    const issues = validateT1Rules(FORMATS.Unlimited, mainDeck, [], groups);
     const errors = issues.filter((i) => i.type === "error");
 
     // Should have at least:
     // 1. deck-size (too small)
-    // 2. banned card (Daniel CoW)
-    // 3. mutual exclusion (SoG + CoF)
-    // 4. mutual exclusion (NJ + TSC)
-    // 5. dominant limit (more dominants than LS)
+    // 2. mutual exclusion (SoG + CoF)
+    // 3. mutual exclusion (NJ + TSC)
+    // 4. dominant limit (more dominants than LS)
     const ruleIds = errors.map((e) => e.rule);
     expect(ruleIds).toContain("t1-deck-size");
-    expect(ruleIds).toContain("t1-banned-card");
     expect(ruleIds).toContain("t1-mutual-exclusion");
     expect(ruleIds).toContain("t1-dominant-limit");
   });
 
   it("handles empty deck gracefully", () => {
-    const issues = validateT1Rules([], [], []);
+    const issues = validateT1Rules(FORMATS.Unlimited, [], [], []);
     const errors = issues.filter((i) => i.type === "error");
     // At minimum, deck size error
     expect(errors.length).toBeGreaterThanOrEqual(1);
@@ -2403,6 +2271,158 @@ describe("Rule: checkCharacterAliasLimit (t1-character-alias)", () => {
     const mainDeck = makeValidMainDeck(50, [kingSaul, saulOfTarsus]);
     const issues = checkCharacterAliasLimit(mainDeck, [], []);
     // Different people — should not conflict
+    expect(issues).toHaveLength(0);
+  });
+});
+
+// ===========================================================================
+// I. Pool legality (pool-legality)
+// ===========================================================================
+
+describe("pool legality", () => {
+  it("rejects a non-Rotation card in a rotation pool", () => {
+    const card = makeCard({ name: "Old Card", legality: "", officialSet: "Kings" });
+    const issues = checkPoolLegality(FORMATS.Limited, [card], []);
+    expect(issues.some((i) => i.rule === "pool-legality")).toBe(true);
+  });
+
+  it("accepts everything in the all pool (incl. Banned-flagged cards)", () => {
+    const card = makeCard({ name: "Daniel (CoW)", legality: "Banned", officialSet: "Cloud of Witnesses" });
+    expect(checkPoolLegality(FORMATS.Unlimited, [card], [])).toEqual([]);
+  });
+
+  it("rejects excluded sets in the paragon pool", () => {
+    const card = makeCard({ name: "Old Hero", legality: "Rotation", officialSet: "Kings" });
+    expect(checkPoolLegality(FORMATS.Paragon, [card], []).length).toBe(1);
+  });
+
+  it("skips card-not-found stubs", () => {
+    const stub = makeCard({ name: "Mystery", type: "", legality: "", officialSet: "" });
+    expect(checkPoolLegality(FORMATS.Limited, [stub], [])).toEqual([]);
+  });
+
+  it("accepts a Rotation-legal card in a rotation pool", () => {
+    const card = makeCard({ name: "Current Card", legality: "Rotation", officialSet: "Fall of Man" });
+    expect(checkPoolLegality(FORMATS.Limited, [card], [])).toEqual([]);
+  });
+
+  it("checks reserve cards too", () => {
+    const card = makeCard({ name: "Old Card", legality: "", officialSet: "Kings", isReserve: true });
+    const issues = checkPoolLegality(FORMATS.Limited, [], [card]);
+    expect(issues.some((i) => i.rule === "pool-legality")).toBe(true);
+  });
+
+  it("skips quantity-0 cards", () => {
+    const card = makeCard({ name: "Old Card", legality: "", officialSet: "Kings", quantity: 0 });
+    expect(checkPoolLegality(FORMATS.Limited, [card], [])).toEqual([]);
+  });
+});
+
+// ===========================================================================
+// I2. Explicit ban list (banned-card / checkFormatBanList)
+// ===========================================================================
+
+describe("banned-card (checkFormatBanList)", () => {
+  const daniel = makeCard({
+    name: "Daniel (CoW)",
+    set: "CoW [Ban]",
+    legality: "Banned",
+    officialSet: "Cloud of Witnesses",
+    type: "Hero",
+  });
+
+  it("flags a banned card in Limited with exactly one banned-card error, and pool-legality does not also fire for it", () => {
+    const banIssues = checkFormatBanList(FORMATS.Limited, [daniel], []);
+    expect(banIssues).toHaveLength(1);
+    expect(banIssues[0].rule).toBe("banned-card");
+    expect(banIssues[0].message).toBe('"Daniel (CoW)" (CoW [Ban]) is banned in Limited.');
+    expect(banIssues[0].cards).toEqual(["Daniel (CoW)"]);
+
+    const poolIssues = checkPoolLegality(FORMATS.Limited, [daniel], []);
+    expect(poolIssues).toEqual([]);
+  });
+
+  it("does not flag the same card in Unlimited (empty ban list, all-cards pool)", () => {
+    expect(checkFormatBanList(FORMATS.Unlimited, [daniel], [])).toEqual([]);
+    expect(checkPoolLegality(FORMATS.Unlimited, [daniel], [])).toEqual([]);
+  });
+
+  it("in T2, falls through to pool-legality (unchanged behavior) with no banned-card", () => {
+    expect(checkFormatBanList(FORMATS.T2, [daniel], [])).toEqual([]);
+    const poolIssues = checkPoolLegality(FORMATS.T2, [daniel], []);
+    expect(poolIssues.some((i) => i.rule === "pool-legality")).toBe(true);
+  });
+
+  it("matches the reference entry for both Lost Souls (Two Liner) and (Three Liner) in Limited", () => {
+    const twoLiner = makeCard({
+      name: "Lost Souls (Two Liner)",
+      set: "Main [Ban]",
+      legality: "Banned",
+      officialSet: "Main",
+      type: "Lost Soul",
+      reference: "Proverbs 22:14",
+    });
+    const threeLiner = makeCard({
+      name: "Lost Souls (Three Liner)",
+      set: "Main UL [Ban]",
+      legality: "Banned",
+      officialSet: "Main Unlimited",
+      type: "Lost Soul",
+      reference: "Proverbs 22:14",
+    });
+    const issues = checkFormatBanList(FORMATS.Limited, [twoLiner, threeLiner], []);
+    expect(issues).toHaveLength(2);
+    expect(issues.every((i) => i.rule === "banned-card")).toBe(true);
+  });
+
+  it("skips quantity-0 and card-not-found stub cards", () => {
+    const zeroQty = { ...daniel, quantity: 0 };
+    const stub = makeCard({ name: "Daniel (CoW)", set: "CoW [Ban]", type: "" });
+    expect(checkFormatBanList(FORMATS.Limited, [zeroQty, stub], [])).toEqual([]);
+  });
+
+  it("does not match on name alone (set must match exactly, no startsWith fuzz)", () => {
+    const wrongSet = makeCard({ name: "Daniel (CoW)", set: "Some Other Set" });
+    expect(checkFormatBanList(FORMATS.Limited, [wrongSet], [])).toEqual([]);
+  });
+
+  it("matches case-insensitively — a card with uppercased name and set still hits the ban list", () => {
+    const shouted = makeCard({
+      name: "DANIEL (COW)",
+      set: "COW [BAN]",
+      legality: "Banned",
+      officialSet: "Cloud of Witnesses",
+      type: "Hero",
+    });
+    const issues = checkFormatBanList(FORMATS.Limited, [shouted], []);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].rule).toBe("banned-card");
+  });
+
+  it("is wired into validateT1Rules — the banned-card issue for this card fires, pool-legality does not", () => {
+    const mainDeck = makeValidMainDeck(50, [daniel]);
+    const issues = validateT1Rules(FORMATS.Limited, mainDeck, [], []);
+    const danielIssues = issues.filter((i) => i.cards?.includes("Daniel (CoW)"));
+    expect(danielIssues).toHaveLength(1);
+    expect(danielIssues[0].rule).toBe("banned-card");
+  });
+});
+
+// ===========================================================================
+// J. T1 deck size (new 50-70)
+// ===========================================================================
+
+describe("T1 deck size (new 50-70)", () => {
+  it("rejects 71+", () => {
+    // build a legal-except-size 71-card deck with the fixture helper
+    const cards71 = makeValidMainDeck(71);
+    const issues = checkDeckSize(cards71, 50, 70);
+    expect(issues.some((i) => i.rule === "t1-deck-size")).toBe(true);
+  });
+
+  it("accepts 70 (new maximum)", () => {
+    const cards70 = makeValidMainDeck(70);
+    const issues = checkDeckSize(cards70, 50, 70);
     expect(issues).toHaveLength(0);
   });
 });

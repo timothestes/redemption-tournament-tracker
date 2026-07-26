@@ -1,4 +1,5 @@
 import { ResolvedCard, DeckCheckIssue, CardGroup } from "./types";
+import { FormatDef, BannedCardDef, PARAGON_EXCLUDED_SETS } from "@/lib/formats";
 
 // ---------------------------------------------------------------------------
 // Helper predicates
@@ -85,67 +86,6 @@ export function getMaxPerFifty(
 function pluralize(name: string): string {
   if (/(?:s|x|z|sh|ch)$/i.test(name)) return `${name}es`;
   return `${name}s`;
-}
-
-// ---------------------------------------------------------------------------
-// Banned card definitions
-// ---------------------------------------------------------------------------
-
-interface BannedCardDef {
-  name: string;
-  set?: string;
-  reference?: string;
-  note: string;
-}
-
-const BANNED_CARDS: BannedCardDef[] = [
-  { name: "Daniel", set: "Cloud of Witnesses", note: "Daniel (Cloud of Witnesses)" },
-  {
-    name: "Endless Treasures",
-    set: "Prophecies of Christ",
-    note: "Endless Treasures (Prophecies of Christ)",
-  },
-  {
-    name: "Ephesian Widow",
-    set: "Persecuted Church",
-    note: "Ephesian Widow (Persecuted Church)",
-  },
-  {
-    reference: "Proverbs 22:14",
-    name: "Lost Soul",
-    note: 'Lost Soul "Proverbs 22:14" (all versions)',
-  },
-  {
-    name: "Mourn and Weep",
-    set: "Prophecies of Christ",
-    note: "Mourn and Weep (Prophecies of Christ)",
-  },
-  {
-    name: "Samuel",
-    set: "Rock of Ages 2011",
-    note: "Samuel (Rock of Ages 2011)",
-  },
-  {
-    name: "The Foretelling Angel",
-    set: "Persecuted Church",
-    note: "The Foretelling Angel (Persecuted Church)",
-  },
-];
-
-function matchesBannedCard(card: ResolvedCard, ban: BannedCardDef): boolean {
-  // Reference-based match (Lost Soul Proverbs 22:14)
-  if (ban.reference) {
-    return card.reference === ban.reference;
-  }
-  // Name + set match (using canonicalName for version tolerance)
-  const nameMatch =
-    card.name.toLowerCase() === ban.name.toLowerCase() ||
-    (card.canonicalName ?? "").toLowerCase() === ban.name.toLowerCase();
-  if (!nameMatch) return false;
-  if (ban.set) {
-    return card.set.toLowerCase() === ban.set.toLowerCase();
-  }
-  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -351,24 +291,29 @@ function sharesAlignment(a: ResolvedCard, b: ResolvedCard): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Rule: t1-deck-size — Main deck must be 50-154 cards.
+ * Rule: t1-deck-size — Main deck size must fall within [min, max].
+ * Defaults to the T1 (Limited/Unlimited) range of 50-70.
  */
-export function checkDeckSize(mainDeckCards: ResolvedCard[]): DeckCheckIssue[] {
+export function checkDeckSize(
+  mainDeckCards: ResolvedCard[],
+  min = 50,
+  max = 70
+): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
   const size = mainDeckCards.reduce((sum, c) => sum + c.quantity, 0);
 
-  if (size < 50) {
+  if (size < min) {
     issues.push({
       type: "error",
       rule: "t1-deck-size",
-      message: `Main deck has ${size} cards — minimum is 50.`,
+      message: `Main deck has ${size} cards — minimum is ${min}.`,
     });
   }
-  if (size > 154) {
+  if (size > max) {
     issues.push({
       type: "error",
       rule: "t1-deck-size",
-      message: `Main deck has ${size} cards — maximum is 154.`,
+      message: `Main deck has ${size} cards — maximum is ${max}.`,
     });
   }
 
@@ -411,19 +356,20 @@ export function checkLostSoulCount(
 }
 
 /**
- * Rule: t1-reserve-size — Reserve may have 0-10 cards.
+ * Rule: t1-reserve-size — Reserve may have 0-max cards (default max 10).
  */
 export function checkReserveSize(
-  reserveCards: ResolvedCard[]
+  reserveCards: ResolvedCard[],
+  max = 10
 ): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
   const size = reserveCards.reduce((sum, c) => sum + c.quantity, 0);
 
-  if (size > 10) {
+  if (size > max) {
     issues.push({
       type: "error",
       rule: "t1-reserve-size",
-      message: `Reserve has ${size} cards — maximum is 10.`,
+      message: `Reserve has ${size} cards — maximum is ${max}.`,
     });
   }
 
@@ -614,7 +560,9 @@ export function extractLsAbilityName(card: ResolvedCard): string | null {
 }
 
 /**
- * Rule: t1-quantity-ls-ability — Lost Souls with a special ability are limited to 1 copy each.
+ * Rule: t1-quantity-ls-ability — Lost Souls with a special ability are limited to
+ * `maxCopies` copies each (default 1). T2 calls this with maxCopies=1 and its own
+ * rule id "t2-ls-ability" (spec §4).
  *
  * Per Deck Building Rules v1.3: "Lost Souls with the same reference have the same name"
  * So we group LS by reference, not just by CardGroup identity.
@@ -627,7 +575,9 @@ export function extractLsAbilityName(card: ResolvedCard): string | null {
 export function checkLostSoulAbilityLimit(
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[],
-  _cardGroups: CardGroup[]
+  _cardGroups: CardGroup[],
+  maxCopies = 1,
+  rule = "t1-quantity-ls-ability"
 ): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
   const allCards = [...mainDeckCards, ...reserveCards];
@@ -697,13 +647,13 @@ export function checkLostSoulAbilityLimit(
   // Step 3: Check each group
   for (const [refKey, group] of byReference) {
     if (merged.has(refKey)) continue; // skip merged groups
-    if (group.totalQty > 1) {
+    if (group.totalQty > maxCopies) {
       const names = [...new Set(group.cards.map((c) => c.name))];
       const displayName = names.length === 1 ? names[0] : names.join(" / ");
       issues.push({
         type: "error",
-        rule: "t1-quantity-ls-ability",
-        message: `"${displayName}" is a Lost Soul with a special ability — max 1 copy allowed, found ${group.totalQty}.`,
+        rule,
+        message: `"${displayName}" is a Lost Soul with a special ability — max ${maxCopies} cop${maxCopies === 1 ? "y" : "ies"} allowed, found ${group.totalQty}.`,
         cards: names,
       });
     }
@@ -902,36 +852,97 @@ export function checkSitesCitiesLimit(
 }
 
 /**
- * Rule: t1-banned-card — Certain cards are banned in Type 1.
+ * Predicate satisfied by both ResolvedCard (deckcheck) and CardData (raw card
+ * database) — the 3 fields a ban-list entry can match on.
  */
-export function checkBannedCards(
+type BanMatchable = Pick<ResolvedCard, "name" | "set" | "reference">;
+
+/**
+ * Match a card against a single ban-list entry. Reference entries (covering
+ * all printings of a scripture reference) match on card.reference alone;
+ * name+set entries match name AND set case-insensitively with EXACT
+ * equality — no startsWith/canonicalName fuzzing, since each entry is keyed
+ * directly to a real row in the card database (see the regression guard in
+ * lib/__tests__/formats.test.ts).
+ */
+export function matchesBanListEntry(
+  card: BanMatchable,
+  entry: BannedCardDef
+): boolean {
+  if (entry.reference !== undefined) {
+    return card.reference === entry.reference;
+  }
+  return (
+    card.name.toLowerCase() === entry.name.toLowerCase() &&
+    card.set.toLowerCase() === (entry.set ?? "").toLowerCase()
+  );
+}
+
+/**
+ * Rule: banned-card — every card is checked against the format's explicit
+ * ban list (lib/formats.ts FormatDef.banList). Def-driven: an empty banList
+ * (currently Unlimited, T2, Paragon) makes this a no-op.
+ */
+export function checkFormatBanList(
+  def: FormatDef,
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[]
 ): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
-  const allCards = [...mainDeckCards, ...reserveCards];
-
-  for (const card of allCards) {
+  if (def.banList.length === 0) return issues;
+  for (const card of [...mainDeckCards, ...reserveCards]) {
     if (card.quantity === 0) continue;
-    for (const ban of BANNED_CARDS) {
-      if (matchesBannedCard(card, ban)) {
-        issues.push({
-          type: "error",
-          rule: "t1-banned-card",
-          message: `"${card.name}" (${card.set}) is banned in Type 1: ${ban.note}.`,
-          cards: [card.name],
-        });
-      }
+    if (card.type === "") continue; // card-not-found stub — card-not-found warning already fired
+    if (def.banList.some((entry) => matchesBanListEntry(card, entry))) {
+      issues.push({
+        type: "error",
+        rule: "banned-card",
+        message: `"${card.name}" (${card.set}) is banned in ${def.label}.`,
+        cards: [card.name],
+      });
     }
   }
+  return issues;
+}
 
+/**
+ * Rule: pool-legality — every card must belong to the format's card pool.
+ * First-ever pool enforcement (previously search-filter only, spec §4).
+ */
+export function checkPoolLegality(
+  def: FormatDef,
+  mainDeckCards: ResolvedCard[],
+  reserveCards: ResolvedCard[]
+): DeckCheckIssue[] {
+  const issues: DeckCheckIssue[] = [];
+  if (def.pool === "all") return issues;
+  for (const card of [...mainDeckCards, ...reserveCards]) {
+    if (card.quantity === 0) continue;
+    if (card.type === "") continue; // card-not-found stub — card-not-found warning already fired
+    if (def.banList.some((entry) => matchesBanListEntry(card, entry))) continue; // banned-card rule already reports this card
+    if (def.pool === "rotation" && card.legality !== "Rotation") {
+      issues.push({
+        type: "error",
+        rule: "pool-legality",
+        message: `"${card.name}" (${card.set}) is not in the ${def.label} card pool.`,
+        cards: [card.name],
+      });
+    } else if (def.pool === "paragon" && PARAGON_EXCLUDED_SETS.has(card.officialSet)) {
+      issues.push({
+        type: "error",
+        rule: "pool-legality",
+        message: `"${card.name}" (${card.set}) is from a set that is not Paragon legal.`,
+        cards: [card.name],
+      });
+    }
+  }
   return issues;
 }
 
 /**
  * Helper: check if a card matches one of the special exception cards.
  */
-function isSpecialExceptionCard(card: ResolvedCard): boolean {
+export function isSpecialExceptionCard(card: ResolvedCard): boolean {
   for (const spec of SPECIAL_CARDS) {
     if (matchesSpecialCard(card, spec)) return true;
   }
@@ -1020,12 +1031,14 @@ export function checkSpecialCards(
 /**
  * Validate a deck against all Type 1 rules.
  *
+ * @param def            - The format definition (Limited or Unlimited)
  * @param mainDeckCards  - Resolved cards in the main deck
  * @param reserveCards   - Resolved cards in the reserve
  * @param cardGroups     - Cards grouped by canonical name (across all versions)
  * @returns All issues found
  */
 export function validateT1Rules(
+  def: FormatDef,
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[],
   cardGroups: CardGroup[]
@@ -1033,9 +1046,9 @@ export function validateT1Rules(
   const issues: DeckCheckIssue[] = [];
 
   // Structural rules
-  issues.push(...checkDeckSize(mainDeckCards));
+  issues.push(...checkDeckSize(mainDeckCards, def.main.min, def.main.max));
   issues.push(...checkLostSoulCount(mainDeckCards));
-  issues.push(...checkReserveSize(reserveCards));
+  issues.push(...checkReserveSize(reserveCards, def.reserveMax));
   issues.push(...checkReserveContents(reserveCards));
 
   // Dominant rules
@@ -1060,8 +1073,11 @@ export function validateT1Rules(
   // Sites + Cities
   issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
 
-  // Banned cards
-  issues.push(...checkBannedCards(mainDeckCards, reserveCards));
+  // Pool legality
+  issues.push(...checkPoolLegality(def, mainDeckCards, reserveCards));
+
+  // Explicit ban list — def-driven, no-op when banList is empty (Unlimited)
+  issues.push(...checkFormatBanList(def, mainDeckCards, reserveCards));
 
   // Special card exceptions
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
@@ -1108,9 +1124,10 @@ export function checkParagonDeckSize(mainDeckCards: ResolvedCard[]): DeckCheckIs
  *
  * Paragon skips: Lost Soul count check, Dominant-vs-Lost-Soul limit.
  * Paragon keeps: deck size (40 exact), reserve size/contents, dominant uniqueness,
- *                mutual exclusion, quantity rules, banned cards, etc.
+ *                mutual exclusion, quantity rules, pool legality, etc.
  */
 export function validateParagonRules(
+  def: FormatDef,
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[],
   cardGroups: CardGroup[]
@@ -1121,7 +1138,7 @@ export function validateParagonRules(
   issues.push(...checkParagonDeckSize(mainDeckCards));
 
   // Reserve rules (same as T1: max 10, no Dominants/LS in reserve)
-  issues.push(...checkReserveSize(reserveCards));
+  issues.push(...checkReserveSize(reserveCards, def.reserveMax));
   issues.push(...checkReserveContents(reserveCards));
 
   // Dominant uniqueness (max 1 copy of each — still applies)
@@ -1142,8 +1159,11 @@ export function validateParagonRules(
   // Sites + Cities
   issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
 
-  // Banned cards
-  issues.push(...checkBannedCards(mainDeckCards, reserveCards));
+  // Pool legality
+  issues.push(...checkPoolLegality(def, mainDeckCards, reserveCards));
+
+  // Explicit ban list — def-driven, no-op when banList is empty (Paragon)
+  issues.push(...checkFormatBanList(def, mainDeckCards, reserveCards));
 
   // Special card exceptions
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
@@ -1247,7 +1267,7 @@ export function getT2RequiredLostSouls(mainDeckSize: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Rule: t2-deck-size — Main deck must be 100-252 cards.
+ * Rule: t2-deck-size — Main deck must be 100-140 cards.
  */
 export function checkT2DeckSize(mainDeckCards: ResolvedCard[]): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
@@ -1260,11 +1280,11 @@ export function checkT2DeckSize(mainDeckCards: ResolvedCard[]): DeckCheckIssue[]
       message: `Main deck has ${size} cards — minimum is 100.`,
     });
   }
-  if (size > 252) {
+  if (size > 140) {
     issues.push({
       type: "error",
       rule: "t2-deck-size",
-      message: `Main deck has ${size} cards — maximum is 252.`,
+      message: `Main deck has ${size} cards — maximum is 140.`,
     });
   }
 
@@ -1305,7 +1325,7 @@ export function checkT2LostSoulCount(
 }
 
 /**
- * Rule: t2-reserve-size — Reserve may have 0-15 cards.
+ * Rule: t2-reserve-size — Reserve may have 0-20 cards.
  */
 export function checkT2ReserveSize(
   reserveCards: ResolvedCard[]
@@ -1313,11 +1333,11 @@ export function checkT2ReserveSize(
   const issues: DeckCheckIssue[] = [];
   const size = reserveCards.reduce((sum, c) => sum + c.quantity, 0);
 
-  if (size > 15) {
+  if (size > 20) {
     issues.push({
       type: "error",
       rule: "t2-reserve-size",
-      message: `Reserve has ${size} cards — maximum is 15.`,
+      message: `Reserve has ${size} cards — maximum is 20.`,
     });
   }
 
@@ -1325,219 +1345,31 @@ export function checkT2ReserveSize(
 }
 
 /**
- * Per-card T2 copy limit based on the same 4-tier system used below.
- * Returns the max copies allowed for a single card, or null when the card is
- * not subject to a brigade/type tier here (Dominants — handled by
- * checkDominantUnique; non-SA Lost Souls — handled by the LS count rules;
- * Colorless / no-brigade cards — uncapped by these tiers).
- *
- * Mirrors the tiers in checkT2QuantityLimits exactly so the two stay in sync.
+ * Rule: t2-copy-limit — flat max 2 copies per card (same-card groups).
+ * Skips Dominants (checkDominantUnique), ALL Lost Souls (t2-ls-ability /
+ * exempt generics), and special exception cards (checkSpecialCards) — each
+ * governed by its own rule. NOTE (spec §4): the exception carve-out is a
+ * deliberate fix — the old tiers only excluded exceptions from the
+ * 3+-brigade tier, capping Locust at 4 and Faithful Witness at 2 in
+ * contradiction of checkSpecialCards. Do not copy the old tier exclusions.
  */
-function getT2CardCopyLimit(card: ResolvedCard): number | null {
-  if (isDominant(card)) return null;
-  if (isLostSoul(card)) return hasSpecialAbility(card) ? 2 : null;
-
-  const brigades = getBrigadeCount(card);
-  if (brigades >= 3) return isSpecialExceptionCard(card) ? null : 1;
-  if (brigades === 2) return 2;
-  if (brigades === 1) {
-    if (isSiteOrCity(card)) return hasSpecialAbility(card) ? 2 : 4;
-    if (isArtifactFortressCovCurse(card)) return 3;
-    if (isCharacter(card) || isEnhancement(card)) return 4;
-  }
-  return null;
-}
-
-/**
- * Rule: t2-quantity-limits — The 4-tier quantity system for Type 2.
- *
- * Max 1: 3+ brigades (getBrigadeCount >= 3), or Dominant (handled by checkDominantUnique)
- * Max 2: 2 brigades, or (LS with SA), or (Site/City with SA and single brigade)
- * Max 3: Artifact/Fortress/Covenant/Curse with single brigade
- * Max 4: Character/Enhancement with single brigade, or non-SA Site/City with single brigade
- *
- * Cards with no brigade or "Colorless" are not subject to brigade-based limits.
- * Dominants are handled by checkDominantUnique, so skip them here.
- */
-export function checkT2QuantityLimits(
-  _mainDeckCards: ResolvedCard[],
-  _reserveCards: ResolvedCard[],
-  cardGroups: CardGroup[]
-): DeckCheckIssue[] {
+export function checkT2CopyLimit(cardGroups: CardGroup[]): DeckCheckIssue[] {
   const issues: DeckCheckIssue[] = [];
-
   for (const group of cardGroups) {
-    const issueCountBeforeGroup = issues.length;
-
-    // Note: Dominant uniqueness (max 1) is handled by checkDominantUnique,
-    // which is called separately in validateT2Rules. Don't duplicate it here.
-
-    // --- Tier: Max 1 (3+ brigades, excluding Dominants) ---
-    const tripleBrigadeCards = group.cards.filter(
-      (c) => !isDominant(c) && !isLostSoul(c) && !isSpecialExceptionCard(c) && getBrigadeCount(c) >= 3
+    const capped = group.cards.filter(
+      (c) => !isDominant(c) && !isLostSoul(c) && !isSpecialExceptionCard(c)
     );
-    if (tripleBrigadeCards.length > 0) {
-      const totalQty = tripleBrigadeCards.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 1) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-3plus-brigade",
-          message: `"${group.canonicalName}" has 3+ brigades — max 1 copy allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 2 (2 brigades, non-Site/City, non-LS) ---
-    const dualBrigadeCards = group.cards.filter(
-      (c) =>
-        !isDominant(c) &&
-        !isLostSoul(c) &&
-        !isSiteOrCity(c) &&
-        getBrigadeCount(c) === 2
-    );
-    if (dualBrigadeCards.length > 0) {
-      const totalQty = dualBrigadeCards.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 2) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-2-brigade",
-          message: `"${group.canonicalName}" has 2 brigades — max 2 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 2 (Lost Soul with special ability) ---
-    const lsWithAbility = group.cards.filter(
-      (c) => isLostSoul(c) && hasSpecialAbility(c)
-    );
-    if (lsWithAbility.length > 0) {
-      const totalQty = lsWithAbility.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 2) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-ls-ability",
-          message: `"${group.canonicalName}" is a Lost Soul with a special ability — max 2 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 2 (Site/City with SA and single brigade) ---
-    const siteWithSA = group.cards.filter(
-      (c) => isSiteOrCity(c) && hasSpecialAbility(c) && getBrigadeCount(c) === 1
-    );
-    if (siteWithSA.length > 0) {
-      const totalQty = siteWithSA.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 2) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-sa-site-city",
-          message: `"${group.canonicalName}" is a Site/City with a special ability — max 2 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 2 (Site/City with 2 brigades) ---
-    const siteDualBrigade = group.cards.filter(
-      (c) => isSiteOrCity(c) && getBrigadeCount(c) === 2
-    );
-    if (siteDualBrigade.length > 0) {
-      const totalQty = siteDualBrigade.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 2) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-2-brigade-site",
-          message: `"${group.canonicalName}" is a Site/City with 2 brigades — max 2 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 3 (Artifact/Fortress/Covenant/Curse with single brigade) ---
-    const artifactSingle = group.cards.filter(
-      (c) => isArtifactFortressCovCurse(c) && getBrigadeCount(c) === 1
-    );
-    if (artifactSingle.length > 0) {
-      const totalQty = artifactSingle.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 3) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-artifact-fortress",
-          message: `"${group.canonicalName}" is an Artifact/Fortress/Covenant/Curse with a single brigade — max 3 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 4 (Character/Enhancement with single brigade) ---
-    // Per rules: "Any character, Enhancement ... with one brigade" — SA doesn't matter for these types
-    const charEnhSingle = group.cards.filter(
-      (c) =>
-        (isCharacter(c) || isEnhancement(c)) &&
-        getBrigadeCount(c) === 1
-    );
-    if (charEnhSingle.length > 0) {
-      const totalQty = charEnhSingle.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 4) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-character-enhancement",
-          message: `"${group.canonicalName}" (single-brigade Character/Enhancement) — max 4 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Tier: Max 4 (non-SA Site/City with single brigade) ---
-    const siteNoSA = group.cards.filter(
-      (c) => isSiteOrCity(c) && !hasSpecialAbility(c) && getBrigadeCount(c) === 1
-    );
-    if (siteNoSA.length > 0) {
-      const totalQty = siteNoSA.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalQty > 4) {
-        issues.push({
-          type: "error",
-          rule: "t2-quantity-vanilla-site",
-          message: `"${group.canonicalName}" (non-SA Site/City, single-brigade) — max 4 copies allowed, found ${totalQty}.`,
-          cards: [group.canonicalName],
-        });
-      }
-    }
-
-    // --- Combined pool cap for authoritative same-card groups ---
-    // Cards in a duplicate_card_groups group (groupId set) are the same card,
-    // even across brigade printings — e.g. "Daniel, the Treasured" [White] and
-    // "Daniel, the Apocalyptist" [Green/White] share group 537. They share ONE
-    // copy pool sized to the most PERMISSIVE printing (single-brigade = 4), so
-    // 3 mono + 1 multicolor (4 total) is legal but a 5th copy is not. The
-    // per-tier checks above still cap each printing by its own brigade limit
-    // (so the multicolor copies can't exceed 2). Only flag the pool here when
-    // every printing is individually legal but the shared pool is exceeded —
-    // otherwise a per-tier error above already covers this group.
-    if (group.groupId != null && issues.length === issueCountBeforeGroup) {
-      const capped = group.cards
-        .map((c) => ({ card: c, limit: getT2CardCopyLimit(c) }))
-        .filter((x): x is { card: ResolvedCard; limit: number } => x.limit != null);
-
-      if (capped.length > 0) {
-        const poolLimit = Math.max(...capped.map((x) => x.limit));
-        const totalQty = capped.reduce((sum, x) => sum + x.card.quantity, 0);
-        if (totalQty > poolLimit) {
-          const names = [...new Set(capped.map((x) => x.card.name))];
-          issues.push({
-            type: "error",
-            rule: "t2-quantity-same-card-combined",
-            message: `"${group.canonicalName}" — these printings count as the same card, max ${poolLimit} copies total, found ${totalQty}.`,
-            cards: names,
-          });
-        }
-      }
+    if (capped.length === 0) continue;
+    const totalQty = capped.reduce((sum, c) => sum + c.quantity, 0);
+    if (totalQty > 2) {
+      issues.push({
+        type: "error",
+        rule: "t2-copy-limit",
+        message: `"${group.canonicalName}" — max 2 copies per card in T2, found ${totalQty}.`,
+        cards: [...new Set(capped.map((c) => c.name))],
+      });
     }
   }
-
   return issues;
 }
 
@@ -1597,12 +1429,14 @@ export function checkGoodEvilBalance(
 /**
  * Validate a deck against all Type 2 rules.
  *
+ * @param def            - The T2 format definition (main size, reserve size, pool)
  * @param mainDeckCards  - Resolved cards in the main deck
  * @param reserveCards   - Resolved cards in the reserve
  * @param cardGroups     - Cards grouped by canonical name (across all versions)
  * @returns All issues found
  */
 export function validateT2Rules(
+  def: FormatDef,
   mainDeckCards: ResolvedCard[],
   reserveCards: ResolvedCard[],
   cardGroups: CardGroup[]
@@ -1614,8 +1448,11 @@ export function validateT2Rules(
   issues.push(...checkT2LostSoulCount(mainDeckCards));
   issues.push(...checkT2ReserveSize(reserveCards));
 
-  // T2-specific quantity rules (includes LS with SA limit of 2)
-  issues.push(...checkT2QuantityLimits(mainDeckCards, reserveCards, cardGroups));
+  // T2-specific quantity rules — flat 2-copy cap, ability souls max 1
+  issues.push(...checkT2CopyLimit(cardGroups));
+  issues.push(
+    ...checkLostSoulAbilityLimit(mainDeckCards, reserveCards, cardGroups, 1, "t2-ls-ability")
+  );
 
   // T2-specific good/evil balance
   issues.push(...checkGoodEvilBalance(mainDeckCards, reserveCards));
@@ -1626,8 +1463,13 @@ export function validateT2Rules(
   issues.push(...checkDominantUnique(mainDeckCards, reserveCards, cardGroups));
   issues.push(...checkMutualExclusion(mainDeckCards, reserveCards));
   issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
-  issues.push(...checkBannedCards(mainDeckCards, reserveCards));
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
+
+  // Pool legality
+  issues.push(...checkPoolLegality(def, mainDeckCards, reserveCards));
+
+  // Explicit ban list — def-driven, no-op when banList is empty (T2)
+  issues.push(...checkFormatBanList(def, mainDeckCards, reserveCards));
 
   // Character alias checks (dual-alignment characters with different names)
   issues.push(

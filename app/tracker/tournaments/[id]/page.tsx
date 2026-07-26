@@ -931,6 +931,7 @@ export default function TournamentPage({
             tournamentStarted={tournament?.has_started || false}
             tournamentEnded={tournament?.has_ended || false}
             tournamentName={tournament?.name}
+            tournamentFormat={tournament?.deck_format || null}
             onTournamentEnd={async () => {
               // End Round writes new match_points/differential to participants;
               // refresh both so Standings doesn't render stale zeros.

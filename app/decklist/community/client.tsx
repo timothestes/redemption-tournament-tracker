@@ -11,6 +11,7 @@ import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageM
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
 import { getCardImageUrlOrNull as getCardImageUrl } from '../../shared/utils/cardImageUrl';
+import { normalizeFormat, getFormatDef } from "@/lib/formats";
 
 interface DeckTag { id: string; name: string; color: string; }
 
@@ -50,11 +51,7 @@ function getContrastColor(hex: string): string {
 }
 
 function formatDeckType(format?: string): string {
-  if (!format) return "T1";
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt === "t2") return "T2";
-  return "T1";
+  return getFormatDef(format).id;
 }
 
 function getDeckTypeBadgeClasses(format?: string): string {
@@ -168,7 +165,12 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
     const s = searchParams.get("sort");
     return s === "most_viewed" || s === "name" ? s : "newest";
   });
-  const [format, setFormat] = useState<string>(searchParams.get("format") || "");
+  const [format, setFormat] = useState<string>(() => {
+    // Old bookmarked links (?format=Type+2) still work: run whatever was
+    // stored in the URL through normalizeFormat to land on the canonical id.
+    const raw = searchParams.get("format");
+    return raw ? normalizeFormat(raw) : "";
+  });
   const [search, setSearch] = useState(searchParams.get("q") || "");
   const [searchInput, setSearchInput] = useState(searchParams.get("q") || "");
   const [usernameFilter, setUsernameFilter] = useState(initialUsername);
@@ -386,8 +388,9 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             className="px-3 py-2 border border-border rounded-lg bg-card text-sm"
           >
             <option value="">All Formats</option>
-            <option value="Type 1">Type 1</option>
-            <option value="Type 2">Type 2</option>
+            <option value="Limited">Limited</option>
+            <option value="Unlimited">Unlimited</option>
+            <option value="T2">T2</option>
             <option value="Paragon">Paragon</option>
           </select>
 

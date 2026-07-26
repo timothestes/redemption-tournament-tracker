@@ -30,6 +30,8 @@ export interface ResolvedCard {
   alignment: string; // Good, Evil, Good/Evil, Neutral
   reference: string;
   imgFile: string;
+  legality: string; // e.g. "Rotation", "Banned", "" — from CardData
+  officialSet: string; // canonical set name — from CardData
   // Same-card identity
   duplicateGroupId?: number; // from duplicate_card_groups table
   canonicalName?: string; // canonical name from the group
@@ -38,7 +40,7 @@ export interface ResolvedCard {
 // Individual validation issue
 export interface DeckCheckIssue {
   type: "error" | "warning" | "info";
-  rule: string; // machine-readable rule ID like "t1-deck-size", "t1-banned-card"
+  rule: string; // machine-readable rule ID like "t1-deck-size", "pool-legality"
   message: string; // human-readable explanation
   cards?: string[]; // card names involved
 }

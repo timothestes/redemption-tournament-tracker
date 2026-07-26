@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { normalizeFormat } from "@/lib/formats";
 
 /**
  * Cookie-free anon client for the cached public-deck loaders. The standard
@@ -91,6 +92,42 @@ export function isUuid(s: string): boolean {
   return UUID_RE.test(s);
 }
 
+export type DeckFormatFilter =
+  | { kind: "or"; clause: string }
+  | { kind: "in"; values: string[] }
+  | { kind: "eq"; value: string };
+
+/**
+ * Pure format -> PostgREST filter mapping, shared by every `decks.format`
+ * query site (the v1 public API below, and the community filter in
+ * app/decklist/actions.ts) so all of them apply the exact same filter shape.
+ * Dual-vocabulary by design: each branch lists both the legacy DB string and
+ * the canonical id, so results are identical before and after the Task 9
+ * backfill. The Limited branch's raw `.or()` clause deliberately matches the
+ * unquoted encoding the library's own `.in()` produces for embedded-space
+ * values (verified in __tests__/cache.test.ts against a real
+ * PostgrestFilterBuilder) rather than hand-quoting — see that test for the
+ * byte-for-byte comparison.
+ */
+export function deckFormatFilterFor(format: string): DeckFormatFilter {
+  const norm = normalizeFormat(format);
+  if (norm === "T2") return { kind: "in", values: ["Type 2", "T2"] };
+  if (norm === "Unlimited") return { kind: "in", values: ["Unlimited", "Classic"] };
+  if (norm === "Paragon") return { kind: "eq", value: "Paragon" };
+  // Limited (the default): decks with null format default to Limited in the
+  // UI, so include them here too.
+  return { kind: "or", clause: "format.is.null,format.in.(Type 1,Limited)" };
+}
+
+function applyDeckFormatFilter<
+  T extends { or(clause: string): T; in(column: string, values: string[]): T; eq(column: string, value: string): T },
+>(query: T, format: string): T {
+  const filter = deckFormatFilterFor(format);
+  if (filter.kind === "or") return query.or(filter.clause);
+  if (filter.kind === "in") return query.in("format", filter.values);
+  return query.eq("format", filter.value);
+}
+
 function deckUrl(id: string): string {
   return `${SITE_URL}/decklist/${id}`;
 }
@@ -169,13 +206,7 @@ async function loadListFresh(params: ListParams): Promise<ListPayload> {
     .select(DECK_COLUMNS, { count: "exact" })
     .eq("visibility", "public");
 
-  if (params.format) {
-    if (params.format === "Type 1") {
-      q = q.or("format.is.null,format.eq.Type 1");
-    } else {
-      q = q.eq("format", params.format);
-    }
-  }
+  if (params.format) q = applyDeckFormatFilter(q, params.format);
   if (userIdFilter) q = q.eq("user_id", userIdFilter);
 
   switch (params.sort) {
@@ -203,11 +234,7 @@ async function loadListFresh(params: ListParams): Promise<ListPayload> {
       .from("decks")
       .select("id", { head: true, count: "exact" })
       .eq("visibility", "public");
-    if (params.format) {
-      countQ = params.format === "Type 1"
-        ? countQ.or("format.is.null,format.eq.Type 1")
-        : countQ.eq("format", params.format);
-    }
+    if (params.format) countQ = applyDeckFormatFilter(countQ, params.format);
     if (userIdFilter) countQ = countQ.eq("user_id", userIdFilter);
     const { count: totalCount } = await countQ;
     return {

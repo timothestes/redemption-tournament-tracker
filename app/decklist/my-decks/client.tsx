@@ -36,6 +36,7 @@ import ShareDeckModal from "../card-search/components/ShareDeckModal";
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
 import { cn } from "@/lib/utils";
+import { getFormatDef, FORMAT_IDS, FormatId } from "@/lib/formats";
 
 // Derive three-state visibility from a deck row (falls back to the is_public mirror).
 function deckVisibility(deck: DeckData): DeckVisibility {
@@ -54,12 +55,8 @@ function visibilityBadge(vis: DeckVisibility): { label: string; classes: string 
 }
 
 // Helper function to normalize deck format display
-function formatDeckType(format?: string): string {
-  if (!format) return "T1";
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt === "t2") return "T2";
-  return "T1";
+function formatDeckType(format?: string): FormatId {
+  return getFormatDef(format).id;
 }
 
 // Helper function to get badge colors based on deck type
@@ -133,7 +130,7 @@ export default function MyDecksClient() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"updated" | "created" | "name">("updated");
-  const [deckTypeFilter, setDeckTypeFilter] = useState<"all" | "T1" | "T2" | "Paragon">("all");
+  const [deckTypeFilter, setDeckTypeFilter] = useState<"all" | FormatId>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchAllFolders, setSearchAllFolders] = useState(true);
   const [searchScopeOpen, setSearchScopeOpen] = useState(false);
@@ -555,7 +552,7 @@ export default function MyDecksClient() {
     : filteredDecks.filter(d => formatDeckType(d.format) === deckTypeFilter);
 
   // Deck types present among the loaded decks (drives which pills render)
-  const availableDeckTypes = (["T1", "T2", "Paragon"] as const).filter(
+  const availableDeckTypes = FORMAT_IDS.filter(
     type => decks.some(d => formatDeckType(d.format) === type)
   );
 

@@ -11,6 +11,7 @@ import { downloadCollectionTxt } from "./utils/collectionCsv";
 import ImportCsvModal from "./components/ImportCsvModal";
 import { useShowPrices } from "../../hooks/useShowPrices";
 import { compareCardsDefault } from "@/lib/cards/defaultSort";
+import { PARAGON_EXCLUDED_SETS } from "@/lib/formats";
 
 const BATCH_SIZE = 60;
 const RARITY_OPTIONS = ["Common", "Rare", "Ultra Rare", "Promo"];
@@ -23,29 +24,20 @@ const EXCLUDED_OFFICIAL_SETS = new Set(["Prophecies of Christ Token"]);
 const COLLECTION_CARDS = ALL_CARDS.filter((c) => !EXCLUDED_OFFICIAL_SETS.has(c.officialSet));
 
 // Tournament format filter, mirrored from the deck builder's legality logic.
-type FormatMode = "Rotation" | "Classic" | "Scrolls" | "Banned" | "Paragon";
-const FORMAT_OPTIONS: FormatMode[] = ["Rotation", "Classic", "Scrolls", "Banned", "Paragon"];
-const DEFAULT_FORMAT: FormatMode = "Rotation";
-
-const PARAGON_EXCLUDED_SETS = new Set([
-  "10th Anniversary", "1st Edition", "1st Edition Unlimited", "2nd Edition",
-  "2nd Edition Revised", "3rd Edition", "Angel Wars", "Apostles", "Cloud of Witnesses",
-  "Cloud of Witnesses (Alternate Border)", "Disciples", "Early Church", "Faith of Our Fathers",
-  "Fall of Man", "Fundraiser", "Gospel of Christ", "Gospel of Christ Token", "Kings",
-  "Lineage of Christ", "Main", "Main Unlimited", "Patriarchs", "Persecuted Church", "Priests",
-  "Promo", "Promo Token", "Prophecies of Christ", "Prophecies of Christ Token", "Prophets",
-  "Revelation of John", "Revelation of John (Alternate Border)", "Rock of Ages",
-  "Thesaurus ex Preteritus", "Warriors", "Women",
-]);
+type FormatMode = "Limited" | "Unlimited" | "Scrolls" | "Banned" | "Paragon";
+const FORMAT_OPTIONS: FormatMode[] = ["Limited", "Unlimited", "Scrolls", "Banned", "Paragon"];
+const DEFAULT_FORMAT: FormatMode = "Limited";
 
 function matchesFormat(card: Card, mode: FormatMode): boolean {
-  if (mode === "Classic") return true;
+  if (mode === "Unlimited") return true;
+  if (mode === "Limited") return card.legality === "Rotation";
+  if (mode === "Banned") return card.legality === "Banned";
   if (mode === "Scrolls") return card.legality !== "Rotation" && card.legality !== "Banned";
   if (mode === "Paragon") {
     if (card.type.toLowerCase().includes("lost soul")) return false;
     return !PARAGON_EXCLUDED_SETS.has(card.officialSet);
   }
-  return card.legality === mode; // Rotation or Banned
+  return false;
 }
 
 // Collapsed type filter. Each bucket's `match` is tested as a substring of the

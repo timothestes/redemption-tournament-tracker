@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireForge } from "@/app/forge/lib/auth";
 import { deckCardCount } from "@/app/forge/lib/deckSerialize";
 import type { ForgeDeckSummary, ForgeDeckDetail, ForgeDeckView, SharedForgeDeckSummary, SaveForgeDeckInput, ForgeDeckEntry } from "@/app/forge/lib/deckTypes";
+import { normalizeFormat } from "@/lib/formats";
 
 export async function listForgeDecks(): Promise<ForgeDeckSummary[]> {
   const ctx = await requireForge();
@@ -148,7 +149,7 @@ export async function saveForgeDeck(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const ctx = await requireForge();
   if (!ctx) return { ok: false, error: "Not authorized" };
-  const isParagon = input.format.toLowerCase().includes("paragon");
+  const isParagon = normalizeFormat(input.format) === "Paragon";
   const row = {
     owner_id: ctx.user.id,
     name: input.name.trim() || "Untitled deck",

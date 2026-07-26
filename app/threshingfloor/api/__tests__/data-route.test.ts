@@ -68,4 +68,24 @@ describe("GET /threshingfloor/api/data?kind=deck", () => {
       { card_name: "The Second Coming", card_set: "Wo", card_img_file: "the_second_coming", quantity: 1, zone: "reserve" },
     ]);
   });
+
+  it.each([
+    ["Limited", "T1"],
+    ["T2", "T2"],
+    [null, "T1"],
+    ["Type 2", "T2"],
+  ])("maps deck.format %s to %s", async (deckFormat, expected) => {
+    (cache.loadPublicDeckDetail as any).mockResolvedValue({
+      name: "My Deck",
+      username: "John",
+      format: deckFormat,
+      card_count: 0,
+      cards: [],
+    });
+
+    const r = await GET(req(`http://x/threshingfloor/api/data?kind=deck&id=${UUID}`));
+    expect(r.status).toBe(200);
+    const body = await r.json();
+    expect(body.format).toBe(expected);
+  });
 });

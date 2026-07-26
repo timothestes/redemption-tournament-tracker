@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadUpcomingListings } from "@/app/tournaments/actions";
 import { loadPublicSpoilersAction } from "@/app/spoilers/actions";
 import { isUuid, loadPublicDeckDetail } from "@/lib/api/cache";
+import { normalizeFormat } from "@/lib/formats";
 import { notFoundResponse, requireThreshingFloor } from "../auth";
 
 // GET /threshingfloor/api/data?kind=tournaments | spoilers | deck&id=<uuid>
@@ -28,8 +29,8 @@ export async function GET(request: NextRequest) {
     const deck = await loadPublicDeckDetail(id);
     if (!deck) return notFoundResponse();
     // null format means Type 1 (legacy decks; see loadListFresh in lib/api/cache.ts)
-    const format =
-      deck.format === "Type 2" ? "T2" : deck.format === "Type 1" || deck.format === null ? "T1" : "";
+    const norm = normalizeFormat(deck.format);           // null → 'Limited'
+    const format = norm === "T2" ? "T2" : norm === "Paragon" ? "" : "T1"; // preserve legacy output contract
     return NextResponse.json({
       name: deck.name,
       creator: deck.username,

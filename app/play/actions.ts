@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { findCard } from '@/lib/cards/lookup';
 import { requireForge } from '@/app/forge/lib/auth';
 import { stdbHttpBase } from '@/app/forge/lib/stdbHttp';
+import { deckFormatFilterFor } from '@/lib/api/cache';
 import type { DeckOption } from './components/DeckPickerCard';
 
 export interface GameCardData {
@@ -246,12 +247,13 @@ export async function loadUserDecksPaged(
   }
 
   if (format) {
-    if (format === 'Type 1') {
-      // Decks with null format default to T1 in the UI, so include them here
-      query = query.or('format.is.null,format.eq.Type 1');
-    } else {
-      query = query.eq('format', format);
-    }
+    // Shared with lib/api/cache.ts's v1 API and the community filter in
+    // app/decklist/actions.ts so every `decks.format` query site applies the
+    // exact same PostgREST filter shape (normalizes legacy + canonical ids).
+    const filter = deckFormatFilterFor(format);
+    if (filter.kind === 'or') query = query.or(filter.clause);
+    else if (filter.kind === 'in') query = query.in('format', filter.values);
+    else query = query.eq('format', filter.value);
   }
 
   switch (sort) {

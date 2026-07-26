@@ -25,6 +25,9 @@ interface ParticipantTableProps {
   onDropIn: (id: string) => void;
   tournamentEnded?: boolean;
   tournamentId: string;
+  // Tournament's raw deck_format column — passed through to AttachDeckDialog
+  // for its attach gate. null/'Other' means "attach anything."
+  tournamentFormat?: string | null;
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
   numberingMode: "tables" | "seats";
@@ -39,6 +42,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
   onDropIn,
   tournamentEnded = false,
   tournamentId,
+  tournamentFormat,
   decklists,
   onDecklistsChange,
   numberingMode,
@@ -308,6 +312,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
         open={attachDialogOpen}
         onOpenChange={setAttachDialogOpen}
         participantName={attachTarget?.name || ""}
+        tournamentFormat={tournamentFormat}
         onSelect={handleAttachDeck}
       />
 
