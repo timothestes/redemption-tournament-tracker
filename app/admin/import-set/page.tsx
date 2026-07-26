@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +76,10 @@ export default function AdminImportSetPage() {
   const [error, setError] = useState("");
   const [loadingSets, setLoadingSets] = useState(false);
   const [loadingPlans, setLoadingPlans] = useState(false);
+  // Guards against a stale `GET ?set=A` response landing after the admin has
+  // already switched to set B — without this, A's plans could get applied
+  // while setCode reads B, and a subsequent POST would write the wrong set.
+  const fetchSeq = useRef(0);
 
   useEffect(() => {
     if (!adminLoading && !isAdmin) {
@@ -102,6 +106,7 @@ export default function AdminImportSetPage() {
   }, [isAdmin]);
 
   const handleSetChange = async (code: string) => {
+    const seq = ++fetchSeq.current;
     setSetCode(code);
     setResults(null);
     setSummary(null);
@@ -115,6 +120,7 @@ export default function AdminImportSetPage() {
     try {
       const res = await fetch(`/api/admin/import-set?set=${encodeURIComponent(code)}`);
       const data = await res.json();
+      if (seq !== fetchSeq.current) return; // a newer set was picked while this request was in flight
       if (!res.ok) throw new Error(data.error || "Failed to load plans");
       const newPlans = data.plans as CardPlan[];
       setPlans(newPlans);
@@ -124,9 +130,10 @@ export default function AdminImportSetPage() {
       }
       setRows(nextRows);
     } catch (err) {
+      if (seq !== fetchSeq.current) return;
       setError(err instanceof Error ? err.message : "Failed to load plans");
     } finally {
-      setLoadingPlans(false);
+      if (seq === fetchSeq.current) setLoadingPlans(false);
     }
   };
 
@@ -270,7 +277,7 @@ export default function AdminImportSetPage() {
               id="set-picker"
               value={setCode}
               onChange={(e) => handleSetChange(e.target.value)}
-              disabled={loadingSets}
+              disabled={loadingSets || loadingPlans || running}
               className="mt-1 flex h-10 w-full rounded-md border-2 border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
               <option value="">{loadingSets ? "Loading sets…" : "Select a set…"}</option>
