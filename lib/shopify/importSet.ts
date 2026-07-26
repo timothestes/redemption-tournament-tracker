@@ -239,7 +239,7 @@ export async function executeImport(
     try {
       const plan = planCard(card, ctx);
 
-      if (plan.plannedAction === 'skip-existing' && !ledgerRow) {
+      if (plan.plannedAction === 'skip-existing') {
         results.push({ cardKey: spec.cardKey, action: 'skipped', productId: null, error: null, mock: isMock });
         await upsertLedgerRow(supabase, {
           card_key: spec.cardKey,
