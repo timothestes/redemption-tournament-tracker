@@ -43,8 +43,8 @@ export interface DeckValidation {
  * Redemption CCG Deck Building Rules Summary (as checked HERE):
  *
  * 1. Deck Size:
- *    - Type 1: 50-154 cards
- *    - Type 2: 100-252 cards
+ *    - Type 1: 50-70 cards
+ *    - Type 2: 100-140 cards
  *    - Paragon: 40 cards (exact)
  *
  * 2. Lost Soul Requirements: Based on Main Deck size ONLY (not including Reserve)
@@ -55,7 +55,7 @@ export interface DeckValidation {
  *
  * 3. Reserve Limits:
  *    - Type 1: Maximum 10 cards
- *    - Type 2: Maximum 15 cards
+ *    - Type 2: Maximum 20 cards
  *    - Paragon: Maximum 10 cards
  *    - Dominants and Lost Souls CANNOT be in Reserve
  *

@@ -40,7 +40,7 @@ export interface ResolvedCard {
 // Individual validation issue
 export interface DeckCheckIssue {
   type: "error" | "warning" | "info";
-  rule: string; // machine-readable rule ID like "t1-deck-size", "t1-banned-card"
+  rule: string; // machine-readable rule ID like "t1-deck-size", "pool-legality"
   message: string; // human-readable explanation
   cards?: string[]; // card names involved
 }
