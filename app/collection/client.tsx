@@ -25,7 +25,8 @@ const COLLECTION_CARDS = ALL_CARDS.filter((c) => !EXCLUDED_OFFICIAL_SETS.has(c.o
 
 // Tournament format filter, mirrored from the deck builder's legality logic.
 type FormatMode = "Limited" | "Unlimited" | "Scrolls" | "Banned" | "Paragon";
-const FORMAT_OPTIONS: FormatMode[] = ["Limited", "Unlimited", "Scrolls", "Banned", "Paragon"];
+// "Scrolls" hidden per Tim 2026-07-25 — filter logic kept; re-add here to restore
+const FORMAT_OPTIONS: FormatMode[] = ["Limited", "Unlimited", "Banned", "Paragon"];
 const DEFAULT_FORMAT: FormatMode = "Limited";
 
 function matchesFormat(card: Card, mode: FormatMode): boolean {
