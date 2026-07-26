@@ -155,4 +155,17 @@ describe('productFromCard', () => {
     const built = productFromCard(dual, 'PoC', opts);
     expect(built.input.tags).toEqual(expect.arrayContaining(['Good Enhancement', 'Evil Enhancement', 'Dual Alignment']));
   });
+
+  it('omits variants/productOptions and the no-price warning when includeVariants is false', () => {
+    const built = productFromCard(I_AM_HAS_SENT_ME, 'PoC', { ...opts, price: null, includeVariants: false });
+    expect(built.input.variants).toBeUndefined();
+    expect(built.input.productOptions).toBeUndefined();
+    expect(built.warnings).not.toContain('no-price');
+  });
+
+  it('keeps variants/productOptions by default (includeVariants unset)', () => {
+    const built = productFromCard(I_AM_HAS_SENT_ME, 'PoC', opts);
+    expect(built.input.variants).toBeDefined();
+    expect(built.input.productOptions).toBeDefined();
+  });
 });

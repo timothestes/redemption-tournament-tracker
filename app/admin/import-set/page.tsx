@@ -44,6 +44,14 @@ type RowState = { include: boolean; price: string; titleOverride: string };
 
 const PRICE_INPUT_RE = /^\d*\.?\d{0,2}$/;
 
+// The input allows in-progress values like ".5" or "5." that the server's
+// stricter regex rejects — normalize those to "0.50" / "5.00" before POST.
+function normalizePriceEntry(value: string): string {
+  if (!value || (!value.startsWith(".") && !value.endsWith("."))) return value;
+  const n = Number(value);
+  return Number.isNaN(n) ? value : n.toFixed(2);
+}
+
 function actionBadgeClass(action: CardPlan["plannedAction"] | ImportResultRow["action"]) {
   switch (action) {
     case "update":
@@ -186,12 +194,15 @@ export default function AdminImportSetPage() {
   ).length;
 
   const buildCardsPayload = () =>
-    plans.map((p) => ({
-      cardKey: p.cardKey,
-      price: rows[p.cardKey].price.trim() || (defaultPrice.trim() || null),
-      include: rows[p.cardKey].include,
-      titleOverride: rows[p.cardKey].titleOverride.trim() || undefined,
-    }));
+    plans.map((p) => {
+      const rawPrice = rows[p.cardKey].price.trim() || defaultPrice.trim() || null;
+      return {
+        cardKey: p.cardKey,
+        price: rawPrice !== null ? normalizePriceEntry(rawPrice) : null,
+        include: rows[p.cardKey].include,
+        titleOverride: rows[p.cardKey].titleOverride.trim() || undefined,
+      };
+    });
 
   const handleDryRun = async () => {
     setRunning(true);

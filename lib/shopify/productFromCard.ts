@@ -21,6 +21,7 @@ export interface ProductBuildOptions {
   status: 'DRAFT' | 'ACTIVE';
   titleOverride?: string;      // admin-entered title replaces the computed one verbatim
   includeMedia?: boolean;      // default true; false => omit files even if imageUrl set (update re-runs)
+  includeVariants?: boolean;   // default true; false => omit variants + productOptions (blank-price updates leave live variant data untouched)
 }
 
 export interface BuiltProduct {
@@ -103,7 +104,8 @@ export function productFromCard(card: CardData, ytgAbbrev: string | null, opts: 
   if (card.officialSet.startsWith('Promo')) tags.add('Promos');
 
   // --- variants / price ---
-  if (opts.price === null) warnings.push('no-price');
+  const includeVariants = opts.includeVariants !== false;
+  if (includeVariants && opts.price === null) warnings.push('no-price');
   const price = opts.price ?? '0.00';
 
   // --- files / image ---
@@ -119,8 +121,10 @@ export function productFromCard(card: CardData, ytgAbbrev: string | null, opts: 
     vendor: 'Your Turn Games',
     tags: Array.from(tags).sort(),
     status: opts.status,
-    productOptions: [{ name: 'Title', values: [{ name: 'Default Title' }] }],
-    variants: [{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price, sku: cardSku(card) }],
+    ...(includeVariants ? {
+      productOptions: [{ name: 'Title', values: [{ name: 'Default Title' }] }],
+      variants: [{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price, sku: cardSku(card) }],
+    } : {}),
     ...(files ? { files } : {}),
     metafields: [{ namespace: 'custom', key: 'rtt_card_key', value: cardKey, type: 'single_line_text_field' }],
   };

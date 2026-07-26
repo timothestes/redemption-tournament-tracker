@@ -9,12 +9,12 @@
 
 import type { CardData } from '@/lib/cards/generated/cardData';
 import { CARDS } from '@/lib/cards/generated/cardData';
-import { productFromCard, cardSku } from './productFromCard';
+import { productFromCard, cardSku, slugifyTitle } from './productFromCard';
 import { productSetUpsert } from './admin-write';
 import { getShopifyAccessToken } from '@/lib/pricing/shopify';
 import { getSupabaseAdmin } from '@/lib/pricing/supabase-admin';
 import { loadSetAliases, runMatchingPipeline, computeCheapestPrices } from '@/lib/pricing/matching';
-import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { getCardImageUrlOrNull } from '@/app/shared/utils/cardImageUrl';
 import { syncShopifyProducts } from '@/lib/pricing/syncShopifyProducts';
 
 export interface CardPlan {
@@ -24,7 +24,7 @@ export interface CardPlan {
   handle: string;
   sku: string;
   tags: string[];
-  imageUrl: string | null; // '' from getCardImageUrl is normalized to null
+  imageUrl: string | null; // null when NEXT_PUBLIC_BLOB_BASE_URL is unset or imgFile is empty
   plannedAction: 'create' | 'update' | 'skip-existing';
   warnings: string[];
 }
@@ -47,10 +47,25 @@ export interface PlanContext {
   existingTitles: Set<string>;
 }
 
+/**
+ * Pure: neutralize mock-mode ledger poisoning.
+ *
+ * Mock imports (`SHOPIFY_WRITE_MOCK=1`) write real ledger rows with a
+ * fabricated `gid://shopify/Product/mock-<handle>` product id and
+ * `media_attached: true`. A later real run must not treat that as an
+ * identifier to update against (it doesn't exist in Shopify) or assume
+ * media is already attached — so any row bearing a mock id is returned as
+ * if it had never been imported. Real rows pass through unchanged.
+ */
+export function normalizeLedgerRow(row: LedgerRow): LedgerRow {
+  if (!row.shopify_product_id?.startsWith('gid://shopify/Product/mock-')) return row;
+  return { ...row, shopify_product_id: null, shopify_variant_id: null, media_attached: false };
+}
+
 /** Pure: given a card and the current plan context, decide what would happen. */
 export function planCard(card: CardData, ctx: PlanContext): CardPlan {
   const cardKey = `${card.name}|${card.set}|${card.imgFile}`;
-  const imageUrl = getCardImageUrl(card.imgFile) || null;
+  const imageUrl = getCardImageUrlOrNull(card.imgFile);
   const alias = ctx.aliasMap.get(card.set) ?? null;
 
   const built = productFromCard(card, alias, {
@@ -128,7 +143,7 @@ async function buildPlanContext(setCode: string): Promise<PlanContext> {
 
   const ledger = new Map<string, LedgerRow>();
   for (const row of (ledgerResult.data ?? []) as LedgerRow[]) {
-    ledger.set(row.card_key, row);
+    ledger.set(row.card_key, normalizeLedgerRow(row));
   }
 
   return {
@@ -233,11 +248,32 @@ export async function executeImport(
       errors++;
       continue;
     }
+    if (card.set !== req.setCode) {
+      results.push({ cardKey: spec.cardKey, action: 'error', productId: null, error: 'card not in set', mock: isMock });
+      errors++;
+      continue;
+    }
 
     const ledgerRow = ctx.ledger.get(spec.cardKey) ?? null;
 
     try {
-      const plan = planCard(card, ctx);
+      let plan = planCard(card, ctx);
+
+      // A titleOverride can rescue a row that only collided under the
+      // computed title/handle — re-check the collision against the
+      // override before accepting the skip.
+      if (plan.plannedAction === 'skip-existing' && spec.titleOverride) {
+        const overrideTitle = spec.titleOverride;
+        const overrideHandle = slugifyTitle(overrideTitle);
+        if (!ctx.existingHandles.has(overrideHandle) && !ctx.existingTitles.has(overrideTitle)) {
+          plan = {
+            ...plan,
+            plannedAction: ledgerRow?.shopify_product_id ? 'update' : 'create',
+            title: overrideTitle,
+            handle: overrideHandle,
+          };
+        }
+      }
 
       if (plan.plannedAction === 'skip-existing') {
         results.push({ cardKey: spec.cardKey, action: 'skipped', productId: null, error: null, mock: isMock });
@@ -278,7 +314,11 @@ export async function executeImport(
 
       const identifier = ledgerRow?.shopify_product_id ? { id: ledgerRow.shopify_product_id } : undefined;
       const includeMedia = !ledgerRow?.media_attached;
-      const imageUrl = getCardImageUrl(card.imgFile) || null;
+      // Omitting `variants`/`productOptions` entirely (not sending price
+      // "0.00") leaves the live product's existing variant data untouched
+      // when a blank price is submitted against an update.
+      const includeVariants = !(identifier && price === null);
+      const imageUrl = getCardImageUrlOrNull(card.imgFile);
       const alias = ctx.aliasMap.get(card.set) ?? null;
 
       const built = productFromCard(card, alias, {
@@ -287,6 +327,7 @@ export async function executeImport(
         status: req.status,
         titleOverride: spec.titleOverride,
         includeMedia,
+        includeVariants,
       });
       const filesIncluded = built.input.files !== undefined;
 
@@ -302,7 +343,9 @@ export async function executeImport(
           shopify_variant_id: outcome.variantId,
           handle: outcome.handle,
           status: 'error',
-          media_attached: (ledgerRow?.media_attached ?? false) || filesIncluded,
+          // productSet is atomic — on userErrors nothing was attached,
+          // regardless of whether files were included in the attempted input.
+          media_attached: ledgerRow?.media_attached ?? false,
           error: errorMsg,
         });
         errors++;

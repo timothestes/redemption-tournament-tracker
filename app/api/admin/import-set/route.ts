@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isRegistrationAdmin } from '@/utils/adminUtils';
 import { planSetImport, executeImport, listImportableSets, type ImportRequest } from '@/lib/shopify/importSet';
 
+// A ~350-card set import plus the post-import reconcile (sync + matching +
+// price computation) can approach this budget. Imports are ledger-safe if
+// the function is killed mid-reconcile — the nightly cron job completes
+// reconciliation on its own schedule.
 export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
