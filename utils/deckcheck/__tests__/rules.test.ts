@@ -2386,6 +2386,19 @@ describe("banned-card (checkFormatBanList)", () => {
     expect(checkFormatBanList(FORMATS.Limited, [wrongSet], [])).toEqual([]);
   });
 
+  it("matches case-insensitively — a card with uppercased name and set still hits the ban list", () => {
+    const shouted = makeCard({
+      name: "DANIEL (COW)",
+      set: "COW [BAN]",
+      legality: "Banned",
+      officialSet: "Cloud of Witnesses",
+      type: "Hero",
+    });
+    const issues = checkFormatBanList(FORMATS.Limited, [shouted], []);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].rule).toBe("banned-card");
+  });
+
   it("is wired into validateT1Rules — the banned-card issue for this card fires, pool-legality does not", () => {
     const mainDeck = makeValidMainDeck(50, [daniel]);
     const issues = validateT1Rules(FORMATS.Limited, mainDeck, [], []);
