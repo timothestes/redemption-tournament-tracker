@@ -1,5 +1,5 @@
 import { ResolvedCard, DeckCheckIssue, CardGroup } from "./types";
-import { FormatDef, PARAGON_EXCLUDED_SETS } from "@/lib/formats";
+import { FormatDef, BannedCardDef, PARAGON_EXCLUDED_SETS } from "@/lib/formats";
 
 // ---------------------------------------------------------------------------
 // Helper predicates
@@ -852,6 +852,60 @@ export function checkSitesCitiesLimit(
 }
 
 /**
+ * Predicate satisfied by both ResolvedCard (deckcheck) and CardData (raw card
+ * database) — the 3 fields a ban-list entry can match on.
+ */
+type BanMatchable = Pick<ResolvedCard, "name" | "set" | "reference">;
+
+/**
+ * Match a card against a single ban-list entry. Reference entries (covering
+ * all printings of a scripture reference) match on card.reference alone;
+ * name+set entries match name AND set case-insensitively with EXACT
+ * equality — no startsWith/canonicalName fuzzing, since each entry is keyed
+ * directly to a real row in the card database (see the regression guard in
+ * lib/__tests__/formats.test.ts).
+ */
+export function matchesBanListEntry(
+  card: BanMatchable,
+  entry: BannedCardDef
+): boolean {
+  if (entry.reference !== undefined) {
+    return card.reference === entry.reference;
+  }
+  return (
+    card.name.toLowerCase() === entry.name.toLowerCase() &&
+    card.set.toLowerCase() === (entry.set ?? "").toLowerCase()
+  );
+}
+
+/**
+ * Rule: banned-card — every card is checked against the format's explicit
+ * ban list (lib/formats.ts FormatDef.banList). Def-driven: an empty banList
+ * (currently Unlimited, T2, Paragon) makes this a no-op.
+ */
+export function checkFormatBanList(
+  def: FormatDef,
+  mainDeckCards: ResolvedCard[],
+  reserveCards: ResolvedCard[]
+): DeckCheckIssue[] {
+  const issues: DeckCheckIssue[] = [];
+  if (def.banList.length === 0) return issues;
+  for (const card of [...mainDeckCards, ...reserveCards]) {
+    if (card.quantity === 0) continue;
+    if (card.type === "") continue; // card-not-found stub — card-not-found warning already fired
+    if (def.banList.some((entry) => matchesBanListEntry(card, entry))) {
+      issues.push({
+        type: "error",
+        rule: "banned-card",
+        message: `"${card.name}" (${card.set}) is banned in ${def.label}.`,
+        cards: [card.name],
+      });
+    }
+  }
+  return issues;
+}
+
+/**
  * Rule: pool-legality — every card must belong to the format's card pool.
  * First-ever pool enforcement (previously search-filter only, spec §4).
  */
@@ -865,6 +919,7 @@ export function checkPoolLegality(
   for (const card of [...mainDeckCards, ...reserveCards]) {
     if (card.quantity === 0) continue;
     if (card.type === "") continue; // card-not-found stub — card-not-found warning already fired
+    if (def.banList.some((entry) => matchesBanListEntry(card, entry))) continue; // banned-card rule already reports this card
     if (def.pool === "rotation" && card.legality !== "Rotation") {
       issues.push({
         type: "error",
@@ -1021,6 +1076,9 @@ export function validateT1Rules(
   // Pool legality
   issues.push(...checkPoolLegality(def, mainDeckCards, reserveCards));
 
+  // Explicit ban list — def-driven, no-op when banList is empty (Unlimited)
+  issues.push(...checkFormatBanList(def, mainDeckCards, reserveCards));
+
   // Special card exceptions
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
 
@@ -1103,6 +1161,9 @@ export function validateParagonRules(
 
   // Pool legality
   issues.push(...checkPoolLegality(def, mainDeckCards, reserveCards));
+
+  // Explicit ban list — def-driven, no-op when banList is empty (Paragon)
+  issues.push(...checkFormatBanList(def, mainDeckCards, reserveCards));
 
   // Special card exceptions
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
@@ -1406,6 +1467,9 @@ export function validateT2Rules(
 
   // Pool legality
   issues.push(...checkPoolLegality(def, mainDeckCards, reserveCards));
+
+  // Explicit ban list — def-driven, no-op when banList is empty (T2)
+  issues.push(...checkFormatBanList(def, mainDeckCards, reserveCards));
 
   // Character alias checks (dual-alignment characters with different names)
   issues.push(

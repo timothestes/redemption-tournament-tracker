@@ -25,11 +25,28 @@ export interface FormatDef {
   banList: BannedCardDef[];
 }
 
-// All four ban lists launch empty by design (Unlimited deliberately so — see
-// spec §1). Baseline exclusion is data-driven: legality !== 'Rotation' fails
-// the Limited/T2 pool test; Paragon's excluded sets cover the rest.
+// Baseline exclusion is data-driven: legality !== 'Rotation' fails the
+// Limited/T2 pool test; Paragon's excluded sets cover the rest. banList adds
+// explicit, print-specific bans on top of that (see BannedCardDef).
+//
+// The 9 legality:'Banned' printings below are Limited's explicit ban list.
+// Unlimited, T2, and Paragon deliberately leave banList EMPTY: Unlimited is
+// wild-west by decision (spec §1), and T2/Paragon already exclude these same
+// printings via the pool-legality rotation/excluded-set test — an
+// intentional asymmetry with Limited, not an oversight.
+const LIMITED_BAN_LIST: BannedCardDef[] = [
+  { name: 'Daniel (CoW)', set: 'CoW [Ban]', note: 'Daniel (Cloud of Witnesses)' },
+  { name: 'Daniel (CoW AB)', set: 'CoW (AB)', note: 'Daniel (Cloud of Witnesses, AB)' },
+  { name: 'Endless Treasures (Banned)', set: 'PoC [Ban]', note: 'Endless Treasures (Prophecies of Christ)' },
+  { name: 'Ephesian Widow', set: 'TPC [Ban]', note: 'Ephesian Widow (Persecuted Church)' },
+  { name: 'Mourn and Weep', set: 'PoC [Ban]', note: 'Mourn and Weep (Prophecies of Christ)' },
+  { name: 'Samuel (RoA)', set: 'RoA [Ban]', note: 'Samuel (Rock of Ages)' },
+  { name: 'The Foretelling Angel (PC)', set: 'TPC', note: 'The Foretelling Angel (Persecuted Church)' },
+  { reference: 'Proverbs 22:14', name: 'Lost Soul', note: 'Lost Soul "Proverbs 22:14" (all printings)' },
+];
+
 export const FORMATS: Record<FormatId, FormatDef> = {
-  Limited:   { id: 'Limited',   label: 'Limited',   badge: 'L',  family: 'T1',      main: { min: 50,  max: 70 },  reserveMax: 10, pool: 'rotation', banList: [] },
+  Limited:   { id: 'Limited',   label: 'Limited',   badge: 'L',  family: 'T1',      main: { min: 50,  max: 70 },  reserveMax: 10, pool: 'rotation', banList: LIMITED_BAN_LIST },
   Unlimited: { id: 'Unlimited', label: 'Unlimited', badge: 'U',  family: 'T1',      main: { min: 50,  max: 70 },  reserveMax: 10, pool: 'all',      banList: [] },
   T2:        { id: 'T2',        label: 'T2',        badge: 'T2', family: 'T2',      main: { min: 100, max: 140 }, reserveMax: 20, pool: 'rotation', banList: [] },
   Paragon:   { id: 'Paragon',   label: 'Paragon',   badge: 'P',  family: 'Paragon', main: { min: 40,  max: 40 },  reserveMax: 10, pool: 'paragon',  banList: [] },

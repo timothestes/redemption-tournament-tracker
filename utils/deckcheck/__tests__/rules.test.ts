@@ -26,6 +26,7 @@ import {
   checkVanillaLimit,
   checkSitesCitiesLimit,
   checkPoolLegality,
+  checkFormatBanList,
   checkSpecialCards,
   validateT1Rules,
 } from "../rules";
@@ -2314,6 +2315,83 @@ describe("pool legality", () => {
   it("skips quantity-0 cards", () => {
     const card = makeCard({ name: "Old Card", legality: "", officialSet: "Kings", quantity: 0 });
     expect(checkPoolLegality(FORMATS.Limited, [card], [])).toEqual([]);
+  });
+});
+
+// ===========================================================================
+// I2. Explicit ban list (banned-card / checkFormatBanList)
+// ===========================================================================
+
+describe("banned-card (checkFormatBanList)", () => {
+  const daniel = makeCard({
+    name: "Daniel (CoW)",
+    set: "CoW [Ban]",
+    legality: "Banned",
+    officialSet: "Cloud of Witnesses",
+    type: "Hero",
+  });
+
+  it("flags a banned card in Limited with exactly one banned-card error, and pool-legality does not also fire for it", () => {
+    const banIssues = checkFormatBanList(FORMATS.Limited, [daniel], []);
+    expect(banIssues).toHaveLength(1);
+    expect(banIssues[0].rule).toBe("banned-card");
+    expect(banIssues[0].message).toBe('"Daniel (CoW)" (CoW [Ban]) is banned in Limited.');
+    expect(banIssues[0].cards).toEqual(["Daniel (CoW)"]);
+
+    const poolIssues = checkPoolLegality(FORMATS.Limited, [daniel], []);
+    expect(poolIssues).toEqual([]);
+  });
+
+  it("does not flag the same card in Unlimited (empty ban list, all-cards pool)", () => {
+    expect(checkFormatBanList(FORMATS.Unlimited, [daniel], [])).toEqual([]);
+    expect(checkPoolLegality(FORMATS.Unlimited, [daniel], [])).toEqual([]);
+  });
+
+  it("in T2, falls through to pool-legality (unchanged behavior) with no banned-card", () => {
+    expect(checkFormatBanList(FORMATS.T2, [daniel], [])).toEqual([]);
+    const poolIssues = checkPoolLegality(FORMATS.T2, [daniel], []);
+    expect(poolIssues.some((i) => i.rule === "pool-legality")).toBe(true);
+  });
+
+  it("matches the reference entry for both Lost Souls (Two Liner) and (Three Liner) in Limited", () => {
+    const twoLiner = makeCard({
+      name: "Lost Souls (Two Liner)",
+      set: "Main [Ban]",
+      legality: "Banned",
+      officialSet: "Main",
+      type: "Lost Soul",
+      reference: "Proverbs 22:14",
+    });
+    const threeLiner = makeCard({
+      name: "Lost Souls (Three Liner)",
+      set: "Main UL [Ban]",
+      legality: "Banned",
+      officialSet: "Main Unlimited",
+      type: "Lost Soul",
+      reference: "Proverbs 22:14",
+    });
+    const issues = checkFormatBanList(FORMATS.Limited, [twoLiner, threeLiner], []);
+    expect(issues).toHaveLength(2);
+    expect(issues.every((i) => i.rule === "banned-card")).toBe(true);
+  });
+
+  it("skips quantity-0 and card-not-found stub cards", () => {
+    const zeroQty = { ...daniel, quantity: 0 };
+    const stub = makeCard({ name: "Daniel (CoW)", set: "CoW [Ban]", type: "" });
+    expect(checkFormatBanList(FORMATS.Limited, [zeroQty, stub], [])).toEqual([]);
+  });
+
+  it("does not match on name alone (set must match exactly, no startsWith fuzz)", () => {
+    const wrongSet = makeCard({ name: "Daniel (CoW)", set: "Some Other Set" });
+    expect(checkFormatBanList(FORMATS.Limited, [wrongSet], [])).toEqual([]);
+  });
+
+  it("is wired into validateT1Rules — the banned-card issue for this card fires, pool-legality does not", () => {
+    const mainDeck = makeValidMainDeck(50, [daniel]);
+    const issues = validateT1Rules(FORMATS.Limited, mainDeck, [], []);
+    const danielIssues = issues.filter((i) => i.cards?.includes("Daniel (CoW)"));
+    expect(danielIssues).toHaveLength(1);
+    expect(danielIssues[0].rule).toBe("banned-card");
   });
 });
 

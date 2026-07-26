@@ -46,6 +46,11 @@ const T1_RULE_CATEGORIES = [
     ruleIds: ["pool-legality"],
   },
   {
+    id: "banned",
+    label: "Banned Cards",
+    ruleIds: ["banned-card"],
+  },
+  {
     id: "sites-cities",
     label: "Sites & Cities",
     ruleIds: ["t1-sites-cities"],

@@ -18,6 +18,8 @@ import {
   checkDominantUnique,
   checkSpecialCards,
   checkGoodEvilBalance,
+  checkPoolLegality,
+  checkFormatBanList,
   validateT2Rules,
 } from "../rules";
 
@@ -1144,6 +1146,36 @@ describe("checkGoodEvilBalance", () => {
     const relevant = issues.filter((i) => i.rule === "t2-good-evil-balance");
     // 40 good (35 hero + 2 site + 2 covenant + 1 fortress) = 40 evil (35 EC + 2 city + 2 curse + 1 fortress)
     expect(relevant).toHaveLength(0);
+  });
+});
+
+// ===========================================================================
+// F2. Explicit ban list — T2 keeps the old pool-legality-only behavior
+// (T2's banList is deliberately empty; see lib/formats.ts).
+// ===========================================================================
+
+describe("banned-card in T2 (unchanged pool-legality behavior)", () => {
+  const daniel = makeCard({
+    name: "Daniel (CoW)",
+    set: "CoW [Ban]",
+    legality: "Banned",
+    officialSet: "Cloud of Witnesses",
+    type: "Hero",
+  });
+
+  it("checkFormatBanList is a no-op (empty banList) and checkPoolLegality still fires", () => {
+    expect(checkFormatBanList(FORMATS.T2, [daniel], [])).toEqual([]);
+    const poolIssues = checkPoolLegality(FORMATS.T2, [daniel], []);
+    expect(poolIssues.some((i) => i.rule === "pool-legality")).toBe(true);
+  });
+
+  it("is wired into validateT2Rules as a no-op — only pool-legality reports this card", () => {
+    const mainDeck = makeValidMainDeck(100, [daniel]);
+    const cardGroups = [makeGroup("Daniel (CoW)", [daniel])];
+    const issues = validateT2Rules(FORMATS.T2, mainDeck, [], cardGroups);
+    const danielIssues = issues.filter((i) => i.cards?.includes("Daniel (CoW)"));
+    expect(danielIssues.every((i) => i.rule !== "banned-card")).toBe(true);
+    expect(danielIssues.some((i) => i.rule === "pool-legality")).toBe(true);
   });
 });
 
