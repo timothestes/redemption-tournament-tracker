@@ -265,8 +265,10 @@ Known breaking sites (exact-match or includes-based, will misbehave on canonical
 - Oversized decks (T1 > 70, T2 > 140) and old T2 copy counts show validation errors.
 - **Pool legality is enforced for the first time ever** — this is the larger population:
   every legacy deck (1211 null-format rows default to Limited) containing any
-  non-Rotation card flips invalid on next validation. The builder's pool-error message
-  should offer the one-click fix: "switch this deck to Unlimited."
+  non-Rotation card flips invalid on next validation. Pool errors name the specific
+  card and pool. (A one-click "switch this deck to Unlimited" hint was built, then
+  removed per Tim's direction on 2026-07-25 — players change the format via the
+  normal L/U/T2/P toggle instead.)
 - Stored `is_legal` / `deckcheck_issues` (written on save, shown as community badges and
   PDF seals, snapshotted into tournament decklists) go stale at cutover and contain
   soon-deleted rule IDs. **Run `scripts/backfill-deck-legality.ts --all` after deploy** to
