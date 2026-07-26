@@ -34,6 +34,9 @@ interface TournamentTabsProps {
   tournamentStarted?: boolean;
   tournamentEnded?: boolean;
   tournamentName?: string | null;
+  // Tournament's raw deck_format column — threaded down to ParticipantTable's
+  // AttachDeckDialog for its attach gate.
+  tournamentFormat?: string | null;
   onTournamentEnd?: () => void;
   setLatestRound: Dispatch<SetStateAction<any>>;
   onRoundActiveChange?: (
@@ -76,6 +79,7 @@ export default function TournamentTabs({
   tournamentStarted = false,
   tournamentEnded = false,
   tournamentName,
+  tournamentFormat,
   onTournamentEnd,
   setLatestRound,
   createPairing,
@@ -238,6 +242,7 @@ export default function TournamentTabs({
               onDropOut={onDropOut}
               onDropIn={onDropIn}
               tournamentId={tournamentId}
+              tournamentFormat={tournamentFormat}
               decklists={decklists}
               onDecklistsChange={onDecklistsChange}
               numberingMode={numberingMode}

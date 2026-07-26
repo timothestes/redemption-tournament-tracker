@@ -32,7 +32,7 @@ export default function PublishDecklistsSection({
   onPublishChange,
 }: PublishDecklistsSectionProps) {
   const [showDialog, setShowDialog] = useState(false);
-  const [selectedFormat, setSelectedFormat] = useState(currentFormat || "Type 1");
+  const [selectedFormat, setSelectedFormat] = useState(currentFormat || "Limited");
   const [publishing, setPublishing] = useState(false);
   const [unpublishing, setUnpublishing] = useState(false);
 
@@ -67,7 +67,7 @@ export default function PublishDecklistsSection({
             {decklistCount} {decklistCount === 1 ? "decklist" : "decklists"} published
           </p>
           <p className="text-xs text-muted-foreground">
-            Visible on community decks page · {currentFormat || "Type 1"}
+            Visible on community decks page · {currentFormat || "Limited"}
           </p>
         </div>
         <Button
@@ -127,8 +127,9 @@ export default function PublishDecklistsSection({
                 onChange={(e) => setSelectedFormat(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-lg bg-card text-sm"
               >
-                <option value="Type 1">Type 1</option>
-                <option value="Type 2">Type 2</option>
+                <option value="Limited">Limited</option>
+                <option value="Unlimited">Unlimited</option>
+                <option value="T2">T2</option>
                 <option value="Paragon">Paragon</option>
                 <option value="Other">Other</option>
               </select>

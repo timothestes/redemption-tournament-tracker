@@ -1,9 +1,11 @@
+import { FormatId } from "../../lib/formats";
+
 // Sensible defaults for a new tournament based on its category/format. These are
 // only a head start — the host can change any of them in Tournament Settings
 // after the tournament is created.
 
 export interface CategoryDefaults {
-  deck_format: "T1" | "T2" | "Paragon" | "Other";
+  deck_format: FormatId | "Other";
   max_score: number; // Lost Souls needed to win a game
   round_length: number; // minutes
 }
@@ -11,7 +13,8 @@ export interface CategoryDefaults {
 // Categories offered when hosting a tournament that isn't tied to an official
 // listing's own format list.
 export const STANDARD_CATEGORIES = [
-  "Type 1",
+  "Type 1 Limited",
+  "Type 1 Unlimited",
   "Type 2",
   "Booster Draft",
   "Sealed Deck",
@@ -30,13 +33,16 @@ export function categoryDefaults(category: string): CategoryDefaults {
   // Teams is built to Type 1 deck rules (per the hosting guide), so it wins at
   // 5 souls — not 7. Checked before Type 2 so it never falls through.
   if (c.includes("teams"))
-    return { deck_format: "T1", max_score: 5, round_length: 60 };
+    return { deck_format: "Limited", max_score: 5, round_length: 60 };
   if (c.includes("type 2") || c.includes("type2"))
     return { deck_format: "T2", max_score: 7, round_length: 75 };
   if (c.includes("draft"))
     return { deck_format: "Other", max_score: 5, round_length: 45 };
   if (c.includes("sealed"))
     return { deck_format: "Other", max_score: 5, round_length: 45 };
-  // Type 1 and Type A (a Type 1 variant) and anything else default to Type 1.
-  return { deck_format: "T1", max_score: 5, round_length: 45 };
+  if (c.includes("unlimited"))
+    return { deck_format: "Unlimited", max_score: 5, round_length: 45 };
+  // Type 1 (Limited) and Type A (a Type 1 variant) and anything else default
+  // to Limited.
+  return { deck_format: "Limited", max_score: 5, round_length: 45 };
 }

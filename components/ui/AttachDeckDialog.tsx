@@ -12,40 +12,59 @@ import {
   DialogBody,
 } from "./dialog";
 import { searchDecksForTournamentAction, type DeckSearchResult } from "../../app/tracker/tournaments/actions";
+import { FORMATS, normalizeFormat, normalizeTournamentFormat } from "../../lib/formats";
 
 interface AttachDeckDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   participantName: string;
+  // The tournament's raw deck_format column. null/'Other' (draft, sealed, or
+  // simply unset — the overwhelming majority of real tournaments) means
+  // "attach anything," matching today's ungated behavior (spec §6).
+  tournamentFormat?: string | null;
   onSelect: (deck: DeckSearchResult) => void;
 }
 
-function formatDeckType(format?: string | null): string {
-  if (!format) return "T1";
-  const fmt = format.toLowerCase();
-  if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt === "t2") return "T2";
-  return "T1";
-}
-
 function getDeckTypeBadgeClasses(format?: string | null): string {
-  const deckType = formatDeckType(format);
+  const id = normalizeFormat(format);
   const base = "min-w-[3.25rem] text-center inline-block px-1.5 py-0.5 rounded text-xs font-medium";
-  if (deckType === "T2") {
+  if (id === "T2") {
     return `${base} bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200`;
   }
-  if (deckType === "Paragon") {
+  if (id === "Paragon") {
     return `${base} bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200`;
   }
+  // Limited and Unlimited share the old T1 accent color (see
+  // DeckBuilderPanel.tsx for the same convention).
   return `${base} bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200`;
+}
+
+// Whether `deck` is attachable to a tournament normalized to `tf`, and if not,
+// why. A Limited deck is attachable to an Unlimited event (pool subset); every
+// other gated case requires exact normalized-id equality. null/'Other' means
+// the tournament doesn't gate at all.
+function deckAttachability(
+  tf: ReturnType<typeof normalizeTournamentFormat>,
+  deck: DeckSearchResult
+): { allowed: true } | { allowed: false; reason: string } {
+  if (tf === null || tf === "Other") return { allowed: true };
+  const deckFmt = normalizeFormat(deck.format);
+  if (deckFmt === tf) return { allowed: true };
+  if (tf === "Unlimited" && deckFmt === "Limited") return { allowed: true };
+  return {
+    allowed: false,
+    reason: `This event is ${FORMATS[tf].label} — this deck is ${FORMATS[deckFmt].label}`,
+  };
 }
 
 export default function AttachDeckDialog({
   open,
   onOpenChange,
   participantName,
+  tournamentFormat,
   onSelect,
 }: AttachDeckDialogProps) {
+  const tf = normalizeTournamentFormat(tournamentFormat);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DeckSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -112,9 +131,10 @@ export default function AttachDeckDialog({
       setFocusedIndex((i) => (i > 0 ? i - 1 : results.length - 1));
     } else if (e.key === "Enter" && focusedIndex >= 0) {
       e.preventDefault();
-      selectDeck(results[focusedIndex]);
+      const deck = results[focusedIndex];
+      if (deckAttachability(tf, deck).allowed) selectDeck(deck);
     }
-  }, [results, focusedIndex, selectDeck]);
+  }, [results, focusedIndex, selectDeck, tf]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,15 +194,21 @@ export default function AttachDeckDialog({
 
             {!loading && results.length > 0 && (
               <div className="space-y-0.5">
-                {results.map((deck, index) => (
+                {results.map((deck, index) => {
+                  const attach = deckAttachability(tf, deck);
+                  return (
                   <button
                     key={deck.id}
                     data-deck-item
-                    onClick={() => selectDeck(deck)}
+                    disabled={attach.allowed === false}
+                    title={attach.allowed === false ? attach.reason : undefined}
+                    onClick={() => attach.allowed && selectDeck(deck)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left group ${
-                      focusedIndex === index
-                        ? "bg-muted"
-                        : "hover:bg-muted"
+                      !attach.allowed
+                        ? "opacity-50 cursor-not-allowed"
+                        : focusedIndex === index
+                          ? "bg-muted"
+                          : "hover:bg-muted"
                     }`}
                   >
                     {/* Preview thumbnail */}
@@ -203,23 +229,29 @@ export default function AttachDeckDialog({
                       <p className="text-sm font-medium truncate">{deck.name}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className={getDeckTypeBadgeClasses(deck.format)}>
-                          {formatDeckType(deck.format)}
+                          {FORMATS[normalizeFormat(deck.format)].badge}
                         </span>
                         <span>{deck.card_count} cards</span>
                         {deck.username && deck.username !== "You" && (
                           <span className="truncate">by {deck.username}</span>
                         )}
                       </div>
+                      {attach.allowed === false && (
+                        <p className="text-xs text-destructive mt-0.5 truncate">{attach.reason}</p>
+                      )}
                     </div>
 
                     {/* Select indicator */}
-                    <span className={`text-xs text-primary flex-shrink-0 transition-opacity ${
-                      focusedIndex === index ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                    }`}>
-                      Select
-                    </span>
+                    {attach.allowed && (
+                      <span className={`text-xs text-primary flex-shrink-0 transition-opacity ${
+                        focusedIndex === index ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      }`}>
+                        Select
+                      </span>
+                    )}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
