@@ -10,6 +10,7 @@ import { HiPencil, HiTrash, HiPlus, HiOutlineDesktopComputer } from "react-icons
 import { useRouter, useSearchParams } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
 import { categoryDefaults } from "../../../utils/tournament/categoryDefaults";
+import { getFormatDef } from "@/lib/formats";
 
 const supabase = createClient();
 
@@ -216,9 +217,8 @@ function TournamentsPageInner() {
 
   const deckFormatLabel = (format: string | null) => {
     if (!format) return null;
-    if (format === "T1") return "Type 1";
-    if (format === "T2") return "Type 2";
-    return format; // Paragon, Other
+    if (format === "Other") return "Other"; // draft/sealed/etc. — not a real format id
+    return getFormatDef(format).label; // "T1"/"T2"/"Paragon" -> Limited/T2/Paragon
   };
 
   // Subtle, scannable tint per category — mirrors the listing badges and keeps
@@ -237,7 +237,7 @@ function TournamentsPageInner() {
       return base + "bg-teal-500/15 text-teal-700 dark:text-teal-400";
     if (t.includes("paragon"))
       return base + "bg-rose-500/15 text-rose-700 dark:text-rose-400";
-    if (t.includes("type 1") || t.includes("type a") || t === "t1")
+    if (t.includes("type 1") || t.includes("type a") || t === "t1" || t === "limited" || t === "unlimited")
       return base + "bg-blue-500/15 text-blue-700 dark:text-blue-400";
     return base + "bg-muted text-muted-foreground";
   };

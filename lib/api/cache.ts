@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { normalizeFormat } from "@/lib/formats";
 
 /**
  * Cookie-free anon client for the cached public-deck loaders. The standard
@@ -170,11 +171,11 @@ async function loadListFresh(params: ListParams): Promise<ListPayload> {
     .eq("visibility", "public");
 
   if (params.format) {
-    if (params.format === "Type 1") {
-      q = q.or("format.is.null,format.eq.Type 1");
-    } else {
-      q = q.eq("format", params.format);
-    }
+    const norm = normalizeFormat(params.format);
+    if (norm === "Limited") q = q.or("format.is.null,format.in.(Type 1,Limited)");
+    else if (norm === "T2") q = q.in("format", ["Type 2", "T2"]);
+    else if (norm === "Unlimited") q = q.in("format", ["Unlimited", "Classic"]);
+    else q = q.eq("format", "Paragon");
   }
   if (userIdFilter) q = q.eq("user_id", userIdFilter);
 
@@ -204,9 +205,11 @@ async function loadListFresh(params: ListParams): Promise<ListPayload> {
       .select("id", { head: true, count: "exact" })
       .eq("visibility", "public");
     if (params.format) {
-      countQ = params.format === "Type 1"
-        ? countQ.or("format.is.null,format.eq.Type 1")
-        : countQ.eq("format", params.format);
+      const norm = normalizeFormat(params.format);
+      if (norm === "Limited") countQ = countQ.or("format.is.null,format.in.(Type 1,Limited)");
+      else if (norm === "T2") countQ = countQ.in("format", ["Type 2", "T2"]);
+      else if (norm === "Unlimited") countQ = countQ.in("format", ["Unlimited", "Classic"]);
+      else countQ = countQ.eq("format", "Paragon");
     }
     if (userIdFilter) countQ = countQ.eq("user_id", userIdFilter);
     const { count: totalCount } = await countQ;

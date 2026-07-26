@@ -122,7 +122,8 @@ export async function POST(request: NextRequest) {
     // Option C: Raw decklist text — parse into cards
     if (!deckId && !cards && decklist) {
       const { mainCards, reserveCards } = parseDecklistText(decklist);
-      const fmt = decklist_type === "type_2" ? "Type 2" : format || "Type 1";
+      const fmt =
+        decklist_type === "type_2" ? "T2" : decklist_type === "type_1" ? "Limited" : (decklist_type || format || "Limited");
       const result = await checkDeck(mainCards, reserveCards, fmt);
       return NextResponse.json(result);
     }

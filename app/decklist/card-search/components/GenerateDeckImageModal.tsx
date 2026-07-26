@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Deck } from "../types/deck";
 import { generateDeckText } from "../utils/deckImportExport";
+import { getFormatDef } from "@/lib/formats";
 import {
   Dialog,
   DialogContent,
@@ -17,11 +18,8 @@ interface GenerateDeckImageModalProps {
 }
 
 export default function GenerateDeckImageModal({ deck, onClose, isLegal }: GenerateDeckImageModalProps) {
-  const deckType = deck.format?.toLowerCase().includes("paragon")
-    ? "paragon"
-    : deck.format?.toLowerCase().includes("type 2")
-    ? "type_2"
-    : "type_1";
+  const fam = getFormatDef(deck.format).family;
+  const deckType = fam === "T2" ? "type_2" : fam === "Paragon" ? "paragon" : "type_1";
 
   const totalCards = deck.cards.reduce((sum, card) => sum + card.quantity, 0);
 

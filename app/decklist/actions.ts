@@ -5,6 +5,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { checkDeck } from "@/utils/deckcheck";
 import type { DeckCheckCard, DeckCheckResult } from "@/utils/deckcheck/types";
 import type { DeckZone } from "./card-search/types/deck";
+import { normalizeFormat } from "@/lib/formats";
 
 // Three-state deck visibility. Mirrors the `visibility` column on `decks`.
 //   private  -> owner only
@@ -1373,11 +1374,16 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
     }
 
     if (format) {
-      if (format === "Type 1") {
-        // Decks with null format default to T1 in the UI, so include them here
-        query = query.or("format.is.null,format.eq.Type 1");
+      const norm = normalizeFormat(format);
+      if (norm === "Limited") {
+        // Decks with null format default to Limited in the UI, so include them here
+        query = query.or("format.is.null,format.in.(Type 1,Limited)");
+      } else if (norm === "T2") {
+        query = query.in("format", ["Type 2", "T2"]);
+      } else if (norm === "Unlimited") {
+        query = query.in("format", ["Unlimited", "Classic"]);
       } else {
-        query = query.eq("format", format);
+        query = query.eq("format", "Paragon");
       }
     }
 
