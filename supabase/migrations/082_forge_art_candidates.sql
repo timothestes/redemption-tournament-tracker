@@ -19,17 +19,21 @@ create index if not exists forge_card_art_candidates_card_idx
 
 alter table public.forge_card_art_candidates enable row level security;
 
--- 2) RLS: candidates are a DESIGNER workspace — owner or elder/superadmin only
---    (playtesters never see them; the active art they do see lives on
---    forge_cards). No direct write policy — writes go through the SECURITY
---    DEFINER RPCs below (cf. 050).
+-- 2) RLS: candidates are a DESIGNER workspace — owner, superadmin, or the
+--    roster set-elder of the card's set only (playtesters never see them;
+--    the active art they do see lives on forge_cards; a global elder with no
+--    roster seat on this card's set is NOT enough — cf. 052). No direct
+--    write policy — writes go through the SECURITY DEFINER RPCs below
+--    (cf. 050).
 drop policy if exists "forge_card_art_candidates_select" on public.forge_card_art_candidates;
 create policy "forge_card_art_candidates_select" on public.forge_card_art_candidates
   for select to authenticated
   using (exists (
     select 1 from public.forge_cards c
     where c.id = card_id
-      and (c.owner_id = auth.uid() or public.is_forge_elder_or_super())
+      and (c.owner_id = auth.uid()
+           or public.is_forge_superadmin()
+           or (c.set_id is not null and public.is_forge_set_elder(c.set_id)))
   ));
 
 revoke all on public.forge_card_art_candidates from anon;
@@ -45,7 +49,9 @@ begin
   if not exists (
     select 1 from public.forge_cards c
     where c.id = p_card_id
-      and (c.owner_id = auth.uid() or public.is_forge_elder_or_super())
+      and (c.owner_id = auth.uid()
+           or public.is_forge_superadmin()
+           or (c.set_id is not null and public.is_forge_set_elder(c.set_id)))
   ) then
     raise exception 'not authorized to edit this card';
   end if;
@@ -73,7 +79,9 @@ begin
   if not exists (
     select 1 from public.forge_cards c
     where c.id = v_card_id
-      and (c.owner_id = auth.uid() or public.is_forge_elder_or_super())
+      and (c.owner_id = auth.uid()
+           or public.is_forge_superadmin()
+           or (c.set_id is not null and public.is_forge_set_elder(c.set_id)))
   ) then
     raise exception 'not authorized to edit this card';
   end if;

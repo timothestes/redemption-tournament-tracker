@@ -47,33 +47,35 @@ export default function CropCandidateModal({
       >
         <p className="text-sm font-medium">Crop artwork</p>
 
-        <div className="relative w-full" style={{ aspectRatio: "3 / 2", background: "black" }}>
-          <Cropper
-            image={imageUrl}
-            crop={crop}
-            zoom={zoom}
-            aspect={ART_SLOT_ASPECT}
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onCropComplete={(area: Area) =>
-              setRect({ x: area.x / 100, y: area.y / 100, width: area.width / 100, height: area.height / 100 })
-            }
-          />
-        </div>
-
-        {/* Live preview: the card face's art strip showing exactly the framed subrect. */}
-        <div>
-          <p className="mb-1 text-xs text-muted-foreground">Preview on card</p>
-          <div className="w-40 overflow-hidden rounded-md border">
-            <div
-              style={{
-                aspectRatio: "750 / 504",
-                backgroundImage: `url(${imageUrl})`,
-                backgroundRepeat: "no-repeat",
-                ...(rect ? cropBackgroundStyle(rect) : { backgroundSize: "cover", backgroundPosition: "center" }),
-              }}
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative w-full sm:min-w-0 sm:flex-1" style={{ aspectRatio: "3 / 2", background: "black" }}>
+            <Cropper
+              image={imageUrl}
+              crop={crop}
+              zoom={zoom}
+              aspect={ART_SLOT_ASPECT}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={(area: Area) =>
+                setRect({ x: area.x / 100, y: area.y / 100, width: area.width / 100, height: area.height / 100 })
+              }
             />
-            <p className="truncate px-2 py-1 text-xs font-semibold">{cardName?.trim() || "Untitled"}</p>
+          </div>
+
+          {/* Live preview: the card face's art strip showing exactly the framed subrect. */}
+          <div>
+            <p className="mb-1 text-xs text-muted-foreground">Preview on card</p>
+            <div className="w-40 overflow-hidden rounded-md border">
+              <div
+                style={{
+                  aspectRatio: "750 / 504",
+                  backgroundImage: `url(${imageUrl})`,
+                  backgroundRepeat: "no-repeat",
+                  ...(rect ? cropBackgroundStyle(rect) : { backgroundSize: "cover", backgroundPosition: "center" }),
+                }}
+              />
+              <p className="truncate px-2 py-1 text-xs font-semibold">{cardName?.trim() || "Untitled"}</p>
+            </div>
           </div>
         </div>
 

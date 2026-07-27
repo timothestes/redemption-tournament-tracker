@@ -58,6 +58,17 @@ describe("addArtCandidate", () => {
     expect(rpc).toHaveBeenCalledWith("forge_set_working_art", { p_card_id: "card1", p_key: "forge-art/k1", p_original_key: "forge-art/k1" });
   });
 
+  it("surfaces an auto-activate failure even though the candidate row was saved", async () => {
+    mockCtx({
+      rows: { forge_cards: { working_art_key: null } },
+      rpcResults: { forge_set_working_art: { error: { message: "boom" } } },
+    });
+    (uploadForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue("forge-art/k1");
+    const r = await addArtCandidate("card1", fd());
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe("Image saved but could not be set as artwork");
+  });
+
   it("does not auto-activate when the card already has art", async () => {
     const { rpc } = mockCtx({ rows: { forge_cards: { working_art_key: "forge-art/existing" } } });
     (uploadForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue("forge-art/k2");

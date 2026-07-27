@@ -66,11 +66,18 @@ export async function addArtCandidate(
     .select("working_art_key")
     .eq("id", cardId)
     .maybeSingle();
+  let activateError: { message: string } | null = null;
   if (card && !card.working_art_key) {
-    await ctx.supabase.rpc("forge_set_working_art", { p_card_id: cardId, p_key: key, p_original_key: key });
+    const { error: setArtError } = await ctx.supabase.rpc("forge_set_working_art", {
+      p_card_id: cardId,
+      p_key: key,
+      p_original_key: key,
+    });
+    activateError = setArtError;
   }
   revalidatePath(`/forge/cards/${cardId}`);
   revalidatePath("/forge/ideas");
+  if (activateError) return { ok: false, error: "Image saved but could not be set as artwork" };
   return { ok: true };
 }
 
