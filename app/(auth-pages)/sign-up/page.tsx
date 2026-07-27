@@ -25,6 +25,10 @@ export default async function Signup(props: {
         Already have an account?{" "}
         <Link className="text-primary hover:text-primary/80 font-medium underline" href="/sign-in">
           Sign in
+        </Link>{" "}
+        or{" "}
+        <Link className="text-primary hover:text-primary/80 font-medium underline" href="/forgot-password">
+          reset your password
         </Link>
       </p>
 
