@@ -132,6 +132,51 @@ function countRoundOneField(matches: MatchEntry[] | undefined): number | null {
   return names.size > 0 ? names.size : null;
 }
 
+/**
+ * Derives every player's W-L(-D) record for a single year+format from that
+ * key's match data, keyed by player name. Mirrors the per-key record math in
+ * playerProfile (Teams rounds collapse to one W/L/D by majority of their
+ * per-pairing games), generalized to every player instead of one.
+ */
+export function recordsForKey(matches: MatchEntry[] | undefined, format: string): Record<string, string> {
+  const totals: Record<string, WLDRecord> = {};
+  if (!matches) return {};
+  const isTeams = format === "Teams";
+  const roundTally: Record<string, Record<string, WLDRecord>> = {};
+
+  for (const m of matches) {
+    for (const name of [m.playerA, m.playerB]) {
+      if (!name) continue;
+      const won = m.winner === name;
+      const lost = !!m.winner && m.winner !== name;
+      const draw = !m.winner;
+      const target = isTeams
+        ? (roundTally[name] ??= {})[m.round] ??= { wins: 0, losses: 0, draws: 0 }
+        : (totals[name] ??= { wins: 0, losses: 0, draws: 0 });
+      if (won) target.wins++;
+      else if (lost) target.losses++;
+      else if (draw) target.draws++;
+    }
+  }
+
+  if (isTeams) {
+    for (const [name, rounds] of Object.entries(roundTally)) {
+      const rec = (totals[name] ??= { wins: 0, losses: 0, draws: 0 });
+      for (const t of Object.values(rounds)) {
+        if (t.wins > t.losses) rec.wins++;
+        else if (t.losses > t.wins) rec.losses++;
+        else rec.draws++;
+      }
+    }
+  }
+
+  const out: Record<string, string> = {};
+  for (const [name, rec] of Object.entries(totals)) {
+    out[name] = rec.draws > 0 ? `${rec.wins}–${rec.losses}–${rec.draws}` : `${rec.wins}–${rec.losses}`;
+  }
+  return out;
+}
+
 /** A match entry enriched with year and format (derived from the matches map key). */
 export interface MatchRow extends MatchEntry {
   year: number;
