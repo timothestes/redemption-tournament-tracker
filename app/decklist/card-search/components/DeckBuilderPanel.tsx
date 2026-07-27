@@ -51,6 +51,7 @@ import ReactMarkdown from "react-markdown";
 import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
 import CollectionCheckModal from "./CollectionCheckModal";
 import { aggregateOwnedByName } from "../utils/collectionCheck";
+import { statCards, countBy } from "../utils/deckStats";
 import DeckLegalityChecklist from "./DeckLegalityChecklist";
 import type { DeckCheckResult } from "@/utils/deckcheck/types";
 import { useBudgetPricing } from '../hooks/useBudgetPricing';
@@ -3312,7 +3313,7 @@ export default function DeckBuilderPanel({
                 </div>
                 <div className="flex justify-between">
                   <span>Unique Cards:</span>
-                  <span className="font-medium">{deck.cards.length}</span>
+                  <span className="font-medium">{statCards(deck.cards).length}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Main Deck:</span>
@@ -3419,20 +3420,16 @@ export default function DeckBuilderPanel({
                   </div>
                   <div className="space-y-0.5">
                     {(() => {
-                      const brigadeCounts: Record<string, number> = {};
-                      for (const deckCard of deck.cards) {
+                      const brigadeCounts = countBy(deck.cards, (deckCard) => {
                         const raw = deckCard.card.brigade;
-                        if (!raw) continue;
+                        if (!raw) return null;
                         try {
-                          const brigades = normalizeBrigadeField(raw, deckCard.card.alignment || "", deckCard.card.name);
-                          for (const b of brigades) {
-                            brigadeCounts[b] = (brigadeCounts[b] || 0) + deckCard.quantity;
-                          }
+                          return normalizeBrigadeField(raw, deckCard.card.alignment || "", deckCard.card.name);
                         } catch {
                           // Fallback for cards that fail normalization
-                          brigadeCounts[raw] = (brigadeCounts[raw] || 0) + deckCard.quantity;
+                          return raw;
                         }
-                      }
+                      });
 
                       const sorted = Object.entries(brigadeCounts)
                         .sort(([, a], [, b]) => b - a);
