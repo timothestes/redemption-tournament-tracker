@@ -70,6 +70,7 @@ export async function addArtCandidate(
     await ctx.supabase.rpc("forge_set_working_art", { p_card_id: cardId, p_key: key, p_original_key: key });
   }
   revalidatePath(`/forge/cards/${cardId}`);
+  revalidatePath("/forge/ideas");
   return { ok: true };
 }
 
@@ -116,6 +117,7 @@ export async function activateCandidate(
   });
   if (error) return { ok: false, error: "Could not set artwork" };
   revalidatePath(`/forge/cards/${cardId}`);
+  revalidatePath("/forge/ideas");
   return { ok: true };
 }
 
@@ -155,5 +157,6 @@ export async function applyCrop(
   });
   if (error) return { ok: false, error: "Could not save artwork" };
   revalidatePath(`/forge/cards/${cardId}`);
+  revalidatePath("/forge/ideas");
   return { ok: true };
 }
