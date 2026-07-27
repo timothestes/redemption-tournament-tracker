@@ -31,10 +31,15 @@ export const signUpAction = async (formData: FormData) => {
     console.error(error.code + " " + error.message);
     return encodedRedirect("error", "/sign-up", error.message);
   } else {
+    // Supabase deliberately returns no error when the email already belongs to a
+    // confirmed account, and sends no verification email — so a bare "check your
+    // email" here strands people who already have an account (they wait on a mail
+    // that never arrives). Cover both cases without confirming whether the account
+    // exists, which is what the obfuscation is protecting against.
     return encodedRedirect(
       "success",
       "/sign-up",
-      "Thanks for signing up! Please check your email for a verification link.",
+      "Thanks for signing up! If this email is new, check your inbox for a verification link. If you already have an account, no email was sent — sign in instead, or reset your password if you've forgotten it.",
     );
   }
 };
