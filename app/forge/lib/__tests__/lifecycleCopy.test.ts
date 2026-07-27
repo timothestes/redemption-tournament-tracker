@@ -1,7 +1,7 @@
 // app/forge/lib/__tests__/lifecycleCopy.test.ts
 import { describe, it, expect } from "vitest";
 import {
-  STATUS_LABEL, ACTION_LABEL, releaseLabel, isEligible, BULK_DONE_VERB,
+  STATUS_LABEL, ACTION_LABEL, releaseLabel, isEligible, BULK_DONE_VERB, releaseProposalNotice,
 } from "../lifecycleCopy";
 
 describe("lifecycleCopy", () => {
@@ -52,5 +52,34 @@ describe("lifecycleCopy", () => {
     for (const a of Object.keys(ACTION_LABEL)) {
       expect(BULK_DONE_VERB[a as keyof typeof BULK_DONE_VERB]).toBeTruthy();
     }
+  });
+});
+
+describe("releaseProposalNotice", () => {
+  it("says nothing when the card has no open proposals", () => {
+    expect(releaseProposalNotice(0, false)).toEqual([]);
+  });
+
+  it("reports the sole matching proposal as recorded-accepted, with nothing closed", () => {
+    const n = releaseProposalNotice(1, true);
+    expect(n).toHaveLength(1);
+    expect(n[0]).toMatch(/recorded as accepted/);
+  });
+
+  it("reports a sole non-matching proposal as closed out of date", () => {
+    const n = releaseProposalNotice(1, false);
+    expect(n).toHaveLength(1);
+    expect(n[0]).toMatch(/closed as out of date/);
+  });
+
+  it("counts only ONE accept per release — the rest are closed", () => {
+    const n = releaseProposalNotice(3, true);
+    expect(n).toHaveLength(2);
+    expect(n[0]).toMatch(/recorded as accepted/);
+    expect(n[1]).toMatch(/^2 open proposals will be closed as out of date/);
+  });
+
+  it("pluralizes the closed count with no match", () => {
+    expect(releaseProposalNotice(2, false)[0]).toMatch(/^2 open proposals will be closed/);
   });
 });
