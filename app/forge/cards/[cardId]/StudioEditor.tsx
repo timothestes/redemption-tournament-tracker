@@ -33,7 +33,7 @@ const arrowClass =
   "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border bg-background/70 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-background hover:text-foreground";
 
 export default function StudioEditor({
-  card, sets, currentUser, setId, setName, prevId, nextId, artCandidates,
+  card, sets, currentUser, setId, setName, prevId, nextId, artCandidates, openProposals,
 }: {
   card: ForgeCardFull;
   sets: ForgeSetSummary[];
@@ -43,6 +43,8 @@ export default function StudioEditor({
   prevId?: string | null;
   nextId?: string | null;
   artCandidates: ArtCandidate[];
+  // Passed straight to LifecycleControls for the release dialog's heads-up.
+  openProposals?: { count: number; hasMatch: boolean };
 }) {
   const [snapshot, setSnapshot] = useState<DesignCard>(card.snapshot ?? {});
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -159,7 +161,7 @@ export default function StudioEditor({
             {saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Save failed" : ""}
           </span>
         </div>
-        <LifecycleControls card={card} sets={sets} />
+        <LifecycleControls card={card} sets={sets} openProposals={openProposals} />
         {card.setId && (
           <p className="text-xs text-muted-foreground">
             Releases are visible to Forge playtesters only — they don’t change the public card database.

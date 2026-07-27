@@ -58,6 +58,26 @@ export function releaseLabel(status: string): string {
   return status === "draft" ? ACTION_LABEL.release : "Release update";
 }
 
+// What releasing will do to the card's open proposals, said before you commit
+// to it. Mirrors migration 083: forge_publish_card records at most ONE matching
+// proposal as accepted (the oldest) and closes the rest as out of date.
+export function releaseProposalNotice(openCount: number, hasMatch: boolean): string[] {
+  if (openCount <= 0) return [];
+  const notices: string[] = [];
+  if (hasMatch) {
+    notices.push(
+      "1 open proposal matches this draft and will be recorded as accepted by this release — its summary is kept in the card’s history.",
+    );
+  }
+  const closed = hasMatch ? openCount - 1 : openCount;
+  if (closed === 1) {
+    notices.push("1 open proposal will be closed as out of date. Review it first if you still want it.");
+  } else if (closed > 1) {
+    notices.push(`${closed} open proposals will be closed as out of date. Review them first if you still want them.`);
+  }
+  return notices;
+}
+
 const ACTION_ELIGIBLE: Record<LifecycleAction, readonly string[]> = {
   release: ["draft", "playtesting"],
   markFinal: ["playtesting"],

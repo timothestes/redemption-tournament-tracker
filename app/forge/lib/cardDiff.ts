@@ -40,6 +40,27 @@ export const SUGGESTABLE_FIELDS: (keyof DesignCard)[] = [
   "scripture", "artistCredit", "cardFrame",
 ];
 
+// Canonical (key-order-independent) deep equality, mirroring SQL jsonb '='.
+// Used ONLY to word the release dialog — migration 083 decides what a release
+// actually does to open proposals, server-side — so drift here can misword the
+// dialog but can never change behavior.
+// Deliberately NOT `diffCards(a, b).length === 0`: DIFF_FIELDS omits
+// specialAbility/legality/rarity/artistCredit/cardFrame, so a diff-based
+// compare would call two genuinely different snapshots equal.
+export function sameSnapshot(a: DesignCard, b: DesignCard): boolean {
+  return canonicalJson(a) === canonicalJson(b);
+}
+
+function canonicalJson(v: unknown): string {
+  if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(",")}]`;
+  const o = v as Record<string, unknown>;
+  return `{${Object.keys(o)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`)
+    .join(",")}}`;
+}
+
 const ARRAY_FIELDS = new Set(["cardType", "brigades", "class", "icons", "identifiers"]);
 const NUMBER_FIELDS = new Set(["strength", "toughness"]);
 

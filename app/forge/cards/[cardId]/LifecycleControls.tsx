@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import { shareToSet, sendToPrivate, publish, approve, unapprove, archive, unarchive, deleteCard } from "@/app/forge/lib/lifecycle";
-import { STATUS_PATH, STATUS_LABEL, ACTION_LABEL, releaseLabel, CONFIRM_COPY } from "@/app/forge/lib/lifecycleCopy";
+import { STATUS_PATH, STATUS_LABEL, ACTION_LABEL, releaseLabel, releaseProposalNotice, CONFIRM_COPY } from "@/app/forge/lib/lifecycleCopy";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,18 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-export default function LifecycleControls({ card, sets }: { card: ForgeCardFull; sets: ForgeSetSummary[] }) {
+export default function LifecycleControls({
+  card,
+  sets,
+  openProposals = { count: 0, hasMatch: false },
+}: {
+  card: ForgeCardFull;
+  sets: ForgeSetSummary[];
+  // Releasing closes the card's open proposals (migration 083). `hasMatch` =
+  // one of them is exactly this draft, so the release records it as accepted
+  // instead of discarding it. Classified server-side in the page.
+  openProposals?: { count: number; hasMatch: boolean };
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [picking, setPicking] = useState(false);
@@ -61,6 +72,7 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
     });
 
   const inSet = card.setId !== null;
+  const releaseNotices = releaseProposalNotice(openProposals.count, openProposals.hasMatch);
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -140,6 +152,13 @@ export default function LifecycleControls({ card, sets }: { card: ForgeCardFull;
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-2">
+            {releaseNotices.length > 0 && (
+              <ul className="space-y-1 rounded-md border bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground">
+                {releaseNotices.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+            )}
             <label className="block text-xs font-medium text-muted-foreground">What changed? (optional)</label>
             <textarea
               autoFocus

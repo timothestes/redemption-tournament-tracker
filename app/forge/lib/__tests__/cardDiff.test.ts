@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { diffCards, summarizeDiff, coerceFieldValue } from "../cardDiff";
+import { diffCards, summarizeDiff, coerceFieldValue, sameSnapshot } from "../cardDiff";
 
 describe("diffCards", () => {
   it("detects a changed scalar field", () => {
@@ -48,5 +48,25 @@ describe("coerceFieldValue", () => {
     expect(coerceFieldValue("strength", "nope")).toBeNull();
     expect(coerceFieldValue("brigades", "Blue, Green")).toEqual(["Blue", "Green"]);
     expect(coerceFieldValue("name", "  David  ")).toBe("David");
+  });
+});
+
+describe("sameSnapshot", () => {
+  it("ignores key order and compares nested values structurally", () => {
+    expect(sameSnapshot({ name: "David", reference: "1 Sam 17" }, { reference: "1 Sam 17", name: "David" })).toBe(true);
+    expect(sameSnapshot({ brigades: ["Blue", "Green"] }, { brigades: ["Blue", "Green"] })).toBe(true);
+    expect(sameSnapshot({ brigades: ["Blue", "Green"] }, { brigades: ["Green", "Blue"] })).toBe(false);
+  });
+
+  it("catches changes diffCards is blind to (DIFF_FIELDS omits rarity et al.)", () => {
+    const a = { name: "David", rarity: "Rare" } as any;
+    const b = { name: "David", rarity: "Common" } as any;
+    expect(diffCards(a, b)).toHaveLength(0);
+    expect(sameSnapshot(a, b)).toBe(false);
+  });
+
+  it("treats an empty snapshot as equal only to another empty one", () => {
+    expect(sameSnapshot({}, {})).toBe(true);
+    expect(sameSnapshot({}, { name: "David" })).toBe(false);
   });
 });

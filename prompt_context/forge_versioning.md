@@ -69,9 +69,19 @@ iteration).
   `superseded`. On a Draft card the dialog says so explicitly: nothing is
   released.
 - **Deny** (elder): requires a reason, stored as a proposal-anchored comment.
-- **Stale base**: if the card gained a newer version after the proposal was
-  made, accepting returns "out of date — please re-propose" and the proposal
-  closes as `superseded`.
+- **Release resolves open proposals** (migration 083). Releasing also mints a
+  version, so it would otherwise leave open proposals permanently
+  un-acceptable. Instead, in the same transaction: the oldest open proposal
+  whose snapshot **equals what is being released** closes as `accepted`,
+  pointing at the new version — the release *is* the acceptance, and its
+  summary lands in History beside the release note. Every other open proposal
+  closes as `superseded`. Propose-then-Release is therefore a supported path,
+  not an error. Only one accept per release; a non-elder owner calling the RPC
+  directly supersedes all and accepts none.
+- **Stale base**: a proposal whose base is no longer the card's latest version
+  cannot be accepted — accepting closes it as `superseded` and returns null.
+  Since 083 this is only reachable as a race (someone releases while another
+  elder has the review open), not the routine Propose-then-Release path.
 - Proposal-anchored comments (deny reasons, accept notes) are **undeletable**
   — they are the decision record.
 
@@ -115,6 +125,6 @@ pipeline + manual Lackey export).
 | History timeline | `CardHistory.tsx` + pure assembly in `app/forge/lib/historyView.ts` |
 | Readers | `app/forge/lib/versions.ts` (listVersions / listCardEvents / listSetActivity) |
 | Server actions | `app/forge/lib/proposals.ts`, `lifecycle.ts` |
-| RPCs (current bodies) | migrations `072` (publish + audit events + undeletable reasons), `075` (draft versions, unified base/guard, sweep exclusions) |
+| RPCs (current bodies) | migrations `083` (**current `forge_publish_card`** — resolves open proposals), `072` (publish note + audit events + undeletable reasons), `075` (draft versions, unified base/guard, sweep exclusions) |
 | Enum + backfill | `074` (`version_status` gains 'draft'), `076` (backfilled the one 073-era lost accept) |
 | Design history | `docs/superpowers/specs/2026-07-06-forge-version-history-design.md` (incl. addendum) |
