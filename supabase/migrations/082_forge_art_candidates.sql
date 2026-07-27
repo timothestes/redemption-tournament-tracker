@@ -40,6 +40,8 @@ create or replace function public.forge_add_art_candidate(p_card_id uuid, p_key 
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare v_id uuid;
 begin
+  -- Serialize concurrent adds per card so the count-then-insert cap can't race.
+  perform pg_advisory_xact_lock(hashtext(p_card_id::text));
   if not exists (
     select 1 from public.forge_cards c
     where c.id = p_card_id
