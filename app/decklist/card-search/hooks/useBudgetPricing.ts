@@ -11,6 +11,7 @@ import {
   type BudgetCard,
 } from '@/lib/pricing/budgetPricing';
 import { useCardPrices } from './useCardPrices';
+import { statCards } from '../utils/deckStats';
 import type { Deck } from '../types/deck';
 
 // ---------------------------------------------------------------------------
@@ -107,7 +108,8 @@ export function useBudgetPricing(deck: Deck, allCards: BudgetCard[]): BudgetPric
     let budgetTotal = 0;
     let hasPricedCard = false;
 
-    for (const deckCard of deck.cards) {
+    // Maybeboard is a scratchpad — it never counts toward either total.
+    for (const deckCard of statCards(deck.cards)) {
       const { card, quantity } = deckCard;
 
       const budgetCard: BudgetCard = {

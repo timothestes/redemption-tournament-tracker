@@ -19,6 +19,7 @@ import { useCollectionState } from "../../collection/hooks/useCollectionState";
 import BuyDeckModal, { type BuyDeckCard } from "../card-search/components/BuyDeckModal";
 import CollectionCheckModal from "../card-search/components/CollectionCheckModal";
 import { aggregateOwnedByName } from "../card-search/utils/collectionCheck";
+import { statCards, countBy, sumQuantity } from "../card-search/utils/deckStats";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import AodCountCard from "../card-search/components/AodCountCard";
@@ -399,7 +400,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const totalDeckPrice = useMemo(() => {
     let total = 0;
     let hasAnyPrice = false;
-    for (const card of enrichedCards) {
+    // Maybeboard is a scratchpad — it never counts toward the deck's price.
+    for (const card of statCards(enrichedCards)) {
       const priceKey = `${card.card_name}|${card.card_set}|${sanitizeImgFile(card.card_img_file || "")}`;
       const priceInfo = getPrice(priceKey);
       if (priceInfo) {
@@ -1249,12 +1251,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 {(() => {
-                  const alignmentCounts = enrichedCards.reduce((acc, card) => {
-                    let alignment = card.alignment || "Neutral";
-                    if (alignment.includes("Good/Evil")) alignment = "Neutral";
-                    acc[alignment] = (acc[alignment] || 0) + card.quantity;
-                    return acc;
-                  }, {} as Record<string, number>);
+                  const alignmentCounts = countBy(enrichedCards, (card) => {
+                    const alignment = card.alignment || "Neutral";
+                    return alignment.includes("Good/Evil") ? "Neutral" : alignment;
+                  });
 
                   const alignmentConfig = [
                     { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
@@ -1293,7 +1293,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 </div>
                 <div className="flex justify-between">
                   <span>Unique Cards:</span>
-                  <span className="font-medium">{enrichedCards.length}</span>
+                  <span className="font-medium">{statCards(enrichedCards).length}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Main Deck:</span>
@@ -1309,13 +1309,13 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   <div className="flex justify-between">
                     <span>Lost Souls:</span>
                     <span className="font-medium">
-                      {enrichedCards.filter(c => c.type === 'LS' || c.type === 'Lost Soul').reduce((s, c) => s + c.quantity, 0)}
+                      {sumQuantity(enrichedCards.filter(c => c.type === 'LS' || c.type === 'Lost Soul'))}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Dominants:</span>
                     <span className="font-medium">
-                      {enrichedCards.filter(c => c.type === 'Dom' || c.type === 'Dominant').reduce((s, c) => s + c.quantity, 0)}
+                      {sumQuantity(enrichedCards.filter(c => c.type === 'Dom' || c.type === 'Dominant'))}
                     </span>
                   </div>
                   {totalDeckPrice !== null && (
@@ -1357,11 +1357,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               </h3>
               <div className="space-y-0.5 text-sm text-muted-foreground">
                 {(() => {
-                  const typeCounts = enrichedCards.reduce((acc, card) => {
-                    const type = prettifyTypeName(card.type || "Unknown");
-                    acc[type] = (acc[type] || 0) + card.quantity;
-                    return acc;
-                  }, {} as Record<string, number>);
+                  const typeCounts = countBy(enrichedCards, (card) =>
+                    prettifyTypeName(card.type || "Unknown")
+                  );
 
                   return Object.entries(typeCounts)
                     .sort(([, a], [, b]) => b - a)
