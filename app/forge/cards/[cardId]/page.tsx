@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireForge } from "@/app/forge/lib/auth";
 import { getCard } from "@/app/forge/lib/cards";
+import { listArtCandidates } from "@/app/forge/lib/artCandidates";
 import { getSet, listSets, listSetCards } from "@/app/forge/lib/sets";
 import { sortSetCards } from "@/app/forge/lib/cardOrder";
 import { getOpenProposalDiffs, listProposals } from "@/app/forge/lib/proposals";
@@ -18,6 +19,7 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
   const { cardId } = await params;
   const card = await getCard(cardId);
   if (!card) notFound();
+  const artCandidates = await listArtCandidates(cardId);
   const set = card.setId ? await getSet(card.setId) : null;
 
   const inSet = card.setId !== null;
@@ -50,7 +52,7 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
 
   return (
     <>
-      <StudioEditor card={card} sets={sets} currentUser={currentUser} setId={card.setId ?? null} setName={set?.name ?? null} prevId={prevId} nextId={nextId} />
+      <StudioEditor card={card} sets={sets} currentUser={currentUser} setId={card.setId ?? null} setName={set?.name ?? null} prevId={prevId} nextId={nextId} artCandidates={artCandidates} />
       {inSet && (
         <ReviewPanel
           card={card}
