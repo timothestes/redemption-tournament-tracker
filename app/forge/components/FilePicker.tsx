@@ -10,12 +10,16 @@ export default function FilePicker({
   accept,
   disabled,
   onFile,
+  onFiles,
+  multiple,
   hint,
 }: {
   label: string;
   accept?: string;
   disabled?: boolean;
-  onFile: (file: File) => void;
+  onFile?: (file: File) => void;
+  onFiles?: (files: File[]) => void;
+  multiple?: boolean;
   hint?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -27,9 +31,13 @@ export default function FilePicker({
         accept={accept}
         aria-label={label}
         className="hidden"
+        multiple={multiple}
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onFile(f);
+          const files = Array.from(e.target.files ?? []);
+          if (files.length > 0) {
+            if (multiple && onFiles) onFiles(files);
+            else if (onFile) onFile(files[0]);
+          }
           e.target.value = "";
         }}
       />
