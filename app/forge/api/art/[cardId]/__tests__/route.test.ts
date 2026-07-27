@@ -16,7 +16,7 @@ import { readForgeArt } from "@/app/forge/lib/art";
  * lookup server-side (SECURITY INVOKER, RLS-checked — migration 066). The
  * route only distinguishes: session valid? key returned? blob readable?
  */
-function mockSupabase(opts: { user?: boolean; artKey?: string | null; rpcError?: boolean }) {
+function mockSupabase(opts: { user?: boolean; artKey?: string | null; candidateKey?: string | null; rpcError?: boolean }) {
   const rpc = vi.fn((fn: string) => {
     if (fn === "forge_art_key") {
       return Promise.resolve(
@@ -24,6 +24,9 @@ function mockSupabase(opts: { user?: boolean; artKey?: string | null; rpcError?:
           ? { data: null, error: { message: "boom" } }
           : { data: opts.artKey ?? null, error: null },
       );
+    }
+    if (fn === "forge_candidate_art_key") {
+      return Promise.resolve({ data: opts.candidateKey ?? null, error: null });
     }
     // forge_log_art_download audit
     return Promise.resolve({ data: null, error: null });
@@ -139,5 +142,25 @@ describe("GET /forge/api/art/[cardId]", () => {
     expect(client.rpc).toHaveBeenCalledWith("forge_log_art_download", { p_card_id: "abc" });
     // download responses must never be cached
     expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("routes candidate requests through forge_candidate_art_key", async () => {
+    const client = mockSupabase({ candidateKey: "forge-art/cand" });
+    (readForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue(okBlob());
+    const req = new Request("http://localhost/forge/api/art/abc?candidate=cand-1") as never;
+    await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
+    expect(client.rpc).toHaveBeenCalledWith("forge_candidate_art_key", {
+      p_card_id: "abc",
+      p_candidate_id: "cand-1",
+    });
+    expect(readForgeArt).toHaveBeenCalledWith("forge-art/cand");
+  });
+
+  it("returns 404 when the candidate RPC yields no key (non-elder, wrong card…)", async () => {
+    mockSupabase({ candidateKey: null });
+    const req = new Request("http://localhost/forge/api/art/abc?candidate=cand-1") as never;
+    const res = await GET(req, { params: Promise.resolve({ cardId: "abc" }) });
+    expect(res.status).toBe(404);
+    expect(readForgeArt).not.toHaveBeenCalled();
   });
 });

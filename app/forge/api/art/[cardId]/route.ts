@@ -13,19 +13,23 @@ export async function GET(
   const url = new URL(req.url);
   const wantApproved = url.searchParams.get("v") === "approved";
   const kind = url.searchParams.get("kind") === "finished" ? "finished" : "art";
+  const candidateId = url.searchParams.get("candidate");
 
   // One RPC does the member gate + version resolution + key lookup (SECURITY
   // INVOKER so the 057 RLS policies still decide what the caller may see —
   // migration 066). getUser() runs concurrently, not before: it validates and
   // refreshes the session cookie, while an expired/invalid token makes the RPC
   // itself return nothing. Either failure is a 404 — the area stays secret.
+  // `candidate` swaps in the designer-gallery lookup (082): same 404-on-anything.
   const [{ data: userData, error: userError }, { data: artKey }] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.rpc("forge_art_key", {
-      p_card_id: cardId,
-      p_approved: wantApproved,
-      p_kind: kind,
-    }),
+    candidateId
+      ? supabase.rpc("forge_candidate_art_key", { p_card_id: cardId, p_candidate_id: candidateId })
+      : supabase.rpc("forge_art_key", {
+          p_card_id: cardId,
+          p_approved: wantApproved,
+          p_kind: kind,
+        }),
   ]);
   if (userError || !userData?.user) return notFoundResponse();
   if (!artKey || typeof artKey !== "string") return notFoundResponse();
