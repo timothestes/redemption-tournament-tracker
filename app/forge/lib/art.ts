@@ -69,6 +69,20 @@ export async function uploadForgeFinished(file: File): Promise<string> {
   return blob.pathname;
 }
 
+/** Upload an already-processed image buffer (e.g. a crop derivative) under
+ * forge-art/ WITHOUT re-normalizing — the corner-gated trim could eat a crop
+ * that happens to have white corners. */
+export async function uploadForgeArtRaw(data: Buffer, contentType: string): Promise<string> {
+  const key = `${ART_PREFIX}${randomUUID()}`;
+  const blob = await put(key, data, {
+    access: "private",
+    addRandomSuffix: false,
+    ...forgeAuth,
+    contentType,
+  });
+  return blob.pathname;
+}
+
 /** Server-side read of a private art blob by its stored key. */
 export function readForgeArt(key: string): Promise<GetBlobResult | null> {
   return get(key, { access: "private", ...forgeAuth });
