@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { requireForge } from "@/app/forge/lib/auth";
 import { getCard } from "@/app/forge/lib/cards";
+import { listArtCandidates } from "@/app/forge/lib/artCandidates";
 import { getSet, listSets, listSetCards } from "@/app/forge/lib/sets";
 import { sortSetCards } from "@/app/forge/lib/cardOrder";
+import { sameSnapshot } from "@/app/forge/lib/cardDiff";
 import { getOpenProposalDiffs, listProposals } from "@/app/forge/lib/proposals";
 import { listComments } from "@/app/forge/lib/comments";
 import { listVersions, listCardEvents } from "@/app/forge/lib/versions";
@@ -18,6 +20,7 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
   const { cardId } = await params;
   const card = await getCard(cardId);
   if (!card) notFound();
+  const artCandidates = await listArtCandidates(cardId);
   const set = card.setId ? await getSet(card.setId) : null;
 
   const inSet = card.setId !== null;
@@ -33,6 +36,14 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
       ])
     : [[], [], [], [], [], []];
   const canReview = ctx.role === "elder" || ctx.role === "superadmin";
+
+  // Releasing closes every open proposal (migration 083); one that is exactly
+  // this working draft is recorded as accepted instead. Classified here so the
+  // release dialog can say which will happen. Wording only — the RPC decides.
+  const openProposals = {
+    count: openDiffs.length,
+    hasMatch: openDiffs.some((d) => sameSnapshot(d.proposal.proposedSnapshot, card.snapshot ?? {})),
+  };
 
   // Prev/next arrows on the card face walk the set in the same order as the grid.
   // No wrap: the boundary card gets null and hides that arrow.
@@ -50,7 +61,7 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
 
   return (
     <>
-      <StudioEditor card={card} sets={sets} currentUser={currentUser} setId={card.setId ?? null} setName={set?.name ?? null} prevId={prevId} nextId={nextId} />
+      <StudioEditor card={card} sets={sets} currentUser={currentUser} setId={card.setId ?? null} setName={set?.name ?? null} prevId={prevId} nextId={nextId} artCandidates={artCandidates} openProposals={openProposals} />
       {inSet && (
         <ReviewPanel
           card={card}

@@ -639,7 +639,7 @@ export function useDeckState(
       mainDeckCount,
       reserveCount,
       maybeboardCount,
-      uniqueCards: deck.cards.length,
+      uniqueCards: mainDeckCards.length + reserveCards.length,
       cardsByType,
       cardsByBrigade,
     };

@@ -7,12 +7,14 @@ import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
 import FilePicker from "@/app/forge/components/FilePicker";
+import ArtCandidatesPanel from "@/app/forge/components/ArtCandidatesPanel";
 import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 import { cn } from "@/lib/utils";
-import { saveCard, uploadArt, uploadFinished, setPlaceholder, type ForgeCardFull } from "@/app/forge/lib/cards";
+import { saveCard, uploadFinished, setPlaceholder, type ForgeCardFull } from "@/app/forge/lib/cards";
 import { cardRawText, type DesignCard } from "@/app/forge/lib/designCard";
+import type { ArtCandidate } from "@/app/forge/lib/artCandidates";
 import LifecycleControls from "./LifecycleControls";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 import { forgeCardTopic } from "@/app/forge/lib/realtime";
@@ -31,7 +33,7 @@ const arrowClass =
   "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border bg-background/70 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-background hover:text-foreground";
 
 export default function StudioEditor({
-  card, sets, currentUser, setId, setName, prevId, nextId,
+  card, sets, currentUser, setId, setName, prevId, nextId, artCandidates, openProposals,
 }: {
   card: ForgeCardFull;
   sets: ForgeSetSummary[];
@@ -40,6 +42,9 @@ export default function StudioEditor({
   setName: string | null;
   prevId?: string | null;
   nextId?: string | null;
+  artCandidates: ArtCandidate[];
+  // Passed straight to LifecycleControls for the release dialog's heads-up.
+  openProposals?: { count: number; hasMatch: boolean };
 }) {
   const [snapshot, setSnapshot] = useState<DesignCard>(card.snapshot ?? {});
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -51,7 +56,7 @@ export default function StudioEditor({
   const lastSaved = useRef(snapshot);    // last snapshot the server accepted
   const savedRef = useRef(saved);
   const [pendingFinished, setPendingFinished] = useState<File | null>(null);
-  const [uploading, setUploading] = useState<"art" | "finished" | null>(null);
+  const [uploading, setUploading] = useState<"finished" | null>(null);
   const router = useRouter();
 
   const { others, setEditing } = useForgeCardChannel(
@@ -114,13 +119,13 @@ export default function StudioEditor({
     setSnapshot((s) => ({ ...s, ...patch }));
   };
 
-  async function onUpload(file: File, kind: "art" | "finished") {
+  async function onUpload(file: File, kind: "finished") {
     setErr(null);
     setUploading(kind);
     try {
       const fd = new FormData();
       fd.set("file", file);
-      const r = kind === "art" ? await uploadArt(card.id, fd) : await uploadFinished(card.id, fd);
+      const r = await uploadFinished(card.id, fd);
       if (r.ok === false) setErr(r.error ?? "Upload failed");
       else router.refresh();
     } finally {
@@ -131,6 +136,7 @@ export default function StudioEditor({
   // Cache-buster: updated_at bumps on every image/snapshot write, so the browser can
   // cache each t-stamped art URL indefinitely and still swap after router.refresh().
   const t = Date.parse(card.updatedAt) || 0;
+  const activeSourceId = artCandidates.find((c) => c.isActiveSource)?.id ?? null;
 
   return (
     <div className="mx-auto max-w-5xl p-4">
@@ -155,7 +161,7 @@ export default function StudioEditor({
             {saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Save failed" : ""}
           </span>
         </div>
-        <LifecycleControls card={card} sets={sets} />
+        <LifecycleControls card={card} sets={sets} openProposals={openProposals} />
         {card.setId && (
           <p className="text-xs text-muted-foreground">
             Releases are visible to Forge playtesters only — they don’t change the public card database.
@@ -202,12 +208,8 @@ export default function StudioEditor({
 
           {/* Artwork (illustration) */}
           <fieldset className="rounded-lg border bg-card p-4">
-            <legend className="px-1 text-sm font-medium">
-              Artwork (illustration)
-              {uploading === "art" && <span className="ml-2 text-xs text-muted-foreground">Uploading…</span>}
-            </legend>
-            <FilePicker label="Choose image…" accept="image/jpeg,image/png,image/webp"
-              disabled={uploading !== null} onFile={(f) => onUpload(f, "art")} />
+            <legend className="px-1 text-sm font-medium">Artwork (illustration)</legend>
+            <ArtCandidatesPanel cardId={card.id} candidates={artCandidates} cardName={snapshot.name ?? null} />
             <label className="mt-3 flex items-start gap-2">
               <Checkbox className="mt-0.5" checked={!!card.isPlaceholder}
                 onCheckedChange={async () => { await setPlaceholder(card.id, !card.isPlaceholder); router.refresh(); }} />
@@ -219,7 +221,9 @@ export default function StudioEditor({
               </span>
             </label>
             {card.hasArt && (
-              <a href={`/forge/api/art/${card.id}?download=1`}
+              <a href={activeSourceId
+                ? `/forge/api/art/${card.id}?candidate=${activeSourceId}&download=1`
+                : `/forge/api/art/${card.id}?download=1`}
                 className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>
                 <Download className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 Download original

@@ -119,7 +119,15 @@ export async function acceptProposal(
     p_proposal_id: proposalId,
   });
   if (error) return { ok: false, error: "Could not accept proposal" };
-  if (data === null) return { ok: false, error: "This proposal is out of date — please re-propose." };
+  // Since migration 083 a release closes open proposals itself, so a stale base
+  // here means a genuine race: someone released while this review was open.
+  if (data === null) {
+    return {
+      ok: false,
+      error:
+        "A newer version was released while this was open, so this proposal was closed. Re-propose from the current draft if the change is still needed.",
+    };
+  }
   // Lifecycle change ripples to set/card/queue views.
   revalidatePath("/forge", "layout");
   return { ok: true };

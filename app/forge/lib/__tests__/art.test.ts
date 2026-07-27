@@ -5,7 +5,7 @@ vi.mock("@/app/forge/lib/imageNormalize", () => ({ normalizeCardImage: vi.fn() }
 
 import { put } from "@vercel/blob";
 import { normalizeCardImage } from "@/app/forge/lib/imageNormalize";
-import { validateArtFile, MAX_ART_BYTES, uploadForgeArt, uploadForgeFinished } from "../art";
+import { validateArtFile, MAX_ART_BYTES, uploadForgeArt, uploadForgeFinished, uploadForgeArtRaw } from "../art";
 
 describe("validateArtFile", () => {
   it("accepts a normal PNG", () => {
@@ -54,5 +54,21 @@ describe("uploadForgeArt / uploadForgeFinished", () => {
     (normalizeCardImage as any).mockRejectedValue(new Error("unsupported image format"));
     await expect(uploadForgeArt(file)).rejects.toThrow();
     expect(put).not.toHaveBeenCalled();
+  });
+});
+
+describe("uploadForgeArtRaw", () => {
+  beforeEach(() => vi.clearAllMocks());
+  it("puts the buffer as-is under forge-art/ without normalizing", async () => {
+    (put as ReturnType<typeof vi.fn>).mockResolvedValue({ pathname: "forge-art/raw-key" });
+    const buf = Buffer.from([9, 9, 9]);
+    const key = await uploadForgeArtRaw(buf, "image/jpeg");
+    expect(key).toBe("forge-art/raw-key");
+    expect(normalizeCardImage).not.toHaveBeenCalled();
+    const [putKey, putData, putOpts] = (put as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(putKey).toMatch(/^forge-art\//);
+    expect(putData).toBe(buf);
+    expect(putOpts.contentType).toBe("image/jpeg");
+    expect(putOpts.access).toBe("private");
   });
 });

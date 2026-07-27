@@ -16,7 +16,7 @@ const ENABLED = process.env.FORGE_LEAK_TEST === "1" && !!URL && !!ANON;
 const FORGE_TABLES = [
   "playtest_members", "forge_invites", "forge_audit", "forge_cards",
   "forge_sets", "forge_set_elders", "forge_set_grants", "card_versions",
-  "card_proposals", "card_comments", "forge_decks",
+  "card_proposals", "card_comments", "forge_decks", "forge_card_art_candidates",
 ];
 
 describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
@@ -87,6 +87,9 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_resolve_comment", { p_comment_id: "00000000-0000-0000-0000-000000000000", p_resolved: true }],
     ["forge_apply_suggestion", { p_comment_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_delete_comment", { p_comment_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_add_art_candidate", { p_card_id: "00000000-0000-0000-0000-000000000000", p_key: "x" }],
+    ["forge_delete_art_candidate", { p_candidate_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_candidate_art_key", { p_card_id: "00000000-0000-0000-0000-000000000000", p_candidate_id: "00000000-0000-0000-0000-000000000000" }],
   ];
 
   for (const [fn, args] of FORGE_RPCS) {
