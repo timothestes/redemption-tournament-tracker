@@ -12,6 +12,7 @@ import {
   categorizeRarity,
   isNativityReference,
   iconPredicates,
+  searchableIdentifier,
 } from "./utils";
 import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG, BuilderConfigProvider } from "./builderConfig";
 import { readStickyFilters, writeStickyFilters, type AltArtMode } from "./stickyFilters";
@@ -982,11 +983,11 @@ export default function CardSearchClient({
               case 'setName':
                 return fieldMatches(c.officialSet, queryObj) || fieldMatches(c.set, queryObj);
               case 'identifier':
-                return fieldMatches(c.identifier, queryObj);
+                return fieldMatches(searchableIdentifier(c), queryObj);
               case 'reference':
                 return fieldMatches(c.reference, queryObj);
               default:
-                return fieldMatches(Object.values(c).join(" "), queryObj);
+                return fieldMatches(`${Object.values(c).join(" ")} ${searchableIdentifier(c)}`, queryObj);
             }
           };
           

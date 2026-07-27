@@ -64,6 +64,23 @@ export const isNativityReference = (ref: string): boolean => {
   }
 };
 
+// Flood survivors are Antediluvians in Redemption, but only newer printings
+// (LoC, RR2) carry the explicit "Antediluvian" identifier. Append it for older
+// Flood survivor characters so an "Antediluvian" search surfaces them too.
+// Restricted to characters so enhancements that merely reference flood
+// survivors (A New Beginning, The Rainbow) are not tagged.
+export const searchableIdentifier = (c: Card): string => {
+  const isCharacter = c.type.includes("Hero") || c.type.includes("Character");
+  if (
+    isCharacter &&
+    /flood survivor/i.test(c.identifier) &&
+    !/antediluvian/i.test(c.identifier)
+  ) {
+    return `${c.identifier}, Antediluvian`;
+  }
+  return c.identifier;
+};
+
 // Define how each icon filter should be applied
 export const iconPredicates: Record<string, (c: Card) => boolean> = {
   Artifact: (c) => c.type === "Artifact",
