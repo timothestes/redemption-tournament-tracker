@@ -1,9 +1,13 @@
 "use server";
 
-import { createClient } from "../../../utils/supabase/server";
-import { getSupabaseAdmin } from "../../../lib/pricing/supabase-admin";
-import { computeFinalStandings } from "../../../lib/tournament/standings";
-import { buildStateFromSupabase } from "../../../utils/tournament/stateAdapter";
+import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAdmin } from "@/lib/pricing/supabase-admin";
+import { computeFinalStandings } from "@/lib/tournament/standings";
+import { buildStateFromSupabase } from "@/utils/tournament/stateAdapter";
+import { generateJoinCode } from "@/lib/tournament/joinCodes";
+import { buildDeckSubmission, type DeckSnapshot } from "@/lib/tournament/deckSubmission";
+import { normalizeTournamentFormat, type FormatId } from "@/lib/formats";
+import { checkDeck, type DeckCheckCard, type DeckCheckIssue } from "@/utils/deckcheck";
 
 // System user that owns published tournament deck copies
 const REDEMPTIONCCG_USER_ID = "a0a8e980-f372-4ebd-be25-d2f26507e98f";
@@ -14,18 +18,44 @@ function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
+// Reads on the default-deny tables (tournament_deck_submissions,
+// tournament_join_blocks) go through the admin client, which bypasses RLS
+// entirely — so authority must be proven first. A user-scoped read of the
+// tournament row only succeeds (RLS: host_can_access_tournaments) if the
+// caller IS the host; that's the proof.
+async function requireHost(tournamentId: string): Promise<{ userId: string } | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: t } = await supabase
+    .from("tournaments")
+    .select("id")
+    .eq("id", tournamentId)
+    .maybeSingle();
+  return t ? { userId: user.id } : null;
+}
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 export interface TournamentDecklistRow {
   id: string;
   tournament_id: string;
   participant_id: string;
-  deck_id: string;
+  deck_id: string | null;
   deck_name: string;
   deck_format: string | null;
   deck_card_count: number;
   preview_card_1: string | null;
   preview_card_2: string | null;
+  submission: {
+    deckName: string;
+    cardCount: number;
+    isLegal: boolean | null;
+    submittedAt: string;
+    source: "player" | "host";
+  } | null;
 }
 
 export interface DeckSearchResult {
@@ -66,17 +96,53 @@ export async function loadTournamentDecklistsAction(tournamentId: string) {
     return { success: false, error: error.message, decklists: [] };
   }
 
-  const decklists: TournamentDecklistRow[] = (data || []).map((row: any) => ({
-    id: row.id,
-    tournament_id: row.tournament_id,
-    participant_id: row.participant_id,
-    deck_id: row.deck_id,
-    deck_name: row.decks?.name || "Unknown",
-    deck_format: row.decks?.format || null,
-    deck_card_count: row.decks?.card_count || 0,
-    preview_card_1: row.decks?.preview_card_1 || null,
-    preview_card_2: row.decks?.preview_card_2 || null,
-  }));
+  // Submissions live in a default-deny table (host-only). Only merge them in
+  // for confirmed hosts; anyone else still gets the plain decklist rows.
+  const submissionMap = new Map<string, any>();
+  const host = await requireHost(tournamentId);
+  if (host) {
+    const admin = getSupabaseAdmin();
+    const { data: subs } = await admin
+      .from("tournament_deck_submissions")
+      .select("participant_id, deck_snapshot, is_legal, submitted_at, source")
+      .eq("tournament_id", tournamentId);
+    for (const s of subs ?? []) {
+      submissionMap.set(s.participant_id, s);
+    }
+  }
+
+  const decklists: TournamentDecklistRow[] = (data || []).map((row: any) => {
+    const sub = submissionMap.get(row.participant_id);
+    const snapshot = sub?.deck_snapshot as DeckSnapshot | undefined;
+    const cardCountFromSnapshot = snapshot
+      ? snapshot.cards.reduce((n, c) => n + c.quantity, 0)
+      : 0;
+    // The `decks` join fails when deck_id is null (deck deleted) or the deck
+    // is private and inaccessible under RLS. Fall back to the submission
+    // snapshot for name/count in that case rather than showing "Unknown".
+    const deckJoinFailed = !row.decks;
+
+    return {
+      id: row.id,
+      tournament_id: row.tournament_id,
+      participant_id: row.participant_id,
+      deck_id: row.deck_id,
+      deck_name: deckJoinFailed && snapshot ? snapshot.deckName : row.decks?.name || "Unknown",
+      deck_format: row.decks?.format || null,
+      deck_card_count: deckJoinFailed && snapshot ? cardCountFromSnapshot : row.decks?.card_count || 0,
+      preview_card_1: row.decks?.preview_card_1 || null,
+      preview_card_2: row.decks?.preview_card_2 || null,
+      submission: sub
+        ? {
+            deckName: snapshot?.deckName ?? "Deck",
+            cardCount: cardCountFromSnapshot,
+            isLegal: sub.is_legal,
+            submittedAt: sub.submitted_at,
+            source: sub.source,
+          }
+        : null,
+    };
+  });
 
   return { success: true, decklists };
 }
@@ -195,6 +261,76 @@ export async function attachDeckToParticipantAction(
     }
   }
 
+  // Record a host-side submission snapshot (default-deny table — admin
+  // client, gated on host authority). Best-effort: if the deck turns out to
+  // be private/inaccessible to the host, leave the tournament_decklists
+  // attach above intact and simply skip the snapshot.
+  const host = await requireHost(tournamentId);
+  if (host) {
+    const admin = getSupabaseAdmin();
+    const { data: tournament } = await supabase
+      .from("tournaments")
+      .select("deck_format")
+      .eq("id", tournamentId)
+      .maybeSingle();
+    const format = normalizeTournamentFormat(tournament?.deck_format);
+
+    let snapshot: DeckSnapshot | null = null;
+    let isLegal: boolean | null = null;
+    let issues: DeckCheckIssue[] | null = null;
+
+    if (format === null || format === "Other") {
+      // No declared tournament format -> a legality verdict would be
+      // meaningless. Still snapshot the cards so the host has a record.
+      const { data: deck } = await admin
+        .from("decks")
+        .select("name")
+        .eq("id", deckId)
+        .maybeSingle();
+      if (deck) {
+        const { data: rows } = await admin
+          .from("deck_cards")
+          .select("card_name, card_set, card_img_file, quantity, zone")
+          .eq("deck_id", deckId)
+          .in("zone", ["main", "reserve"]);
+        snapshot = {
+          deckName: deck.name ?? "Untitled Deck",
+          deckFormat: "",
+          cards: (rows ?? []).map((r: any) => ({
+            name: r.card_name,
+            set: r.card_set,
+            imgFile: r.card_img_file ?? null,
+            quantity: r.quantity,
+            zone: r.zone,
+          })),
+        };
+      }
+    } else {
+      const built = await buildDeckSubmission(admin, deckId, host.userId, format);
+      if (built.success === true) {
+        snapshot = built.snapshot;
+        isLegal = built.isLegal;
+        issues = built.issues;
+      }
+    }
+
+    if (snapshot) {
+      await admin.from("tournament_deck_submissions").upsert(
+        {
+          tournament_id: tournamentId,
+          participant_id: participantId,
+          deck_id: deckId,
+          submitted_by: host.userId,
+          source: "host",
+          deck_snapshot: snapshot,
+          is_legal: isLegal,
+          deckcheck_issues: issues && issues.length > 0 ? issues : null,
+        },
+        { onConflict: "participant_id" }
+      );
+    }
+  }
+
   return { success: true };
 }
 
@@ -203,16 +339,321 @@ export async function attachDeckToParticipantAction(
 export async function detachDeckFromParticipantAction(participantId: string) {
   const supabase = await createClient();
 
-  const { error } = await supabase
+  // Proof-of-delete: only when the user-scoped delete actually removed a row
+  // (i.e. RLS let it through because the caller is the host) do we touch the
+  // admin-only submissions table. Without this, any authenticated caller
+  // could pass an arbitrary participantId and admin-delete someone else's
+  // submission through this open server action.
+  const { data, error } = await supabase
     .from("tournament_decklists")
     .delete()
-    .eq("participant_id", participantId);
+    .eq("participant_id", participantId)
+    .select("tournament_id");
 
   if (error) {
     console.error("Error detaching deck:", error);
     return { success: false, error: error.message };
   }
 
+  if (!data || data.length === 0) {
+    return { success: false, error: "not_found" };
+  }
+
+  const admin = getSupabaseAdmin();
+  await admin.from("tournament_deck_submissions").delete().eq("participant_id", participantId);
+
+  return { success: true };
+}
+
+// ─── QR join controls ────────────────────────────────────────────────
+
+export async function setQrJoinEnabledAction(
+  tournamentId: string,
+  enabled: boolean
+): Promise<{ success: boolean; code?: string | null; error?: string }> {
+  const supabase = await createClient();
+
+  if (enabled === false) {
+    const { data, error } = await supabase
+      .from("tournaments")
+      .update({ code: null })
+      .eq("id", tournamentId)
+      .select("code")
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    // RLS makes a non-host's update touch zero rows -> data comes back null
+    // with no error. Treat that as "not found" (can't tell it apart from a
+    // truly missing tournament, which is fine — same response either way).
+    if (!data) return { success: false, error: "not_found" };
+    return { success: true, code: null };
+  }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateJoinCode();
+    const { data, error } = await supabase
+      .from("tournaments")
+      .update({ code })
+      .eq("id", tournamentId)
+      .select("code")
+      .maybeSingle();
+    if (error) {
+      if (error.code === "23505") continue; // code collision — try another
+      return { success: false, error: error.message };
+    }
+    if (!data) return { success: false, error: "not_found" };
+    return { success: true, code: data.code };
+  }
+  return { success: false, error: "code_generation_failed" };
+}
+
+export async function updateJoinSettingsAction(
+  tournamentId: string,
+  s: { deckFormat: FormatId | "Other"; requireDecklists: boolean }
+): Promise<{ success: boolean; error?: string }> {
+  if (s.requireDecklists === true && s.deckFormat === "Other") {
+    return { success: false, error: "format_required" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tournaments")
+    .update({ deck_format: s.deckFormat, require_decklists: s.requireDecklists })
+    .eq("id", tournamentId);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+// ─── Final placements ────────────────────────────────────────────────
+//
+// participants.place is written in exactly one spot: here. Both a
+// results-only publish (setResultsPublishedAction) and a decklist publish
+// (publishTournamentDecklistsAction) need it computed and persisted, so it's
+// factored out rather than duplicated.
+
+async function persistFinalPlaces(tournamentId: string): Promise<Map<string, number>> {
+  const supabase = await createClient();
+  const placementMap = new Map<string, number>(); // participant_id → place
+
+  const state = await buildStateFromSupabase(supabase, tournamentId);
+  if (state) {
+    const standings = computeFinalStandings(state);
+    for (const placement of standings) {
+      placementMap.set(placement.participantId, placement.place);
+      await supabase
+        .from("participants")
+        .update({ place: placement.place })
+        .eq("id", placement.participantId);
+    }
+    // Dropped players are excluded from `standings` per algorithm.md
+    // ("no place value at all"). Clear any stale `place` left over from a
+    // prior publish so the data accurately reflects their dropped status.
+    await supabase
+      .from("participants")
+      .update({ place: null })
+      .eq("tournament_id", tournamentId)
+      .eq("dropped_out", true);
+  }
+
+  return placementMap;
+}
+
+// ─── Join stats ───────────────────────────────────────────────────────
+
+export async function getJoinStatsAction(
+  tournamentId: string
+): Promise<{ success: boolean; joined: number; submitted: number }> {
+  const host = await requireHost(tournamentId);
+  if (!host) return { success: false, joined: 0, submitted: 0 };
+
+  const supabase = await createClient();
+  const { count: joined } = await supabase
+    .from("participants")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId);
+
+  const admin = getSupabaseAdmin();
+  const { count: submitted } = await admin
+    .from("tournament_deck_submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId);
+
+  return { success: true, joined: joined ?? 0, submitted: submitted ?? 0 };
+}
+
+// ─── Single submission (host review modal) ────────────────────────────
+
+export async function getSubmissionAction(
+  tournamentId: string,
+  participantId: string
+): Promise<{
+  success: boolean;
+  submission?: {
+    snapshot: DeckSnapshot;
+    isLegal: boolean | null;
+    issues: DeckCheckIssue[];
+    submittedAt: string;
+    source: "player" | "host";
+    submittedByUsername: string | null;
+  };
+  error?: string;
+}> {
+  const host = await requireHost(tournamentId);
+  if (!host) return { success: false, error: "not_found" };
+
+  const admin = getSupabaseAdmin();
+  const { data: sub, error } = await admin
+    .from("tournament_deck_submissions")
+    .select("deck_snapshot, is_legal, deckcheck_issues, submitted_at, source, submitted_by")
+    .eq("tournament_id", tournamentId)
+    .eq("participant_id", participantId)
+    .maybeSingle();
+
+  if (error) return { success: false, error: error.message };
+  if (!sub) return { success: false, error: "not_found" };
+
+  let submittedByUsername: string | null = null;
+  if (sub.submitted_by) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("username")
+      .eq("id", sub.submitted_by)
+      .maybeSingle();
+    submittedByUsername = profile?.username ?? null;
+  }
+
+  return {
+    success: true,
+    submission: {
+      snapshot: sub.deck_snapshot as DeckSnapshot,
+      isLegal: sub.is_legal,
+      issues: (sub.deckcheck_issues as DeckCheckIssue[] | null) ?? [],
+      submittedAt: sub.submitted_at,
+      source: sub.source,
+      submittedByUsername,
+    },
+  };
+}
+
+// ─── Remove participant (with optional rejoin block) ───────────────────
+
+export async function removeParticipantWithBlockAction(
+  tournamentId: string,
+  participantId: string,
+  block: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const host = await requireHost(tournamentId);
+  if (!host) return { success: false, error: "not_found" };
+
+  const admin = getSupabaseAdmin();
+  const { data: participant } = await admin
+    .from("participants")
+    .select("user_id")
+    .eq("id", participantId)
+    .eq("tournament_id", tournamentId)
+    .maybeSingle();
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("participants")
+    .delete()
+    .eq("id", participantId)
+    .eq("tournament_id", tournamentId);
+
+  if (error) return { success: false, error: error.message };
+
+  if (block === true && participant?.user_id != null) {
+    await admin
+      .from("tournament_join_blocks")
+      .upsert(
+        { tournament_id: tournamentId, user_id: participant.user_id },
+        { onConflict: "tournament_id,user_id", ignoreDuplicates: true }
+      );
+  }
+
+  return { success: true };
+}
+
+// ─── Recheck all submissions against current format ────────────────────
+
+export async function recheckAllSubmissionsAction(
+  tournamentId: string
+): Promise<{ success: boolean; rechecked: number; nowIllegal: number; error?: string }> {
+  const host = await requireHost(tournamentId);
+  if (!host) return { success: false, rechecked: 0, nowIllegal: 0, error: "not_found" };
+
+  const supabase = await createClient();
+  const { data: tournament } = await supabase
+    .from("tournaments")
+    .select("deck_format")
+    .eq("id", tournamentId)
+    .maybeSingle();
+
+  const format = normalizeTournamentFormat(tournament?.deck_format);
+  if (format === null || format === "Other") {
+    // No declared format -> a legality verdict is meaningless (same rule as
+    // host-attach). Nothing to recheck.
+    return { success: false, rechecked: 0, nowIllegal: 0, error: "format_required" };
+  }
+
+  const admin = getSupabaseAdmin();
+  const { data: subs, error } = await admin
+    .from("tournament_deck_submissions")
+    .select("id, deck_snapshot, is_legal")
+    .eq("tournament_id", tournamentId);
+
+  if (error) return { success: false, rechecked: 0, nowIllegal: 0, error: error.message };
+
+  let rechecked = 0;
+  let nowIllegal = 0;
+
+  for (const sub of subs ?? []) {
+    const snapshot = sub.deck_snapshot as DeckSnapshot;
+    const toCheckCard = (c: DeckSnapshot["cards"][number]): DeckCheckCard => ({
+      name: c.name,
+      set: c.set,
+      quantity: c.quantity,
+      imgFile: c.imgFile ?? undefined,
+    });
+    const main = snapshot.cards.filter((c) => c.zone === "main").map(toCheckCard);
+    const reserve = snapshot.cards.filter((c) => c.zone === "reserve").map(toCheckCard);
+    const result = await checkDeck(main, reserve, format);
+
+    if (sub.is_legal === true && result.valid === false) nowIllegal++;
+
+    await admin
+      .from("tournament_deck_submissions")
+      .update({
+        is_legal: result.valid,
+        deckcheck_issues: result.issues.length > 0 ? result.issues : null,
+      })
+      .eq("id", sub.id);
+
+    rechecked++;
+  }
+
+  return { success: true, rechecked, nowIllegal };
+}
+
+// ─── Publish / unpublish results ────────────────────────────────────────
+
+export async function setResultsPublishedAction(
+  tournamentId: string,
+  published: boolean
+): Promise<{ success: boolean; error?: string }> {
+  if (published === true) {
+    // Results page shows the Place column — compute + persist it here since
+    // this path may run without ever publishing decklists.
+    await persistFinalPlaces(tournamentId);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tournaments")
+    .update({ results_published: published })
+    .eq("id", tournamentId);
+
+  if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
@@ -261,25 +702,22 @@ export async function publishTournamentDecklistsAction(
   // Uses the pure standings module so head-to-head tiebreakers are applied
   // (previous code only sorted by match_points then differential, which missed
   // the head-to-head step required by algorithm.md).
-  const placementMap = new Map<string, number>(); // participant_id → place
-  const state = await buildStateFromSupabase(supabase, tournamentId);
-  if (state) {
-    const standings = computeFinalStandings(state);
-    for (const placement of standings) {
-      placementMap.set(placement.participantId, placement.place);
-      await supabase
-        .from("participants")
-        .update({ place: placement.place })
-        .eq("id", placement.participantId);
+  const placementMap = await persistFinalPlaces(tournamentId);
+
+  // Submissions live in a default-deny table — admin client, so authority
+  // must be proven first. The tournament read above already proved it (RLS
+  // returned a row), but re-check explicitly right at the point of admin
+  // access so the gate is obvious and doesn't rely on code above staying put.
+  const host = await requireHost(tournamentId);
+  const submissionMap = new Map<string, any>();
+  if (host) {
+    const { data: subs } = await admin
+      .from("tournament_deck_submissions")
+      .select("participant_id, deck_snapshot, is_legal, deckcheck_issues")
+      .eq("tournament_id", tournamentId);
+    for (const s of subs ?? []) {
+      submissionMap.set(s.participant_id, s);
     }
-    // Dropped players are excluded from `standings` per algorithm.md
-    // ("no place value at all"). Clear any stale `place` left over from a
-    // prior publish so the data accurately reflects their dropped status.
-    await supabase
-      .from("participants")
-      .update({ place: null })
-      .eq("tournament_id", tournamentId)
-      .eq("dropped_out", true);
   }
 
   // Check if copies already exist (previous publish that was unpublished)
@@ -320,25 +758,96 @@ export async function publishTournamentDecklistsAction(
   // No existing copies — create them fresh
   for (const dl of decklists as any[]) {
     const participantName = dl.participants?.name || "Unknown";
+    const submission = submissionMap.get(dl.participant_id);
 
-    // Fetch original deck metadata. Carry is_legal/deckcheck_issues forward so
-    // PDF generation on the published copy renders the legal/illegal seal —
-    // the cards are copied 1:1, so legality is identical to the original.
-    const { data: origDeck } = await admin
-      .from("decks")
-      .select("name, description, format, paragon, preview_card_1, preview_card_2, card_count, is_legal, deckcheck_issues")
-      .eq("id", dl.deck_id)
-      .single();
+    // Snapshot-first: a submission is an immutable record of what the
+    // player/host actually entered, and survives the live deck being
+    // deleted or edited. Carry is_legal/deckcheck_issues forward so PDF
+    // generation on the published copy renders the legal/illegal seal.
+    // (Note: the published deck's `name` is always participant + place +
+    // tournament name, below — never the original/snapshot deck name, same
+    // as the pre-existing behavior.)
+    let deckMeta: {
+      description: string | null;
+      format: string | null;
+      paragon: string | null;
+      preview_card_1: string | null;
+      preview_card_2: string | null;
+      card_count: number;
+      is_legal: boolean | null;
+      deckcheck_issues: unknown;
+    };
+    let cardsToInsert: {
+      card_name: string;
+      card_set: string | null;
+      card_img_file: string | null;
+      quantity: number;
+      zone: string;
+    }[];
 
-    if (!origDeck) continue;
+    if (submission) {
+      const snapshot = submission.deck_snapshot as DeckSnapshot;
+      deckMeta = {
+        description: null,
+        format: snapshot.deckFormat || null,
+        paragon: null,
+        preview_card_1: null,
+        preview_card_2: null,
+        card_count: snapshot.cards.reduce((n, c) => n + c.quantity, 0),
+        is_legal: submission.is_legal ?? null,
+        deckcheck_issues: submission.deckcheck_issues ?? null,
+      };
+      cardsToInsert = snapshot.cards.map((c) => ({
+        card_name: c.name,
+        card_set: c.set || null,
+        card_img_file: c.imgFile || null,
+        quantity: c.quantity,
+        zone: c.zone,
+      }));
+    } else if (dl.deck_id !== null) {
+      // Fetch original deck metadata.
+      const { data: origDeck } = await admin
+        .from("decks")
+        .select("name, description, format, paragon, preview_card_1, preview_card_2, card_count, is_legal, deckcheck_issues")
+        .eq("id", dl.deck_id)
+        .single();
 
-    // Fetch original deck cards. Maybeboard rows are excluded from the
-    // tournament submission — only main + reserve get published.
-    const { data: origCards } = await admin
-      .from("deck_cards")
-      .select("card_name, card_set, card_img_file, quantity, zone")
-      .eq("deck_id", dl.deck_id)
-      .in("zone", ["main", "reserve"]);
+      if (!origDeck) continue;
+
+      // Fetch original deck cards. Maybeboard rows are excluded from the
+      // tournament submission — only main + reserve get published.
+      const { data: origCards } = await admin
+        .from("deck_cards")
+        .select("card_name, card_set, card_img_file, quantity, zone")
+        .eq("deck_id", dl.deck_id)
+        .in("zone", ["main", "reserve"]);
+
+      deckMeta = {
+        description: origDeck.description || null,
+        format: origDeck.format,
+        paragon: origDeck.paragon || null,
+        preview_card_1: origDeck.preview_card_1 || null,
+        preview_card_2: origDeck.preview_card_2 || null,
+        card_count: origDeck.card_count || 0,
+        is_legal: origDeck.is_legal ?? null,
+        deckcheck_issues: origDeck.deckcheck_issues ?? null,
+      };
+      cardsToInsert = (origCards ?? []).map((c: any) => ({
+        card_name: c.card_name,
+        card_set: c.card_set || null,
+        card_img_file: c.card_img_file || null,
+        quantity: c.quantity,
+        zone: c.zone,
+      }));
+    } else {
+      // Neither a submission snapshot nor a live deck (deck was deleted and
+      // this participant never submitted through the join flow) — nothing
+      // to publish for this participant.
+      console.warn(
+        `publishTournamentDecklistsAction: participant ${dl.participant_id} has neither a submission nor a live deck; skipping.`
+      );
+      continue;
+    }
 
     // Create copy owned by RedemptionCCG.app
     const place = placementMap.get(dl.participant_id);
@@ -349,15 +858,15 @@ export async function publishTournamentDecklistsAction(
       .insert({
         user_id: REDEMPTIONCCG_USER_ID,
         name: deckName,
-        description: origDeck.description || null,
-        format: deckFormat !== "Other" ? deckFormat : origDeck.format,
-        paragon: origDeck.paragon || null,
-        preview_card_1: origDeck.preview_card_1 || null,
-        preview_card_2: origDeck.preview_card_2 || null,
-        card_count: origDeck.card_count || 0,
+        description: deckMeta.description,
+        format: deckFormat !== "Other" ? deckFormat : deckMeta.format,
+        paragon: deckMeta.paragon,
+        preview_card_1: deckMeta.preview_card_1,
+        preview_card_2: deckMeta.preview_card_2,
+        card_count: deckMeta.card_count,
         visibility: "public",
-        is_legal: origDeck.is_legal ?? null,
-        deckcheck_issues: origDeck.deckcheck_issues ?? null,
+        is_legal: deckMeta.is_legal,
+        deckcheck_issues: deckMeta.deckcheck_issues,
       })
       .select("id")
       .single();
@@ -368,14 +877,10 @@ export async function publishTournamentDecklistsAction(
     }
 
     // Copy cards to the new deck
-    if (origCards && origCards.length > 0) {
-      const cardRows = origCards.map((c: any) => ({
+    if (cardsToInsert.length > 0) {
+      const cardRows = cardsToInsert.map((c) => ({
         deck_id: newDeck.id,
-        card_name: c.card_name,
-        card_set: c.card_set || null,
-        card_img_file: c.card_img_file || null,
-        quantity: c.quantity,
-        zone: c.zone,
+        ...c,
       }));
 
       await admin.from("deck_cards").insert(cardRows);
