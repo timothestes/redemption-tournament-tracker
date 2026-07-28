@@ -106,21 +106,27 @@ function pickMainDeck(): DeckCardSeed[] {
 
 // ─── Seed: host + player accounts, a require_decklists Limited tournament, ───
 // ─── and a legal deck for the player.                                     ───
-
+//
+// `Seeded` fields are populated INCREMENTALLY, in-place, as each row/user is
+// created — never assigned only at the end. If any step throws partway
+// through (e.g. pickMainDeck() finding the card database changed shape),
+// whatever was already created is still recorded on this same object, so
+// `cleanup()` (which runs in afterAll regardless of whether beforeAll threw)
+// can still find and delete it instead of orphaning rows in prod.
 interface Seeded {
-  tournamentId: string;
-  code: string;
-  hostId: string;
-  hostEmail: string;
-  hostPassword: string;
-  playerId: string;
-  playerEmail: string;
-  playerPassword: string;
-  deckId: string;
-  deckName: string;
+  tournamentId?: string;
+  code?: string;
+  hostId?: string;
+  hostEmail?: string;
+  hostPassword?: string;
+  playerId?: string;
+  playerEmail?: string;
+  playerPassword?: string;
+  deckId?: string;
+  deckName?: string;
 }
 
-async function seed(): Promise<Seeded> {
+async function seed(state: Seeded): Promise<void> {
   if (!admin) throw new Error("qr-join e2e seed requires SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL");
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const password = "Testpass12345";
@@ -132,6 +138,9 @@ async function seed(): Promise<Seeded> {
     email_confirm: true,
   });
   if (hostErr || !hostUser?.user) throw new Error(`Failed to create host: ${hostErr?.message}`);
+  state.hostId = hostUser.user.id;
+  state.hostEmail = hostEmail;
+  state.hostPassword = password;
 
   const playerEmail = `qr-join-player-${stamp}@e2e.test`;
   const { data: playerUser, error: playerErr } = await admin.auth.admin.createUser({
@@ -140,6 +149,9 @@ async function seed(): Promise<Seeded> {
     email_confirm: true,
   });
   if (playerErr || !playerUser?.user) throw new Error(`Failed to create player: ${playerErr?.message}`);
+  state.playerId = playerUser.user.id;
+  state.playerEmail = playerEmail;
+  state.playerPassword = password;
 
   // Retry on join-code collision, mirroring the production regenerateJoinCode path.
   let tournamentId: string | null = null;
@@ -165,6 +177,8 @@ async function seed(): Promise<Seeded> {
     tournamentId = tournament!.id;
   }
   if (!tournamentId) throw new Error("qr-join e2e: could not allocate a unique join code");
+  state.tournamentId = tournamentId;
+  state.code = code;
 
   const deckName = `QR Join E2E Deck ${stamp}`;
   const { data: deck, error: deckErr } = await admin
@@ -173,7 +187,13 @@ async function seed(): Promise<Seeded> {
     .select("id")
     .single();
   if (deckErr || !deck) throw new Error(`Failed to create deck: ${deckErr?.message}`);
+  state.deckId = deck.id;
+  state.deckName = deckName;
 
+  // Everything above this point creates rows that MUST be tracked before we
+  // touch anything that can throw for reasons unrelated to Supabase (a card
+  // database shape change) — pickMainDeck() runs only now, after state.deckId
+  // is already recorded, so a throw here still leaves a cleanable (empty) deck.
   const mainDeck = pickMainDeck();
   const { error: cardsErr } = await admin.from("deck_cards").insert(
     mainDeck.map((c) => ({
@@ -186,34 +206,40 @@ async function seed(): Promise<Seeded> {
     }))
   );
   if (cardsErr) throw new Error(`Failed to insert deck cards: ${cardsErr.message}`);
-
-  return {
-    tournamentId,
-    code,
-    hostId: hostUser.user.id,
-    hostEmail,
-    hostPassword: password,
-    playerId: playerUser.user.id,
-    playerEmail,
-    playerPassword: password,
-    deckId: deck.id,
-    deckName,
-  };
 }
 
-async function cleanup(seeded: Seeded) {
+// Best-effort over whatever `state` has recorded so far: every delete is
+// guarded on its ID being present, and no single failed/skipped delete stops
+// the rest from being attempted. Any delete that comes back with an `.error`
+// is logged via console.warn so a real cleanup gap is visible on the first
+// live run rather than silently swallowed.
+async function cleanup(state: Seeded) {
   if (!admin) return;
+
   // Tournament delete cascades participants, matches, rounds,
   // tournament_decklists, tournament_deck_submissions, tournament_join_blocks.
-  await admin.from("tournaments").delete().eq("id", seeded.tournamentId);
+  if (state.tournamentId) {
+    const { error } = await admin.from("tournaments").delete().eq("id", state.tournamentId);
+    if (error) console.warn(`qr-join e2e cleanup: failed to delete tournament ${state.tournamentId}:`, error.message);
+  }
+
   // decks.user_id -> auth.users has no ON DELETE action, so the deck (and its
   // cascaded deck_cards) must go before the owning user.
-  await admin.from("decks").delete().eq("id", seeded.deckId);
-  for (const userId of [seeded.hostId, seeded.playerId]) {
+  if (state.deckId) {
+    const { error } = await admin.from("decks").delete().eq("id", state.deckId);
+    if (error) console.warn(`qr-join e2e cleanup: failed to delete deck ${state.deckId}:`, error.message);
+  }
+
+  for (const [label, userId] of [
+    ["host", state.hostId],
+    ["player", state.playerId],
+  ] as const) {
+    if (!userId) continue;
     try {
-      await admin.auth.admin.deleteUser(userId);
-    } catch {
-      // best-effort — matches the cleanup pattern in e2e/seed.ts / forgeSeed.ts
+      const { error } = await admin.auth.admin.deleteUser(userId);
+      if (error) console.warn(`qr-join e2e cleanup: failed to delete ${label} user ${userId}:`, error.message);
+    } catch (err) {
+      console.warn(`qr-join e2e cleanup: failed to delete ${label} user ${userId}:`, err);
     }
   }
 }
@@ -229,10 +255,14 @@ async function signIn(page: Page, email: string, password: string) {
 test.describe("QR join + decklist submission", () => {
   test.skip(!adminAvailable, "requires SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL");
 
-  let seeded: Seeded;
+  // Created up front (not assigned from seed()'s return value) so afterAll
+  // can always find it — even if beforeAll throws partway through seeding,
+  // Playwright still runs afterAll, and this object already carries whatever
+  // IDs were recorded before the throw.
+  const seeded: Seeded = {};
 
   test.beforeAll(async () => {
-    seeded = await seed();
+    await seed(seeded);
   });
 
   test.afterAll(async () => {
