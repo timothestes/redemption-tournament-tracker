@@ -44,8 +44,14 @@ const ERROR_MESSAGES: Record<string, string> = {
   format_required: "Choose a specific format before requiring decklists.",
 };
 
+// Shown when a server action throws outright (network drop, expired
+// session, uncaught server exception) instead of resolving to
+// {success:false, error} — and reused as friendlyError()'s fallback for any
+// error code that isn't one of the known ones above.
+const GENERIC_ERROR_MESSAGE = "Something went wrong — try again.";
+
 function friendlyError(code: string): string {
-  return ERROR_MESSAGES[code] ?? "Something went wrong. Please try again.";
+  return ERROR_MESSAGES[code] ?? GENERIC_ERROR_MESSAGE;
 }
 
 function initialFormat(tournament: QRJoinTournament): FormatId | "Other" {
@@ -123,61 +129,92 @@ export default function QRJoinDialog({
   async function handleEnable() {
     setSaving(true);
     setError(null);
-    const settingsRes = await updateJoinSettingsAction(tournament.id, {
-      deckFormat,
-      requireDecklists,
-    });
-    if (settingsRes.success === false) {
-      setError(friendlyError(settingsRes.error ?? ""));
+    try {
+      const settingsRes = await updateJoinSettingsAction(tournament.id, {
+        deckFormat,
+        requireDecklists,
+      });
+      if (settingsRes.success === false) {
+        setError(friendlyError(settingsRes.error ?? ""));
+        return;
+      }
+      const enableRes = await setQrJoinEnabledAction(tournament.id, true);
+      if (enableRes.success === false) {
+        setError(friendlyError(enableRes.error ?? ""));
+        return;
+      }
+      onTournamentUpdated();
+    } catch {
+      // Server actions can throw outright (network drop, expired session,
+      // uncaught server exception) rather than resolving to {success:false}.
+      // Without this catch, `saving` never gets reset and the dialog locks
+      // up for the rest of the session.
+      setError(GENERIC_ERROR_MESSAGE);
+    } finally {
       setSaving(false);
-      return;
     }
-    const enableRes = await setQrJoinEnabledAction(tournament.id, true);
-    setSaving(false);
-    if (enableRes.success === false) {
-      setError(friendlyError(enableRes.error ?? ""));
-      return;
-    }
-    onTournamentUpdated();
   }
 
   async function handleDisable() {
     setSaving(true);
     setError(null);
-    const res = await setQrJoinEnabledAction(tournament.id, false);
-    setSaving(false);
-    if (res.success === false) {
-      setError(friendlyError(res.error ?? ""));
-      return;
+    try {
+      const res = await setQrJoinEnabledAction(tournament.id, false);
+      if (res.success === false) {
+        setError(friendlyError(res.error ?? ""));
+        return;
+      }
+      onTournamentUpdated();
+    } catch {
+      setError(GENERIC_ERROR_MESSAGE);
+    } finally {
+      setSaving(false);
     }
-    onTournamentUpdated();
   }
 
   // Auto-save knob edits once QR Join is already live — there's no separate
-  // "save" step once a code has been handed out.
-  async function persistSettings(next: { deckFormat: FormatId | "Other"; requireDecklists: boolean }) {
+  // "save" step once a code has been handed out. `previous` is the
+  // pre-optimistic-update {deckFormat, requireDecklists} pair so a failed or
+  // thrown save can roll the local (already-changed) state back to the
+  // last-known-persisted values instead of leaving the UI showing something
+  // the server never saved.
+  async function persistSettings(
+    next: { deckFormat: FormatId | "Other"; requireDecklists: boolean },
+    previous: { deckFormat: FormatId | "Other"; requireDecklists: boolean }
+  ) {
     if (!enabled) return;
     setSaving(true);
     setError(null);
-    const res = await updateJoinSettingsAction(tournament.id, next);
-    setSaving(false);
-    if (res.success === false) {
-      setError(friendlyError(res.error ?? ""));
-      return;
+    try {
+      const res = await updateJoinSettingsAction(tournament.id, next);
+      if (res.success === false) {
+        setError(friendlyError(res.error ?? ""));
+        setDeckFormat(previous.deckFormat);
+        setRequireDecklists(previous.requireDecklists);
+        return;
+      }
+      onTournamentUpdated();
+    } catch {
+      setError(GENERIC_ERROR_MESSAGE);
+      setDeckFormat(previous.deckFormat);
+      setRequireDecklists(previous.requireDecklists);
+    } finally {
+      setSaving(false);
     }
-    onTournamentUpdated();
   }
 
   function handleFormatChange(next: FormatId | "Other") {
+    const previous = { deckFormat, requireDecklists };
     const nextRequire = next === "Other" ? false : requireDecklists;
     setDeckFormat(next);
     setRequireDecklists(nextRequire);
-    if (enabled) persistSettings({ deckFormat: next, requireDecklists: nextRequire });
+    if (enabled) persistSettings({ deckFormat: next, requireDecklists: nextRequire }, previous);
   }
 
   function handleRequireChange(checked: boolean) {
+    const previous = { deckFormat, requireDecklists };
     setRequireDecklists(checked);
-    if (enabled) persistSettings({ deckFormat, requireDecklists: checked });
+    if (enabled) persistSettings({ deckFormat, requireDecklists: checked }, previous);
   }
 
   function copyUrl() {
