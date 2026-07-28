@@ -142,7 +142,14 @@ describe("loadPublicResultsAction", () => {
     expect(calls.decklists).toBe(0); // gated on decklists_published, never queried
   });
 
-  it("payload never contains a deck_snapshot field", async () => {
+  it("payload never contains a deck_snapshot field, even when the underlying rows carry one", async () => {
+    // Hostile-input guard: these rows carry deck_snapshot/deckcheck_issues
+    // (as if a careless `.select("*")` or a row spread let them through the
+    // query layer). If the loader ever starts spreading raw participant/
+    // decklist rows into its output instead of naming fields explicitly,
+    // this fixture data would leak and the assertion below would catch it.
+    // Without these fields present here, the assertion could only ever
+    // prove "the mock lacks the key" — not "the loader strips it."
     vi.mocked(getSupabaseAdmin).mockReturnValue(
       fakeAdmin({
         tournament: {
@@ -154,15 +161,35 @@ describe("loadPublicResultsAction", () => {
           results_published: true,
           decklists_published: true,
         },
-        participants: [{ id: "p1", place: 1, name: "Alice", match_points: 12, differential: 10 }],
-        decklists: [{ participant_id: "p1", published_deck_id: "d1" }],
+        participants: [
+          {
+            id: "p1",
+            place: 1,
+            name: "Alice",
+            match_points: 12,
+            differential: 10,
+            deck_snapshot: { deckName: "Secret Deck", cards: [{ name: "Hidden Card" }] },
+            deckcheck_issues: [{ type: "warning", rule: "x", message: "y", cards: [] }],
+          },
+        ],
+        decklists: [
+          {
+            participant_id: "p1",
+            published_deck_id: "d1",
+            deck_snapshot: { deckName: "Other Secret Deck", cards: [{ name: "Other Hidden Card" }] },
+          },
+        ],
       })
     );
 
     const r = await loadPublicResultsAction("t1");
 
     expect(r.success).toBe(true);
-    expect(JSON.stringify(r)).not.toContain("deck_snapshot");
+    const serialized = JSON.stringify(r);
+    expect(serialized).not.toContain("deck_snapshot");
+    expect(serialized).not.toContain("deckcheck_issues");
+    expect(serialized).not.toContain("Secret Deck");
+    expect(serialized).not.toContain("Hidden Card");
   });
 });
 
