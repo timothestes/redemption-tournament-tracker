@@ -187,6 +187,21 @@ export default function AdminImportSetPage() {
     });
   };
 
+  const setIncludeForAll = (include: boolean) => {
+    setRows((prev) => {
+      const next = { ...prev };
+      for (const p of plans) {
+        const row = next[p.cardKey];
+        if (!row) continue;
+        // Include-all leaves skip-existing rows out (same rule as the initial defaults);
+        // they can still be opted in per-row.
+        if (include && p.plannedAction === "skip-existing") continue;
+        next[p.cardKey] = { ...row, include };
+      }
+      return next;
+    });
+  };
+
   const includedCount = plans.filter((p) => rows[p.cardKey]?.include).length;
   const blankPriceCount = plans.filter((p) => rows[p.cardKey]?.include && !rows[p.cardKey].price.trim()).length;
   const finalBlankCount = plans.filter(
@@ -321,6 +336,12 @@ export default function AdminImportSetPage() {
                 </Button>
                 <Button variant="outline" onClick={setAllPrices} disabled={!defaultPrice.trim()}>
                   Set ALL prices to {defaultPrice.trim() || "X"}
+                </Button>
+                <Button variant="outline" onClick={() => setIncludeForAll(true)}>
+                  Include all
+                </Button>
+                <Button variant="outline" onClick={() => setIncludeForAll(false)}>
+                  Include none
                 </Button>
                 <div className="text-sm text-muted-foreground ml-auto">
                   {includedCount} included · {blankPriceCount} with blank price
