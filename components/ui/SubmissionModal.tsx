@@ -121,15 +121,28 @@ export default function SubmissionModal({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getSubmissionAction(tournamentId, participantId).then((res) => {
-      if (cancelled) return;
-      if (res.success === true && res.submission) {
-        setSubmission(res.submission);
-      } else {
-        setError(res.error ?? "not_found");
-      }
-      setLoading(false);
-    });
+    getSubmissionAction(tournamentId, participantId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success === true && res.submission) {
+          setSubmission(res.submission);
+        } else {
+          setError(res.error ?? "not_found");
+        }
+      })
+      .catch(() => {
+        // Thrown server action / network failure — distinct from the
+        // `{ success: false }` path above, which the action returns
+        // normally. Without this, a rejection leaves `loading` true
+        // forever and the modal is stuck on "Loading…" until closed and
+        // reopened.
+        if (cancelled) return;
+        setError("load_failed");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -160,7 +173,7 @@ export default function SubmissionModal({
         <DialogBody className="space-y-4">
           {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
           {!loading && error && (
-            <p className="text-sm text-destructive">Couldn't load this submission.</p>
+            <p className="text-sm text-destructive">Couldn't load the submission — try again.</p>
           )}
           {!loading && submission && (
             <>
