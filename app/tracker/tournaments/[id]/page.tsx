@@ -19,7 +19,12 @@ import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
 import { createPairing } from "../../../../utils/tournament/pairingUtilsV2";
 import { buildStateFromSupabase } from "../../../../utils/tournament/stateAdapter";
 import { recomputeTotalsFromHistory } from "../../../../lib/tournament/results";
-import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
+import {
+  loadTournamentDecklistsAction,
+  setResultsPublishedAction,
+  publishTournamentDecklistsAction,
+  type TournamentDecklistRow,
+} from "../actions";
 import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
 import { RegeneratePairingsButton } from "../../../../components/ui/RegeneratePairingsButton";
 import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/ui/UnlockAndRepairDialog";
@@ -270,7 +275,37 @@ export default function TournamentPage({
     setEndTournamentConfirmOpen(true);
   };
 
-  const performEndTournament = async () => {
+  // Called after has_ended is committed, from either end path:
+  //  - Manual end (performEndTournament, below) — honors the confirm
+  //    dialog's checkbox. A single call there covers both of its internal
+  //    branches (the round gets finalized via handleEndRound first when it
+  //    wasn't already completed, but performEndTournament's own update always
+  //    runs after, so hooking it once here is sufficient — no double-fire).
+  //  - Auto end on the final round (TournamentRounds' "End Round" button —
+  //    the common case; most tournaments end this way, not via the admin
+  //    menu) — wired unconditionally with publish=true via the
+  //    onTournamentAutoPublish callback threaded through TournamentTabs,
+  //    since that path has no publish-choice dialog; the host's opt-out
+  //    there is unpublishing afterward from the Publish section.
+  // "No decklists to publish" is NORMAL for events without submissions —
+  // treated as success for the toast, not a failure.
+  const publishOnEnd = async (publish: boolean) => {
+    if (!publish) return;
+    const results = await setResultsPublishedAction(id, true);
+    const decks = await publishTournamentDecklistsAction(
+      id,
+      tournament?.deck_format ?? "Other"
+    );
+    const deckFailure =
+      decks.success === false && decks.error !== "No decklists to publish";
+    if (results.success === false || deckFailure) {
+      showToast("Ended, but publishing failed — use the Publish section.", "warning");
+    } else {
+      showToast("Tournament ended — results published.", "success");
+    }
+  };
+
+  const performEndTournament = async (publish: boolean) => {
     if (!tournament) return;
     setTogglingStatus(true);
 
@@ -315,7 +350,9 @@ export default function TournamentPage({
       if (error) throw error;
       setTournament(data);
       setActiveTab(2); // jump to Standings — the tournament is now complete
-      showToast("Tournament ended successfully!", "success");
+      // Publishing never rolls back the end — it already committed above.
+      await publishOnEnd(publish);
+      if (!publish) showToast("Tournament ended successfully!", "success");
     } catch (error) {
       showToast("Error updating tournament status.", "error");
       console.error("Error updating tournament status:", error);
@@ -901,6 +938,7 @@ export default function TournamentPage({
                     decklistCount={decklists.length}
                     isPublished={tournament.decklists_published || false}
                     currentFormat={tournament.deck_format || null}
+                    resultsPublished={tournament.results_published || false}
                     onPublishChange={() => {
                       fetchTournamentDetails();
                       fetchDecklists();
@@ -969,6 +1007,11 @@ export default function TournamentPage({
               // refresh both so Standings doesn't render stale zeros.
               await Promise.all([fetchTournamentDetails(), fetchParticipants()]);
             }}
+            // Fires only when the FINAL round's End Round button completes the
+            // tournament — the common way tournaments end (no confirm dialog
+            // exists on this path, unlike the admin-menu End Tournament flow),
+            // so it always publishes.
+            onTournamentAutoPublish={() => publishOnEnd(true)}
             onRoundActiveChange={(isActive, roundStartTime) => {
               setIsRoundActive(isActive);
               fetchTournamentDetails();
@@ -1162,8 +1205,8 @@ export default function TournamentPage({
             onOpenChange={setEndTournamentConfirmOpen}
             tournamentName={tournament.name ?? ""}
             isEnding={togglingStatus}
-            onConfirm={async () => {
-              await performEndTournament();
+            onConfirm={async (publish) => {
+              await performEndTournament(publish);
               setEndTournamentConfirmOpen(false);
             }}
           />

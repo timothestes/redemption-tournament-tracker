@@ -38,6 +38,10 @@ interface TournamentTabsProps {
   // AttachDeckDialog for its attach gate.
   tournamentFormat?: string | null;
   onTournamentEnd?: () => void;
+  /** Fired only when the FINAL round's End Round button completes the
+   * tournament (not on every round end, and not on the admin-menu End
+   * Tournament path, which handles its own publish choice separately). */
+  onTournamentAutoPublish?: () => void | Promise<void>;
   setLatestRound: Dispatch<SetStateAction<any>>;
   onRoundActiveChange?: (
     isActive: boolean,
@@ -89,6 +93,7 @@ export default function TournamentTabs({
   tournamentName,
   tournamentFormat,
   onTournamentEnd,
+  onTournamentAutoPublish,
   setLatestRound,
   createPairing,
   matchErrorIndex,
@@ -308,7 +313,10 @@ export default function TournamentTabs({
             isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
             onTournamentEnd={onTournamentEnd}
-            onTournamentEnded={() => setActiveTab(2)} // jump to Standings (index 2) when the tournament finishes
+            onTournamentEnded={() => {
+              setActiveTab(2); // jump to Standings (index 2) when the tournament finishes
+              onTournamentAutoPublish?.();
+            }}
             setLatestRound={setLatestRound}
             createPairing={createPairing}
             matchErrorIndex={matchErrorIndex}
