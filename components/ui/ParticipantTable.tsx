@@ -70,6 +70,10 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
   const [deleteTarget, setDeleteTarget] = useState<Participant | null>(null);
   const [removeBlockTarget, setRemoveBlockTarget] = useState<Participant | null>(null);
   const [submissionTarget, setSubmissionTarget] = useState<Participant | null>(null);
+  // Detaching a player-submitted decklist deletes the immutable submission
+  // record (spec §8) — that needs a confirmation step. Detaching a
+  // host-attached deck (no submission) stays a single click.
+  const [detachSubmissionTarget, setDetachSubmissionTarget] = useState<Participant | null>(null);
   const [toast, setToast] = useState<{
     message: string;
     show: boolean;
@@ -255,7 +259,9 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
             {sub ? sub.cardCount : linkedDeck.deck_card_count}c
           </span>
           <button
-            onClick={() => handleDetachDeck(participant.id)}
+            onClick={() =>
+              sub ? setDetachSubmissionTarget(participant) : handleDetachDeck(participant.id)
+            }
             className="p-1 -m-0.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
             title="Remove deck"
             aria-label={`Remove deck from ${participant.name}`}
@@ -460,6 +466,22 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
         title={deleteTarget ? `Delete ${deleteTarget.name}?` : ""}
         description="This permanently removes them from the tournament."
         confirmLabel="Delete"
+        cancelLabel="Cancel"
+      />
+
+      {/* Detach on a player-submitted row deletes the immutable submission
+          record (spec §8) — unlike a host-attached deck, that needs a
+          confirmation step. */}
+      <ConfirmationDialog
+        open={detachSubmissionTarget !== null}
+        onOpenChange={(open) => { if (!open) setDetachSubmissionTarget(null); }}
+        onConfirm={() => {
+          if (detachSubmissionTarget) handleDetachDeck(detachSubmissionTarget.id);
+        }}
+        variant="destructive"
+        title={detachSubmissionTarget ? `Remove ${detachSubmissionTarget.name}'s deck?` : ""}
+        description="This player submitted this decklist themselves. Removing it deletes their submitted record — this cannot be undone."
+        confirmLabel="Remove deck"
         cancelLabel="Cancel"
       />
 
