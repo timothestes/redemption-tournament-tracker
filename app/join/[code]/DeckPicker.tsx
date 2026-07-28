@@ -72,10 +72,18 @@ export default function DeckPicker({ tournamentFormat, onSelect }: DeckPickerPro
   useEffect(() => {
     if (myDecks !== null) return;
     setMyLoading(true);
-    loadUserDecksAction().then((res) => {
-      setMyLoading(false);
-      setMyDecks(res.success === true ? (res.decks as MyDeck[]) : []);
-    });
+    loadUserDecksAction()
+      .then((res) => {
+        setMyDecks(res.success === true ? (res.decks as MyDeck[]) : []);
+      })
+      .catch(() => {
+        // Network drop: fall back to the same empty state the non-throw
+        // failure path already uses, rather than leaving myLoading stuck.
+        setMyDecks([]);
+      })
+      .finally(() => {
+        setMyLoading(false);
+      });
     // Load once regardless of which tab is active first — cheap and avoids a
     // spinner if the player switches to "My decks" after browsing others.
   }, [myDecks]);
@@ -101,9 +109,15 @@ export default function DeckPicker({ tournamentFormat, onSelect }: DeckPickerPro
     }
     const t = setTimeout(async () => {
       setCommunityLoading(true);
-      const res = await searchDecksForTournamentAction(term);
-      setCommunityLoading(false);
-      if (res.success === true) setCommunityResults(res.decks);
+      try {
+        const res = await searchDecksForTournamentAction(term);
+        if (res.success === true) setCommunityResults(res.decks);
+      } catch {
+        // Network drop: don't leave communityLoading stuck true forever.
+        setCommunityResults([]);
+      } finally {
+        setCommunityLoading(false);
+      }
     }, 300);
     return () => clearTimeout(t);
   }, [communityQuery]);
@@ -123,12 +137,18 @@ export default function DeckPicker({ tournamentFormat, onSelect }: DeckPickerPro
       return;
     }
     setLinkLoading(true);
-    const res = await loadPublicDeckAction(match[1]);
-    setLinkLoading(false);
-    if (res.success === true && res.deck) {
-      setLinkPreview({ id: res.deck.id, name: res.deck.name, format: res.deck.format ?? null });
-    } else {
-      setLinkError(res.error ?? "Couldn't load that deck.");
+    try {
+      const res = await loadPublicDeckAction(match[1]);
+      if (res.success === true && res.deck) {
+        setLinkPreview({ id: res.deck.id, name: res.deck.name, format: res.deck.format ?? null });
+      } else {
+        setLinkError(res.error ?? "Couldn't load that deck.");
+      }
+    } catch {
+      // Network drop: don't leave linkLoading stuck true forever.
+      setLinkError("Something went wrong — try again.");
+    } finally {
+      setLinkLoading(false);
     }
   }
 

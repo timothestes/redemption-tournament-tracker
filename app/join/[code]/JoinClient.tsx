@@ -131,14 +131,20 @@ export default function JoinClient({
   const [result, setResult] = useState<{ res: JoinResult; deckId?: string } | null>(null);
 
   async function refresh() {
-    const fresh = await getJoinInfoAction(code);
-    setInfo(fresh);
-    // A refresh always means the UI is about to reflect a real state
-    // transition (joined, resubmitted, or bounced back to the join form
-    // after a host removal) — any action-result banner from the call that
-    // triggered this refresh (e.g. the transient "already registered —
-    // refreshing…" notice) is now stale and must not persist past it.
-    setResult(null);
+    try {
+      const fresh = await getJoinInfoAction(code);
+      setInfo(fresh);
+      // A refresh always means the UI is about to reflect a real state
+      // transition (joined, resubmitted, or bounced back to the join form
+      // after a host removal) — any action-result banner from the call that
+      // triggered this refresh (e.g. the transient "already registered —
+      // refreshing…" notice) is now stale and must not persist past it.
+      setResult(null);
+    } catch {
+      // Network drop mid-refresh: don't leave a stale "refreshing…" banner
+      // up forever, surface the generic retry message instead.
+      setResult({ res: { success: false, error: "join_failed" } });
+    }
   }
 
   async function handleJoin(e: React.FormEvent) {
@@ -146,24 +152,36 @@ export default function JoinClient({
     if (submitting) return;
     setSubmitting(true);
     const deckId = selectedDeck?.id;
-    const r = await joinTournamentAction(code, { displayName, deckId });
-    setSubmitting(false);
-    setResult({ res: r, deckId });
-    if (r.success === true || (r.success === false && r.error === "already_joined")) {
-      await refresh();
+    try {
+      const r = await joinTournamentAction(code, { displayName, deckId });
+      setResult({ res: r, deckId });
+      if (r.success === true || (r.success === false && r.error === "already_joined")) {
+        await refresh();
+      }
+    } catch {
+      // A thrown server action (network drop — venue wifi on a phone, the
+      // primary environment) must not leave `submitting` stuck true forever.
+      setResult({ res: { success: false, error: "join_failed" }, deckId });
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function handleResubmit(deckId: string) {
     setSubmitting(true);
-    const r = await resubmitDeckAction(code, deckId);
-    setSubmitting(false);
-    setResult({ res: r, deckId });
-    if (r.success === true) {
-      setShowChangeDeck(false);
-      await refresh();
-    } else if (r.error === "not_joined") {
-      await refresh();
+    try {
+      const r = await resubmitDeckAction(code, deckId);
+      setResult({ res: r, deckId });
+      if (r.success === true) {
+        setShowChangeDeck(false);
+        await refresh();
+      } else if (r.error === "not_joined") {
+        await refresh();
+      }
+    } catch {
+      setResult({ res: { success: false, error: "join_failed" }, deckId });
+    } finally {
+      setSubmitting(false);
     }
   }
 
