@@ -99,7 +99,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
     if (frozen) {
       onSubmit([
         {
-          name: buildTournamentName(selected[0], { city: listingCity }),
+          name: buildTournamentName(cleanCategory(selected[0]), { city: listingCity }),
           category: selected[0],
         },
       ]);
@@ -189,7 +189,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
                   Tournament name
                 </span>
                 <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground truncate">
-                  {buildTournamentName(selected[0], { city: listingCity })}
+                  {buildTournamentName(cleanCategory(selected[0]), { city: listingCity })}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Official events use standardized names.
