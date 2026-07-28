@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "./button";
 import { STANDARD_CATEGORIES } from "../../utils/tournament/categoryDefaults";
+import { buildTournamentName, isNameFrozen } from "../../utils/tournament/naming";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,8 @@ interface TournamentFormModalProps {
   // Create one tournament per item. With 0/1 category selected this is a single
   // item carrying the (editable) name; with 2+ it's one auto-named item per type.
   onSubmit: (items: { name: string; category: string | null }[]) => void;
-  defaultName?: string;
+  // City to append to generated names for events hosted from a public listing.
+  listingCity?: string;
   // Categories to offer. Defaults to the standard list when omitted (e.g. an
   // official listing passes its own formats here).
   categoryOptions?: string[];
@@ -25,22 +27,11 @@ interface TournamentFormModalProps {
 // Drop a trailing "- 2P" / "2P" player-count suffix; it reads as clutter.
 const cleanCategory = (label: string) => label.replace(/\s*-?\s*2P$/i, "").trim();
 
-// Build a name like "Jun 29, 2026 Type 1 Tournament" from the selected category.
-const buildAutoName = (type: string) => {
-  if (!type) return "";
-  const date = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date());
-  return `${date} ${type} Tournament`;
-};
-
 const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  defaultName,
+  listingCity,
   categoryOptions,
 }) => {
   const firstCheckboxRef = useRef<HTMLInputElement>(null);
@@ -66,17 +57,19 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
     const initial = options[0] ? [options[0]] : [];
     setSelected(initial);
     setNameTouched(false);
-    // A listing-provided name wins; otherwise auto-build from the first category.
-    setName(defaultName ? defaultName : buildAutoName(initial[0] ?? ""));
+    setName(buildTournamentName(cleanCategory(initial[0] ?? "")));
     requestAnimationFrame(() => {
       firstCheckboxRef.current?.focus();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, defaultName]);
+  }, [isOpen]);
 
   // Creating multiple tournaments at once: each gets an auto-built name, so the
   // single editable name field is replaced by a preview list.
   const isMulti = selected.length >= 2;
+  // A single official category freezes the name to the generated form; only
+  // Unofficial (or no category yet) keeps the field editable.
+  const frozen = selected.length === 1 && isNameFrozen(selected[0]);
 
   const toggleCategory = (value: string) => {
     const next = selected.includes(value)
@@ -84,10 +77,10 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
       : [...selected, value];
     setSelected(next);
     // Keep the single name field in sync while exactly one type is checked and the
-    // host hasn't taken over the name (and we're not preserving a listing name).
-    // Going to 0 or 2+ leaves the field for the host / preview to drive.
-    if (!nameTouched && !defaultName) {
-      if (next.length === 1) setName(buildAutoName(next[0]));
+    // host hasn't taken over the name. Going to 0 or 2+ leaves the field for the
+    // host / preview to drive.
+    if (!nameTouched) {
+      if (next.length === 1) setName(buildTournamentName(cleanCategory(next[0])));
       else if (next.length === 0) setName("");
     }
   };
@@ -95,7 +88,21 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isMulti) {
-      onSubmit(selected.map((c) => ({ name: buildAutoName(c), category: c })));
+      onSubmit(
+        selected.map((c) => ({
+          name: buildTournamentName(cleanCategory(c)),
+          category: c,
+        }))
+      );
+      return;
+    }
+    if (frozen) {
+      onSubmit([
+        {
+          name: buildTournamentName(selected[0], { city: listingCity }),
+          category: selected[0],
+        },
+      ]);
       return;
     }
     const trimmed = name.trim();
@@ -106,7 +113,8 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   const fieldClasses =
     "w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none";
 
-  const canSubmit = isMulti || name.trim().length > 0;
+  const canSubmit =
+    selected.length >= 1 && (isMulti || frozen || name.trim().length > 0);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -165,14 +173,26 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
                     <li
                       key={c}
                       className="text-sm text-foreground truncate"
-                      title={buildAutoName(c)}
+                      title={buildTournamentName(cleanCategory(c))}
                     >
-                      {buildAutoName(c)}
+                      {buildTournamentName(cleanCategory(c))}
                     </li>
                   ))}
                 </ul>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Rename any of them later from the tournaments list.
+                  Official event names are standardized.
+                </p>
+              </div>
+            ) : frozen ? (
+              <div>
+                <span className="block text-xs font-medium text-muted-foreground mb-1">
+                  Tournament name
+                </span>
+                <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground truncate">
+                  {buildTournamentName(selected[0], { city: listingCity })}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Official events use standardized names.
                 </p>
               </div>
             ) : (

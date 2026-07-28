@@ -9,7 +9,7 @@ import { Button } from "../../../components/ui/button";
 import { HiPencil, HiTrash, HiPlus, HiOutlineDesktopComputer } from "react-icons/hi";
 import { useRouter, useSearchParams } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
-import { categoryDefaults } from "../../../utils/tournament/categoryDefaults";
+import { categoryDefaults, requireDecklistsDefault } from "../../../utils/tournament/categoryDefaults";
 import { getFormatDef } from "@/lib/formats";
 
 const supabase = createClient();
@@ -24,7 +24,7 @@ function TournamentsPageInner() {
     useState(false);
   const [currentTournament, setCurrentTournament] = useState(null);
   const [newTournamentName, setNewTournamentName] = useState("");
-  const [prefillName, setPrefillName] = useState("");
+  const [listingCity, setListingCity] = useState("");
   const [fromListingId, setFromListingId] = useState<string | null>(null);
   const [listingFormats, setListingFormats] = useState<string[]>([]);
   const router = useRouter();
@@ -37,10 +37,10 @@ function TournamentsPageInner() {
 
     // Auto-open modal if coming from "Host This Event" on /tournaments
     const listingId = searchParams.get("from_listing");
-    const name = searchParams.get("name");
+    const city = searchParams.get("city");
     const formats = searchParams.get("formats");
-    if (listingId && name) {
-      setPrefillName(name);
+    if (listingId) {
+      setListingCity(city ?? "");
       setFromListingId(listingId);
       setListingFormats(formats ? formats.split("|").filter(Boolean) : []);
       setisAddTournamentModalOpen(true);
@@ -94,6 +94,7 @@ function TournamentsPageInner() {
         // host can still change later in Tournament Settings.
         if (category) {
           row.category = category;
+          row.require_decklists = requireDecklistsDefault(category);
           const defaults = categoryDefaults(category);
           row.deck_format = defaults.deck_format;
           row.max_score = defaults.max_score;
@@ -117,7 +118,6 @@ function TournamentsPageInner() {
             .update({ linked_tournament_id: data[0].id })
             .eq("id", fromListingId);
           setFromListingId(null);
-          setPrefillName("");
           setListingFormats([]);
           // Clean up URL params
           router.replace("/tracker/tournaments", { scroll: false });
@@ -132,9 +132,15 @@ function TournamentsPageInner() {
 
   // Open the create modal pre-targeted at an existing event's listing so the
   // host can add a category that was played later (or skipped on the day).
-  const openHostAnotherCategory = (listingId: string, baseName: string) => {
+  // Names are generated ("Aug 2, 2026 Type 2 Tournament — Wichita"), so the
+  // city is pulled off an existing sibling's name to match the new category's
+  // generated name to the rest of the event. Note: the generated date is
+  // today's, not the original event date — a category added after the fact
+  // carries the date it was created.
+  const openHostAnotherCategory = (listingId: string, group: any[]) => {
     setFromListingId(listingId);
-    setPrefillName(baseName);
+    const city = group[0]?.name?.split(" — ")[1] ?? "";
+    setListingCity(city);
     setListingFormats([]);
     setisAddTournamentModalOpen(true);
   };
@@ -327,13 +333,13 @@ function TournamentsPageInner() {
               setisAddTournamentModalOpen(false);
               if (fromListingId) {
                 setFromListingId(null);
-                setPrefillName("");
+                setListingCity("");
                 setListingFormats([]);
                 router.replace("/tracker/tournaments", { scroll: false });
               }
             }}
             onSubmit={handleAddTournament}
-            defaultName={prefillName}
+            listingCity={listingCity}
             categoryOptions={listingFormats.length > 0 ? listingFormats : undefined}
           />
         </div>
@@ -371,7 +377,7 @@ function TournamentsPageInner() {
                   <Button
                     variant="outline"
                     onClick={() =>
-                      openHostAnotherCategory(listingId, group[0].name)
+                      openHostAnotherCategory(listingId, group)
                     }
                     className="flex items-center gap-1.5 flex-shrink-0 text-xs px-2.5 py-1.5"
                   >
