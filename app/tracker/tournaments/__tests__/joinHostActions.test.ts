@@ -207,11 +207,19 @@ describe("attachDeckToParticipantAction — no-format path", () => {
 
     userClientImpl = makeClient({ tournament_decklists: tournamentDecklists, tournaments });
 
+    const participants = makeNode();
+    participants._resp = { data: { id: "p1" }, error: null }; // participant belongs to t1
+
     const decks = makeNode();
     decks.maybeSingle.mockResolvedValue({ data: deck, error: null });
     const deckCards = makeNode();
     const submissions = makeNode();
-    adminImpl = makeClient({ decks, deck_cards: deckCards, tournament_deck_submissions: submissions });
+    adminImpl = makeClient({
+      participants,
+      decks,
+      deck_cards: deckCards,
+      tournament_deck_submissions: submissions,
+    });
 
     return { decks, deckCards, submissions };
   }
@@ -260,6 +268,60 @@ describe("attachDeckToParticipantAction — no-format path", () => {
     expect(r).toEqual({ success: true });
     expect(deckCards.select).toHaveBeenCalledTimes(1);
     expect(submissions.upsert).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── attachDeckToParticipantAction — participant/tournament scoping ─────
+//
+// requireHost only proves the caller hosts SOME tournament (their own). The
+// admin upsert into tournament_deck_submissions is keyed onConflict:
+// "participant_id" and bypasses RLS entirely, so a hostile host of their
+// own tournament could otherwise pass a victim's participantId (from a
+// DIFFERENT tournament) and repoint/overwrite the victim's submission row.
+// Guard: admin-read the participant scoped to (id, tournament_id) and bail
+// before any write when it doesn't match — same pattern
+// removeParticipantWithBlockAction already uses.
+
+describe("attachDeckToParticipantAction — participant/tournament scoping", () => {
+  it("participantId belongs to a different tournament -> failure, no tournament_decklists or submissions writes", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "host1" } } });
+
+    const tournaments = makeNode();
+    tournaments._resp = { data: { id: "t1" }, error: null }; // requireHost: caller hosts t1
+
+    const tournamentDecklists = makeNode();
+    userClientImpl = makeClient({ tournaments, tournament_decklists: tournamentDecklists });
+
+    const participants = makeNode();
+    // Admin-scoped lookup for (id: "p1", tournament_id: "t1") finds nothing —
+    // p1 actually belongs to a different (victim's) tournament.
+    participants._resp = { data: null, error: null };
+    const submissions = makeNode();
+    adminImpl = makeClient({ participants, tournament_deck_submissions: submissions });
+
+    const r = await attachDeckToParticipantAction("t1", "p1", "some-deck");
+
+    expect(r).toEqual({ success: false, error: "not_found" });
+    expect(participants.eq).toHaveBeenCalledWith("id", "p1");
+    expect(participants.eq).toHaveBeenCalledWith("tournament_id", "t1");
+    expect(tournamentDecklists.select).not.toHaveBeenCalled();
+    expect(tournamentDecklists.insert).not.toHaveBeenCalled();
+    expect(tournamentDecklists.update).not.toHaveBeenCalled();
+    expect(submissions.upsert).not.toHaveBeenCalled();
+  });
+
+  it("non-host -> failure before any participant lookup", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "intruder" } } });
+    const tournaments = makeNode();
+    tournaments._resp = { data: null, error: null }; // RLS: not visible to non-host
+    userClientImpl = makeClient({ tournaments });
+    const adminFrom = vi.fn();
+    adminImpl = { from: adminFrom };
+
+    const r = await attachDeckToParticipantAction("t1", "p1", "some-deck");
+
+    expect(r).toEqual({ success: false, error: "not_found" });
+    expect(adminFrom).not.toHaveBeenCalled();
   });
 });
 

@@ -227,6 +227,27 @@ export async function attachDeckToParticipantAction(
   participantId: string,
   deckId: string
 ) {
+  // Only the tournament's host may attach a deck, and participantId must
+  // actually belong to tournamentId. requireHost alone only proves the
+  // caller hosts SOME tournament (their own) — the admin upsert further
+  // below (onConflict: "participant_id") bypasses RLS entirely, so without
+  // this check a host of tournament T_a could pass a victim's participantId
+  // (participant UUIDs of published tournaments are publicly readable via
+  // migration 017's published-decklists policy) and repoint the victim's
+  // tournament_deck_submissions row at T_a, destroying that immutable
+  // record. Same pattern removeParticipantWithBlockAction already uses.
+  const host = await requireHost(tournamentId);
+  if (!host) return { success: false, error: "not_found" };
+
+  const admin = getSupabaseAdmin();
+  const { data: participant } = await admin
+    .from("participants")
+    .select("id")
+    .eq("id", participantId)
+    .eq("tournament_id", tournamentId)
+    .maybeSingle();
+  if (!participant) return { success: false, error: "not_found" };
+
   const supabase = await createClient();
 
   // Upsert: if participant already has a deck, replace it
@@ -234,6 +255,7 @@ export async function attachDeckToParticipantAction(
     .from("tournament_decklists")
     .select("id")
     .eq("participant_id", participantId)
+    .eq("tournament_id", tournamentId)
     .single();
 
   if (existing) {
@@ -262,83 +284,79 @@ export async function attachDeckToParticipantAction(
   }
 
   // Record a host-side submission snapshot (default-deny table — admin
-  // client, gated on host authority). Best-effort: if the deck turns out to
-  // be private/inaccessible to the host, leave the tournament_decklists
-  // attach above intact and simply skip the snapshot.
-  const host = await requireHost(tournamentId);
-  if (host) {
-    const admin = getSupabaseAdmin();
-    const { data: tournament } = await supabase
-      .from("tournaments")
-      .select("deck_format")
-      .eq("id", tournamentId)
+  // client, host authority already confirmed above). Best-effort: if the
+  // deck turns out to be private/inaccessible to the host, leave the
+  // tournament_decklists attach above intact and simply skip the snapshot.
+  const { data: tournament } = await supabase
+    .from("tournaments")
+    .select("deck_format")
+    .eq("id", tournamentId)
+    .maybeSingle();
+  const format = normalizeTournamentFormat(tournament?.deck_format);
+
+  let snapshot: DeckSnapshot | null = null;
+  let isLegal: boolean | null = null;
+  let issues: DeckCheckIssue[] | null = null;
+
+  if (format === null || format === "Other") {
+    // No declared tournament format -> a legality verdict would be
+    // meaningless, so we can't route this through buildDeckSubmission
+    // (which requires a FormatId). Still snapshot the cards so the host
+    // has a record — but this reads via the ADMIN client, which bypasses
+    // RLS entirely, so we must re-enforce the same access rule
+    // buildDeckSubmission enforces by hand (deckSubmission.ts:47-49):
+    // the requester must own the deck OR it must not be private. Without
+    // this, a host on a no-format tournament could attach ANY deck UUID
+    // (not just ones surfaced by searchDecksForTournamentAction) and read
+    // back a private deck's full card list via the submission snapshot.
+    const { data: deck } = await admin
+      .from("decks")
+      .select("name, user_id, visibility")
+      .eq("id", deckId)
       .maybeSingle();
-    const format = normalizeTournamentFormat(tournament?.deck_format);
-
-    let snapshot: DeckSnapshot | null = null;
-    let isLegal: boolean | null = null;
-    let issues: DeckCheckIssue[] | null = null;
-
-    if (format === null || format === "Other") {
-      // No declared tournament format -> a legality verdict would be
-      // meaningless, so we can't route this through buildDeckSubmission
-      // (which requires a FormatId). Still snapshot the cards so the host
-      // has a record — but this reads via the ADMIN client, which bypasses
-      // RLS entirely, so we must re-enforce the same access rule
-      // buildDeckSubmission enforces by hand (deckSubmission.ts:47-49):
-      // the requester must own the deck OR it must not be private. Without
-      // this, a host on a no-format tournament could attach ANY deck UUID
-      // (not just ones surfaced by searchDecksForTournamentAction) and read
-      // back a private deck's full card list via the submission snapshot.
-      const { data: deck } = await admin
-        .from("decks")
-        .select("name, user_id, visibility")
-        .eq("id", deckId)
-        .maybeSingle();
-      const isOwner = deck?.user_id === host.userId;
-      const isAccessible = !!deck && (isOwner || deck.visibility !== "private");
-      if (isAccessible && deck) {
-        const { data: rows } = await admin
-          .from("deck_cards")
-          .select("card_name, card_set, card_img_file, quantity, zone")
-          .eq("deck_id", deckId)
-          .in("zone", ["main", "reserve"]);
-        snapshot = {
-          deckName: deck.name ?? "Untitled Deck",
-          deckFormat: "",
-          cards: (rows ?? []).map((r: any) => ({
-            name: r.card_name,
-            set: r.card_set,
-            imgFile: r.card_img_file ?? null,
-            quantity: r.quantity,
-            zone: r.zone,
-          })),
-        };
-      }
-    } else {
-      const built = await buildDeckSubmission(admin, deckId, host.userId, format);
-      if (built.success === true) {
-        snapshot = built.snapshot;
-        isLegal = built.isLegal;
-        issues = built.issues;
-      }
+    const isOwner = deck?.user_id === host.userId;
+    const isAccessible = !!deck && (isOwner || deck.visibility !== "private");
+    if (isAccessible && deck) {
+      const { data: rows } = await admin
+        .from("deck_cards")
+        .select("card_name, card_set, card_img_file, quantity, zone")
+        .eq("deck_id", deckId)
+        .in("zone", ["main", "reserve"]);
+      snapshot = {
+        deckName: deck.name ?? "Untitled Deck",
+        deckFormat: "",
+        cards: (rows ?? []).map((r: any) => ({
+          name: r.card_name,
+          set: r.card_set,
+          imgFile: r.card_img_file ?? null,
+          quantity: r.quantity,
+          zone: r.zone,
+        })),
+      };
     }
-
-    if (snapshot) {
-      await admin.from("tournament_deck_submissions").upsert(
-        {
-          tournament_id: tournamentId,
-          participant_id: participantId,
-          deck_id: deckId,
-          submitted_by: host.userId,
-          source: "host",
-          deck_snapshot: snapshot,
-          is_legal: isLegal,
-          deckcheck_issues: issues && issues.length > 0 ? issues : null,
-        },
-        { onConflict: "participant_id" }
-      );
+  } else {
+    const built = await buildDeckSubmission(admin, deckId, host.userId, format);
+    if (built.success === true) {
+      snapshot = built.snapshot;
+      isLegal = built.isLegal;
+      issues = built.issues;
     }
+  }
+
+  if (snapshot) {
+    await admin.from("tournament_deck_submissions").upsert(
+      {
+        tournament_id: tournamentId,
+        participant_id: participantId,
+        deck_id: deckId,
+        submitted_by: host.userId,
+        source: "host",
+        deck_snapshot: snapshot,
+        is_legal: isLegal,
+        deckcheck_issues: issues && issues.length > 0 ? issues : null,
+      },
+      { onConflict: "participant_id" }
+    );
   }
 
   return { success: true };
