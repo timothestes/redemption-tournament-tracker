@@ -43,6 +43,7 @@ import { createClient } from "@/utils/supabase/server";
 import {
   setQrJoinEnabledAction,
   updateJoinSettingsAction,
+  attachDeckToParticipantAction,
   detachDeckFromParticipantAction,
   removeParticipantWithBlockAction,
   recheckAllSubmissionsAction,
@@ -153,6 +154,112 @@ describe("updateJoinSettingsAction", () => {
 
     expect(r).toEqual({ success: true });
     expect(tournaments.update).toHaveBeenCalledWith({ deck_format: "Limited", require_decklists: true });
+  });
+
+  // Regression: "Sealed"/"Draft" normalize to 'Other' via normalizeTournamentFormat,
+  // so comparing raw input against the literal "Other" alone let a caller
+  // bypass the format_required gate by passing "Sealed" instead of "Other" —
+  // persisting exactly the state (require_decklists=true, no real format)
+  // the gate exists to prevent. The whitelist must reject it outright,
+  // regardless of requireDecklists.
+  it("'Sealed' (not the literal 'Other', but normalizes to it) is rejected outright", async () => {
+    const r = await updateJoinSettingsAction("t1", {
+      deckFormat: "Sealed" as any,
+      requireDecklists: true,
+    });
+
+    expect(r).toEqual({ success: false, error: "invalid_format" });
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("junk format string is rejected outright, even with requireDecklists=false", async () => {
+    const r = await updateJoinSettingsAction("t1", {
+      deckFormat: "asdf" as any,
+      requireDecklists: false,
+    });
+
+    expect(r).toEqual({ success: false, error: "invalid_format" });
+    expect(createClient).not.toHaveBeenCalled();
+  });
+});
+
+// ─── attachDeckToParticipantAction — no-format path access control ──────
+//
+// On a tournament with no declared format, host-attach can't route through
+// buildDeckSubmission (it requires a FormatId) and instead reads the deck
+// via the admin client directly. That read bypasses RLS entirely, so it
+// must re-enforce buildDeckSubmission's own access rule by hand: owner OR
+// not-private. Otherwise a host could attach ANY deck UUID — not just ones
+// surfaced by searchDecksForTournamentAction — and read a stranger's
+// private decklist back via the submission snapshot.
+
+describe("attachDeckToParticipantAction — no-format path", () => {
+  function setupNoFormatHost(deck: { name: string; user_id: string; visibility: string }) {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "host1" } } });
+
+    const tournamentDecklists = makeNode();
+    tournamentDecklists._resp = { data: null, error: null }; // no existing row -> insert branch
+
+    const tournaments = makeNode();
+    tournaments.maybeSingle
+      .mockResolvedValueOnce({ data: { id: "t1" }, error: null }) // requireHost
+      .mockResolvedValueOnce({ data: { deck_format: null }, error: null }); // deck_format lookup
+
+    userClientImpl = makeClient({ tournament_decklists: tournamentDecklists, tournaments });
+
+    const decks = makeNode();
+    decks.maybeSingle.mockResolvedValue({ data: deck, error: null });
+    const deckCards = makeNode();
+    const submissions = makeNode();
+    adminImpl = makeClient({ decks, deck_cards: deckCards, tournament_deck_submissions: submissions });
+
+    return { decks, deckCards, submissions };
+  }
+
+  it("private deck owned by someone else -> no card read, no submission upsert", async () => {
+    const { deckCards, submissions } = setupNoFormatHost({
+      name: "Victim's Private Deck",
+      user_id: "victim1",
+      visibility: "private",
+    });
+
+    const r = await attachDeckToParticipantAction("t1", "p1", "victim-deck-1");
+
+    // The attach itself (tournament_decklists) still succeeds — only the
+    // submission-snapshot side effect is blocked.
+    expect(r).toEqual({ success: true });
+    expect(deckCards.select).not.toHaveBeenCalled();
+    expect(submissions.upsert).not.toHaveBeenCalled();
+  });
+
+  it("the host's OWN private deck is still snapshotted", async () => {
+    const { deckCards, submissions } = setupNoFormatHost({
+      name: "My Own Private Deck",
+      user_id: "host1",
+      visibility: "private",
+    });
+    deckCards._resp = { data: [], error: null };
+
+    const r = await attachDeckToParticipantAction("t1", "p1", "own-deck-1");
+
+    expect(r).toEqual({ success: true });
+    expect(deckCards.select).toHaveBeenCalledTimes(1);
+    expect(submissions.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("a public deck owned by someone else is still snapshotted", async () => {
+    const { deckCards, submissions } = setupNoFormatHost({
+      name: "Public Deck",
+      user_id: "someoneElse",
+      visibility: "public",
+    });
+    deckCards._resp = { data: [], error: null };
+
+    const r = await attachDeckToParticipantAction("t1", "p1", "public-deck-1");
+
+    expect(r).toEqual({ success: true });
+    expect(deckCards.select).toHaveBeenCalledTimes(1);
+    expect(submissions.upsert).toHaveBeenCalledTimes(1);
   });
 });
 

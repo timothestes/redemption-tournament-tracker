@@ -6,7 +6,7 @@ import { computeFinalStandings } from "@/lib/tournament/standings";
 import { buildStateFromSupabase } from "@/utils/tournament/stateAdapter";
 import { generateJoinCode } from "@/lib/tournament/joinCodes";
 import { buildDeckSubmission, type DeckSnapshot } from "@/lib/tournament/deckSubmission";
-import { normalizeTournamentFormat, type FormatId } from "@/lib/formats";
+import { normalizeTournamentFormat, FORMAT_IDS, type FormatId } from "@/lib/formats";
 import { checkDeck, type DeckCheckCard, type DeckCheckIssue } from "@/utils/deckcheck";
 
 // System user that owns published tournament deck copies
@@ -281,13 +281,23 @@ export async function attachDeckToParticipantAction(
 
     if (format === null || format === "Other") {
       // No declared tournament format -> a legality verdict would be
-      // meaningless. Still snapshot the cards so the host has a record.
+      // meaningless, so we can't route this through buildDeckSubmission
+      // (which requires a FormatId). Still snapshot the cards so the host
+      // has a record — but this reads via the ADMIN client, which bypasses
+      // RLS entirely, so we must re-enforce the same access rule
+      // buildDeckSubmission enforces by hand (deckSubmission.ts:47-49):
+      // the requester must own the deck OR it must not be private. Without
+      // this, a host on a no-format tournament could attach ANY deck UUID
+      // (not just ones surfaced by searchDecksForTournamentAction) and read
+      // back a private deck's full card list via the submission snapshot.
       const { data: deck } = await admin
         .from("decks")
-        .select("name")
+        .select("name, user_id, visibility")
         .eq("id", deckId)
         .maybeSingle();
-      if (deck) {
+      const isOwner = deck?.user_id === host.userId;
+      const isAccessible = !!deck && (isOwner || deck.visibility !== "private");
+      if (isAccessible && deck) {
         const { data: rows } = await admin
           .from("deck_cards")
           .select("card_name, card_set, card_img_file, quantity, zone")
@@ -410,6 +420,15 @@ export async function updateJoinSettingsAction(
   tournamentId: string,
   s: { deckFormat: FormatId | "Other"; requireDecklists: boolean }
 ): Promise<{ success: boolean; error?: string }> {
+  // The declared type is FormatId | "Other", but nothing stops a caller from
+  // bypassing TS and passing an arbitrary string. normalizeTournamentFormat
+  // maps things like "Sealed"/"Draft" to 'Other' and unrecognized junk to
+  // 'Limited', so comparing the raw input against the literal "Other" below
+  // is only safe once we've confirmed it's actually one of the real ids.
+  const isValidFormat = s.deckFormat === "Other" || (FORMAT_IDS as readonly string[]).includes(s.deckFormat);
+  if (!isValidFormat) {
+    return { success: false, error: "invalid_format" };
+  }
   if (s.requireDecklists === true && s.deckFormat === "Other") {
     return { success: false, error: "format_required" };
   }
