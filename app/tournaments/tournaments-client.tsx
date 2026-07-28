@@ -604,6 +604,12 @@ export default function TournamentsClient({
             {filtered.length} event{filtered.length !== 1 ? "s" : ""} scheduled
             {stateFilter !== "all" ? ` in ${stateFilter}` : ""}
           </p>
+          <Link
+            href="/tournaments/results"
+            className="mt-1 inline-block text-xs text-muted-foreground hover:text-primary hover:underline transition-colors"
+          >
+            Recent results
+          </Link>
         </div>
 
         {/* View toggle */}
