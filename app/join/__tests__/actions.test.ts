@@ -252,13 +252,17 @@ describe("joinTournamentAction", () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
     const admin = makeAdmin({ tournaments: baseTournament() });
     mockAdminImpl = admin;
-    const dirty = "  Tim my" + "x".repeat(50) + "  ";
-    const expected = dirty.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 40);
-    expect(expected.length).toBe(40); // sanity: input really does exceed the cap
+    // Real C0 control chars (BEL, NUL) spliced in on purpose -- the point of
+    // this test is to exercise the strip-control-chars path, not just
+    // trim/slice. "  Tim" + BEL + "my" + NUL + 50 x's + "  "
+    const dirty = "  Tim" + String.fromCharCode(7) + "my" + String.fromCharCode(0) + "x".repeat(50) + "  ";
     const r = await joinTournamentAction(VALID_CODE, { displayName: dirty });
     expect(r).toEqual({ success: true });
     const rpcArgs = admin.rpc.mock.calls[0][1];
-    expect(rpcArgs.p_display_name).toBe(expected);
+    // Literal expected string (not re-derived via the same strip/trim/slice
+    // pipeline as the implementation) so a regression in that pipeline --
+    // including the control-char strip specifically -- actually fails this.
+    expect(rpcArgs.p_display_name).toBe("Timmy" + "x".repeat(35));
   });
 
   it("blank display name after sanitization -> invalid_name", async () => {
