@@ -133,6 +133,12 @@ export default function JoinClient({
   async function refresh() {
     const fresh = await getJoinInfoAction(code);
     setInfo(fresh);
+    // A refresh always means the UI is about to reflect a real state
+    // transition (joined, resubmitted, or bounced back to the join form
+    // after a host removal) — any action-result banner from the call that
+    // triggered this refresh (e.g. the transient "already registered —
+    // refreshing…" notice) is now stale and must not persist past it.
+    setResult(null);
   }
 
   async function handleJoin(e: React.FormEvent) {
