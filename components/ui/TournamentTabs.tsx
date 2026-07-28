@@ -52,6 +52,9 @@ interface TournamentTabsProps {
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
   isHost?: boolean;
+  // participant.user_id -> profiles.username, batched once on the page —
+  // threaded down to ParticipantTable's account-linkage badge.
+  usernames?: Map<string, string>;
   /** Opens the QR Join dialog (mounted at the page level). */
   onOpenQrJoin?: () => void;
   /** "N of M participants have decklists" — only meaningful pre-start when
@@ -96,6 +99,7 @@ export default function TournamentTabs({
   decklists,
   onDecklistsChange,
   isHost = false,
+  usernames,
   onOpenQrJoin,
   decklistSummary,
   numberingMode,
@@ -276,6 +280,9 @@ export default function TournamentTabs({
               decklists={decklists}
               onDecklistsChange={onDecklistsChange}
               numberingMode={numberingMode}
+              usernames={usernames}
+              isHost={isHost}
+              fetchParticipants={fetchParticipants}
             />
           </div>
         )}

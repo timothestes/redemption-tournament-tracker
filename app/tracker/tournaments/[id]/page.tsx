@@ -76,6 +76,7 @@ export default function TournamentPage({
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
+  const [usernames, setUsernames] = useState<Map<string, string>>(new Map());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [qrJoinDialogOpen, setQrJoinDialogOpen] = useState(false);
 
@@ -184,6 +185,28 @@ export default function TournamentPage({
       setLoading(false);
     }
   };
+
+  // Batched profile lookup for the account-linkage badge (Task 9 Step 1) —
+  // one query for every distinct user_id currently on the roster. Profiles
+  // are publicly readable, so this runs on the regular client, not admin.
+  useEffect(() => {
+    const userIds = [...new Set(participants.map((p: any) => p.user_id).filter(Boolean))];
+    if (userIds.length === 0) {
+      setUsernames(new Map());
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("id, username")
+      .in("id", userIds)
+      .then(({ data }) => {
+        const map = new Map<string, string>();
+        for (const p of data ?? []) {
+          if (p.username) map.set(p.id, p.username);
+        }
+        setUsernames(map);
+      });
+  }, [participants]);
 
   const updateParticipant = async () => {
     if (!currentParticipant || !newParticipantName.trim()) return;
@@ -958,6 +981,7 @@ export default function TournamentPage({
             fetchParticipants={fetchParticipants}
             decklists={decklists}
             onDecklistsChange={fetchDecklists}
+            usernames={usernames}
             onOpenQrJoin={() => setQrJoinDialogOpen(true)}
             decklistSummary={decklistSummary}
             onRepairCompleted={() => {
