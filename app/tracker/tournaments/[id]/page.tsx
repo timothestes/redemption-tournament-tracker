@@ -11,6 +11,7 @@ import EditParticipantModal from "../../../../components/ui/EditParticipantModal
 import EditTournamentNameModal from "../../../../components/ui/EditTournamentNameModal";
 import TournamentStartModal from "../../../../components/ui/TournamentStartModal";
 import TournamentTabs from "../../../../components/ui/TournamentTabs";
+import QRJoinDialog from "../../../../components/ui/QRJoinDialog";
 import Breadcrumb from "../../../../components/ui/breadcrumb";
 import ToastNotification from "../../../../components/ui/toast-notification";
 import { createClient } from "../../../../utils/supabase/client";
@@ -76,6 +77,7 @@ export default function TournamentPage({
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [qrJoinDialogOpen, setQrJoinDialogOpen] = useState(false);
 
   // Confirmation dialogs
   const [endTournamentConfirmOpen, setEndTournamentConfirmOpen] = useState(false);
@@ -661,6 +663,13 @@ export default function TournamentPage({
   const isHost = !!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId);
   const numberingMode: "tables" | "seats" =
     tournament?.numbering_mode === "seats" ? "seats" : "tables";
+  // "N of M participants have decklists" — tournament_decklists has at most
+  // one row per participant, so decklists.length is exactly the submitted
+  // count regardless of source (player QR submission or host attach).
+  const decklistSummary =
+    tournament?.require_decklists === true
+      ? { submitted: decklists.length, total: participants.length }
+      : null;
 
   return (
     <div className="flex min-h-screen px-3 sm:px-5 w-full jayden-gradient-bg">
@@ -949,6 +958,8 @@ export default function TournamentPage({
             fetchParticipants={fetchParticipants}
             decklists={decklists}
             onDecklistsChange={fetchDecklists}
+            onOpenQrJoin={() => setQrJoinDialogOpen(true)}
+            decklistSummary={decklistSummary}
             onRepairCompleted={() => {
               fetchParticipants();
               fetchTournamentDetails();
@@ -1108,7 +1119,16 @@ export default function TournamentPage({
           defaultByeDifferential={tournament?.bye_differential}
           defaultStartingTableNumber={tournament?.starting_table_number}
           defaultSoundNotifications={tournament?.sound_notifications}
+          decklistSummary={decklistSummary}
         />
+        {tournament && !tournament.has_started && !tournament.has_ended && (
+          <QRJoinDialog
+            tournament={tournament}
+            isOpen={qrJoinDialogOpen}
+            onClose={() => setQrJoinDialogOpen(false)}
+            onTournamentUpdated={fetchTournamentDetails}
+          />
+        )}
         {tournament && (
           // Typed-confirmation gate — owner explicitly wanted a higher bar
           // than the standard ConfirmationDialog primitive for the only host

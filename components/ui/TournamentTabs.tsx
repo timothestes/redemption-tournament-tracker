@@ -4,7 +4,7 @@ import { Tabs } from "flowbite-react";
 import PodGenerationModal from "./PodGenerationModal";
 import { Dispatch, ReactNode, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
-import { FaGear, FaClipboardList } from "react-icons/fa6";
+import { FaGear, FaClipboardList, FaQrcode } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
 import TournamentSettings from "./TournamentSettings";
 import TournamentRounds from "./TournamentRounds";
@@ -52,6 +52,11 @@ interface TournamentTabsProps {
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
   isHost?: boolean;
+  /** Opens the QR Join dialog (mounted at the page level). */
+  onOpenQrJoin?: () => void;
+  /** "N of M participants have decklists" — only meaningful pre-start when
+   * the tournament requires decklists; null hides the line entirely. */
+  decklistSummary?: { submitted: number; total: number } | null;
   numberingMode: "tables" | "seats";
   onRepairCompleted?: () => void;
   matchesRefreshNonce?: number;
@@ -91,6 +96,8 @@ export default function TournamentTabs({
   decklists,
   onDecklistsChange,
   isHost = false,
+  onOpenQrJoin,
+  decklistSummary,
   numberingMode,
   onRepairCompleted,
   matchesRefreshNonce,
@@ -176,6 +183,21 @@ export default function TournamentTabs({
                 <span className="sm:hidden">Print</span>
               </Button>
             )}
+            {/* QR Join — same eligibility window as the Start button: the
+                join code can only be generated/used before the tournament
+                has started, and it's moot once the event has ended. */}
+            {!tournamentStarted && !tournamentEnded && onOpenQrJoin && (
+              <Button
+                type="button"
+                onClick={onOpenQrJoin}
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+              >
+                <FaQrcode className="w-4 h-4" />
+                <span className="hidden sm:inline">QR Join</span>
+              </Button>
+            )}
             {!tournamentEnded && (
               <div className="relative group">
                 <Button
@@ -218,6 +240,14 @@ export default function TournamentTabs({
             />
           </div>
         </div>
+        {!tournamentStarted && decklistSummary && (
+          <p className="text-sm text-muted-foreground -mt-4 mb-4">
+            <span className="font-medium text-foreground">
+              {decklistSummary.submitted} of {decklistSummary.total}
+            </span>{" "}
+            participants have decklists
+          </p>
+        )}
         {loading ? (
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
