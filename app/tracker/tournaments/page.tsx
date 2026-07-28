@@ -118,6 +118,7 @@ function TournamentsPageInner() {
             .update({ linked_tournament_id: data[0].id })
             .eq("id", fromListingId);
           setFromListingId(null);
+          setListingCity("");
           setListingFormats([]);
           // Clean up URL params
           router.replace("/tracker/tournaments", { scroll: false });
@@ -139,7 +140,10 @@ function TournamentsPageInner() {
   // carries the date it was created.
   const openHostAnotherCategory = (listingId: string, group: any[]) => {
     setFromListingId(listingId);
-    const city = group[0]?.name?.split(" — ")[1] ?? "";
+    // Not every sibling's name necessarily carries a city (Unofficial /
+    // pre-feature names don't), so check the whole group, not just the most
+    // recent one.
+    const city = group.map((t) => t.name?.split(" — ")[1]).find(Boolean) ?? "";
     setListingCity(city);
     setListingFormats([]);
     setisAddTournamentModalOpen(true);
