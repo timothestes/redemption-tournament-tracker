@@ -90,7 +90,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
     if (isMulti) {
       onSubmit(
         selected.map((c) => ({
-          name: buildTournamentName(cleanCategory(c)),
+          name: buildTournamentName(cleanCategory(c), { city: listingCity }),
           category: c,
         }))
       );
@@ -173,9 +173,9 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
                     <li
                       key={c}
                       className="text-sm text-foreground truncate"
-                      title={buildTournamentName(cleanCategory(c))}
+                      title={buildTournamentName(cleanCategory(c), { city: listingCity })}
                     >
-                      {buildTournamentName(cleanCategory(c))}
+                      {buildTournamentName(cleanCategory(c), { city: listingCity })}
                     </li>
                   ))}
                 </ul>
