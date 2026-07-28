@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "./button";
+import { Checkbox } from "./checkbox";
 import {
   Dialog,
   DialogBody,
@@ -18,7 +19,7 @@ interface EndTournamentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tournamentName: string;
-  onConfirm: () => Promise<void> | void;
+  onConfirm: (publish: boolean) => Promise<void> | void;
   isEnding?: boolean;
 }
 
@@ -44,6 +45,9 @@ export function EndTournamentDialog({
   isEnding = false,
 }: EndTournamentDialogProps) {
   const [typed, setTyped] = useState("");
+  // Publishing is opt-out, not opt-in — checked by default so ending a
+  // tournament publishes results + decklists unless the host unchecks it.
+  const [publish, setPublish] = useState(true);
   const matches =
     typed.trim().toLowerCase() === tournamentName.trim().toLowerCase();
   // Only nag once the user has actually typed something — don't yell at
@@ -53,7 +57,10 @@ export function EndTournamentDialog({
   // Reset the input every time the dialog opens so a previous attempt
   // doesn't pre-fill the confirmation gate.
   useEffect(() => {
-    if (open) setTyped("");
+    if (open) {
+      setTyped("");
+      setPublish(true);
+    }
   }, [open]);
 
   return (
@@ -108,6 +115,18 @@ export function EndTournamentDialog({
               enable End tournament.
             </p>
           )}
+          <p className="text-sm text-muted-foreground pt-1">
+            Results and decklists publish automatically when the event ends.
+          </p>
+          <label className="flex items-start gap-2 text-sm">
+            <Checkbox
+              checked={publish}
+              onCheckedChange={(v) => setPublish(v === true)}
+              disabled={isEnding}
+              className="mt-0.5"
+            />
+            <span>Publish results and decklists</span>
+          </label>
         </DialogBody>
         <DialogFooter className="justify-end">
           <Button
@@ -120,7 +139,7 @@ export function EndTournamentDialog({
           <Button
             variant="destructive"
             disabled={!matches || isEnding}
-            onClick={onConfirm}
+            onClick={() => onConfirm(publish)}
           >
             {isEnding ? "Ending…" : "End tournament"}
           </Button>

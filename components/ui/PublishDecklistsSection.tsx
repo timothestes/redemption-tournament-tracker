@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, Globe, Undo2 } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, Globe, Trophy, Undo2 } from "lucide-react";
 import { Button } from "./button";
 import {
   Dialog,
@@ -12,7 +13,11 @@ import {
   DialogBody,
   DialogFooter,
 } from "./dialog";
-import { publishTournamentDecklistsAction, unpublishTournamentDecklistsAction } from "../../app/tracker/tournaments/actions";
+import {
+  publishTournamentDecklistsAction,
+  unpublishTournamentDecklistsAction,
+  setResultsPublishedAction,
+} from "../../app/tracker/tournaments/actions";
 
 interface PublishDecklistsSectionProps {
   tournamentId: string;
@@ -20,6 +25,7 @@ interface PublishDecklistsSectionProps {
   decklistCount: number;
   isPublished: boolean;
   currentFormat: string | null;
+  resultsPublished: boolean;
   onPublishChange: () => void;
 }
 
@@ -29,15 +35,17 @@ export default function PublishDecklistsSection({
   decklistCount,
   isPublished,
   currentFormat,
+  resultsPublished,
   onPublishChange,
 }: PublishDecklistsSectionProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState(currentFormat || "Limited");
   const [publishing, setPublishing] = useState(false);
   const [unpublishing, setUnpublishing] = useState(false);
+  const [togglingResults, setTogglingResults] = useState(false);
 
-  // Don't show if tournament hasn't ended or no decklists attached
-  if (!tournamentEnded || decklistCount === 0) return null;
+  // Don't show if tournament hasn't ended
+  if (!tournamentEnded) return null;
 
   async function handlePublish() {
     setPublishing(true);
@@ -58,53 +66,117 @@ export default function PublishDecklistsSection({
     }
   }
 
+  async function handleToggleResults() {
+    setTogglingResults(true);
+    const result = await setResultsPublishedAction(tournamentId, !resultsPublished);
+    setTogglingResults(false);
+    if (result.success) {
+      onPublishChange();
+    }
+  }
+
+  const resultsRow = resultsPublished ? (
+    <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg">
+      <Trophy className="w-4 h-4 text-primary flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">Results published</p>
+        <Link
+          href={`/tournaments/results/${tournamentId}`}
+          className="text-xs text-primary hover:underline"
+        >
+          View public results page
+        </Link>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleToggleResults}
+        disabled={togglingResults}
+        className="flex-shrink-0 gap-1.5"
+      >
+        <Undo2 className="w-3.5 h-3.5" />
+        {togglingResults ? "Unpublishing..." : "Unpublish"}
+      </Button>
+    </div>
+  ) : (
+    <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 border border-border rounded-lg">
+      <Trophy className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">Results private</p>
+        <p className="text-xs text-muted-foreground">
+          Publish to show final standings on a public results page
+        </p>
+      </div>
+      <Button
+        variant="success"
+        size="sm"
+        onClick={handleToggleResults}
+        disabled={togglingResults}
+        className="flex-shrink-0 gap-1.5"
+      >
+        <Globe className="w-3.5 h-3.5" />
+        {togglingResults ? "Publishing..." : "Publish"}
+      </Button>
+    </div>
+  );
+
+  if (decklistCount === 0) {
+    return <div className="space-y-2">{resultsRow}</div>;
+  }
+
   if (isPublished) {
     return (
-      <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg">
-        <Globe className="w-4 h-4 text-primary flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">
-            {decklistCount} {decklistCount === 1 ? "decklist" : "decklists"} published
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Visible on community decks page · {currentFormat || "Limited"}
-          </p>
+      <div className="space-y-2">
+        {resultsRow}
+        <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg">
+          <Globe className="w-4 h-4 text-primary flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">
+              {decklistCount} {decklistCount === 1 ? "decklist" : "decklists"} published
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Visible on community decks page · {currentFormat || "Limited"}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUnpublish}
+            disabled={unpublishing}
+            className="flex-shrink-0 gap-1.5"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+            {unpublishing ? "Unpublishing..." : "Unpublish"}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleUnpublish}
-          disabled={unpublishing}
-          className="flex-shrink-0 gap-1.5"
-        >
-          <Undo2 className="w-3.5 h-3.5" />
-          {unpublishing ? "Unpublishing..." : "Unpublish"}
-        </Button>
       </div>
     );
   }
 
   return (
     <>
-      <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 border border-border rounded-lg">
-        <BookOpen className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">
-            {decklistCount} {decklistCount === 1 ? "decklist" : "decklists"} attached
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Publish to make them visible on the community decks page
-          </p>
+      <div className="space-y-2">
+        {resultsRow}
+        <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 border border-border rounded-lg">
+          <BookOpen className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">
+              {decklistCount} {decklistCount === 1 ? "decklist" : "decklists"} attached
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Publish to make them visible on the community decks page
+            </p>
+          </div>
+          <Button
+            variant="success"
+            size="sm"
+            onClick={() => setShowDialog(true)}
+            className="flex-shrink-0 gap-1.5"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            Publish All
+          </Button>
         </div>
-        <Button
-          variant="success"
-          size="sm"
-          onClick={() => setShowDialog(true)}
-          className="flex-shrink-0 gap-1.5"
-        >
-          <Globe className="w-3.5 h-3.5" />
-          Publish All
-        </Button>
       </div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

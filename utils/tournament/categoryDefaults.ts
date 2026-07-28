@@ -21,6 +21,7 @@ export const STANDARD_CATEGORIES = [
   "Teams",
   "Type A",
   "Paragon",
+  "Unofficial",
 ] as const;
 
 // Maps a category/format string (from a listing or the standard list) to its
@@ -38,11 +39,28 @@ export function categoryDefaults(category: string): CategoryDefaults {
     return { deck_format: "T2", max_score: 7, round_length: 75 };
   if (c.includes("draft"))
     return { deck_format: "Other", max_score: 5, round_length: 45 };
-  if (c.includes("sealed"))
+  // "Closed Deck - 2 Player" is the official listing term for sealed-product
+  // events (46 prod listing entries) — sealed product, never Limited.
+  if (c.includes("sealed") || c.includes("closed"))
     return { deck_format: "Other", max_score: 5, round_length: 45 };
   if (c.includes("unlimited"))
     return { deck_format: "Unlimited", max_score: 5, round_length: 45 };
+  if (c.includes("unofficial"))
+    return { deck_format: "Other", max_score: 5, round_length: 45 };
   // Type 1 (Limited) and Type A (a Type 1 variant) and anything else default
   // to Limited.
   return { deck_format: "Limited", max_score: 5, round_length: 45 };
+}
+
+/** Whether a decklist is required to QR-join, by category. Derives from the
+ * category's RESOLVED format (so listing strings like "Type 1" count), with
+ * explicit carve-outs: Type A and Teams also resolve to Limited but default
+ * off (Type A construction rules would hard-block at the door; Teams pending
+ * elder details). Hosts can flip per event. */
+export function requireDecklistsDefault(category: string | null): boolean {
+  if (!category) return false;
+  const c = category.toLowerCase();
+  if (c.includes("type a") || c.includes("teams") || c.includes("unofficial")) return false;
+  const fmt = categoryDefaults(category).deck_format;
+  return fmt === "Limited" || fmt === "Unlimited" || fmt === "T2";
 }

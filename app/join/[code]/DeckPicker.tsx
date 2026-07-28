@@ -1,0 +1,279 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Search } from "lucide-react";
+import { loadUserDecksAction, loadPublicDeckAction } from "@/app/decklist/actions";
+import { searchDecksForTournamentAction, type DeckSearchResult } from "@/app/tracker/tournaments/actions";
+import { FORMATS, normalizeFormat, type FormatId } from "@/lib/formats";
+
+interface MyDeck {
+  id: string;
+  name: string;
+  format: string | null;
+}
+
+type Tab = "mine" | "community" | "link";
+
+interface DeckPickerProps {
+  tournamentFormat: FormatId | "Other" | null;
+  onSelect: (deckId: string, deckName: string) => void;
+}
+
+// Compatibility is a sorting hint, not a gate — checkDeck (server-side, on
+// submit) is the real legality check. A Limited deck is compatible with an
+// Unlimited event (pool subset); an ungated tournament (null/'Other') treats
+// everything as compatible.
+function isCompatible(deckFormat: string | null | undefined, tf: FormatId | "Other" | null): boolean {
+  if (tf === null || tf === "Other") return true;
+  const df = normalizeFormat(deckFormat);
+  return df === tf || (tf === "Unlimited" && df === "Limited");
+}
+
+function badgeClasses(format?: string | null) {
+  const id = normalizeFormat(format);
+  const base = "min-w-[2.5rem] flex-shrink-0 text-center inline-block px-1.5 py-0.5 rounded text-xs font-medium";
+  if (id === "T2") return `${base} bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200`;
+  if (id === "Paragon") return `${base} bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200`;
+  return `${base} bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200`;
+}
+
+function DeckRow({
+  name,
+  format,
+  subtitle,
+  onClick,
+}: {
+  name: string;
+  format: string | null | undefined;
+  subtitle?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+    >
+      <span className={badgeClasses(format)}>{FORMATS[normalizeFormat(format)].badge}</span>
+      <span className="min-w-0 flex-1 truncate text-foreground">{name}</span>
+      {subtitle && <span className="flex-shrink-0 text-xs text-muted-foreground">{subtitle}</span>}
+    </button>
+  );
+}
+
+export default function DeckPicker({ tournamentFormat, onSelect }: DeckPickerProps) {
+  const [tab, setTab] = useState<Tab>("mine");
+
+  // My decks
+  const [myDecks, setMyDecks] = useState<MyDeck[] | null>(null);
+  const [myLoading, setMyLoading] = useState(false);
+  const [myQuery, setMyQuery] = useState("");
+
+  useEffect(() => {
+    if (myDecks !== null) return;
+    setMyLoading(true);
+    loadUserDecksAction()
+      .then((res) => {
+        setMyDecks(res.success === true ? (res.decks as MyDeck[]) : []);
+      })
+      .catch(() => {
+        // Network drop: fall back to the same empty state the non-throw
+        // failure path already uses, rather than leaving myLoading stuck.
+        setMyDecks([]);
+      })
+      .finally(() => {
+        setMyLoading(false);
+      });
+    // Load once regardless of which tab is active first — cheap and avoids a
+    // spinner if the player switches to "My decks" after browsing others.
+  }, [myDecks]);
+
+  const filteredMine = (myDecks ?? []).filter((d) =>
+    d.name.toLowerCase().includes(myQuery.trim().toLowerCase())
+  );
+  const compatibleMine = filteredMine.filter((d) => isCompatible(d.format, tournamentFormat));
+  const incompatibleMine = filteredMine.filter((d) => !isCompatible(d.format, tournamentFormat));
+  const otherFormatLabel =
+    tournamentFormat && tournamentFormat !== "Other" ? FORMATS[tournamentFormat].label : "this event's format";
+
+  // Community
+  const [communityQuery, setCommunityQuery] = useState("");
+  const [communityResults, setCommunityResults] = useState<DeckSearchResult[]>([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
+
+  useEffect(() => {
+    const term = communityQuery.trim();
+    if (!term) {
+      setCommunityResults([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setCommunityLoading(true);
+      try {
+        const res = await searchDecksForTournamentAction(term);
+        if (res.success === true) setCommunityResults(res.decks);
+      } catch {
+        // Network drop: don't leave communityLoading stuck true forever.
+        setCommunityResults([]);
+      } finally {
+        setCommunityLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [communityQuery]);
+
+  // Paste a link
+  const [linkInput, setLinkInput] = useState("");
+  const [linkPreview, setLinkPreview] = useState<{ id: string; name: string; format: string | null } | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+
+  async function handleLinkLookup() {
+    setLinkError(null);
+    setLinkPreview(null);
+    const match = linkInput.match(/([0-9a-f-]{36})/i);
+    if (!match) {
+      setLinkError("Paste a deck link or ID.");
+      return;
+    }
+    setLinkLoading(true);
+    try {
+      const res = await loadPublicDeckAction(match[1]);
+      if (res.success === true && res.deck) {
+        setLinkPreview({ id: res.deck.id, name: res.deck.name, format: res.deck.format ?? null });
+      } else {
+        setLinkError(res.error ?? "Couldn't load that deck.");
+      }
+    } catch {
+      // Network drop: don't leave linkLoading stuck true forever.
+      setLinkError("Something went wrong — try again.");
+    } finally {
+      setLinkLoading(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-border">
+      <div className="flex border-b border-border text-sm">
+        {(["mine", "community", "link"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`flex-1 px-3 py-2 font-medium transition-colors ${
+              tab === t
+                ? "border-b-2 border-primary text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t === "mine" ? "My decks" : t === "community" ? "Community" : "Paste a link"}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-3">
+        {tab === "mine" && (
+          <div>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={myQuery}
+                onChange={(e) => setMyQuery(e.target.value)}
+                placeholder="Search your decks..."
+                className="w-full rounded-md border border-border bg-background py-2 pl-8 pr-3 text-sm text-foreground"
+              />
+            </div>
+            {myLoading && <p className="mt-3 text-sm text-muted-foreground">Loading your decks…</p>}
+            {!myLoading && myDecks !== null && filteredMine.length === 0 && (
+              <p className="mt-3 text-sm text-muted-foreground">No decks found.</p>
+            )}
+            <div className="mt-2 max-h-72 space-y-1 overflow-y-auto">
+              {compatibleMine.map((d) => (
+                <DeckRow key={d.id} name={d.name} format={d.format} onClick={() => onSelect(d.id, d.name)} />
+              ))}
+              {incompatibleMine.length > 0 && (
+                <>
+                  <div className="my-2 border-t border-border pt-2 text-xs text-muted-foreground">
+                    Different format
+                  </div>
+                  {incompatibleMine.map((d) => (
+                    <div key={d.id}>
+                      <DeckRow name={d.name} format={d.format} onClick={() => onSelect(d.id, d.name)} />
+                      <p className="pl-3 pb-1 text-xs text-amber-600 dark:text-amber-400">
+                        Different format — will be validated as {otherFormatLabel}
+                      </p>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === "community" && (
+          <div>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={communityQuery}
+                onChange={(e) => setCommunityQuery(e.target.value)}
+                placeholder="Search public decks..."
+                className="w-full rounded-md border border-border bg-background py-2 pl-8 pr-3 text-sm text-foreground"
+              />
+            </div>
+            {communityLoading && <p className="mt-3 text-sm text-muted-foreground">Searching…</p>}
+            {!communityLoading && communityQuery.trim() && communityResults.length === 0 && (
+              <p className="mt-3 text-sm text-muted-foreground">No decks found.</p>
+            )}
+            <div className="mt-2 max-h-72 space-y-1 overflow-y-auto">
+              {communityResults.map((d) => (
+                <DeckRow
+                  key={d.id}
+                  name={d.name}
+                  format={d.format}
+                  subtitle={d.username && d.username !== "You" ? `by ${d.username}` : undefined}
+                  onClick={() => onSelect(d.id, d.name)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "link" && (
+          <div>
+            <div className="flex gap-2">
+              <input
+                value={linkInput}
+                onChange={(e) => {
+                  setLinkInput(e.target.value);
+                  setLinkPreview(null);
+                  setLinkError(null);
+                }}
+                placeholder="Paste a deck link or ID"
+                className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+              />
+              <button
+                type="button"
+                onClick={handleLinkLookup}
+                disabled={linkLoading || !linkInput.trim()}
+                className="flex-shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                {linkLoading ? "Looking up…" : "Find"}
+              </button>
+            </div>
+            {linkError && <p className="mt-2 text-sm text-destructive">{linkError}</p>}
+            {linkPreview && (
+              <div className="mt-3">
+                <DeckRow
+                  name={linkPreview.name}
+                  format={linkPreview.format}
+                  onClick={() => onSelect(linkPreview.id, linkPreview.name)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

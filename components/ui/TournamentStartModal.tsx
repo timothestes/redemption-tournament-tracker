@@ -26,6 +26,10 @@ interface TournamentStartModalProps {
   defaultByeDifferential?: number | null;
   defaultStartingTableNumber?: number | null;
   defaultSoundNotifications?: boolean | null;
+  // "N of M participants have decklists" — same figure shown pre-start under
+  // the Participants toolbar; null/omitted hides the line (tournament doesn't
+  // require decklists).
+  decklistSummary?: { submitted: number; total: number } | null;
 }
 
 export default function TournamentStartModal({
@@ -40,6 +44,7 @@ export default function TournamentStartModal({
   defaultByeDifferential,
   defaultStartingTableNumber,
   defaultSoundNotifications,
+  decklistSummary,
 }: TournamentStartModalProps) {
   const initialRoundLength = defaultRoundLength ?? 45;
   const initialMaxScore = defaultMaxScore ?? 5;
@@ -108,6 +113,14 @@ export default function TournamentStartModal({
         </DialogHeader>
 
         <DialogBody className="space-y-6">
+          {decklistSummary && (
+            <p className="text-sm text-center text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {decklistSummary.submitted} of {decklistSummary.total}
+              </span>{" "}
+              participants have decklists
+            </p>
+          )}
           {/* Number of Rounds */}
           <div className="flex flex-col items-center jayden-gradient-bg rounded-lg border border-border p-5">
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

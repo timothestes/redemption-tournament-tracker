@@ -11,6 +11,7 @@ import EditParticipantModal from "../../../../components/ui/EditParticipantModal
 import EditTournamentNameModal from "../../../../components/ui/EditTournamentNameModal";
 import TournamentStartModal from "../../../../components/ui/TournamentStartModal";
 import TournamentTabs from "../../../../components/ui/TournamentTabs";
+import QRJoinDialog from "../../../../components/ui/QRJoinDialog";
 import Breadcrumb from "../../../../components/ui/breadcrumb";
 import ToastNotification from "../../../../components/ui/toast-notification";
 import { createClient } from "../../../../utils/supabase/client";
@@ -18,7 +19,12 @@ import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
 import { createPairing } from "../../../../utils/tournament/pairingUtilsV2";
 import { buildStateFromSupabase } from "../../../../utils/tournament/stateAdapter";
 import { recomputeTotalsFromHistory } from "../../../../lib/tournament/results";
-import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
+import {
+  loadTournamentDecklistsAction,
+  setResultsPublishedAction,
+  publishTournamentDecklistsAction,
+  type TournamentDecklistRow,
+} from "../actions";
 import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
 import { RegeneratePairingsButton } from "../../../../components/ui/RegeneratePairingsButton";
 import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/ui/UnlockAndRepairDialog";
@@ -75,7 +81,9 @@ export default function TournamentPage({
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
+  const [usernames, setUsernames] = useState<Map<string, string>>(new Map());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [qrJoinDialogOpen, setQrJoinDialogOpen] = useState(false);
 
   // Confirmation dialogs
   const [endTournamentConfirmOpen, setEndTournamentConfirmOpen] = useState(false);
@@ -183,6 +191,28 @@ export default function TournamentPage({
     }
   };
 
+  // Batched profile lookup for the account-linkage badge (Task 9 Step 1) —
+  // one query for every distinct user_id currently on the roster. Profiles
+  // are publicly readable, so this runs on the regular client, not admin.
+  useEffect(() => {
+    const userIds = [...new Set(participants.map((p: any) => p.user_id).filter(Boolean))];
+    if (userIds.length === 0) {
+      setUsernames(new Map());
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("id, username")
+      .in("id", userIds)
+      .then(({ data }) => {
+        const map = new Map<string, string>();
+        for (const p of data ?? []) {
+          if (p.username) map.set(p.id, p.username);
+        }
+        setUsernames(map);
+      });
+  }, [participants]);
+
   const updateParticipant = async () => {
     if (!currentParticipant || !newParticipantName.trim()) return;
     const trimmedSeat = newParticipantSeat.trim();
@@ -245,7 +275,37 @@ export default function TournamentPage({
     setEndTournamentConfirmOpen(true);
   };
 
-  const performEndTournament = async () => {
+  // Called after has_ended is committed, from either end path:
+  //  - Manual end (performEndTournament, below) — honors the confirm
+  //    dialog's checkbox. A single call there covers both of its internal
+  //    branches (the round gets finalized via handleEndRound first when it
+  //    wasn't already completed, but performEndTournament's own update always
+  //    runs after, so hooking it once here is sufficient — no double-fire).
+  //  - Auto end on the final round (TournamentRounds' "End Round" button —
+  //    the common case; most tournaments end this way, not via the admin
+  //    menu) — wired unconditionally with publish=true via the
+  //    onTournamentAutoPublish callback threaded through TournamentTabs,
+  //    since that path has no publish-choice dialog; the host's opt-out
+  //    there is unpublishing afterward from the Publish section.
+  // "No decklists to publish" is NORMAL for events without submissions —
+  // treated as success for the toast, not a failure.
+  const publishOnEnd = async (publish: boolean) => {
+    if (!publish) return;
+    const results = await setResultsPublishedAction(id, true);
+    const decks = await publishTournamentDecklistsAction(
+      id,
+      tournament?.deck_format ?? "Other"
+    );
+    const deckFailure =
+      decks.success === false && decks.error !== "No decklists to publish";
+    if (results.success === false || deckFailure) {
+      showToast("Ended, but publishing failed — use the Publish section.", "warning");
+    } else {
+      showToast("Tournament ended — results published.", "success");
+    }
+  };
+
+  const performEndTournament = async (publish: boolean) => {
     if (!tournament) return;
     setTogglingStatus(true);
 
@@ -290,7 +350,9 @@ export default function TournamentPage({
       if (error) throw error;
       setTournament(data);
       setActiveTab(2); // jump to Standings — the tournament is now complete
-      showToast("Tournament ended successfully!", "success");
+      // Publishing never rolls back the end — it already committed above.
+      await publishOnEnd(publish);
+      if (!publish) showToast("Tournament ended successfully!", "success");
     } catch (error) {
       showToast("Error updating tournament status.", "error");
       console.error("Error updating tournament status:", error);
@@ -661,6 +723,13 @@ export default function TournamentPage({
   const isHost = !!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId);
   const numberingMode: "tables" | "seats" =
     tournament?.numbering_mode === "seats" ? "seats" : "tables";
+  // "N of M participants have decklists" — tournament_decklists has at most
+  // one row per participant, so decklists.length is exactly the submitted
+  // count regardless of source (player QR submission or host attach).
+  const decklistSummary =
+    tournament?.require_decklists === true
+      ? { submitted: decklists.length, total: participants.length }
+      : null;
 
   return (
     <div className="flex min-h-screen px-3 sm:px-5 w-full jayden-gradient-bg">
@@ -869,6 +938,7 @@ export default function TournamentPage({
                     decklistCount={decklists.length}
                     isPublished={tournament.decklists_published || false}
                     currentFormat={tournament.deck_format || null}
+                    resultsPublished={tournament.results_published || false}
                     onPublishChange={() => {
                       fetchTournamentDetails();
                       fetchDecklists();
@@ -937,6 +1007,11 @@ export default function TournamentPage({
               // refresh both so Standings doesn't render stale zeros.
               await Promise.all([fetchTournamentDetails(), fetchParticipants()]);
             }}
+            // Fires only when the FINAL round's End Round button completes the
+            // tournament — the common way tournaments end (no confirm dialog
+            // exists on this path, unlike the admin-menu End Tournament flow),
+            // so it always publishes.
+            onTournamentAutoPublish={() => publishOnEnd(true)}
             onRoundActiveChange={(isActive, roundStartTime) => {
               setIsRoundActive(isActive);
               fetchTournamentDetails();
@@ -949,6 +1024,9 @@ export default function TournamentPage({
             fetchParticipants={fetchParticipants}
             decklists={decklists}
             onDecklistsChange={fetchDecklists}
+            usernames={usernames}
+            onOpenQrJoin={() => setQrJoinDialogOpen(true)}
+            decklistSummary={decklistSummary}
             onRepairCompleted={() => {
               fetchParticipants();
               fetchTournamentDetails();
@@ -1108,7 +1186,16 @@ export default function TournamentPage({
           defaultByeDifferential={tournament?.bye_differential}
           defaultStartingTableNumber={tournament?.starting_table_number}
           defaultSoundNotifications={tournament?.sound_notifications}
+          decklistSummary={decklistSummary}
         />
+        {tournament && !tournament.has_started && !tournament.has_ended && (
+          <QRJoinDialog
+            tournament={tournament}
+            isOpen={qrJoinDialogOpen}
+            onClose={() => setQrJoinDialogOpen(false)}
+            onTournamentUpdated={fetchTournamentDetails}
+          />
+        )}
         {tournament && (
           // Typed-confirmation gate — owner explicitly wanted a higher bar
           // than the standard ConfirmationDialog primitive for the only host
@@ -1118,8 +1205,8 @@ export default function TournamentPage({
             onOpenChange={setEndTournamentConfirmOpen}
             tournamentName={tournament.name ?? ""}
             isEnding={togglingStatus}
-            onConfirm={async () => {
-              await performEndTournament();
+            onConfirm={async (publish) => {
+              await performEndTournament(publish);
               setEndTournamentConfirmOpen(false);
             }}
           />
