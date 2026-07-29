@@ -29,6 +29,7 @@ function TournamentsPageInner() {
   const [fromListingId, setFromListingId] = useState<string | null>(null);
   const [listingFormats, setListingFormats] = useState<string[]>([]);
   const [listingTier, setListingTier] = useState<string | null>(null);
+  const [listingState, setListingState] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -45,8 +46,10 @@ function TournamentsPageInner() {
     // Regional"); normalizeTier collapses it onto a canonical tier, or null if
     // it's something we don't recognize.
     const type = searchParams.get("type");
+    const state = searchParams.get("state");
     if (listingId) {
       setListingCity(city ?? "");
+      setListingState(state);
       setFromListingId(listingId);
       setListingFormats(formats ? formats.split("|").filter(Boolean) : []);
       setListingTier(normalizeTier(type));
@@ -74,7 +77,13 @@ function TournamentsPageInner() {
   // creates one per checked type in a single insert; when hosting from a listing
   // they share its listing_id and group under one event card.
   const handleAddTournament = async (
-    items: { name: string; category: string | null; tier: string | null }[]
+    items: {
+      name: string;
+      category: string | null;
+      tier: string | null;
+      city: string | null;
+      state: string | null;
+    }[]
   ) => {
     if (items.length === 0) return;
     try {
@@ -94,10 +103,12 @@ function TournamentsPageInner() {
         return;
       }
 
-      const rows = items.map(({ name, category, tier }) => {
+      const rows = items.map(({ name, category, tier, city, state }) => {
         const row: Record<string, unknown> = { name, host_id: user.id };
         if (fromListingId) row.listing_id = fromListingId;
         if (tier) row.tier = tier;
+        if (city) row.city = city;
+        if (state) row.state = state;
         // A chosen category records the format and pre-fills sensible settings the
         // host can still change later in Tournament Settings.
         if (category) {
@@ -129,6 +140,7 @@ function TournamentsPageInner() {
           setListingCity("");
           setListingFormats([]);
           setListingTier(null);
+          setListingState(null);
           // Clean up URL params
           router.replace("/tracker/tournaments", { scroll: false });
         }
@@ -142,22 +154,18 @@ function TournamentsPageInner() {
 
   // Open the create modal pre-targeted at an existing event's listing so the
   // host can add a category that was played later (or skipped on the day).
-  // Names are generated ("Aug 2, 2026 Type 2 Tournament — Wichita"), so the
-  // city is pulled off an existing sibling's name to match the new category's
-  // generated name to the rest of the event. Note: the generated date is
-  // today's, not the original event date — a category added after the fact
-  // carries the date it was created.
+  // Tier and location are inherited from the siblings so the new category's
+  // generated name matches the rest of the event. Not every sibling
+  // necessarily has them set, so scan the whole group rather than just the
+  // most recent one. Note: the generated date is today's, not the original
+  // event date — a category added after the fact carries the date it was
+  // created.
   const openHostAnotherCategory = (listingId: string, group: any[]) => {
     setFromListingId(listingId);
-    // Not every sibling's name necessarily carries a city (Unofficial /
-    // pre-feature names don't), so check the whole group, not just the most
-    // recent one.
-    const city = group.map((t) => t.name?.split(" — ")[1]).find(Boolean) ?? "";
-    setListingCity(city);
-    setListingFormats([]);
-    // Same reasoning as the city: inherit the tier its siblings carry so the
-    // late-added category's generated name matches the rest of the event.
+    setListingCity(group.map((t) => t.city).find(Boolean) ?? "");
+    setListingState(group.map((t) => t.state).find(Boolean) ?? null);
     setListingTier(group.map((t) => t.tier).find(Boolean) ?? null);
+    setListingFormats([]);
     setisAddTournamentModalOpen(true);
   };
 
@@ -352,12 +360,14 @@ function TournamentsPageInner() {
                 setListingCity("");
                 setListingFormats([]);
                 setListingTier(null);
+                setListingState(null);
                 router.replace("/tracker/tournaments", { scroll: false });
               }
             }}
             onSubmit={handleAddTournament}
             listingCity={listingCity}
             categoryOptions={listingFormats.length > 0 ? listingFormats : undefined}
+            listingState={listingState}
             defaultTier={listingTier}
           />
         </div>

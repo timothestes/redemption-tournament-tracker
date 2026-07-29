@@ -7,6 +7,7 @@ import { createClient } from "../../utils/supabase/client";
 import { FORMAT_IDS, normalizeTournamentFormat, type FormatId } from "../../lib/formats";
 import { STANDARD_CATEGORIES } from "../../utils/tournament/categoryDefaults";
 import { TOURNAMENT_TIERS } from "../../utils/tournament/tiers";
+import { US_STATES } from "../../utils/tournament/usStates";
 import { planEventTypeChange, type EventTypePlan } from "../../utils/tournament/eventType";
 import { getJoinStatsAction } from "../../app/tracker/tournaments/actions";
 
@@ -27,6 +28,8 @@ interface TournamentInfo {
   name: string;
   tier: string | null;
   category: string | null;
+  city: string | null;
+  state: string | null;
   deck_format: string | null;
   require_decklists: boolean | null;
   created_at: string;
@@ -56,6 +59,8 @@ const EMPTY_INFO: TournamentInfo = {
   name: "",
   tier: null,
   category: null,
+  city: null,
+  state: null,
   deck_format: null,
   require_decklists: null,
   created_at: new Date(0).toISOString(),
@@ -92,6 +97,8 @@ export default function TournamentSettings({
   // cascade into name/format/derived settings is computed rather than typed.
   const [tier, setTier] = useState<string>("");
   const [category, setCategory] = useState<string>("");
+  const [city, setCity] = useState<string>("");
+  const [state, setState] = useState<string>("");
   const [unofficialFormat, setUnofficialFormat] = useState<FormatId | "Other">("Other");
 
   const suggestedRounds = suggestNumberOfRounds(participantCount);
@@ -104,7 +111,7 @@ export default function TournamentSettings({
       const { data, error } = await client
         .from("tournaments")
         .select(
-          "n_rounds, current_round, round_length, max_score, bye_points, bye_differential, starting_table_number, sound_notifications, has_started, has_ended, numbering_mode, name, tier, category, deck_format, require_decklists, created_at",
+          "n_rounds, current_round, round_length, max_score, bye_points, bye_differential, starting_table_number, sound_notifications, has_started, has_ended, numbering_mode, name, tier, category, city, state, deck_format, require_decklists, created_at",
         )
         .eq("id", tournamentId)
         .single();
@@ -118,6 +125,8 @@ export default function TournamentSettings({
       setSavedInfo(data);
       setTier(data.tier ?? "");
       setCategory(data.category ?? "");
+      setCity(data.city ?? "");
+      setState(data.state ?? "");
       setUnofficialFormat(normalizeTournamentFormat(data.deck_format) ?? "Other");
 
       // Only used to warn that changing the format leaves existing deck-check
@@ -155,10 +164,14 @@ export default function TournamentSettings({
 
   const savedTier = savedInfo.tier ?? "";
   const savedCategory = savedInfo.category ?? "";
+  const savedCity = savedInfo.city ?? "";
+  const savedState = savedInfo.state ?? "";
   const savedUnofficialFormat = normalizeTournamentFormat(savedInfo.deck_format) ?? "Other";
   const eventTypeDirty =
     tier !== savedTier ||
     category !== savedCategory ||
+    city.trim() !== savedCity ||
+    state !== savedState ||
     (category === "Unofficial" && unofficialFormat !== savedUnofficialFormat);
 
   // The same plan drives the preview and the persisted patch, so what the host
@@ -171,6 +184,8 @@ export default function TournamentSettings({
         name: savedInfo.name,
         tier: savedInfo.tier,
         category: savedInfo.category,
+        city: savedInfo.city,
+        state: savedInfo.state,
         deck_format: savedInfo.deck_format,
         // Pending edits count as host overrides: a round length just changed by
         // hand shouldn't be re-seeded out from under them.
@@ -182,6 +197,8 @@ export default function TournamentSettings({
       {
         tier: tier || null,
         category,
+        city: city.trim() || null,
+        state: state || null,
         unofficialFormat: category === "Unofficial" ? unofficialFormat : undefined,
       },
       { maxScoreLocked },
@@ -193,6 +210,8 @@ export default function TournamentSettings({
     tournamentInfo.max_score,
     tournamentInfo.round_length,
     tier,
+    city,
+    state,
     unofficialFormat,
     maxScoreLocked,
   ]);
@@ -219,9 +238,12 @@ export default function TournamentSettings({
     if (plan) {
       Object.assign(patch, plan as Partial<TournamentInfo>);
     } else if (eventTypeDirty) {
-      // Tier changed on a tournament that has no category. There's nothing to
-      // cascade from and no frozen name to regenerate — just write the tier.
+      // Tier or location changed on a tournament that has no category. There's
+      // nothing to cascade from and no frozen name to regenerate — just write
+      // the fields themselves.
       patch.tier = tier || null;
+      patch.city = city.trim() || null;
+      patch.state = state || null;
     }
     if (Object.keys(patch).length === 0) return;
 
@@ -267,6 +289,15 @@ export default function TournamentSettings({
     savedCategory && !STANDARD_CATEGORIES.includes(savedCategory as never)
       ? [savedCategory, ...STANDARD_CATEGORIES]
       : [...STANDARD_CATEGORIES];
+
+  // Same guard for state: the column is free text, so a value the US list
+  // doesn't cover (an international event, a scraper oddity) must survive
+  // opening this page rather than being silently blanked.
+  const stateCodes = US_STATES.map((s) => s.code);
+  const stateOptions =
+    savedState && !stateCodes.includes(savedState)
+      ? [savedState, ...stateCodes]
+      : stateCodes;
 
   return (
     <div className="w-full max-w-[800px] mx-auto">
@@ -379,6 +410,42 @@ export default function TournamentSettings({
                   {categoryOptions.map((c) => (
                     <option key={c} value={c}>
                       {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-4">
+              <label className="block">
+                <span className="text-sm font-medium text-foreground mb-1.5 block">
+                  City
+                </span>
+                <input
+                  type="text"
+                  value={city}
+                  maxLength={60}
+                  placeholder="Optional"
+                  onChange={(e) => setCity(e.target.value)}
+                  disabled={editingDisabled}
+                  className={inputClasses}
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-foreground mb-1.5 block">
+                  State
+                </span>
+                <select
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  disabled={editingDisabled}
+                  className={inputClasses}
+                >
+                  <option value="">—</option>
+                  {stateOptions.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
                     </option>
                   ))}
                 </select>

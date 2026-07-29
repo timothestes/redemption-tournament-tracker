@@ -1,20 +1,22 @@
 import { FormatId, normalizeTournamentFormat } from "../../lib/formats";
 import { categoryDefaults, requireDecklistsDefault } from "./categoryDefaults";
-import { buildTournamentName, isNameFrozen } from "./naming";
+import { buildTournamentName, formatLocation, isNameFrozen } from "./naming";
 
-// An event's "type" is two orthogonal things: its sanctioning tier (Regional,
-// State, …) and its category/format (Type 2, Paragon, …). Changing either
-// cascades into the frozen name; changing the category also cascades into the
-// settings derived from it. One rule governs that cascade: derived values the
-// host never overrode follow the new category; anything the host changed stays
-// put. Kept pure so the Settings preview and the persisted patch are computed
-// by the same code and can't disagree.
+// An event's "type" is a few orthogonal things: its sanctioning tier (Regional,
+// State, …), its category/format (Type 2, Paragon, …), and where it's held.
+// Changing any of them cascades into the frozen name; changing the category
+// also cascades into the settings derived from it. One rule governs that
+// cascade: derived values the host never overrode follow the new category;
+// anything the host changed stays put. Kept pure so the Settings preview and
+// the persisted patch are computed by the same code and can't disagree.
 
 export interface EventTypeCurrent {
   name: string;
   tier: string | null;
   category: string | null;
   deck_format: string | null;
+  city: string | null;
+  state: string | null;
   max_score: number | null;
   round_length: number | null;
   require_decklists: boolean | null;
@@ -24,6 +26,8 @@ export interface EventTypeCurrent {
 export interface EventTypeNext {
   tier: string | null;
   category: string;
+  city: string | null;
+  state: string | null;
   /** Read only when category is "Unofficial" — the one case with no category to derive a format from. */
   unofficialFormat?: FormatId | "Other";
 }
@@ -32,42 +36,41 @@ export interface EventTypePlan {
   tier: string | null;
   category: string;
   deck_format: FormatId | "Other";
+  city: string | null;
+  state: string | null;
   name?: string;
   max_score?: number;
   round_length?: number;
   require_decklists?: boolean;
 }
 
-// "{Mon D, YYYY} {subject} Tournament[ — {City}]" — the frozen form from
-// buildTournamentName, where subject is the tier and category together. Only
-// the date and city are read back out; tier and category come from columns, so
-// there's no need to disambiguate them inside the subject.
+// The leading "{Mon D, YYYY}" of a generated name. Only the date is read back
+// out — tier, category, city and state all come from columns now, so the rest
+// of the name is rebuilt rather than parsed.
 //
 // Capturing the date rather than reformatting it matters: created_at is UTC
 // while the stored name was generated in the host's timezone (created_at
 // 2026-07-29T01:15Z on an event named "Jul 28, 2026 …"), so reformatting would
 // shift the date by a day.
-const FROZEN_NAME_RE = /^(.+?, \d{4}) (.+) Tournament(?: — (.+))?$/;
+const NAME_DATE_RE = /^(.+?, \d{4}) /;
 
 export function renameForEventType(
   currentName: string,
-  next: { tier: string | null; category: string },
+  next: { tier: string | null; category: string; city: string | null; state: string | null },
   createdAt: string
 ): string {
   const subject = [next.tier, next.category].filter(Boolean).join(" ");
-  const m = currentName.match(FROZEN_NAME_RE);
+  const location = formatLocation(next.city, next.state);
+  const m = currentName.match(NAME_DATE_RE);
   if (m) {
-    const [, date, , city] = m;
-    return `${date} ${subject} Tournament${city ? ` — ${city}` : ""}`;
+    return `${m[1]} ${subject} Tournament${location ? ` — ${location}` : ""}`;
   }
   // Free-form name (an Unofficial event being promoted to an official
-  // category). Rebuild from the creation date, keeping any city suffix.
-  const city = currentName.includes(" — ")
-    ? currentName.split(" — ").slice(1).join(" — ")
-    : undefined;
+  // category) — nothing to salvage, so build the whole thing.
   return buildTournamentName(next.category, {
     date: new Date(createdAt),
-    city,
+    city: next.city,
+    state: next.state,
     tier: next.tier,
   });
 }
@@ -91,14 +94,18 @@ export function planEventTypeChange(
       ? next.unofficialFormat ?? normalizeTournamentFormat(current.deck_format) ?? "Other"
       : nextDefaults.deck_format;
 
+  // City and state aren't derived from anything — they're whatever the host
+  // set — so they pass straight through and only affect the name.
   const plan: EventTypePlan = {
     tier: next.tier,
     category: next.category,
     deck_format: deckFormat,
+    city: next.city,
+    state: next.state,
   };
 
   // Only official categories have a frozen name to regenerate — an Unofficial
-  // event's name is the host's own, tier change or not.
+  // event's name is the host's own, wherever it's held.
   if (isNameFrozen(next.category)) {
     const name = renameForEventType(current.name, next, current.created_at);
     if (name !== current.name) plan.name = name;
