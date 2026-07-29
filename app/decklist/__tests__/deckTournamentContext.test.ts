@@ -133,6 +133,12 @@ describe("loadDeckTournamentContext", () => {
     const ctx = await loadDeckTournamentContext("d1");
     expect(ctx?.results_published).toBe(false);
     expect(ctx?.tournament_name).toBe("Nationals 2026");
+    // Standings the host chose NOT to publish must not ride along on a
+    // published decklist. Placement survives — it's already baked into the
+    // published copy's name — but the record exists nowhere else.
+    expect(ctx?.match_points).toBeNull();
+    expect(ctx?.differential).toBeNull();
+    expect(ctx?.placement).toBe(1);
   });
 
   it("degrades to null instead of throwing when the admin client is unavailable", async () => {

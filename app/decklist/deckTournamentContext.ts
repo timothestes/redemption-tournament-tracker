@@ -68,6 +68,14 @@ export async function loadDeckTournamentContext(
     ]);
 
     const participant = participantResult.data;
+    // Decklists and results publish independently, so `decklists_published`
+    // alone doesn't license the standings. Placement is already public either
+    // way — publishTournamentDecklistsAction bakes it into the copy's name
+    // ("Kevin - 1st Place - Nationals 2026") — but match points and
+    // differential exist nowhere else, so a host who published decks while
+    // keeping standings private must not have them leak out here. Withheld at
+    // the loader, not the view, so they never reach the browser at all.
+    const resultsPublished = tournament.results_published === true;
 
     return {
       tournament_id: tournament.id,
@@ -75,11 +83,11 @@ export async function loadDeckTournamentContext(
       category: tournament.category ?? null,
       deck_format: normalizeTournamentFormat(tournament.deck_format),
       ended_at: tournament.ended_at ?? null,
-      results_published: tournament.results_published === true,
+      results_published: resultsPublished,
       placement: participant?.place ?? null,
       player_name: participant?.name ?? null,
-      match_points: participant?.match_points ?? null,
-      differential: participant?.differential ?? null,
+      match_points: resultsPublished ? participant?.match_points ?? null : null,
+      differential: resultsPublished ? participant?.differential ?? null : null,
       participant_count: countResult.count ?? 0,
     };
   } catch (error) {
