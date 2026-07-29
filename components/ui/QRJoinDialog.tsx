@@ -18,7 +18,8 @@ import {
   getJoinStatsAction,
 } from "../../app/tracker/tournaments/actions";
 import { FORMAT_IDS, normalizeTournamentFormat, type FormatId } from "../../lib/formats";
-import { requireDecklistsDefault } from "../../utils/tournament/categoryDefaults";
+import { categoryDefaults, requireDecklistsDefault } from "../../utils/tournament/categoryDefaults";
+import { isNameFrozen } from "../../utils/tournament/naming";
 
 // Only the columns this dialog reads/writes — callers pass the full
 // tournament row (typed `any` at the page level), which satisfies this shape.
@@ -55,6 +56,15 @@ function friendlyError(code: string): string {
 }
 
 function initialFormat(tournament: QRJoinTournament): FormatId | "Other" {
+  // Official categories freeze the event name (e.g. "… Type 1 Unlimited
+  // Tournament"), so the format is implied by the category itself. Derive it
+  // from the category — not the stored deck_format, which an earlier edit
+  // could have drifted from the name — so what the host sees and what the
+  // deck-check enforces always agree with the name. Only free-form
+  // "Unofficial" events keep a stored, host-chosen format.
+  if (isNameFrozen(tournament.category)) {
+    return categoryDefaults(tournament.category as string).deck_format;
+  }
   return normalizeTournamentFormat(tournament.deck_format) ?? "Other";
 }
 
@@ -75,6 +85,9 @@ export default function QRJoinDialog({
   onTournamentUpdated,
 }: QRJoinDialogProps) {
   const enabled = !!tournament.code;
+  // Official events derive their format from the category (which also freezes
+  // the name), so the host can't edit it into a name/format contradiction.
+  const formatLocked = isNameFrozen(tournament.category);
 
   const [deckFormat, setDeckFormat] = useState<FormatId | "Other">(() => initialFormat(tournament));
   const [requireDecklists, setRequireDecklists] = useState<boolean>(() =>
@@ -287,22 +300,32 @@ export default function QRJoinDialog({
           )}
 
           <div className="space-y-4">
-            <label className="block">
-              <span className="text-sm font-medium text-foreground mb-1.5 block">Format</span>
-              <select
-                value={deckFormat}
-                onChange={(e) => handleFormatChange(e.target.value as FormatId | "Other")}
-                disabled={saving}
-                className={selectClasses}
-              >
-                {FORMAT_IDS.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
-                <option value="Other">Other</option>
-              </select>
-            </label>
+            {formatLocked ? (
+              <div>
+                <span className="text-sm font-medium text-foreground mb-1.5 block">Format</span>
+                <div className="w-full flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-2.5">
+                  <span className="font-medium text-foreground">{deckFormat}</span>
+                  <span className="text-xs text-muted-foreground">Set by the event category</span>
+                </div>
+              </div>
+            ) : (
+              <label className="block">
+                <span className="text-sm font-medium text-foreground mb-1.5 block">Format</span>
+                <select
+                  value={deckFormat}
+                  onChange={(e) => handleFormatChange(e.target.value as FormatId | "Other")}
+                  disabled={saving}
+                  className={selectClasses}
+                >
+                  {FORMAT_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {id}
+                    </option>
+                  ))}
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+            )}
 
             <label
               className={`flex items-start gap-3 rounded-lg border border-border bg-background p-3 transition-colors ${

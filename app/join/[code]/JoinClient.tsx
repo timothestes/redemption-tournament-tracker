@@ -11,17 +11,24 @@ import {
   type JoinInfo,
   type JoinResult,
 } from "../actions";
-import { FORMATS } from "@/lib/formats";
 
 type JoinedState = Extract<JoinInfo, { success: true }>;
 type FailedResult = Extract<JoinResult, { success: false }>;
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="mx-auto max-w-md px-4 py-8">{children}</main>;
+  // Centered card over the full-screen hero background: without the vertical
+  // centering the content clings to the top of an otherwise-empty immersive
+  // backdrop, and without the panel it reads as bare text floating on art.
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card/80 p-6 shadow-xl backdrop-blur-md sm:p-8">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 function EventHeader({ info }: { info: JoinedState }) {
-  const badge = info.deckFormat ? FORMATS[info.deckFormat]?.badge : undefined;
   return (
     <div className="mb-6 text-center">
       <h1 className="font-cinzel text-2xl font-bold text-foreground sm:text-3xl">
@@ -29,11 +36,6 @@ function EventHeader({ info }: { info: JoinedState }) {
       </h1>
       <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
         {info.category && <span>{info.category}</span>}
-        {badge && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground">
-            {badge}
-          </span>
-        )}
         {info.hostName && <span>Hosted by {info.hostName}</span>}
       </div>
     </div>
@@ -237,7 +239,7 @@ export default function JoinClient({
     return (
       <Shell>
         <EventHeader info={info} />
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-lg border border-border bg-background/40 p-4">
           <p className="text-sm text-muted-foreground">Registered as</p>
           <p className="text-lg font-medium text-foreground">{joined.displayName}</p>
 
