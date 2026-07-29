@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { deleteTestUserByEmail } from "./deleteUser";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -64,19 +65,9 @@ export async function seedTournamentWithCompletedRound1(): Promise<SeededTournam
 
 export async function cleanupTournament(seed: SeededTournament) {
   if (!admin) return;
-  const client = admin;
-  await client.from("tournaments").delete().eq("id", seed.tournamentId);
-  // Best-effort user cleanup. The admin.auth.admin API doesn't expose getUserByEmail
-  // on all SDK versions; if it's missing, the test users accumulate harmlessly.
-  try {
-    const result = await client.auth.admin.listUsers();
-    if (!result.error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const users = (result.data as any).users as Array<{ id: string; email?: string }>;
-      const user = users.find(u => u.email === seed.hostEmail);
-      if (user) await client.auth.admin.deleteUser(user.id);
-    }
-  } catch {
-    // ignore
-  }
+  await admin.from("tournaments").delete().eq("id", seed.tournamentId);
+  // This used to swallow every failure on the theory that "test users accumulate
+  // harmlessly". They don't — the real failure mode was the profiles FK, and
+  // 146 host-* accounts piled up from this one call site alone.
+  await deleteTestUserByEmail(admin, seed.hostEmail);
 }

@@ -15,6 +15,9 @@ import { Button } from "./button";
 import ToastNotification from "./toast-notification";
 import ConfirmationDialog from "./confirmation-dialog";
 import InfoHint, { MP_ROUND_HINT, DIFF_ROUND_HINT } from "./InfoHint";
+import { ScoreCell, SaveIndicator } from "./ScoreCell";
+import { useScoreGrid } from "./useScoreGrid";
+import { ScoreShortcutsButton, ScoreShortcutsDialog } from "./ScoreShortcutsDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +25,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
+
+/** Set once the host dismisses the "type scores straight into the table" hint. */
+const KEYBOARD_HINT_DISMISSED_KEY = "rtt.scoreGrid.hintDismissed";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -168,6 +174,8 @@ export default function TournamentRounds({
   // on the current round's view, surfacing the repair UI on a round that was
   // never completed. Only the latest request applies its results.
   const latestRoundFetch = useRef(0);
+  /** Same guard for the matches/byes fetch — see fetchCurrentRoundData. */
+  const latestMatchesFetch = useRef(0);
   const [roundInfo, setRoundInfo] = useState<RoundInfo>({
     started_at: null,
     ended_at: null,
@@ -402,6 +410,13 @@ export default function TournamentRounds({
   };
 
   const fetchCurrentRoundData = async () => {
+    // Sequence guard, mirroring fetchTournamentAndRoundInfo's. Entering a round
+    // from the keyboard fires one refetch per saved match, so a dozen of these
+    // can be in flight at once; without this the last RESPONSE wins rather than
+    // the last REQUEST, and an early, mostly-unscored snapshot can clobber the
+    // current one — which then makes End Round reject a fully-scored round.
+    const seq = ++latestMatchesFetch.current;
+
     const { data, error } = await client
       .from("matches")
       .select(
@@ -411,17 +426,19 @@ export default function TournamentRounds({
       .eq("round", currentPage)
       .order("table_number", { ascending: true, nullsFirst: true })
       .order("match_order", { ascending: true });
-    
+
+    if (seq !== latestMatchesFetch.current) return;
     if (error) console.log(error);
     setMatches(data || []);
-  
+
     const { data: byeData, error: byeError } = await client
       .from("byes")
       .select("id, participant_id:participants(id, name), match_points, differential")
       .eq("tournament_id", tournamentId)
       .eq("round_number", currentPage)
       .order("id", { ascending: true });
-    
+
+    if (seq !== latestMatchesFetch.current) return;
     if (byeError) console.log(byeError);
     setByes(byeData);
   };
@@ -910,6 +927,45 @@ export default function TournamentRounds({
 
   const isSeatsMode = tournamentInfo.numbering_mode === "seats";
 
+  // ---- Keyboard score grid (desktop, live round, host only) ---------------
+  // Inline score cells replace the read-only Result column so a host can enter
+  // a whole round without touching the mouse. Re-pair mode takes the table
+  // over for click-to-swap, so the grid stands down while it's active.
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const gridEnabled = isHost && isRoundActive && !repairMode;
+
+  // Read in an effect, not in the initializer — localStorage isn't available
+  // during SSR and reading it inline would hydrate-mismatch.
+  const [showKeyboardHint, setShowKeyboardHint] = useState(false);
+  useEffect(() => {
+    setShowKeyboardHint(
+      window.localStorage.getItem(KEYBOARD_HINT_DISMISSED_KEY) !== "1",
+    );
+  }, []);
+  const dismissKeyboardHint = () => {
+    window.localStorage.setItem(KEYBOARD_HINT_DISMISSED_KEY, "1");
+    setShowKeyboardHint(false);
+  };
+
+  const scoreGrid = useScoreGrid({
+    matches,
+    maxScore: tournamentInfo.max_score ?? 5,
+    // Stand down while the cheatsheet is up, so keys read as "I'm reading the
+    // shortcuts" rather than being typed into the row behind the modal.
+    enabled: gridEnabled && !shortcutsOpen,
+    onSaved: (matchId) => {
+      // Clear the "missing score" highlight for THIS row only. Clearing the
+      // whole set would wipe the other rows End Round flagged, losing the
+      // "which ones are still missing" affordance the highlight exists for.
+      setMatchErrorIndex((prev) => {
+        const row = matches.findIndex((m) => m.id === matchId);
+        return row === -1 ? prev : prev.filter((i) => i !== row);
+      });
+      onMatchesChanged?.();
+    },
+    onOpenHelp: () => setShortcutsOpen(true),
+  });
+
   /** Persisted table with legacy fallback to positional numbering. */
   const displayTable = (match: any, index: number): number =>
     match.table_number ?? index + (tournamentInfo.starting_table_number || 1);
@@ -968,6 +1024,9 @@ export default function TournamentRounds({
                       <h2 className="text-lg font-semibold text-foreground whitespace-nowrap">
                         Round {currentPage} of {tournamentInfo.n_rounds}
                       </h2>
+                      {gridEnabled && (
+                        <ScoreShortcutsButton onClick={() => setShortcutsOpen(true)} />
+                      )}
                     </div>
                     {/* Status line — always one row so the panel header height
                         stays consistent across upcoming / live / completed
@@ -986,6 +1045,29 @@ export default function TournamentRounds({
                         <span className="italic">Awaiting start</span>
                       )}
                     </p>
+                    {/* One-time discovery hint. The grid is invisible until you
+                        click a cell, so first-time hosts need a nudge; after
+                        that it's noise, hence the localStorage dismissal. */}
+                    {gridEnabled && showKeyboardHint && (
+                      <p className="hidden md:flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap">
+                        <span>Type scores straight into the table</span>
+                        <button
+                          type="button"
+                          onClick={() => setShortcutsOpen(true)}
+                          className="text-foreground underline underline-offset-2 hover:text-primary"
+                        >
+                          See shortcuts
+                        </button>
+                        <span aria-hidden="true">·</span>
+                        <button
+                          type="button"
+                          onClick={dismissKeyboardHint}
+                          className="hover:text-foreground"
+                        >
+                          Dismiss
+                        </button>
+                      </p>
+                    )}
                   </div>
                   {currentPage === tournamentInfo.current_round && (
                       // Round-control tiering: prints are outline (secondary),
@@ -1151,7 +1233,38 @@ export default function TournamentRounds({
                                   </span>
                                 </td>
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
-                                  {hasResult ? (
+                                  {gridEnabled ? (
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      {([0, 1] as const).map((col) => (
+                                        <ScoreCell
+                                          key={col}
+                                          ref={(el) => scoreGrid.registerInput(index, col, el)}
+                                          value={scoreGrid.valueAt(index, col)}
+                                          playerName={
+                                            col === 0
+                                              ? match.player1_id.name
+                                              : match.player2_id.name
+                                          }
+                                          isCursor={scoreGrid.isCursor(index, col)}
+                                          isRejected={scoreGrid.isRejected(index, col)}
+                                          saveState={scoreGrid.saveState[match.id] ?? "idle"}
+                                          onKeyDown={(e) =>
+                                            scoreGrid.onKeyDown(e, { row: index, col })
+                                          }
+                                          onFocus={() =>
+                                            scoreGrid.focusCell({ row: index, col })
+                                          }
+                                          // Clicking away mid-correction must not
+                                          // strand the edit locally.
+                                          onBlur={(e) => scoreGrid.onBlurCell(e, index)}
+                                        />
+                                      ))}
+                                      <SaveIndicator
+                                        state={scoreGrid.saveState[match.id] ?? "idle"}
+                                        error={scoreGrid.saveError[match.id]}
+                                      />
+                                    </div>
+                                  ) : hasResult ? (
                                     <span className="font-medium text-foreground">
                                       {match.player1_score}&ndash;{match.player2_score}
                                     </span>
@@ -1680,6 +1793,11 @@ export default function TournamentRounds({
         }
         confirmLabel="End round"
         cancelLabel="Cancel"
+      />
+      <ScoreShortcutsDialog
+        open={shortcutsOpen}
+        onOpenChange={setShortcutsOpen}
+        maxScore={tournamentInfo.max_score ?? 5}
       />
     </div >
     </>

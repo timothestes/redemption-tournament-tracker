@@ -1,15 +1,29 @@
 import { test, expect } from "../fixtures";
+import {
+  dialog,
+  dialogBox,
+  EDIT_DIALOG_HEADING,
+  EDIT_SUCCESS_TOAST,
+  editResultPencil,
+  gotoRounds,
+  REASON_PLACEHOLDER,
+  saveEdit,
+  setScore,
+} from "./helpers";
 
-test.use({ viewport: { width: 375, height: 667 } });
+const VIEWPORT = { width: 375, height: 667 }; // iPhone SE
+test.use({ viewport: VIEWPORT });
 
-test("repair golden path works on mobile viewport (iPhone SE)", async ({ page, seeded }) => {
-  await page.goto(`/tracker/tournaments/${seeded.tournamentId}`);
+test("past-result edit is usable on a phone-sized viewport", async ({ page, seeded }) => {
+  await gotoRounds(page, seeded.tournamentId, 1);
 
-  // Find the repair pencil for Alice vs Bob.
-  const pencil = page.getByRole("button", { name: /repair result for alice vs bob/i });
+  // Below md the table is display:none and the card list takes over, so this
+  // resolves to the mobile pencil.
+  const pencil = editResultPencil(page, "Alice", "Bob");
   await expect(pencil).toBeVisible();
 
-  // Verify the hit area is at least 44x44.
+  // Touch target: match-edit renders the trigger w-11 h-11 and the mobile card
+  // wraps it in a matching w-11 h-11 box, so 44×44 is the contract.
   const box = await pencil.boundingBox();
   expect(box).not.toBeNull();
   expect(box!.width).toBeGreaterThanOrEqual(44);
@@ -17,23 +31,50 @@ test("repair golden path works on mobile viewport (iPhone SE)", async ({ page, s
 
   await pencil.click();
 
-  // The dialog renders bottom-sheet on mobile — anchored to the bottom half.
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  const dialogBox = await dialog.boundingBox();
-  expect(dialogBox).not.toBeNull();
-  // Bottom-anchored: the dialog's bottom edge should be close to the viewport bottom (667).
-  expect(dialogBox!.y + dialogBox!.height).toBeGreaterThan(400);
+  const d = dialog(page);
+  await expect(d.getByRole("heading", { name: EDIT_DIALOG_HEADING })).toBeVisible();
 
-  // Set player2 score to 3 (was 0). Brittle selector — first run will tune.
-  await dialog.getByRole("button", { name: /^3$/ }).nth(1).click();
+  // The overlay carries role="dialog" and is fixed inset-0, so measure the box
+  // inside it. It is centred (not a bottom sheet) and capped at
+  // max-h-[calc(100dvh-2rem)], so what matters on a phone is that it fits:
+  // no horizontal overflow and no vertical clipping.
+  const modal = dialogBox(page);
+  const modalBox = await modal.boundingBox();
+  expect(modalBox).not.toBeNull();
+  expect(modalBox!.x).toBeGreaterThanOrEqual(0);
+  expect(modalBox!.x + modalBox!.width).toBeLessThanOrEqual(VIEWPORT.width);
+  expect(modalBox!.y).toBeGreaterThanOrEqual(0);
+  expect(modalBox!.y + modalBox!.height).toBeLessThanOrEqual(VIEWPORT.height);
 
-  // The primary submit "Repair" should be reachable in the bottom half.
-  const submit = dialog.getByRole("button", { name: /^repair$/i });
+  // Every score option in both rows has to be tappable without scrolling
+  // sideways — six 40px buttons plus gaps is the tightest row in the app.
+  for (const row of [0, 1]) {
+    for (const score of [0, 5]) {
+      const b = d.getByRole("button", { name: new RegExp(`^${score}$`) }).nth(row);
+      const bb = await b.boundingBox();
+      expect(bb).not.toBeNull();
+      expect(bb!.x).toBeGreaterThanOrEqual(0);
+      expect(bb!.x + bb!.width).toBeLessThanOrEqual(VIEWPORT.width);
+    }
+  }
+
+  await setScore(d, 2, 3);
+  await d.getByPlaceholder(REASON_PLACEHOLDER).fill("phone edit");
+
+  // Submit must be on-screen, not pushed below the fold by the score rows.
+  const submit = d.getByRole("button", { name: /^save$/i });
   const submitBox = await submit.boundingBox();
   expect(submitBox).not.toBeNull();
-  expect(submitBox!.y).toBeGreaterThan(333); // lower half of 667
+  expect(submitBox!.y + submitBox!.height).toBeLessThanOrEqual(VIEWPORT.height);
 
-  await submit.click();
-  await expect(dialog).toBeHidden({ timeout: 5_000 });
+  await saveEdit(d);
+  await expect(d).toBeHidden();
+  await expect(page.getByText(EDIT_SUCCESS_TOAST, { exact: true })).toBeVisible();
+
+  // The mobile card reflects the corrected result. The card layout shows no
+  // raw score — only the derived per-round line — so assert on that: Alice's
+  // differential moves +5 → +2 and Bob's −5 → −2.
+  const card = page.locator("div.md\\:hidden > div").filter({ hasText: "Alice" }).first();
+  await expect(card).toContainText("Match Pts 3 · Diff 2");
+  await expect(card).toContainText("Match Pts 0 · Diff -2");
 });

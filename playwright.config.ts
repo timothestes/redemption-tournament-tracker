@@ -7,10 +7,18 @@ loadEnv({ path: ".env.local", quiet: true });
 
 export default defineConfig({
   testDir: "./e2e",
+  // Belt-and-braces for seeded accounts: per-test cleanup handles the normal
+  // path, this catches whatever a timed-out or crashed worker left behind.
+  globalTeardown: "./e2e/globalTeardown.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
+  // The default 30s doesn't cover a cold `next dev` route compile. The tracker
+  // tournament page alone takes ~10s the first time it's hit, and a spec that
+  // visits two uncompiled routes blows the budget before it asserts anything.
+  timeout: 90_000,
+  expect: { timeout: 10_000 },
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     trace: "on-first-retry",
