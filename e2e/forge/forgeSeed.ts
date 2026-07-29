@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { deleteTestUser } from "../deleteUser";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -58,8 +59,7 @@ export async function cleanupForgeMember(seed: SeededForgeMember) {
   await admin.from("forge_set_grants").delete().eq("user_id", seed.userId);
   await admin.from("forge_audit").delete().eq("actor", seed.userId);
   await admin.from("playtest_members").delete().eq("user_id", seed.userId);
-  // The live profiles FK to auth.users is NO ACTION (signup trigger auto-creates
-  // the row), so it must go first or deleteUser 500s and users accumulate.
-  await admin.from("profiles").delete().eq("id", seed.userId);
-  try { await admin.auth.admin.deleteUser(seed.userId); } catch { /* best-effort */ }
+  // This file already knew about the profiles FK; deleteTestUser is that same
+  // knowledge, shared, so the other seeds stop leaking users.
+  await deleteTestUser(admin, seed.userId);
 }

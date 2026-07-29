@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { deleteTestUser } from "./deleteUser";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -43,7 +44,16 @@ export async function seedPlayer(label: string): Promise<SeededPlayer> {
 
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const email = `spec-${label}-${stamp}@e2e.test`;
-  const username = `spec_${label}_${stamp}`.slice(0, 24);
+  // profiles.username is UNIQUE and capped at 24 chars, so the uniquifier has
+  // to survive the cap — `spec_${label}_${stamp}`.slice(0, 24) truncated from
+  // the RIGHT, cutting the random suffix off entirely and leaving only coarse
+  // timestamp precision. Playwright parallelises across files (6 workers), and
+  // board.spec and lobby-lifecycle both seed the label "host", so two runs
+  // could land on the same name and fail with a profiles_username_key
+  // violation. Build it right-to-left instead: the random part is never lost,
+  // and only the human-readable label gets squeezed.
+  const suffix = Math.random().toString(36).slice(2, 8); // 6 chars, always kept
+  const username = `s_${label}`.slice(0, 24 - suffix.length - 1) + `_${suffix}`;
 
   const { data: created, error: uErr } = await admin.auth.admin.createUser({
     email,
@@ -89,11 +99,9 @@ export async function seedPlayer(label: string): Promise<SeededPlayer> {
 
 export async function cleanupPlayer(p: SeededPlayer) {
   if (!admin) return;
-  // deck_cards cascade on deck delete in most schemas; delete decks explicitly.
-  await admin.from("decks").delete().eq("user_id", p.userId);
-  try {
-    await admin.auth.admin.deleteUser(p.userId);
-  } catch {
-    // ignore — leftover e2e users are harmless
-  }
+  // The old comment here said "leftover e2e users are harmless". They are not:
+  // their profiles rows keep the usernames a later run needs, which is exactly
+  // how this file's own lobby-lifecycle spec started failing on
+  // profiles_username_key. deleteTestUser removes the blocking rows first.
+  await deleteTestUser(admin, p.userId);
 }

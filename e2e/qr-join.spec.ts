@@ -4,6 +4,7 @@ import { CARDS, type CardData } from "@/lib/cards/lookup";
 import { FORMATS } from "@/lib/formats";
 import { matchesBanListEntry } from "@/utils/deckcheck/rules";
 import { generateJoinCode } from "@/lib/tournament/joinCodes";
+import { deleteTestUser } from "./deleteUser";
 
 // This spec exercises migration 084 (tournament_deck_submissions,
 // participants.user_id, tournaments.require_decklists) end-to-end. It is
@@ -235,12 +236,11 @@ async function cleanup(state: Seeded) {
     ["player", state.playerId],
   ] as const) {
     if (!userId) continue;
-    try {
-      const { error } = await admin.auth.admin.deleteUser(userId);
-      if (error) console.warn(`qr-join e2e cleanup: failed to delete ${label} user ${userId}:`, error.message);
-    } catch (err) {
-      console.warn(`qr-join e2e cleanup: failed to delete ${label} user ${userId}:`, err);
-    }
+    // Was a bare deleteUser, which always 500s on the profiles FK — this spec
+    // logged "Database error deleting user" on every single run and leaked both
+    // accounts each time.
+    const ok = await deleteTestUser(admin, userId);
+    if (!ok) console.warn(`qr-join e2e cleanup: ${label} user ${userId} survived`);
   }
 }
 
