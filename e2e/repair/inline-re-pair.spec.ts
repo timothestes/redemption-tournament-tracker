@@ -1,8 +1,22 @@
 import { test, expect } from "../fixtures";
 import { admin } from "../seed";
+import {
+  adminMenuItem,
+  dialog,
+  editPastResult,
+  gotoRounds,
+  MENU_REGENERATE_PAIRINGS,
+  openAdminMenu,
+  REGENERATE_CONFIRM_BUTTON,
+  REGENERATE_CONFIRM_CHECKBOX,
+} from "./helpers";
 
-test("repair followed by re-pair button regenerates current round pairings", async ({ page, seeded }) => {
-  // Ensure round 2 has been paired but unscored.
+test("editing a past result then regenerating replaces the current round's pairings", async ({
+  page,
+  seeded,
+}) => {
+  // Round 2 is paired but unscored — the state in which "Regenerate pairings"
+  // is allowed without unlocking.
   await admin!.from("matches").insert([
     { tournament_id: seeded.tournamentId, round: 2, match_order: 1,
       player1_id: seeded.participantIds[0], player2_id: seeded.participantIds[2],
@@ -15,36 +29,47 @@ test("repair followed by re-pair button regenerates current round pairings", asy
     tournament_id: seeded.tournamentId, round_number: 2, is_completed: false,
   });
 
-  await page.goto(`/tracker/tournaments/${seeded.tournamentId}`);
-
-  // Step 1: repair Alice vs Bob in round 1 (change 5-0 to 5-3).
-  const repairBtn = page.getByRole("button", { name: /repair result for alice vs bob/i });
-  await repairBtn.click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: /^3$/ }).nth(1).click();
-  await dialog.getByRole("button", { name: /^repair$/i }).click();
-  await expect(dialog).toBeHidden({ timeout: 5_000 });
-  await expect(page.getByText(/result repaired/i)).toBeVisible({ timeout: 5_000 });
-
-  // Step 2: open the host overflow menu, then choose Re-pair current round.
-  // (Project toast has no inline action button per Task 18; the destructive
-  // actions live behind the ⋯ overflow menu post-WS4.)
-  await page.getByRole("button", { name: /more host actions/i }).click();
-  await page.getByRole("menuitem", { name: /re-pair current round/i }).click();
-
-  // Confirm dialog with checkbox.
-  const confirmDialog = page.getByRole("dialog").filter({ hasText: /re-pair round 2/i });
-  await expect(confirmDialog).toBeVisible();
-  await confirmDialog.getByLabel(/i confirm no players have started/i).check();
-  await confirmDialog.getByRole("button", { name: /^re-pair$/i }).click();
-
-  // Verify success: matches table for round 2 still has 2 rows (pairings replaced, not deleted).
-  // We re-fetch via admin (back-channel verify) to avoid flaky UI assertions.
-  await page.waitForTimeout(500); // give the action time to commit and revalidate
-  const { data: round2Matches } = await admin!.from("matches")
-    .select("id, player1_id, player2_id")
+  const before = await admin!.from("matches")
+    .select("id")
     .eq("tournament_id", seeded.tournamentId)
     .eq("round", 2);
-  expect(round2Matches?.length).toBeGreaterThan(0);
+  const beforeIds = (before.data ?? []).map((m) => m.id);
+  expect(beforeIds).toHaveLength(2);
+
+  // Step 1: correct Alice vs Bob in round 1 (5-0 → 5-3).
+  await gotoRounds(page, seeded.tournamentId, 1);
+  await editPastResult(page, { p1: "Alice", p2: "Bob", p2Score: 3, reason: "misheard" });
+
+  // Step 2: regenerate round 2's pairings off the corrected standings.
+  await openAdminMenu(page);
+  const regenerate = adminMenuItem(page, MENU_REGENERATE_PAIRINGS);
+  await expect(regenerate).toBeEnabled();
+  await regenerate.click();
+
+  const confirm = dialog(page).filter({ hasText: /regenerate pairings for round 2\?/i });
+  await expect(confirm).toBeVisible();
+
+  // The confirm button is gated on the checkbox.
+  const submit = confirm.getByRole("button", { name: REGENERATE_CONFIRM_BUTTON });
+  await expect(submit).toBeDisabled();
+  await confirm.getByLabel(REGENERATE_CONFIRM_CHECKBOX).check();
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(confirm).toBeHidden();
+
+  // The RPC deletes and re-inserts, so round 2 keeps 2 unscored pairings but
+  // none of the original rows survive.
+  await expect
+    .poll(async () => {
+      const { data } = await admin!.from("matches")
+        .select("id, player1_score")
+        .eq("tournament_id", seeded.tournamentId)
+        .eq("round", 2);
+      return {
+        count: data?.length ?? 0,
+        reused: (data ?? []).filter((m) => beforeIds.includes(m.id)).length,
+        scored: (data ?? []).filter((m) => m.player1_score !== null).length,
+      };
+    })
+    .toEqual({ count: 2, reused: 0, scored: 0 });
 });
