@@ -138,6 +138,9 @@ describe("loadPublicResultsAction", () => {
     expect(r.success).toBe(true);
     if (r.success === true) {
       expect(r.standings[0].publishedDeckId).toBeNull();
+      // The results page drops the whole Decklist column off this flag, so it
+      // has to reach the UI rather than being inferred from all-null rows.
+      expect(r.decklistsPublished).toBe(false);
     }
     expect(calls.decklists).toBe(0); // gated on decklists_published, never queried
   });
