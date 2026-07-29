@@ -5,6 +5,7 @@ import type { ViewId } from "../NavTabs";
 import { useSeed } from "../seed-context";
 import type { MatchEntry } from "@/lib/nationals/types";
 import { buildKey } from "@/lib/nationals/format";
+import { recordsForKey } from "@/lib/nationals/selectors";
 import { FormatBadge } from "../components/FormatBadge";
 import { PlacementBadge } from "../components/PlacementBadge";
 import { SectionTitle } from "../components/SectionTitle";
@@ -258,6 +259,7 @@ export function TournamentDetailView({
 
   const matches: MatchEntry[] = seed.matches[key] ?? [];
   const hasMatchData = tournament.year >= MATCH_DATA_START_YEAR;
+  const derivedRecords = recordsForKey(matches, selectedFormat);
 
   const swissMatches = matches.filter((m) => !m.topCut);
   const tcMatches = matches.filter((m) => m.topCut);
@@ -469,7 +471,7 @@ export function TournamentDetailView({
                       {r.deck || "—"}
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">
-                      {r.record || "—"}
+                      {r.record || derivedRecords[r.playerName] || "—"}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground hidden lg:table-cell">
                       {r.notes || "—"}

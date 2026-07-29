@@ -325,7 +325,7 @@ function ListingCard({
 
           <div className="mt-4 flex items-center gap-3">
             <Link
-              href={`/tracker/tournaments?from_listing=${listing.id}&name=${encodeURIComponent(`${listing.city} ${listing.tournament_type || ""} ${listing.start_date.slice(5)}`.trim())}${listing.formats.length > 0 ? `&formats=${encodeURIComponent(listing.formats.map((f) => f.format).join("|"))}` : ""}`}
+              href={`/tracker/tournaments?from_listing=${listing.id}&city=${encodeURIComponent(listing.city)}&state=${encodeURIComponent(listing.state)}${listing.formats.length > 0 ? `&formats=${encodeURIComponent(listing.formats.map((f) => f.format).join("|"))}` : ""}${listing.tournament_type ? `&type=${encodeURIComponent(listing.tournament_type)}` : ""}`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <FaTrophy className="w-3 h-3" />
@@ -604,6 +604,12 @@ export default function TournamentsClient({
             {filtered.length} event{filtered.length !== 1 ? "s" : ""} scheduled
             {stateFilter !== "all" ? ` in ${stateFilter}` : ""}
           </p>
+          <Link
+            href="/tournaments/results"
+            className="mt-1 inline-block text-xs text-muted-foreground hover:text-primary hover:underline transition-colors"
+          >
+            Recent results
+          </Link>
         </div>
 
         {/* View toggle */}

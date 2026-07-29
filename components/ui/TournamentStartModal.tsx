@@ -26,6 +26,10 @@ interface TournamentStartModalProps {
   defaultByeDifferential?: number | null;
   defaultStartingTableNumber?: number | null;
   defaultSoundNotifications?: boolean | null;
+  // "N of M participants have decklists" — same figure shown pre-start under
+  // the Participants toolbar; null/omitted hides the line (tournament doesn't
+  // require decklists).
+  decklistSummary?: { submitted: number; total: number } | null;
 }
 
 export default function TournamentStartModal({
@@ -40,6 +44,7 @@ export default function TournamentStartModal({
   defaultByeDifferential,
   defaultStartingTableNumber,
   defaultSoundNotifications,
+  decklistSummary,
 }: TournamentStartModalProps) {
   const initialRoundLength = defaultRoundLength ?? 45;
   const initialMaxScore = defaultMaxScore ?? 5;
@@ -66,19 +71,24 @@ export default function TournamentStartModal({
     initialSoundNotifications !== false;
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(hasNonDefaultAdvanced);
 
+  // Seed the form when the dialog OPENS, and only then. Keying this on the
+  // prop values too would discard whatever the host has typed the moment one
+  // of them moves — and `suggestedRounds` moves on its own now that the roster
+  // refreshes in the background: a player scanning the QR while this dialog is
+  // open crosses a 2/4/8/16 boundary, and the host's round count, round length
+  // and starting table all silently snap back to defaults.
   useEffect(() => {
-    if (isOpen) {
-      setNumberOfRounds(suggestedRounds);
-      setRoundLength(initialRoundLength);
-      setMaxScore(initialMaxScore);
-      setByePoints(initialByePoints);
-      setByeDifferential(initialByeDifferential);
-      setStartingTableNumber(initialStartingTableNumber);
-      setSoundNotifications(initialSoundNotifications);
-      setIsAdvancedOpen(hasNonDefaultAdvanced);
-    }
+    if (!isOpen) return;
+    setNumberOfRounds(suggestedRounds);
+    setRoundLength(initialRoundLength);
+    setMaxScore(initialMaxScore);
+    setByePoints(initialByePoints);
+    setByeDifferential(initialByeDifferential);
+    setStartingTableNumber(initialStartingTableNumber);
+    setSoundNotifications(initialSoundNotifications);
+    setIsAdvancedOpen(hasNonDefaultAdvanced);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, suggestedRounds, initialRoundLength, initialMaxScore, initialByePoints, initialByeDifferential, initialStartingTableNumber, initialSoundNotifications]);
+  }, [isOpen]);
 
   const handleIncrement = () => {
     setNumberOfRounds(prev => prev + 1);
@@ -108,6 +118,14 @@ export default function TournamentStartModal({
         </DialogHeader>
 
         <DialogBody className="space-y-6">
+          {decklistSummary && (
+            <p className="text-sm text-center text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {decklistSummary.submitted} of {decklistSummary.total}
+              </span>{" "}
+              participants have decklists
+            </p>
+          )}
           {/* Number of Rounds */}
           <div className="flex flex-col items-center jayden-gradient-bg rounded-lg border border-border p-5">
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

@@ -4,7 +4,7 @@ import { Tabs } from "flowbite-react";
 import PodGenerationModal from "./PodGenerationModal";
 import { Dispatch, ReactNode, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
-import { FaGear, FaClipboardList } from "react-icons/fa6";
+import { FaGear, FaClipboardList, FaQrcode } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
 import TournamentSettings from "./TournamentSettings";
 import TournamentRounds from "./TournamentRounds";
@@ -38,6 +38,10 @@ interface TournamentTabsProps {
   // AttachDeckDialog for its attach gate.
   tournamentFormat?: string | null;
   onTournamentEnd?: () => void;
+  /** Fired only when the FINAL round's End Round button completes the
+   * tournament (not on every round end, and not on the admin-menu End
+   * Tournament path, which handles its own publish choice separately). */
+  onTournamentAutoPublish?: () => void | Promise<void>;
   setLatestRound: Dispatch<SetStateAction<any>>;
   onRoundActiveChange?: (
     isActive: boolean,
@@ -52,6 +56,17 @@ interface TournamentTabsProps {
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
   isHost?: boolean;
+  // participant.user_id -> profiles.username, batched once on the page —
+  // threaded down to ParticipantTable's account-linkage badge.
+  usernames?: Map<string, string>;
+  /** Opens the QR Join dialog (mounted at the page level). */
+  onOpenQrJoin?: () => void;
+  /** Fired after Tournament Settings persists a change, so the page header
+   * picks up a rename from the Event Type section. */
+  onTournamentUpdated?: () => void;
+  /** "N of M participants have decklists" — only meaningful pre-start when
+   * the tournament requires decklists; null hides the line entirely. */
+  decklistSummary?: { submitted: number; total: number } | null;
   numberingMode: "tables" | "seats";
   onRepairCompleted?: () => void;
   matchesRefreshNonce?: number;
@@ -81,6 +96,7 @@ export default function TournamentTabs({
   tournamentName,
   tournamentFormat,
   onTournamentEnd,
+  onTournamentAutoPublish,
   setLatestRound,
   createPairing,
   matchErrorIndex,
@@ -91,6 +107,10 @@ export default function TournamentTabs({
   decklists,
   onDecklistsChange,
   isHost = false,
+  usernames,
+  onOpenQrJoin,
+  onTournamentUpdated,
+  decklistSummary,
   numberingMode,
   onRepairCompleted,
   matchesRefreshNonce,
@@ -176,6 +196,21 @@ export default function TournamentTabs({
                 <span className="sm:hidden">Print</span>
               </Button>
             )}
+            {/* QR Join — same eligibility window as the Start button: the
+                join code can only be generated/used before the tournament
+                has started, and it's moot once the event has ended. */}
+            {!tournamentStarted && !tournamentEnded && onOpenQrJoin && (
+              <Button
+                type="button"
+                onClick={onOpenQrJoin}
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+              >
+                <FaQrcode className="w-4 h-4" />
+                <span className="hidden sm:inline">QR Join</span>
+              </Button>
+            )}
             {!tournamentEnded && (
               <div className="relative group">
                 <Button
@@ -218,6 +253,14 @@ export default function TournamentTabs({
             />
           </div>
         </div>
+        {!tournamentStarted && decklistSummary && (
+          <p className="text-sm text-muted-foreground -mt-4 mb-4">
+            <span className="font-medium text-foreground">
+              {decklistSummary.submitted} of {decklistSummary.total}
+            </span>{" "}
+            participants have decklists
+          </p>
+        )}
         {loading ? (
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
@@ -246,6 +289,9 @@ export default function TournamentTabs({
               decklists={decklists}
               onDecklistsChange={onDecklistsChange}
               numberingMode={numberingMode}
+              usernames={usernames}
+              isHost={isHost}
+              fetchParticipants={fetchParticipants}
             />
           </div>
         )}
@@ -271,7 +317,10 @@ export default function TournamentTabs({
             isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
             onTournamentEnd={onTournamentEnd}
-            onTournamentEnded={() => setActiveTab(2)} // jump to Standings (index 2) when the tournament finishes
+            onTournamentEnded={() => {
+              setActiveTab(2); // jump to Standings (index 2) when the tournament finishes
+              onTournamentAutoPublish?.();
+            }}
             setLatestRound={setLatestRound}
             createPairing={createPairing}
             matchErrorIndex={matchErrorIndex}
@@ -326,6 +375,7 @@ export default function TournamentTabs({
           <TournamentSettings
             tournamentId={tournamentId}
             participantCount={participants.length}
+            onTournamentUpdated={onTournamentUpdated}
             key={activeTab} // Force re-render when tab becomes active
           />
         </div>

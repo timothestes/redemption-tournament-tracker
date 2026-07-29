@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Check, Loader2, Lock } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { AlertTriangle, Check, Loader2, Lock } from "lucide-react";
 import { suggestNumberOfRounds } from "../../utils/tournamentUtils";
 import { createClient } from "../../utils/supabase/client";
+import { FORMAT_IDS, normalizeTournamentFormat, type FormatId } from "../../lib/formats";
+import { STANDARD_CATEGORIES } from "../../utils/tournament/categoryDefaults";
+import { TOURNAMENT_TIERS } from "../../utils/tournament/tiers";
+import { US_STATES } from "../../utils/tournament/usStates";
+import { planEventTypeChange, type EventTypePlan } from "../../utils/tournament/eventType";
+import { getJoinStatsAction } from "../../app/tracker/tournaments/actions";
 
 interface TournamentInfo {
   n_rounds: number | null;
@@ -17,11 +23,23 @@ interface TournamentInfo {
   numbering_mode: string | null;
   has_started: boolean | null;
   has_ended: boolean | null;
+  // Event type. Edited through the dedicated tier/category state below rather
+  // than in place, so these always hold the persisted values.
+  name: string;
+  tier: string | null;
+  category: string | null;
+  city: string | null;
+  state: string | null;
+  deck_format: string | null;
+  require_decklists: boolean | null;
+  created_at: string;
 }
 
 interface TournamentSettingsProps {
   tournamentId: string;
   participantCount: number;
+  // Called after a successful save so the page header picks up a rename.
+  onTournamentUpdated?: () => void;
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -38,6 +56,14 @@ const EMPTY_INFO: TournamentInfo = {
   numbering_mode: "tables",
   has_started: null,
   has_ended: null,
+  name: "",
+  tier: null,
+  category: null,
+  city: null,
+  state: null,
+  deck_format: null,
+  require_decklists: null,
+  created_at: new Date(0).toISOString(),
 };
 
 // Fields the user can edit and that get written on Save.
@@ -55,14 +81,25 @@ const EDITABLE_KEYS = [
 export default function TournamentSettings({
   tournamentId,
   participantCount,
+  onTournamentUpdated,
 }: TournamentSettingsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>(EMPTY_INFO);
   // Baseline reflecting what's persisted in the DB, used for dirty tracking.
   const [savedInfo, setSavedInfo] = useState<TournamentInfo>(EMPTY_INFO);
   const [round1Started, setRound1Started] = useState(false);
   const [pinnedCount, setPinnedCount] = useState(0);
+  const [submittedCount, setSubmittedCount] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Event type lives outside tournamentInfo: "" means unspecified, and the
+  // cascade into name/format/derived settings is computed rather than typed.
+  const [tier, setTier] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
+  const [city, setCity] = useState<string>("");
+  const [state, setState] = useState<string>("");
+  const [unofficialFormat, setUnofficialFormat] = useState<FormatId | "Other">("Other");
 
   const suggestedRounds = suggestNumberOfRounds(participantCount);
 
@@ -74,7 +111,7 @@ export default function TournamentSettings({
       const { data, error } = await client
         .from("tournaments")
         .select(
-          "n_rounds, current_round, round_length, max_score, bye_points, bye_differential, starting_table_number, sound_notifications, has_started, has_ended, numbering_mode",
+          "n_rounds, current_round, round_length, max_score, bye_points, bye_differential, starting_table_number, sound_notifications, has_started, has_ended, numbering_mode, name, tier, category, city, state, deck_format, require_decklists, created_at",
         )
         .eq("id", tournamentId)
         .single();
@@ -86,6 +123,16 @@ export default function TournamentSettings({
 
       setTournamentInfo(data);
       setSavedInfo(data);
+      setTier(data.tier ?? "");
+      setCategory(data.category ?? "");
+      setCity(data.city ?? "");
+      setState(data.state ?? "");
+      setUnofficialFormat(normalizeTournamentFormat(data.deck_format) ?? "Other");
+
+      // Only used to warn that changing the format leaves existing deck-check
+      // verdicts stale. Host-gated server action; a non-host gets 0 and no warning.
+      const stats = await getJoinStatsAction(tournamentId);
+      setSubmittedCount(stats.success === true ? stats.submitted : 0);
 
       const { data: round1 } = await client
         .from("rounds")
@@ -109,12 +156,75 @@ export default function TournamentSettings({
   const flashSaved = useCallback(() => {
     setSaveStatus("saved");
     if (savedTimer.current) clearTimeout(savedTimer.current);
-    savedTimer.current = setTimeout(() => setSaveStatus("idle"), 1500);
+    savedTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
   }, []);
 
-  const isDirty = EDITABLE_KEYS.some(
+  const editingDisabled = !!tournamentInfo.has_ended;
+  const maxScoreLocked = round1Started || editingDisabled;
+
+  const savedTier = savedInfo.tier ?? "";
+  const savedCategory = savedInfo.category ?? "";
+  const savedCity = savedInfo.city ?? "";
+  const savedState = savedInfo.state ?? "";
+  const savedUnofficialFormat = normalizeTournamentFormat(savedInfo.deck_format) ?? "Other";
+  const eventTypeDirty =
+    tier !== savedTier ||
+    category !== savedCategory ||
+    city.trim() !== savedCity ||
+    state !== savedState ||
+    (category === "Unofficial" && unofficialFormat !== savedUnofficialFormat);
+
+  // The same plan drives the preview and the persisted patch, so what the host
+  // is shown and what gets written can't drift apart. Only computed once a
+  // category is picked — there's nothing to cascade from "unspecified".
+  const plan: EventTypePlan | null = useMemo(() => {
+    if (!category || !eventTypeDirty) return null;
+    return planEventTypeChange(
+      {
+        name: savedInfo.name,
+        tier: savedInfo.tier,
+        category: savedInfo.category,
+        city: savedInfo.city,
+        state: savedInfo.state,
+        deck_format: savedInfo.deck_format,
+        // Pending edits count as host overrides: a round length just changed by
+        // hand shouldn't be re-seeded out from under them.
+        max_score: tournamentInfo.max_score,
+        round_length: tournamentInfo.round_length,
+        require_decklists: savedInfo.require_decklists,
+        created_at: savedInfo.created_at,
+      },
+      {
+        tier: tier || null,
+        category,
+        city: city.trim() || null,
+        state: state || null,
+        unofficialFormat: category === "Unofficial" ? unofficialFormat : undefined,
+      },
+      { maxScoreLocked },
+    );
+  }, [
+    category,
+    eventTypeDirty,
+    savedInfo,
+    tournamentInfo.max_score,
+    tournamentInfo.round_length,
+    tier,
+    city,
+    state,
+    unofficialFormat,
+    maxScoreLocked,
+  ]);
+
+  const scalarDirty = EDITABLE_KEYS.some(
     (key) => tournamentInfo[key] !== savedInfo[key],
   );
+  const isDirty = scalarDirty || eventTypeDirty;
+
+  // Changing the format leaves already-stored deck-check verdicts stale — they
+  // were computed against the old one and are not re-run.
+  const formatChanging =
+    !!plan && normalizeTournamentFormat(savedInfo.deck_format) !== plan.deck_format;
 
   const handleSave = useCallback(async () => {
     const patch: Partial<TournamentInfo> = {};
@@ -123,10 +233,23 @@ export default function TournamentSettings({
         patch[key] = tournamentInfo[key] as never;
       }
     }
+    // The event-type cascade wins over a same-field scalar edit: re-seeded
+    // values are computed from the pending edits, so they're already current.
+    if (plan) {
+      Object.assign(patch, plan as Partial<TournamentInfo>);
+    } else if (eventTypeDirty) {
+      // Tier or location changed on a tournament that has no category. There's
+      // nothing to cascade from and no frozen name to regenerate — just write
+      // the fields themselves.
+      patch.tier = tier || null;
+      patch.city = city.trim() || null;
+      patch.state = state || null;
+    }
     if (Object.keys(patch).length === 0) return;
 
-    const snapshot = tournamentInfo;
+    const snapshot = { ...tournamentInfo, ...patch };
     setSaveStatus("saving");
+    setSaveError(null);
     try {
       const client = createClient();
       const { error } = await client
@@ -135,12 +258,17 @@ export default function TournamentSettings({
         .eq("id", tournamentId);
       if (error) throw error;
       setSavedInfo(snapshot);
+      // Re-seeded settings and the regenerated name have to show up in the form
+      // too, not just in the baseline.
+      setTournamentInfo(snapshot);
       flashSaved();
+      onTournamentUpdated?.();
     } catch (err) {
       console.error("Error updating tournament:", err);
+      setSaveError(err instanceof Error ? err.message : String(err));
       setSaveStatus("error");
     }
-  }, [tournamentId, tournamentInfo, savedInfo, flashSaved]);
+  }, [tournamentId, tournamentInfo, savedInfo, plan, flashSaved, onTournamentUpdated]);
 
   useEffect(() => {
     return () => {
@@ -148,13 +276,28 @@ export default function TournamentSettings({
     };
   }, []);
 
-  const editingDisabled = !!tournamentInfo.has_ended;
-  const maxScoreLocked = round1Started || editingDisabled;
   const numberingModeLocked = !!tournamentInfo.has_started || editingDisabled;
   const minRounds = Math.max(1, tournamentInfo.current_round || 1);
 
   const inputClasses =
     "w-full bg-background border border-border text-foreground rounded-lg p-2.5 focus:outline-none focus:border-primary/60 transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+
+  // Events hosted from an official listing carry that listing's own category
+  // string ("Type 1 - 2P", "Type 1 - Teams"), which isn't in the standard list.
+  // Prepend it so opening Settings never silently coerces the category.
+  const categoryOptions =
+    savedCategory && !STANDARD_CATEGORIES.includes(savedCategory as never)
+      ? [savedCategory, ...STANDARD_CATEGORIES]
+      : [...STANDARD_CATEGORIES];
+
+  // Same guard for state: the column is free text, so a value the US list
+  // doesn't cover (an international event, a scraper oddity) must survive
+  // opening this page rather than being silently blanked.
+  const stateCodes = US_STATES.map((s) => s.code);
+  const stateOptions =
+    savedState && !stateCodes.includes(savedState)
+      ? [savedState, ...stateCodes]
+      : stateCodes;
 
   return (
     <div className="w-full max-w-[800px] mx-auto">
@@ -181,26 +324,9 @@ export default function TournamentSettings({
           </svg>
           Tournament Settings
         </h2>
-        <div className="text-xs text-muted-foreground h-5 flex items-center gap-1.5" aria-live="polite">
-          {saveStatus === "saving" && (
-            <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Saving…
-            </>
-          )}
-          {saveStatus === "saved" && (
-            <>
-              <Check className="w-3.5 h-3.5 text-primary" />
-              Saved
-            </>
-          )}
-          {saveStatus === "error" && (
-            <span className="text-destructive">Failed to save</span>
-          )}
-          {saveStatus === "idle" && isDirty && (
-            <span className="text-amber-600 dark:text-amber-500">Unsaved changes</span>
-          )}
-        </div>
+        {/* Save status lives in the sticky footer next to the button, where the
+            host is actually looking when they click it — this card is tall
+            enough that a header-only confirmation flashes off-screen. */}
       </div>
 
       <div className="bg-card jayden-gradient-bg shadow-md dark:shadow-none border border-border rounded-xl overflow-hidden">
@@ -237,6 +363,182 @@ export default function TournamentSettings({
         </div>
 
         <div className="p-4 sm:p-6 space-y-6">
+          {/* Event type — the single owner of category/format. The QR Join
+              dialog reads these; it no longer writes them. */}
+          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Event Type</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Sets the deck format players are checked against, and the event name.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-sm font-medium text-foreground mb-1.5 block">
+                  Tier
+                </span>
+                <select
+                  value={tier}
+                  onChange={(e) => setTier(e.target.value)}
+                  disabled={editingDisabled}
+                  className={inputClasses}
+                >
+                  <option value="">Not specified</option>
+                  {TOURNAMENT_TIERS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-foreground mb-1.5 block">
+                  Category
+                </span>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  disabled={editingDisabled}
+                  className={inputClasses}
+                >
+                  {/* Only offered while the event genuinely has no category
+                      (pre-dates the field). Once one is set, clearing it would
+                      strand the frozen name with a category it no longer has. */}
+                  {!savedCategory && <option value="">Not specified</option>}
+                  {categoryOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-4">
+              <label className="block">
+                <span className="text-sm font-medium text-foreground mb-1.5 block">
+                  City
+                </span>
+                <input
+                  type="text"
+                  value={city}
+                  maxLength={60}
+                  placeholder="Optional"
+                  onChange={(e) => setCity(e.target.value)}
+                  disabled={editingDisabled}
+                  className={inputClasses}
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-foreground mb-1.5 block">
+                  State
+                </span>
+                <select
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  disabled={editingDisabled}
+                  className={inputClasses}
+                >
+                  <option value="">—</option>
+                  {stateOptions.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {category === "Unofficial" ? (
+              <label className="block">
+                <span className="text-sm font-medium text-foreground mb-1.5 block">
+                  Format
+                </span>
+                <select
+                  value={unofficialFormat}
+                  onChange={(e) =>
+                    setUnofficialFormat(e.target.value as FormatId | "Other")
+                  }
+                  disabled={editingDisabled}
+                  className={inputClasses}
+                >
+                  {FORMAT_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {id}
+                    </option>
+                  ))}
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+            ) : (
+              <div>
+                <span className="text-sm font-medium text-foreground mb-1.5 block">
+                  Format
+                </span>
+                <div className="w-full flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-2.5">
+                  <span className="font-medium text-foreground">
+                    {plan
+                      ? plan.deck_format
+                      : normalizeTournamentFormat(savedInfo.deck_format) ?? "—"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {category ? "Set by the category" : "Pick a category to set this"}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {plan && (
+              <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-1">
+                <p className="text-xs font-medium text-foreground">On save:</p>
+                <ul className="text-xs text-muted-foreground space-y-0.5">
+                  {plan.name && (
+                    <li>
+                      Renames to <span className="text-foreground">{plan.name}</span>
+                    </li>
+                  )}
+                  {plan.max_score !== undefined && (
+                    <li>
+                      Lost Souls {tournamentInfo.max_score} → {plan.max_score}
+                    </li>
+                  )}
+                  {plan.round_length !== undefined && (
+                    <li>
+                      Round length {tournamentInfo.round_length} → {plan.round_length} min
+                    </li>
+                  )}
+                  {plan.require_decklists !== undefined && (
+                    <li>
+                      Decklists {plan.require_decklists ? "required" : "no longer required"}
+                    </li>
+                  )}
+                  {!plan.name &&
+                    plan.max_score === undefined &&
+                    plan.round_length === undefined &&
+                    plan.require_decklists === undefined && (
+                      <li>No other settings change.</li>
+                    )}
+                </ul>
+              </div>
+            )}
+
+            {formatChanging && submittedCount > 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  {submittedCount} submitted decklist{submittedCount === 1 ? " was" : "s were"}{" "}
+                  checked against{" "}
+                  {normalizeTournamentFormat(savedInfo.deck_format) ?? "no format"}. Changing
+                  the format won&apos;t re-check {submittedCount === 1 ? "it" : "them"} — the
+                  legality badges will be stale.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Status row (always read-only) */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="rounded-lg bg-muted/40 border border-border p-3">
@@ -474,12 +776,40 @@ export default function TournamentSettings({
           )}
 
           {!editingDisabled && (
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
-              {isDirty && saveStatus !== "saving" && (
-                <span className="text-xs text-muted-foreground">
-                  You have unsaved changes
-                </span>
-              )}
+            // Sticky so the button and its status stay on screen while the host
+            // scrolls this (very tall) form. -mx/-mb pull it out of the card's
+            // padding so the backdrop spans the full width.
+            <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 mt-2 px-4 sm:px-6 py-3 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 flex items-center justify-end gap-3 flex-wrap">
+              <div
+                className="text-xs flex items-center gap-1.5 mr-auto"
+                aria-live="polite"
+              >
+                {saveStatus === "saving" && (
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Saving…
+                  </span>
+                )}
+                {saveStatus === "saved" && (
+                  <span className="text-primary flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5" />
+                    Saved
+                  </span>
+                )}
+                {saveStatus === "error" && (
+                  <span className="text-destructive">
+                    Failed to save{saveError ? `: ${saveError}` : ""}
+                  </span>
+                )}
+                {saveStatus === "idle" &&
+                  (isDirty ? (
+                    <span className="text-amber-600 dark:text-amber-500">
+                      Unsaved changes
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">No changes to save</span>
+                  ))}
+              </div>
               <button
                 type="button"
                 onClick={handleSave}

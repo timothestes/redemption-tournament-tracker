@@ -99,6 +99,9 @@ const PROMO_DATA: Record<number, PromoCard[]> = {
     { label: "Worker", cardName: 'Lost Soul "Crowds" (2025 Promo)', imgFile: "Lost-Soul-Crowds-Worker" },
   ],
   2026: [
+    { label: "1st Place", cardName: "Son of God (National Promo 2026)", imgFile: "Son-of-God-Nativity-1st-Place" },
+    { label: "2nd Place", cardName: 'Lost Soul "Forsaken" (National Promo 2026)', imgFile: "Lost-Soul-Forsaken-2nd-Place" },
+    { label: "3rd Place", cardName: "Warrior Overtaken (National Promo 2026)", imgFile: "Warrior-Overtaken-3rd-Place" },
     { label: "Participation", cardName: "Ruth, the Retainer", imgFile: "Ruth-the-Retainer-Participation" },
   ],
 };

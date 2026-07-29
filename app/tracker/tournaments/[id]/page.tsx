@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "../../../../components/ui/button";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { HiPencil } from "react-icons/hi";
 import { Wrench, RefreshCw, Unlock, SquarePen } from "lucide-react";
@@ -11,6 +11,7 @@ import EditParticipantModal from "../../../../components/ui/EditParticipantModal
 import EditTournamentNameModal from "../../../../components/ui/EditTournamentNameModal";
 import TournamentStartModal from "../../../../components/ui/TournamentStartModal";
 import TournamentTabs from "../../../../components/ui/TournamentTabs";
+import QRJoinDialog from "../../../../components/ui/QRJoinDialog";
 import Breadcrumb from "../../../../components/ui/breadcrumb";
 import ToastNotification from "../../../../components/ui/toast-notification";
 import { createClient } from "../../../../utils/supabase/client";
@@ -18,7 +19,12 @@ import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
 import { createPairing } from "../../../../utils/tournament/pairingUtilsV2";
 import { buildStateFromSupabase } from "../../../../utils/tournament/stateAdapter";
 import { recomputeTotalsFromHistory } from "../../../../lib/tournament/results";
-import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
+import {
+  loadTournamentDecklistsAction,
+  setResultsPublishedAction,
+  publishTournamentDecklistsAction,
+  type TournamentDecklistRow,
+} from "../actions";
 import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
 import { RegeneratePairingsButton } from "../../../../components/ui/RegeneratePairingsButton";
 import { UnlockAndRepairDialog, type ScoredMatch } from "../../../../components/ui/UnlockAndRepairDialog";
@@ -38,6 +44,11 @@ import {
 
 const supabase = createClient();
 
+// How often the pre-start page re-reads the roster. Short enough that a player
+// scanning the QR at the check-in table appears while the host is still looking
+// at the screen; long enough to stay cheap for a tab left open all morning.
+const CHECK_IN_POLL_MS = 8000;
+
 export default function TournamentPage({
   params,
 }: {
@@ -55,6 +66,10 @@ export default function TournamentPage({
     useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
+  // Bumped per request so a slow response from an earlier fetch can't overwrite
+  // the result of a later one — see fetchParticipants / fetchDecklists.
+  const participantsSeqRef = useRef(0);
+  const decklistsSeqRef = useRef(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTournamentName, setNewTournamentName] = useState("");
   const [showStartModal, setShowStartModal] = useState(false);
@@ -75,7 +90,9 @@ export default function TournamentPage({
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [showPairingNotice, setShowPairingNotice] = useState(true);
   const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
+  const [usernames, setUsernames] = useState<Map<string, string>>(new Map());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [qrJoinDialogOpen, setQrJoinDialogOpen] = useState(false);
 
   // Confirmation dialogs
   const [endTournamentConfirmOpen, setEndTournamentConfirmOpen] = useState(false);
@@ -166,8 +183,15 @@ export default function TournamentPage({
     }
   };
 
-  const fetchParticipants = async () => {
+  // useCallback so the check-in poller below can depend on a stable identity —
+  // a fresh function each render would reset its interval before it ever fires.
+  const fetchParticipants = useCallback(async () => {
     if (!id) return;
+    // Reads now come from two places — host actions and the background poller —
+    // so responses can land out of order. A slow poll issued BEFORE a delete
+    // resolving AFTER it would resurrect the deleted row until the next tick.
+    // Ignore any response that isn't from the newest request.
+    const seq = ++participantsSeqRef.current;
     try {
       const { data, error } = await supabase
         .from("participants")
@@ -175,13 +199,41 @@ export default function TournamentPage({
         .eq("tournament_id", id)
         .order("match_points", { ascending: false });
       if (error) throw error;
-      setParticipants(data);
+      if (seq !== participantsSeqRef.current) return;
+      // Skip the state write when nothing changed: a new array identity on
+      // every tick re-fires the profiles lookup below, turning an idle page
+      // into three requests every poll for data that never moved.
+      setParticipants((prev) =>
+        JSON.stringify(prev) === JSON.stringify(data) ? prev : data
+      );
     } catch (error) {
       console.error("Error fetching participants:", error);
     } finally {
-      setLoading(false);
+      if (seq === participantsSeqRef.current) setLoading(false);
     }
-  };
+  }, [id]);
+
+  // Batched profile lookup for the account-linkage badge (Task 9 Step 1) —
+  // one query for every distinct user_id currently on the roster. Profiles
+  // are publicly readable, so this runs on the regular client, not admin.
+  useEffect(() => {
+    const userIds = [...new Set(participants.map((p: any) => p.user_id).filter(Boolean))];
+    if (userIds.length === 0) {
+      setUsernames(new Map());
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("id, username")
+      .in("id", userIds)
+      .then(({ data }) => {
+        const map = new Map<string, string>();
+        for (const p of data ?? []) {
+          if (p.username) map.set(p.id, p.username);
+        }
+        setUsernames(map);
+      });
+  }, [participants]);
 
   const updateParticipant = async () => {
     if (!currentParticipant || !newParticipantName.trim()) return;
@@ -245,7 +297,37 @@ export default function TournamentPage({
     setEndTournamentConfirmOpen(true);
   };
 
-  const performEndTournament = async () => {
+  // Called after has_ended is committed, from either end path:
+  //  - Manual end (performEndTournament, below) — honors the confirm
+  //    dialog's checkbox. A single call there covers both of its internal
+  //    branches (the round gets finalized via handleEndRound first when it
+  //    wasn't already completed, but performEndTournament's own update always
+  //    runs after, so hooking it once here is sufficient — no double-fire).
+  //  - Auto end on the final round (TournamentRounds' "End Round" button —
+  //    the common case; most tournaments end this way, not via the admin
+  //    menu) — wired unconditionally with publish=true via the
+  //    onTournamentAutoPublish callback threaded through TournamentTabs,
+  //    since that path has no publish-choice dialog; the host's opt-out
+  //    there is unpublishing afterward from the Publish section.
+  // "No decklists to publish" is NORMAL for events without submissions —
+  // treated as success for the toast, not a failure.
+  const publishOnEnd = async (publish: boolean) => {
+    if (!publish) return;
+    const results = await setResultsPublishedAction(id, true);
+    const decks = await publishTournamentDecklistsAction(
+      id,
+      tournament?.deck_format ?? "Other"
+    );
+    const deckFailure =
+      decks.success === false && decks.error !== "No decklists to publish";
+    if (results.success === false || deckFailure) {
+      showToast("Ended, but publishing failed — use the Publish section.", "warning");
+    } else {
+      showToast("Tournament ended — results published.", "success");
+    }
+  };
+
+  const performEndTournament = async (publish: boolean) => {
     if (!tournament) return;
     setTogglingStatus(true);
 
@@ -290,7 +372,9 @@ export default function TournamentPage({
       if (error) throw error;
       setTournament(data);
       setActiveTab(2); // jump to Standings — the tournament is now complete
-      showToast("Tournament ended successfully!", "success");
+      // Publishing never rolls back the end — it already committed above.
+      await publishOnEnd(publish);
+      if (!publish) showToast("Tournament ended successfully!", "success");
     } catch (error) {
       showToast("Error updating tournament status.", "error");
       console.error("Error updating tournament status:", error);
@@ -641,9 +725,12 @@ export default function TournamentPage({
 
   const fetchDecklists = useCallback(async () => {
     if (!id) return;
+    const seq = ++decklistsSeqRef.current;
     const res = await loadTournamentDecklistsAction(id);
-    if (res.success) {
-      setDecklists(res.decklists);
+    if (res.success && seq === decklistsSeqRef.current) {
+      setDecklists((prev) =>
+        JSON.stringify(prev) === JSON.stringify(res.decklists) ? prev : res.decklists
+      );
     }
   }, [id]);
 
@@ -658,9 +745,52 @@ export default function TournamentPage({
     }
   }, [id]);
 
+  // Live check-in roster. QR joins and player deck submissions are written
+  // server-side (admin RPC), so the host's open page has no way to learn about
+  // them — before this, a host watching players scan the code saw nothing until
+  // they hit refresh. Poll instead of realtime: the submission tables are
+  // admin-only (RLS with no authenticated policy), so postgres_changes would
+  // deliver the join but never the decklist.
+  //
+  // Scoped tight: only once the tournament row has actually loaded (a deleted
+  // or RLS-denied id leaves `tournament` null forever behind the "not found"
+  // screen — polling that would be free of charge to nobody), only before it
+  // starts (joins are rejected after), and only while the tab is visible.
+  useEffect(() => {
+    if (!id || !tournament || tournament.has_started || tournament.has_ended) return;
+    let inFlight = false;
+    const refresh = async () => {
+      if (document.visibilityState !== "visible") return;
+      // Decklists go through a server action, and Next runs those one at a
+      // time. Letting ticks stack up behind a slow one would queue ahead of
+      // whatever the host clicks next, so skip a tick rather than pile on.
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        await Promise.all([fetchParticipants(), fetchDecklists()]);
+      } finally {
+        inFlight = false;
+      }
+    };
+    const timer = setInterval(refresh, CHECK_IN_POLL_MS);
+    // A host tabbing back mid-check-in shouldn't wait out the interval.
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [id, tournament?.has_started, tournament?.has_ended, fetchParticipants, fetchDecklists]);
+
   const isHost = !!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId);
   const numberingMode: "tables" | "seats" =
     tournament?.numbering_mode === "seats" ? "seats" : "tables";
+  // "N of M participants have decklists" — tournament_decklists has at most
+  // one row per participant, so decklists.length is exactly the submitted
+  // count regardless of source (player QR submission or host attach).
+  const decklistSummary =
+    tournament?.require_decklists === true
+      ? { submitted: decklists.length, total: participants.length }
+      : null;
 
   return (
     <div className="flex min-h-screen px-3 sm:px-5 w-full jayden-gradient-bg">
@@ -778,11 +908,14 @@ export default function TournamentPage({
                   {/* Push actions to the right */}
                   <div className="ml-auto flex items-center gap-2">
                     {/* Start Tournament — primary pre-start action stays inline so
-                        a host can see it without opening the menu. */}
+                        a host can see it without opening the menu. Outline, not
+                        green: the filled CTA belongs to the Participants toolbar
+                        (Add Participant), and two greens on one screen made it
+                        unclear which action came first. */}
                     {!tournament?.has_started && !tournament?.has_ended && (
                       <Button
                         disabled={participants.length === 0 || togglingStatus}
-                        variant="success"
+                        variant="outline"
                         onClick={handleTournamentStatusToggle}
                         size="sm"
                       >
@@ -869,6 +1002,7 @@ export default function TournamentPage({
                     decklistCount={decklists.length}
                     isPublished={tournament.decklists_published || false}
                     currentFormat={tournament.deck_format || null}
+                    resultsPublished={tournament.results_published || false}
                     onPublishChange={() => {
                       fetchTournamentDetails();
                       fetchDecklists();
@@ -937,6 +1071,11 @@ export default function TournamentPage({
               // refresh both so Standings doesn't render stale zeros.
               await Promise.all([fetchTournamentDetails(), fetchParticipants()]);
             }}
+            // Fires only when the FINAL round's End Round button completes the
+            // tournament — the common way tournaments end (no confirm dialog
+            // exists on this path, unlike the admin-menu End Tournament flow),
+            // so it always publishes.
+            onTournamentAutoPublish={() => publishOnEnd(true)}
             onRoundActiveChange={(isActive, roundStartTime) => {
               setIsRoundActive(isActive);
               fetchTournamentDetails();
@@ -949,6 +1088,10 @@ export default function TournamentPage({
             fetchParticipants={fetchParticipants}
             decklists={decklists}
             onDecklistsChange={fetchDecklists}
+            usernames={usernames}
+            onOpenQrJoin={() => setQrJoinDialogOpen(true)}
+            onTournamentUpdated={fetchTournamentDetails}
+            decklistSummary={decklistSummary}
             onRepairCompleted={() => {
               fetchParticipants();
               fetchTournamentDetails();
@@ -1108,7 +1251,16 @@ export default function TournamentPage({
           defaultByeDifferential={tournament?.bye_differential}
           defaultStartingTableNumber={tournament?.starting_table_number}
           defaultSoundNotifications={tournament?.sound_notifications}
+          decklistSummary={decklistSummary}
         />
+        {tournament && !tournament.has_started && !tournament.has_ended && (
+          <QRJoinDialog
+            tournament={tournament}
+            isOpen={qrJoinDialogOpen}
+            onClose={() => setQrJoinDialogOpen(false)}
+            onTournamentUpdated={fetchTournamentDetails}
+          />
+        )}
         {tournament && (
           // Typed-confirmation gate — owner explicitly wanted a higher bar
           // than the standard ConfirmationDialog primitive for the only host
@@ -1118,8 +1270,8 @@ export default function TournamentPage({
             onOpenChange={setEndTournamentConfirmOpen}
             tournamentName={tournament.name ?? ""}
             isEnding={togglingStatus}
-            onConfirm={async () => {
-              await performEndTournament();
+            onConfirm={async (publish) => {
+              await performEndTournament(publish);
               setEndTournamentConfirmOpen(false);
             }}
           />

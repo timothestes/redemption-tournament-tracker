@@ -9,7 +9,8 @@ import { Button } from "../../../components/ui/button";
 import { HiPencil, HiTrash, HiPlus, HiOutlineDesktopComputer } from "react-icons/hi";
 import { useRouter, useSearchParams } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
-import { categoryDefaults } from "../../../utils/tournament/categoryDefaults";
+import { categoryDefaults, requireDecklistsDefault } from "../../../utils/tournament/categoryDefaults";
+import { normalizeTier } from "../../../utils/tournament/tiers";
 import { getFormatDef } from "@/lib/formats";
 
 const supabase = createClient();
@@ -24,9 +25,11 @@ function TournamentsPageInner() {
     useState(false);
   const [currentTournament, setCurrentTournament] = useState(null);
   const [newTournamentName, setNewTournamentName] = useState("");
-  const [prefillName, setPrefillName] = useState("");
+  const [listingCity, setListingCity] = useState("");
   const [fromListingId, setFromListingId] = useState<string | null>(null);
   const [listingFormats, setListingFormats] = useState<string[]>([]);
+  const [listingTier, setListingTier] = useState<string | null>(null);
+  const [listingState, setListingState] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -37,12 +40,19 @@ function TournamentsPageInner() {
 
     // Auto-open modal if coming from "Host This Event" on /tournaments
     const listingId = searchParams.get("from_listing");
-    const name = searchParams.get("name");
+    const city = searchParams.get("city");
     const formats = searchParams.get("formats");
-    if (listingId && name) {
-      setPrefillName(name);
+    // The listing's advertised tournament_type is free text ("South Central
+    // Regional"); normalizeTier collapses it onto a canonical tier, or null if
+    // it's something we don't recognize.
+    const type = searchParams.get("type");
+    const state = searchParams.get("state");
+    if (listingId) {
+      setListingCity(city ?? "");
+      setListingState(state);
       setFromListingId(listingId);
       setListingFormats(formats ? formats.split("|").filter(Boolean) : []);
+      setListingTier(normalizeTier(type));
       setisAddTournamentModalOpen(true);
     }
   }, [searchParams]);
@@ -67,7 +77,13 @@ function TournamentsPageInner() {
   // creates one per checked type in a single insert; when hosting from a listing
   // they share its listing_id and group under one event card.
   const handleAddTournament = async (
-    items: { name: string; category: string | null }[]
+    items: {
+      name: string;
+      category: string | null;
+      tier: string | null;
+      city: string | null;
+      state: string | null;
+    }[]
   ) => {
     if (items.length === 0) return;
     try {
@@ -87,13 +103,17 @@ function TournamentsPageInner() {
         return;
       }
 
-      const rows = items.map(({ name, category }) => {
+      const rows = items.map(({ name, category, tier, city, state }) => {
         const row: Record<string, unknown> = { name, host_id: user.id };
         if (fromListingId) row.listing_id = fromListingId;
+        if (tier) row.tier = tier;
+        if (city) row.city = city;
+        if (state) row.state = state;
         // A chosen category records the format and pre-fills sensible settings the
         // host can still change later in Tournament Settings.
         if (category) {
           row.category = category;
+          row.require_decklists = requireDecklistsDefault(category);
           const defaults = categoryDefaults(category);
           row.deck_format = defaults.deck_format;
           row.max_score = defaults.max_score;
@@ -117,8 +137,10 @@ function TournamentsPageInner() {
             .update({ linked_tournament_id: data[0].id })
             .eq("id", fromListingId);
           setFromListingId(null);
-          setPrefillName("");
+          setListingCity("");
           setListingFormats([]);
+          setListingTier(null);
+          setListingState(null);
           // Clean up URL params
           router.replace("/tracker/tournaments", { scroll: false });
         }
@@ -132,9 +154,17 @@ function TournamentsPageInner() {
 
   // Open the create modal pre-targeted at an existing event's listing so the
   // host can add a category that was played later (or skipped on the day).
-  const openHostAnotherCategory = (listingId: string, baseName: string) => {
+  // Tier and location are inherited from the siblings so the new category's
+  // generated name matches the rest of the event. Not every sibling
+  // necessarily has them set, so scan the whole group rather than just the
+  // most recent one. Note: the generated date is today's, not the original
+  // event date — a category added after the fact carries the date it was
+  // created.
+  const openHostAnotherCategory = (listingId: string, group: any[]) => {
     setFromListingId(listingId);
-    setPrefillName(baseName);
+    setListingCity(group.map((t) => t.city).find(Boolean) ?? "");
+    setListingState(group.map((t) => t.state).find(Boolean) ?? null);
+    setListingTier(group.map((t) => t.tier).find(Boolean) ?? null);
     setListingFormats([]);
     setisAddTournamentModalOpen(true);
   };
@@ -327,14 +357,18 @@ function TournamentsPageInner() {
               setisAddTournamentModalOpen(false);
               if (fromListingId) {
                 setFromListingId(null);
-                setPrefillName("");
+                setListingCity("");
                 setListingFormats([]);
+                setListingTier(null);
+                setListingState(null);
                 router.replace("/tracker/tournaments", { scroll: false });
               }
             }}
             onSubmit={handleAddTournament}
-            defaultName={prefillName}
+            listingCity={listingCity}
             categoryOptions={listingFormats.length > 0 ? listingFormats : undefined}
+            listingState={listingState}
+            defaultTier={listingTier}
           />
         </div>
         {loading ? (
@@ -371,7 +405,7 @@ function TournamentsPageInner() {
                   <Button
                     variant="outline"
                     onClick={() =>
-                      openHostAnotherCategory(listingId, group[0].name)
+                      openHostAnotherCategory(listingId, group)
                     }
                     className="flex items-center gap-1.5 flex-shrink-0 text-xs px-2.5 py-1.5"
                   >

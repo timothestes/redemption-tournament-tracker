@@ -1,11 +1,19 @@
 import React, { useMemo, useState } from "react";
 import { Table } from "flowbite-react";
 import { HiPencil, HiTrash } from "react-icons/hi";
-import { BookOpen, CircleMinus, CirclePlus, Crown, Link2Off } from "lucide-react";
+import { BookOpen, CircleMinus, CirclePlus, Crown, Link2Off, RefreshCw } from "lucide-react";
 import AttachDeckDialog from "./AttachDeckDialog";
 import type { TournamentDecklistRow, DeckSearchResult } from "../../app/tracker/tournaments/actions";
-import { attachDeckToParticipantAction, detachDeckFromParticipantAction } from "../../app/tracker/tournaments/actions";
+import {
+  attachDeckToParticipantAction,
+  detachDeckFromParticipantAction,
+  recheckAllSubmissionsAction,
+  removeParticipantWithBlockAction,
+} from "../../app/tracker/tournaments/actions";
 import ConfirmationDialog from "./confirmation-dialog";
+import SubmissionModal, { LegalityDot } from "./SubmissionModal";
+import ToastNotification from "./toast-notification";
+import { Dialog, DialogContent, DialogHeader, DialogFooter } from "./dialog";
 
 interface Participant {
   id: string;
@@ -14,6 +22,7 @@ interface Participant {
   differential: number;
   dropped_out: boolean;
   assigned_seat?: number | null;
+  user_id?: string | null;
 }
 
 interface ParticipantTableProps {
@@ -31,6 +40,11 @@ interface ParticipantTableProps {
   decklists: TournamentDecklistRow[];
   onDecklistsChange: () => void;
   numberingMode: "tables" | "seats";
+  // participant.user_id -> profiles.username, batched once on the page.
+  usernames?: Map<string, string>;
+  isHost?: boolean;
+  // Refreshes the participant roster — used after Remove & block deletes a row.
+  fetchParticipants?: () => void;
 }
 
 const ParticipantTable: React.FC<ParticipantTableProps> = ({
@@ -46,11 +60,32 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
   decklists,
   onDecklistsChange,
   numberingMode,
+  usernames = new Map(),
+  isHost = false,
+  fetchParticipants,
 }) => {
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
   const [attachTarget, setAttachTarget] = useState<Participant | null>(null);
   const [dropTarget, setDropTarget] = useState<Participant | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Participant | null>(null);
+  const [removeBlockTarget, setRemoveBlockTarget] = useState<Participant | null>(null);
+  const [submissionTarget, setSubmissionTarget] = useState<Participant | null>(null);
+  // Detaching a player-submitted decklist deletes the immutable submission
+  // record (spec §8) — that needs a confirmation step. Detaching a
+  // host-attached deck (no submission) stays a single click.
+  const [detachSubmissionTarget, setDetachSubmissionTarget] = useState<Participant | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    show: boolean;
+    type?: "success" | "error" | "warning" | "info";
+  }>({ message: "", show: false, type: "success" });
+
+  const showToast = (
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "success"
+  ) => {
+    setToast({ message, show: true, type });
+  };
 
   const decklistMap = useMemo(() => {
     const map = new Map<string, TournamentDecklistRow>();
@@ -101,6 +136,41 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
     }
   }
 
+  async function handleRemoveWithBlock(participant: Participant, block: boolean) {
+    setRemoveBlockTarget(null);
+    const result = await removeParticipantWithBlockAction(tournamentId, participant.id, block);
+    if (result.success) {
+      fetchParticipants?.();
+      showToast(
+        block
+          ? `Removed ${participant.name} and blocked their account from rejoining.`
+          : `Removed ${participant.name}.`,
+        "success"
+      );
+    } else {
+      showToast("Error removing participant.", "error");
+    }
+  }
+
+  // Season-boundary tool (spec §7): re-validates every submission against the
+  // tournament's current format. No declared format -> no legality verdict is
+  // possible, which the action reports as "format_required" — that's expected
+  // configuration state, not a failure, so it gets an informational toast.
+  async function handleRecheckAll() {
+    const result = await recheckAllSubmissionsAction(tournamentId);
+    if (result.success) {
+      showToast(
+        `${result.rechecked} re-checked, ${result.nowIllegal} now illegal`,
+        result.nowIllegal > 0 ? "warning" : "success"
+      );
+      onDecklistsChange();
+    } else if (result.error === "format_required") {
+      showToast("Set a format for this tournament first, then re-check decklists.", "info");
+    } else {
+      showToast("Error re-checking decklists.", "error");
+    }
+  }
+
   function renderActionButtons(participant: Participant) {
     return (
       <div className="flex items-center gap-1">
@@ -133,7 +203,11 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
           )
         ) : (
           <button
-            onClick={() => setDeleteTarget(participant)}
+            onClick={() =>
+              participant.user_id != null
+                ? setRemoveBlockTarget(participant)
+                : setDeleteTarget(participant)
+            }
             className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 touch-manipulation transition-colors"
             aria-label={`Delete ${participant.name}`}
             title="Remove participant"
@@ -148,22 +222,46 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
   function renderDeckCell(participant: Participant) {
     const linkedDeck = decklistMap.get(participant.id);
     if (linkedDeck) {
+      const sub = linkedDeck.submission;
+      // The `decks` join fails when deck_id is null (deleted) or private/
+      // inaccessible — loadTournamentDecklistsAction then falls back
+      // deck_name to the literal "Unknown". Only link out when there's an
+      // actual deck to land on.
+      const linkable = linkedDeck.deck_id != null && linkedDeck.deck_name !== "Unknown";
+
       return (
         <div className="flex items-center gap-2 min-w-0">
-          <a
-            href={`/decklist/${linkedDeck.deck_id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline truncate"
-            title={linkedDeck.deck_name}
-          >
-            {linkedDeck.deck_name}
-          </a>
+          {sub ? (
+            <button
+              onClick={() => setSubmissionTarget(participant)}
+              className="flex items-center gap-1.5 min-w-0 text-sm text-foreground hover:text-primary transition-colors"
+              title={`${sub.deckName} — view submission`}
+            >
+              <LegalityDot isLegal={sub.isLegal} />
+              <span className="truncate">{sub.deckName}</span>
+            </button>
+          ) : linkable ? (
+            <a
+              href={`/decklist/${linkedDeck.deck_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline truncate"
+              title={linkedDeck.deck_name}
+            >
+              {linkedDeck.deck_name}
+            </a>
+          ) : (
+            <span className="text-sm text-muted-foreground truncate" title={linkedDeck.deck_name}>
+              {linkedDeck.deck_name}
+            </span>
+          )}
           <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
-            {linkedDeck.deck_card_count}c
+            {sub ? sub.cardCount : linkedDeck.deck_card_count}c
           </span>
           <button
-            onClick={() => handleDetachDeck(participant.id)}
+            onClick={() =>
+              sub ? setDetachSubmissionTarget(participant) : handleDetachDeck(participant.id)
+            }
             className="p-1 -m-0.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
             title="Remove deck"
             aria-label={`Remove deck from ${participant.name}`}
@@ -187,8 +285,21 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
     );
   }
 
+  const hasAnySubmission = decklists.some((dl) => dl.submission !== null);
+
   return (
     <>
+      {isHost && hasAnySubmission && (
+        <div className="mb-3 flex justify-end">
+          <button
+            onClick={handleRecheckAll}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Re-check all decklists
+          </button>
+        </div>
+      )}
       {/* Mobile card list */}
       <ul className="md:hidden space-y-2">
         {sortedParticipants.map((participant) => {
@@ -211,6 +322,14 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                     <span className="font-medium text-foreground truncate">
                       {participant.name}
                     </span>
+                    {participant.user_id != null && usernames.get(participant.user_id) && (
+                      <span
+                        className="text-xs text-muted-foreground flex-shrink-0"
+                        title={`Joined via QR with account @${usernames.get(participant.user_id)}`}
+                      >
+                        @{usernames.get(participant.user_id)}
+                      </span>
+                    )}
                     {participant.dropped_out && (
                       <span className="text-destructive text-[11px] flex-shrink-0 uppercase tracking-wide">
                         Dropped
@@ -281,6 +400,14 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                         <Crown className="w-4 h-4 text-orange-300 flex-shrink-0" />
                       )}
                       <span className="truncate">{participant.name}</span>
+                      {participant.user_id != null && usernames.get(participant.user_id) && (
+                        <span
+                          className="text-xs text-muted-foreground flex-shrink-0"
+                          title={`Joined via QR with account @${usernames.get(participant.user_id)}`}
+                        >
+                          @{usernames.get(participant.user_id)}
+                        </span>
+                      )}
                       {participant.dropped_out && (
                         <span className="text-destructive text-[11px] flex-shrink-0 uppercase tracking-wide">Dropped</span>
                       )}
@@ -340,6 +467,77 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
         description="This permanently removes them from the tournament."
         confirmLabel="Delete"
         cancelLabel="Cancel"
+      />
+
+      {/* Detach on a player-submitted row deletes the immutable submission
+          record (spec §8) — unlike a host-attached deck, that needs a
+          confirmation step. */}
+      <ConfirmationDialog
+        open={detachSubmissionTarget !== null}
+        onOpenChange={(open) => { if (!open) setDetachSubmissionTarget(null); }}
+        onConfirm={() => {
+          if (detachSubmissionTarget) handleDetachDeck(detachSubmissionTarget.id);
+        }}
+        variant="destructive"
+        title={detachSubmissionTarget ? `Remove ${detachSubmissionTarget.name}'s deck?` : ""}
+        description="This player submitted this decklist themselves. Removing it deletes their submitted record — this cannot be undone."
+        confirmLabel="Remove deck"
+        cancelLabel="Cancel"
+      />
+
+      {/* Remove & block — user-linked rows only. ConfirmationDialog only
+          supports a single confirm action, so this is a bespoke two-button
+          confirm built from the same Dialog primitives. */}
+      <Dialog
+        open={removeBlockTarget !== null}
+        onOpenChange={(open) => { if (!open) setRemoveBlockTarget(null); }}
+      >
+        <DialogContent size="md">
+          <DialogHeader className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+            <h3 className="text-lg font-semibold text-foreground">
+              {removeBlockTarget ? `Remove ${removeBlockTarget.name}?` : ""}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              This permanently removes them from the tournament. They joined with a linked
+              account — you can also block that account from rejoining this event.
+            </p>
+          </DialogHeader>
+          <DialogFooter className="justify-end flex-wrap">
+            <button
+              onClick={() => setRemoveBlockTarget(null)}
+              className="px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => removeBlockTarget && handleRemoveWithBlock(removeBlockTarget, false)}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+            >
+              Remove
+            </button>
+            <button
+              onClick={() => removeBlockTarget && handleRemoveWithBlock(removeBlockTarget, true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-800 hover:bg-red-900 rounded-lg transition-colors"
+            >
+              Remove &amp; block
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <SubmissionModal
+        open={submissionTarget !== null}
+        onOpenChange={(open) => { if (!open) setSubmissionTarget(null); }}
+        tournamentId={tournamentId}
+        participantId={submissionTarget?.id ?? null}
+        participantName={submissionTarget?.name ?? ""}
+      />
+
+      <ToastNotification
+        message={toast.message}
+        show={toast.show}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, show: false }))}
       />
     </>
   );

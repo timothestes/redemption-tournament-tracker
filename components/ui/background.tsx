@@ -25,6 +25,12 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
 
   const skipBackground = SKIP_BACKGROUND_PREFIXES.some(prefix => pathname.startsWith(prefix));
 
+  // Most pages render the app nav in the top 56px, so the hero starts at
+  // top-14 to sit below it. The public /join pages have no nav, so that
+  // offset leaves an empty dark band at the top — let the hero go full-bleed
+  // there instead.
+  const heroTop = pathname.startsWith("/join") ? "top-0" : "top-14";
+
   if (skipBackground) {
     return (
       <div className="min-h-screen w-full bg-background">
@@ -41,7 +47,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
         <div className={`absolute inset-0 bg-background`}></div>
 
       {/* Hero image container */}
-      <div className="fixed inset-x-0 top-14 bottom-0 overflow-hidden">
+      <div className={`fixed inset-x-0 ${heroTop} bottom-0 overflow-hidden`}>
         {/* Base background color */}
         <div className="absolute inset-0 bg-background" />
 

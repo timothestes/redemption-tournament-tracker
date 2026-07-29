@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import seed from "../../public/data/nationals-history.json";
-import { buildChampionData, getAllFormats, headToHead, playerProfile } from "./selectors";
+import { buildChampionData, getAllFormats, headToHead, playerProfile, recordsForKey } from "./selectors";
 
 const data = seed as any;
 
@@ -199,5 +199,33 @@ describe("playerProfile multiWL", () => {
     expect(p.multiDraws).toBeGreaterThanOrEqual(0);
     expect(typeof p.multiWLByFmt).toBe("object");
     expect(p.hasMulti).toBe(true);
+  });
+});
+
+describe("recordsForKey", () => {
+  it("agrees with playerProfile's per-key matchRecord for a non-Teams format", () => {
+    const key = "2026_Booster Draft";
+    const [year, format] = [2026, "Booster Draft"];
+    const records = recordsForKey(data.matches[key], format);
+    for (const r of data.results[key]) {
+      const p = playerProfile(data, r.playerName);
+      const entry = p.placements.find((h) => h.year === year && h.format === format);
+      expect(records[r.playerName]).toBe(entry?.matchRecord ?? undefined);
+    }
+  });
+
+  it("agrees with playerProfile's per-key matchRecord for Teams (round-majority collapse)", () => {
+    const key = "2026_Teams";
+    const [year, format] = [2026, "Teams"];
+    const records = recordsForKey(data.matches[key], format);
+    for (const r of data.results[key]) {
+      const p = playerProfile(data, r.playerName);
+      const entry = p.placements.find((h) => h.year === year && h.format === format);
+      expect(records[r.playerName]).toBe(entry?.matchRecord ?? undefined);
+    }
+  });
+
+  it("returns an empty object when there is no match data for the key", () => {
+    expect(recordsForKey(undefined, "T1 2-Player")).toEqual({});
   });
 });
