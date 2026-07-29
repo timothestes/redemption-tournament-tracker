@@ -11,6 +11,7 @@ import {
 } from "./dialog";
 import { getSubmissionAction } from "@/app/tracker/tournaments/actions";
 import { findCard } from "@/lib/cards/lookup";
+import CardTile from "./CardTile";
 import type { DeckSnapshot, DeckSnapshotCard } from "@/lib/tournament/deckSubmission";
 import type { DeckCheckIssue } from "@/utils/deckcheck";
 
@@ -99,6 +100,36 @@ function ZoneSection({ title, cards }: { title: string; cards: DeckSnapshotCard[
   );
 }
 
+/** Card-image grid for the same zone the list view renders as text. Uses the
+ * public deck page's CardTile so a host sees decks exactly as players do.
+ * Cards keep the list view's order (type, then name) so switching views doesn't
+ * reshuffle them mid deck-check. */
+function ZoneImages({ title, cards }: { title: string; cards: DeckSnapshotCard[] }) {
+  if (cards.length === 0) return null;
+  const total = cards.reduce((n, c) => n + c.quantity, 0);
+  const ordered = groupByType(cards).flatMap((g) => g.cards);
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-foreground">
+        {title} <span className="font-normal text-muted-foreground">({total})</span>
+      </h4>
+      <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6">
+        {ordered.map((c, i) => (
+          <CardTile
+            key={`${c.name}-${c.set}-${i}`}
+            card={{
+              card_name: c.name,
+              card_set: c.set,
+              card_img_file: c.imgFile,
+              quantity: c.quantity,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const ISSUE_COLOR: Record<DeckCheckIssue["type"], string> = {
   error: "text-destructive",
   warning: "text-amber-600 dark:text-amber-400",
@@ -115,6 +146,11 @@ export default function SubmissionModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+  // Text stays the default — it's the faster read for checking a list against
+  // a physical deck. Images are for recognising cards the host doesn't know by
+  // name. The choice sticks across opens so a host checking a row of decks
+  // picks a view once.
+  const [view, setView] = useState<"list" | "images">("list");
 
   useEffect(() => {
     if (!open || !participantId) return;
@@ -177,12 +213,30 @@ export default function SubmissionModal({
           )}
           {!loading && submission && (
             <>
-              <p className="text-xs text-muted-foreground">
-                {submission.source === "player" ? "Submitted" : "Attached"} by{" "}
-                {submission.submittedByUsername ? `@${submission.submittedByUsername}` : "unknown"}
-                {" · "}
-                {new Date(submission.submittedAt).toLocaleString()}
-              </p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  {submission.source === "player" ? "Submitted" : "Attached"} by{" "}
+                  {submission.submittedByUsername ? `@${submission.submittedByUsername}` : "unknown"}
+                  {" · "}
+                  {new Date(submission.submittedAt).toLocaleString()}
+                </p>
+                <div className="flex flex-shrink-0 rounded-md border border-border p-0.5">
+                  {(["list", "images"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setView(mode)}
+                      aria-pressed={view === mode}
+                      className={`rounded px-2 py-0.5 text-xs font-medium capitalize transition-colors ${
+                        view === mode
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {submission.isLegal === false && submission.issues.length > 0 && (
                 <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 p-3">
                   {submission.issues.map((issue, i) => (
@@ -192,8 +246,17 @@ export default function SubmissionModal({
                   ))}
                 </div>
               )}
-              <ZoneSection title="Main deck" cards={mainCards} />
-              <ZoneSection title="Reserve" cards={reserveCards} />
+              {view === "list" ? (
+                <>
+                  <ZoneSection title="Main deck" cards={mainCards} />
+                  <ZoneSection title="Reserve" cards={reserveCards} />
+                </>
+              ) : (
+                <>
+                  <ZoneImages title="Main deck" cards={mainCards} />
+                  <ZoneImages title="Reserve" cards={reserveCards} />
+                </>
+              )}
             </>
           )}
         </DialogBody>
