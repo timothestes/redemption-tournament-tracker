@@ -41,7 +41,10 @@ export default function CardTile({
 
   return (
     <div
-      className={`relative group ${interactive ? "cursor-pointer" : ""} ${compact ? "w-[calc(100%/12-4px)] min-w-[70px] -mb-6 last:mb-0" : ""}`}
+      // Sizing is the caller's grid's job. This used to hardcode a 12-column
+      // track plus a negative bottom margin, which pinned every tile to ~70px
+      // at every breakpoint and overlapped each row onto the next.
+      className={`relative group ${interactive ? "cursor-pointer" : ""}`}
       onClick={onClick}
       onMouseEnter={
         onHover
@@ -71,7 +74,7 @@ export default function CardTile({
             className="object-contain"
             sizes={
               compact
-                ? "(max-width: 640px) 25vw, (max-width: 1024px) 12.5vw, 8vw"
+                ? "(max-width: 640px) 33vw, (max-width: 1024px) 17vw, 12vw"
                 : "(max-width: 640px) 33vw, (max-width: 768px) 25vw, 16vw"
             }
             loading="lazy"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,9 @@ import {
 } from "./dialog";
 import { getSubmissionAction } from "@/app/tracker/tournaments/actions";
 import { findCard } from "@/lib/cards/lookup";
+import { getCardImageUrl } from "@/app/shared/utils/cardImageUrl";
 import CardTile from "./CardTile";
+import CardEnlargeModal from "./CardEnlargeModal";
 import type { DeckSnapshot, DeckSnapshotCard } from "@/lib/tournament/deckSubmission";
 import type { DeckCheckIssue } from "@/utils/deckcheck";
 
@@ -104,7 +107,15 @@ function ZoneSection({ title, cards }: { title: string; cards: DeckSnapshotCard[
  * public deck page's CardTile so a host sees decks exactly as players do, and
  * keeps the list view's type headings — without them the grid is strictly less
  * information than the list it replaces. */
-function ZoneImages({ title, cards }: { title: string; cards: DeckSnapshotCard[] }) {
+function ZoneImages({
+  title,
+  cards,
+  onSelect,
+}: {
+  title: string;
+  cards: DeckSnapshotCard[];
+  onSelect: (card: DeckSnapshotCard) => void;
+}) {
   if (cards.length === 0) return null;
   const total = cards.reduce((n, c) => n + c.quantity, 0);
   const groups = groupByType(cards);
@@ -119,7 +130,9 @@ function ZoneImages({ title, cards }: { title: string; cards: DeckSnapshotCard[]
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {g.type}
             </p>
-            <div className="mt-1.5 grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+            {/* ~97px on a phone up to ~163px on a desktop: enough to recognise
+                the art, never enough to read the card, so tiles enlarge. */}
+            <div className="mt-1.5 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
               {g.cards.map((c, i) => (
                 <CardTile
                   key={`${c.name}-${c.set}-${i}`}
@@ -129,6 +142,7 @@ function ZoneImages({ title, cards }: { title: string; cards: DeckSnapshotCard[]
                     card_img_file: c.imgFile,
                     quantity: c.quantity,
                   }}
+                  onClick={() => onSelect(c)}
                 />
               ))}
             </div>
@@ -136,6 +150,28 @@ function ZoneImages({ title, cards }: { title: string; cards: DeckSnapshotCard[]
         ))}
       </div>
     </div>
+  );
+}
+
+/** The enlarged face for one snapshot card — name-only when the art is missing,
+ * mirroring CardTile's fallback. */
+function EnlargedFace({ card }: { card: DeckSnapshotCard }) {
+  const src = getCardImageUrl(card.imgFile || "");
+  if (!src) {
+    return (
+      <div className="flex aspect-[2.5/3.5] w-full items-center justify-center rounded-lg bg-muted p-4 text-center text-sm font-medium text-muted-foreground">
+        {card.name}
+      </div>
+    );
+  }
+  return (
+    <Image
+      src={src}
+      alt={card.name}
+      width={500}
+      height={700}
+      className="h-auto w-full rounded-lg shadow-2xl"
+    />
   );
 }
 
@@ -160,6 +196,7 @@ export default function SubmissionModal({
   // name. The choice sticks across opens so a host checking a row of decks
   // picks a view once.
   const [view, setView] = useState<"list" | "images">("list");
+  const [enlarged, setEnlarged] = useState<DeckSnapshotCard | null>(null);
 
   useEffect(() => {
     if (!open || !participantId) return;
@@ -199,11 +236,21 @@ export default function SubmissionModal({
     if (!open) {
       setSubmission(null);
       setError(null);
+      setEnlarged(null);
     }
   }, [open]);
 
   const mainCards = submission?.snapshot.cards.filter((c) => c.zone === "main") ?? [];
   const reserveCards = submission?.snapshot.cards.filter((c) => c.zone === "reserve") ?? [];
+
+  // Flat display order (main groups → reserve groups) for the enlarged card's
+  // prev/next. `groupByType` hands back the very snapshot objects ZoneImages
+  // renders, so identity is enough to locate the clicked card.
+  const navCards = [...groupByType(mainCards), ...groupByType(reserveCards)].flatMap(
+    (g) => g.cards,
+  );
+  const enlargedIndex = enlarged ? navCards.indexOf(enlarged) : -1;
+  const hasNav = enlargedIndex !== -1 && navCards.length > 1;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -270,8 +317,8 @@ export default function SubmissionModal({
                 </>
               ) : (
                 <>
-                  <ZoneImages title="Main deck" cards={mainCards} />
-                  <ZoneImages title="Reserve" cards={reserveCards} />
+                  <ZoneImages title="Main deck" cards={mainCards} onSelect={setEnlarged} />
+                  <ZoneImages title="Reserve" cards={reserveCards} onSelect={setEnlarged} />
                 </>
               )}
             </>
@@ -285,6 +332,30 @@ export default function SubmissionModal({
             Close
           </button>
         </DialogFooter>
+        {/* Inside DialogContent so its backdrop click can't bubble out to the
+            Dialog root and close the whole submission modal. */}
+        {enlarged && (
+          <CardEnlargeModal
+            onClose={() => setEnlarged(null)}
+            name={enlarged.name}
+            qty={enlarged.quantity}
+            subtitle={enlarged.set}
+            nav={
+              hasNav
+                ? {
+                    index: enlargedIndex,
+                    total: navCards.length,
+                    onNavigate: (delta) =>
+                      setEnlarged(
+                        navCards[(enlargedIndex + delta + navCards.length) % navCards.length],
+                      ),
+                  }
+                : undefined
+            }
+          >
+            <EnlargedFace card={enlarged} />
+          </CardEnlargeModal>
+        )}
       </DialogContent>
     </Dialog>
   );

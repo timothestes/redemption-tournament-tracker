@@ -6,10 +6,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Link2, Check, Pencil, Copy, Loader2,
-  ChevronLeft, ChevronRight, X, LayoutGrid, GalleryVerticalEnd,
+  LayoutGrid, GalleryVerticalEnd,
 } from "lucide-react";
 import type { GrantedForgeCard } from "@/app/forge/lib/deckPool";
 import type { ForgeDeckView } from "@/app/forge/lib/deckTypes";
@@ -28,6 +28,7 @@ import {
 import { getPublicImageUrl } from "@/app/decklist/card-search/hooks/useCardImageUrl";
 import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 import ForgeShareDeckModal from "@/app/forge/components/ForgeShareDeckModal";
+import CardEnlargeModal from "@/components/ui/CardEnlargeModal";
 import { getFormatDef } from "@/lib/formats";
 
 function formatDeckType(format: string): string {
@@ -204,19 +205,6 @@ export default function DeckViewClient({ deck, granted }: { deck: ForgeDeckView;
     [navItems],
   );
 
-  useEffect(() => {
-    if (enlarged === null) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setEnlarged(null);
-      else if (e.key === "ArrowLeft") navigate(-1);
-      else if (e.key === "ArrowRight") navigate(1);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [enlarged, navigate]);
-
-  const touchStartX = useRef<number | null>(null);
-
   async function copyLink() {
     await navigator.clipboard.writeText(`${window.location.origin}/forge/play/decks/${deck.id}/view`);
     setLinkCopied(true);
@@ -244,77 +232,26 @@ export default function DeckViewClient({ deck, granted }: { deck: ForgeDeckView;
   return (
     <div className="mt-4">
       {/* Enlarged card modal — arrows/keyboard/swipe cycle through the deck */}
-      {enlarged !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-          onClick={() => setEnlarged(null)}
+      {enlarged === "paragon" ? (
+        <CardEnlargeModal onClose={() => setEnlarged(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/paragons/Paragon ${deck.paragon}.png`}
+            alt={deck.paragon ?? "Paragon"}
+            className="w-full rounded-lg shadow-2xl"
+          />
+        </CardEnlargeModal>
+      ) : enlarged !== null ? (
+        <CardEnlargeModal
+          onClose={() => setEnlarged(null)}
+          name={enlarged.name}
+          qty={enlarged.qty}
+          subtitle={enlarged.type ? prettifyTypeName(enlarged.type) : undefined}
+          nav={hasNav ? { index: enlargedIndex, total: navItems.length, onNavigate: navigate } : undefined}
         >
-          <button
-            onClick={() => setEnlarged(null)}
-            className="absolute right-4 top-4 rounded-full p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Close"
-          >
-            <X className="h-6 w-6" />
-          </button>
-          <div
-            className="flex w-full max-w-lg items-center justify-center gap-2 sm:gap-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {hasNav && (
-              <button
-                onClick={() => navigate(-1)}
-                className="hidden flex-shrink-0 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/25 sm:block"
-                aria-label="Previous card"
-              >
-                <ChevronLeft className="h-6 w-6" />
-              </button>
-            )}
-            <div
-              className="w-full max-w-sm"
-              onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
-              onTouchEnd={(e) => {
-                const start = touchStartX.current;
-                touchStartX.current = null;
-                if (start === null) return;
-                const dx = e.changedTouches[0].clientX - start;
-                if (Math.abs(dx) > 48) navigate(dx > 0 ? -1 : 1);
-              }}
-            >
-              {enlarged === "paragon" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`/paragons/Paragon ${deck.paragon}.png`}
-                  alt={deck.paragon ?? "Paragon"}
-                  className="w-full rounded-lg shadow-2xl"
-                />
-              ) : (
-                <>
-                  <CardFace item={enlarged} />
-                  <div className="mt-3 text-center">
-                    <p className="text-sm font-semibold text-white">
-                      {enlarged.name}
-                      {enlarged.qty > 1 && <span className="font-normal text-white/70"> ×{enlarged.qty}</span>}
-                    </p>
-                    <p className="text-xs text-white/70">
-                      {enlarged.type && `${prettifyTypeName(enlarged.type)}`}
-                      {hasNav && `${enlarged.type ? " · " : ""}${enlargedIndex + 1} of ${navItems.length}`}
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-            {hasNav && (
-              <button
-                onClick={() => navigate(1)}
-                className="hidden flex-shrink-0 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/25 sm:block"
-                aria-label="Next card"
-              >
-                <ChevronRight className="h-6 w-6" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+          <CardFace item={enlarged} />
+        </CardEnlargeModal>
+      ) : null}
 
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
