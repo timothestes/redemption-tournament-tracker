@@ -616,6 +616,9 @@ describe("publishTournamentDecklistsAction — snapshot-first", () => {
             deckFormat: "Limited",
             cards: [
               { name: "Snapshot Card", set: "TPC", imgFile: "snap.jpg", quantity: 3, zone: "main" },
+              // Reserve cards must not reach card_count — without one here the
+              // main-only reduce and an all-zone reduce give the same answer.
+              { name: "Reserve Card", set: "TPC", imgFile: "res.jpg", quantity: 7, zone: "reserve" },
             ],
           },
         },
@@ -640,22 +643,34 @@ describe("publishTournamentDecklistsAction — snapshot-first", () => {
 
     expect(r).toEqual({ success: true });
 
-    // The live-deck path must never fire: only the insert-then-select("id")
-    // chain touches decks.select, never the "name, description, format..."
-    // live-deck fetch.
-    expect(decks.select).toHaveBeenCalledTimes(1);
+    // The live deck may be consulted for ONE thing — the cover art the player
+    // hand-picked, which lives on the deck row and not in the snapshot. Cards
+    // and metadata must still come from the snapshot, so the "name,
+    // description, format..." live-deck fetch must never fire.
+    expect(decks.select).toHaveBeenCalledWith("preview_card_1, preview_card_2");
     expect(decks.select).toHaveBeenCalledWith("id");
+    expect(decks.select).not.toHaveBeenCalledWith(
+      expect.stringContaining("description")
+    );
 
     expect(decks.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         user_id: REDEMPTIONCCG_USER_ID,
         name: "Timmy - 1st Place - Spring Open",
+        // Main only — the 7 reserve cards in the snapshot don't count.
         card_count: 3,
         is_legal: true,
         deckcheck_issues: null,
         visibility: "public",
       })
     );
+
+    // The bug this replaced: published copies from a snapshot got null covers
+    // and rendered as blank tiles on the community decks page. Assert the
+    // wiring, not just the helper — reverting the call site must fail here.
+    const published = decks.insert.mock.calls[0][0];
+    expect(published.preview_card_1).toBe("snap.jpg");
+    expect(published.preview_card_1).not.toBeNull();
 
     expect(deckCards.insert).toHaveBeenCalledWith([
       {
@@ -665,6 +680,14 @@ describe("publishTournamentDecklistsAction — snapshot-first", () => {
         card_img_file: "snap.jpg",
         quantity: 3,
         zone: "main",
+      },
+      {
+        deck_id: "new-deck-1",
+        card_name: "Reserve Card",
+        card_set: "TPC",
+        card_img_file: "res.jpg",
+        quantity: 7,
+        zone: "reserve",
       },
     ]);
 

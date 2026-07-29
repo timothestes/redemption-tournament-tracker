@@ -52,11 +52,39 @@ describe("derivePreviewCards", () => {
     ]);
   });
 
-  it("never returns a preview for a deck that would publish blank", () => {
-    // Regression: the publish path hardcoded null previews for submission
-    // snapshots, so QR-submitted decks landed on the community page with no
-    // cover art at all.
-    const [p1] = derivePreviewCards([HERO, EVIL]);
-    expect(p1).not.toBeNull();
+  it("never repeats the same card in both slots", () => {
+    // Real case, 1 deck in prod: hero sits at main[1] and there is no exact
+    // Evil Character, so an independent positional fallback for slot 2 returned
+    // the hero again — the community tile rendered the same art twice.
+    const [p1, p2] = derivePreviewCards([ARTIFACT, HERO]);
+    expect(p1).toBe("Aaron_(Di)");
+    expect(p2).toBe("CoW_AB_N03-Aarons-Staff-R");
+    expect(p2).not.toBe(p1);
+  });
+
+  it("returns a single preview rather than a duplicate for a one-card deck", () => {
+    expect(derivePreviewCards([HERO])).toEqual(["Aaron_(Di)", null]);
+  });
+
+  it("matches dual-typed cards", () => {
+    // "Behemoth" is GE/Evil Character. An exact-equality type check misses it,
+    // so a deck whose only EC is dual-typed silently falls through to a
+    // positional pick. Two prod decks are in exactly that shape.
+    const dualEvil = card("Behemoth (RoJ AB)", "RoJ (AB)", "RoJ_AB_N25-Behemoth-R");
+    expect(derivePreviewCards([HERO, ARTIFACT, dualEvil])).toEqual([
+      "Aaron_(Di)",
+      "RoJ_AB_N25-Behemoth-R",
+    ]);
+  });
+
+  it("skips cards with no usable art instead of storing a blank cover", () => {
+    // Storing a null imgFile would publish exactly the blank tile this
+    // function exists to prevent.
+    const artless = { ...HERO, imgFile: null };
+    const forgeRef = { ...EVIL, imgFile: "forge:abc-123" };
+    expect(derivePreviewCards([artless, forgeRef, ARTIFACT])).toEqual([
+      "CoW_AB_N03-Aarons-Staff-R",
+      null,
+    ]);
   });
 });
