@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "../../../../components/ui/button";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { HiPencil } from "react-icons/hi";
 import { Wrench, RefreshCw, Unlock, SquarePen } from "lucide-react";
@@ -44,6 +44,11 @@ import {
 
 const supabase = createClient();
 
+// How often the pre-start page re-reads the roster. Short enough that a player
+// scanning the QR at the check-in table appears while the host is still looking
+// at the screen; long enough to stay cheap for a tab left open all morning.
+const CHECK_IN_POLL_MS = 8000;
+
 export default function TournamentPage({
   params,
 }: {
@@ -61,6 +66,10 @@ export default function TournamentPage({
     useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
+  // Bumped per request so a slow response from an earlier fetch can't overwrite
+  // the result of a later one — see fetchParticipants / fetchDecklists.
+  const participantsSeqRef = useRef(0);
+  const decklistsSeqRef = useRef(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTournamentName, setNewTournamentName] = useState("");
   const [showStartModal, setShowStartModal] = useState(false);
@@ -174,8 +183,15 @@ export default function TournamentPage({
     }
   };
 
-  const fetchParticipants = async () => {
+  // useCallback so the check-in poller below can depend on a stable identity —
+  // a fresh function each render would reset its interval before it ever fires.
+  const fetchParticipants = useCallback(async () => {
     if (!id) return;
+    // Reads now come from two places — host actions and the background poller —
+    // so responses can land out of order. A slow poll issued BEFORE a delete
+    // resolving AFTER it would resurrect the deleted row until the next tick.
+    // Ignore any response that isn't from the newest request.
+    const seq = ++participantsSeqRef.current;
     try {
       const { data, error } = await supabase
         .from("participants")
@@ -183,13 +199,19 @@ export default function TournamentPage({
         .eq("tournament_id", id)
         .order("match_points", { ascending: false });
       if (error) throw error;
-      setParticipants(data);
+      if (seq !== participantsSeqRef.current) return;
+      // Skip the state write when nothing changed: a new array identity on
+      // every tick re-fires the profiles lookup below, turning an idle page
+      // into three requests every poll for data that never moved.
+      setParticipants((prev) =>
+        JSON.stringify(prev) === JSON.stringify(data) ? prev : data
+      );
     } catch (error) {
       console.error("Error fetching participants:", error);
     } finally {
-      setLoading(false);
+      if (seq === participantsSeqRef.current) setLoading(false);
     }
-  };
+  }, [id]);
 
   // Batched profile lookup for the account-linkage badge (Task 9 Step 1) —
   // one query for every distinct user_id currently on the roster. Profiles
@@ -703,9 +725,12 @@ export default function TournamentPage({
 
   const fetchDecklists = useCallback(async () => {
     if (!id) return;
+    const seq = ++decklistsSeqRef.current;
     const res = await loadTournamentDecklistsAction(id);
-    if (res.success) {
-      setDecklists(res.decklists);
+    if (res.success && seq === decklistsSeqRef.current) {
+      setDecklists((prev) =>
+        JSON.stringify(prev) === JSON.stringify(res.decklists) ? prev : res.decklists
+      );
     }
   }, [id]);
 
@@ -719,6 +744,42 @@ export default function TournamentPage({
       });
     }
   }, [id]);
+
+  // Live check-in roster. QR joins and player deck submissions are written
+  // server-side (admin RPC), so the host's open page has no way to learn about
+  // them — before this, a host watching players scan the code saw nothing until
+  // they hit refresh. Poll instead of realtime: the submission tables are
+  // admin-only (RLS with no authenticated policy), so postgres_changes would
+  // deliver the join but never the decklist.
+  //
+  // Scoped tight: only once the tournament row has actually loaded (a deleted
+  // or RLS-denied id leaves `tournament` null forever behind the "not found"
+  // screen — polling that would be free of charge to nobody), only before it
+  // starts (joins are rejected after), and only while the tab is visible.
+  useEffect(() => {
+    if (!id || !tournament || tournament.has_started || tournament.has_ended) return;
+    let inFlight = false;
+    const refresh = async () => {
+      if (document.visibilityState !== "visible") return;
+      // Decklists go through a server action, and Next runs those one at a
+      // time. Letting ticks stack up behind a slow one would queue ahead of
+      // whatever the host clicks next, so skip a tick rather than pile on.
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        await Promise.all([fetchParticipants(), fetchDecklists()]);
+      } finally {
+        inFlight = false;
+      }
+    };
+    const timer = setInterval(refresh, CHECK_IN_POLL_MS);
+    // A host tabbing back mid-check-in shouldn't wait out the interval.
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [id, tournament?.has_started, tournament?.has_ended, fetchParticipants, fetchDecklists]);
 
   const isHost = !!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId);
   const numberingMode: "tables" | "seats" =
@@ -847,11 +908,14 @@ export default function TournamentPage({
                   {/* Push actions to the right */}
                   <div className="ml-auto flex items-center gap-2">
                     {/* Start Tournament — primary pre-start action stays inline so
-                        a host can see it without opening the menu. */}
+                        a host can see it without opening the menu. Outline, not
+                        green: the filled CTA belongs to the Participants toolbar
+                        (Add Participant), and two greens on one screen made it
+                        unclear which action came first. */}
                     {!tournament?.has_started && !tournament?.has_ended && (
                       <Button
                         disabled={participants.length === 0 || togglingStatus}
-                        variant="success"
+                        variant="outline"
                         onClick={handleTournamentStatusToggle}
                         size="sm"
                       >

@@ -8,6 +8,7 @@ import { generateJoinCode } from "@/lib/tournament/joinCodes";
 import { buildDeckSubmission, type DeckSnapshot } from "@/lib/tournament/deckSubmission";
 import { normalizeTournamentFormat, type FormatId } from "@/lib/formats";
 import { checkDeck, type DeckCheckCard, type DeckCheckIssue } from "@/utils/deckcheck";
+import { derivePreviewCards } from "@/lib/tournament/previewCards";
 
 // System user that owns published tournament deck copies
 const REDEMPTIONCCG_USER_ID = "a0a8e980-f372-4ebd-be25-d2f26507e98f";
@@ -17,6 +18,7 @@ function ordinal(n: number): string {
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
+
 
 // Reads on the default-deny tables (tournament_deck_submissions,
 // tournament_join_blocks) go through the admin client, which bypasses RLS
@@ -114,8 +116,13 @@ export async function loadTournamentDecklistsAction(tournamentId: string) {
   const decklists: TournamentDecklistRow[] = (data || []).map((row: any) => {
     const sub = submissionMap.get(row.participant_id);
     const snapshot = sub?.deck_snapshot as DeckSnapshot | undefined;
+    // Main deck only — `decks.card_count` excludes reserve and maybeboard
+    // everywhere else in the app (saveDeckAction), and the public v1 API
+    // documents the column as main-zone-only. Counting every zone here made a
+    // submitted deck read "61c" against the "51c" the deck builder and
+    // /my-decks show for the very same deck.
     const cardCountFromSnapshot = snapshot
-      ? snapshot.cards.reduce((n, c) => n + c.quantity, 0)
+      ? snapshot.cards.reduce((n, c) => (c.zone === "main" ? n + c.quantity : n), 0)
       : 0;
     // The `decks` join fails when deck_id is null (deck deleted) or the deck
     // is private and inaccessible under RLS. Fall back to the submission
@@ -828,13 +835,35 @@ export async function publishTournamentDecklistsAction(
 
     if (submission) {
       const snapshot = submission.deck_snapshot as DeckSnapshot;
+      const [derived1, derived2] = derivePreviewCards(snapshot.cards);
+      // A player can hand-pick their deck's cover art, and that choice lives on
+      // the deck row, not in the snapshot. Host attaches write a submission row
+      // too, so this branch handles nearly every publish — reading the original
+      // deck here is what keeps a deliberate cover from being silently replaced
+      // by a derived one. Falls back to derived when the deck is gone.
+      let chosen1: string | null = null;
+      let chosen2: string | null = null;
+      if (dl.deck_id !== null) {
+        const { data: orig } = await admin
+          .from("decks")
+          .select("preview_card_1, preview_card_2")
+          .eq("id", dl.deck_id)
+          .maybeSingle();
+        chosen1 = orig?.preview_card_1 ?? null;
+        chosen2 = orig?.preview_card_2 ?? null;
+      }
       deckMeta = {
         description: null,
         format: snapshot.deckFormat || null,
         paragon: null,
-        preview_card_1: null,
-        preview_card_2: null,
-        card_count: snapshot.cards.reduce((n, c) => n + c.quantity, 0),
+        // Never null: a published copy with no cover renders as a blank tile on
+        // the community decks page, which is the bug this replaced.
+        preview_card_1: chosen1 ?? derived1,
+        preview_card_2: chosen2 ?? derived2,
+        // Main deck only — matches how `decks.card_count` is written everywhere
+        // else (see saveDeckAction); counting reserve here inflated the count
+        // on every published copy.
+        card_count: snapshot.cards.reduce((n, c) => (c.zone === "main" ? n + c.quantity : n), 0),
         is_legal: submission.is_legal ?? null,
         deckcheck_issues: submission.deckcheck_issues ?? null,
       };

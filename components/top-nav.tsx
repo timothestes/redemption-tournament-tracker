@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { IconType } from "react-icons";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey, HiClipboardList } from "react-icons/hi";
 import { GiCrossedSwords, GiAnvil } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
@@ -137,6 +137,7 @@ const TopNav: React.FC = () => {
 
   const tournamentLinks: NavLink[] = [
     { href: "/tournaments", label: "Upcoming Events", icon: HiCalendar },
+    { href: "/tournaments/results", label: "Results", icon: HiClipboardList, isNew: true },
     { href: "/tournaments/rnrs-points", label: "RNRS Points", icon: HiChartBar },
     { href: "/tournaments/history", label: "History", icon: FaBookOpen },
     { href: "/tracker/tournaments", label: "My Tournaments", icon: FaTrophy, authRequired: true },
@@ -380,6 +381,11 @@ const TopNav: React.FC = () => {
                         >
                           <Icon className="w-4 h-4" />
                           {link.label}
+                          {link.isNew && (
+                            <span className="ml-auto px-1.5 py-0.5 bg-primary/15 text-primary text-[10px] font-bold rounded uppercase">
+                              New
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
@@ -769,6 +775,11 @@ const TopNav: React.FC = () => {
                       >
                         <Icon className="w-4 h-4" />
                         {link.label}
+                        {link.isNew && (
+                          <span className="ml-auto px-1.5 py-0.5 bg-primary/15 text-primary text-[10px] font-bold rounded uppercase">
+                            New
+                          </span>
+                        )}
                       </Link>
                     );
                   })}

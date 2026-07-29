@@ -263,6 +263,8 @@ export default function JoinClient({
               {info.hasStarted ? (
                 <p className="mt-3 text-xs text-muted-foreground">
                   This event has started — decklist changes are locked.
+                  {joined.submission === null &&
+                    " Talk to your host if you still need to hand in a decklist."}
                 </p>
               ) : (
                 <>
@@ -285,6 +287,22 @@ export default function JoinClient({
             </div>
           )}
         </div>
+
+        {/* Players don't otherwise know whether this page is meant to stay open
+            — it looks like a live event screen. Say so explicitly, but only
+            once there's nothing left for them to do here: on a decklist event
+            with nothing submitted, "you can close this" would be wrong. */}
+        {(!info.requiresDecklist || joined.submission !== null) && (
+          <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+            <p className="text-sm text-foreground">
+              You're all set — you can close this page.
+            </p>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Coming soon:</span> check your round
+              pairings and report scores from here. For now your host handles both at the event.
+            </p>
+          </div>
+        )}
 
         {result && result.res.success === false && (
           <div className="mt-3">
