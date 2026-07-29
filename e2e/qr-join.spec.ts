@@ -252,6 +252,25 @@ async function signIn(page: Page, email: string, password: string) {
   await page.getByRole("button", { name: /sign in/i }).click();
 }
 
+/**
+ * Sign in and wait for the session to actually be established.
+ *
+ * signInAction is a server-action redirect, so the click resolves long before
+ * the browser has left /sign-in. Navigating during that window lands on a page
+ * rendered without the session — which then bounces straight back to /sign-in.
+ * Callers that need a *specific* destination (the redirectTo flow below) wait
+ * on that URL instead; this is for callers that just need to be logged in.
+ *
+ * Mirrors the pattern the forge specs already use.
+ */
+async function signInAndSettle(page: Page, email: string, password: string) {
+  await signIn(page, email, password);
+  await page.waitForURL((u) => !u.pathname.startsWith("/sign-in"), {
+    timeout: 30_000,
+  });
+  await page.waitForLoadState("load");
+}
+
 test.describe("QR join + decklist submission", () => {
   test.skip(!adminAvailable, "requires SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL");
 
@@ -327,13 +346,30 @@ test.describe("QR join + decklist submission", () => {
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto("/sign-in");
-    await signIn(hostPage, seeded.hostEmail, seeded.hostPassword);
-    await hostPage.waitForURL(/.*/);
+    // NOT waitForURL(/.*/) — that regex matches the CURRENT url, so it resolved
+    // instantly against /sign-in and the goto below raced the pending sign-in
+    // redirect. The host arrived unauthenticated and was bounced back to
+    // /sign-in, where "1 of 1" naturally doesn't exist.
+    await signInAndSettle(hostPage, seeded.hostEmail, seeded.hostPassword);
 
     await hostPage.goto(`/tracker/tournaments/${seeded.tournamentId}`);
-    await expect(hostPage.getByText("1 of 1")).toBeVisible();
+    // The summary renders after the participants + decklists fetches resolve,
+    // which on a cold dev-server route compile is well past the 5s default.
+    await expect(hostPage.getByText("1 of 1")).toBeVisible({ timeout: 30_000 });
     await expect(hostPage.getByText(/participants have decklists/i)).toBeVisible();
-    await expect(hostPage.getByTitle(`${seeded.deckName} — view submission`)).toBeVisible();
+
+    // ParticipantTable renders a desktop table AND a mobile card list, both
+    // always in the DOM and toggled by CSS — so an unfiltered getByTitle matches
+    // two elements and trips strict mode before it ever checks visibility.
+    // Assert on whichever layout this viewport is actually showing.
+    const submissionButton = hostPage
+      .getByTitle(`${seeded.deckName} — view submission`)
+      .filter({ visible: true });
+    await expect(submissionButton).toBeVisible();
+
+    // It opens the submission, which is the point of the link.
+    await submissionButton.click();
+    await expect(hostPage.getByRole("dialog")).toBeVisible();
 
     await hostContext.close();
   });
