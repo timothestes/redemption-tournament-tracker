@@ -137,49 +137,82 @@ describe("setQrJoinEnabledAction", () => {
 
 // ─── updateJoinSettingsAction ───────────────────────────────────────────
 
+// The format itself is no longer an input here — Tournament Settings owns it.
+// What this action still has to guarantee is the invariant that gate protected:
+// require_decklists=true must never persist on an event with no specific
+// format, because every player would then be bounced with `decklist_required`.
+// It now enforces that against the PERSISTED deck_format instead of a caller-
+// supplied one, which also closes the old bypass (passing "Sealed" instead of
+// the literal "Other") by construction.
 describe("updateJoinSettingsAction", () => {
-  it("rejects require_decklists=true with deckFormat='Other', never touches the DB", async () => {
-    const r = await updateJoinSettingsAction("t1", { deckFormat: "Other", requireDecklists: true });
+  it("rejects require_decklists=true when the persisted format is 'Other'", async () => {
+    const tournaments = makeNode();
+    tournaments._resp = { data: { deck_format: "Other" }, error: null };
+    userClientImpl = makeClient({ tournaments });
+
+    const r = await updateJoinSettingsAction("t1", { requireDecklists: true });
 
     expect(r).toEqual({ success: false, error: "format_required" });
-    expect(createClient).not.toHaveBeenCalled();
+    expect(tournaments.update).not.toHaveBeenCalled();
   });
 
-  it("accepts require_decklists=true with a real format", async () => {
+  it("rejects require_decklists=true when no format is set at all", async () => {
+    const tournaments = makeNode();
+    tournaments._resp = { data: { deck_format: null }, error: null };
+    userClientImpl = makeClient({ tournaments });
+
+    const r = await updateJoinSettingsAction("t1", { requireDecklists: true });
+
+    expect(r).toEqual({ success: false, error: "format_required" });
+    expect(tournaments.update).not.toHaveBeenCalled();
+  });
+
+  // The old bypass: "Sealed" isn't the literal "Other" but normalizes to it.
+  // Reading the persisted value through normalizeTournamentFormat catches it.
+  it("rejects a stored format that only normalizes to 'Other' (e.g. 'Sealed')", async () => {
+    const tournaments = makeNode();
+    tournaments._resp = { data: { deck_format: "Sealed" }, error: null };
+    userClientImpl = makeClient({ tournaments });
+
+    const r = await updateJoinSettingsAction("t1", { requireDecklists: true });
+
+    expect(r).toEqual({ success: false, error: "format_required" });
+    expect(tournaments.update).not.toHaveBeenCalled();
+  });
+
+  it("accepts require_decklists=true when a real format is persisted", async () => {
+    const tournaments = makeNode();
+    tournaments._resp = { data: { deck_format: "Limited" }, error: null };
+    userClientImpl = makeClient({ tournaments });
+
+    const r = await updateJoinSettingsAction("t1", { requireDecklists: true });
+
+    expect(r).toEqual({ success: true });
+    expect(tournaments.update).toHaveBeenCalledWith({ require_decklists: true });
+  });
+
+  it("turning decklists OFF never needs a format and skips the lookup", async () => {
     const tournaments = makeNode();
     tournaments._resp = { data: null, error: null };
     userClientImpl = makeClient({ tournaments });
 
-    const r = await updateJoinSettingsAction("t1", { deckFormat: "Limited", requireDecklists: true });
+    const r = await updateJoinSettingsAction("t1", { requireDecklists: false });
 
     expect(r).toEqual({ success: true });
-    expect(tournaments.update).toHaveBeenCalledWith({ deck_format: "Limited", require_decklists: true });
+    expect(tournaments.select).not.toHaveBeenCalled();
+    expect(tournaments.update).toHaveBeenCalledWith({ require_decklists: false });
   });
 
-  // Regression: "Sealed"/"Draft" normalize to 'Other' via normalizeTournamentFormat,
-  // so comparing raw input against the literal "Other" alone let a caller
-  // bypass the format_required gate by passing "Sealed" instead of "Other" —
-  // persisting exactly the state (require_decklists=true, no real format)
-  // the gate exists to prevent. The whitelist must reject it outright,
-  // regardless of requireDecklists.
-  it("'Sealed' (not the literal 'Other', but normalizes to it) is rejected outright", async () => {
-    const r = await updateJoinSettingsAction("t1", {
-      deckFormat: "Sealed" as any,
-      requireDecklists: true,
-    });
+  it("never writes deck_format — that's Tournament Settings' column now", async () => {
+    const tournaments = makeNode();
+    tournaments._resp = { data: { deck_format: "T2" }, error: null };
+    userClientImpl = makeClient({ tournaments });
 
-    expect(r).toEqual({ success: false, error: "invalid_format" });
-    expect(createClient).not.toHaveBeenCalled();
-  });
+    await updateJoinSettingsAction("t1", { requireDecklists: true });
 
-  it("junk format string is rejected outright, even with requireDecklists=false", async () => {
-    const r = await updateJoinSettingsAction("t1", {
-      deckFormat: "asdf" as any,
-      requireDecklists: false,
-    });
-
-    expect(r).toEqual({ success: false, error: "invalid_format" });
-    expect(createClient).not.toHaveBeenCalled();
+    for (const call of tournaments.update.mock.calls) {
+      expect(call[0]).not.toHaveProperty("deck_format");
+    }
   });
 });
 

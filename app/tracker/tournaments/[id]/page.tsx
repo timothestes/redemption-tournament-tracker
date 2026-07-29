@@ -1026,6 +1026,7 @@ export default function TournamentPage({
             onDecklistsChange={fetchDecklists}
             usernames={usernames}
             onOpenQrJoin={() => setQrJoinDialogOpen(true)}
+            onTournamentUpdated={fetchTournamentDetails}
             decklistSummary={decklistSummary}
             onRepairCompleted={() => {
               fetchParticipants();

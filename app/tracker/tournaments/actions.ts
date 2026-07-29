@@ -6,7 +6,7 @@ import { computeFinalStandings } from "@/lib/tournament/standings";
 import { buildStateFromSupabase } from "@/utils/tournament/stateAdapter";
 import { generateJoinCode } from "@/lib/tournament/joinCodes";
 import { buildDeckSubmission, type DeckSnapshot } from "@/lib/tournament/deckSubmission";
-import { normalizeTournamentFormat, FORMAT_IDS, type FormatId } from "@/lib/formats";
+import { normalizeTournamentFormat, type FormatId } from "@/lib/formats";
 import { checkDeck, type DeckCheckCard, type DeckCheckIssue } from "@/utils/deckcheck";
 
 // System user that owns published tournament deck copies
@@ -436,25 +436,29 @@ export async function setQrJoinEnabledAction(
 
 export async function updateJoinSettingsAction(
   tournamentId: string,
-  s: { deckFormat: FormatId | "Other"; requireDecklists: boolean }
+  s: { requireDecklists: boolean }
 ): Promise<{ success: boolean; error?: string }> {
-  // The declared type is FormatId | "Other", but nothing stops a caller from
-  // bypassing TS and passing an arbitrary string. normalizeTournamentFormat
-  // maps things like "Sealed"/"Draft" to 'Other' and unrecognized junk to
-  // 'Limited', so comparing the raw input against the literal "Other" below
-  // is only safe once we've confirmed it's actually one of the real ids.
-  const isValidFormat = s.deckFormat === "Other" || (FORMAT_IDS as readonly string[]).includes(s.deckFormat);
-  if (!isValidFormat) {
-    return { success: false, error: "invalid_format" };
-  }
-  if (s.requireDecklists === true && s.deckFormat === "Other") {
-    return { success: false, error: "format_required" };
+  const supabase = await createClient();
+
+  // The format is Tournament Settings' to set, not this dialog's — but the
+  // invariant it protects still has to hold here: requiring a decklist on an
+  // event with no specific format makes it unjoinable (every player is bounced
+  // with `decklist_required`). Read the persisted format and refuse.
+  if (s.requireDecklists === true) {
+    const { data } = await supabase
+      .from("tournaments")
+      .select("deck_format")
+      .eq("id", tournamentId)
+      .maybeSingle();
+    const format = normalizeTournamentFormat(data?.deck_format);
+    if (format === null || format === "Other") {
+      return { success: false, error: "format_required" };
+    }
   }
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from("tournaments")
-    .update({ deck_format: s.deckFormat, require_decklists: s.requireDecklists })
+    .update({ require_decklists: s.requireDecklists })
     .eq("id", tournamentId);
 
   if (error) return { success: false, error: error.message };

@@ -17,7 +17,7 @@ import {
   updateJoinSettingsAction,
   getJoinStatsAction,
 } from "../../app/tracker/tournaments/actions";
-import { FORMAT_IDS, normalizeTournamentFormat, type FormatId } from "../../lib/formats";
+import { normalizeTournamentFormat, type FormatId } from "../../lib/formats";
 import { categoryDefaults, requireDecklistsDefault } from "../../utils/tournament/categoryDefaults";
 import { isNameFrozen } from "../../utils/tournament/naming";
 
@@ -42,7 +42,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   not_found: "You don't have access to this tournament.",
   code_generation_failed: "Couldn't generate a join code — please try again.",
   invalid_format: "That format isn't valid.",
-  format_required: "Choose a specific format before requiring decklists.",
+  format_required: "Set a format in the Settings tab before requiring decklists.",
 };
 
 // Shown when a server action throws outright (network drop, expired
@@ -85,10 +85,9 @@ export default function QRJoinDialog({
   onTournamentUpdated,
 }: QRJoinDialogProps) {
   const enabled = !!tournament.code;
-  // Official events derive their format from the category (which also freezes
-  // the name), so the host can't edit it into a name/format contradiction.
-  const formatLocked = isNameFrozen(tournament.category);
 
+  // Read-only here: Tournament Settings owns the event's category and format.
+  // This dialog owns the join knobs (code, require-decklist) and nothing else.
   const [deckFormat, setDeckFormat] = useState<FormatId | "Other">(() => initialFormat(tournament));
   const [requireDecklists, setRequireDecklists] = useState<boolean>(() =>
     initialRequireDecklists(tournament)
@@ -144,7 +143,6 @@ export default function QRJoinDialog({
     setError(null);
     try {
       const settingsRes = await updateJoinSettingsAction(tournament.id, {
-        deckFormat,
         requireDecklists,
       });
       if (settingsRes.success === false) {
@@ -187,47 +185,31 @@ export default function QRJoinDialog({
 
   // Auto-save knob edits once QR Join is already live — there's no separate
   // "save" step once a code has been handed out. `previous` is the
-  // pre-optimistic-update {deckFormat, requireDecklists} pair so a failed or
-  // thrown save can roll the local (already-changed) state back to the
-  // last-known-persisted values instead of leaving the UI showing something
-  // the server never saved.
-  async function persistSettings(
-    next: { deckFormat: FormatId | "Other"; requireDecklists: boolean },
-    previous: { deckFormat: FormatId | "Other"; requireDecklists: boolean }
-  ) {
+  // pre-optimistic-update value so a failed or thrown save can roll the local
+  // (already-changed) state back to the last-known-persisted one instead of
+  // leaving the UI showing something the server never saved.
+  async function handleRequireChange(checked: boolean) {
+    const previous = requireDecklists;
+    setRequireDecklists(checked);
     if (!enabled) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await updateJoinSettingsAction(tournament.id, next);
+      const res = await updateJoinSettingsAction(tournament.id, {
+        requireDecklists: checked,
+      });
       if (res.success === false) {
         setError(friendlyError(res.error ?? ""));
-        setDeckFormat(previous.deckFormat);
-        setRequireDecklists(previous.requireDecklists);
+        setRequireDecklists(previous);
         return;
       }
       onTournamentUpdated();
     } catch {
       setError(GENERIC_ERROR_MESSAGE);
-      setDeckFormat(previous.deckFormat);
-      setRequireDecklists(previous.requireDecklists);
+      setRequireDecklists(previous);
     } finally {
       setSaving(false);
     }
-  }
-
-  function handleFormatChange(next: FormatId | "Other") {
-    const previous = { deckFormat, requireDecklists };
-    const nextRequire = next === "Other" ? false : requireDecklists;
-    setDeckFormat(next);
-    setRequireDecklists(nextRequire);
-    if (enabled) persistSettings({ deckFormat: next, requireDecklists: nextRequire }, previous);
-  }
-
-  function handleRequireChange(checked: boolean) {
-    const previous = { deckFormat, requireDecklists };
-    setRequireDecklists(checked);
-    if (enabled) persistSettings({ deckFormat, requireDecklists: checked }, previous);
   }
 
   function copyUrl() {
@@ -240,9 +222,6 @@ export default function QRJoinDialog({
       })
       .catch(() => {});
   }
-
-  const selectClasses =
-    "w-full bg-background border border-border text-foreground rounded-lg p-2.5 focus:outline-none focus:border-primary/60 transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -300,32 +279,13 @@ export default function QRJoinDialog({
           )}
 
           <div className="space-y-4">
-            {formatLocked ? (
-              <div>
-                <span className="text-sm font-medium text-foreground mb-1.5 block">Format</span>
-                <div className="w-full flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-2.5">
-                  <span className="font-medium text-foreground">{deckFormat}</span>
-                  <span className="text-xs text-muted-foreground">Set by the event category</span>
-                </div>
+            <div>
+              <span className="text-sm font-medium text-foreground mb-1.5 block">Format</span>
+              <div className="w-full flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-2.5">
+                <span className="font-medium text-foreground">{deckFormat}</span>
+                <span className="text-xs text-muted-foreground">Set in the Settings tab</span>
               </div>
-            ) : (
-              <label className="block">
-                <span className="text-sm font-medium text-foreground mb-1.5 block">Format</span>
-                <select
-                  value={deckFormat}
-                  onChange={(e) => handleFormatChange(e.target.value as FormatId | "Other")}
-                  disabled={saving}
-                  className={selectClasses}
-                >
-                  {FORMAT_IDS.map((id) => (
-                    <option key={id} value={id}>
-                      {id}
-                    </option>
-                  ))}
-                  <option value="Other">Other</option>
-                </select>
-              </label>
-            )}
+            </div>
 
             <label
               className={`flex items-start gap-3 rounded-lg border border-border bg-background p-3 transition-colors ${

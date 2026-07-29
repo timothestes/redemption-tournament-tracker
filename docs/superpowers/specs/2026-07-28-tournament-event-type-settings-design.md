@@ -1,12 +1,25 @@
 # Tournament event type in Settings — design
 
 **Date:** 2026-07-28
-**Status:** Approved, ready for implementation plan
+**Status:** Implemented
 **Branch:** `feat/event-type-settings`
 
 ## 1. Problem
 
-A tournament's format lives in `tournaments.deck_format`, set once at creation from the
+An event's "type" is two orthogonal things — its **tier** (Regional, State, National…) and
+its **category/format** (Type 2, Paragon…). Neither was owned by Tournament Settings.
+
+**Tier didn't exist at all.** The public listings page already carries one
+(`tournament_listings.tournament_type`) and renders it as a badge, but hosting an event
+from a listing dropped it on the floor: no column, no field at creation, nothing in the
+generated name. Prod listings use `Local (Open)` (23), `State` (17), `District` (9),
+`Regional` (8, plus 8 named variants like "South Central Regional"), `Local (Closed)` (7),
+and `National` (1, plus "Redemption National Tournament").
+
+**Category/format was set once and never shown again.** The format lives in
+`tournaments.deck_format`, written at creation from the category the host checks in
+**Add Tournament** ([`app/tracker/tournaments/page.tsx:90-100`](../../../app/tracker/tournaments/page.tsx)).
+After that:
 category the host checks in **Add Tournament** ([`app/tracker/tournaments/page.tsx:90-100`](../../../app/tracker/tournaments/page.tsx)).
 After that:
 
@@ -29,34 +42,66 @@ bottom and the confirmation flashes for 1.5s off-screen at the top.
 
 ## 2. Goals
 
-1. Tournament Settings becomes the single owner of event type (category → format).
-2. The QR Join dialog stops writing `deck_format` and becomes read-only about it.
-3. Changing category cascades to the frozen name and category-derived settings under one
-   predictable rule, previewed before save.
-4. Save feedback lands where the host is looking.
+1. A tier can be set when creating a tournament, inherited from the listing when hosting
+   from one, and it shows up in the event name.
+2. Tournament Settings becomes the single owner of event type (tier + category → format).
+3. The QR Join dialog stops writing `deck_format` and becomes read-only about it.
+4. Changing tier or category cascades to the frozen name — and, for category, to the
+   category-derived settings — under one predictable rule, previewed before save.
+5. Save feedback lands where the host is looking.
 
 **Non-goals:** re-running deck check on format change (ruled out — warn only); versioning
-deck submissions; exposing format anywhere outside Settings and the QR dialog.
+deck submissions; backfilling tiers onto existing tournaments; exposing tier or format
+anywhere outside Settings, the create modal, and the QR dialog.
 
 ## 3. Locked decisions
 
 | Question | Ruling |
 |---|---|
-| Name when category changes | **Regenerate automatically** when the new category is official. |
+| Name when tier/category changes | **Regenerate automatically** when the category is official. |
 | Editable after decklists / start | **Allow, warn only** — stale legality verdicts are surfaced, not prevented. |
 | Format select | Editable **only** for `Unofficial`; derived and read-only otherwise. |
 | Save-row placement | Sticky footer inside the settings card. |
+| Tier vocabulary | The six canonical tiers, normalized from listing free text. |
+
+## 3.1 Tier model
+
+`tournaments.tier` (migration `085_add_tournament_tier.sql`) — nullable `text`, no default,
+no backfill. Free text rather than an enum for the same reason `category` is: the
+vocabulary originates in scraped listing text, and a new tier appearing in a listing must
+not require a migration.
+
+The canonical list and normalizer live in [`utils/tournament/tiers.ts`](../../../utils/tournament/tiers.ts):
+`Local (Open)`, `Local (Closed)`, `District`, `State`, `Regional`, `National`.
+`normalizeTier()` collapses listing variants — "South Central Regional" → `Regional`,
+"Redemption National Tournament" → `National` — and returns `null` for anything
+unrecognized rather than guessing.
+
+The name formula gains a tier slot: `{Mon D, YYYY} [{Tier} ]{Category} Tournament[ — {City}]`,
+so "Aug 2, 2026 Regional Type 2 Tournament — Wichita". With no tier the formula is
+byte-identical to today's, which is what keeps every existing name valid.
+
+Where a tier comes from at creation:
+- **Hosting from a listing** — `/tournaments` passes `&type=` on the Host This Event link;
+  the tracker normalizes it and pre-selects it.
+- **Adding a category to an existing event** — inherited from a sibling tournament, the
+  same way the city already is.
+- **Otherwise** — the host picks from the select, defaulting to "Not specified".
+
+One tier applies to every tournament the modal creates in a batch: an event is one tier
+even when it runs several categories.
 
 ## 4. The cascade rule
 
 One principle: **derived values the host has not overridden follow the category; anything
 the host changed stays put.**
 
-Concretely, given a category change from `old` → `next`:
+Concretely, given a change from `old` → `next`:
 
 | Field | Behavior |
 |---|---|
-| `category` | Set to `next`. |
+| `tier` | Set to `next.tier` (or `null`). Cascades into `name` only — a tier carries no settings. |
+| `category` | Set to `next.category`. |
 | `deck_format` | `categoryDefaults(next).deck_format`, unless `next === "Unofficial"`, where it is the host's explicit select value. |
 | `name` | Regenerated when `isNameFrozen(next)`. Left untouched when `next === "Unofficial"` (no frozen form exists). |
 | `max_score` | Re-seeded to `categoryDefaults(next).max_score` **only if** it currently equals `categoryDefaults(old).max_score`. Skipped entirely when locked (round 1 started). |
@@ -72,23 +117,29 @@ unconditionally.
 
 ### 4.1 Name regeneration
 
-Applies only when `isNameFrozen(next)` — switching *to* `Unofficial` never touches the name.
+Applies only when `isNameFrozen(next.category)` — switching *to* `Unofficial` never touches
+the name, tier change or not.
 
 Do **not** reformat from `created_at` — that is a UTC timestamp, while the stored name was
 generated client-side in the host's timezone (`created_at = 2026-07-29 01:15Z` on an event
 named "Jul 28, 2026 …"). Server- or UTC-side regeneration would shift the date.
 
-Instead, swap the category token in place:
+Instead, swap the subject in place:
 
 ```
 /^(.+?, \d{4}) (.+) Tournament(?: — (.+))?$/
-      ^date       ^category            ^city
+      ^date      ^subject             ^city
 ```
 
-On match, keep group 1 (date) and group 3 (city) verbatim and substitute the new category.
-On no match — the name is free-form, e.g. coming from `Unofficial` — fall back to
-`buildTournamentName(next, { date: new Date(created_at) })`, preserving any ` — City`
-suffix found in the current name.
+Only the date and city are read back out; tier and category come from columns, so the
+subject never has to be disambiguated. On match, keep group 1 (date) and group 3 (city)
+verbatim and rebuild the subject as `[tier, category].filter(Boolean).join(" ")`. On no
+match — the name is free-form, e.g. an `Unofficial` event being promoted — fall back to
+`buildTournamentName(next.category, { date: new Date(created_at), tier, city })`,
+preserving any ` — City` suffix found in the current name.
+
+This also means a tier that is *set*, *changed*, or *cleared* rewrites the name correctly
+without stacking or stranding tokens.
 
 **Accepted trade-off:** a host who renamed an official event by hand loses that name. The
 post-creation rename paths ([`page.tsx:185`](../../../app/tracker/tournaments/page.tsx),
@@ -99,8 +150,9 @@ replacement visible rather than silent.
 ### 4.2 One pure function
 
 ```ts
-// utils/tournament/categoryChange.ts
-export interface CategoryChangePlan {
+// utils/tournament/eventType.ts
+export interface EventTypePlan {
+  tier: string | null;
   category: string;
   deck_format: FormatId | "Other";
   name?: string;
@@ -109,9 +161,10 @@ export interface CategoryChangePlan {
   require_decklists?: boolean;
 }
 
-export function planCategoryChange(
+export function planEventTypeChange(
   current: {
     name: string;
+    tier: string | null;
     category: string | null;
     deck_format: string | null;
     max_score: number | null;
@@ -119,9 +172,9 @@ export function planCategoryChange(
     require_decklists: boolean | null;
     created_at: string;
   },
-  next: { category: string; unofficialFormat?: FormatId | "Other" },
+  next: { tier: string | null; category: string; unofficialFormat?: FormatId | "Other" },
   opts: { maxScoreLocked: boolean }
-): CategoryChangePlan;
+): EventTypePlan;
 ```
 
 `unofficialFormat` is read only when `next.category === "Unofficial"`. Omitted there, the
@@ -130,25 +183,31 @@ Unofficial preserves whatever format was already in force rather than resetting 
 and silently disabling decklist requirements.
 
 The same function drives both the preview and the persisted patch, so the two cannot
-disagree. It is pure and unit-testable — no Supabase, no clock. Tests cover: official →
-official re-seed, overridden field preserved, `maxScoreLocked` skip, the `Other` +
-`require_decklists` invariant, city-suffix preservation, and the free-form-name fallback.
+disagree. It is pure and unit-testable — no Supabase, no clock.
+[`utils/tournament/__tests__/eventType.test.ts`](../../../utils/tournament/__tests__/eventType.test.ts)
+(24 tests) covers: tier normalization and round-tripping, tier set/change/clear in the
+name, official → official re-seed, tier-only change touching nothing but the name,
+overridden field preserved, `maxScoreLocked` skip, the `Other` + `require_decklists`
+invariant (including the hand-toggled Type A → Sealed case), city-suffix preservation, the
+free-form-name fallback, the UTC date-shift guard, and the null-category legacy row.
 
 ## 5. UI: Event Type section
 
 A new section at the top of the Tournament Settings card, above the status row.
 
-- **Category** — a `<select>` over `STANDARD_CATEGORIES`.
+- **Tier** — a `<select>` over `TOURNAMENT_TIERS` plus "Not specified".
+- **Category** — a `<select>` over `STANDARD_CATEGORIES` plus "Not specified".
   **Legacy categories must not be silently coerced.** Prod holds category values that came
   from official listings and are absent from `STANDARD_CATEGORIES`: `Type 1`,
   `Type 1 - 2P`, `Type 1 - 2 Player`, `Type 1 - Teams`, `Type 2 - 2P`, `Type 2 - 2 Player`
   (12 rows). When the tournament's current category is not in the list, prepend it as an
   option so opening Settings never changes what is displayed.
-- **Format** — read-only display (`Unlimited · set by category`) for every category except
-  `Unofficial`, which gets an editable select over `FORMAT_IDS` + `Other`.
-- **Change preview** — while the category select differs from the persisted value, render
-  the diff produced by `planCategoryChange`:
-  > Will rename to *Jul 28, 2026 Type 2 Tournament* · Lost Souls 5 → 7 · Round length 45 → 75
+- **Format** — read-only display (`Unlimited · Set by the category`) for every category
+  except `Unofficial`, which gets an editable select over `FORMAT_IDS` + `Other`.
+- **Change preview** — while tier/category/format differ from the persisted values, render
+  the diff produced by `planEventTypeChange`:
+  > On save: Renames to *Jul 28, 2026 Regional Type 2 Tournament* · Lost Souls 5 → 7 ·
+  > Round length 45 → 75
 - **Stale-verdict warning** — when `deck_format` would change and submissions exist, amber:
   > 3 submitted decklists were checked against Unlimited. Changing the format won't re-check
   > them — their legality badges will be stale.
@@ -177,11 +236,18 @@ normalizing correctly.
   from category for name-frozen events, which stays correct and covers legacy drift).
 - `updateJoinSettingsAction` drops `deckFormat` from its payload and writes only
   `require_decklists`. `handleFormatChange` is deleted.
+- **The invariant it used to enforce still has to hold.** The old action refused
+  `requireDecklists=true` with `deckFormat="Other"`; with the format no longer an input, it
+  now reads the *persisted* `deck_format` and refuses on `null`/`Other`. This also closes
+  the old bypass by construction — a caller could previously pass `"Sealed"` (not the
+  literal `"Other"`, but normalizing to it) and was caught only by a separate whitelist;
+  reading the stored value through `normalizeTournamentFormat` catches every such variant.
+  Turning decklists *off* skips the lookup entirely.
 - The `format_required` error message changes to point at Settings:
   "Set a format in the Settings tab before requiring decklists."
 
-Resulting boundary: **Settings owns event identity** (category → format); **the QR dialog
-owns join knobs** (code, require-decklist, live counters).
+Resulting boundary: **Settings owns event identity** (tier + category → format); **the QR
+dialog owns join knobs** (code, require-decklist, live counters).
 
 ## 7. Save feedback
 
@@ -198,40 +264,54 @@ owns join knobs** (code, require-decklist, live counters).
 
 `TournamentSettings` already writes with the browser Supabase client; the
 `host_can_access_tournaments` RLS policy is `ALL` on `auth.uid() = host_id`, so `name`,
-`category`, and `deck_format` are all writable from the client exactly like the existing
-fields. No new server action is needed for the save itself.
+`tier`, `category`, and `deck_format` are all writable from the client exactly like the
+existing fields. No new server action is needed for the save itself.
 
 Changes required around it:
 
-- Extend the settings `SELECT` to include `name`, `category`, `deck_format`,
+- Extend the settings `SELECT` to include `name`, `tier`, `category`, `deck_format`,
   `require_decklists`, `created_at`.
-- Category is tracked outside `EDITABLE_KEYS`; on save, when it changed, merge
-  `planCategoryChange(...)` into the patch. The scalar-field diff is unchanged.
+- Tier and category are tracked outside `EDITABLE_KEYS`, in their own state ( `""` means
+  unspecified). On save, when either changed, merge `planEventTypeChange(...)` into the
+  patch. The scalar-field diff is unchanged, and the plan wins on any overlapping field
+  because its re-seeds are computed *from* the pending edits.
+- On success, both `savedInfo` and `tournamentInfo` are set to the merged snapshot, so
+  re-seeded settings and the regenerated name show up in the form and not just the
+  dirty-tracking baseline.
 - Add an `onTournamentUpdated?: () => void` prop to `TournamentSettings`, threaded through
-  [`TournamentTabs.tsx:371`](../../../components/ui/TournamentTabs.tsx) to
+  [`TournamentTabs.tsx`](../../../components/ui/TournamentTabs.tsx) to
   `fetchTournamentDetails` in [`[id]/page.tsx`](../../../app/tracker/tournaments/[id]/page.tsx),
   so a rename refreshes the page header. `key={activeTab}` already remounts the component
   per tab visit, so no other staleness handling is needed.
 
 ## 9. Testing
 
-**Unit** (`utils/tournament/__tests__/categoryChange.test.ts`) — the cascade cases in §4.2,
-plus the name regex against every prod-observed name shape.
+**Unit** — [`utils/tournament/__tests__/eventType.test.ts`](../../../utils/tournament/__tests__/eventType.test.ts)
+(24 tests, §4.2) and the rewritten `updateJoinSettingsAction` block in
+[`app/tracker/tournaments/__tests__/joinHostActions.test.ts`](../../../app/tracker/tournaments/__tests__/joinHostActions.test.ts)
+(26 tests), which now asserts the invariant against the persisted format, the `"Sealed"`
+bypass, the skip-lookup-when-off path, and that `deck_format` is never written.
 
-**Component/manual** — change category on a fresh event and confirm rename + re-seed;
+Full suite: 1673 passing. Three files fail identically with these changes stashed —
+`forge-anon-leak` and `superuser-anon-leak` (env-gated, run via `npm run test:security`)
+and one `forge-lackey` brigade assertion. All pre-existing and unrelated.
+
+**Manual, still to do** — change category on a fresh event and confirm rename + re-seed;
 change it on an event with a submitted decklist and confirm the amber warning and that
 verdicts are left alone; change it after round 1 and confirm `max_score` is untouched;
 open Settings on a legacy `Type 1 - 2P` event and confirm the category is not coerced;
-confirm the QR dialog shows format read-only and can still toggle require-decklist.
-
-**Regression** — `updateJoinSettingsAction` no longer accepting `deckFormat` must not break
-`app/join/__tests__/actions.test.ts` or the QR dialog's enable path, which calls it before
-`setQrJoinEnabledAction`.
+set a tier and confirm the name gains it and the sticky footer confirmation is visible
+without scrolling; confirm the QR dialog shows format read-only and can still toggle
+require-decklist.
 
 ## 10. Out of scope
 
 - Re-running deck check on format change (explicitly ruled out).
 - Deck-submission history — resubmission overwrites via `onConflict: "participant_id"`.
+- Backfilling `tier` onto existing tournaments, or onto tournaments already linked to a
+  listing that advertises one.
+- Rendering the tier as a badge on the tracker list or the public results page — it only
+  reaches those surfaces through the event name for now.
 - Showing format on the tournament detail header or the public results page.
 - Server-side enforcement that `deck_format` matches `category`; Settings and the create
   modal are the only writers, and both derive it.
