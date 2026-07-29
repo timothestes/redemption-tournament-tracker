@@ -6,6 +6,7 @@ import { checkDeck } from "@/utils/deckcheck";
 import type { DeckCheckCard, DeckCheckResult } from "@/utils/deckcheck/types";
 import type { DeckZone } from "./card-search/types/deck";
 import { deckFormatFilterFor } from "@/lib/api/cache";
+import { loadDeckTournamentContext, type DeckTournamentContext } from "./deckTournamentContext";
 
 // Three-state deck visibility. Mirrors the `visibility` column on `decks`.
 //   private  -> owner only
@@ -1081,13 +1082,16 @@ export async function loadPublicDeckAction(deckId: string) {
         .then(() => {});
     }
 
-    // Fetch total and budget prices
+    // Fetch total and budget prices, plus any tournament this deck is the
+    // published copy of (null for every ordinary community deck).
     let totalPrice: number | null = null;
     let budgetPrice: number | null = null;
+    let tournament: DeckTournamentContext | null = null;
     {
-      const [priceResult, budgetResult] = await Promise.all([
+      const [priceResult, budgetResult, tournamentResult] = await Promise.all([
         supabase.rpc("get_deck_total_prices", { deck_ids: [deckId] }),
         supabase.rpc("get_deck_budget_prices", { deck_ids: [deckId] }),
+        loadDeckTournamentContext(deckId),
       ]);
       if (priceResult.data?.[0]?.total_price > 0) {
         totalPrice = parseFloat(priceResult.data[0].total_price);
@@ -1095,6 +1099,7 @@ export async function loadPublicDeckAction(deckId: string) {
       if (budgetResult.data?.[0]?.budget_price > 0) {
         budgetPrice = parseFloat(budgetResult.data[0].budget_price);
       }
+      tournament = tournamentResult;
     }
 
     return {
@@ -1106,6 +1111,7 @@ export async function loadPublicDeckAction(deckId: string) {
         tags,
         total_price: totalPrice,
         budget_price: budgetPrice,
+        tournament,
       },
       isOwner,
     };

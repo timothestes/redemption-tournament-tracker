@@ -12,7 +12,7 @@ import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
 import { getCardImageUrlOrNull as getCardImageUrl } from '../../shared/utils/cardImageUrl';
 import { normalizeFormat, getFormatDef } from "@/lib/formats";
-import { TrophyIcon } from "@/components/trophy-icon";
+import { TrophyIcon, getPlacementLabel } from "@/components/trophy-icon";
 
 interface DeckTag { id: string; name: string; color: string; }
 
@@ -82,13 +82,6 @@ function timeAgo(dateString: string): string {
   if (diffDays < 365) return `${months} ${months === 1 ? "month" : "months"} ago`;
   const years = Math.floor(diffDays / 365);
   return `${years} ${years === 1 ? "year" : "years"} ago`;
-}
-
-function getPlacementLabel(place: number): string {
-  if (place === 1) return "1st Place";
-  if (place === 2) return "2nd Place";
-  if (place === 3) return "3rd Place";
-  return `${place}th Place`;
 }
 
 const PAGE_SIZE = 24;

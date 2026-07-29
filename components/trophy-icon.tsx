@@ -31,3 +31,17 @@ export function TrophyIcon({ place, className }: { place: number; className?: st
     </svg>
   );
 }
+
+/**
+ * "1st Place" / "22nd Place" — shared so a finish reads identically on the
+ * community grid and on a published decklist's result header.
+ */
+export function getPlacementLabel(place: number): string {
+  const v = place % 100;
+  if (v < 11 || v > 13) {
+    if (place % 10 === 1) return `${place}st Place`;
+    if (place % 10 === 2) return `${place}nd Place`;
+    if (place % 10 === 3) return `${place}rd Place`;
+  }
+  return `${place}th Place`;
+}
