@@ -101,29 +101,38 @@ function ZoneSection({ title, cards }: { title: string; cards: DeckSnapshotCard[
 }
 
 /** Card-image grid for the same zone the list view renders as text. Uses the
- * public deck page's CardTile so a host sees decks exactly as players do.
- * Cards keep the list view's order (type, then name) so switching views doesn't
- * reshuffle them mid deck-check. */
+ * public deck page's CardTile so a host sees decks exactly as players do, and
+ * keeps the list view's type headings — without them the grid is strictly less
+ * information than the list it replaces. */
 function ZoneImages({ title, cards }: { title: string; cards: DeckSnapshotCard[] }) {
   if (cards.length === 0) return null;
   const total = cards.reduce((n, c) => n + c.quantity, 0);
-  const ordered = groupByType(cards).flatMap((g) => g.cards);
+  const groups = groupByType(cards);
   return (
     <div>
       <h4 className="text-sm font-semibold text-foreground">
         {title} <span className="font-normal text-muted-foreground">({total})</span>
       </h4>
-      <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6">
-        {ordered.map((c, i) => (
-          <CardTile
-            key={`${c.name}-${c.set}-${i}`}
-            card={{
-              card_name: c.name,
-              card_set: c.set,
-              card_img_file: c.imgFile,
-              quantity: c.quantity,
-            }}
-          />
+      <div className="mt-2 space-y-3">
+        {groups.map((g) => (
+          <div key={g.type}>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {g.type}
+            </p>
+            <div className="mt-1.5 grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+              {g.cards.map((c, i) => (
+                <CardTile
+                  key={`${c.name}-${c.set}-${i}`}
+                  card={{
+                    card_name: c.name,
+                    card_set: c.set,
+                    card_img_file: c.imgFile,
+                    quantity: c.quantity,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>
@@ -198,7 +207,10 @@ export default function SubmissionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg">
+      {/* `size="lg"` is only max-w-lg (512px) — fine for the text list, far too
+          narrow for card art, which came out ~70px wide and unreadable. Widen
+          it the way the other image-bearing modals do. */}
+      <DialogContent size="lg" className="max-w-4xl">
         <DialogHeader>
           <div className="flex items-center justify-between gap-2">
             <DialogTitle>{submission?.snapshot.deckName ?? "Decklist"}</DialogTitle>
@@ -220,10 +232,15 @@ export default function SubmissionModal({
                   {" · "}
                   {new Date(submission.submittedAt).toLocaleString()}
                 </p>
-                <div className="flex flex-shrink-0 rounded-md border border-border p-0.5">
+                <div
+                  role="group"
+                  aria-label="Decklist view"
+                  className="flex flex-shrink-0 rounded-md border border-border p-0.5"
+                >
                   {(["list", "images"] as const).map((mode) => (
                     <button
                       key={mode}
+                      type="button"
                       onClick={() => setView(mode)}
                       aria-pressed={view === mode}
                       className={`rounded px-2 py-0.5 text-xs font-medium capitalize transition-colors ${

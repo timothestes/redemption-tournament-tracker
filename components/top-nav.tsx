@@ -381,6 +381,11 @@ const TopNav: React.FC = () => {
                         >
                           <Icon className="w-4 h-4" />
                           {link.label}
+                          {link.isNew && (
+                            <span className="ml-auto px-1.5 py-0.5 bg-primary/15 text-primary text-[10px] font-bold rounded uppercase">
+                              New
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
@@ -770,6 +775,11 @@ const TopNav: React.FC = () => {
                       >
                         <Icon className="w-4 h-4" />
                         {link.label}
+                        {link.isNew && (
+                          <span className="ml-auto px-1.5 py-0.5 bg-primary/15 text-primary text-[10px] font-bold rounded uppercase">
+                            New
+                          </span>
+                        )}
                       </Link>
                     );
                   })}

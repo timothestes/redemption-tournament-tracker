@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { getCardImageUrl } from "../../app/shared/utils/cardImageUrl";
+import { getCardImageUrl } from "@/app/shared/utils/cardImageUrl";
 
 /** Structural shape — accepts the public deck page's EnrichedCard/DeckCardData
  * and the tournament submission snapshot alike, so both render identical tiles. */
@@ -34,10 +34,14 @@ export default function CardTile({
 }) {
   const [imgError, setImgError] = useState(false);
   const src = getCardImageUrl(card.card_img_file || "");
+  // Only advertise interactivity when there is some. Callers that just display
+  // cards (the tournament submission modal) were getting a pointer cursor and a
+  // hover ring on every tile and nothing happened on click.
+  const interactive = !!onClick;
 
   return (
     <div
-      className={`relative group cursor-pointer ${compact ? "w-[calc(100%/12-4px)] min-w-[70px] -mb-6 last:mb-0" : ""}`}
+      className={`relative group ${interactive ? "cursor-pointer" : ""} ${compact ? "w-[calc(100%/12-4px)] min-w-[70px] -mb-6 last:mb-0" : ""}`}
       onClick={onClick}
       onMouseEnter={
         onHover
@@ -52,7 +56,9 @@ export default function CardTile({
       }
       onMouseLeave={onHover ? () => onHover(null) : undefined}
     >
-      <div className="relative w-full aspect-[2.5/3.5] bg-muted rounded-md overflow-hidden shadow-sm hover:shadow-md transition-all hover:ring-2 hover:ring-blue-500">
+      <div
+        className={`relative w-full aspect-[2.5/3.5] bg-muted rounded-md overflow-hidden shadow-sm transition-all ${interactive ? "hover:shadow-md hover:ring-2 hover:ring-blue-500" : ""}`}
+      >
         {imgError || !src ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground text-xs p-1">
             <div className="text-center font-medium text-[10px] leading-tight">{card.card_name}</div>
@@ -76,7 +82,7 @@ export default function CardTile({
         {/* Quantity badge */}
         {card.quantity > 1 && (
           <div
-            className={`absolute top-0.5 right-0.5 bg-black/75 backdrop-blur-sm text-white rounded font-bold shadow-lg ${compact ? "px-1.5 py-0.5 text-[10px]" : "px-2.5 py-1 text-sm rounded-md"}`}
+            className={`absolute top-0.5 right-0.5 bg-black/75 backdrop-blur-sm text-white rounded font-bold shadow-lg ${compact ? "px-1.5 py-0.5 text-[10px]" : "px-1.5 py-0.5 text-xs"}`}
           >
             ×{card.quantity}
           </div>

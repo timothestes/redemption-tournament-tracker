@@ -263,6 +263,8 @@ export default function JoinClient({
               {info.hasStarted ? (
                 <p className="mt-3 text-xs text-muted-foreground">
                   This event has started — decklist changes are locked.
+                  {joined.submission === null &&
+                    " Talk to your host if you still need to hand in a decklist."}
                 </p>
               ) : (
                 <>
