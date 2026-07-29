@@ -1541,7 +1541,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                       <span className="ml-1.5 font-normal">({groupCount})</span>
                     </h3>
                   )}
-                  <div className="flex flex-wrap gap-x-1.5">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-7">
                     {cards.map((card, index) => (
                       <CardTile
                         key={`main-${card.card_name}-${card.card_set}-${index}`}
@@ -1568,7 +1568,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               ({reserveCount} cards)
             </span>
           </h2>
-          <div className="flex flex-wrap gap-x-1.5">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-7">
             {sortedReserveCards.map((card, index) => (
               <CardTile
                 key={`reserve-${card.card_name}-${card.card_set}-${index}`}
@@ -1597,7 +1597,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               ?
             </span>
           </h2>
-          <div className="flex flex-wrap gap-x-1.5">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-7">
             {sortedMaybeboardCards.map((card, index) => (
               <CardTile
                 key={`maybeboard-${card.card_name}-${card.card_set}-${index}`}
