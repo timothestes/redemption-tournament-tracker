@@ -71,19 +71,24 @@ export default function TournamentStartModal({
     initialSoundNotifications !== false;
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(hasNonDefaultAdvanced);
 
+  // Seed the form when the dialog OPENS, and only then. Keying this on the
+  // prop values too would discard whatever the host has typed the moment one
+  // of them moves — and `suggestedRounds` moves on its own now that the roster
+  // refreshes in the background: a player scanning the QR while this dialog is
+  // open crosses a 2/4/8/16 boundary, and the host's round count, round length
+  // and starting table all silently snap back to defaults.
   useEffect(() => {
-    if (isOpen) {
-      setNumberOfRounds(suggestedRounds);
-      setRoundLength(initialRoundLength);
-      setMaxScore(initialMaxScore);
-      setByePoints(initialByePoints);
-      setByeDifferential(initialByeDifferential);
-      setStartingTableNumber(initialStartingTableNumber);
-      setSoundNotifications(initialSoundNotifications);
-      setIsAdvancedOpen(hasNonDefaultAdvanced);
-    }
+    if (!isOpen) return;
+    setNumberOfRounds(suggestedRounds);
+    setRoundLength(initialRoundLength);
+    setMaxScore(initialMaxScore);
+    setByePoints(initialByePoints);
+    setByeDifferential(initialByeDifferential);
+    setStartingTableNumber(initialStartingTableNumber);
+    setSoundNotifications(initialSoundNotifications);
+    setIsAdvancedOpen(hasNonDefaultAdvanced);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, suggestedRounds, initialRoundLength, initialMaxScore, initialByePoints, initialByeDifferential, initialStartingTableNumber, initialSoundNotifications]);
+  }, [isOpen]);
 
   const handleIncrement = () => {
     setNumberOfRounds(prev => prev + 1);
