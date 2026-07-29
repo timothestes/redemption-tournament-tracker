@@ -216,7 +216,13 @@ export default function TournamentSettings({
     }
     // The event-type cascade wins over a same-field scalar edit: re-seeded
     // values are computed from the pending edits, so they're already current.
-    if (plan) Object.assign(patch, plan);
+    if (plan) {
+      Object.assign(patch, plan as Partial<TournamentInfo>);
+    } else if (eventTypeDirty) {
+      // Tier changed on a tournament that has no category. There's nothing to
+      // cascade from and no frozen name to regenerate — just write the tier.
+      patch.tier = tier || null;
+    }
     if (Object.keys(patch).length === 0) return;
 
     const snapshot = { ...tournamentInfo, ...patch };
@@ -366,7 +372,10 @@ export default function TournamentSettings({
                   disabled={editingDisabled}
                   className={inputClasses}
                 >
-                  <option value="">Not specified</option>
+                  {/* Only offered while the event genuinely has no category
+                      (pre-dates the field). Once one is set, clearing it would
+                      strand the frozen name with a category it no longer has. */}
+                  {!savedCategory && <option value="">Not specified</option>}
                   {categoryOptions.map((c) => (
                     <option key={c} value={c}>
                       {c}
