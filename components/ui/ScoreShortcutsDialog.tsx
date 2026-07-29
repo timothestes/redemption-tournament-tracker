@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Keyboard } from "lucide-react";
 import { Dialog, DialogContent } from "./dialog";
 
@@ -89,10 +90,24 @@ export function ScoreShortcutsDialog({
     row.keys[0] === "0" ? { ...row, keys: ["0", String(maxScore)] } : row,
   );
 
+  // The Dialog primitive is hand-rolled and does not trap focus, so opening the
+  // cheatsheet from a score cell would leave that cell focused underneath —
+  // every keystroke spent reading this would land in the grid behind it.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (open) headingRef.current?.focus();
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md" className="bg-card border-2 border-border px-8 py-7">
-        <h2 className="text-xl font-bold text-foreground">Keyboard score entry</h2>
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-xl font-bold text-foreground outline-none"
+        >
+          Keyboard score entry
+        </h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Click any score cell in the round table to start. Most matches are two
           keystrokes — type both scores and you land on the next match.

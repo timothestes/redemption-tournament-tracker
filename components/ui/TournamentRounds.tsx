@@ -174,6 +174,8 @@ export default function TournamentRounds({
   // on the current round's view, surfacing the repair UI on a round that was
   // never completed. Only the latest request applies its results.
   const latestRoundFetch = useRef(0);
+  /** Same guard for the matches/byes fetch — see fetchCurrentRoundData. */
+  const latestMatchesFetch = useRef(0);
   const [roundInfo, setRoundInfo] = useState<RoundInfo>({
     started_at: null,
     ended_at: null,
@@ -408,6 +410,13 @@ export default function TournamentRounds({
   };
 
   const fetchCurrentRoundData = async () => {
+    // Sequence guard, mirroring fetchTournamentAndRoundInfo's. Entering a round
+    // from the keyboard fires one refetch per saved match, so a dozen of these
+    // can be in flight at once; without this the last RESPONSE wins rather than
+    // the last REQUEST, and an early, mostly-unscored snapshot can clobber the
+    // current one — which then makes End Round reject a fully-scored round.
+    const seq = ++latestMatchesFetch.current;
+
     const { data, error } = await client
       .from("matches")
       .select(
@@ -417,17 +426,19 @@ export default function TournamentRounds({
       .eq("round", currentPage)
       .order("table_number", { ascending: true, nullsFirst: true })
       .order("match_order", { ascending: true });
-    
+
+    if (seq !== latestMatchesFetch.current) return;
     if (error) console.log(error);
     setMatches(data || []);
-  
+
     const { data: byeData, error: byeError } = await client
       .from("byes")
       .select("id, participant_id:participants(id, name), match_points, differential")
       .eq("tournament_id", tournamentId)
       .eq("round_number", currentPage)
       .order("id", { ascending: true });
-    
+
+    if (seq !== latestMatchesFetch.current) return;
     if (byeError) console.log(byeError);
     setByes(byeData);
   };
@@ -939,11 +950,17 @@ export default function TournamentRounds({
   const scoreGrid = useScoreGrid({
     matches,
     maxScore: tournamentInfo.max_score ?? 5,
-    enabled: gridEnabled,
-    onSaved: () => {
-      // Clear the "missing score" highlight End Round paints, and let the page
-      // re-evaluate its re-pair gating.
-      setMatchErrorIndex([]);
+    // Stand down while the cheatsheet is up, so keys read as "I'm reading the
+    // shortcuts" rather than being typed into the row behind the modal.
+    enabled: gridEnabled && !shortcutsOpen,
+    onSaved: (matchId) => {
+      // Clear the "missing score" highlight for THIS row only. Clearing the
+      // whole set would wipe the other rows End Round flagged, losing the
+      // "which ones are still missing" affordance the highlight exists for.
+      setMatchErrorIndex((prev) => {
+        const row = matches.findIndex((m) => m.id === matchId);
+        return row === -1 ? prev : prev.filter((i) => i !== row);
+      });
       onMatchesChanged?.();
     },
     onOpenHelp: () => setShortcutsOpen(true),
@@ -1218,27 +1235,34 @@ export default function TournamentRounds({
                                 <td className={`px-4 py-2 text-center border-r tabular-nums ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                   {gridEnabled ? (
                                     <div className="flex items-center justify-center gap-1.5">
-                                      <ScoreCell
-                                        ref={(el) => scoreGrid.registerInput(index, 0, el)}
-                                        value={scoreGrid.valueAt(index, 0)}
-                                        playerName={match.player1_id.name}
-                                        isCursor={scoreGrid.isCursor(index, 0)}
-                                        isRejected={scoreGrid.isRejected(index, 0)}
-                                        saveState={scoreGrid.saveState[match.id] ?? "idle"}
-                                        onKeyDown={(e) => scoreGrid.onKeyDown(e, { row: index, col: 0 })}
-                                        onFocus={() => scoreGrid.focusCell({ row: index, col: 0 })}
+                                      {([0, 1] as const).map((col) => (
+                                        <ScoreCell
+                                          key={col}
+                                          ref={(el) => scoreGrid.registerInput(index, col, el)}
+                                          value={scoreGrid.valueAt(index, col)}
+                                          playerName={
+                                            col === 0
+                                              ? match.player1_id.name
+                                              : match.player2_id.name
+                                          }
+                                          isCursor={scoreGrid.isCursor(index, col)}
+                                          isRejected={scoreGrid.isRejected(index, col)}
+                                          saveState={scoreGrid.saveState[match.id] ?? "idle"}
+                                          onKeyDown={(e) =>
+                                            scoreGrid.onKeyDown(e, { row: index, col })
+                                          }
+                                          onFocus={() =>
+                                            scoreGrid.focusCell({ row: index, col })
+                                          }
+                                          // Clicking away mid-correction must not
+                                          // strand the edit locally.
+                                          onBlur={(e) => scoreGrid.onBlurCell(e, index)}
+                                        />
+                                      ))}
+                                      <SaveIndicator
+                                        state={scoreGrid.saveState[match.id] ?? "idle"}
+                                        error={scoreGrid.saveError[match.id]}
                                       />
-                                      <ScoreCell
-                                        ref={(el) => scoreGrid.registerInput(index, 1, el)}
-                                        value={scoreGrid.valueAt(index, 1)}
-                                        playerName={match.player2_id.name}
-                                        isCursor={scoreGrid.isCursor(index, 1)}
-                                        isRejected={scoreGrid.isRejected(index, 1)}
-                                        saveState={scoreGrid.saveState[match.id] ?? "idle"}
-                                        onKeyDown={(e) => scoreGrid.onKeyDown(e, { row: index, col: 1 })}
-                                        onFocus={() => scoreGrid.focusCell({ row: index, col: 1 })}
-                                      />
-                                      <SaveIndicator state={scoreGrid.saveState[match.id] ?? "idle"} />
                                     </div>
                                   ) : hasResult ? (
                                     <span className="font-medium text-foreground">

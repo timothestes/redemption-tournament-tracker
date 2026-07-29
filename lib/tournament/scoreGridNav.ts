@@ -26,8 +26,14 @@ export interface CellRef {
 export type GridAction =
   /** Move the cursor; write nothing. */
   | { kind: "move"; to: CellRef }
-  /** Write `value` (null = clear) into `at`, then move the cursor to `then`. */
-  | { kind: "write"; at: CellRef; value: number | null; then: CellRef }
+  /** Write `value` into `at`, then move the cursor to `then`. */
+  | { kind: "write"; at: CellRef; value: number; then: CellRef }
+  /**
+   * Clear `at` back to unscored. Distinct from `write` because clearing has to
+   * reach the database — a local-only clear leaves the host looking at a blank
+   * cell while the old score is still recorded.
+   */
+  | { kind: "clear"; at: CellRef }
   /** Discard the in-progress edit on `at` and restore its saved value. */
   | { kind: "revert"; at: CellRef }
   /** Leave the grid entirely (blur back to the page). */
@@ -51,12 +57,22 @@ export interface GridContext {
    * matches array; a row is "complete" once both its cells hold a value.
    */
   isRowComplete: (row: number) => boolean;
+  /**
+   * Current effective value of a cell (draft if any, else the saved score).
+   * Lets the handler tell "this keystroke completes the row" from "the row is
+   * still half-filled", which `isRowComplete` alone can't express.
+   */
+  valueAt: (row: number, col: ScoreColumn) => number | null;
   /** True when the in-progress edit on the cursor differs from what's saved. */
   isDirty?: boolean;
 }
 
 const clampRow = (row: number, rowCount: number) =>
   Math.max(0, Math.min(row, rowCount - 1));
+
+/** The value in the cursor row's OTHER column. */
+const valueAtOtherColumn = (ctx: GridContext): number | null =>
+  ctx.valueAt(ctx.cursor.row, ctx.cursor.col === 0 ? 1 : 0);
 
 /**
  * Step one cell to the right, wrapping P2 → next row's P1. Returns null when
@@ -94,16 +110,76 @@ export function nextUnscored(
   return null;
 }
 
+/** A row's two scores, either of which may still be unset. */
+export interface ScorePair {
+  p1: number | null;
+  p2: number | null;
+}
+
+/**
+ * Whether writing `next` over `current` should hit the database now.
+ *
+ * - `commit`  — this keystroke completed a previously incomplete row.
+ * - `defer`   — the row was already complete, so this is a correction in
+ *               progress. Holding the write until the cursor leaves the row
+ *               means re-typing 3-1 as 1-3 produces ONE save, not a spurious
+ *               1-1 tie followed by a race to overwrite it.
+ * - `none`    — still half-filled; nothing to persist.
+ *
+ * Pure and exported so the rule is testable without rendering the grid; the
+ * hook that owns draft state is where this used to live implicitly, and where
+ * the intermediate-write bug lived with it.
+ */
+export function commitDecision(
+  current: ScorePair,
+  next: ScorePair,
+): "commit" | "defer" | "none" {
+  const nowComplete = next.p1 !== null && next.p2 !== null;
+  if (!nowComplete) return "none";
+  const wasComplete = current.p1 !== null && current.p2 !== null;
+  return wasComplete ? "defer" : "commit";
+}
+
+/**
+ * Whether a deferred correction still needs flushing when the cursor leaves.
+ * Returns false when the draft matches what's already saved, so merely tabbing
+ * across an untouched row doesn't fire a pointless write.
+ */
+export function needsFlush(draft: ScorePair | undefined, saved: ScorePair): boolean {
+  if (!draft) return false;
+  if (draft.p1 === null || draft.p2 === null) return false;
+  return draft.p1 !== saved.p1 || draft.p2 !== saved.p2;
+}
+
+/** Modifier state of the keystroke. Absent fields are treated as false. */
+export interface KeyModifiers {
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  altKey?: boolean;
+}
+
 /**
  * Interpret a keystroke. `key` is a raw KeyboardEvent.key.
  *
  * Enter is deliberately NOT a commit key — writes are committed by the
  * component when the cursor leaves a row, so a digit keystroke alone is enough.
  * Enter just advances to the next row, matching spreadsheet muscle memory.
+ *
+ * `mods` must be passed through from the event. Without it, Cmd+1 (switch to
+ * browser tab 1) and Cmd+0 (reset zoom) arrive here as a bare "1"/"0" and get
+ * written into the focused cell — a real score, silently saved.
  */
-export function handleGridKey(key: string, ctx: GridContext): GridAction {
+export function handleGridKey(
+  key: string,
+  ctx: GridContext,
+  mods: KeyModifiers = {},
+): GridAction {
   const { cursor, rowCount, maxScore, isRowComplete } = ctx;
   if (rowCount === 0) return { kind: "passthrough" };
+
+  // Any Ctrl/Cmd/Alt combination belongs to the browser or the OS, never to the
+  // grid. Bail before the digit branch so accelerators keep working untouched.
+  if (mods.ctrlKey || mods.metaKey || mods.altKey) return { kind: "passthrough" };
 
   // A digit writes and auto-advances. This is the hot path: "3" "1" fills a
   // whole match and lands on the next one.
@@ -116,9 +192,12 @@ export function handleGridKey(key: string, ctx: GridContext): GridAction {
     const then =
       forward ??
       nextUnscored(0, rowCount, (r) =>
-        // The cell we're about to write isn't in state yet, so treat the row
-        // we just completed as complete when scanning.
-        r === cursor.row ? true : isRowComplete(r),
+        // Treat the row we're completing as done, but only when this keystroke
+        // actually completes it — on a half-filled row the other cell is still
+        // blank and the host needs to be sent back to it.
+        r === cursor.row
+          ? valueAtOtherColumn(ctx) !== null
+          : isRowComplete(r),
       ) ??
       cursor;
     return { kind: "write", at: cursor, value, then };
@@ -155,7 +234,7 @@ export function handleGridKey(key: string, ctx: GridContext): GridAction {
 
     case "Backspace":
     case "Delete":
-      return { kind: "write", at: cursor, value: null, then: cursor };
+      return { kind: "clear", at: cursor };
 
     case "Home":
       return { kind: "move", to: { row: 0, col: 0 } };

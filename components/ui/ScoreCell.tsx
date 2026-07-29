@@ -22,12 +22,12 @@ export const ScoreCell = forwardRef<
     isCursor: boolean;
     isRejected: boolean;
     saveState: RowSaveState;
-    disabled?: boolean;
     onKeyDown: (e: React.KeyboardEvent) => void;
     onFocus: () => void;
+    onBlur: (e: React.FocusEvent) => void;
   }
 >(function ScoreCell(
-  { value, playerName, isCursor, isRejected, saveState, disabled, onKeyDown, onFocus },
+  { value, playerName, isCursor, isRejected, saveState, onKeyDown, onFocus, onBlur },
   ref,
 ) {
   return (
@@ -37,12 +37,12 @@ export const ScoreCell = forwardRef<
       inputMode="numeric"
       maxLength={1}
       readOnly
-      disabled={disabled}
       value={value === null ? "" : String(value)}
       placeholder="–"
       aria-label={`Score for ${playerName}`}
       onKeyDown={onKeyDown}
       onFocus={onFocus}
+      onBlur={onBlur}
       // Every mutation goes through the key handler, which owns validation and
       // cursor movement. readOnly keeps the browser from inserting characters
       // behind its back (paste, IME, autofill) while still allowing focus.
@@ -55,22 +55,27 @@ export const ScoreCell = forwardRef<
         // underline rather than an outlined box.
         "border-0 border-b-2 outline-none",
         "placeholder:text-muted-foreground/50",
-        disabled
-          ? "bg-transparent border-transparent text-muted-foreground cursor-not-allowed"
-          : isRejected
-            ? "bg-destructive/15 border-destructive text-foreground"
-            : isCursor
-              ? "bg-muted border-primary text-foreground"
-              : saveState === "error"
-                ? "bg-destructive/10 border-destructive/50 text-foreground"
-                : "bg-muted/40 border-transparent text-foreground hover:bg-muted",
+        isRejected
+          ? "bg-destructive/15 border-destructive text-foreground"
+          : isCursor
+            ? "bg-muted border-primary text-foreground"
+            : saveState === "error"
+              ? "bg-destructive/10 border-destructive/50 text-foreground"
+              : "bg-muted/40 border-transparent text-foreground hover:bg-muted",
       ].join(" ")}
     />
   );
 });
 
 /** Per-row save indicator, sized to never shift the row's layout. */
-export function SaveIndicator({ state }: { state: RowSaveState }) {
+export function SaveIndicator({
+  state,
+  error,
+}: {
+  state: RowSaveState;
+  /** Why the save failed — surfaced verbatim rather than a generic string. */
+  error?: string;
+}) {
   return (
     <span className="inline-flex w-4 justify-center" aria-live="polite">
       {state === "saving" && (
@@ -83,10 +88,12 @@ export function SaveIndicator({ state }: { state: RowSaveState }) {
         <Check className="w-3 h-3 text-primary" aria-label="Saved" />
       )}
       {state === "error" && (
-        <TriangleAlert
-          className="w-3 h-3 text-destructive"
-          aria-label="Failed to save — check the score"
-        />
+        <span title={error ?? "Failed to save"} className="inline-flex">
+          <TriangleAlert
+            className="w-3 h-3 text-destructive"
+            aria-label={error ?? "Failed to save"}
+          />
+        </span>
       )}
     </span>
   );

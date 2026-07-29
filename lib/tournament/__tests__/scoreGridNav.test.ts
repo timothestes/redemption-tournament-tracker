@@ -4,6 +4,8 @@ import {
   stepLeft,
   stepRight,
   nextUnscored,
+  commitDecision,
+  needsFlush,
   type GridContext,
   type CellRef,
 } from "../scoreGridNav";
@@ -16,8 +18,15 @@ const ctx = (over: Partial<GridContext> = {}): GridContext => ({
   rowCount: 4,
   maxScore: 5,
   isRowComplete: () => false,
+  valueAt: () => null,
   ...over,
 });
+
+/** Build a valueAt from a sparse {"row:col": value} map. */
+const valuesFrom =
+  (map: Record<string, number>) =>
+  (row: number, col: 0 | 1): number | null =>
+    map[`${row}:${col}`] ?? null;
 
 describe("stepRight / stepLeft", () => {
   it("moves P1 -> P2 within a row", () => {
@@ -84,7 +93,12 @@ describe("digit entry", () => {
   });
 
   it("accepts a digit equal to max_score", () => {
-    expect(handleGridKey("5", ctx()).kind).toBe("write");
+    expect(handleGridKey("5", ctx())).toEqual({
+      kind: "write",
+      at: cell(0, 0),
+      value: 5,
+      then: cell(0, 1),
+    });
   });
 
   it("rejects a digit above max_score without writing", () => {
@@ -92,8 +106,16 @@ describe("digit entry", () => {
   });
 
   it("accepts 7 only when max_score is 7", () => {
-    expect(handleGridKey("7", ctx({ maxScore: 5 })).kind).toBe("reject");
-    expect(handleGridKey("7", ctx({ maxScore: 7 })).kind).toBe("write");
+    expect(handleGridKey("7", ctx({ maxScore: 5 }))).toEqual({
+      kind: "reject",
+      at: cell(0, 0),
+    });
+    expect(handleGridKey("7", ctx({ maxScore: 7 }))).toEqual({
+      kind: "write",
+      at: cell(0, 0),
+      value: 7,
+      then: cell(0, 1),
+    });
   });
 
   it("accepts 0", () => {
@@ -107,6 +129,8 @@ describe("digit entry", () => {
       ctx({
         cursor: cell(3, 1),
         isRowComplete: (r) => r === 0 || r === 2,
+        // Row 3's P1 is filled, so this keystroke really does complete it.
+        valueAt: valuesFrom({ "3:0": 4 }),
       }),
     );
     expect(action).toEqual({
@@ -120,7 +144,11 @@ describe("digit entry", () => {
   it("holds position when the last cell completes the round", () => {
     const action = handleGridKey(
       "2",
-      ctx({ cursor: cell(3, 1), isRowComplete: (r) => r !== 3 }),
+      ctx({
+        cursor: cell(3, 1),
+        isRowComplete: (r) => r !== 3,
+        valueAt: valuesFrom({ "3:0": 4 }),
+      }),
     );
     expect(action).toEqual({
       kind: "write",
@@ -128,6 +156,51 @@ describe("digit entry", () => {
       value: 2,
       then: cell(3, 1),
     });
+  });
+
+  it("comes back to a half-filled last row instead of skipping past it", () => {
+    // Filling row 3's P2 while its P1 is still blank must NOT treat row 3 as
+    // done — otherwise the round ends with a silently half-scored match.
+    const action = handleGridKey(
+      "2",
+      ctx({
+        cursor: cell(3, 1),
+        isRowComplete: () => true,
+        valueAt: () => null, // row 3's P1 is empty
+      }),
+    );
+    expect(action).toEqual({
+      kind: "write",
+      at: cell(3, 1),
+      value: 2,
+      then: cell(3, 0),
+    });
+  });
+});
+
+describe("modifier keys are never scores", () => {
+  // Cmd+1..9 switches browser tabs, Cmd+0 resets zoom. Treating those as score
+  // input silently wrote a real result into the focused cell.
+  for (const mod of ["ctrlKey", "metaKey", "altKey"] as const) {
+    it(`ignores digits held with ${mod}`, () => {
+      expect(handleGridKey("1", ctx(), { [mod]: true }).kind).toBe("passthrough");
+      expect(handleGridKey("0", ctx(), { [mod]: true }).kind).toBe("passthrough");
+    });
+
+    it(`ignores navigation keys held with ${mod}`, () => {
+      expect(handleGridKey("ArrowDown", ctx(), { [mod]: true }).kind).toBe("passthrough");
+      expect(handleGridKey("Enter", ctx(), { [mod]: true }).kind).toBe("passthrough");
+      expect(handleGridKey("Backspace", ctx(), { [mod]: true }).kind).toBe("passthrough");
+    });
+  }
+
+  it("still writes a bare digit with no modifiers", () => {
+    expect(handleGridKey("3", ctx(), {}).kind).toBe("write");
+    expect(handleGridKey("3", ctx()).kind).toBe("write");
+  });
+
+  it("allows Shift, which is how '?' is typed on most layouts", () => {
+    expect(handleGridKey("?", ctx(), { ctrlKey: false }).kind).toBe("help");
   });
 });
 
@@ -220,17 +293,21 @@ describe("Enter", () => {
 });
 
 describe("clearing and exiting", () => {
-  it("Backspace clears the cell without moving", () => {
+  // `clear` is its own action, not a write-with-null: clearing has to reach the
+  // database. When it was a local-only write the cell went blank while the old
+  // score stayed recorded, and the cheatsheet promised otherwise.
+  it("Backspace emits a clear for the cursor cell", () => {
     expect(handleGridKey("Backspace", ctx({ cursor: cell(2, 1) }))).toEqual({
-      kind: "write",
+      kind: "clear",
       at: cell(2, 1),
-      value: null,
-      then: cell(2, 1),
     });
   });
 
   it("Delete behaves like Backspace", () => {
-    expect(handleGridKey("Delete", ctx()).kind).toBe("write");
+    expect(handleGridKey("Delete", ctx({ cursor: cell(1, 0) }))).toEqual({
+      kind: "clear",
+      at: cell(1, 0),
+    });
   });
 
   it("Escape reverts a dirty cell, then exits on the second press", () => {
@@ -239,6 +316,51 @@ describe("clearing and exiting", () => {
       at: cell(0, 0),
     });
     expect(handleGridKey("Escape", ctx({ isDirty: false }))).toEqual({ kind: "exit" });
+  });
+});
+
+describe("commitDecision", () => {
+  it("commits when a keystroke completes a previously blank row", () => {
+    expect(commitDecision({ p1: 3, p2: null }, { p1: 3, p2: 1 })).toBe("commit");
+  });
+
+  it("does nothing while the row is still half-filled", () => {
+    expect(commitDecision({ p1: null, p2: null }, { p1: 3, p2: null })).toBe("none");
+    expect(commitDecision({ p1: null, p2: null }, { p1: null, p2: 2 })).toBe("none");
+  });
+
+  // The bug this exists to prevent: correcting a recorded 3-1 to 1-3 used to
+  // write a 1-1 tie the moment the first digit landed, then race a second save.
+  it("defers when overwriting a row that was already complete", () => {
+    expect(commitDecision({ p1: 3, p2: 1 }, { p1: 1, p2: 1 })).toBe("defer");
+    expect(commitDecision({ p1: 1, p2: 1 }, { p1: 1, p2: 3 })).toBe("defer");
+  });
+
+  it("treats 0 as a real score, not as absent", () => {
+    expect(commitDecision({ p1: 0, p2: null }, { p1: 0, p2: 0 })).toBe("commit");
+    expect(commitDecision({ p1: 0, p2: 0 }, { p1: 5, p2: 0 })).toBe("defer");
+  });
+});
+
+describe("needsFlush", () => {
+  it("flushes a complete draft that differs from what's saved", () => {
+    expect(needsFlush({ p1: 1, p2: 3 }, { p1: 3, p2: 1 })).toBe(true);
+  });
+
+  it("skips a draft that already matches the saved scores", () => {
+    expect(needsFlush({ p1: 3, p2: 1 }, { p1: 3, p2: 1 })).toBe(false);
+  });
+
+  it("skips a half-filled draft — a partial row is never persisted", () => {
+    expect(needsFlush({ p1: 1, p2: null }, { p1: 3, p2: 1 })).toBe(false);
+  });
+
+  it("skips when there is no draft at all", () => {
+    expect(needsFlush(undefined, { p1: 3, p2: 1 })).toBe(false);
+  });
+
+  it("flushes a draft onto a row that had no score", () => {
+    expect(needsFlush({ p1: 2, p2: 0 }, { p1: null, p2: null })).toBe(true);
   });
 });
 
