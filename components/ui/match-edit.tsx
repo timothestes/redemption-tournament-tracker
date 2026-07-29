@@ -4,7 +4,7 @@ import { Button } from "./button";
 import { Pencil } from "lucide-react";
 import { Dispatch, FormEvent, SetStateAction, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
-import { getUserSafe } from "../../utils/supabase/getUserSafe";
+import { saveMatchScore, validateScorePair } from "../../utils/tournament/saveMatchScore";
 import { Dialog, DialogContent } from "./dialog";
 
 export default function MatchEditModal({
@@ -108,27 +108,17 @@ export default function MatchEditModal({
     e.preventDefault();
     setError(null);
 
-    // Require an explicit choice — null sentinel guard. Without this, the
-    // < / > comparisons below would treat null as 0 and silently submit a
-    // 0–0 result the user never selected.
-    if (player1Score === null || player2Score === null) {
-      setError("Select a score for both players before submitting.");
+    // Covers the null sentinel ("no choice yet" — never conflate with 0), the
+    // 0..max_score range, and the unreachable max–max pair.
+    const invalid = validateScorePair(player1Score, player2Score, tournament.max_score);
+    if (invalid) {
+      setError(invalid);
       return;
     }
+    // Past the guard both scores are numbers; TS can't narrow through the helper.
+    if (player1Score === null || player2Score === null) return;
 
     if (mode === "repair") {
-      if (
-        player1Score < 0 || player2Score < 0 ||
-        player1Score > tournament.max_score ||
-        player2Score > tournament.max_score
-      ) {
-        setError(`Invalid scores. Scores must be between 0 and ${tournament.max_score}, inclusive.`);
-        return;
-      }
-      if (player1Score === tournament.max_score && player2Score === tournament.max_score) {
-        setError(`Score cannot be ${tournament.max_score}-${tournament.max_score}.`);
-        return;
-      }
       const { repairMatchScoreAction } = await import("@/app/tracker/tournaments/repair-actions");
       const result = await repairMatchScoreAction({
         matchId: match.id,
@@ -150,114 +140,23 @@ export default function MatchEditModal({
       return;
     }
 
-    if (
-      isNaN(player2Score) ||
-      player1Score < 0 ||
-      player2Score < 0 ||
-      player1Score > tournament.max_score ||
-      player2Score > tournament.max_score
-    ) {
-      setError(`Invalid scores. Scores must be between 0 and ${tournament.max_score}, inclusive.`);
-      return;
-    }
-    if (player1Score === tournament.max_score && player2Score === tournament.max_score) {
-      setError(`Score cannot be ${tournament.max_score}-${tournament.max_score}.`);
-      return;
-    }
-    const client = createClient();
-
-    // A read/write failure mid-round is most often a dead/expired session (the
-    // owner-scoped RLS query returns no row). getUserSafe distinguishes that
-    // (returns null) from a transient network blip (keeps the session), so flaky
-    // venue wifi shows a generic retry message rather than a false "session
-    // expired"; it also refreshes the token if it still can, enabling recovery
-    // on retry.
-    const sessionExpiredMessage =
-      "Your session expired — reload the page to sign back in, then re-enter the score.";
-    const hasValidSession = async () => !!(await getUserSafe(client));
-
-    const player1 = await client
-      .from("participants")
-      .select("differential, match_points, id")
-      .eq("id", match.player1_id.id)
-      .single();
-    const player2 = await client
-      .from("participants")
-      .select("differential, match_points, id")
-      .eq("id", match.player2_id.id)
-      .single();
-
-    if (player1.error || player2.error) {
-      console.log(player1.error, player2.error);
-      setError(
-        (await hasValidSession())
-          ? "Couldn't load player data. Please try again."
-          : sessionExpiredMessage,
-      );
-      return;
-    }
-
-    let player1_match_points, player2_match_points;
-    let isTie = false;
-    let winnerId: string | null = null;
-
-    if (player2Score === player1Score) {
-      player1_match_points = 1.5;
-      player2_match_points = 1.5;
-      isTie = true;
-      winnerId = null;
-    } else if (player1Score === tournament.max_score) {
-      player1_match_points = 3;
-      player2_match_points = 0;
-      winnerId = match.player1_id.id;
-    } else if (player2Score === tournament.max_score) {
-      player1_match_points = 0;
-      player2_match_points = 3;
-      winnerId = match.player2_id.id;
-    } else if (player1Score > player2Score) {
-      player1_match_points = 2;
-      player2_match_points = 1;
-      winnerId = match.player1_id.id;
-    } else if (player2Score > player1Score) {
-      player1_match_points = 1;
-      player2_match_points = 2;
-      winnerId = match.player2_id.id;
-    }
-
-    // Update the match without modifying match_order
-    const { data, error } = await client
-      .from("matches")
-      .update({
-        player1_score: player1Score,
-        player2_score: player2Score,
-        differential:
-          (player1.data.differential ?? 0) + (player1Score - player2Score),
-        differential2:
-          (player2.data.differential ?? 0) + (player2Score - player1Score),
-        player1_match_points:
-          (player1.data.match_points || 0) + player1_match_points,
-        player2_match_points:
-          (player2.data.match_points || 0) + player2_match_points,
-        is_tie: isTie,
-        winner_id: winnerId,
-        updated_at: new Date(),
-      })
-      .eq("id", match.id);
+    const result = await saveMatchScore(createClient(), {
+      matchId: match.id,
+      player1Id: match.player1_id.id,
+      player2Id: match.player2_id.id,
+      player1Score,
+      player2Score,
+      maxScore: tournament.max_score,
+    });
 
     setMatchErrorIndex((prev) => prev.filter((i) => i !== index));
 
-    if (!error) {
-      setOpen(false);
-    } else {
-      console.log(error);
-      setError(
-        (await hasValidSession())
-          ? "Failed to save match scores. Please try again."
-          : sessionExpiredMessage,
-      );
+    if (result.ok === false) {
+      setError(result.error);
       return;
     }
 
+    setOpen(false);
     fetchCurrentRoundData?.();
   };
 
