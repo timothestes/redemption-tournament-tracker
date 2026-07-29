@@ -61,6 +61,9 @@ interface TournamentTabsProps {
   usernames?: Map<string, string>;
   /** Opens the QR Join dialog (mounted at the page level). */
   onOpenQrJoin?: () => void;
+  /** Fired after Tournament Settings persists a change, so the page header
+   * picks up a rename from the Event Type section. */
+  onTournamentUpdated?: () => void;
   /** "N of M participants have decklists" — only meaningful pre-start when
    * the tournament requires decklists; null hides the line entirely. */
   decklistSummary?: { submitted: number; total: number } | null;
@@ -106,6 +109,7 @@ export default function TournamentTabs({
   isHost = false,
   usernames,
   onOpenQrJoin,
+  onTournamentUpdated,
   decklistSummary,
   numberingMode,
   onRepairCompleted,
@@ -371,6 +375,7 @@ export default function TournamentTabs({
           <TournamentSettings
             tournamentId={tournamentId}
             participantCount={participants.length}
+            onTournamentUpdated={onTournamentUpdated}
             key={activeTab} // Force re-render when tab becomes active
           />
         </div>

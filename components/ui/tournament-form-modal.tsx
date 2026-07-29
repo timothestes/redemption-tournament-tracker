@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Button } from "./button";
 import { STANDARD_CATEGORIES } from "../../utils/tournament/categoryDefaults";
 import { buildTournamentName, isNameFrozen } from "../../utils/tournament/naming";
+import { TOURNAMENT_TIERS } from "../../utils/tournament/tiers";
 import {
   Dialog,
   DialogContent,
@@ -16,12 +17,16 @@ interface TournamentFormModalProps {
   onClose: () => void;
   // Create one tournament per item. With 0/1 category selected this is a single
   // item carrying the (editable) name; with 2+ it's one auto-named item per type.
-  onSubmit: (items: { name: string; category: string | null }[]) => void;
+  onSubmit: (
+    items: { name: string; category: string | null; tier: string | null }[]
+  ) => void;
   // City to append to generated names for events hosted from a public listing.
   listingCity?: string;
   // Categories to offer. Defaults to the standard list when omitted (e.g. an
   // official listing passes its own formats here).
   categoryOptions?: string[];
+  // Tier the source listing advertised, pre-selected when hosting from one.
+  defaultTier?: string | null;
 }
 
 // Drop a trailing "- 2P" / "2P" player-count suffix; it reads as clutter.
@@ -33,11 +38,15 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   onSubmit,
   listingCity,
   categoryOptions,
+  defaultTier,
 }) => {
   const firstCheckboxRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   // The set of checked categories. Each checked type becomes its own tournament.
   const [selected, setSelected] = useState<string[]>([]);
+  // Sanctioning tier, shared by every tournament this modal creates — one event
+  // is one tier even when it runs several categories. "" means unspecified.
+  const [tier, setTier] = useState<string>("");
   // Once the host edits the name, we stop auto-building it from the category.
   const [nameTouched, setNameTouched] = useState(false);
 
@@ -55,14 +64,18 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
     // Pre-check the first type so the modal opens ready to add one tournament,
     // matching the previous single-select default. The host can check more.
     const initial = options[0] ? [options[0]] : [];
+    const initialTier = defaultTier ?? "";
     setSelected(initial);
+    setTier(initialTier);
     setNameTouched(false);
-    setName(buildTournamentName(cleanCategory(initial[0] ?? "")));
+    setName(
+      buildTournamentName(cleanCategory(initial[0] ?? ""), { tier: initialTier || null })
+    );
     requestAnimationFrame(() => {
       firstCheckboxRef.current?.focus();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, defaultTier]);
 
   // Creating multiple tournaments at once: each gets an auto-built name, so the
   // single editable name field is replaced by a preview list.
@@ -80,18 +93,35 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
     // host hasn't taken over the name. Going to 0 or 2+ leaves the field for the
     // host / preview to drive.
     if (!nameTouched) {
-      if (next.length === 1) setName(buildTournamentName(cleanCategory(next[0])));
+      if (next.length === 1)
+        setName(buildTournamentName(cleanCategory(next[0]), { tier: tier || null }));
       else if (next.length === 0) setName("");
     }
   };
 
+  const handleTierChange = (value: string) => {
+    setTier(value);
+    if (!nameTouched && selected.length === 1) {
+      setName(buildTournamentName(cleanCategory(selected[0]), { tier: value || null }));
+    }
+  };
+
+  // The name every generated (frozen or multi) tournament gets.
+  const generatedName = (category: string) =>
+    buildTournamentName(cleanCategory(category), {
+      city: listingCity,
+      tier: tier || null,
+    });
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const chosenTier = tier || null;
     if (isMulti) {
       onSubmit(
         selected.map((c) => ({
-          name: buildTournamentName(cleanCategory(c), { city: listingCity }),
+          name: generatedName(c),
           category: c,
+          tier: chosenTier,
         }))
       );
       return;
@@ -99,15 +129,16 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
     if (frozen) {
       onSubmit([
         {
-          name: buildTournamentName(cleanCategory(selected[0]), { city: listingCity }),
+          name: generatedName(selected[0]),
           category: selected[0],
+          tier: chosenTier,
         },
       ]);
       return;
     }
     const trimmed = name.trim();
     if (!trimmed) return;
-    onSubmit([{ name: trimmed, category: selected[0] ?? null }]);
+    onSubmit([{ name: trimmed, category: selected[0] ?? null, tier: chosenTier }]);
   };
 
   const fieldClasses =
@@ -124,6 +155,30 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <DialogBody className="space-y-3">
+            <div>
+              <label
+                htmlFor="tier"
+                className="block text-xs font-medium text-muted-foreground mb-1"
+              >
+                Tier
+              </label>
+              <select
+                id="tier"
+                value={tier}
+                onChange={(e) => handleTierChange(e.target.value)}
+                className={fieldClasses}
+              >
+                <option value="">Not specified</option>
+                {TOURNAMENT_TIERS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Appears in the event name. Applies to every category you check.
+              </p>
+            </div>
             <div
               role="group"
               aria-labelledby="category-group-label"
@@ -173,9 +228,9 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
                     <li
                       key={c}
                       className="text-sm text-foreground truncate"
-                      title={buildTournamentName(cleanCategory(c), { city: listingCity })}
+                      title={generatedName(c)}
                     >
-                      {buildTournamentName(cleanCategory(c), { city: listingCity })}
+                      {generatedName(c)}
                     </li>
                   ))}
                 </ul>
@@ -189,7 +244,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
                   Tournament name
                 </span>
                 <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground truncate">
-                  {buildTournamentName(cleanCategory(selected[0]), { city: listingCity })}
+                  {generatedName(selected[0])}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Official events use standardized names.

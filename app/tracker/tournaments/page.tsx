@@ -10,6 +10,7 @@ import { HiPencil, HiTrash, HiPlus, HiOutlineDesktopComputer } from "react-icons
 import { useRouter, useSearchParams } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
 import { categoryDefaults, requireDecklistsDefault } from "../../../utils/tournament/categoryDefaults";
+import { normalizeTier } from "../../../utils/tournament/tiers";
 import { getFormatDef } from "@/lib/formats";
 
 const supabase = createClient();
@@ -27,6 +28,7 @@ function TournamentsPageInner() {
   const [listingCity, setListingCity] = useState("");
   const [fromListingId, setFromListingId] = useState<string | null>(null);
   const [listingFormats, setListingFormats] = useState<string[]>([]);
+  const [listingTier, setListingTier] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -39,10 +41,15 @@ function TournamentsPageInner() {
     const listingId = searchParams.get("from_listing");
     const city = searchParams.get("city");
     const formats = searchParams.get("formats");
+    // The listing's advertised tournament_type is free text ("South Central
+    // Regional"); normalizeTier collapses it onto a canonical tier, or null if
+    // it's something we don't recognize.
+    const type = searchParams.get("type");
     if (listingId) {
       setListingCity(city ?? "");
       setFromListingId(listingId);
       setListingFormats(formats ? formats.split("|").filter(Boolean) : []);
+      setListingTier(normalizeTier(type));
       setisAddTournamentModalOpen(true);
     }
   }, [searchParams]);
@@ -67,7 +74,7 @@ function TournamentsPageInner() {
   // creates one per checked type in a single insert; when hosting from a listing
   // they share its listing_id and group under one event card.
   const handleAddTournament = async (
-    items: { name: string; category: string | null }[]
+    items: { name: string; category: string | null; tier: string | null }[]
   ) => {
     if (items.length === 0) return;
     try {
@@ -87,9 +94,10 @@ function TournamentsPageInner() {
         return;
       }
 
-      const rows = items.map(({ name, category }) => {
+      const rows = items.map(({ name, category, tier }) => {
         const row: Record<string, unknown> = { name, host_id: user.id };
         if (fromListingId) row.listing_id = fromListingId;
+        if (tier) row.tier = tier;
         // A chosen category records the format and pre-fills sensible settings the
         // host can still change later in Tournament Settings.
         if (category) {
@@ -120,6 +128,7 @@ function TournamentsPageInner() {
           setFromListingId(null);
           setListingCity("");
           setListingFormats([]);
+          setListingTier(null);
           // Clean up URL params
           router.replace("/tracker/tournaments", { scroll: false });
         }
@@ -146,6 +155,9 @@ function TournamentsPageInner() {
     const city = group.map((t) => t.name?.split(" — ")[1]).find(Boolean) ?? "";
     setListingCity(city);
     setListingFormats([]);
+    // Same reasoning as the city: inherit the tier its siblings carry so the
+    // late-added category's generated name matches the rest of the event.
+    setListingTier(group.map((t) => t.tier).find(Boolean) ?? null);
     setisAddTournamentModalOpen(true);
   };
 
@@ -339,12 +351,14 @@ function TournamentsPageInner() {
                 setFromListingId(null);
                 setListingCity("");
                 setListingFormats([]);
+                setListingTier(null);
                 router.replace("/tracker/tournaments", { scroll: false });
               }
             }}
             onSubmit={handleAddTournament}
             listingCity={listingCity}
             categoryOptions={listingFormats.length > 0 ? listingFormats : undefined}
+            defaultTier={listingTier}
           />
         </div>
         {loading ? (
