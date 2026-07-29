@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 export type ViewId =
   | "tournaments"
   | "champions"
@@ -45,15 +43,6 @@ export default function NavTabs({ view, setView }: NavTabsProps) {
           {tab.label}
         </button>
       ))}
-      {/* Pattern-break: this is a real navigation link (to /tournaments/results),
-          not a view-state switch like the buttons above — Results is its own
-          page, not a HistoryClient view. Styled to match the other tabs. */}
-      <Link
-        href="/tournaments/results"
-        className="shrink-0 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border-b-2 border-transparent"
-      >
-        Results
-      </Link>
     </div>
   );
 }
