@@ -44,6 +44,11 @@ import {
 
 const supabase = createClient();
 
+// How often the pre-start page re-reads the roster. Short enough that a player
+// scanning the QR at the check-in table appears while the host is still looking
+// at the screen; long enough to stay cheap for a tab left open all morning.
+const CHECK_IN_POLL_MS = 8000;
+
 export default function TournamentPage({
   params,
 }: {
@@ -174,7 +179,9 @@ export default function TournamentPage({
     }
   };
 
-  const fetchParticipants = async () => {
+  // useCallback so the check-in poller below can depend on a stable identity —
+  // a fresh function each render would reset its interval before it ever fires.
+  const fetchParticipants = useCallback(async () => {
     if (!id) return;
     try {
       const { data, error } = await supabase
@@ -189,7 +196,7 @@ export default function TournamentPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   // Batched profile lookup for the account-linkage badge (Task 9 Step 1) —
   // one query for every distinct user_id currently on the roster. Profiles
@@ -720,6 +727,31 @@ export default function TournamentPage({
     }
   }, [id]);
 
+  // Live check-in roster. QR joins and player deck submissions are written
+  // server-side (admin RPC), so the host's open page has no way to learn about
+  // them — before this, a host watching players scan the code saw nothing until
+  // they hit refresh. Poll instead of realtime: the submission tables are
+  // admin-only (RLS with no authenticated policy), so postgres_changes would
+  // deliver the join but never the decklist.
+  //
+  // Scoped tight: only before the tournament starts (joins are rejected after),
+  // and only while the tab is actually visible, so a forgotten tab costs nothing.
+  useEffect(() => {
+    if (!id || tournament?.has_started || tournament?.has_ended) return;
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      fetchParticipants();
+      fetchDecklists();
+    };
+    const timer = setInterval(refresh, CHECK_IN_POLL_MS);
+    // A host tabbing back mid-check-in shouldn't wait out the interval.
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [id, tournament?.has_started, tournament?.has_ended, fetchParticipants, fetchDecklists]);
+
   const isHost = !!(tournament?.host_id && currentUserId && tournament.host_id === currentUserId);
   const numberingMode: "tables" | "seats" =
     tournament?.numbering_mode === "seats" ? "seats" : "tables";
@@ -847,11 +879,14 @@ export default function TournamentPage({
                   {/* Push actions to the right */}
                   <div className="ml-auto flex items-center gap-2">
                     {/* Start Tournament — primary pre-start action stays inline so
-                        a host can see it without opening the menu. */}
+                        a host can see it without opening the menu. Outline, not
+                        green: the filled CTA belongs to the Participants toolbar
+                        (Add Participant), and two greens on one screen made it
+                        unclear which action came first. */}
                     {!tournament?.has_started && !tournament?.has_ended && (
                       <Button
                         disabled={participants.length === 0 || togglingStatus}
-                        variant="success"
+                        variant="outline"
                         onClick={handleTournamentStatusToggle}
                         size="sm"
                       >
