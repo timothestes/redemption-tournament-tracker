@@ -8,6 +8,7 @@ import { generateJoinCode } from "@/lib/tournament/joinCodes";
 import { buildDeckSubmission, type DeckSnapshot } from "@/lib/tournament/deckSubmission";
 import { normalizeTournamentFormat, type FormatId } from "@/lib/formats";
 import { checkDeck, type DeckCheckCard, type DeckCheckIssue } from "@/utils/deckcheck";
+import { derivePreviewCards } from "@/lib/tournament/previewCards";
 
 // System user that owns published tournament deck copies
 const REDEMPTIONCCG_USER_ID = "a0a8e980-f372-4ebd-be25-d2f26507e98f";
@@ -17,6 +18,7 @@ function ordinal(n: number): string {
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
+
 
 // Reads on the default-deny tables (tournament_deck_submissions,
 // tournament_join_blocks) go through the admin client, which bypasses RLS
@@ -114,8 +116,12 @@ export async function loadTournamentDecklistsAction(tournamentId: string) {
   const decklists: TournamentDecklistRow[] = (data || []).map((row: any) => {
     const sub = submissionMap.get(row.participant_id);
     const snapshot = sub?.deck_snapshot as DeckSnapshot | undefined;
+    // Main deck only — `decks.card_count` excludes reserve and maybeboard
+    // everywhere else in the app (see saveDeckAction), so counting every zone
+    // here made a QR-submitted deck read "60c" where the same deck attached by
+    // the host read "50c".
     const cardCountFromSnapshot = snapshot
-      ? snapshot.cards.reduce((n, c) => n + c.quantity, 0)
+      ? snapshot.cards.reduce((n, c) => (c.zone === "main" ? n + c.quantity : n), 0)
       : 0;
     // The `decks` join fails when deck_id is null (deck deleted) or the deck
     // is private and inaccessible under RLS. Fall back to the submission
@@ -828,13 +834,21 @@ export async function publishTournamentDecklistsAction(
 
     if (submission) {
       const snapshot = submission.deck_snapshot as DeckSnapshot;
+      const [preview1, preview2] = derivePreviewCards(snapshot.cards);
       deckMeta = {
         description: null,
         format: snapshot.deckFormat || null,
         paragon: null,
-        preview_card_1: null,
-        preview_card_2: null,
-        card_count: snapshot.cards.reduce((n, c) => n + c.quantity, 0),
+        // Derived, not null: a published copy with no preview cards renders as
+        // a blank tile on the community decks page. The snapshot has no
+        // player-chosen previews to carry over, so apply the same auto-pick
+        // rule the deck builder uses when saving (useDeckState).
+        preview_card_1: preview1,
+        preview_card_2: preview2,
+        // Main deck only — matches how `decks.card_count` is written everywhere
+        // else (see saveDeckAction); counting reserve here inflated the count
+        // on every published copy.
+        card_count: snapshot.cards.reduce((n, c) => (c.zone === "main" ? n + c.quantity : n), 0),
         is_legal: submission.is_legal ?? null,
         deckcheck_issues: submission.deckcheck_issues ?? null,
       };
