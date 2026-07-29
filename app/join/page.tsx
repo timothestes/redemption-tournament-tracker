@@ -21,8 +21,8 @@ export default function JoinLandingPage() {
   }
 
   return (
-    <main className="mx-auto max-w-sm px-4 py-16">
-      <div className="rounded-lg border border-border bg-card p-6">
+    <main className="flex min-h-[100dvh] items-center justify-center px-4 py-10">
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl backdrop-blur-md">
         <h1 className="text-2xl font-semibold text-foreground">Join a tournament</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Enter the code your host gave you.
