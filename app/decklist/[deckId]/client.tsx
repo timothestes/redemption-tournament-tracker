@@ -28,6 +28,8 @@ import { generateDeckText } from "../card-search/utils/deckImportExport";
 import CardTile from "@/components/ui/CardTile";
 import { compareCardsByType, compareCardsDefault, compareTypeGroups, type SortableCard } from "@/lib/cards/defaultSort";
 import { getFormatDef } from "@/lib/formats";
+import { TrophyIcon, getPlacementLabel } from "@/components/trophy-icon";
+import type { DeckTournamentContext } from "../deckTournamentContext";
 
 interface PublicDeckData {
   id: string;
@@ -48,6 +50,32 @@ interface PublicDeckData {
   tags?: GlobalTag[];
   total_price?: number | null;
   budget_price?: number | null;
+  tournament?: DeckTournamentContext | null;
+}
+
+function formatEventDate(endedAt: string | null): string | null {
+  if (!endedAt) return null;
+  return new Date(endedAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+// Same podium tones the community grid uses on its placement badge.
+function getPlacementToneClass(place: number): string {
+  if (place === 1) return "text-yellow-700 dark:text-yellow-300";
+  if (place === 2) return "text-foreground";
+  if (place === 3) return "text-orange-700 dark:text-orange-300";
+  return "text-muted-foreground";
+}
+
+function BreadcrumbChevron() {
+  return (
+    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
+  );
 }
 
 function getContrastColor(hex: string): string {
@@ -184,6 +212,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
   // Card prices
   const { getPrice, getProductUrl } = useCardPrices();
+
+  // Tournament provenance. Present only on published tournament copies, where
+  // it — not the deck row — carries the identity of this decklist.
+  const tournament = deck.tournament ?? null;
 
   // Inline name editing (owner only)
   const [deckName, setDeckName] = useState(deck.name);
@@ -531,22 +563,117 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         </div>
       )}
 
-      {/* Breadcrumb */}
+      {/* Breadcrumb — a published tournament copy belongs to its event, not the community index */}
       <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
-        <a href="/decklist/community" className="hover:text-foreground transition-colors">
-          Community Decks
-        </a>
-        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <span className="text-foreground truncate">{deckName}</span>
+        {tournament ? (
+          <>
+            {/* Root crumb is dropped on phones so the trail stays one line */}
+            <Link href="/tournaments/results" className="hidden sm:inline hover:text-foreground transition-colors">
+              Tournament Results
+            </Link>
+            <span className="hidden sm:contents"><BreadcrumbChevron /></span>
+            {tournament.results_published ? (
+              <Link
+                href={`/tournaments/results/${tournament.tournament_id}`}
+                className="hover:text-foreground transition-colors truncate"
+              >
+                {tournament.tournament_name}
+              </Link>
+            ) : (
+              <span className="truncate">{tournament.tournament_name}</span>
+            )}
+            <BreadcrumbChevron />
+            <span className="text-foreground truncate">{tournament.player_name || deckName}</span>
+          </>
+        ) : (
+          <>
+            <a href="/decklist/community" className="hover:text-foreground transition-colors">
+              Community Decks
+            </a>
+            <BreadcrumbChevron />
+            <span className="text-foreground truncate">{deckName}</span>
+          </>
+        )}
       </nav>
+
+      {/* Tournament result header — the identity of a published copy */}
+      {tournament && (
+        <div className="mb-6 rounded-xl bg-muted/40 px-4 py-4 sm:px-5 sm:py-5">
+          {tournament.placement != null && (
+            <div className="flex items-center gap-2 mb-1">
+              <TrophyIcon place={tournament.placement} className="w-5 h-5 flex-shrink-0" />
+              <span className={`text-sm font-semibold uppercase tracking-wide ${getPlacementToneClass(tournament.placement)}`}>
+                {getPlacementLabel(tournament.placement)}
+              </span>
+            </div>
+          )}
+          <h1 className="font-cinzel text-3xl font-bold text-foreground break-words">
+            {tournament.player_name || deckName}
+          </h1>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            {(() => {
+              // Separators trail their own item so a wrap on narrow screens
+              // never starts a line with a stray "·".
+              const meta = [
+                formatEventDate(tournament.ended_at),
+                tournament.deck_format,
+                tournament.participant_count > 0
+                  ? `${tournament.participant_count} player${tournament.participant_count === 1 ? "" : "s"}`
+                  : null,
+              ].filter(Boolean) as string[];
+              return (
+                <>
+                  <span className="flex items-center gap-2">
+                    {tournament.results_published ? (
+                      <Link
+                        href={`/tournaments/results/${tournament.tournament_id}`}
+                        className="font-medium underline underline-offset-2 hover:text-foreground transition-colors"
+                      >
+                        {tournament.tournament_name}
+                      </Link>
+                    ) : (
+                      <span className="font-medium">{tournament.tournament_name}</span>
+                    )}
+                    {meta.length > 0 && <span aria-hidden="true">·</span>}
+                  </span>
+                  {meta.map((part, i) => (
+                    <span key={part} className="flex items-center gap-2">
+                      {part}
+                      {i < meta.length - 1 && <span aria-hidden="true">·</span>}
+                    </span>
+                  ))}
+                </>
+              );
+            })()}
+          </div>
+          {(tournament.match_points != null || tournament.differential != null) && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {tournament.match_points != null && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-background px-2.5 py-1 text-xs text-muted-foreground">
+                  <span className="uppercase tracking-wide">Match points</span>
+                  <span className="font-semibold text-foreground">{tournament.match_points}</span>
+                </span>
+              )}
+              {tournament.differential != null && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-background px-2.5 py-1 text-xs text-muted-foreground">
+                  <span className="uppercase tracking-wide">Differential</span>
+                  <span className="font-semibold text-foreground">
+                    {tournament.differential > 0 ? `+${tournament.differential}` : tournament.differential}
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Header */}
       <div className="mb-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            {isOwner && editingName ? (
+            {/* Tournament copies are titled "<player> - <place> - <event>"; the
+                result header above already says all of that, and better. */}
+            {!tournament && (isOwner && editingName ? (
               <input
                 autoFocus
                 value={nameInput}
@@ -566,7 +693,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               >
                 {deckName}
               </h1>
-            )}
+            ))}
             <div className="flex items-center gap-3 flex-wrap">
               <span className={getDeckTypeBadgeClasses(deck.format)}>
                 {formatDeckType(deck.format)}
@@ -576,7 +703,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   Paragon: <strong>{deck.paragon}</strong>
                 </span>
               )}
-              {deck.username && (
+              {/* The byline on a published copy is the service account that owns
+                  it, not the player — the result header credits the player. */}
+              {!tournament && deck.username && (
                 <span className="text-sm text-muted-foreground">
                   by{" "}
                   <Link
@@ -589,7 +718,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               )}
               <span className="text-sm text-muted-foreground">
                 {mainDeckCount} cards{reserveCount > 0 && ` + ${reserveCount} reserve`}
-                {totalDeckPrice !== null && (
+                {/* Price stays available in the Stats panel, but it must not be
+                    the loudest thing on a tournament result page. */}
+                {!tournament && totalDeckPrice !== null && (
                   <button
                     onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                     className="text-green-600 dark:text-green-400 font-medium hover:underline inline-flex items-center gap-1"
@@ -601,7 +732,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     ${totalDeckPrice.toFixed(2)}
                   </button>
                 )}
-                {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
+                {!tournament && deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
                   <button
                     onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
                     className="text-muted-foreground font-normal hover:underline inline-flex items-center gap-0.5 text-xs"
@@ -612,12 +743,18 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   </button>
                 )}
               </span>
-              <span className="text-sm text-muted-foreground">
-                Created {new Date(deck.created_at).toLocaleDateString()}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                Updated {new Date(deck.updated_at).toLocaleDateString()}
-              </span>
+              {/* A published copy is an immutable archive row — its own created/
+                  updated stamps say nothing. The event date is the real date. */}
+              {!tournament && (
+                <>
+                  <span className="text-sm text-muted-foreground">
+                    Created {new Date(deck.created_at).toLocaleDateString()}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    Updated {new Date(deck.updated_at).toLocaleDateString()}
+                  </span>
+                </>
+              )}
               {(deck.view_count ?? 0) > 0 && (
                 <span className="text-sm text-muted-foreground">{deck.view_count} views</span>
               )}
