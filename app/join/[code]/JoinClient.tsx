@@ -11,7 +11,6 @@ import {
   type JoinInfo,
   type JoinResult,
 } from "../actions";
-import { FORMATS } from "@/lib/formats";
 
 type JoinedState = Extract<JoinInfo, { success: true }>;
 type FailedResult = Extract<JoinResult, { success: false }>;
@@ -30,7 +29,6 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 function EventHeader({ info }: { info: JoinedState }) {
-  const badge = info.deckFormat ? FORMATS[info.deckFormat]?.badge : undefined;
   return (
     <div className="mb-6 text-center">
       <h1 className="font-cinzel text-2xl font-bold text-foreground sm:text-3xl">
@@ -38,11 +36,6 @@ function EventHeader({ info }: { info: JoinedState }) {
       </h1>
       <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
         {info.category && <span>{info.category}</span>}
-        {badge && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground">
-            {badge}
-          </span>
-        )}
         {info.hostName && <span>Hosted by {info.hostName}</span>}
       </div>
     </div>
