@@ -3,6 +3,7 @@ import { Button } from "./button";
 import { STANDARD_CATEGORIES } from "../../utils/tournament/categoryDefaults";
 import { buildTournamentName, isNameFrozen } from "../../utils/tournament/naming";
 import { TOURNAMENT_TIERS } from "../../utils/tournament/tiers";
+import { US_STATES, normalizeState } from "../../utils/tournament/usStates";
 import {
   Dialog,
   DialogContent,
@@ -18,10 +19,17 @@ interface TournamentFormModalProps {
   // Create one tournament per item. With 0/1 category selected this is a single
   // item carrying the (editable) name; with 2+ it's one auto-named item per type.
   onSubmit: (
-    items: { name: string; category: string | null; tier: string | null }[]
+    items: {
+      name: string;
+      category: string | null;
+      tier: string | null;
+      city: string | null;
+      state: string | null;
+    }[]
   ) => void;
-  // City to append to generated names for events hosted from a public listing.
+  // Location the source listing advertised, pre-filled when hosting from one.
   listingCity?: string;
+  listingState?: string | null;
   // Categories to offer. Defaults to the standard list when omitted (e.g. an
   // official listing passes its own formats here).
   categoryOptions?: string[];
@@ -37,6 +45,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   onClose,
   onSubmit,
   listingCity,
+  listingState,
   categoryOptions,
   defaultTier,
 }) => {
@@ -44,9 +53,12 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   const [name, setName] = useState("");
   // The set of checked categories. Each checked type becomes its own tournament.
   const [selected, setSelected] = useState<string[]>([]);
-  // Sanctioning tier, shared by every tournament this modal creates — one event
-  // is one tier even when it runs several categories. "" means unspecified.
+  // Sanctioning tier and location, shared by every tournament this modal
+  // creates — one event is one tier in one place even when it runs several
+  // categories. "" means unspecified.
   const [tier, setTier] = useState<string>("");
+  const [city, setCity] = useState<string>("");
+  const [state, setState] = useState<string>("");
   // Once the host edits the name, we stop auto-building it from the category.
   const [nameTouched, setNameTouched] = useState(false);
 
@@ -65,17 +77,25 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
     // matching the previous single-select default. The host can check more.
     const initial = options[0] ? [options[0]] : [];
     const initialTier = defaultTier ?? "";
+    const initialCity = listingCity ?? "";
+    const initialState = normalizeState(listingState) ?? "";
     setSelected(initial);
     setTier(initialTier);
+    setCity(initialCity);
+    setState(initialState);
     setNameTouched(false);
     setName(
-      buildTournamentName(cleanCategory(initial[0] ?? ""), { tier: initialTier || null })
+      buildTournamentName(cleanCategory(initial[0] ?? ""), {
+        tier: initialTier || null,
+        city: initialCity || null,
+        state: initialState || null,
+      })
     );
     requestAnimationFrame(() => {
       firstCheckboxRef.current?.focus();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, defaultTier]);
+  }, [isOpen, defaultTier, listingCity, listingState]);
 
   // Creating multiple tournaments at once: each gets an auto-built name, so the
   // single editable name field is replaced by a preview list.
@@ -84,61 +104,74 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   // Unofficial (or no category yet) keeps the field editable.
   const frozen = selected.length === 1 && isNameFrozen(selected[0]);
 
+  // The name every generated (frozen or multi) tournament gets. Also seeds the
+  // editable field, so what the host sees while typing is what gets created.
+  const generatedName = (
+    category: string,
+    over?: { tier?: string; city?: string; state?: string }
+  ) =>
+    buildTournamentName(cleanCategory(category), {
+      tier: (over?.tier ?? tier) || null,
+      city: (over?.city ?? city) || null,
+      state: (over?.state ?? state) || null,
+    });
+
+  // Any event-identity edit re-syncs the single name field, unless the host has
+  // taken the name over or isn't on exactly one category.
+  const resyncName = (
+    next: string[],
+    over?: { tier?: string; city?: string; state?: string }
+  ) => {
+    if (nameTouched) return;
+    if (next.length === 1) setName(generatedName(next[0], over));
+    else if (next.length === 0) setName("");
+  };
+
   const toggleCategory = (value: string) => {
     const next = selected.includes(value)
       ? selected.filter((c) => c !== value)
       : [...selected, value];
     setSelected(next);
-    // Keep the single name field in sync while exactly one type is checked and the
-    // host hasn't taken over the name. Going to 0 or 2+ leaves the field for the
-    // host / preview to drive.
-    if (!nameTouched) {
-      if (next.length === 1)
-        setName(buildTournamentName(cleanCategory(next[0]), { tier: tier || null }));
-      else if (next.length === 0) setName("");
-    }
+    resyncName(next);
   };
 
   const handleTierChange = (value: string) => {
     setTier(value);
-    if (!nameTouched && selected.length === 1) {
-      setName(buildTournamentName(cleanCategory(selected[0]), { tier: value || null }));
-    }
+    resyncName(selected, { tier: value });
   };
 
-  // The name every generated (frozen or multi) tournament gets.
-  const generatedName = (category: string) =>
-    buildTournamentName(cleanCategory(category), {
-      city: listingCity,
-      tier: tier || null,
-    });
+  const handleCityChange = (value: string) => {
+    setCity(value);
+    resyncName(selected, { city: value });
+  };
+
+  const handleStateChange = (value: string) => {
+    setState(value);
+    resyncName(selected, { state: value });
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const chosenTier = tier || null;
+    const shared = {
+      tier: tier || null,
+      city: city.trim() || null,
+      state: state || null,
+    };
     if (isMulti) {
       onSubmit(
-        selected.map((c) => ({
-          name: generatedName(c),
-          category: c,
-          tier: chosenTier,
-        }))
+        selected.map((c) => ({ name: generatedName(c), category: c, ...shared }))
       );
       return;
     }
     if (frozen) {
       onSubmit([
-        {
-          name: generatedName(selected[0]),
-          category: selected[0],
-          tier: chosenTier,
-        },
+        { name: generatedName(selected[0]), category: selected[0], ...shared },
       ]);
       return;
     }
     const trimmed = name.trim();
     if (!trimmed) return;
-    onSubmit([{ name: trimmed, category: selected[0] ?? null, tier: chosenTier }]);
+    onSubmit([{ name: trimmed, category: selected[0] ?? null, ...shared }]);
   };
 
   const fieldClasses =
@@ -178,6 +211,46 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
               <p className="mt-1 text-xs text-muted-foreground">
                 Appears in the event name. Applies to every category you check.
               </p>
+            </div>
+            <div className="grid grid-cols-[1fr_7rem] gap-2">
+              <div>
+                <label
+                  htmlFor="city"
+                  className="block text-xs font-medium text-muted-foreground mb-1"
+                >
+                  City
+                </label>
+                <input
+                  id="city"
+                  type="text"
+                  value={city}
+                  maxLength={60}
+                  placeholder="Optional"
+                  onChange={(e) => handleCityChange(e.target.value)}
+                  className={fieldClasses}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="state"
+                  className="block text-xs font-medium text-muted-foreground mb-1"
+                >
+                  State
+                </label>
+                <select
+                  id="state"
+                  value={state}
+                  onChange={(e) => handleStateChange(e.target.value)}
+                  className={fieldClasses}
+                >
+                  <option value="">—</option>
+                  {US_STATES.map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {s.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div
               role="group"

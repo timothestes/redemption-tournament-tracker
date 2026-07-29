@@ -6,8 +6,15 @@
 
 ## 1. Problem
 
-An event's "type" is two orthogonal things — its **tier** (Regional, State, National…) and
-its **category/format** (Type 2, Paragon…). Neither was owned by Tournament Settings.
+An event's identity is several orthogonal things — its **tier** (Regional, State, National…),
+its **category/format** (Type 2, Paragon…), and **where it's held**. None was owned by
+Tournament Settings.
+
+**Location lived inside the name.** There was no `city` or `state` column. The city was
+appended to the generated name as a ` — {City}` suffix at creation, and when adding a
+category to an existing event it was recovered by *string-splitting a sibling's name*
+(`name?.split(" — ")[1]`). That made the name the source of truth for data the name is
+supposed to merely render. State was dropped entirely, even though listings carry it.
 
 **Tier didn't exist at all.** The public listings page already carries one
 (`tournament_listings.tournament_type`) and renders it as a badge, but hosting an event
@@ -19,8 +26,6 @@ and `National` (1, plus "Redemption National Tournament").
 **Category/format was set once and never shown again.** The format lives in
 `tournaments.deck_format`, written at creation from the category the host checks in
 **Add Tournament** ([`app/tracker/tournaments/page.tsx:90-100`](../../../app/tracker/tournaments/page.tsx)).
-After that:
-category the host checks in **Add Tournament** ([`app/tracker/tournaments/page.tsx:90-100`](../../../app/tracker/tournaments/page.tsx)).
 After that:
 
 - **No screen shows it.** The only UI that surfaces `deck_format` is the QR Join dialog,
@@ -42,17 +47,19 @@ bottom and the confirmation flashes for 1.5s off-screen at the top.
 
 ## 2. Goals
 
-1. A tier can be set when creating a tournament, inherited from the listing when hosting
-   from one, and it shows up in the event name.
-2. Tournament Settings becomes the single owner of event type (tier + category → format).
-3. The QR Join dialog stops writing `deck_format` and becomes read-only about it.
-4. Changing tier or category cascades to the frozen name — and, for category, to the
-   category-derived settings — under one predictable rule, previewed before save.
-5. Save feedback lands where the host is looking.
+1. A tier and a location (city + state) can be set when creating a tournament, inherited
+   from the listing when hosting from one, and both show up in the event name.
+2. Location becomes real columns instead of a substring of the name.
+3. Tournament Settings becomes the single owner of event identity (tier + location +
+   category → format).
+4. The QR Join dialog stops writing `deck_format` and becomes read-only about it.
+5. Changing tier, location, or category cascades to the frozen name — and, for category,
+   to the category-derived settings — under one predictable rule, previewed before save.
+6. Save feedback lands where the host is looking.
 
 **Non-goals:** re-running deck check on format change (ruled out — warn only); versioning
-deck submissions; backfilling tiers onto existing tournaments; exposing tier or format
-anywhere outside Settings, the create modal, and the QR dialog.
+deck submissions; backfilling tier/city/state onto existing tournaments; exposing any of
+these anywhere outside Settings, the create modal, and the QR dialog.
 
 ## 3. Locked decisions
 
@@ -63,6 +70,7 @@ anywhere outside Settings, the create modal, and the QR dialog.
 | Format select | Editable **only** for `Unofficial`; derived and read-only otherwise. |
 | Save-row placement | Sticky footer inside the settings card. |
 | Tier vocabulary | The six canonical tiers, normalized from listing free text. |
+| Location in the name | Yes — `— {City}, {State}`, extending the existing city-only suffix. |
 
 ## 3.1 Tier model
 
@@ -77,19 +85,48 @@ The canonical list and normalizer live in [`utils/tournament/tiers.ts`](../../..
 "Redemption National Tournament" → `National` — and returns `null` for anything
 unrecognized rather than guessing.
 
-The name formula gains a tier slot: `{Mon D, YYYY} [{Tier} ]{Category} Tournament[ — {City}]`,
-so "Aug 2, 2026 Regional Type 2 Tournament — Wichita". With no tier the formula is
-byte-identical to today's, which is what keeps every existing name valid.
+The name formula gains a tier slot between the date and the category (see §3.2 for the
+full formula). With no tier it is byte-identical to today's, which is what keeps every
+existing name valid.
 
 Where a tier comes from at creation:
 - **Hosting from a listing** — `/tournaments` passes `&type=` on the Host This Event link;
   the tracker normalizes it and pre-selects it.
 - **Adding a category to an existing event** — inherited from a sibling tournament, the
-  same way the city already is.
+  same way the location is.
 - **Otherwise** — the host picks from the select, defaulting to "Not specified".
 
 One tier applies to every tournament the modal creates in a batch: an event is one tier
 even when it runs several categories.
+
+## 3.2 Location model
+
+`tournaments.city` and `tournaments.state` (migration `086_add_tournament_location.sql`) —
+nullable `text`, no defaults, no backfill. **Not one of the 288 existing tournaments has a
+` — ` suffix in its name**, so there is nothing to recover: the city has only ever been
+*capable* of reaching a name, never actually done so.
+
+Free text mirroring `tournament_listings.city/state`, which is where the values come from
+when hosting from a listing. Every prod listing uses a two-letter state code (`MA`, `OR`,
+`TX`); [`utils/tournament/usStates.ts`](../../../utils/tournament/usStates.ts) holds the
+canonical list plus `normalizeState()`, which accepts `"tx"`, `" KS "`, or `"Texas"` and
+returns the code, `null` otherwise. The column stays permissive so an out-of-list value
+(an international event, a scraper oddity) still round-trips — and both the create modal
+and Settings prepend an unrecognized current value rather than blanking it.
+
+The name's location suffix is `formatLocation(city, state)`: `"Wichita, KS"`, or whichever
+half is set, or nothing. Full formula:
+
+```
+{Mon D, YYYY} [{Tier} ]{Category} Tournament[ — {City}[, {State}]]
+→ "Aug 2, 2026 Regional Type 2 Tournament — Wichita, KS"
+```
+
+**The name is no longer parsed for location.** `renameForEventType` reads only the date out
+of the existing name and rebuilds everything after it from columns, so setting, changing,
+or clearing a location updates the suffix correctly instead of stacking or stranding it.
+`openHostAnotherCategory` reads `t.city` / `t.state` off a sibling row instead of
+splitting its name.
 
 ## 4. The cascade rule
 
@@ -101,6 +138,7 @@ Concretely, given a change from `old` → `next`:
 | Field | Behavior |
 |---|---|
 | `tier` | Set to `next.tier` (or `null`). Cascades into `name` only — a tier carries no settings. |
+| `city`, `state` | Set from `next`. Not derived from anything; cascade into `name` only. |
 | `category` | Set to `next.category`. |
 | `deck_format` | `categoryDefaults(next).deck_format`, unless `next === "Unofficial"`, where it is the host's explicit select value. |
 | `name` | Regenerated when `isNameFrozen(next)`. Left untouched when `next === "Unofficial"` (no frozen form exists). |
@@ -127,19 +165,15 @@ named "Jul 28, 2026 …"). Server- or UTC-side regeneration would shift the date
 Instead, swap the subject in place:
 
 ```
-/^(.+?, \d{4}) (.+) Tournament(?: — (.+))?$/
-      ^date      ^subject             ^city
+/^(.+?, \d{4}) /
+      ^date
 ```
 
-Only the date and city are read back out; tier and category come from columns, so the
-subject never has to be disambiguated. On match, keep group 1 (date) and group 3 (city)
-verbatim and rebuild the subject as `[tier, category].filter(Boolean).join(" ")`. On no
+**Only the date is read back out.** Tier, category, city and state all live in columns
+now, so everything after the date is rebuilt rather than parsed — which is what makes
+set / change / clear all work on any of them without stacking or stranding tokens. On no
 match — the name is free-form, e.g. an `Unofficial` event being promoted — fall back to
-`buildTournamentName(next.category, { date: new Date(created_at), tier, city })`,
-preserving any ` — City` suffix found in the current name.
-
-This also means a tier that is *set*, *changed*, or *cleared* rewrites the name correctly
-without stacking or stranding tokens.
+`buildTournamentName(next.category, { date: new Date(created_at), tier, city, state })`.
 
 **Accepted trade-off:** a host who renamed an official event by hand loses that name. The
 post-creation rename paths ([`page.tsx:185`](../../../app/tracker/tournaments/page.tsx),
@@ -196,6 +230,9 @@ free-form-name fallback, the UTC date-shift guard, and the null-category legacy 
 A new section at the top of the Tournament Settings card, above the status row.
 
 - **Tier** — a `<select>` over `TOURNAMENT_TIERS` plus "Not specified".
+- **City** — free text (60 char cap), optional.
+- **State** — a `<select>` over the two-letter codes, with any unrecognized persisted value
+  prepended, plus an em-dash "unset" option.
 - **Category** — a `<select>` over `STANDARD_CATEGORIES` plus "Not specified".
   **Legacy categories must not be silently coerced.** Prod holds category values that came
   from official listings and are absent from `STANDARD_CATEGORIES`: `Type 1`,
@@ -269,11 +306,11 @@ existing fields. No new server action is needed for the save itself.
 
 Changes required around it:
 
-- Extend the settings `SELECT` to include `name`, `tier`, `category`, `deck_format`,
-  `require_decklists`, `created_at`.
-- Tier and category are tracked outside `EDITABLE_KEYS`, in their own state ( `""` means
-  unspecified). On save, when either changed, merge `planEventTypeChange(...)` into the
-  patch. The scalar-field diff is unchanged, and the plan wins on any overlapping field
+- Extend the settings `SELECT` to include `name`, `tier`, `category`, `city`, `state`,
+  `deck_format`, `require_decklists`, `created_at`.
+- Tier, category, city and state are tracked outside `EDITABLE_KEYS`, in their own state
+  (`""` means unspecified). On save, when any changed, merge `planEventTypeChange(...)`
+  into the patch. The scalar-field diff is unchanged, and the plan wins on any overlapping field
   because its re-seeds are computed *from* the pending edits.
 - On success, both `savedInfo` and `tournamentInfo` are set to the merged snapshot, so
   re-seeded settings and the regenerated name show up in the form and not just the
@@ -287,12 +324,12 @@ Changes required around it:
 ## 9. Testing
 
 **Unit** — [`utils/tournament/__tests__/eventType.test.ts`](../../../utils/tournament/__tests__/eventType.test.ts)
-(24 tests, §4.2) and the rewritten `updateJoinSettingsAction` block in
+(28 tests, §4.2) and the rewritten `updateJoinSettingsAction` block in
 [`app/tracker/tournaments/__tests__/joinHostActions.test.ts`](../../../app/tracker/tournaments/__tests__/joinHostActions.test.ts)
 (26 tests), which now asserts the invariant against the persisted format, the `"Sealed"`
 bypass, the skip-lookup-when-off path, and that `deck_format` is never written.
 
-Full suite: 1673 passing. Three files fail identically with these changes stashed —
+Full suite: 1677 passing. Three files fail identically with these changes stashed —
 `forge-anon-leak` and `superuser-anon-leak` (env-gated, run via `npm run test:security`)
 and one `forge-lackey` brigade assertion. All pre-existing and unrelated.
 
@@ -300,18 +337,22 @@ and one `forge-lackey` brigade assertion. All pre-existing and unrelated.
 change it on an event with a submitted decklist and confirm the amber warning and that
 verdicts are left alone; change it after round 1 and confirm `max_score` is untouched;
 open Settings on a legacy `Type 1 - 2P` event and confirm the category is not coerced;
-set a tier and confirm the name gains it and the sticky footer confirmation is visible
-without scrolling; confirm the QR dialog shows format read-only and can still toggle
+set a tier and a city/state and confirm the name gains "— City, ST" and the sticky footer
+confirmation is visible without scrolling; clear the location and confirm the suffix goes
+away; add a category to an existing event and confirm tier/city/state are inherited from
+its siblings; confirm the QR dialog shows format read-only and can still toggle
 require-decklist.
 
 ## 10. Out of scope
 
 - Re-running deck check on format change (explicitly ruled out).
 - Deck-submission history — resubmission overwrites via `onConflict: "participant_id"`.
-- Backfilling `tier` onto existing tournaments, or onto tournaments already linked to a
-  listing that advertises one.
-- Rendering the tier as a badge on the tracker list or the public results page — it only
-  reaches those surfaces through the event name for now.
+- Backfilling `tier`, `city` or `state` onto existing tournaments, or onto tournaments
+  already linked to a listing that advertises them.
+- Venue name/address, which listings also carry — only city and state reach the name.
+- Rendering tier or location as a badge on the tracker list or the public results page —
+  they only reach those surfaces through the event name for now.
+- Filtering or grouping events by state, which the new column now makes possible.
 - Showing format on the tournament detail header or the public results page.
 - Server-side enforcement that `deck_format` matches `category`; Settings and the create
   modal are the only writers, and both derive it.

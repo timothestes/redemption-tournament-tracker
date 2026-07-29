@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { planEventTypeChange, renameForEventType } from "../eventType";
 import { normalizeTier, TOURNAMENT_TIERS } from "../tiers";
+import { formatLocation } from "../naming";
+import { normalizeState } from "../usStates";
 
 // A Type 1 Unlimited event sitting entirely at its category defaults
 // (Unlimited / 5 souls / 45 min / decklists required), with no tier.
@@ -9,6 +11,8 @@ const UNLIMITED = {
   tier: null,
   category: "Type 1 Unlimited",
   deck_format: "Unlimited",
+  city: null,
+  state: null,
   max_score: 5,
   round_length: 45,
   require_decklists: true,
@@ -50,7 +54,7 @@ describe("normalizeTier", () => {
 describe("renameForEventType", () => {
   it("swaps the category token and keeps the date verbatim", () => {
     expect(
-      renameForEventType(UNLIMITED.name, { tier: null, category: "Type 2" }, UNLIMITED.created_at)
+      renameForEventType(UNLIMITED.name, { tier: null, category: "Type 2", city: null, state: null }, UNLIMITED.created_at)
     ).toBe("Jul 28, 2026 Type 2 Tournament");
   });
 
@@ -58,7 +62,7 @@ describe("renameForEventType", () => {
     expect(
       renameForEventType(
         UNLIMITED.name,
-        { tier: "Regional", category: "Type 2" },
+        { tier: "Regional", category: "Type 2", city: null, state: null },
         UNLIMITED.created_at
       )
     ).toBe("Jul 28, 2026 Regional Type 2 Tournament");
@@ -68,7 +72,7 @@ describe("renameForEventType", () => {
     expect(
       renameForEventType(
         "Jul 28, 2026 Regional Type 2 Tournament",
-        { tier: null, category: "Type 2" },
+        { tier: null, category: "Type 2", city: null, state: null },
         UNLIMITED.created_at
       )
     ).toBe("Jul 28, 2026 Type 2 Tournament");
@@ -78,52 +82,99 @@ describe("renameForEventType", () => {
     expect(
       renameForEventType(
         "Jul 28, 2026 Regional Type 2 Tournament",
-        { tier: "National", category: "Type 2" },
+        { tier: "National", category: "Type 2", city: null, state: null },
         UNLIMITED.created_at
       )
     ).toBe("Jul 28, 2026 National Type 2 Tournament");
   });
 
-  it("preserves a city suffix", () => {
+  it("builds the location suffix from the columns, not the old name", () => {
     expect(
       renameForEventType(
         "Jul 28, 2026 Type 1 Unlimited Tournament — Dallas",
-        { tier: "State", category: "Type 2" },
+        { tier: "State", category: "Type 2", city: "Wichita", state: "KS" },
         UNLIMITED.created_at
       )
-    ).toBe("Jul 28, 2026 State Type 2 Tournament — Dallas");
+    ).toBe("Jul 28, 2026 State Type 2 Tournament — Wichita, KS");
+  });
+
+  it("drops a stale suffix when the location is cleared", () => {
+    expect(
+      renameForEventType(
+        "Jul 28, 2026 Type 2 Tournament — Dallas, TX",
+        { tier: null, category: "Type 2", city: null, state: null },
+        UNLIMITED.created_at
+      )
+    ).toBe("Jul 28, 2026 Type 2 Tournament");
+  });
+
+  it("takes whichever half of the location is set", () => {
+    const at = UNLIMITED.created_at;
+    expect(
+      renameForEventType(UNLIMITED.name, { tier: null, category: "Type 2", city: "Wichita", state: null }, at)
+    ).toBe("Jul 28, 2026 Type 2 Tournament — Wichita");
+    expect(
+      renameForEventType(UNLIMITED.name, { tier: null, category: "Type 2", city: null, state: "KS" }, at)
+    ).toBe("Jul 28, 2026 Type 2 Tournament — KS");
   });
 
   it("does not reformat the date from created_at (UTC would shift it a day)", () => {
     // created_at is Jul 29 in UTC; the stored name says Jul 28 because it was
     // generated in the host's timezone. The rename must not "correct" it.
     expect(
-      renameForEventType(UNLIMITED.name, { tier: null, category: "Type 2" }, UNLIMITED.created_at)
+      renameForEventType(UNLIMITED.name, { tier: null, category: "Type 2", city: null, state: null }, UNLIMITED.created_at)
     ).toContain("Jul 28, 2026");
   });
 
   it("rebuilds from created_at when the name is free-form", () => {
     const out = renameForEventType(
       "Friday Night Redemption",
-      { tier: "Local (Open)", category: "Type 2" },
+      { tier: "Local (Open)", category: "Type 2", city: null, state: null },
       UNLIMITED.created_at
     );
     expect(out).toMatch(/^\w{3} \d{1,2}, \d{4} Local \(Open\) Type 2 Tournament$/);
   });
 
-  it("keeps a city suffix when falling back on a free-form name", () => {
+  it("applies the location when falling back on a free-form name", () => {
     expect(
-      renameForEventType("Game Night — Dallas", { tier: null, category: "Type 2" }, UNLIMITED.created_at)
-    ).toMatch(/ Type 2 Tournament — Dallas$/);
+      renameForEventType(
+        "Game Night",
+        { tier: null, category: "Type 2", city: "Wichita", state: "KS" },
+        UNLIMITED.created_at
+      )
+    ).toMatch(/ Type 2 Tournament — Wichita, KS$/);
+  });
+});
+
+describe("formatLocation", () => {
+  it("joins city and state, or takes whichever half exists", () => {
+    expect(formatLocation("Wichita", "KS")).toBe("Wichita, KS");
+    expect(formatLocation("Wichita", null)).toBe("Wichita");
+    expect(formatLocation(null, "KS")).toBe("KS");
+    expect(formatLocation(null, null)).toBe("");
+    expect(formatLocation("  ", "  ")).toBe("");
+  });
+});
+
+describe("normalizeState", () => {
+  it("canonicalizes codes and full names, rejects the rest", () => {
+    expect(normalizeState("tx")).toBe("TX");
+    expect(normalizeState(" KS ")).toBe("KS");
+    expect(normalizeState("Texas")).toBe("TX");
+    expect(normalizeState("Ontario")).toBeNull();
+    expect(normalizeState("")).toBeNull();
+    expect(normalizeState(null)).toBeNull();
   });
 });
 
 describe("planEventTypeChange", () => {
   it("re-seeds every derived field the host left alone", () => {
-    const plan = planEventTypeChange(UNLIMITED, { tier: null, category: "Type 2" }, UNLOCKED);
+    const plan = planEventTypeChange(UNLIMITED, { tier: null, category: "Type 2", city: null, state: null }, UNLOCKED);
     expect(plan).toEqual({
       tier: null,
       category: "Type 2",
+      city: null,
+      state: null,
       deck_format: "T2",
       name: "Jul 28, 2026 Type 2 Tournament",
       max_score: 7,
@@ -136,7 +187,7 @@ describe("planEventTypeChange", () => {
   it("renames on a tier-only change and touches nothing else", () => {
     const plan = planEventTypeChange(
       UNLIMITED,
-      { tier: "Regional", category: "Type 1 Unlimited" },
+      { tier: "Regional", category: "Type 1 Unlimited", city: null, state: null },
       UNLOCKED
     );
     expect(plan.name).toBe("Jul 28, 2026 Regional Type 1 Unlimited Tournament");
@@ -148,7 +199,7 @@ describe("planEventTypeChange", () => {
   it("preserves a setting the host overrode", () => {
     const plan = planEventTypeChange(
       { ...UNLIMITED, round_length: 60 },
-      { tier: null, category: "Type 2" },
+      { tier: null, category: "Type 2", city: null, state: null },
       UNLOCKED
     );
     expect(plan.round_length).toBeUndefined();
@@ -158,7 +209,7 @@ describe("planEventTypeChange", () => {
   it("skips max_score when it is locked by round 1", () => {
     const plan = planEventTypeChange(
       UNLIMITED,
-      { tier: null, category: "Type 2" },
+      { tier: null, category: "Type 2", city: null, state: null },
       { maxScoreLocked: true }
     );
     expect(plan.max_score).toBeUndefined();
@@ -166,7 +217,7 @@ describe("planEventTypeChange", () => {
   });
 
   it("forces require_decklists off when the format becomes Other", () => {
-    const plan = planEventTypeChange(UNLIMITED, { tier: null, category: "Booster Draft" }, UNLOCKED);
+    const plan = planEventTypeChange(UNLIMITED, { tier: null, category: "Booster Draft", city: null, state: null }, UNLOCKED);
     expect(plan.deck_format).toBe("Other");
     expect(plan.require_decklists).toBe(false);
   });
@@ -181,7 +232,7 @@ describe("planEventTypeChange", () => {
       deck_format: "Limited",
       require_decklists: true,
     };
-    const plan = planEventTypeChange(typeA, { tier: null, category: "Sealed Deck" }, UNLOCKED);
+    const plan = planEventTypeChange(typeA, { tier: null, category: "Sealed Deck", city: null, state: null }, UNLOCKED);
     expect(plan.deck_format).toBe("Other");
     expect(plan.require_decklists).toBe(false);
   });
@@ -189,7 +240,7 @@ describe("planEventTypeChange", () => {
   it("leaves the name alone when switching to Unofficial, tier or not", () => {
     const plan = planEventTypeChange(
       UNLIMITED,
-      { tier: "Regional", category: "Unofficial" },
+      { tier: "Regional", category: "Unofficial", city: null, state: null },
       UNLOCKED
     );
     expect(plan.name).toBeUndefined();
@@ -197,14 +248,14 @@ describe("planEventTypeChange", () => {
   });
 
   it("keeps the current format when switching to Unofficial without an explicit one", () => {
-    const plan = planEventTypeChange(UNLIMITED, { tier: null, category: "Unofficial" }, UNLOCKED);
+    const plan = planEventTypeChange(UNLIMITED, { tier: null, category: "Unofficial", city: null, state: null }, UNLOCKED);
     expect(plan.deck_format).toBe("Unlimited");
   });
 
   it("takes the host's format when switching to Unofficial with one", () => {
     const plan = planEventTypeChange(
       UNLIMITED,
-      { tier: null, category: "Unofficial", unofficialFormat: "T2" },
+      { tier: null, category: "Unofficial", city: null, state: null, unofficialFormat: "T2" },
       UNLOCKED
     );
     expect(plan.deck_format).toBe("T2");
@@ -219,7 +270,7 @@ describe("planEventTypeChange", () => {
       round_length: 45,
       require_decklists: false,
     };
-    const plan = planEventTypeChange(legacy, { tier: null, category: "Type 2" }, UNLOCKED);
+    const plan = planEventTypeChange(legacy, { tier: null, category: "Type 2", city: null, state: null }, UNLOCKED);
     expect(plan.max_score).toBeUndefined();
     expect(plan.round_length).toBeUndefined();
     expect(plan.require_decklists).toBeUndefined();
@@ -228,7 +279,7 @@ describe("planEventTypeChange", () => {
 
   it("normalizes a legacy T1 deck_format when moving to Unofficial", () => {
     const legacy = { ...UNLIMITED, category: "Type 1", deck_format: "T1" };
-    const plan = planEventTypeChange(legacy, { tier: null, category: "Unofficial" }, UNLOCKED);
+    const plan = planEventTypeChange(legacy, { tier: null, category: "Unofficial", city: null, state: null }, UNLOCKED);
     expect(plan.deck_format).toBe("Limited");
   });
 });
