@@ -1,39 +1,67 @@
 import { test, expect } from "../fixtures";
+import {
+  dialog,
+  editHistory,
+  editPastResult,
+  editResultPencil,
+  gotoRounds,
+  openRound,
+  PAGE_READY_TIMEOUT,
+} from "./helpers";
 
-test("host repairs a past-round score and standings reflect the change", async ({ page, seeded }) => {
-  await page.goto(`/tracker/tournaments/${seeded.tournamentId}`);
+// This spec reads the desktop match table (`hidden md:table`) and the standings
+// table, so pin a ≥md viewport rather than inheriting it from the project —
+// `npm run test:e2e` also runs the iPhone project, where those are display:none.
+test.use({ viewport: { width: 1280, height: 800 } });
 
-  // The repair pencil button is labeled "Repair result for {p1} vs {p2}" per Task 10.
-  const repairBtn = page.getByRole("button", { name: /repair result for alice vs bob/i });
-  await repairBtn.click();
+test("host edits a past-round score and standings reflect the change", async ({
+  page,
+  seeded,
+}) => {
+  // The pencil only renders for the host on a COMPLETED round, and the Rounds
+  // panel opens on current_round (2). Round 1 is the completed one in the seed.
+  await gotoRounds(page, seeded.tournamentId, 1);
 
-  // Repair dialog opens (mode="repair", title "Repair result").
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText(/repair result/i)).toBeVisible();
+  const row = page.getByRole("row").filter({ hasText: "Alice" });
+  await expect(row).toContainText("5–0");
 
-  // The dialog uses a ScoreSelector that renders buttons 0..max_score per player.
-  // To set player2 to 3 (was 0), click the "3" option in the second selector group.
-  // The ScoreSelector groups don't have stable role-based selectors, so fall back to
-  // clicking the visible button labeled "3" inside the dialog scope. There are two
-  // sets of 0-5 buttons; pick the second column by .nth(...).
-  //
-  // This selector is best-effort and may need adjustment when the test is first run.
-  // The dialog body has the player2 row second; the "3" button in that row should be:
-  await dialog.getByRole("button", { name: /^3$/ }).nth(1).click();
+  await editPastResult(page, {
+    p1: "Alice",
+    p2: "Bob",
+    p2Score: 3,
+    reason: "scorer mistake",
+  });
 
-  // Fill the optional reason field.
-  await dialog.getByPlaceholder(/why are you repairing/i).fill("scorer mistake");
+  // The round table re-renders with the corrected result and the per-round
+  // differential recomputed from it (Alice +2 / Bob −2, was +5 / −5).
+  await expect(row).toContainText("5–3");
+  await expect(row).toContainText("2 / -2");
 
-  // Submit the repair.
-  await dialog.getByRole("button", { name: /^repair$/i }).click();
+  // Host-only audit trail: one entry, old → new, carrying the reason.
+  const history = editHistory(page);
+  await expect(history).toBeVisible();
+  await history.locator("summary").click();
+  const entry = history.locator("li").first();
+  await expect(entry).toBeVisible();
+  await expect(entry).toContainText("5-0 → 5-3");
+  await expect(entry).toContainText("scorer mistake");
 
-  // Dialog closes after success.
-  await expect(dialog).toBeHidden({ timeout: 5_000 });
+  // Standings pick up the corrected differential. Alice still took the max
+  // score so her MP is unchanged at 3; only Diff moves, 5 → 2.
+  await page.getByRole("tablist").getByText("Standings", { exact: true }).click();
+  const aliceStanding = page.getByRole("row").filter({ hasText: "Alice" });
+  await expect(aliceStanding).toBeVisible({ timeout: PAGE_READY_TIMEOUT });
+  await expect(aliceStanding.getByRole("cell").nth(3)).toHaveText("3");
+  await expect(aliceStanding.getByRole("cell").nth(4)).toHaveText("2");
 
-  // Success toast shows.
-  await expect(page.getByText(/result repaired/i)).toBeVisible({ timeout: 5_000 });
-
-  // Audit log panel (host-only) should reflect the new entry with the reason.
-  await expect(page.getByText(/scorer mistake/i)).toBeVisible({ timeout: 5_000 });
+  // Reopening the dialog preselects the SAVED score, not the pre-edit one —
+  // guards match-edit's "seed both scores from the match on open" behaviour.
+  // (Leaving and re-entering the Rounds tab remounts the panel — TournamentRounds
+  // is keyed on activeTab — so it lands back on current_round and needs the hop.)
+  await page.getByRole("tablist").getByText("Rounds", { exact: true }).click();
+  await openRound(page, 1);
+  await editResultPencil(page, "Alice", "Bob").click();
+  await expect(
+    dialog(page).getByRole("button", { name: /^3$/ }).nth(1),
+  ).toHaveClass(/bg-primary/);
 });
