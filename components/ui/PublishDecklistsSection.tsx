@@ -2,17 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, Globe, Trophy, Undo2 } from "lucide-react";
+import { Globe, Trophy, Undo2 } from "lucide-react";
 import { Button } from "./button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogBody,
-  DialogFooter,
-} from "./dialog";
 import {
   publishTournamentDecklistsAction,
   unpublishTournamentDecklistsAction,
@@ -29,6 +20,13 @@ interface PublishDecklistsSectionProps {
   onPublishChange: () => void;
 }
 
+/**
+ * Results and decklists publish as ONE action — the same semantics as the
+ * "Publish results and decklists" checkbox on End Tournament and the
+ * automatic publish when the final round ends. A tournament left half
+ * published by the older two-button UI reads as unpublished here and is
+ * squared away by the next Publish click.
+ */
 export default function PublishDecklistsSection({
   tournamentId,
   tournamentEnded,
@@ -38,200 +36,88 @@ export default function PublishDecklistsSection({
   resultsPublished,
   onPublishChange,
 }: PublishDecklistsSectionProps) {
-  const [showDialog, setShowDialog] = useState(false);
-  const [selectedFormat, setSelectedFormat] = useState(currentFormat || "Limited");
-  const [publishing, setPublishing] = useState(false);
-  const [unpublishing, setUnpublishing] = useState(false);
-  const [togglingResults, setTogglingResults] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   // Don't show if tournament hasn't ended
   if (!tournamentEnded) return null;
 
+  const published = resultsPublished && (decklistCount === 0 || isPublished);
+
   async function handlePublish() {
-    setPublishing(true);
-    const result = await publishTournamentDecklistsAction(tournamentId, selectedFormat);
-    setPublishing(false);
-    if (result.success) {
-      setShowDialog(false);
-      onPublishChange();
+    setBusy(true);
+    await setResultsPublishedAction(tournamentId, true);
+    if (decklistCount > 0) {
+      // Format comes from Tournament Settings — the same source the
+      // end-of-tournament auto-publish uses.
+      await publishTournamentDecklistsAction(tournamentId, currentFormat || "Other");
     }
+    setBusy(false);
+    onPublishChange();
   }
 
   async function handleUnpublish() {
-    setUnpublishing(true);
-    const result = await unpublishTournamentDecklistsAction(tournamentId);
-    setUnpublishing(false);
-    if (result.success) {
-      onPublishChange();
+    setBusy(true);
+    await setResultsPublishedAction(tournamentId, false);
+    if (isPublished) {
+      await unpublishTournamentDecklistsAction(tournamentId);
     }
+    setBusy(false);
+    onPublishChange();
   }
 
-  async function handleToggleResults() {
-    setTogglingResults(true);
-    const result = await setResultsPublishedAction(tournamentId, !resultsPublished);
-    setTogglingResults(false);
-    if (result.success) {
-      onPublishChange();
-    }
-  }
+  const decklistPhrase =
+    decklistCount > 0
+      ? ` and ${decklistCount} ${decklistCount === 1 ? "decklist" : "decklists"}`
+      : "";
 
-  const resultsRow = resultsPublished ? (
-    <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg">
-      <Trophy className="w-4 h-4 text-primary flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">Results published</p>
-        <Link
-          href={`/tournaments/results/${tournamentId}`}
-          className="text-xs text-primary hover:underline"
-        >
-          View public results page
-        </Link>
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleToggleResults}
-        disabled={togglingResults}
-        className="flex-shrink-0 gap-1.5"
-      >
-        <Undo2 className="w-3.5 h-3.5" />
-        {togglingResults ? "Unpublishing..." : "Unpublish"}
-      </Button>
-    </div>
-  ) : (
-    <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 border border-border rounded-lg">
-      <Trophy className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">Results private</p>
-        <p className="text-xs text-muted-foreground">
-          Publish to show final standings on a public results page
-        </p>
-      </div>
-      <Button
-        variant="success"
-        size="sm"
-        onClick={handleToggleResults}
-        disabled={togglingResults}
-        className="flex-shrink-0 gap-1.5"
-      >
-        <Globe className="w-3.5 h-3.5" />
-        {togglingResults ? "Publishing..." : "Publish"}
-      </Button>
-    </div>
-  );
-
-  if (decklistCount === 0) {
-    return <div className="space-y-2">{resultsRow}</div>;
-  }
-
-  if (isPublished) {
+  if (published) {
     return (
-      <div className="space-y-2">
-        {resultsRow}
-        <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg">
-          <Globe className="w-4 h-4 text-primary flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">
-              {decklistCount} {decklistCount === 1 ? "decklist" : "decklists"} published
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Visible on community decks page · {currentFormat || "Limited"}
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleUnpublish}
-            disabled={unpublishing}
-            className="flex-shrink-0 gap-1.5"
+      <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg">
+        <Trophy className="w-4 h-4 text-primary flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">
+            Final standings{decklistPhrase} published
+          </p>
+          <Link
+            href={`/tournaments/results/${tournamentId}`}
+            className="text-xs text-primary hover:underline"
           >
-            <Undo2 className="w-3.5 h-3.5" />
-            {unpublishing ? "Unpublishing..." : "Unpublish"}
-          </Button>
+            View public results page
+          </Link>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleUnpublish}
+          disabled={busy}
+          className="flex-shrink-0 gap-1.5"
+        >
+          <Undo2 className="w-3.5 h-3.5" />
+          {busy ? "Unpublishing..." : "Unpublish"}
+        </Button>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="space-y-2">
-        {resultsRow}
-        <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 border border-border rounded-lg">
-          <BookOpen className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">
-              {decklistCount} {decklistCount === 1 ? "decklist" : "decklists"} attached
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Publish to make them visible on the community decks page
-            </p>
-          </div>
-          <Button
-            variant="success"
-            size="sm"
-            onClick={() => setShowDialog(true)}
-            className="flex-shrink-0 gap-1.5"
-          >
-            <Globe className="w-3.5 h-3.5" />
-            Publish All
-          </Button>
-        </div>
+    <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 border border-border rounded-lg">
+      <Trophy className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">Results private</p>
+        <p className="text-xs text-muted-foreground">
+          Publish final standings{decklistPhrase} to a public results page
+        </p>
       </div>
-
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent size="sm">
-          <DialogHeader>
-            <DialogTitle>Publish Tournament Decklists</DialogTitle>
-            <DialogDescription>
-              This will make all {decklistCount} attached {decklistCount === 1 ? "decklist" : "decklists"} public
-              and calculate final placements.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogBody className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">
-                Tournament Format
-              </label>
-              <select
-                value={selectedFormat}
-                onChange={(e) => setSelectedFormat(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-card text-sm"
-              >
-                <option value="Limited">Limited</option>
-                <option value="Unlimited">Unlimited</option>
-                <option value="T2">T2</option>
-                <option value="Paragon">Paragon</option>
-                <option value="Other">Other</option>
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                This format will be shown alongside the tournament results
-              </p>
-            </div>
-          </DialogBody>
-
-          <DialogFooter className="justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="success"
-              size="sm"
-              onClick={handlePublish}
-              disabled={publishing}
-              className="gap-1.5"
-            >
-              <Globe className="w-3.5 h-3.5" />
-              {publishing ? "Publishing..." : "Publish All"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+      <Button
+        variant="success"
+        size="sm"
+        onClick={handlePublish}
+        disabled={busy}
+        className="flex-shrink-0 gap-1.5"
+      >
+        <Globe className="w-3.5 h-3.5" />
+        {busy ? "Publishing..." : "Publish"}
+      </Button>
+    </div>
   );
 }
