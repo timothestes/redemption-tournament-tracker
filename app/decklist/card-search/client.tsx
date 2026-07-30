@@ -30,6 +30,7 @@ import type { User } from "@supabase/supabase-js";
 import { deleteDeckAction } from "../actions";
 import { MobileBottomNav } from "./components/MobileBottomNav";
 import { useCardPrices } from "./hooks/useCardPrices";
+import { useHoverPreview } from "./hooks/useHoverPreview";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const supabase = createClient();
@@ -304,6 +305,12 @@ export default function CardSearchClient({
   // Drag-to-deck is disabled on mobile — touch drag doesn't work reliably and
   // the tap/stepper controls cover adding cards.
   const isMobile = useMediaQuery("(max-width: 767px)");
+
+  // Card hover preview. Owned here rather than in DeckBuilderPanel (which
+  // renders the toggle) so the search grid on the left honors the same
+  // preference as the deck panel on the right.
+  const [hoverPreviewEnabled, setHoverPreviewEnabled] = useState(true);
+  const searchHoverPreview = useHoverPreview(hoverPreviewEnabled && !isMobile);
   const [player1Name, setPlayer1Name] = useState(() => {
     if (typeof window === 'undefined') return "Player 1";
     return localStorage.getItem('spotlight-p1-name') ?? "Player 1";
@@ -2364,9 +2371,13 @@ export default function CardSearchClient({
               return (
                 <div
                   key={c.dataLine}
+                  {...searchHoverPreview.hoverProps(c)}
                   draggable={!isSpotlight && !isMobile}
                   onDragStart={(e) => {
                     if (isSpotlight || isMobile) return;
+                    // The tile keeps mouse-over while dragging, so the preview
+                    // would otherwise hang next to the cursor for the whole drag.
+                    searchHoverPreview.clear();
                     // Native HTML5 drag — picked up by `useExternalDropTarget`
                     // on the deck-panel zones. No @dnd-kit dependency, so this
                     // works across the search↔deck context boundary without
@@ -2612,6 +2623,8 @@ export default function CardSearchClient({
               );
             })}
           </div>
+          {/* Card preview on hover — follows the deck panel's toggle */}
+          {searchHoverPreview.overlay}
           <div className="py-3 text-center text-xs sm:text-sm text-muted-foreground">
             Showing {Math.min(visibleCount, filtered.length)} of {filtered.length}
           </div>
@@ -2748,6 +2761,8 @@ export default function CardSearchClient({
             hasUnsavedChanges={hasUnsavedChanges}
             isAuthenticated={!!user}
             isExpanded={!showSearch}
+            hoverPreviewEnabled={hoverPreviewEnabled}
+            onHoverPreviewEnabledChange={setHoverPreviewEnabled}
             deckCheckResult={deckCheckResult}
             isDeckChecking={isDeckChecking}
             allCards={cards}
@@ -2854,6 +2869,8 @@ export default function CardSearchClient({
               isAuthenticated={!!user}
               isExpanded={false}
               forceDisableHoverPreview
+              hoverPreviewEnabled={hoverPreviewEnabled}
+              onHoverPreviewEnabledChange={setHoverPreviewEnabled}
               deckCheckResult={deckCheckResult}
               isDeckChecking={isDeckChecking}
               allCards={cards}

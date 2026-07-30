@@ -179,6 +179,10 @@ interface DeckBuilderPanelProps {
   onDescriptionChange?: (description: string) => void;
   /** Force-disable hover previews (e.g. on mobile) */
   forceDisableHoverPreview?: boolean;
+  /** Hover-preview preference. Owned by the parent so the search grid shares it. */
+  hoverPreviewEnabled: boolean;
+  /** Called when the user flips the hover-preview toggle in this panel. */
+  onHoverPreviewEnabledChange: (enabled: boolean) => void;
   /** Default tab to show when panel mounts (persists across mobile drawer open/close) */
   defaultTab?: TabType;
   /** Server-side deck check result */
@@ -237,6 +241,8 @@ export default function DeckBuilderPanel({
   onPreviewCardsChange,
   onDescriptionChange,
   forceDisableHoverPreview = false,
+  hoverPreviewEnabled,
+  onHoverPreviewEnabledChange,
   defaultTab,
   deckCheckResult,
   isDeckChecking,
@@ -573,7 +579,10 @@ export default function DeckBuilderPanel({
   // Expanded (FullDeckView) view options
   const [expandedViewMode, setExpandedViewMode] = useState<'normal' | 'stacked'>('stacked');
   const [expandedGroupBy, setExpandedGroupBy] = useState<'none' | 'alignment' | 'type'>('type');
-  const [disableHoverPreview, setDisableHoverPreview] = useState(forceDisableHoverPreview);
+  // The preference lives in the parent (shared with the search grid); this panel
+  // only renders the toggle and can force previews off regardless (mobile).
+  const disableHoverPreview = forceDisableHoverPreview || !hoverPreviewEnabled;
+  const toggleHoverPreview = () => onHoverPreviewEnabledChange(!hoverPreviewEnabled);
   
   // Initialize deck type based on deck.format
   const [deckType, setDeckType] = useState<FormatId>(() => normalizeFormat(deck.format));
@@ -2301,7 +2310,7 @@ export default function DeckBuilderPanel({
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Card Hover Preview</span>
                   <Switch
                     checked={!disableHoverPreview}
-                    onChange={() => setDisableHoverPreview((v) => !v)}
+                    onChange={toggleHoverPreview}
                     className={`${!disableHoverPreview ? 'bg-primary' : 'bg-muted'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`}
                   >
                     <span
@@ -2514,7 +2523,7 @@ export default function DeckBuilderPanel({
               {/* Preview sidebar toggle */}
               <div className="hidden lg:block ml-auto">
                 <button
-                  onClick={() => setDisableHoverPreview((v) => !v)}
+                  onClick={toggleHoverPreview}
                   className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                     !disableHoverPreview
                       ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
