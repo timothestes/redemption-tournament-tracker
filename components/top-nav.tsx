@@ -394,8 +394,8 @@ const TopNav: React.FC = () => {
               )}
             </div>
 
-            {/* Rest of nav links (Play is rendered separately above, so exclude it) */}
-            {navLinks.filter((link) => !link.highlight && link.href !== "/play").map((link) => {
+            {/* Rest of nav links (Play and Spoilers are rendered separately, so exclude them) */}
+            {navLinks.filter((link) => !link.highlight && link.href !== "/play" && link.href !== "/spoilers").map((link) => {
               if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
@@ -465,6 +465,19 @@ const TopNav: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Spoilers link - after Decks */}
+            <Link
+              href="/spoilers"
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                ${isActive('/spoilers')
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+            >
+              <HiSparkles className="w-4 h-4" />
+              Spoilers
+            </Link>
 
             {/* Resources Dropdown */}
             <div className="relative">
@@ -787,30 +800,6 @@ const TopNav: React.FC = () => {
               )}
             </div>
 
-            {/* Rest of nav links */}
-            {navLinks.slice(2).map((link) => {
-              if (link.authRequired && !user) return null;
-              const Icon = link.icon;
-              const isHighlight = link.highlight;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={closeMobileMenu}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
-                    ${isHighlight
-                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
-                      : isActive(link.href)
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted'
-                    }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  {link.label}
-                </Link>
-              );
-            })}
-
             {/* Mobile Decks Section */}
             <div className="pt-2">
               <button
@@ -855,6 +844,30 @@ const TopNav: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Rest of nav links (Spoilers) - after Decks */}
+            {navLinks.slice(2).map((link) => {
+              if (link.authRequired && !user) return null;
+              const Icon = link.icon;
+              const isHighlight = link.highlight;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={closeMobileMenu}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
+                    ${isHighlight
+                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
+                      : isActive(link.href)
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {link.label}
+                </Link>
+              );
+            })}
 
             {/* Mobile Resources Section */}
             <div className="pt-2">

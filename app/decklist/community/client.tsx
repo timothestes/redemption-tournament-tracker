@@ -118,8 +118,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
     searchParams.get("page") ||
     searchParams.get("tags") ||
     searchParams.getAll("card").length > 0 ||
-    searchParams.get("tournament") ||
-    searchParams.get("hide100")
+    searchParams.get("tournament")
   );
 
   const [decks, setDecks] = useState<PublicDeck[]>(hasInitialFilters ? [] : initialDecks);
@@ -139,7 +138,6 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
   const [search, setSearch] = useState(searchParams.get("q") || "");
   const [searchInput, setSearchInput] = useState(searchParams.get("q") || "");
   const [usernameFilter, setUsernameFilter] = useState(initialUsername);
-  const [excludeFullSize, setExcludeFullSize] = useState(searchParams.get("hide100") === "1");
   const [tournamentOnly, setTournamentOnly] = useState(searchParams.get("tournament") === "1");
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(() => {
     const t = searchParams.get("tags");
@@ -228,7 +226,6 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
       cardNames: cardFilters.length > 0 ? cardFilters : undefined,
       tournamentOnly: tournamentOnly || undefined,
-      excludeFullSize: excludeFullSize || undefined,
     };
     const result = await loadPublicDecksAction(params);
     if (result.success) {
@@ -236,7 +233,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       setTotalCount(result.totalCount);
     }
     setLoading(false);
-  }, [page, sort, format, search, usernameFilter, selectedTagIds, cardFilters, tournamentOnly, excludeFullSize]);
+  }, [page, sort, format, search, usernameFilter, selectedTagIds, cardFilters, tournamentOnly]);
 
   useEffect(() => {
     // Skip the initial fetch if we already have server-provided data (no URL filters)
@@ -257,14 +254,13 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
     if (selectedTagIds.length > 0) qs.set("tags", selectedTagIds.join(","));
     for (const name of cardFilters) qs.append("card", name);
     if (tournamentOnly) qs.set("tournament", "1");
-    if (excludeFullSize) qs.set("hide100", "1");
     if (usernameFilter) qs.set("username", usernameFilter);
     if (page > 1) qs.set("page", String(page));
     const next = qs.toString();
     if (next !== searchParams.toString()) {
       router.replace(next ? `/decklist/community?${next}` : "/decklist/community", { scroll: false });
     }
-  }, [search, format, sort, selectedTagIds, cardFilters, tournamentOnly, excludeFullSize, usernameFilter, page, router, searchParams]);
+  }, [search, format, sort, selectedTagIds, cardFilters, tournamentOnly, usernameFilter, page, router, searchParams]);
 
   // Reset to page 1 when filters change
   function handleSortChange(newSort: typeof sort) {
@@ -369,21 +365,6 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             <option value="most_viewed">Most Viewed</option>
             <option value="name">Name A-Z</option>
           </select>
-
-          {/* Exclude 100-card decks toggle */}
-          <button
-            onClick={() => { setExcludeFullSize((v) => !v); setPage(1); }}
-            className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
-              excludeFullSize
-                ? "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
-                : "border-border bg-card text-foreground hover:bg-muted"
-            }`}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Hide 100-Card
-          </button>
 
           {/* Tournament-only toggle — hidden until any tournament has published decklists */}
           {showTournamentFilter && (
