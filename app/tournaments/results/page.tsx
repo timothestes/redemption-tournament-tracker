@@ -8,6 +8,13 @@ export const metadata = {
   description: "Browse published standings and decklists from past Redemption CCG tournaments.",
 };
 
+// Nothing on this page reads cookies or headers — TopNav/SponsorFooter are
+// client components and the index query uses the service-role client — so Next
+// prerenders it at build time and never regenerates. That froze the list to
+// whatever was published at the last deploy; newly published events only showed
+// on their own /results/[id] page (a dynamic segment) and never in the index.
+export const dynamic = "force-dynamic";
+
 function formatEndedAt(endedAt: string | null): string | null {
   if (!endedAt) return null;
   return new Date(endedAt).toLocaleDateString("en-US", {
