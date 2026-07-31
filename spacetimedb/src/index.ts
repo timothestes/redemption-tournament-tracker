@@ -6,6 +6,7 @@ import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
 import { isLeavingPlayField } from './playField';
 import { makeFreeSpotAllocator } from './battlePlacement';
+import { resolveDestinationOwnerId, resolveHomeOwnerId, type OwnerRouting } from './cardOwnership';
 import {
   getAbilitiesForCard,
   getEffectiveAbilities,
@@ -3010,24 +3011,18 @@ export const move_card = spacetimedb.reducer(
       return;
     }
 
-    // Home zones = private per-player piles. The "home" owner is the card's
-    // true owner (originalOwnerId, falling back to current ownerId) — a
-    // captured opponent card (e.g. a captured hero) returns to the opponent's
-    // pile when banished/discarded, and an opponent's in-play card banished
-    // by the actor goes to the opponent's banish pile.
-    //
-    // Narrow exception: when the actor pulls a card OUT of an opponent's
-    // hidden home pile (their deck/hand/reserve/banish/discard) without an
-    // explicit targetOwnerId, treat it as *taking* — route to the actor's
-    // pile. Public in-play zones (territory / land-of-redemption /
-    // land-of-bondage) never trigger this, so banishing an opponent's
-    // territory card sends it to the opponent's banish pile.
-    const HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand', 'land-of-bondage'];
-    const HIDDEN_HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand'];
-    const trueHomeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
-    const isTakingFromOpponentHiddenZone =
-      HIDDEN_HOME_ZONES.includes(fromZone) && card.ownerId !== player.id;
-    const homeOwnerId = isTakingFromOpponentHiddenZone ? player.id : trueHomeOwnerId;
+    // Destination ownership — see cardOwnership.ts for the full rule set. In
+    // short: graveyard piles always belong to the card's true owner, other home
+    // zones route home (with an explicit drop on the other seat honored), and
+    // shared table zones keep the current owner.
+    const ownerRouting: OwnerRouting = {
+      ownerId: card.ownerId,
+      originalOwnerId: card.originalOwnerId,
+      fromZone,
+      toZone,
+      actorId: player.id,
+      targetOwnerId: targetOwnerId ? BigInt(targetOwnerId) : null,
+    };
 
     // Lost souls sent to discard or reserve go to land-of-bondage instead
     const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
@@ -3072,47 +3067,7 @@ export const move_card = spacetimedb.reducer(
     // Moving to deck/soul-deck = face-down; leaving deck, reserve, or soul-deck = face-up; otherwise preserve
     const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (fromZone === 'deck' || fromZone === 'reserve' || fromZone === 'soul-deck') ? false : card.isFlipped;
     // Optionally transfer ownership (e.g. rescue lost soul, capture hero).
-    // For private home zones, route to the original owner so opponent-owned
-    // cards return to their real owner's piles even when the actor dropped
-    // them on their own zone (e.g. banishing a captured opponent card on my
-    // banish pile sends it to the opponent's banish). An explicit drop on
-    // someone else's zone (targetOwnerId ≠ actor) still wins, so "give to
-    // opponent's hand" works as intended.
-    // Explicit LoB drops are unambiguous user intent — the player dragged the
-    // card onto a specific seat's LoB. Honor targetOwnerId without applying
-    // home-routing, which would otherwise redirect opponent-owned cards back
-    // to the opponent's LoB even when the user dropped on their own.
-    // Hand is the same: a drag onto a specific seat's hand is "take into my
-    // hand" or "give to opponent's hand" — never "send the captured card back
-    // to its original owner's hand".
-    const isExplicitLobDrop =
-      toZone === 'land-of-bondage' && !!targetOwnerId;
-    const isExplicitHandDrop =
-      toZone === 'hand' && !!targetOwnerId;
-
-    // Graveyard-style piles (discard / reserve / banish) always belong to the
-    // card's true owner — you can't send a card you gave or lent to the
-    // opponent into *their* pile. An explicit drop on a specific seat's pile is
-    // honored only when that seat is the card's true owner (returning a captured
-    // card, or discarding the opponent's own deck card); otherwise the card
-    // returns home. The "taking from an opponent's hidden zone" case is
-    // preserved through homeOwnerId.
-    const GRAVEYARD_PILE_ZONES = ['discard', 'reserve', 'banish'];
-    let newOwnerId: bigint;
-    if (isExplicitLobDrop || isExplicitHandDrop) {
-      newOwnerId = BigInt(targetOwnerId);
-    } else if (GRAVEYARD_PILE_ZONES.includes(toZone)) {
-      newOwnerId = (targetOwnerId && BigInt(targetOwnerId) === trueHomeOwnerId)
-        ? trueHomeOwnerId
-        : homeOwnerId;
-    } else if (HOME_ZONES.includes(toZone)) {
-      const droppedOnOwnZone = !targetOwnerId || BigInt(targetOwnerId) === player.id;
-      newOwnerId = droppedOnOwnZone ? homeOwnerId : BigInt(targetOwnerId);
-    } else if (targetOwnerId) {
-      newOwnerId = BigInt(targetOwnerId);
-    } else {
-      newOwnerId = card.ownerId;
-    }
+    let newOwnerId: bigint = resolveDestinationOwnerId(ownerRouting);
     // Paragon: dropping a soul-origin card back into the shared LoB resets ownership to the shared sentinel.
     if (
       targetOwnerId === '0' &&
@@ -3541,22 +3496,16 @@ export const move_cards_batch = spacetimedb.reducer(
         }
       }
 
-      // Home zones = private per-player piles. The "home" owner is the card's
-      // true owner (originalOwnerId, falling back to current ownerId) — a
-      // captured opponent card returns to the opponent's pile when banished/
-      // discarded, and an opponent's in-play card banished by the actor goes
-      // to the opponent's banish pile.
-      //
-      // Narrow exception: when the actor pulls a card OUT of an opponent's
-      // hidden home pile (their deck/hand/reserve/banish/discard) without an
-      // explicit targetOwnerId, treat it as *taking* — route to the actor's
-      // pile. See parallel comment in move_card.
-      const HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand', 'land-of-bondage'];
-      const HIDDEN_HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand'];
-      const trueHomeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
-      const isTakingFromOpponentHiddenZone =
-        HIDDEN_HOME_ZONES.includes(card.zone) && card.ownerId !== player.id;
-      const homeOwnerId = isTakingFromOpponentHiddenZone ? player.id : trueHomeOwnerId;
+      // Destination ownership — shared with move_card, see cardOwnership.ts.
+      const ownerRouting: OwnerRouting = {
+        ownerId: card.ownerId,
+        originalOwnerId: card.originalOwnerId,
+        fromZone: card.zone,
+        toZone,
+        actorId: player.id,
+        targetOwnerId: newOwnerId,
+      };
+      const homeOwnerId = resolveHomeOwnerId(ownerRouting);
 
       // Lost souls sent to discard or reserve go to land-of-bondage instead.
       // Tokens are exempt — a token Lost Soul dragged to a removal zone is
@@ -3633,36 +3582,8 @@ export const move_cards_batch = spacetimedb.reducer(
       const rawPos = posMap[idStr] || { posX: '', posY: '' };
       // Ensure posX/posY are strings — client may send numbers via JSON positions map
       const pos = { posX: String(rawPos.posX ?? ''), posY: String(rawPos.posY ?? '') };
-      // Same home-zone routing rule as the single move_card reducer: a drop on
-      // the actor's own home pile sends captured cards to their original
-      // owner's pile. Explicit drops on someone else's zone (newOwnerId set
-      // and not the actor) still win.
-      // Explicit LoB drop: honor the target seat (mirror of move_card). The
-      // user dragged the card onto a specific player's LoB, so home-routing
-      // shouldn't override that choice. Hand follows the same rule — a drag
-      // onto a specific seat's hand is "take" or "give", never "return to
-      // original owner".
-      const isExplicitLobDrop =
-        toZone === 'land-of-bondage' && newOwnerId !== null;
-      const isExplicitHandDrop =
-        toZone === 'hand' && newOwnerId !== null;
-      // Graveyard-style piles (discard / reserve / banish) always return to the
-      // card's true owner — mirror of the move_card rule. An explicit drop on a
-      // seat's pile only wins when that seat is the card's true owner.
-      const GRAVEYARD_PILE_ZONES = ['discard', 'reserve', 'banish'];
-      let cardOwnerId: bigint;
-      if (isExplicitLobDrop || isExplicitHandDrop) {
-        cardOwnerId = newOwnerId!;
-      } else if (GRAVEYARD_PILE_ZONES.includes(toZone)) {
-        cardOwnerId = (newOwnerId !== null && newOwnerId === trueHomeOwnerId)
-          ? trueHomeOwnerId
-          : homeOwnerId;
-      } else if (HOME_ZONES.includes(toZone)) {
-        const droppedOnOwnZone = newOwnerId === null || newOwnerId === player.id;
-        cardOwnerId = droppedOnOwnZone ? homeOwnerId : newOwnerId;
-      } else {
-        cardOwnerId = newOwnerId ?? card.ownerId;
-      }
+      // Same routing rule as the single move_card reducer.
+      const cardOwnerId: bigint = resolveDestinationOwnerId(ownerRouting);
       const cardFinalZone = finalZoneById.get(idStr) ?? toZone;
       // Paragon: rescuing a shared soul transfers ownership. Default to the
       // acting seat, but honor an explicit targetOwnerId when the caller
