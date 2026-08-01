@@ -4,7 +4,7 @@ import { Button } from "../../../../components/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { HiPencil } from "react-icons/hi";
-import { Wrench, RefreshCw, Unlock, SquarePen } from "lucide-react";
+import { Wrench, RefreshCw, Unlock, SquarePen, Play } from "lucide-react";
 import CountdownTimer from "../../../../components/ui/CountdownTimer";
 import RoundProgressBar from "../../../../components/ui/RoundProgressBar";
 import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
@@ -923,17 +923,18 @@ export default function TournamentPage({
                   {/* Push actions to the right */}
                   <div className="ml-auto flex items-center gap-2">
                     {/* Start Tournament — primary pre-start action stays inline so
-                        a host can see it without opening the menu. Outline, not
-                        green: the filled CTA belongs to the Participants toolbar
-                        (Add Participant), and two greens on one screen made it
-                        unclear which action came first. */}
+                        a host can see it without opening the menu. Filled amber,
+                        not green: it echoes the "Not Started" status pill it sits
+                        beside, and the filled green CTA belongs to the
+                        Participants toolbar (Add Participant) — two greens on one
+                        screen made it unclear which action came first. */}
                     {!tournament?.has_started && !tournament?.has_ended && (
                       <Button
                         disabled={participants.length === 0 || togglingStatus}
-                        variant="outline"
                         onClick={handleTournamentStatusToggle}
-                        size="sm"
+                        className="bg-amber-500 text-amber-950 hover:bg-amber-400 font-semibold shadow-sm"
                       >
+                        <Play className="w-4 h-4 mr-1.5 fill-current" />
                         Start Tournament
                       </Button>
                     )}
