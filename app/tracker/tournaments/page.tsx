@@ -6,9 +6,10 @@ import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
 import ToastNotification from "../../../components/ui/toast-notification";
 import { Button } from "../../../components/ui/button";
-import { HiPencil, HiTrash, HiPlus, HiOutlineDesktopComputer } from "react-icons/hi";
+import { HiPencil, HiTrash, HiPlus, HiOutlineDesktopComputer, HiOutlineLogin } from "react-icons/hi";
 import { useRouter, useSearchParams } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
+import JoinCodeDialog from "../../../components/ui/JoinCodeDialog";
 import { categoryDefaults, requireDecklistsDefault } from "../../../utils/tournament/categoryDefaults";
 import { normalizeTier } from "../../../utils/tournament/tiers";
 import { getFormatDef } from "@/lib/formats";
@@ -23,6 +24,7 @@ function TournamentsPageInner() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddTournamentModalOpen, setisAddTournamentModalOpen] =
     useState(false);
+  const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
   const [currentTournament, setCurrentTournament] = useState(null);
   const [newTournamentName, setNewTournamentName] = useState("");
   const [listingCity, setListingCity] = useState("");
@@ -342,6 +344,14 @@ function TournamentsPageInner() {
               </a>
             </Button>
             <Button
+              variant="outline"
+              onClick={() => setIsJoinDialogOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <HiOutlineLogin className="w-4 h-4" />
+              <span>Join a Tournament</span>
+            </Button>
+            <Button
               onClick={() => setisAddTournamentModalOpen(true)}
               className="flex items-center gap-3 bg-primary text-primary-foreground hover:bg-primary/90"
             >
@@ -369,6 +379,10 @@ function TournamentsPageInner() {
             categoryOptions={listingFormats.length > 0 ? listingFormats : undefined}
             listingState={listingState}
             defaultTier={listingTier}
+          />
+          <JoinCodeDialog
+            isOpen={isJoinDialogOpen}
+            onClose={() => setIsJoinDialogOpen(false)}
           />
         </div>
         {loading ? (
