@@ -9,7 +9,7 @@ import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
 import { reassignRoundTables } from "../../utils/tournament/reassignTables";
 import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, Printer } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, Printer, Search, X } from "lucide-react";
 import { printTournamentPairings, printMatchSlips } from "../../utils/printUtils";
 import { printFinalStandingsFor } from "./StandingsTable";
 import { Button } from "./button";
@@ -40,6 +40,10 @@ const formatDateTime = (timestamp: string | null) => {
     minute: "2-digit",
   }).format(new Date(timestamp));
 };
+
+/** Case- and accent-insensitive comparison key for the Find player box. */
+const normalizeName = (name: string) =>
+  name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /**
  * MP and differential each player EARNED in this single match — NOT the
@@ -975,6 +979,44 @@ export default function TournamentRounds({
   const displayTable = (match: any, index: number): number =>
     match.table_number ?? index + (tournamentInfo.starting_table_number || 1);
 
+  // ---- Find player ---------------------------------------------------------
+  // Highlights matching rows rather than filtering them out: hiding rows would
+  // break the score grid's row-index navigation and the End Round "missing
+  // score" highlights, and the host wants the table number in view anyway.
+  const [playerQuery, setPlayerQuery] = useState("");
+  const findQuery = normalizeName(playerQuery.trim());
+  const findActive = findQuery !== "";
+  const nameHit = (name?: string | null) =>
+    findActive && normalizeName(name ?? "").includes(findQuery);
+  const matchHit = (match: any) =>
+    nameHit(match.player1_id?.name) || nameHit(match.player2_id?.name);
+  const anyFindHit =
+    findActive &&
+    (matches.some(matchHit) ||
+      byes.some((bye) => nameHit(bye.participant_id?.name)));
+
+  // Scroll the first hit into view as the host types. The desktop row and the
+  // mobile card both carry data-find-key; only the one CSS keeps visible has
+  // client rects, so scroll that one.
+  useEffect(() => {
+    if (!findActive) return;
+    const firstMatch = matches.find(matchHit);
+    const firstBye = byes.find((bye) => nameHit(bye.participant_id?.name));
+    const key = firstMatch
+      ? String(firstMatch.id)
+      : firstBye
+        ? `bye-${firstBye.id}`
+        : null;
+    if (key === null) return;
+    const el = Array.from(
+      document.querySelectorAll(`[data-find-key="${key}"]`),
+    ).find((candidate) => candidate.getClientRects().length > 0);
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    // Re-scrolling on matches/byes refetches would yank the page mid-round;
+    // only the query should drive the scroll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findQuery]);
+
   /**
    * True when a player's static pin was not honored this round. Reads the
    * flag persisted at generation time (assignTables' overriddenPins), not a
@@ -1145,6 +1187,45 @@ export default function TournamentRounds({
                       </div>
                     )}
                 </div>
+                {(matches.length > 0 || byes.length > 0) && (
+                  <div className="mb-3">
+                    <div className="relative w-full sm:max-w-xs">
+                      <Search
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+                        aria-hidden="true"
+                      />
+                      <input
+                        type="text"
+                        value={playerQuery}
+                        onChange={(e) => setPlayerQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            setPlayerQuery("");
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        placeholder="Find player…"
+                        aria-label="Find player"
+                        className="w-full pl-9 pr-8 py-1.5 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground"
+                      />
+                      {playerQuery !== "" && (
+                        <button
+                          type="button"
+                          aria-label="Clear player search"
+                          onClick={() => setPlayerQuery("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="w-4 h-4" aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                    {findActive && !anyFindHit && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        No players found in this round.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="overflow-x-auto max-w-full bg-card text-foreground">
                   {repairMode && (
                     <div className="bg-primary/10 border border-primary/30 text-foreground p-3 mb-4 rounded-lg text-center">
@@ -1199,9 +1280,14 @@ export default function TournamentRounds({
                           const hasResult =
                             match.player1_score !== null && match.player2_score !== null;
                           const perRound = perRoundScores(match, tournamentInfo.max_score ?? 5);
+                          const isFindHit = findActive && matchHit(match);
+                          const isFindDimmed = findActive && !isFindHit;
                           return (
                             <Fragment key={match.id}>
-                              <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
+                              <tr
+                                data-find-key={match.id}
+                                className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : isFindHit ? "bg-primary/10" : "bg-muted/50"}${isFindDimmed ? " opacity-40" : ""}`}
+                              >
                                 <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                   {isSeatsMode
                                     ? `${2 * displayTable(match, index) - 1}·${2 * displayTable(match, index)}`
@@ -1411,7 +1497,7 @@ export default function TournamentRounds({
                                 </td>
                               </tr>
                               {isHost && (matchEditsByMatch[match.id]?.length ?? 0) > 0 && (
-                                <tr className="border-b border-border bg-muted/30">
+                                <tr className={`border-b border-border bg-muted/30${isFindDimmed ? " opacity-40" : ""}`}>
                                   <td colSpan={7} className="px-4 py-1">
                                     <details className="text-xs">
                                       <summary className="cursor-pointer text-muted-foreground">
@@ -1441,6 +1527,8 @@ export default function TournamentRounds({
                     <div className="md:hidden space-y-2">
                       {matches.map((match, index) => {
                         const isError = matchErrorIndex.includes(index);
+                        const isFindHit = findActive && matchHit(match);
+                        const isFindDimmed = findActive && !isFindHit;
                         const tableNum = displayTable(match, index);
                         const tableLabel = isSeatsMode ? `Seats ${2 * tableNum - 1}·${2 * tableNum}` : `Table ${tableNum}`;
                         const repairEnabled = canRepairCurrentRound;
@@ -1470,9 +1558,14 @@ export default function TournamentRounds({
                         return (
                           <div
                             key={match.id}
+                            data-find-key={match.id}
                             className={`rounded-lg border ${
-                              isError ? "border-red-500/60 bg-red-600/10" : "border-border bg-card"
-                            } p-3`}
+                              isError
+                                ? "border-red-500/60 bg-red-600/10"
+                                : isFindHit
+                                  ? "border-primary/40 bg-primary/10"
+                                  : "border-border bg-card"
+                            } p-3${isFindDimmed ? " opacity-40" : ""}`}
                           >
                             <div className="flex items-center justify-between gap-2 mb-2">
                               <span className="text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
@@ -1623,10 +1716,15 @@ export default function TournamentRounds({
                         repairSourceMatch &&
                         repairSourceMatch.isBye &&
                         repairSourceMatch.byeId === bye.id;
+                      const isFindHit = nameHit(bye.participant_id?.name);
+                      const isFindDimmed = findActive && !isFindHit;
                       return (
                         <div
                           key={bye.id}
-                          className="rounded-lg border border-border bg-card p-3 flex items-center gap-3"
+                          data-find-key={`bye-${bye.id}`}
+                          className={`rounded-lg border ${
+                            isFindHit ? "border-primary/40 bg-primary/10" : "border-border bg-card"
+                          } p-3 flex items-center gap-3${isFindDimmed ? " opacity-40" : ""}`}
                         >
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-foreground truncate">
@@ -1690,7 +1788,10 @@ export default function TournamentRounds({
                         {byes.length > 0 &&
                           byes.map((bye, index) => (
                             <Fragment key={bye.id}>
-                              <tr className="border-b border-border bg-muted/50">
+                              <tr
+                                data-find-key={`bye-${bye.id}`}
+                                className={`border-b border-border ${nameHit(bye.participant_id?.name) ? "bg-primary/10" : "bg-muted/50"}${findActive && !nameHit(bye.participant_id?.name) ? " opacity-40" : ""}`}
+                              >
                                 <td className="px-4 py-2 text-center border-r border-border">
                                   N/A
                                 </td>
