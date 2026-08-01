@@ -10,11 +10,10 @@ import TournamentSettings from "./TournamentSettings";
 import TournamentRounds from "./TournamentRounds";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
-import StandingsTable from "./StandingsTable";
+import StandingsTable, { printFinalStandingsFor } from "./StandingsTable";
 import { HiPlus } from "react-icons/hi";
 import { GiCardPickup } from "react-icons/gi";
 import { HiOutlineChartBar } from "react-icons/hi2";
-import { printFinalStandings } from "../../utils/printUtils";
 import { Button } from "./button";
 import ExportTrackerButton from "./ExportTrackerButton";
 import { AuditLogPanel } from "./AuditLogPanel";
@@ -188,7 +187,7 @@ export default function TournamentTabs({
             )}
             {tournamentEnded && (
               <Button
-                onClick={() => printFinalStandings(participants, tournamentName || "Tournament")}
+                onClick={() => printFinalStandingsFor(tournamentId, participants, tournamentName || "Tournament")}
                 variant="accent"
                 size="sm"
               >
@@ -350,7 +349,7 @@ export default function TournamentTabs({
                 )}
                 {tournamentEnded && (
                   <Button
-                    onClick={() => printFinalStandings(participants, tournamentName || "Tournament")}
+                    onClick={() => printFinalStandingsFor(tournamentId, participants, tournamentName || "Tournament")}
                     variant="accent"
                     size="sm"
                   >

@@ -30,38 +30,38 @@ const escapeHtml = (value: unknown): string =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
+/** One already-ranked row of the final standings. */
+export interface FinalStandingRow {
+  /** 1-indexed placing; tied players share one. */
+  place: number;
+  name: string;
+  mp: number;
+  diff: number;
+}
+
 /**
- * Prints the final standings of a tournament in a printer-friendly format
+ * Prints the final standings of a tournament in a printer-friendly format.
  *
- * @param participants - Array of participant objects containing ranking information
+ * Rows arrive already ranked — this function must not re-derive an order.
+ * Placings follow the host guide's tiebreaker chain (match points, then
+ * head-to-head, then differential), which cannot be reconstructed from the
+ * stored per-player totals alone; `printFinalStandingsFor` in StandingsTable
+ * is the single place that works it out.
+ *
+ * @param rows - Ranked standings rows for the active players
  * @param tournamentName - Name of the tournament
+ * @param droppedOut - Players who dropped; listed after the standings with no place
  * @returns void - Opens a new window with printable content
  */
 export const printFinalStandings = (
-  participants: any[],
+  rows: FinalStandingRow[],
   tournamentName?: string | null,
+  droppedOut: { name: string; match_points: number | null; differential: number | null }[] = [],
 ): void => {
   const pageTitle = tournamentName
     ? `${tournamentName} - Final Standings`
     : `Final Tournament Standings`;
-  
-  // Sort participants by match points (desc) then by differential (desc)
-  const sortedParticipants = [...participants].sort((a, b) => {
-    // Dropped players always rank after active players
-    if (a.dropped_out !== b.dropped_out) return a.dropped_out ? 1 : -1;
 
-    const mpA = a.match_points !== null ? a.match_points : -Infinity;
-    const mpB = b.match_points !== null ? b.match_points : -Infinity;
-
-    if (mpA !== mpB) {
-      return mpB - mpA; // sort descending by match_points
-    }
-
-    const diffA = a.differential !== null ? a.differential : -Infinity;
-    const diffB = b.differential !== null ? b.differential : -Infinity;
-    return diffB - diffA; // sort descending by differential if match_points are equal
-  });
-  
   // Create the print content HTML header
   let printContent = `
     <html>
@@ -88,7 +88,7 @@ export const printFinalStandings = (
   `;
 
   // Add standings table
-  if (sortedParticipants && sortedParticipants.length > 0) {
+  if (rows.length > 0 || droppedOut.length > 0) {
     printContent += `
       <table>
         <thead>
@@ -101,43 +101,31 @@ export const printFinalStandings = (
         </thead>
         <tbody>
     `;
-    
-    // Track places correctly, handling ties
-    let places = [];
-    let currentRank = 1;
-    
-    // First assign ranks properly handling ties
-    for (let i = 0; i < sortedParticipants.length; i++) {
-      if (i > 0) {
-        const prev = sortedParticipants[i-1];
-        const current = sortedParticipants[i];
-        
-        // If current participant has same points and differential as previous one, give them the same rank
-        if (current.match_points === prev.match_points && current.differential === prev.differential) {
-          places.push(places[i-1]); // Same place as previous participant
-        } else {
-          places.push(i + 1); // New place (1-based indexing)
-        }
-      } else {
-        places.push(1); // First place for first participant
-      }
-    }
-    
-    // Now render each row with the correct place number
-    for (let i = 0; i < sortedParticipants.length; i++) {
-      const participant = sortedParticipants[i];
-      const isWinner = i === 0;
-      
+
+    for (const row of rows) {
       printContent += `
-        <tr class="${isWinner ? 'winner' : ''}">
-          <td>${places[i]}</td>
-          <td>${participant.name}${participant.dropped_out ? ' (Dropped)' : ''}</td>
-          <td>${participant.match_points || 0}</td>
-          <td>${participant.differential || 0}</td>
+        <tr class="${row.place === 1 ? 'winner' : ''}">
+          <td>${row.place}</td>
+          <td>${escapeHtml(row.name)}</td>
+          <td>${row.mp}</td>
+          <td>${row.diff}</td>
         </tr>
       `;
     }
-    
+
+    // Drop-outs are excluded from the placings entirely (algorithm.md step 1)
+    // but still belong on the sheet, so they trail the standings with no place.
+    for (const player of droppedOut) {
+      printContent += `
+        <tr>
+          <td>&mdash;</td>
+          <td>${escapeHtml(player.name)} (Dropped)</td>
+          <td>${player.match_points ?? 0}</td>
+          <td>${player.differential ?? 0}</td>
+        </tr>
+      `;
+    }
+
     printContent += `
         </tbody>
       </table>

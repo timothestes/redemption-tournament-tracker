@@ -141,13 +141,15 @@ Per the official Redemption Host Guide, in this order:
 
 2. **Sort remaining players by `game_score DESC`.**
 
-3. **Within a game-score tie, apply the head-to-head rule**:
-   - If exactly one tied player defeated all other players in the tie group (head-to-head), they take the top place of the group.
-   - Repeat: remove that player from the group and re-check head-to-head among the remaining tied players for the next place.
+3. **Within a game-score tie, apply the head-to-head rule**: if one tied player defeated *all* other players in the tie group, they take the top place of the group. A win over only some of them does not count.
 
-4. **If no clean head-to-head winner remains**, fall to **`lost_soul_score DESC`** within the tie group.
+4. **If no head-to-head winner exists**, the highest **`lost_soul_score`** in the tie group takes the top place.
 
-5. **Joint placement on true ties**: if players are still tied in both game score and lost soul score (and have no decisive head-to-head among them), they share that placement. The next assigned place skips ahead by the size of the tie group. (E.g., two players tied for 3rd → next player is 5th.) Per official rules, ranking points and prizes are split.
+5. **Repeat the whole process on whoever is left** — the guide's "taking the 1st place player out of the group". Head-to-head is re-checked after *every* removal, whichever rule made the removal. So in a cyclic tie (A beat B, B beat C, C beat A) where lost soul score peels A off first, B still takes the next place for having beaten C; B and C are not tied.
+
+6. **Joint placement on true ties**: players who are tied in both game score and lost soul score *and* whom head-to-head cannot separate share that placement. The next assigned place skips ahead by the size of the tie group. (E.g., two players tied for 3rd → next player is 5th.) Per official rules, ranking points and prizes are split.
+
+> Implemented once, in `orderByTiebreakers` (`lib/tournament/standings.ts`). The live Standings tab ranks players through the same function so the tab, the printed sheet, and the published placings cannot disagree.
 
 > Redemption uses lost soul score as the primary numeric tiebreaker; it does **not** use OMW (opponent match-win percentage) or other strength-of-schedule tiebreakers, despite generic Swiss references mentioning them.
 

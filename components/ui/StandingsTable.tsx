@@ -8,6 +8,9 @@ import {
   gameScoreForMatch,
   differentialForMatch,
 } from "../../lib/tournament/standingsScoring";
+import { orderByTiebreakers } from "../../lib/tournament/standings";
+import type { Tiebreak } from "../../lib/tournament/types";
+import { printFinalStandings } from "../../utils/printUtils";
 
 interface Participant {
   id: string;
@@ -48,9 +51,11 @@ interface StandingsTableProps {
   currentRound?: number | null;
 }
 
-interface StandingRow {
+export interface StandingRow {
   participant: Participant;
-  rank: number;
+  /** 1-indexed placing. Players a tiebreaker cannot separate share a place,
+   * and the next place skips ahead by the size of the tie. */
+  place: number;
   wins: number;
   losses: number;
   ties: number;
@@ -60,6 +65,8 @@ interface StandingRow {
   mp: number;
   /** Differential computed LIVE from matches (mirrors stored differential). */
   diff: number;
+  /** Which tiebreaker settled this placing, and against whom. */
+  tiebreak: Tiebreak;
 }
 
 /** Default tournament win threshold; only used when max_score isn't supplied
@@ -104,15 +111,11 @@ function computeRecord(
 }
 
 /**
- * Direct head-to-head between two participants (across all matches in the
- * tournament, not just within a tier). Used as the final tiebreaker after MP
- * and differential: if A beat B head-to-head, A ranks above B.
+ * Did `aId` defeat `bId`? True when a won more of their matches than b did —
+ * a pair normally meets at most once, but the rematch fallback can pair them
+ * twice in a small field.
  */
-function directHeadToHead(
-  aId: string,
-  bId: string,
-  matches: MatchRow[],
-): number {
+function beatHeadToHead(aId: string, bId: string, matches: MatchRow[]): boolean {
   let aWins = 0;
   let bWins = 0;
   for (const m of matches) {
@@ -125,14 +128,14 @@ function directHeadToHead(
     if (m.winner_id === aId) aWins++;
     else if (m.winner_id === bId) bWins++;
   }
-  return aWins - bWins;
+  return aWins > bWins;
 }
 
 /**
- * Build sorted standings rows. Sort order:
- *   1. MP desc
- *   2. Differential desc
- *   3. Direct head-to-head (A beat B → A ranks higher)
+ * Build sorted standings rows. Ordering is delegated to
+ * `orderByTiebreakers` so this tab ranks players exactly the way the
+ * published placings do: MP desc, then head-to-head, then differential, with
+ * shared places for players nothing separates.
  *
  * The Byes column shown in the UI reports how many byes each player has been
  * awarded in completed rounds (each counts as a win in the W-L-T record).
@@ -194,31 +197,172 @@ export function buildStandings(
     active.map((p) => [p.id, liveTotals(p.id)]),
   );
 
-  const sorted = [...active].sort((a, b) => {
-    const at = totals.get(a.id)!;
-    const bt = totals.get(b.id)!;
-    const mp = bt.mp - at.mp;
-    if (mp !== 0) return mp;
-    const diff = bt.diff - at.diff;
-    if (diff !== 0) return diff;
-    // Both tied on MP and differential — apply direct head-to-head.
-    return directHeadToHead(b.id, a.id, matches);
-  });
-  return sorted.map((p, idx) => {
+  const ranked = orderByTiebreakers(
+    active.map((p) => {
+      const t = totals.get(p.id)!;
+      return {
+        id: p.id,
+        gameScore: t.mp,
+        lostSoulScore: t.diff,
+        participant: p,
+      };
+    }),
+    (a, b) => beatHeadToHead(a, b, matches),
+  );
+
+  return ranked.map((entry) => {
+    const p = entry.row.participant;
     const record = computeRecord(p.id, matches, playedByes);
     const byeCount = playedByes.filter((b) => b.participant_id === p.id).length;
     const t = totals.get(p.id)!;
     return {
       participant: p,
-      rank: idx + 1,
+      place: entry.place,
       wins: record.wins,
       losses: record.losses,
       ties: record.ties,
       byes: byeCount,
       mp: t.mp,
       diff: t.diff,
+      tiebreak: entry.tiebreak,
     };
   });
+}
+
+/** Everything `buildStandings` needs beyond the participant roster. */
+async function fetchStandingsInputs(tournamentId: string): Promise<{
+  matches: MatchRow[];
+  byes: ByeRow[];
+  startedRounds: number[];
+  maxScore: number;
+}> {
+  const client = createClient();
+  const [matchesRes, byesRes, roundsRes, tournamentRes] = await Promise.all([
+    client
+      .from("matches")
+      .select(
+        "id, round, player1_id, player2_id, player1_score, player2_score, winner_id, is_tie",
+      )
+      .eq("tournament_id", tournamentId),
+    client
+      .from("byes")
+      .select("participant_id, round_number")
+      .eq("tournament_id", tournamentId),
+    // Started rounds gate which byes count — a bye only scores once its
+    // round has actually started (Option C), matching the server recompute.
+    client
+      .from("rounds")
+      .select("round_number, started_at")
+      .eq("tournament_id", tournamentId),
+    // max_score is the win threshold ("full win") used by the live MP
+    // formula — same value migration 039 reads from tournaments.max_score.
+    client
+      .from("tournaments")
+      .select("max_score")
+      .eq("id", tournamentId)
+      .single(),
+  ]);
+  const ms = (tournamentRes.data as any)?.max_score;
+  return {
+    matches: (matchesRes.data ?? []) as MatchRow[],
+    byes: (byesRes.data ?? []) as ByeRow[],
+    startedRounds: (roundsRes.data ?? [])
+      .filter((r: any) => r.started_at != null)
+      .map((r: any) => Number(r.round_number)),
+    maxScore: ms != null ? Number(ms) : DEFAULT_MAX_SCORE,
+  };
+}
+
+/**
+ * Print the final standings, ranked the same way this tab (and the published
+ * placings) rank them. The Print Final Standings buttons live outside this
+ * component, so they come back through here rather than re-deriving an order
+ * from the stored participant columns — that shortcut is what let the printed
+ * sheet disagree with the published result.
+ */
+export async function printFinalStandingsFor(
+  tournamentId: string,
+  participants: Participant[],
+  tournamentName?: string | null,
+): Promise<void> {
+  const inputs = await fetchStandingsInputs(tournamentId);
+  const rows = buildStandings(
+    participants,
+    inputs.matches,
+    inputs.byes,
+    null,
+    inputs.startedRounds,
+    inputs.maxScore,
+  );
+  printFinalStandings(
+    rows.map((r) => ({
+      place: r.place,
+      name: r.participant.name,
+      mp: r.mp,
+      diff: r.diff,
+    })),
+    tournamentName,
+    participants
+      .filter((p) => p.dropped_out)
+      .map((p) => ({
+        name: p.name,
+        match_points: p.match_points,
+        differential: p.differential,
+      })),
+  );
+}
+
+/** "Bob", "Bob and Carl", "Bob, Carl and Dave", "Bob, Carl, Dave and 3 others". */
+function nameList(ids: string[], nameOf: (id: string) => string): string {
+  const names = ids.map(nameOf);
+  if (names.length <= 1) return names.join("");
+  const MAX_NAMED = 3;
+  if (names.length <= MAX_NAMED) {
+    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  }
+  const rest = names.length - MAX_NAMED;
+  return `${names.slice(0, MAX_NAMED).join(", ")} and ${rest} other${rest === 1 ? "" : "s"}`;
+}
+
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  const suffix = { 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th";
+  return `${n}${suffix}`;
+}
+
+/**
+ * Plain-language reason a row sits where it does, for the hover hint next to
+ * its place. Returns null when the player shared their game score with nobody
+ * and there was nothing to break.
+ *
+ * Exported for unit testing.
+ */
+export function explainTiebreak(
+  row: Pick<StandingRow, "place" | "mp" | "diff" | "tiebreak">,
+  nameOf: (id: string) => string,
+): string | null {
+  const { tiedWith, by, others } = row.tiebreak;
+  if (by === "none" || tiedWith.length === 0) return null;
+
+  const tied = `Tied on ${row.mp} MP with ${nameList(tiedWith, nameOf)}.`;
+  switch (by) {
+    case "head_to_head":
+      return `${tied} Placed ahead for beating ${nameList(others, nameOf)} head-to-head.`;
+    case "lost_soul_score":
+      return `${tied} No head-to-head win settled it, so the higher differential placed them ahead of ${nameList(
+        others,
+        nameOf,
+      )}.`;
+    case "shared":
+      return `${tied} Same ${row.diff} differential, and ${
+        others.length === 1
+          ? "neither beat the other"
+          : "nobody beat all the others"
+      }, so they share ${ordinal(row.place)} — ranking points and prizes are split.`;
+    case "behind":
+      return `${tied} Placed behind them on head-to-head and differential.`;
+  }
 }
 
 export default function StandingsTable({
@@ -236,44 +380,14 @@ export default function StandingsTable({
 
   useEffect(() => {
     if (!tournamentId) return;
-    const client = createClient();
     let cancelled = false;
     (async () => {
-      const [matchesRes, byesRes, roundsRes, tournamentRes] = await Promise.all([
-        client
-          .from("matches")
-          .select(
-            "id, round, player1_id, player2_id, player1_score, player2_score, winner_id, is_tie",
-          )
-          .eq("tournament_id", tournamentId),
-        client
-          .from("byes")
-          .select("participant_id, round_number")
-          .eq("tournament_id", tournamentId),
-        // Started rounds gate which byes count — a bye only scores once its
-        // round has actually started (Option C), matching the server recompute.
-        client
-          .from("rounds")
-          .select("round_number, started_at")
-          .eq("tournament_id", tournamentId),
-        // max_score is the win threshold ("full win") used by the live MP
-        // formula — same value migration 039 reads from tournaments.max_score.
-        client
-          .from("tournaments")
-          .select("max_score")
-          .eq("id", tournamentId)
-          .single(),
-      ]);
+      const inputs = await fetchStandingsInputs(tournamentId);
       if (cancelled) return;
-      setMatches((matchesRes.data ?? []) as MatchRow[]);
-      setByes((byesRes.data ?? []) as ByeRow[]);
-      setStartedRounds(
-        (roundsRes.data ?? [])
-          .filter((r: any) => r.started_at != null)
-          .map((r: any) => Number(r.round_number)),
-      );
-      const ms = (tournamentRes.data as any)?.max_score;
-      if (ms != null) setMaxScore(Number(ms));
+      setMatches(inputs.matches);
+      setByes(inputs.byes);
+      setStartedRounds(inputs.startedRounds);
+      setMaxScore(inputs.maxScore);
       setLoading(false);
     })();
     return () => {
@@ -294,6 +408,13 @@ export default function StandingsTable({
     [participants, matches, byes, currentRound, startedRounds, maxScore],
   );
 
+  // Tiebreak hints name the players a row was tied with, so the hint text
+  // needs id → name for everyone on the roster.
+  const nameOf = useMemo(() => {
+    const names = new Map(participants.map((p) => [p.id, p.name]));
+    return (id: string) => names.get(id) ?? "another player";
+  }, [participants]);
+
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading standings…</p>;
   }
@@ -311,7 +432,8 @@ export default function StandingsTable({
       {/* Mobile cards */}
       <ul className="md:hidden space-y-2">
         {rows.map((row) => {
-          const isWinner = tournamentEnded && row.rank === 1;
+          const isWinner = tournamentEnded && row.place === 1;
+          const why = explainTiebreak(row, nameOf);
           return (
             <li
               key={row.participant.id}
@@ -323,8 +445,9 @@ export default function StandingsTable({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 min-w-0 flex-wrap">
                     <span className="text-sm font-semibold text-muted-foreground tabular-nums">
-                      #{row.rank}
+                      #{row.place}
                     </span>
+                    {why && <InfoHint text={why} />}
                     {isWinner && (
                       <Crown
                         className="w-4 h-4 text-orange-300 flex-shrink-0"
@@ -378,6 +501,8 @@ export default function StandingsTable({
             tiebreaker) read as `text-foreground` with a muted chevron;
             inactive headers stay muted with no chevron. Communicates active
             sort via header tint rather than a bright accent on the icon.
+            Head-to-head sits between the two but has no column of its own —
+            it shows up in the per-row hint next to the place instead.
           */}
           <thead className="text-xs uppercase font-medium bg-muted">
             <tr>
@@ -423,7 +548,8 @@ export default function StandingsTable({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const isWinner = tournamentEnded && row.rank === 1;
+              const isWinner = tournamentEnded && row.place === 1;
+              const why = explainTiebreak(row, nameOf);
               return (
                 <tr
                   key={row.participant.id}
@@ -432,7 +558,10 @@ export default function StandingsTable({
                   }`}
                 >
                   <td className="px-4 py-3 font-semibold text-foreground tabular-nums">
-                    {row.rank}
+                    <span className="inline-flex items-center gap-1.5">
+                      {row.place}
+                      {why && <InfoHint text={why} />}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-foreground">
                     <span className="inline-flex items-center gap-2">

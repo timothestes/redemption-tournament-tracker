@@ -90,6 +90,28 @@ export interface ParticipantTotals {
   lostSoulScore: number;
 }
 
+/** Why a player sits where they do relative to the players they tied with. */
+export type TiebreakBy =
+  /** Nobody else finished on this game score — nothing to break. */
+  | "none"
+  /** Defeated every other player still tied with them. */
+  | "head_to_head"
+  /** Head-to-head was inconclusive; won on lost soul score. */
+  | "lost_soul_score"
+  /** Nothing separated them — the place is shared. */
+  | "shared"
+  /** Everyone else in the tie was placed above them. */
+  | "behind";
+
+export interface Tiebreak {
+  /** Everyone who finished on the same game score, excluding this player. */
+  tiedWith: ParticipantId[];
+  by: TiebreakBy;
+  /** Who `by` refers to: the players defeated ('head_to_head'), out-scored
+   * ('lost_soul_score'), or sharing the place ('shared'). Empty otherwise. */
+  others: ParticipantId[];
+}
+
 /** A single placement entry in the final standings. */
 export interface Placement {
   participantId: ParticipantId;
@@ -97,4 +119,6 @@ export interface Placement {
   place: number;
   gameScore: number;
   lostSoulScore: number;
+  /** Which tiebreaker settled this placing, and against whom. */
+  tiebreak: Tiebreak;
 }
