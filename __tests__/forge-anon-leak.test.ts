@@ -19,12 +19,16 @@ const FORGE_TABLES = [
   "card_proposals", "card_comments", "forge_decks", "forge_card_art_candidates",
 ];
 
-describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
-  const anon = createClient(URL!, ANON!);
+// Built per test, not once in the describe body: vitest still evaluates the
+// body of a skipped `describe.runIf`, so constructing the client up there
+// threw "supabaseUrl is required" and failed the whole default run in any
+// checkout without a .env.local (a fresh clone or a git worktree).
+const anonClient = () => createClient(URL!, ANON!);
 
+describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
   for (const table of FORGE_TABLES) {
     it(`anon sees zero rows in ${table}`, async () => {
-      const { data, error } = await anon.from(table).select("*").limit(1000);
+      const { data, error } = await anonClient().from(table).select("*").limit(1000);
       const rows = data ?? [];
       // A permission error (REVOKE) or an empty result (RLS) is fine; a leak is not.
       expect(
@@ -94,7 +98,7 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
 
   for (const [fn, args] of FORGE_RPCS) {
     it(`anon cannot execute ${fn}`, async () => {
-      const { error } = await anon.rpc(fn, args);
+      const { error } = await anonClient().rpc(fn, args);
       expect(error, `anon was able to execute ${fn} — a definer grant leaked`).not.toBeNull();
     });
   }

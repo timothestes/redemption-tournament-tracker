@@ -127,7 +127,12 @@ describe("lackeyRowToDesignCard", () => {
     expect(parse({ Brigade: "Good Gold" }).brigades).toEqual(["GoodGold"]);
     expect(parse({ Brigade: "Crimson/Orange/Pale Green" }).brigades).toEqual(["Crimson", "Orange", "PaleGreen"]);
     expect(parse({ Brigade: "Purple (Crimson)" }).brigades).toEqual(["Purple", "Crimson"]);
-    expect(parse({ Brigade: "Red" }).brigades).toBeUndefined();
+    // The three brigades added later than the rest of this map, so a
+    // regression in BRIGADE_MAP can't slip through as "unknown, dropped".
+    expect(parse({ Brigade: "Red" }).brigades).toEqual(["Red"]);
+    expect(parse({ Brigade: "Teal" }).brigades).toEqual(["Teal"]);
+    expect(parse({ Brigade: "Evil Gold" }).brigades).toEqual(["EvilGold"]);
+    expect(parse({ Brigade: "Mauve" }).brigades).toBeUndefined();
     expect(parse({ Brigade: "-" }).brigades).toBeUndefined();
   });
   it("maps '-' stats to absent and Territory class to icons", () => {
