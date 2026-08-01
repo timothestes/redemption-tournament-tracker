@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeFinalStandings } from '../standings';
+import { computeFinalStandings, orderByTiebreakers } from '../standings';
 import type { TournamentState, Participant, Match, Bye } from '../types';
 
 function p(id: string, droppedOut = false): Participant {
@@ -88,12 +88,34 @@ describe('computeFinalStandings', () => {
     //   B: -5 (R1) + +4 (R2) + 0 (R3 bye) = -1
     //   C: 0 (R1 bye) + -4 (R2) + +3 (R3) = -1
     // No clean head-to-head (A>B, B>C, C>A — cycle).
-    // Falls to LSS: A=+2 first, then B and C tied at -1 → joint placement.
+    // Falls to LSS: A=+2 takes 1st. Then the host guide's "repeat this process
+    // (taking the 1st place player out of the group)" restarts at head-to-head
+    // for the remaining {B, C}: B beat C, so B is 2nd and C is 3rd. They are
+    // NOT jointly placed — the tie clause only applies to players who "did not
+    // face each other".
     const standings = computeFinalStandings(state(ps, matches, byes));
     expect(standings.find(s => s.participantId === 'A')?.place).toBe(1);
-    // B and C are jointly placed 2nd.
     expect(standings.find(s => s.participantId === 'B')?.place).toBe(2);
-    expect(standings.find(s => s.participantId === 'C')?.place).toBe(2);
+    expect(standings.find(s => s.participantId === 'C')?.place).toBe(3);
+  });
+
+  it('breaks an equal-lost-soul-score tie by head-to-head when the two players faced each other', () => {
+    // A and B end on identical game score AND identical lost soul score, and
+    // played each other in R2 (A won). The joint-placement clause requires
+    // "did not face each other", so A must be placed above B.
+    // C is kept on a different game score so the tie group is exactly {A, B}.
+    const ps = ['A', 'B', 'C', 'D'].map(x => p(x));
+    const matches: Match[] = [
+      fullWin(1, 'C', 'A'), // A 0MP/-5, C 3MP/+5
+      fullWin(1, 'B', 'D'), // B 3MP/+5, D 0MP/-5
+      fullWin(2, 'A', 'B'), // A 3MP/0 total, B 3MP/0 total
+      fullWin(2, 'C', 'D'), // C 6MP/+10, D 0MP/-10
+    ];
+    const standings = computeFinalStandings(state(ps, matches));
+    expect(standings.find(s => s.participantId === 'C')?.place).toBe(1);
+    expect(standings.find(s => s.participantId === 'A')?.place).toBe(2);
+    expect(standings.find(s => s.participantId === 'B')?.place).toBe(3);
+    expect(standings.find(s => s.participantId === 'D')?.place).toBe(4);
   });
 
   it('uses joint placement on true ties (next place skips by tie size)', () => {
@@ -114,6 +136,25 @@ describe('computeFinalStandings', () => {
     }
   });
 
+  it('reports why each player landed where they did', () => {
+    // Same shape as the test above: A and B tie on game score, A beat B,
+    // C and D sit alone on their own game scores.
+    const ps = ['A', 'B', 'C', 'D'].map(x => p(x));
+    const matches: Match[] = [
+      fullWin(1, 'C', 'A'),
+      fullWin(1, 'B', 'D'),
+      fullWin(2, 'A', 'B'),
+      fullWin(2, 'C', 'D'),
+    ];
+    const standings = computeFinalStandings(state(ps, matches));
+    const byId = (id: string) => standings.find(s => s.participantId === id)!;
+    expect(byId('C').tiebreak.by).toBe('none');
+    expect(byId('A').tiebreak.by).toBe('head_to_head');
+    expect(byId('A').tiebreak.others).toEqual(['B']);
+    expect(byId('B').tiebreak.by).toBe('behind');
+    expect(byId('B').tiebreak.tiedWith).toEqual(['A']);
+  });
+
   it('excludes dropped players from final standings entirely', () => {
     const ps = [
       p('A'),
@@ -127,5 +168,57 @@ describe('computeFinalStandings', () => {
     const standings = computeFinalStandings(state(ps, matches));
     expect(standings.map(s => s.participantId).sort()).toEqual(['A', 'C']);
     expect(standings.find(s => s.participantId === 'B')).toBeUndefined();
+  });
+});
+
+describe('orderByTiebreakers', () => {
+  const row = (id: string, gameScore: number, lostSoulScore: number) => ({
+    id, gameScore, lostSoulScore,
+  });
+  /** beat(a, b) from an explicit list of "a beat b" pairs. */
+  const beats = (...pairs: string[]) => (a: string, b: string) =>
+    pairs.includes(`${a}>${b}`);
+
+  it('applies head-to-head before lost soul score', () => {
+    // B has the better lost soul score, but A beat B and they are the whole
+    // tie group — head-to-head comes first.
+    const ranked = orderByTiebreakers(
+      [row('A', 3, -4), row('B', 3, 4)],
+      beats('A>B'),
+    );
+    expect(ranked.map(e => e.row.id)).toEqual(['A', 'B']);
+    expect(ranked.map(e => e.place)).toEqual([1, 2]);
+  });
+
+  it('needs a win over EVERY other player in the tie group, not just one', () => {
+    // A beat B but never played C, so no one "defeated all other tied
+    // players" → lost soul score decides.
+    const ranked = orderByTiebreakers(
+      [row('A', 3, -4), row('B', 3, 4), row('C', 3, 0)],
+      beats('A>B'),
+    );
+    expect(ranked.map(e => e.row.id)).toEqual(['B', 'C', 'A']);
+  });
+
+  it('shares a place when nothing separates the players, and skips ahead', () => {
+    const ranked = orderByTiebreakers(
+      [row('A', 3, 5), row('B', 3, 5), row('C', 1, 0)],
+      beats(),
+    );
+    expect(ranked.map(e => e.place)).toEqual([1, 1, 3]);
+    expect(ranked[0].tiebreak.by).toBe('shared');
+    expect(ranked[0].tiebreak.others).toEqual(['B']);
+    expect(ranked[2].tiebreak.by).toBe('none');
+  });
+
+  it('labels a lost-soul-score win with the players it out-scored', () => {
+    const ranked = orderByTiebreakers(
+      [row('A', 3, 5), row('B', 3, 1), row('C', 3, 0)],
+      beats(),
+    );
+    expect(ranked.map(e => e.row.id)).toEqual(['A', 'B', 'C']);
+    expect(ranked[0].tiebreak.by).toBe('lost_soul_score');
+    expect(ranked[0].tiebreak.others).toEqual(['B', 'C']);
+    expect(ranked[0].tiebreak.tiedWith).toEqual(['B', 'C']);
   });
 });

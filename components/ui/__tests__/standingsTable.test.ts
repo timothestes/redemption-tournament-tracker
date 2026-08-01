@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildStandings } from "../StandingsTable";
+import { buildStandings, explainTiebreak } from "../StandingsTable";
 
 type Participant = {
   id: string;
@@ -72,31 +72,78 @@ function match(
 }
 
 describe("StandingsTable buildStandings", () => {
-  it("ranks A above B when live MP and differential tie and A beat B head-to-head", () => {
-    // Exact tie at 3 MP / 0 diff for both, with p06 winning the head-to-head:
+  it("shares the place across a head-to-head cycle with identical MP and differential", () => {
+    // Exact tie at 3 MP / 0 diff for all three, and the head-to-head results
+    // form a cycle (p06 > p12 > p99 > p06), so no player defeated all the
+    // others. Nothing is left to separate them — they share the place.
     //   r1: p06 beats p12  → p06 3MP/+5, p12 0MP/-5
-    //   r2: p12 beats p99  → p12 3MP/+5  (p12 total 3MP/0)
-    //   r2: p99 beats p06? no — give p06 a full loss to net 0 diff:
-    //   r2: p06 loses to p99 → p06 0MP/-5 (p06 total 3MP/0)
+    //   r2: p99 beats p06  → p99 3MP/+5, p06 0MP/-5 (p06 total 3MP/0)
+    //   r3: p12 beats p99  → p12 3MP/+5 (p12 total 3MP/0), p99 total 3MP/0
     const rows = buildStandings(
       [p("p12"), p("p06"), p("p99")],
       [
-        fullWin(1, "p06", "p12"), // p06: 3MP/+5 ; p12: 0MP/-5
-        fullWin(2, "p99", "p06"), // p06: 0MP/-5 -> p06 total 3MP/0
-        fullWin(3, "p12", "p99"), // p12: 3MP/+5 -> p12 total 3MP/0
+        fullWin(1, "p06", "p12"),
+        fullWin(2, "p99", "p06"),
+        fullWin(3, "p12", "p99"),
       ],
       [],
       null,
       null,
       MAX,
     );
-    const p06 = rows.find((r) => r.participant.id === "p06")!;
-    const p12 = rows.find((r) => r.participant.id === "p12")!;
-    expect(p06.mp).toBe(3);
-    expect(p12.mp).toBe(3);
-    expect(p06.diff).toBe(0);
-    expect(p12.diff).toBe(0);
-    expect(p06.rank).toBeLessThan(p12.rank);
+    expect(rows.map((r) => r.mp)).toEqual([3, 3, 3]);
+    expect(rows.map((r) => r.diff)).toEqual([0, 0, 0]);
+    expect(rows.map((r) => r.place)).toEqual([1, 1, 1]);
+    expect(rows[0].tiebreak.by).toBe("shared");
+  });
+
+  it("ranks A above B on head-to-head even when B has the better differential", () => {
+    // The head-to-head step comes BEFORE differential in the host guide.
+    //   r1: C beats A 5-0   → A 0MP/-5 ; C 3MP/+5
+    //   r1: B beats D 5-1   → B 3MP/+4 ; D 0MP/-4
+    //   r2: A beats B 5-4   → A 3MP/+1 (total 3MP/-4) ; B 0MP/-1 (total 3MP/+3)
+    //   r2: C beats D 5-0   → C 6MP/+10 ; D 0MP/-9
+    // The 3MP tie group is exactly {A, B}. B's differential (+3) beats A's
+    // (-4), but A beat B head-to-head, so A places above B.
+    const rows = buildStandings(
+      [p("A"), p("B"), p("C"), p("D")],
+      [
+        match(1, "C", "A", 5, 0),
+        match(1, "B", "D", 5, 1),
+        match(2, "A", "B", 5, 4),
+        match(2, "C", "D", 5, 0),
+      ],
+      [],
+      null,
+      null,
+      MAX,
+    );
+    const a = rows.find((r) => r.participant.id === "A")!;
+    const b = rows.find((r) => r.participant.id === "B")!;
+    expect(a.mp).toBe(3);
+    expect(b.mp).toBe(3);
+    expect(a.diff).toBe(-4);
+    expect(b.diff).toBe(3);
+    expect(a.place).toBe(2);
+    expect(b.place).toBe(3);
+    expect(a.tiebreak.by).toBe("head_to_head");
+    expect(a.tiebreak.others).toEqual(["B"]);
+  });
+
+  it("gives tied players the same place and skips the next place", () => {
+    // A and B both 3MP/+5 and never played each other → they share 1st, and
+    // the next players start at 3rd.
+    const rows = buildStandings(
+      [p("A"), p("B"), p("x"), p("y")],
+      [fullWin(1, "A", "x"), fullWin(1, "B", "y")],
+      [],
+      null,
+      null,
+      MAX,
+    );
+    expect(rows.map((r) => r.place)).toEqual([1, 1, 3, 3]);
+    expect(rows[0].tiebreak.by).toBe("shared");
+    expect(rows[0].tiebreak.others).toEqual(["B"]);
   });
 
   it("uses live MP as the primary sort and live differential second", () => {
@@ -231,5 +278,70 @@ describe("StandingsTable buildStandings", () => {
     const rows = buildStandings(participants, [], byes, null, null, MAX);
     expect(rows[0].wins).toBe(3);
     expect(rows[0].mp).toBe(9); // 3 byes × 3 MP
+  });
+});
+
+describe("explainTiebreak", () => {
+  const nameOf = (id: string) => ({ b: "Bob", c: "Carl", d: "Dave" })[id] ?? id;
+  const row = (
+    place: number,
+    mp: number,
+    diff: number,
+    tiebreak: any,
+  ): any => ({ place, mp, diff, tiebreak });
+
+  it("says nothing when the player was not tied with anyone", () => {
+    expect(
+      explainTiebreak(
+        row(1, 12, 4, { tiedWith: [], by: "none", others: [] }),
+        nameOf,
+      ),
+    ).toBeNull();
+  });
+
+  it("names the players beaten head-to-head", () => {
+    const text = explainTiebreak(
+      row(2, 12, -4, { tiedWith: ["b", "c"], by: "head_to_head", others: ["b", "c"] }),
+      nameOf,
+    )!;
+    expect(text).toContain("Tied on 12 MP with Bob and Carl");
+    expect(text).toContain("beating Bob and Carl head-to-head");
+  });
+
+  it("explains a differential win as the fallback after head-to-head", () => {
+    const text = explainTiebreak(
+      row(1, 12, 6, { tiedWith: ["b"], by: "lost_soul_score", others: ["b"] }),
+      nameOf,
+    )!;
+    expect(text).toContain("head-to-head");
+    expect(text).toContain("differential");
+    expect(text).toContain("Bob");
+  });
+
+  it("explains a shared place and the split", () => {
+    const text = explainTiebreak(
+      row(3, 12, 4, { tiedWith: ["b"], by: "shared", others: ["b"] }),
+      nameOf,
+    )!;
+    expect(text).toContain("share 3rd");
+    expect(text).toContain("split");
+  });
+
+  it("explains being placed behind the rest of the tie", () => {
+    const text = explainTiebreak(
+      row(4, 12, -4, { tiedWith: ["b", "c"], by: "behind", others: [] }),
+      nameOf,
+    )!;
+    expect(text).toContain("Bob and Carl");
+    expect(text).toContain("behind");
+  });
+
+  it("abbreviates a long list of tied players", () => {
+    const many = ["b", "c", "d", "e", "f", "g"];
+    const text = explainTiebreak(
+      row(7, 6, 0, { tiedWith: many, by: "behind", others: [] }),
+      nameOf,
+    )!;
+    expect(text).toContain("Bob, Carl, Dave and 3 others");
   });
 });

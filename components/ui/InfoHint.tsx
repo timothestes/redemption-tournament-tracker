@@ -5,7 +5,7 @@ import { HelpCircle } from "lucide-react";
 export const MP_HINT =
   "Match Points (MP) — points earned from wins, ties, and byes. The primary metric for ranking players.";
 export const DIFF_HINT =
-  "Differential (Diff) — cumulative lost-soul-score margin. Used to break ties between players with equal match points.";
+  "Differential (Diff) — cumulative lost-soul-score margin. Breaks ties between players with equal match points when head-to-head doesn't settle it.";
 
 /** Round-scoped variants for the Rounds tab, where the columns show what was
  * earned in THIS round only — not the running total. The Standings tab is the

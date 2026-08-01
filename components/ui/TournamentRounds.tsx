@@ -10,7 +10,8 @@ import { reassignRoundTables } from "../../utils/tournament/reassignTables";
 import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
 import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, Printer } from "lucide-react";
-import { printTournamentPairings, printFinalStandings, printMatchSlips } from "../../utils/printUtils";
+import { printTournamentPairings, printMatchSlips } from "../../utils/printUtils";
+import { printFinalStandingsFor } from "./StandingsTable";
 import { Button } from "./button";
 import ToastNotification from "./toast-notification";
 import ConfirmationDialog from "./confirmation-dialog";
@@ -894,7 +895,11 @@ export default function TournamentRounds({
   };
 
   const handlePrintFinalStandings = () => {
-    printFinalStandings(participants, tournamentName || tournamentInfo.name);
+    printFinalStandingsFor(
+      tournamentId,
+      participants,
+      tournamentName || tournamentInfo.name,
+    );
   };
   
   // Update local tournament name from parent prop when it changes
