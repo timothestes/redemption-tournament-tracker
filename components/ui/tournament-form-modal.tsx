@@ -186,7 +186,10 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Add Tournament</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        {/* The form is the dialog's flex child, so it has to be a shrinkable
+            column itself — otherwise it sizes to its content, the body never
+            scrolls, and the footer gets clipped by the dialog on short screens. */}
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
           <DialogBody className="space-y-3">
             <div>
               <label
