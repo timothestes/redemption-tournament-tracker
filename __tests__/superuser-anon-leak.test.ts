@@ -11,11 +11,15 @@ const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // suite) so the default unit run stays hermetic (no network).
 const ENABLED = process.env.FORGE_LEAK_TEST === "1" && !!URL && !!ANON;
 
-describe.runIf(ENABLED)("Superuser portal anon-leak guardrail", () => {
-  const anon = createClient(URL!, ANON!);
+// Built per test, not once in the describe body: vitest still evaluates the
+// body of a skipped `describe.runIf`, so constructing the client up there
+// threw "supabaseUrl is required" and failed the whole default run in any
+// checkout without a .env.local (a fresh clone or a git worktree).
+const anonClient = () => createClient(URL!, ANON!);
 
+describe.runIf(ENABLED)("Superuser portal anon-leak guardrail", () => {
   it("anon sees zero rows in admin_users", async () => {
-    const { data, error } = await anon.from("admin_users").select("*").limit(1000);
+    const { data, error } = await anonClient().from("admin_users").select("*").limit(1000);
     const rows = data ?? [];
     // A permission error (REVOKE) or an empty result (RLS) is fine; a leak is not.
     expect(
@@ -36,7 +40,7 @@ describe.runIf(ENABLED)("Superuser portal anon-leak guardrail", () => {
 
   for (const [fn, args] of SUPER_RPCS) {
     it(`anon cannot execute ${fn}`, async () => {
-      const { error } = await anon.rpc(fn, args);
+      const { error } = await anonClient().rpc(fn, args);
       expect(error, `anon was able to execute ${fn} — a definer grant leaked`).not.toBeNull();
     });
   }
