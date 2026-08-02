@@ -74,6 +74,7 @@ export function buildForgeGoldfishCards(
         card_brigade: r.brigade, card_strength: r.strength, card_toughness: r.toughness,
         card_special_ability: r.rawText,
         card_identifier: r.identifier, card_reference: r.reference, card_alignment: r.alignment,
+        card_class: r.cardClass,
         quantity: e.qty,
         is_reserve,
       });

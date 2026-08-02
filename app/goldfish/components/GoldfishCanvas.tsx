@@ -51,7 +51,8 @@ import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPromp
 import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePrompt';
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
-import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
+import { gameCardIsWarrior, gameCardIsWeapon } from '../utils/equipClass';
+import { findCard } from '@/lib/cards/lookup';
 import { compareCardsDefault } from '@/lib/cards/defaultSort';
 import { getEffectiveAbilities, isLostSoulCard, isHeroCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
@@ -952,8 +953,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       // Runs only for single-card drags (group drags are intentional batch moves).
       const isGroupDragForEquip = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       if (!isGroupDragForEquip) {
-        const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
-        if (isWeapon(cardMeta)) {
+        if (gameCardIsWeapon(card)) {
           const dropNode = e.target;
           const dropCenterX = dropNode.x() + cardWidth / 2;
           const dropCenterY = dropNode.y() + cardHeight / 2;
@@ -964,8 +964,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             const warriorCandidates = state.zones.territory.filter(c => {
               if (c.instanceId === card.instanceId) return false;
               if (c.equippedTo) return false; // a weapon attached to someone else isn't a valid target
-              const meta = findCard(c.cardName, c.cardSet, c.cardImgFile);
-              if (!isWarrior(meta)) return false;
+              if (!gameCardIsWarrior(c)) return false;
               const attached = state.zones.territory.filter(x => x.equippedTo === c.instanceId);
               return attached.length < MAX_EQUIPPED_WEAPONS_PER_WARRIOR;
             });

@@ -5,7 +5,7 @@ const ID = "11111111-2222-3333-4444-555555555555";
 const entry = {
   cardId: ID, name: "Test Hero", rawText: "Does things.", hasFinished: false, hasArt: true, versionId: "v-9",
   typeDisplay: "Hero", alignment: "Good", brigade: "Blue", strength: "5", toughness: "4",
-  identifier: "Judah", reference: "Genesis 1:1",
+  identifier: "Judah", reference: "Genesis 1:1", cardClass: "Warrior",
 };
 
 function stubInstance(over: Record<string, unknown> = {}) {
@@ -54,5 +54,14 @@ describe("cardInstanceToGameCard forge resolution", () => {
     expect(gc.alignment).toBe("");
     expect(gc.brigade).toBe("");
     expect(gc.reference).toBe("");
+  });
+  it("carries the forge class so the weapon-equip hit-test can see it", () => {
+    // The STDB row has no class field at all and forge cards aren't in the
+    // public index, so without this a forge Warrior could never host a weapon.
+    expect(cardInstanceToGameCard(stubInstance(), [], "player1", new Map([[ID, entry]])).cardClass).toBe("Warrior");
+    // Unresolved stays undefined rather than '' — nothing to assert about it.
+    expect(cardInstanceToGameCard(stubInstance(), [], "player1", new Map()).cardClass).toBeUndefined();
+    // Public cards never carry it; their class comes from the card index.
+    expect(cardInstanceToGameCard(stubInstance({ cardImgFile: "Public.jpg" }), [], "player1", new Map([[ID, entry]])).cardClass).toBeUndefined();
   });
 });

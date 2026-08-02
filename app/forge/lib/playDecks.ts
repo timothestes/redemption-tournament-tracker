@@ -39,11 +39,14 @@ export async function loadForgeDeckForGame(deckId: string): Promise<ForgePlayDec
 // alignment/brigade/strength/toughness/identifier/reference ride the resolver so
 // the owner's client can re-hydrate them for the in-game deck search — the
 // world-readable STDB row deliberately blanks them (leak spine, playSerialize.ts).
+// cardClass rides it too: forge cards aren't in the public card index, so the
+// client's Warrior/Weapon equip test has no other way to learn a forge card's
+// class (see app/goldfish/utils/equipClass.ts).
 export type ForgePlayResolverEntry = {
   cardId: string; name: string; rawText: string;
   hasFinished: boolean; hasArt: boolean; versionId: string; typeDisplay: string;
   alignment: string; brigade: string; strength: string; toughness: string;
-  identifier: string; reference: string;
+  identifier: string; reference: string; cardClass: string;
 };
 
 function toResolverEntry(g: GrantedForgeCard): ForgePlayResolverEntry {
@@ -57,6 +60,7 @@ function toResolverEntry(g: GrantedForgeCard): ForgePlayResolverEntry {
     hasArt: g.hasApprovedArt,
     versionId: g.versionId,
     typeDisplay,
+    cardClass: (g.data.class ?? []).join("/"),
     ...designCardSearchFields(g.data),
   };
 }

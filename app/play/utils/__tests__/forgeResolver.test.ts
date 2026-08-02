@@ -6,7 +6,7 @@ const ID = "11111111-2222-3333-4444-555555555555";
 const entry = {
   cardId: ID, name: "Test Hero", rawText: "Does things.", hasFinished: true, hasArt: true, versionId: "v-1",
   typeDisplay: "Hero", alignment: "Good", brigade: "Blue", strength: "5", toughness: "4",
-  identifier: "Judah", reference: "Genesis 1:1",
+  identifier: "Judah", reference: "Genesis 1:1", cardClass: "Warrior",
 };
 const resolver = new Map([[ID, entry]]);
 

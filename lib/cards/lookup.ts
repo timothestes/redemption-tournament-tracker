@@ -69,22 +69,33 @@ export function findCard(
   return CARD_BY_NAME.get(name) ?? CARD_BY_NAME_LOWER.get(lower);
 }
 
-function classTokens(card: CardData | undefined): string[] {
-  if (!card?.class) return [];
+function classTokens(cls: string | undefined): string[] {
+  if (!cls) return [];
   // Class strings use ',', '/', or ' / ' as separators — split on any run of
   // commas, slashes, or whitespace, then lowercase for case-insensitive matching.
-  return card.class
+  return cls
     .split(/[,\/\s]+/)
     .map((t) => t.trim().toLowerCase())
     .filter(Boolean);
 }
 
+/** Warrior/Weapon tests against a raw class string. Forge cards carry their
+ *  class this way (they're not in the public index), so callers holding a
+ *  class string — rather than a CardData — use these directly. */
+export function classIsWarrior(cls: string | undefined): boolean {
+  return classTokens(cls).includes('warrior');
+}
+
+export function classIsWeapon(cls: string | undefined): boolean {
+  return classTokens(cls).includes('weapon');
+}
+
 export function isWarrior(card: CardData | undefined): boolean {
-  return classTokens(card).includes('warrior');
+  return classIsWarrior(card?.class);
 }
 
 export function isWeapon(card: CardData | undefined): boolean {
-  return classTokens(card).includes('weapon');
+  return classIsWeapon(card?.class);
 }
 
 export function isSite(card: CardData | undefined): boolean {
