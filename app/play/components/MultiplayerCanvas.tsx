@@ -69,7 +69,8 @@ import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/car
 import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
-import { findCard, isWarrior, isWeapon, isSite } from '@/lib/cards/lookup';
+import { gameCardIsWarrior, gameCardIsWeapon } from '@/app/goldfish/utils/equipClass';
+import { findCard, isSite } from '@/lib/cards/lookup';
 import { compareCardsDefault } from '@/lib/cards/defaultSort';
 import { normalizeDeckFormat } from '@/lib/deck-format';
 import { SOUL_DECK_BACK_IMG } from '@/app/shared/paragon/soulDeck';
@@ -3939,10 +3940,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         hit.owner === 'my' &&
         card.ownerId === 'player1'
       ) {
-        const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
         const isBattleTarget = targetZone === 'battle';
         const hostZoneRect = isBattleTarget ? battleBandRect : myZones['territory'];
-        if (isWeapon(cardMeta) && hostZoneRect) {
+        if (gameCardIsWeapon(card) && hostZoneRect) {
           const myHostRaw = isBattleTarget ? myCards['battle'] ?? [] : myCards['territory'] ?? [];
           const myHostCards = myHostRaw.map((c) => {
             const adapted = cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1', forgeResolver);
@@ -3955,8 +3955,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           const warriorCandidates = myHostCards.filter((c) => {
             if (c.instanceId === card.instanceId) return false;
             if (c.equippedTo) return false;
-            const meta = findCard(c.cardName, c.cardSet, c.cardImgFile);
-            if (!isWarrior(meta)) return false;
+            if (!gameCardIsWarrior(c)) return false;
             const attached = myHostCards.filter((x) => x.equippedTo === c.instanceId);
             return attached.length < MAX_EQUIPPED_WEAPONS_PER_WARRIOR;
           });
@@ -3983,7 +3982,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (c.instanceId === card.instanceId) return false;
             if (c.equippedTo) return false;
             if (!isCharacterCard({ cardType: c.type })) return false;
-            return !isWarrior(findCard(c.cardName, c.cardSet, c.cardImgFile));
+            return !gameCardIsWarrior(c);
           });
           const hitNonWarrior = hitTestWarrior(
             center.x,

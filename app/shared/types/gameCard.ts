@@ -75,6 +75,10 @@ export interface GameCard {
   counters: Counter[];
   isFlipped: boolean;
   isToken: boolean;
+  /** Warrior/Weapon class, set only for Forge cards (which are absent from the
+   *  public card index, so `findCard` can't supply it). Undefined for public
+   *  cards — those resolve their class through the index. See equipClass.ts. */
+  cardClass?: string;
   zone: ZoneId;
   ownerId: 'player1' | 'player2' | 'shared';
   isSoulDeckOrigin?: boolean;
@@ -186,6 +190,8 @@ export interface DeckDataForGoldfish {
     card_identifier: string;
     card_reference: string;
     card_alignment: string;
+    /** Forge cards only — see GameCard.cardClass. */
+    card_class?: string;
     quantity: number;
     is_reserve: boolean;
   }[];

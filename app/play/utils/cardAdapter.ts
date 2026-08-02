@@ -38,6 +38,10 @@ export function cardInstanceToGameCard(
     identifier: resolved ? resolved.identifier : card.identifier,
     reference: resolved ? resolved.reference : card.reference,
     alignment: resolved ? resolved.alignment : card.alignment,
+    // Forge only: the STDB row carries no class at all, so an unresolved forge
+    // card stays undefined (falls through to the public index, which won't know
+    // it either — fail-closed) while a resolved one is authoritative.
+    cardClass: resolved ? resolved.cardClass : undefined,
     isMeek: card.isMeek,
     isFlipped: card.isFlipped,
     isToken: card.isToken,
@@ -100,6 +104,7 @@ function gameCardEquals(a: GameCard, b: GameCard): boolean {
     a.identifier === b.identifier &&
     a.reference === b.reference &&
     a.alignment === b.alignment &&
+    a.cardClass === b.cardClass &&
     a.isMeek === b.isMeek &&
     a.isFlipped === b.isFlipped &&
     a.isToken === b.isToken &&

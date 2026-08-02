@@ -19,6 +19,7 @@ const resolverEntry = (overrides: Partial<ForgePlayResolverEntry> = {}): ForgePl
   toughness: "",
   identifier: "",
   reference: "",
+  cardClass: "",
   ...overrides,
 });
 
