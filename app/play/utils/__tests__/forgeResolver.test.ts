@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { forgeCardIdFromImgFile, forgeProxyUrl, resolveCardImageUrl, mergeForgeDeckData, resolveBattleRowFields } from "../forgeResolver";
+import { forgeCardIdFromImgFile, forgeProxyUrl, resolveCardImageUrl, mergeForgeDeckData, resolveBattleRowFields, resolveForgeCardName } from "../forgeResolver";
+import { getEffectiveAbilities } from "@/lib/cards/cardAbilities";
 import { getCardImageUrl, getCardImageUrlOrNull } from "@/app/shared/utils/cardImageUrl";
 
 const ID = "11111111-2222-3333-4444-555555555555";
@@ -63,6 +64,33 @@ describe("forge image seams", () => {
     expect(merged[0].toughness).toBe("6");
     expect(merged[0].identifier).toBe("Demon");
     expect(merged[0].reference).toBe("Revelation 8:11");
+  });
+});
+
+describe("resolveForgeCardName", () => {
+  // Right-click abilities are keyed by card name. The world-readable STDB row
+  // blanks the name on forge cards, so dispatching off the raw row found zero
+  // abilities even though the context menu (which uses the resolved name)
+  // offered them — the forge "Virgin Birth" right-click did nothing.
+  const forgeRow = { cardImgFile: `forge:${ID}`, cardName: "" };
+
+  it("returns the granted name for a forge row", () => {
+    expect(resolveForgeCardName(forgeRow, resolver)).toBe("Test Hero");
+  });
+
+  it("keeps the blank name when the viewer has no grant — fail-closed", () => {
+    expect(resolveForgeCardName(forgeRow, new Map())).toBe("");
+    expect(resolveForgeCardName(forgeRow, null)).toBe("");
+  });
+
+  it("passes public rows through untouched", () => {
+    expect(resolveForgeCardName({ cardImgFile: "Public.jpg", cardName: "Pub" }, resolver)).toBe("Pub");
+  });
+
+  it("makes a forge card's abilities dispatchable; blank name finds none", () => {
+    const vb = new Map([[ID, { ...entry, name: "Virgin Birth" }]]);
+    expect(getEffectiveAbilities({ cardName: resolveForgeCardName(forgeRow, vb) })).toHaveLength(1);
+    expect(getEffectiveAbilities({ cardName: forgeRow.cardName })).toHaveLength(0);
   });
 });
 
