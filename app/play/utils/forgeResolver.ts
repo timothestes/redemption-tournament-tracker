@@ -27,6 +27,23 @@ export function resolveCardImageUrl(imgFile: string, resolver?: ForgeResolverMap
   return getCardImageUrl(imgFile);
 }
 
+// The real name of a forge card, for the viewer who has the grant. Right-click
+// abilities are keyed by card name (CARD_ABILITIES), and the world-readable
+// STDB row blanks the name on forge cards — so dispatching off the raw row
+// always found zero abilities. Ungranted forge rows keep the blank name and
+// stay ability-less, fail-closed.
+//
+// Callers must NOT feed the result into anything world-readable (game log
+// payloads, broadcast reveal labels) — those deliberately stay blanked.
+export function resolveForgeCardName(
+  row: { cardImgFile: string; cardName: string },
+  resolver?: ForgeResolverMap | null,
+): string {
+  const forgeId = forgeCardIdFromImgFile(row.cardImgFile);
+  const e = forgeId ? resolver?.get(forgeId) : undefined;
+  return e ? e.name : row.cardName;
+}
+
 // Re-hydrate the battle-math fields the leak spine blanked on a forge
 // CardInstance row (name/brigade/strength/toughness), from the viewer's
 // granted resolver. Deliberately NOT specialAbility: the auto-return summary

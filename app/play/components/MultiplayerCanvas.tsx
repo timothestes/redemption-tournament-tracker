@@ -83,7 +83,7 @@ import { LostSoulDealLayer, type SoulDeal } from '@/app/shared/components/LostSo
 import { computeDealFlight } from '@/app/shared/utils/lostSoulDeal';
 import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
 import { cardInstanceToGameCard } from '../utils/cardAdapter';
-import { resolveCardImageUrl, resolveBattleRowFields, type ForgeResolverMap } from '../utils/forgeResolver';
+import { resolveCardImageUrl, resolveBattleRowFields, resolveForgeCardName, type ForgeResolverMap } from '../utils/forgeResolver';
 import type { UndoStack, Captured } from '../hooks/useUndoStack';
 import { makeReverseAction, makeBatchReverseAction, reverseIsSafe } from '../hooks/useUndoStack';
 import {
@@ -1832,7 +1832,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Use effective abilities so imitated souls' right-click abilities (e.g.
       // Lawless reveal-top-6 on an Imitate) dispatch correctly. Mirrors the
       // server's execute_card_ability dispatcher and the goldfish path.
-      const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
+      // Forge rows blank cardName (leak spine) while the context menu builds
+      // its items off the RESOLVED name — so without this the menu offered an
+      // ability that then dispatched to nothing. Resolve for the lookup only;
+      // the log/broadcast uses below keep the blanked name on purpose.
+      const ability = source
+        ? getEffectiveAbilities({
+            cardName: resolveForgeCardName(source, forgeResolver),
+            imitatingName: source.imitatingName,
+          })[abilityIndex]
+        : undefined;
       // (Star) abilities fired from hand also reveal the source card to
       // opponents/spectators so the implicit "reveal from hand" cost is
       // visible. Reveal duration matches the standard 30s — see
@@ -2074,7 +2083,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // look_at_own_deck) — open the look modal with the player-chosen count
       // (capped at the ability limit) instead of routing through the server.
       const source = findAnyCardById(sourceInstanceId);
-      const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
+      // Resolved name for the lookup — see executeCardAbility above.
+      const ability = source
+        ? getEffectiveAbilities({
+            cardName: resolveForgeCardName(source, forgeResolver),
+            imitatingName: source.imitatingName,
+          })[abilityIndex]
+        : undefined;
       if (ability?.type === 'look_at_own_deck_choose') {
         const n = Math.min(count, ability.maxCount);
         setLookState({ position: ability.position, count: n });
@@ -2212,7 +2227,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       logDeckSearchNoShuffle: ({ topCount, bottomCount }) =>
         gameState.logDeckSearchNoShuffle(topCount, bottomCount),
     },
-  }), [myCards, counters, gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack]);
+  }), [myCards, counters, gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, forgeResolver]);
 
   // ---- ModalGameProvider value for opponent deck modals (peek/search operate on opponent cards) ----
   const opponentModalGameValue = useMemo<ModalGameContextValue>(() => ({
