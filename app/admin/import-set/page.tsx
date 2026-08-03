@@ -101,6 +101,20 @@ function humanizeWarning(code: string): string {
   return code;
 }
 
+// Best-effort summary of what the import is about to do. Uses plannedAction
+// (computed before the run) rather than re-deriving server-side rescue
+// logic (e.g. a titleOverride rescuing a skip-existing row) — close enough
+// for a confirmation prompt, not a substitute for the results table.
+function confirmImportIntro(createCount: number, updateCount: number, includedCount: number): string {
+  if (createCount > 0 && updateCount > 0) {
+    return `You're about to create ${createCount} and update ${updateCount} products in the Your Turn Games Shopify store.`;
+  }
+  if (updateCount > 0 && createCount === 0) {
+    return `You're about to update ${updateCount} product${updateCount === 1 ? "" : "s"} in the Your Turn Games Shopify store.`;
+  }
+  return `You're about to create ${includedCount} product${includedCount === 1 ? "" : "s"} in the Your Turn Games Shopify store.`;
+}
+
 export default function AdminImportSetPage() {
   const router = useRouter();
   const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
@@ -117,6 +131,7 @@ export default function AdminImportSetPage() {
   const [active, setActive] = useState(false);
   const [defaultPrice, setDefaultPrice] = useState("");
   const [running, setRunning] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [results, setResults] = useState<ImportResultRow[] | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [dryRunMsg, setDryRunMsg] = useState("");
@@ -287,6 +302,17 @@ export default function AdminImportSetPage() {
   const finalBlankCount = plans.filter(
     (p) => rows[p.cardKey]?.include && !rows[p.cardKey].price.trim() && !defaultPrice.trim(),
   ).length;
+  const createCount = plans.filter((p) => rows[p.cardKey]?.include && p.plannedAction === "create").length;
+  const updateCount = plans.filter((p) => rows[p.cardKey]?.include && p.plannedAction === "update").length;
+
+  useEffect(() => {
+    if (!confirmOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !running) setConfirmOpen(false);
+    };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [confirmOpen, running]);
 
   const buildCardsPayload = () =>
     plans.map((p) => {
@@ -327,13 +353,9 @@ export default function AdminImportSetPage() {
     }
   };
 
-  const handleImport = async () => {
+  const runImport = async () => {
     const statusLabel = active ? "ACTIVE" : "DRAFT";
-    const confirmed = window.confirm(
-      `Import ${includedCount} cards as ${statusLabel}?\n${finalBlankCount} card(s) will have a blank price.`,
-    );
-    if (!confirmed) return;
-
+    setConfirmOpen(false);
     setRunning(true);
     setError("");
     setDryRunMsg("");
@@ -569,8 +591,8 @@ export default function AdminImportSetPage() {
                 <Button variant="outline" onClick={handleDryRun} disabled={running}>
                   Dry run
                 </Button>
-                <Button onClick={handleImport} disabled={running || includedCount === 0}>
-                  Import {includedCount} cards
+                <Button onClick={() => setConfirmOpen(true)} disabled={running || includedCount === 0}>
+                  Import {includedCount} card{includedCount === 1 ? "" : "s"}
                 </Button>
                 {running && <span className="text-sm text-muted-foreground">Working, please wait…</span>}
                 {dryRunMsg && <span className="text-sm text-muted-foreground">{dryRunMsg}</span>}
@@ -624,6 +646,42 @@ export default function AdminImportSetPage() {
           )}
         </div>
       </div>
+
+      {confirmOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget && !running) setConfirmOpen(false); }}
+        >
+          <div className="bg-card border rounded-lg shadow-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-3">Confirm import</h2>
+            <div className="space-y-2 mb-6">
+              <p className="text-sm">{confirmImportIntro(createCount, updateCount, includedCount)}</p>
+              {active ? (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  As ACTIVE — these go live in the store immediately.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  As Drafts — hidden from shoppers until published in Shopify.
+                </p>
+              )}
+              {finalBlankCount > 0 && (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  {finalBlankCount} of them {finalBlankCount === 1 ? "has" : "have"} no price and will import at $0.00.
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={running}>
+                Cancel
+              </Button>
+              <Button onClick={runImport} disabled={running}>
+                Import {includedCount} card{includedCount === 1 ? "" : "s"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
