@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { IconType } from "react-icons";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey, HiClipboardList } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey, HiClipboardList, HiShoppingCart } from "react-icons/hi";
 import { GiCrossedSwords, GiAnvil } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
@@ -301,6 +301,16 @@ const TopNav: React.FC = () => {
                         >
                           <HiDocumentText className="w-4 h-4" />
                           Manage Rulings
+                        </Link>
+                      )}
+                      {permissions.includes('manage_shopify_imports') && (
+                        <Link
+                          href="/admin/import-set"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiShoppingCart className="w-4 h-4" />
+                          YTG Imports
                         </Link>
                       )}
                       {isSuperuser && (
@@ -725,6 +735,16 @@ const TopNav: React.FC = () => {
                       >
                         <HiDocumentText className="w-4 h-4" />
                         Manage Rulings
+                      </Link>
+                    )}
+                    {permissions.includes('manage_shopify_imports') && (
+                      <Link
+                        href="/admin/import-set"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiShoppingCart className="w-4 h-4" />
+                        YTG Imports
                       </Link>
                     )}
                     {isSuperuser && (

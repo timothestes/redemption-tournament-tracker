@@ -69,7 +69,8 @@ function actionBadgeClass(action: CardPlan["plannedAction"] | ImportResultRow["a
 
 export default function AdminImportSetPage() {
   const router = useRouter();
-  const { isAdmin, loading: adminLoading } = useIsAdmin();
+  const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
+  const canImport = isAdmin && permissions.includes("manage_shopify_imports");
 
   const [sets, setSets] = useState<{ code: string; name: string; count: number }[]>([]);
   const [setCode, setSetCode] = useState("");
@@ -90,13 +91,13 @@ export default function AdminImportSetPage() {
   const fetchSeq = useRef(0);
 
   useEffect(() => {
-    if (!adminLoading && !isAdmin) {
+    if (!adminLoading && !canImport) {
       router.replace("/");
     }
-  }, [adminLoading, isAdmin, router]);
+  }, [adminLoading, canImport, router]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canImport) return;
     const loadSets = async () => {
       setLoadingSets(true);
       try {
@@ -111,7 +112,7 @@ export default function AdminImportSetPage() {
       }
     };
     loadSets();
-  }, [isAdmin]);
+  }, [canImport]);
 
   const handleSetChange = async (code: string) => {
     const seq = ++fetchSeq.current;
@@ -280,7 +281,7 @@ export default function AdminImportSetPage() {
     }
   };
 
-  if (adminLoading || !isAdmin) return null;
+  if (adminLoading || !canImport) return null;
 
   return (
     <div className="flex flex-col min-h-screen">
