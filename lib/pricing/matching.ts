@@ -49,7 +49,7 @@ export async function loadCardData(): Promise<CardRow[]> {
 /**
  * Load set aliases from Supabase.
  */
-async function loadSetAliases(): Promise<Map<string, string>> {
+export async function loadSetAliases(): Promise<Map<string, string>> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.from('set_aliases').select('*');
   if (error) throw new Error(`Failed to load set_aliases: ${error.message}`);
