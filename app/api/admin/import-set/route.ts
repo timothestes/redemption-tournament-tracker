@@ -10,7 +10,7 @@ export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   if (!(await hasPermission('manage_shopify_imports'))) {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    return NextResponse.json({ error: 'Shopify import permission required' }, { status: 403 });
   }
   try {
     const setCode = request.nextUrl.searchParams.get('set');
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   if (!(await hasPermission('manage_shopify_imports'))) {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    return NextResponse.json({ error: 'Shopify import permission required' }, { status: 403 });
   }
   try {
     const body = await request.json();

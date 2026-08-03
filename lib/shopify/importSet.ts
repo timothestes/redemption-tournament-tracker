@@ -329,6 +329,7 @@ export async function executeImport(
         includeMedia,
         includeVariants,
         includeDescription: !identifier,
+        trackInventory: !identifier,
       });
       const filesIncluded = built.input.files !== undefined;
 

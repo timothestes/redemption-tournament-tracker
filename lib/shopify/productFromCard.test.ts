@@ -185,6 +185,11 @@ describe('productFromCard', () => {
     expect(built.input.descriptionHtml).toBeUndefined();
   });
 
+  it('omits inventoryItem when trackInventory is false (update re-run)', () => {
+    const built = productFromCard(I_AM_HAS_SENT_ME, 'PoC', { ...opts, trackInventory: false });
+    expect(built.input.variants![0]).not.toHaveProperty('inventoryItem');
+  });
+
   it('omits descriptionHtml when specialAbility is empty', () => {
     const card: CardData = { ...ABUSIVE_SOLDIERS, specialAbility: '' };
     const built = productFromCard(card, 'GoC', opts);

@@ -11,7 +11,7 @@ export interface ShopifyProductSetInput {
   status: 'DRAFT' | 'ACTIVE';
   descriptionHtml?: string;
   productOptions?: { name: string; values: { name: string }[] }[];
-  variants?: { optionValues: { optionName: string; name: string }[]; price: string; sku: string; inventoryItem: { tracked: boolean } }[];
+  variants?: { optionValues: { optionName: string; name: string }[]; price: string; sku: string; inventoryItem?: { tracked: boolean } }[];
   files?: { originalSource: string; contentType: 'IMAGE'; alt: string }[];
   metafields?: { namespace: string; key: string; value: string; type: string }[];
 }
@@ -24,6 +24,7 @@ export interface ProductBuildOptions {
   includeMedia?: boolean;      // default true; false => omit files even if imageUrl set (update re-runs)
   includeVariants?: boolean;   // default true; false => omit variants + productOptions (blank-price updates leave live variant data untouched)
   includeDescription?: boolean; // default true; false => omit descriptionHtml even if specialAbility set (updates don't clobber store edits)
+  trackInventory?: boolean;    // default true; false on update re-runs — never toggle tracking on live products
 }
 
 export interface BuiltProduct {
@@ -118,6 +119,7 @@ export function productFromCard(card: CardData, ytgAbbrev: string | null, opts: 
   const includeVariants = opts.includeVariants !== false;
   if (includeVariants && opts.price === null) warnings.push('no-price');
   const price = opts.price ?? '0.00';
+  const trackInventory = opts.trackInventory !== false;
 
   // --- files / image ---
   if (opts.imageUrl === null) warnings.push('no-image');
@@ -141,7 +143,12 @@ export function productFromCard(card: CardData, ytgAbbrev: string | null, opts: 
     ...(descriptionHtml ? { descriptionHtml } : {}),
     ...(includeVariants ? {
       productOptions: [{ name: 'Title', values: [{ name: 'Default Title' }] }],
-      variants: [{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price, sku: cardSku(card), inventoryItem: { tracked: true } }],
+      variants: [{
+        optionValues: [{ optionName: 'Title', name: 'Default Title' }],
+        price,
+        sku: cardSku(card),
+        ...(trackInventory ? { inventoryItem: { tracked: true } } : {}),
+      }],
     } : {}),
     ...(files ? { files } : {}),
     metafields: [{ namespace: 'custom', key: 'rtt_card_key', value: cardKey, type: 'single_line_text_field' }],
