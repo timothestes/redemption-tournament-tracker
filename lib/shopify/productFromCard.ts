@@ -9,8 +9,9 @@ export interface ShopifyProductSetInput {
   vendor: string;
   tags: string[];
   status: 'DRAFT' | 'ACTIVE';
+  descriptionHtml?: string;
   productOptions?: { name: string; values: { name: string }[] }[];
-  variants?: { optionValues: { optionName: string; name: string }[]; price: string; sku: string }[];
+  variants?: { optionValues: { optionName: string; name: string }[]; price: string; sku: string; inventoryItem: { tracked: boolean } }[];
   files?: { originalSource: string; contentType: 'IMAGE'; alt: string }[];
   metafields?: { namespace: string; key: string; value: string; type: string }[];
 }
@@ -22,6 +23,7 @@ export interface ProductBuildOptions {
   titleOverride?: string;      // admin-entered title replaces the computed one verbatim
   includeMedia?: boolean;      // default true; false => omit files even if imageUrl set (update re-runs)
   includeVariants?: boolean;   // default true; false => omit variants + productOptions (blank-price updates leave live variant data untouched)
+  includeDescription?: boolean; // default true; false => omit descriptionHtml even if specialAbility set (updates don't clobber store edits)
 }
 
 export interface BuiltProduct {
@@ -56,6 +58,15 @@ export function cardSku(card: CardData): string {
 
 function normalizeRarity(rarity: string): string {
   return rarity === 'Ultra-Rare' ? 'Ultra Rare' : rarity;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export function productFromCard(card: CardData, ytgAbbrev: string | null, opts: ProductBuildOptions): BuiltProduct {
@@ -114,6 +125,12 @@ export function productFromCard(card: CardData, ytgAbbrev: string | null, opts: 
     ? [{ originalSource: opts.imageUrl, contentType: 'IMAGE' as const, alt: baseCardName(card.name) }]
     : undefined;
 
+  // --- description ---
+  const trimmedAbility = card.specialAbility.trim();
+  const descriptionHtml = opts.includeDescription !== false && trimmedAbility.length > 0
+    ? `<p>${escapeHtml(trimmedAbility)}</p>`
+    : undefined;
+
   const input: ShopifyProductSetInput = {
     title,
     handle,
@@ -121,9 +138,10 @@ export function productFromCard(card: CardData, ytgAbbrev: string | null, opts: 
     vendor: 'Your Turn Games',
     tags: Array.from(tags).sort(),
     status: opts.status,
+    ...(descriptionHtml ? { descriptionHtml } : {}),
     ...(includeVariants ? {
       productOptions: [{ name: 'Title', values: [{ name: 'Default Title' }] }],
-      variants: [{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price, sku: cardSku(card) }],
+      variants: [{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price, sku: cardSku(card), inventoryItem: { tracked: true } }],
     } : {}),
     ...(files ? { files } : {}),
     metafields: [{ namespace: 'custom', key: 'rtt_card_key', value: cardKey, type: 'single_line_text_field' }],

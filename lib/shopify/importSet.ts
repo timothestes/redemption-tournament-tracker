@@ -328,6 +328,7 @@ export async function executeImport(
         titleOverride: spec.titleOverride,
         includeMedia,
         includeVariants,
+        includeDescription: !identifier,
       });
       const filesIncluded = built.input.files !== undefined;
 

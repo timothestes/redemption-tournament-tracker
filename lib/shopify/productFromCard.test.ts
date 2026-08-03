@@ -108,7 +108,7 @@ describe('productFromCard', () => {
     expect(built.input.vendor).toBe('Your Turn Games');
     expect(built.input.status).toBe('DRAFT');
     expect(built.input.productOptions).toEqual([{ name: 'Title', values: [{ name: 'Default Title' }] }]);
-    expect(built.input.variants).toEqual([{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price: '0.75', sku: cardSku(I_AM_HAS_SENT_ME) }]);
+    expect(built.input.variants).toEqual([{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price: '0.75', sku: cardSku(I_AM_HAS_SENT_ME), inventoryItem: { tracked: true } }]);
     expect(built.input.files).toEqual([{ originalSource: opts.imageUrl, contentType: 'IMAGE', alt: 'I AM Has Sent Me' }]);
     expect(built.warnings).toEqual([]);
   });
@@ -167,5 +167,33 @@ describe('productFromCard', () => {
     const built = productFromCard(I_AM_HAS_SENT_ME, 'PoC', opts);
     expect(built.input.variants).toBeDefined();
     expect(built.input.productOptions).toBeDefined();
+  });
+
+  it('sets descriptionHtml from the special ability by default', () => {
+    const built = productFromCard(ABUSIVE_SOLDIERS, 'GoC', opts);
+    expect(built.input.descriptionHtml).toBe(`<p>${ABUSIVE_SOLDIERS.specialAbility}</p>`);
+  });
+
+  it('HTML-escapes the special ability in descriptionHtml', () => {
+    const card: CardData = { ...ABUSIVE_SOLDIERS, specialAbility: `A "Test" & <tag> isn't fine` };
+    const built = productFromCard(card, 'GoC', opts);
+    expect(built.input.descriptionHtml).toBe('<p>A &quot;Test&quot; &amp; &lt;tag&gt; isn&#39;t fine</p>');
+  });
+
+  it('omits descriptionHtml when includeDescription is false', () => {
+    const built = productFromCard(ABUSIVE_SOLDIERS, 'GoC', { ...opts, includeDescription: false });
+    expect(built.input.descriptionHtml).toBeUndefined();
+  });
+
+  it('omits descriptionHtml when specialAbility is empty', () => {
+    const card: CardData = { ...ABUSIVE_SOLDIERS, specialAbility: '' };
+    const built = productFromCard(card, 'GoC', opts);
+    expect(built.input.descriptionHtml).toBeUndefined();
+  });
+
+  it('omits descriptionHtml when specialAbility is whitespace-only', () => {
+    const card: CardData = { ...ABUSIVE_SOLDIERS, specialAbility: '   ' };
+    const built = productFromCard(card, 'GoC', opts);
+    expect(built.input.descriptionHtml).toBeUndefined();
   });
 });
