@@ -6,7 +6,7 @@ const INPUT: ShopifyProductSetInput = {
   title: 'Test Card (XX)', handle: 'test-card-xx', productType: 'Single',
   vendor: 'Your Turn Games', tags: ['Hero'], status: 'DRAFT',
   productOptions: [{ name: 'Title', values: [{ name: 'Default Title' }] }],
-  variants: [{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price: '1.00', sku: 'XX-test' }],
+  variants: [{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price: '1.00', sku: 'XX-test', inventoryItem: { tracked: true } }],
 };
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
