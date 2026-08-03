@@ -2,11 +2,11 @@
 
 import { createClient } from "../../../utils/supabase/server";
 import { revalidatePath } from "next/cache";
-import { requireRegistrationAdmin } from "../../../utils/adminUtils";
+import { requirePermission } from "../../../utils/adminUtils";
 
 export async function createGlobalTagAction(name: string, color: string) {
   try {
-    await requireRegistrationAdmin();
+    await requirePermission("manage_tags");
     const supabase = await createClient();
 
     const trimmed = name.trim();
@@ -34,7 +34,7 @@ export async function createGlobalTagAction(name: string, color: string) {
 
 export async function updateGlobalTagAction(id: string, name: string, color: string) {
   try {
-    await requireRegistrationAdmin();
+    await requirePermission("manage_tags");
     const supabase = await createClient();
 
     const trimmed = name.trim();
@@ -61,7 +61,7 @@ export async function updateGlobalTagAction(id: string, name: string, color: str
 
 export async function deleteGlobalTagAction(id: string) {
   try {
-    await requireRegistrationAdmin();
+    await requirePermission("manage_tags");
     const supabase = await createClient();
 
     const { error } = await supabase
@@ -81,7 +81,7 @@ export async function deleteGlobalTagAction(id: string) {
 
 export async function loadGlobalTagsAdminAction() {
   try {
-    await requireRegistrationAdmin();
+    await requirePermission("manage_tags");
     const supabase = await createClient();
 
     const { data, error } = await supabase
