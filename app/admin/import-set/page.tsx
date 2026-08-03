@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +67,40 @@ function actionBadgeClass(action: CardPlan["plannedAction"] | ImportResultRow["a
   }
 }
 
+function planStatusLabel(action: CardPlan["plannedAction"]): string {
+  switch (action) {
+    case "create":
+      return "New";
+    case "update":
+      return "Update existing";
+    case "skip-existing":
+      return "Already in store";
+  }
+}
+
+function resultStatusLabel(action: ImportResultRow["action"]): string {
+  switch (action) {
+    case "created":
+      return "Created";
+    case "updated":
+      return "Updated";
+    case "skipped":
+      return "Skipped";
+    case "error":
+      return "Error";
+  }
+}
+
+// Humanizes plan-time warning codes for display under the title.
+// ('no-price' never appears at plan time — filtered out in planCard.)
+function humanizeWarning(code: string): string {
+  if (code === "no-image") return "No card image — imports without an image";
+  if (code === "no-set-alias") return "No set alias — set code used in title";
+  if (code.startsWith("brigade-unmapped:")) return `Unmapped brigade: ${code.slice("brigade-unmapped:".length)}`;
+  if (code.startsWith("type-unmapped:")) return `Unmapped type: ${code.slice("type-unmapped:".length)}`;
+  return code;
+}
+
 export default function AdminImportSetPage() {
   const router = useRouter();
   const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
@@ -74,6 +108,10 @@ export default function AdminImportSetPage() {
 
   const [sets, setSets] = useState<{ code: string; name: string; count: number }[]>([]);
   const [setCode, setSetCode] = useState("");
+  const [setSearch, setSetSearch] = useState("");
+  const [setPickerOpen, setSetPickerOpen] = useState(false);
+  const [activeSetIndex, setActiveSetIndex] = useState(-1);
+  const setPickerRef = useRef<HTMLDivElement>(null);
   const [plans, setPlans] = useState<CardPlan[]>([]);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [active, setActive] = useState(false);
@@ -143,6 +181,47 @@ export default function AdminImportSetPage() {
       setError(err instanceof Error ? err.message : "Failed to load plans");
     } finally {
       if (seq === fetchSeq.current) setLoadingPlans(false);
+    }
+  };
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (setPickerRef.current && !setPickerRef.current.contains(e.target as Node)) {
+        setSetPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filteredSets = useMemo(() => {
+    const q = setSearch.trim().toLowerCase();
+    if (!q) return sets;
+    return sets.filter((s) => s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q));
+  }, [sets, setSearch]);
+
+  const handleSelectSet = (s: { code: string; name: string; count: number }) => {
+    setSetSearch(`${s.name} (${s.code})`);
+    setSetPickerOpen(false);
+    setActiveSetIndex(-1);
+    handleSetChange(s.code);
+  };
+
+  const handleSetPickerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!setPickerOpen) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveSetIndex((prev) => Math.min(prev + 1, filteredSets.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveSetIndex((prev) => Math.max(prev - 1, 0));
+    } else if (e.key === "Enter") {
+      if (activeSetIndex >= 0 && activeSetIndex < filteredSets.length) {
+        e.preventDefault();
+        handleSelectSet(filteredSets[activeSetIndex]);
+      }
+    } else if (e.key === "Escape") {
+      setSetPickerOpen(false);
     }
   };
 
@@ -300,20 +379,39 @@ export default function AdminImportSetPage() {
 
           <div className="mb-6 max-w-md">
             <Label htmlFor="set-picker">Set</Label>
-            <select
-              id="set-picker"
-              value={setCode}
-              onChange={(e) => handleSetChange(e.target.value)}
-              disabled={loadingSets || loadingPlans || running}
-              className="mt-1 flex h-10 w-full rounded-md border-2 border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">{loadingSets ? "Loading sets…" : "Select a set…"}</option>
-              {sets.map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.name} ({s.code}) — {s.count} cards
-                </option>
-              ))}
-            </select>
+            <div ref={setPickerRef} className="relative mt-1">
+              <Input
+                id="set-picker"
+                value={setSearch}
+                onChange={(e) => {
+                  setSetSearch(e.target.value);
+                  setActiveSetIndex(-1);
+                  setSetPickerOpen(true);
+                }}
+                onFocus={() => setSetPickerOpen(true)}
+                onKeyDown={handleSetPickerKeyDown}
+                placeholder="Search sets — e.g. Roots 2"
+                disabled={loadingSets || loadingPlans || running}
+                autoComplete="off"
+              />
+              {setPickerOpen && filteredSets.length > 0 && (
+                <div className="absolute mt-1 w-full bg-card border rounded-lg shadow-lg max-h-72 overflow-y-auto z-10">
+                  {filteredSets.map((s, i) => (
+                    <button
+                      key={s.code}
+                      type="button"
+                      onClick={() => handleSelectSet(s)}
+                      className={`w-full text-left px-3 py-2 ${i === activeSetIndex ? "bg-muted" : ""}`}
+                    >
+                      <div className="text-sm">
+                        {s.name} ({s.code})
+                      </div>
+                      <div className="text-xs text-muted-foreground">{s.count} cards</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {loadingPlans && <p className="text-muted-foreground mb-6">Loading cards…</p>}
@@ -349,15 +447,30 @@ export default function AdminImportSetPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 mb-6">
-                <input
-                  id="active-toggle"
-                  type="checkbox"
-                  checked={active}
-                  onChange={(e) => setActive(e.target.checked)}
-                  className="w-4 h-4"
-                />
-                <Label htmlFor="active-toggle">Publish as ACTIVE immediately (default: DRAFT)</Label>
+              <div className="mb-6">
+                <div className="text-sm font-medium mb-2">Import as:</div>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="publish-status"
+                      checked={!active}
+                      onChange={() => setActive(false)}
+                      className="w-4 h-4"
+                    />
+                    Draft — hidden until published in Shopify
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="publish-status"
+                      checked={active}
+                      onChange={() => setActive(true)}
+                      className="w-4 h-4"
+                    />
+                    Active — live in the store immediately
+                  </label>
+                </div>
               </div>
 
               <div className="bg-card border rounded-lg overflow-hidden mb-6">
@@ -365,13 +478,12 @@ export default function AdminImportSetPage() {
                   <table className="w-full">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold"></th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Import</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Image</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Card</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold">Title</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Shopify listing</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Tags</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold">Action</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold">Warnings</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold">Price</th>
                       </tr>
                     </thead>
@@ -386,6 +498,7 @@ export default function AdminImportSetPage() {
                                 type="checkbox"
                                 checked={row.include}
                                 onChange={(e) => updateRow(plan.cardKey, { include: e.target.checked })}
+                                aria-label={`Import ${plan.cardName}`}
                                 className="w-4 h-4"
                               />
                             </td>
@@ -405,29 +518,31 @@ export default function AdminImportSetPage() {
                             </td>
                             <td className="px-4 py-3 text-sm">{plan.cardName}</td>
                             <td className="px-4 py-3">
-                              <div className="text-sm text-muted-foreground mb-1">{plan.title}</div>
+                              <div className="text-sm mb-1">{plan.title}</div>
                               <Input
                                 value={row.titleOverride}
                                 onChange={(e) => updateRow(plan.cardKey, { titleOverride: e.target.value })}
-                                placeholder={plan.title}
+                                placeholder="Override title (optional)"
+                                aria-label={`Title override for ${plan.cardName}`}
                                 className="h-8 text-xs"
                               />
+                              {plan.warnings.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                  {plan.warnings.map((w) => (
+                                    <div key={w} className="text-xs text-amber-600 dark:text-amber-400">
+                                      {humanizeWarning(w)}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">{plan.tags.join(", ")}</td>
                             <td className="px-4 py-3">
                               <span
                                 className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${actionBadgeClass(plan.plannedAction)}`}
                               >
-                                {plan.plannedAction}
+                                {planStatusLabel(plan.plannedAction)}
                               </span>
-                              {plan.plannedAction === "skip-existing" && (
-                                <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-400">
-                                  exists in store
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-amber-600 dark:text-amber-400">
-                              {plan.warnings.join(", ")}
                             </td>
                             <td className="px-4 py-3">
                               <Input
@@ -435,6 +550,7 @@ export default function AdminImportSetPage() {
                                 value={row.price}
                                 onChange={(e) => handlePriceChange(plan.cardKey, e.target.value)}
                                 placeholder="0.00"
+                                aria-label={`Price for ${plan.cardName}`}
                                 className="h-8 w-20 text-xs"
                               />
                               {!row.price.trim() && (
@@ -494,7 +610,7 @@ export default function AdminImportSetPage() {
                           <span
                             className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${actionBadgeClass(r.action)}`}
                           >
-                            {r.action}
+                            {resultStatusLabel(r.action)}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-sm text-muted-foreground">{r.productId ?? "—"}</td>
