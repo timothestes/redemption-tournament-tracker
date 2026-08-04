@@ -203,6 +203,35 @@ describe("fixture: fiery-furnace.html (live store description)", () => {
 describe("fixture: daniel-contender.html (live store description)", () => {
   const lines = parseDeckContents(fixture("daniel-contender.html"), ALIASES);
 
+  it("auto-drops intro junk before the first section header", () => {
+    for (const raw of [
+      "And check out these videos to find out more about this deck!",
+      "Deck overview and intro",
+      "Live online Local tournament gameplay using budget-free version of the deck",
+    ]) {
+      expect(lines.some((l) => l.raw === raw)).toBe(false);
+    }
+    // Scope guard: prose AFTER the first section header is not auto-dropped —
+    // the review screen's explicit resolve-or-drop gate still owns those.
+    expect(byRaw(lines, "Deck strategy and tips:").status).toBe("unresolved");
+    expect(byRaw(lines, "OVERVIEW:").status).toBe("unresolved");
+  });
+  it("keeps pre-section lines that resolve as cards; no headers → nothing dropped", () => {
+    // Card line before any section header must survive the prose drop.
+    const withHeader = parseDeckContents(
+      "<p>Told to Take (TtC)</p><p>Some intro chatter here</p><p>Dominants</p><p>Son of God (K)</p>",
+      ALIASES,
+    );
+    expect(withHeader.map((l) => l.raw)).toEqual(["Told to Take (TtC)", "Son of God (K)"]);
+    expect(withHeader[0].status).toBe("resolved");
+    // Defensive: descriptions with no section headers at all drop nothing.
+    const headerless = parseDeckContents(
+      "<p>Some intro chatter here</p><p>Told to Take (TtC)</p>", ALIASES);
+    expect(headerless.map((l) => l.raw)).toEqual(
+      ["Some intro chatter here", "Told to Take (TtC)"]);
+    expect(headerless[0].status).toBe("unresolved");
+  });
+
   it("'Son of God (K Deck)' → ambiguous across K and K1P (both contain it)", () => {
     const l = byRaw(lines, "Son of God (K Deck)");
     expect(l.status).toBe("ambiguous");

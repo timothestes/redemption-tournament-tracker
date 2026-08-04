@@ -262,8 +262,12 @@ export function parseDeckContents(
   const idx = cardIndex();
   const out: ParsedLine[] = [];
   let section: string | null = null;
+  const lines = htmlToLines(bodyHtml);
+  // Pre-section prose drop only applies when the description actually has
+  // section headers; otherwise everything is "before the first section".
+  const hasSections = lines.some((l) => sectionHeader(l) !== null);
 
-  for (const line of htmlToLines(bodyHtml)) {
+  for (const line of lines) {
     const header = sectionHeader(line);
     if (header) { section = header; continue; }
     // Prose/flavor-text heuristic: long sentence with no trailing paren.
@@ -271,7 +275,13 @@ export function parseDeckContents(
     if (!/[a-zA-Z]/.test(line)) continue;
 
     const { qty, rest } = parseQty(line);
-    out.push({ raw: line, qty, section, ...resolveLine(rest, aliasCandidates, idx) });
+    const res = resolveLine(rest, aliasCandidates, idx);
+    // Intro junk ("And check out these videos…") sits before the first
+    // section header; anything there that doesn't look like a card is
+    // dropped outright — same consumption semantics as the prose heuristic.
+    // Lines that DO resolve (or are ambiguous) as cards are kept.
+    if (hasSections && section === null && res.candidates.length === 0) continue;
+    out.push({ raw: line, qty, section, ...res });
   }
   return out;
 }
