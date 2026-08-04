@@ -75,6 +75,28 @@ export function sectionHeader(line: string): string | null {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Post-decklist cutoff                                               */
+/* ------------------------------------------------------------------ */
+
+/** Headings that start the post-decklist tail in Andy's descriptions
+ *  ("Deck strategy and tips:", "Deck tips and strategies:", "YTG
+ *  recommends the below cards…", "OVERVIEW", "THE OFFENSE", "THE
+ *  DEFENSE"). Everything from the first marker on is strategy prose and
+ *  per-line HYPERLINKED card names that resolve as real cards — without a
+ *  hard stop those become phantom deck entries (audit: 525 resolving tail
+ *  lines across 71 of 93 decks). Prefix match, case-insensitive; trailing
+ *  colons/formatting tolerated. */
+const CUTOFF_PREFIXES = [
+  "deck strategy", "deck tips", "ytg recommends",
+  "overview", "the offense", "the defense",
+];
+
+export function isDecklistCutoff(line: string): boolean {
+  const t = normalize(line);
+  return CUTOFF_PREFIXES.some((p) => t.startsWith(p));
+}
+
+/* ------------------------------------------------------------------ */
 /*  Alias candidates                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -419,6 +441,11 @@ export function parseDeckContents(
   const hasSections = lines.some((l) => sectionHeader(l) !== null);
 
   for (const line of lines) {
+    // HARD STOP at the first post-decklist marker: the tail's hyperlinked
+    // card names resolve as real cards and would silently corrupt the deck.
+    // Gated on being inside the decklist (section seen) so an intro line
+    // that happens to start with a marker word can't wipe the whole parse.
+    if (section !== null && isDecklistCutoff(line)) break;
     const header = sectionHeader(line);
     if (header) { section = header; continue; }
     // Prose/flavor-text heuristic: long sentence with no trailing paren.

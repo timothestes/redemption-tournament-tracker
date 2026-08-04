@@ -210,13 +210,34 @@ describe("fixture: fiery-furnace.html (live store description)", () => {
 describe("fixture: daniel-contender.html (live store description)", () => {
   const lines = parseDeckContents(fixture("daniel-contender.html"), ALIASES);
 
-  it("resolution summary: 83 lines — 75 resolved, 2 ambiguous, 6 unresolved", () => {
-    // Was 86 lines with 68/1/17 before scripture matching, or-option parens
-    // and the pre-section prose drop.
-    expect(lines).toHaveLength(83);
+  it("resolution summary: 60 lines — 58 resolved, 2 ambiguous, 0 unresolved", () => {
+    // Was 86 lines with 68/1/17 before scripture matching, or-option parens,
+    // the pre-section prose drop and the post-decklist cutoff. 60 is the
+    // real physical deck (50 main + 10 Reserve section lines).
+    expect(lines).toHaveLength(60);
     const counts = { resolved: 0, ambiguous: 0, unresolved: 0 };
     for (const l of lines) counts[l.status]++;
-    expect(counts).toEqual({ resolved: 75, ambiguous: 2, unresolved: 6 });
+    expect(counts).toEqual({ resolved: 58, ambiguous: 2, unresolved: 0 });
+  });
+  it("hard-stops at 'Deck strategy and tips:' — tail card links never become deck lines", () => {
+    // The tail's recommended-cards section is per-line hyperlinked REAL card
+    // names; without the cutoff they'd resolve and silently join the deck.
+    expect(lines[lines.length - 1].raw).toBe("Servants of the King (River) (TtC)");
+    for (const raw of [
+      "Deck strategy and tips:", "OVERVIEW:", "THE OFFENSE:", "THE DEFENSE:",
+      "Michael, the Guardian (TtC)",           // recommended-cards tail, resolves
+      "Lost Soul (Job 30:26) “Darkness” (RoJ)", // ditto
+      "Raiders' Camp (2025 Promo)",
+    ]) {
+      expect(lines.some((l) => l.raw === raw)).toBe(false);
+    }
+  });
+  it("cutoff only arms after the first section header (intro lines can't wipe the parse)", () => {
+    const parsed = parseDeckContents(
+      "<p>Overview video linked below!</p><p>Dominants</p><p>Son of God (K)</p><p>THE OFFENSE:</p><p>Told to Take (TtC)</p>",
+      ALIASES,
+    );
+    expect(parsed.map((l) => l.raw)).toEqual(["Son of God (K)"]);
   });
   it("auto-drops intro junk before the first section header", () => {
     for (const raw of [
@@ -226,10 +247,6 @@ describe("fixture: daniel-contender.html (live store description)", () => {
     ]) {
       expect(lines.some((l) => l.raw === raw)).toBe(false);
     }
-    // Scope guard: prose AFTER the first section header is not auto-dropped —
-    // the review screen's explicit resolve-or-drop gate still owns those.
-    expect(byRaw(lines, "Deck strategy and tips:").status).toBe("unresolved");
-    expect(byRaw(lines, "OVERVIEW:").status).toBe("unresolved");
   });
   it("keeps pre-section lines that resolve as cards; no headers → nothing dropped", () => {
     // Card line before any section header must survive the prose drop.
@@ -266,7 +283,9 @@ describe("fixture: daniel-contender.html (live store description)", () => {
     ]);
   });
   it("or-split leaves non-option parens alone ('2025 Promo' has no delimiter)", () => {
-    expect(byRaw(lines, "Raiders' Camp (2025 Promo)").status).toBe("unresolved");
+    // Synthetic since the fixture's occurrence sits in the cut-off tail.
+    const [l] = parseDeckContents("<p>Raiders' Camp (2025 Promo)</p>", ALIASES);
+    expect(l.status).toBe("unresolved");
   });
   it("folds doubled straight quotes to match carddata curly-quote names", () => {
     const l = byRaw(lines, "Lost Soul ''Idolaters'' [Daniel 3:7] (TtC)");
@@ -295,14 +314,17 @@ describe("fixture: daniel-contender.html (live store description)", () => {
       'Lost Soul "Foreigner" [Jeremiah 22:3]|PoC|128-Lost-Soul-Foreigner-(Jeremiah-22_3)');
   });
   it("handles multi-ref verses and rarity-suffixed brackets in carddata names", () => {
+    // Synthetic (these store shapes sat in the now-cut-off recommended tail).
     // Line "(James 4:6/Proverbs 3:34)" vs carddata "[James 4:6 / Proverbs 3:34 - RoJ]".
-    const humble = byRaw(lines, "Lost Soul (James 4:6/Proverbs 3:34) “Humble” (RoJ)");
+    const [humble, cg] = parseDeckContents(
+      "<p>Lost Soul (James 4:6/Proverbs 3:34) “Humble” (RoJ)<br>Lost Soul ''Color Guard'' (Jeremiah 13:10) (Roots)</p>",
+      ALIASES,
+    );
     expect(humble.status).toBe("resolved");
     expect(humble.candidates[0].cardKey).toBe(
       'Lost Soul "Humble" [James 4:6 / Proverbs 3:34 - RoJ]|RoJ|22-Lost-Soul-Humble-R');
     // Line "(Jeremiah 13:10)" vs carddata "[Jeremiah 13:10 - RR]" — set-scoped
     // to RR via Roots, so the Pri print with the same verse is not a candidate.
-    const cg = byRaw(lines, "Lost Soul ''Color Guard'' (Jeremiah 13:10) (Roots)");
     expect(cg.status).toBe("resolved");
     expect(cg.candidates[0].cardKey).toBe(
       'Lost Soul "Color Guard" [Jeremiah 13:10 - RR]|RR|016-Lost-Soul-Color-Guard');
@@ -328,8 +350,5 @@ describe("fixture: daniel-contender.html (live store description)", () => {
   it("attributes sections through 'Fortresses/Sites/Cities' and drops strategy prose", () => {
     expect(byRaw(lines, "Babylon (TtC)").section).toBe("Fortresses/Sites/Cities");
     expect(lines.some((l) => l.raw.includes("Banding is a central component"))).toBe(false);
-    // Known noise: the recommended-cards tail parses as real lines; the
-    // review screen's explicit resolve-or-drop gate is the mitigation.
-    expect(lines.some((l) => l.raw === "Michael, the Guardian (TtC)")).toBe(true);
   });
 });
