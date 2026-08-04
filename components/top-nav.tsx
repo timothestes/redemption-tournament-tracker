@@ -305,12 +305,12 @@ const TopNav: React.FC = () => {
                       )}
                       {permissions.includes('manage_shopify_imports') && (
                         <Link
-                          href="/admin/import-set"
+                          href="/admin/ytg"
                           onClick={() => setIsAdminOpen(false)}
                           className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
                         >
                           <HiShoppingCart className="w-4 h-4" />
-                          YTG Imports
+                          YTG Store
                         </Link>
                       )}
                       {isSuperuser && (
@@ -739,12 +739,12 @@ const TopNav: React.FC = () => {
                     )}
                     {permissions.includes('manage_shopify_imports') && (
                       <Link
-                        href="/admin/import-set"
+                        href="/admin/ytg"
                         onClick={closeMobileMenu}
                         className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                       >
                         <HiShoppingCart className="w-4 h-4" />
-                        YTG Imports
+                        YTG Store
                       </Link>
                     )}
                     {isSuperuser && (

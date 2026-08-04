@@ -41,6 +41,7 @@ interface ShopifyAPIProduct {
   handle: string;
   tags: string;
   product_type: string;
+  body_html: string | null;
   variants: {
     id: number | string;
     title: string;
