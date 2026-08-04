@@ -18,7 +18,9 @@ export async function GET() {
         handle,
         tags,
         price,
-        inventory_quantity
+        inventory_quantity,
+        body_html,
+        sku
       )
     `)
     .eq('status', 'needs_review')
