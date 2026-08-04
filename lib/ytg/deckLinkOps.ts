@@ -5,6 +5,7 @@
  * decks/deck_cards and the decks belong to YTG_ACCOUNT_USER_ID.
  */
 import { YTG_ACCOUNT_USER_ID } from "./constants";
+import type { DeckZone } from "./deckZones";
 
 export interface ResolvedEntry {
   cardKey: string;   // `${name}|${set}|${imgFile}`
@@ -12,6 +13,9 @@ export interface ResolvedEntry {
   setCode: string;
   imgFile: string;   // raw carddata imgFile
   qty: number;
+  // Derived by the wizard from the parsed line's section (Reserve section →
+  // 'reserve', else 'main' — see lib/ytg/deckZones.ts); ops trust it.
+  zone: DeckZone;
 }
 
 export type CreateDeckResult =
@@ -20,7 +24,7 @@ export type CreateDeckResult =
   | { success: false; conflict?: false; error: string };
 
 export type ReplaceResult =
-  | { success: true; deckId: string; cardCount: number }
+  | { success: true; deckId: string; cardCount: number } // cardCount = main-zone qty (matches decks.card_count)
   | { success: false; error: string };
 
 // Canonical format id — 'T1' is legacy (migration 081 retired it;
@@ -31,21 +35,26 @@ export function cleanDeckName(title: string): string {
   return title.replace(/^\*New\*\s*/i, "").trim();
 }
 
+// Entries cross the client→server boundary; anything that isn't exactly
+// 'reserve' lands in 'main' so the deck_cards CHECK can never reject a row.
+const zoneOf = (r: ResolvedEntry): DeckZone => (r.zone === "reserve" ? "reserve" : "main");
+
 function mergeRows(deckId: string, resolved: ResolvedEntry[]) {
   // deck_cards is UNIQUE (deck_id, card_name, card_set, zone); the same card
-  // can appear in two description sections (e.g. Heroes AND Reserve) and
-  // everything lands in zone 'main' (spec) — so duplicates must be summed.
+  // can repeat within a zone (e.g. two Heroes-section lines) — summed — while
+  // a card in both Heroes AND Reserve keeps one row per zone.
   const byKey = new Map<string, {
     deck_id: string; card_name: string; card_set: string;
-    card_img_file: string; quantity: number; zone: "main";
+    card_img_file: string; quantity: number; zone: DeckZone;
   }>();
   for (const r of resolved) {
-    const k = `${r.cardName}|${r.setCode}`;
+    const zone = zoneOf(r);
+    const k = `${r.cardName}|${r.setCode}|${zone}`;
     const prev = byKey.get(k);
     if (prev) prev.quantity += r.qty;
     else byKey.set(k, {
       deck_id: deckId, card_name: r.cardName, card_set: r.setCode,
-      card_img_file: r.imgFile, quantity: r.qty, zone: "main",
+      card_img_file: r.imgFile, quantity: r.qty, zone,
     });
   }
   return [...byKey.values()];
@@ -77,7 +86,10 @@ export async function createDeckLinkedOp(admin: any, args: {
   if (nameHit && nameHit.length > 0) deckName = `${deckName} — ${handle}`;
 
   const deckId = crypto.randomUUID();
-  const totalQty = resolved.reduce((s, r) => s + r.qty, 0);
+  // card_count is MAIN-only app-wide (app/decklist/actions.ts convention);
+  // previews likewise come from main-zone entries.
+  const mains = resolved.filter((r) => zoneOf(r) === "main");
+  const mainQty = mains.reduce((s, r) => s + r.qty, 0);
 
   // (3) Insert the deck. True link-first (per the spec's wording) is
   // impossible: links.deck_id is NOT NULL REFERENCES decks(id). The link
@@ -90,9 +102,9 @@ export async function createDeckLinkedOp(admin: any, args: {
     description: `Contents of the YTG product "${productTitle}" — source of truth for store inventory.`,
     format: DECK_FORMAT,
     visibility: "public",
-    card_count: totalQty,
-    preview_card_1: resolved[0]?.imgFile ?? null,
-    preview_card_2: resolved[1]?.imgFile ?? null,
+    card_count: mainQty,
+    preview_card_1: mains[0]?.imgFile ?? null,
+    preview_card_2: mains[1]?.imgFile ?? null,
   });
   if (deckErr) return { success: false, error: `deck insert failed: ${deckErr.message}` };
 
@@ -117,7 +129,7 @@ export async function createDeckLinkedOp(admin: any, args: {
     return { success: false, conflict: true, existingDeckId: winner ? winner.deck_id : null, error: conflictMsg };
   }
 
-  // (5) Bulk insert contents — zone 'main' only, raw carddata img files.
+  // (5) Bulk insert contents — per-entry zone (main/reserve), raw carddata img files.
   const { error: cardsErr } = await admin.from("deck_cards").insert(mergeRows(deckId, resolved));
   if (cardsErr) {
     // Compensate: link first (frees ON DELETE RESTRICT), then the deck.
@@ -163,16 +175,18 @@ export async function replaceDeckContentsOp(admin: any, args: {
     return { success: false, error: `re-insert failed — deck is now empty, re-run the wizard: ${insErr.message}` };
   }
 
-  const totalQty = resolved.reduce((s, r) => s + r.qty, 0);
+  // MAIN-only count + previews, same convention as create.
+  const mains = resolved.filter((r) => zoneOf(r) === "main");
+  const mainQty = mains.reduce((s, r) => s + r.qty, 0);
   const { error: updErr } = await admin.from("decks").update({
-    card_count: totalQty,
-    preview_card_1: resolved[0]?.imgFile ?? null,
-    preview_card_2: resolved[1]?.imgFile ?? null,
+    card_count: mainQty,
+    preview_card_1: mains[0]?.imgFile ?? null,
+    preview_card_2: mains[1]?.imgFile ?? null,
     // updated_at is maintained by the decks BEFORE UPDATE trigger (001).
   }).eq("id", deckId);
   if (updErr) return { success: false, error: updErr.message };
 
-  return { success: true, deckId, cardCount: totalQty };
+  return { success: true, deckId, cardCount: mainQty };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

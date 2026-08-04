@@ -10,12 +10,14 @@ import {
 import type { DeckProductMeta } from "../actions";
 import type { ParsedLine, ParsedCandidate } from "@/lib/ytg/deckContentsParser";
 import type { ResolvedEntry } from "@/lib/ytg/deckLinkOps";
+import { sectionZone, type DeckZone } from "@/lib/ytg/deckZones";
 import CardPickerInline, { type PickedCard } from "./CardPickerInline";
 
 const imgFileFromCardKey = (cardKey: string) => cardKey.split("|")[2] ?? "";
 
 interface RowState {
   line: ParsedLine;
+  zone: DeckZone;    // derived from the parsed section — not user-editable (v1)
   chosen: PickedCard | null;
   qty: number;
   dropped: boolean;
@@ -24,6 +26,7 @@ interface RowState {
 function toRows(lines: ParsedLine[]): RowState[] {
   return lines.map((line) => ({
     line,
+    zone: sectionZone(line.section),
     chosen:
       line.status === "resolved"
         ? {
@@ -36,6 +39,11 @@ function toRows(lines: ParsedLine[]): RowState[] {
     qty: line.qty,
     dropped: false,
   }));
+}
+
+/** "50 main + 10 reserve", or just "50 cards" when there is no Reserve section. */
+function countLabel(main: number, reserve: number): string {
+  return reserve > 0 ? `${main} main + ${reserve} reserve` : `${main} cards`;
 }
 
 export default function ContentsWizard({
@@ -56,13 +64,16 @@ export default function ContentsWizard({
 
   const counts = useMemo(() => {
     const active = rows.filter((r) => !r.dropped);
+    const qtyIn = (zone: DeckZone) =>
+      active.reduce((s, r) => s + (r.chosen && r.zone === zone ? r.qty : 0), 0);
     return {
       total: rows.length,
       resolved: active.filter((r) => r.chosen !== null).length,
       ambiguous: active.filter((r) => r.chosen === null && r.line.status === "ambiguous").length,
       unresolved: active.filter((r) => r.chosen === null && r.line.status !== "ambiguous").length,
       dropped: rows.filter((r) => r.dropped).length,
-      qtyTotal: active.reduce((s, r) => s + (r.chosen ? r.qty : 0), 0),
+      qtyMain: qtyIn("main"),
+      qtyReserve: qtyIn("reserve"),
     };
   }, [rows]);
 
@@ -71,6 +82,110 @@ export default function ContentsWizard({
 
   const patch = (i: number, p: Partial<RowState>) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...p } : r)));
+
+  // Partition for grouped rendering; indices stay row-state indices so
+  // patch(i, …) keeps working from either group.
+  const indexed = rows.map((r, i) => [r, i] as const);
+  const mainRows = indexed.filter(([r]) => r.zone === "main");
+  const reserveRows = indexed.filter(([r]) => r.zone === "reserve");
+
+  const renderRow = (r: RowState, i: number) => (
+    <div key={i} className={`px-3 py-2 ${r.dropped ? "opacity-40" : ""}`}>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-full sm:w-64 shrink-0">
+          <div className="text-xs text-muted-foreground font-mono truncate" title={r.line.raw}>
+            {r.line.raw}
+          </div>
+          {r.line.section && (
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+              {r.line.section}
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          {r.chosen !== null ? (
+            <div className="flex items-center gap-2">
+              <img src={getCardImageUrl(r.chosen.imgFile)} alt="" className="w-7 h-10 rounded-sm object-cover" />
+              <span className="truncate text-sm">{r.chosen.cardName}</span>
+              <span className="text-xs text-muted-foreground">{r.chosen.setCode}</span>
+              {!r.dropped && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline"
+                  onClick={() => patch(i, { chosen: null })}
+                >
+                  change
+                </button>
+              )}
+            </div>
+          ) : r.dropped ? (
+            <span className="text-sm text-muted-foreground">dropped</span>
+          ) : (
+            <div className="space-y-1">
+              {r.line.candidates.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {r.line.candidates.map((c: ParsedCandidate) => (
+                    <button
+                      key={c.cardKey}
+                      type="button"
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted hover:bg-muted/70 text-xs"
+                      onClick={() =>
+                        patch(i, {
+                          chosen: {
+                            cardKey: c.cardKey, cardName: c.cardName,
+                            setCode: c.setCode, imgFile: imgFileFromCardKey(c.cardKey),
+                          },
+                        })
+                      }
+                    >
+                      <img src={getCardImageUrl(imgFileFromCardKey(c.cardKey))} alt="" className="w-5 h-7 rounded-sm object-cover" />
+                      {c.cardName} <span className="text-muted-foreground">({c.setCode})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <CardPickerInline
+                preferredSets={[...new Set(r.line.candidates.map((c) => c.setCode))]}
+                initialQuery={r.line.name}
+                onPick={(card) => patch(i, { chosen: card })}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className={`px-1.5 py-0.5 rounded text-xs ${
+              r.dropped
+                ? "bg-muted text-muted-foreground"
+                : r.chosen !== null
+                  ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300"
+                  : r.line.status === "ambiguous"
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                    : "bg-destructive/10 text-destructive"
+            }`}
+          >
+            {r.dropped ? "dropped" : r.chosen !== null ? "resolved" : r.line.status}
+          </span>
+          <div className="flex items-center rounded bg-muted">
+            <button type="button" className="px-2 py-0.5 text-sm" disabled={r.dropped || r.qty <= 1}
+              onClick={() => patch(i, { qty: Math.max(1, r.qty - 1) })}>−</button>
+            <span className="px-1 text-sm tabular-nums">{r.qty}</span>
+            <button type="button" className="px-2 py-0.5 text-sm" disabled={r.dropped}
+              onClick={() => patch(i, { qty: r.qty + 1 })}>+</button>
+          </div>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground underline"
+            onClick={() => patch(i, { dropped: !r.dropped })}
+          >
+            {r.dropped ? "restore" : "drop"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   const submit = () => {
     const resolved: ResolvedEntry[] = rows
@@ -81,6 +196,7 @@ export default function ContentsWizard({
         setCode: r.chosen!.setCode,
         imgFile: r.chosen!.imgFile,
         qty: r.qty,
+        zone: r.zone,
       }));
     startTransition(async () => {
       setError("");
@@ -116,7 +232,8 @@ export default function ContentsWizard({
           {replaceMode ? "Contents replaced" : "Deck created"} — {done.deckName}
         </h2>
         <p className="text-sm text-muted-foreground">
-          This deck is now the source of truth for &ldquo;{product.title}&rdquo;.
+          {countLabel(counts.qtyMain, counts.qtyReserve)} imported. This deck is now the
+          source of truth for &ldquo;{product.title}&rdquo;.
         </p>
         <div className="flex gap-3">
           <Link href={`/decklist/${done.deckId}`}><Button>View public deck</Button></Link>
@@ -154,8 +271,8 @@ export default function ContentsWizard({
 
       {replaceMode && (
         <div className="px-4 py-2 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 text-sm">
-          Replace mode: deck currently has {linked!.currentCardCount} cards; this parse
-          resolves {counts.qtyTotal}. Replacing rewrites the deck&apos;s contents.
+          Replace mode: deck currently has {linked!.currentCardCount} cards (all zones); this parse
+          resolves {countLabel(counts.qtyMain, counts.qtyReserve)}. Replacing rewrites the deck&apos;s contents.
           {" "}<Link className="underline" href={`/decklist/${linked!.deckId}`}>View current deck</Link>
         </div>
       )}
@@ -179,114 +296,38 @@ export default function ContentsWizard({
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur px-1 py-2 text-sm">
         <span className="font-medium">{counts.resolved} of {counts.total} resolved</span>
         <span className="text-muted-foreground">
-          {" "}· {counts.ambiguous} ambiguous · {counts.unresolved} unresolved · {counts.dropped} dropped · {counts.qtyTotal} cards total
+          {" "}· {counts.ambiguous} ambiguous · {counts.unresolved} unresolved · {counts.dropped} dropped · {countLabel(counts.qtyMain, counts.qtyReserve)}
         </span>
       </div>
 
-      {/* Review table */}
+      {/* Review table — Main section(s) first, then the Reserve group. Zone is
+          not editable: it follows the parsed section (mis-sectioned card → drop
+          here, add manually in the deck builder later). */}
+      {reserveRows.length > 0 && (
+        <div className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Main deck <span className="font-normal normal-case">· {counts.qtyMain} cards</span>
+        </div>
+      )}
       <div className="rounded-lg bg-muted/30 divide-y divide-background">
-        {rows.map((r, i) => (
-          <div key={i} className={`px-3 py-2 ${r.dropped ? "opacity-40" : ""}`}>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="w-full sm:w-64 shrink-0">
-                <div className="text-xs text-muted-foreground font-mono truncate" title={r.line.raw}>
-                  {r.line.raw}
-                </div>
-                {r.line.section && (
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                    {r.line.section}
-                  </div>
-                )}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                {r.chosen !== null ? (
-                  <div className="flex items-center gap-2">
-                    <img src={getCardImageUrl(r.chosen.imgFile)} alt="" className="w-7 h-10 rounded-sm object-cover" />
-                    <span className="truncate text-sm">{r.chosen.cardName}</span>
-                    <span className="text-xs text-muted-foreground">{r.chosen.setCode}</span>
-                    {!r.dropped && (
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground underline"
-                        onClick={() => patch(i, { chosen: null })}
-                      >
-                        change
-                      </button>
-                    )}
-                  </div>
-                ) : r.dropped ? (
-                  <span className="text-sm text-muted-foreground">dropped</span>
-                ) : (
-                  <div className="space-y-1">
-                    {r.line.candidates.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {r.line.candidates.map((c: ParsedCandidate) => (
-                          <button
-                            key={c.cardKey}
-                            type="button"
-                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted hover:bg-muted/70 text-xs"
-                            onClick={() =>
-                              patch(i, {
-                                chosen: {
-                                  cardKey: c.cardKey, cardName: c.cardName,
-                                  setCode: c.setCode, imgFile: imgFileFromCardKey(c.cardKey),
-                                },
-                              })
-                            }
-                          >
-                            <img src={getCardImageUrl(imgFileFromCardKey(c.cardKey))} alt="" className="w-5 h-7 rounded-sm object-cover" />
-                            {c.cardName} <span className="text-muted-foreground">({c.setCode})</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <CardPickerInline
-                      preferredSets={[...new Set(r.line.candidates.map((c) => c.setCode))]}
-                      initialQuery={r.line.name}
-                      onPick={(card) => patch(i, { chosen: card })}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <span
-                  className={`px-1.5 py-0.5 rounded text-xs ${
-                    r.dropped
-                      ? "bg-muted text-muted-foreground"
-                      : r.chosen !== null
-                        ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300"
-                        : r.line.status === "ambiguous"
-                          ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                          : "bg-destructive/10 text-destructive"
-                  }`}
-                >
-                  {r.dropped ? "dropped" : r.chosen !== null ? "resolved" : r.line.status}
-                </span>
-                <div className="flex items-center rounded bg-muted">
-                  <button type="button" className="px-2 py-0.5 text-sm" disabled={r.dropped || r.qty <= 1}
-                    onClick={() => patch(i, { qty: Math.max(1, r.qty - 1) })}>−</button>
-                  <span className="px-1 text-sm tabular-nums">{r.qty}</span>
-                  <button type="button" className="px-2 py-0.5 text-sm" disabled={r.dropped}
-                    onClick={() => patch(i, { qty: r.qty + 1 })}>+</button>
-                </div>
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground underline"
-                  onClick={() => patch(i, { dropped: !r.dropped })}
-                >
-                  {r.dropped ? "restore" : "drop"}
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+        {mainRows.map(([r, i]) => renderRow(r, i))}
       </div>
+
+      {reserveRows.length > 0 && (
+        <>
+          <div className="px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-400">
+            Reserve <span className="font-normal normal-case text-muted-foreground">· {counts.qtyReserve} cards · imports as reserve zone</span>
+          </div>
+          <div className="rounded-lg bg-violet-500/5 divide-y divide-background border border-violet-500/30">
+            {reserveRows.map(([r, i]) => renderRow(r, i))}
+          </div>
+        </>
+      )}
 
       <div className="flex items-center gap-3">
         <Button disabled={!allSettled || pending || conflictDeckId !== null} onClick={submit}>
-          {replaceMode ? `Replace contents (${counts.qtyTotal} cards)` : `Create deck (${counts.qtyTotal} cards)`}
+          {replaceMode
+            ? `Replace contents (${countLabel(counts.qtyMain, counts.qtyReserve)})`
+            : `Create deck (${countLabel(counts.qtyMain, counts.qtyReserve)})`}
         </Button>
         {!allSettled && (
           <span className="text-sm text-muted-foreground">

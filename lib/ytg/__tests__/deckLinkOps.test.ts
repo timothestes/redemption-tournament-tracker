@@ -33,10 +33,13 @@ function stubAdmin(script: Step[]) {
 }
 
 const RESOLVED: ResolvedEntry[] = [
-  { cardKey: "Son of God [K]|K|K1-Son-of-God", cardName: "Son of God [K]", setCode: "K", imgFile: "K1-Son-of-God", qty: 1 },
-  { cardKey: "Told to Take|T2C|123-Told-to-Take", cardName: "Told to Take", setCode: "T2C", imgFile: "123-Told-to-Take", qty: 2 },
-  // Same card appears in a second section — must merge (deck_cards UNIQUE).
-  { cardKey: "Told to Take|T2C|123-Told-to-Take", cardName: "Told to Take", setCode: "T2C", imgFile: "123-Told-to-Take", qty: 1 },
+  { cardKey: "Son of God [K]|K|K1-Son-of-God", cardName: "Son of God [K]", setCode: "K", imgFile: "K1-Son-of-God", qty: 1, zone: "main" },
+  { cardKey: "Told to Take|T2C|123-Told-to-Take", cardName: "Told to Take", setCode: "T2C", imgFile: "123-Told-to-Take", qty: 2, zone: "main" },
+  // Same card appears in a second MAIN section — must merge (deck_cards UNIQUE).
+  { cardKey: "Told to Take|T2C|123-Told-to-Take", cardName: "Told to Take", setCode: "T2C", imgFile: "123-Told-to-Take", qty: 1, zone: "main" },
+  // Same card ALSO in the Reserve section — separate row, never merged across zones.
+  { cardKey: "Told to Take|T2C|123-Told-to-Take", cardName: "Told to Take", setCode: "T2C", imgFile: "123-Told-to-Take", qty: 1, zone: "reserve" },
+  { cardKey: "Scattered|RoA 3|RoA3-Scattered", cardName: "Scattered", setCode: "RoA 3", imgFile: "RoA3-Scattered", qty: 2, zone: "reserve" },
 ];
 const ARGS = { productId: "p1", handle: "the-fiery-furnace", productTitle: "*New* The Fiery Furnace", createdBy: "admin-1", resolved: RESOLVED };
 
@@ -64,18 +67,43 @@ describe("createDeckLinkedOp", () => {
     expect(deckRow.user_id).toBe(YTG_ACCOUNT_USER_ID);
     expect(deckRow.visibility).toBe("public");
     expect(deckRow.format).toBe("Limited");
-    expect(deckRow.card_count).toBe(4);
+    expect(deckRow.card_count).toBe(4); // MAIN qty only — the 3 reserve cards don't count
     expect(deckRow.preview_card_1).toBe("K1-Son-of-God");
     expect(deckRow.preview_card_2).toBe("123-Told-to-Take");
     expect(deckRow.description).toBe('Contents of the YTG product "*New* The Fiery Furnace" — source of truth for store inventory.');
 
     const cardRows = calls[4].args[0][0] as Record<string, unknown>[];
-    expect(cardRows).toHaveLength(2); // merged
-    const ttt = cardRows.find((r) => r.card_name === "Told to Take")!;
-    expect(ttt.quantity).toBe(3);
-    expect(ttt.zone).toBe("main");
-    expect(ttt.card_set).toBe("T2C");
-    expect(ttt.card_img_file).toBe("123-Told-to-Take");
+    expect(cardRows).toHaveLength(4); // merged within zone; main+reserve stay separate rows
+    const tttMain = cardRows.find((r) => r.card_name === "Told to Take" && r.zone === "main")!;
+    expect(tttMain.quantity).toBe(3);
+    expect(tttMain.card_set).toBe("T2C");
+    expect(tttMain.card_img_file).toBe("123-Told-to-Take");
+    const tttReserve = cardRows.find((r) => r.card_name === "Told to Take" && r.zone === "reserve")!;
+    expect(tttReserve.quantity).toBe(1);
+    const scattered = cardRows.find((r) => r.card_name === "Scattered")!;
+    expect(scattered.zone).toBe("reserve");
+    expect(scattered.quantity).toBe(2);
+  });
+
+  it("previews come from MAIN entries even when a reserve entry sorts first", async () => {
+    const reserveFirst: ResolvedEntry[] = [
+      { cardKey: "Scattered|RoA 3|RoA3-Scattered", cardName: "Scattered", setCode: "RoA 3", imgFile: "RoA3-Scattered", qty: 2, zone: "reserve" },
+      { cardKey: "Son of God [K]|K|K1-Son-of-God", cardName: "Son of God [K]", setCode: "K", imgFile: "K1-Son-of-God", qty: 1, zone: "main" },
+      { cardKey: "Told to Take|T2C|123-Told-to-Take", cardName: "Told to Take", setCode: "T2C", imgFile: "123-Told-to-Take", qty: 2, zone: "main" },
+    ];
+    const { admin, calls } = stubAdmin([
+      { table: "ytg_deck_links", result: { data: null } },
+      { table: "decks", result: { data: [] } },
+      { table: "decks", result: { data: null } },
+      { table: "ytg_deck_links", result: { data: [{ shopify_product_id: "p1" }] } },
+      { table: "deck_cards", result: { data: null } },
+    ]);
+    const res = await createDeckLinkedOp(admin, { ...ARGS, resolved: reserveFirst });
+    if (res.success === false) throw new Error(res.error);
+    const deckRow = calls[2].args[0][0] as Record<string, unknown>;
+    expect(deckRow.card_count).toBe(3);
+    expect(deckRow.preview_card_1).toBe("K1-Son-of-God");
+    expect(deckRow.preview_card_2).toBe("123-Told-to-Take");
   });
 
   it("lost claim race: compensating deck delete, conflict result, NO cards insert", async () => {
@@ -163,9 +191,17 @@ describe("replaceDeckContentsOp", () => {
     ]);
     const res = await replaceDeckContentsOp(admin, { productId: "p1", resolved: RESOLVED });
     if (res.success === false) throw new Error(res.error);
-    expect(res.cardCount).toBe(4);
+    expect(res.cardCount).toBe(4); // MAIN only
     const upd = calls[4].args[0][0] as Record<string, unknown>;
     expect(upd.card_count).toBe(4);
     expect(upd.preview_card_1).toBe("K1-Son-of-God");
+
+    // Re-inserted rows preserve zones: merged within zone, split across zones.
+    const rows = calls[3].args[0][0] as Record<string, unknown>[];
+    expect(rows).toHaveLength(4);
+    expect(rows.filter((r) => r.zone === "reserve").map((r) => r.card_name).sort())
+      .toEqual(["Scattered", "Told to Take"]);
+    expect(rows.find((r) => r.card_name === "Told to Take" && r.zone === "main")!.quantity).toBe(3);
+    expect(rows.find((r) => r.card_name === "Told to Take" && r.zone === "reserve")!.quantity).toBe(1);
   });
 });
