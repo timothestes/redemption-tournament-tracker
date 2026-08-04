@@ -1,6 +1,6 @@
 import type { CardData } from '@/lib/cards/generated/cardData';
-import { normalizeBrigadeField } from '@/app/decklist/card-search/utils';
 import { sanitizeImgFile } from '@/app/shared/utils/cardImageUrl';
+import { computeCardTags } from './tagRules';
 
 export interface ShopifyProductSetInput {
   title: string;
@@ -33,18 +33,6 @@ export interface BuiltProduct {
   warnings: string[];          // 'no-price' | 'no-image' | 'no-set-alias' | `brigade-unmapped:<value>` | `type-unmapped:<value>`
 }
 
-const TYPE_TAGS: Record<string, string> = {
-  'Hero': 'Hero', 'GE': 'Good Enhancement', 'EE': 'Evil Enhancement',
-  'Evil Character': 'Evil Character', 'Artifact': 'Artifact', 'Lost Soul': 'Lost Soul',
-  'Dominant': 'Dominant', 'Fortress': 'Fortress', 'Site': 'Site', 'City': 'City',
-  'Covenant': 'Covenant', 'Curse': 'Curse',
-  'Hero Token': 'Hero', 'Evil Character Token': 'Evil Character', 'Lost Soul Token': 'Lost Soul',
-};
-const GOOD_TYPE_PARTS = new Set(['Hero', 'GE']);
-const EVIL_TYPE_PARTS = new Set(['Evil Character', 'EE']);
-// Canonical brigade name -> YTG tag name (identity unless listed)
-const BRIGADE_TAGS: Record<string, string> = { 'Good Gold': 'Gold' };
-
 export function baseCardName(name: string): string {
   return name.replace(/\s*[([][^)\]]*[)\]]\s*$/, '').trim();
 }
@@ -55,10 +43,6 @@ export function slugifyTitle(title: string): string {
 
 export function cardSku(card: CardData): string {
   return `${card.set}-${sanitizeImgFile(card.imgFile)}`.replace(/\s+/g, '');
-}
-
-function normalizeRarity(rarity: string): string {
-  return rarity === 'Ultra-Rare' ? 'Ultra Rare' : rarity;
 }
 
 function escapeHtml(text: string): string {
@@ -78,42 +62,9 @@ export function productFromCard(card: CardData, ytgAbbrev: string | null, opts: 
   const title = opts.titleOverride ?? `${baseCardName(card.name)} (${ytgAbbrev ?? card.set})`;
   const handle = slugifyTitle(title);
 
-  // --- tags ---
-  const tags = new Set<string>();
-
-  const typeParts = card.type.split('/').map(p => p.trim()).filter(p => p.length > 0);
-  const matchedTypeParts: string[] = [];
-  for (const part of typeParts) {
-    const tag = TYPE_TAGS[part];
-    if (tag) {
-      tags.add(tag);
-      matchedTypeParts.push(part);
-    } else {
-      warnings.push(`type-unmapped:${part}`);
-    }
-  }
-  const hasGood = matchedTypeParts.some(p => GOOD_TYPE_PARTS.has(p));
-  const hasEvil = matchedTypeParts.some(p => EVIL_TYPE_PARTS.has(p));
-  if (hasGood && hasEvil) tags.add('Dual Alignment');
-
-  if (card.brigade) {
-    try {
-      const canonicalBrigades = normalizeBrigadeField(card.brigade, card.alignment, card.name);
-      for (const brigade of canonicalBrigades) {
-        tags.add(BRIGADE_TAGS[brigade] ?? brigade);
-      }
-    } catch {
-      warnings.push(`brigade-unmapped:${card.brigade}`);
-    }
-  }
-
-  if (card.officialSet) tags.add(card.officialSet);
-
-  const normalizedRarity = normalizeRarity(card.rarity);
-  if (normalizedRarity === 'Legacy Rare' || normalizedRarity === 'Ultra Rare') tags.add(normalizedRarity);
-
-  if (card.legality === 'Rotation') tags.add('Rotation Cards');
-  if (card.officialSet.startsWith('Promo')) tags.add('Promos');
+  // --- tags (shared rules with the Products-tab tag sync — see tagRules.ts) ---
+  const tagResult = computeCardTags(card);
+  warnings.push(...tagResult.warnings);
 
   // --- variants / price ---
   const includeVariants = opts.includeVariants !== false;
@@ -138,7 +89,7 @@ export function productFromCard(card: CardData, ytgAbbrev: string | null, opts: 
     handle,
     productType: 'Single',
     vendor: 'Your Turn Games',
-    tags: Array.from(tags).sort(),
+    tags: tagResult.tags,
     status: opts.status,
     ...(descriptionHtml ? { descriptionHtml } : {}),
     ...(includeVariants ? {
