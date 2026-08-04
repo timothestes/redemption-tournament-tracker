@@ -6,6 +6,8 @@ import { normalize as normalizeDup, stripSetSuffix, findGroup } from '@/lib/dupl
 import type { DuplicateGroupIndex, DuplicateGroup, DuplicateSibling } from '@/lib/duplicateCards';
 import { normalizeAbility } from '@/lib/pricing/budgetPricing';
 import { CARDS } from '@/lib/cards/lookup';
+import { cardSku } from '@/lib/shopify/productFromCard';
+import { stripHtmlToText, abilityTextScore } from './abilityText';
 import type { CardRow, SetAlias, ShopifyProductRow, MatchResult, MatchingSummary } from './types';
 
 /**
@@ -97,6 +99,8 @@ const TAG_SET_TO_ABBREV: Record<string, string> = {
  */
 async function loadShopifyProducts(): Promise<{
   byNormalizedTitle: Map<string, ShopifyProductRow>;
+  bySku: Map<string, ShopifyProductRow[]>;
+  byId: Map<string, ShopifyProductRow>;
   all: ShopifyProductRow[];
 }> {
   const supabase = getSupabaseAdmin();
@@ -117,12 +121,20 @@ async function loadShopifyProducts(): Promise<{
   }
 
   const byNormalizedTitle = new Map<string, ShopifyProductRow>();
+  const bySku = new Map<string, ShopifyProductRow[]>();
+  const byId = new Map<string, ShopifyProductRow>();
   for (const p of allProducts) {
     const cleanTitle = stripShopifySuffixes(p.title);
     byNormalizedTitle.set(normalize(cleanTitle), p);
+    byId.set(p.id, p);
+    const sku = (p.sku ?? '').trim();
+    if (sku) {
+      const list = bySku.get(sku);
+      if (list) list.push(p); else bySku.set(sku, [p]);
+    }
   }
 
-  return { byNormalizedTitle, all: allProducts };
+  return { byNormalizedTitle, bySku, byId, all: allProducts };
 }
 
 /**
@@ -146,6 +158,51 @@ async function loadProtectedKeys(): Promise<Set<string>> {
   }
 
   return keys;
+}
+
+/** Expected SKU for a pipeline CardRow — always via cardSku() (strips ALL whitespace:
+ *  "RoA 3" → "RoA3-..."). Never string-build `${set}-${imgFile}`. */
+export function cardSkuFromRow(card: CardRow): string {
+  return cardSku({ set: card.set_code, imgFile: card.img_file });
+}
+
+/**
+ * Pass 0: exact SKU identity. Deterministic — importer/backfill wrote cardSku(card)
+ * onto the product's variant; the mirror's sku column round-trips it.
+ *
+ * PROTECTION-EXEMPT by design (spec §Matching tab): loadProtectedKeys covers
+ * auto_matched ≥ 0.95, and nearly every match sits there — a pass 0 gated by it
+ * could never correct a confident-but-wrong fuzzy match. writeResults' re-fetched
+ * manual/no_price_exists filter remains the write-layer guard.
+ *
+ * Duplicate SKUs (2+ products): a data bug (see backfill hygiene) — surface as
+ * needs_review/sku_duplicate, never auto-pick. The carried product id is the
+ * lowest-id duplicate, purely as a review-queue suggestion.
+ */
+export function pass0Sku(
+  cards: CardRow[],
+  bySku: Map<string, ShopifyProductRow[]>
+): MatchResult[] {
+  const out: MatchResult[] = [];
+  for (const card of cards) {
+    const candidates = bySku.get(cardSkuFromRow(card));
+    if (!candidates || candidates.length === 0) continue;
+    if (candidates.length > 1) {
+      const sorted = [...candidates].sort((a, b) => a.id.localeCompare(b.id));
+      out.push({
+        card_key: card.card_key, card_name: card.name, set_code: card.set_code,
+        shopify_product_id: sorted[0].id, confidence: 0,
+        match_method: 'sku_duplicate', status: 'needs_review',
+      });
+      continue;
+    }
+    out.push({
+      card_key: card.card_key, card_name: card.name, set_code: card.set_code,
+      shopify_product_id: candidates[0].id, confidence: 1.0,
+      match_method: 'sku', status: 'auto_matched',
+    });
+  }
+  return out;
 }
 
 /**
@@ -523,7 +580,9 @@ let fuzzyDebugCount = 0;
  */
 async function pass3and4Fuzzy(
   card: CardRow,
-  shopifyAbbrev: string | undefined
+  shopifyAbbrev: string | undefined,
+  productById?: Map<string, ShopifyProductRow>,
+  useAbilityText: boolean = true
 ): Promise<MatchResult | null> {
   const supabase = getSupabaseAdmin();
   const cleanName = stripEmbeddedSet(card.name);
@@ -604,6 +663,19 @@ async function pass3and4Fuzzy(
       }
     }
 
+    // Ability-text signal: ADDITIVE ONLY. Empty/missing body_html or a disabled
+    // flag leaves boostedScore untouched — behavior is byte-identical to the
+    // pre-signal pipeline in those cases. Tiered like the tag boosts above.
+    if (useAbilityText && card.special_ability && productById) {
+      const row = productById.get(candidate.id);
+      const bodyText = row && row.body_html ? stripHtmlToText(row.body_html) : '';
+      if (bodyText) {
+        const overlap = abilityTextScore(card.special_ability, bodyText);
+        if (overlap >= 0.6) boostedScore += 0.15;
+        else if (overlap >= 0.35) boostedScore += 0.08;
+      }
+    }
+
     if (!bestCandidate || boostedScore > bestCandidate.boostedScore) {
       bestCandidate = { id: candidate.id, rawScore, boostedScore, title: candidateTitle };
     }
@@ -662,17 +734,19 @@ function log(msg: string) {
 }
 
 /**
- * Run the full matching pipeline (passes 1-4) for all cards.
+ * Run the full matching pipeline (passes 0-4) for all cards.
  */
 export async function runMatchingPipeline(options?: {
   passes?: number[];
   setCodes?: string[];
   force?: boolean;
   dryRun?: boolean;
+  abilityText?: boolean;
 }): Promise<MatchingSummary> {
-  const passes = options?.passes ?? [1, 2, 3, 4];
+  const passes = options?.passes ?? [0, 1, 2, 3, 4];
   const force = options?.force ?? false;
   const dryRun = options?.dryRun ?? false;
+  const abilityTextEnabled = options?.abilityText !== false;
 
   log('Loading data...');
   const [cards, aliases, shopify, protectedKeys] = await Promise.all([
@@ -700,12 +774,28 @@ export async function runMatchingPipeline(options?: {
     unmatched: 0,
   };
 
+  // ── Phase 0: SKU identity (runs against ALL cards, INCLUDING protected keys) ──
+  const pass0Handled = new Set<string>();
+  if (passes.includes(0)) {
+    log('Running pass 0 (SKU identity, protection-exempt)...');
+    const pass0Results = pass0Sku(filteredCards, shopify.bySku);
+    let dupCount = 0;
+    for (const r of pass0Results) {
+      results.push(r);
+      pass0Handled.add(r.card_key);
+      if (r.status === 'auto_matched') summary.matched++;
+      else { summary.needs_review++; dupCount++; }
+    }
+    log(`Pass 0 done: ${pass0Results.length} SKU hits (${dupCount} duplicate-SKU → needs_review)`);
+  }
+
   // ── Phase 1: In-memory passes (instant) ──
   log('Running passes 1 & 2 (exact + normalized)...');
   const needsFuzzy: { card: CardRow; shopifyAbbrev: string | undefined }[] = [];
 
   for (const card of filteredCards) {
-    if (protectedKeys.has(card.card_key)) continue;
+    if (pass0Handled.has(card.card_key)) continue;   // pass 0 already decided this card
+    if (protectedKeys.has(card.card_key)) continue;  // protection applies to passes 1-4 only
 
     // Unsold sets
     if (UNSOLD_SETS.has(card.set_code)) {
@@ -800,7 +890,7 @@ export async function runMatchingPipeline(options?: {
       const batch = needsFuzzy.slice(i, i + concurrency);
       const batchResults = await Promise.all(
         batch.map(({ card, shopifyAbbrev }) =>
-          pass3and4Fuzzy(card, shopifyAbbrev).then(match => ({ card, match }))
+          pass3and4Fuzzy(card, shopifyAbbrev, shopify.byId, abilityTextEnabled).then(match => ({ card, match }))
         )
       );
 
@@ -859,6 +949,7 @@ export async function runMatchingPipeline(options?: {
 
   summary.unmatchedCards = results.filter(r => r.status === 'unmatched');
   summary.noPriceCards = results.filter(r => r.status === 'no_price_exists');
+  if (dryRun) summary.results = results;
 
   log(`Done! matched=${summary.matched} review=${summary.needs_review} no_price=${summary.no_price_exists} unmatched=${summary.unmatched}`);
   return summary;
@@ -866,8 +957,10 @@ export async function runMatchingPipeline(options?: {
 
 /**
  * Write match results to card_price_mappings (upsert, never overwrite manual).
+ * Exported as a test seam only — the manual/no_price_exists refetch-filter
+ * below is load-bearing and force-proof; do not modify it.
  */
-async function writeResults(results: MatchResult[]): Promise<void> {
+export async function writeResults(results: MatchResult[]): Promise<void> {
   const supabase = getSupabaseAdmin();
 
   // Load manually-protected keys to exclude from writes.

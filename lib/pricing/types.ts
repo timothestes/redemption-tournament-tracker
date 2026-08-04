@@ -36,6 +36,8 @@ export interface ShopifyProductRow {
   price: number | null;
   inventory_quantity: number | null;
   raw_json: ShopifyProduct | null;
+  sku: string | null;        // migration 088; written by sync + SKU backfill
+  body_html: string | null;  // migration 088; ability text source
   last_synced_at: string;
 }
 
@@ -87,6 +89,7 @@ export interface MatchingSummary {
   unmatched: number;
   unmatchedCards?: MatchResult[];
   noPriceCards?: MatchResult[];
+  results?: MatchResult[];   // populated only on dryRun — validation tooling reads per-method detail
 }
 
 export interface PricesResponse {

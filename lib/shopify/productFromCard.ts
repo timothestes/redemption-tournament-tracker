@@ -41,7 +41,7 @@ export function slugifyTitle(title: string): string {
   return title.toLowerCase().replace(/['‘’"“”]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-export function cardSku(card: CardData): string {
+export function cardSku(card: Pick<CardData, 'set' | 'imgFile'>): string {
   return `${card.set}-${sanitizeImgFile(card.imgFile)}`.replace(/\s+/g, '');
 }
 

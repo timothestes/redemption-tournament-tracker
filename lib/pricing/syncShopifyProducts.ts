@@ -41,7 +41,10 @@ export async function syncShopifyProducts(): Promise<{ upserted: number; errors:
         product_type: p.product_type,
         price,
         inventory_quantity: inventory,
-        sku: p.variants[0]?.sku ?? null,
+        // `|| null`, not `?? null`: Shopify returns "" for blank SKUs, and an
+        // empty-string sku poisons the 088 partial index + backfill planning
+        // (pass 0 and planBackfillRows treat ""/null as "no SKU").
+        sku: p.variants[0]?.sku || null,
         body_html: p.body_html ?? null,
         raw_json: p,
         last_synced_at: new Date().toISOString(),
