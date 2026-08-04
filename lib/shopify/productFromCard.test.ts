@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { CardData } from '@/lib/cards/generated/cardData';
+import { CARDS } from '@/lib/cards/lookup';
 import { productFromCard, baseCardName, slugifyTitle, cardSku } from './productFromCard';
 
 // Fixtures: EXACT rows from lib/cards/generated/cardData.json (Step 1 extraction).
@@ -200,5 +201,26 @@ describe('productFromCard', () => {
     const card: CardData = { ...ABUSIVE_SOLDIERS, specialAbility: '   ' };
     const built = productFromCard(card, 'GoC', opts);
     expect(built.input.descriptionHtml).toBeUndefined();
+  });
+});
+
+describe('cardSku collision guard', () => {
+  it('collides for exactly one known pair: Angel of the Lord (G)/(H), both 10A, shared imgFile', () => {
+    // Spec §Matching tab: this collision is inert — 10A is in UNSOLD_SETS → no_price_exists.
+    // If card data ever grows a SECOND collision, pass 0 could silently mis-match; this test is the tripwire.
+    const bySku = new Map<string, string[]>();
+    for (const c of CARDS) {
+      const sku = cardSku(c);
+      const list = bySku.get(sku) ?? [];
+      list.push(`${c.name}|${c.set}|${c.imgFile}`);
+      bySku.set(sku, list);
+    }
+    const collisions = [...bySku.entries()].filter(([, keys]) => keys.length > 1);
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0][0]).toBe('10A-Angel_of_the_Lord_(G)');
+    expect(collisions[0][1].map(k => k.split('|')[0]).sort()).toEqual([
+      'Angel of the Lord (G)',
+      'Angel of the Lord (H)',
+    ]);
   });
 });
