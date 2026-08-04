@@ -302,6 +302,12 @@ describe("fixture: rotation-jerusalem.html (prod-mirror body_html, worst tail of
     expect(first.status).toBe("resolved");
     expect(first.candidates[0].cardKey).toBe(
       'Lost Soul "The First" [Luke 13:30]|I/J+|Lost-Soul-The-First-Luke_13_30-IJ');
+    // In-set epithet beats the cross-set name fallback: "Escape" is also an
+    // AW dominant, but (PC) + Lost Souls section means the TPC soul.
+    const escape = byRaw(lines, "Escape (PC)");
+    expect(escape.status).toBe("resolved");
+    expect(escape.candidates[0].cardName).toBe('Lost Soul "Escape" [II Timothy 2:26 - TPC]');
+    expect(escape.candidates[0].setCode).toBe("TPC");
   });
 });
 

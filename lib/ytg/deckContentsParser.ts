@@ -395,14 +395,25 @@ function withLostSoulScripture(
  *  (TtC)" — while carddata writes 'Lost Soul "Remnant" [Jeremiah 31:8]'.
  *  Match the line's name as an epithet among Lost Soul cards within the
  *  aliased candidate sets. One hit → resolved; several → ambiguous (never
- *  auto-pick); none → keep the base resolution. */
+ *  auto-pick); none → keep the base resolution.
+ *
+ *  Runs when the base is unresolved, and ALSO when the base only found
+ *  cards outside the aliased sets: "Escape (PC)" would otherwise
+ *  cross-set-fall-back to the AW dominant "Escape" and shadow TPC's
+ *  'Lost Soul "Escape" [II Timothy 2:26 - TPC]' — in a Lost Souls section
+ *  with an explicit set, the in-set soul is the stronger read. In-pool base
+ *  resolutions are never overridden. */
 function withLostSoulEpithet(
   base: Resolution,
   innerName: string,
   poolSets: string[],
   inLostSoulSection: boolean,
 ): Resolution {
-  if (base.status !== "unresolved" || !inLostSoulSection) return base;
+  if (!inLostSoulSection) return base;
+  const outOfPool =
+    base.candidates.length > 0 &&
+    base.candidates.every((c) => !poolSets.includes(c.setCode));
+  if (base.status !== "unresolved" && !outOfPool) return base;
   if (/^lost soul/i.test(innerName.trim())) return base;
   const epithet = normalize(innerName);
   if (!epithet) return base;
