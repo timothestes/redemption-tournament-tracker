@@ -141,6 +141,18 @@ function pushKey(map: Map<string, CardData[]>, key: string, card: CardData) {
   else map.set(key, [card]);
 }
 
+/** Strip a trailing paren/bracket that is exactly the card's OWN set code.
+ *  stripEmbeddedSet only handles short alphanumeric codes; names like
+ *  "New Jerusalem (I/J+)" (set I/J+) slip through and would otherwise never
+ *  be findable by their bare name within their set. */
+function ownSetStripped(name: string, set: string): string | null {
+  const esc = set.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`\\s*[(\\[]${esc}[)\\]]\\s*$`);
+  if (!re.test(name)) return null;
+  const stripped = name.replace(re, "").trim();
+  return stripped || null;
+}
+
 function cardIndex(): CardIndex {
   if (INDEX) return INDEX;
   const bySet = new Map<string, Map<string, CardData[]>>();
@@ -149,7 +161,10 @@ function cardIndex(): CardIndex {
     if (!card.name) continue;
     let setMap = bySet.get(card.set);
     if (!setMap) { setMap = new Map(); bySet.set(card.set, setMap); }
-    for (const key of nameKeyVariants(card.name)) {
+    const keys = nameKeyVariants(card.name);
+    const own = ownSetStripped(card.name, card.set);
+    if (own) keys.push(...nameKeyVariants(own));
+    for (const key of new Set(keys)) {
       pushKey(setMap, key, card);
       pushKey(global, key, card);
     }
@@ -165,6 +180,47 @@ function lookup(map: Map<string, CardData[]> | undefined, variants: string[]): C
     if (hits && hits.length > 0) return hits;
   }
   return [];
+}
+
+/* ------------------------------------------------------------------ */
+/*  Lost Soul scripture-reference matching                             */
+/* ------------------------------------------------------------------ */
+
+/** Book word + chapter:verse(-range). Book capture is deliberately just the
+ *  immediately-preceding word (plus optional 1-3 numeral) so extraction is
+ *  consistent between store lines ("(Daniel 9:5)") and carddata names
+ *  ("[Daniel 9:5]", "Lost Soul Jeremiah 13:10 (Color Guard)"). */
+const SCRIPTURE_RE = /(?:\b([1-3])\s+)?([A-Za-z][A-Za-z.]*)\s+(\d+):(\d+(?:\s*[-–]\s*\d+)?)/g;
+
+function scriptureRefs(s: string): string[] {
+  const out: string[] = [];
+  for (const m of s.matchAll(SCRIPTURE_RE)) {
+    const book = `${m[1] ? `${m[1]} ` : ""}${m[2].toLowerCase().replace(/\./g, "")}`;
+    const verse = m[4].replace(/\s*[-–]\s*/g, "-");
+    out.push(`${book} ${m[3]}:${verse}`);
+  }
+  return out;
+}
+
+/** First quoted span, quote styles folded ('' doubled-singles, smart quotes). */
+function epithetOf(s: string): string | null {
+  const m = /"([^"]+)"/.exec(normalize(s.replace(/''/g, '"')));
+  return m ? m[1].trim() : null;
+}
+
+interface LostSoulEntry { card: CardData; refs: string[]; epithet: string | null }
+
+let LS_INDEX: LostSoulEntry[] | null = null;
+
+function lostSoulIndex(): LostSoulEntry[] {
+  if (LS_INDEX) return LS_INDEX;
+  LS_INDEX = [];
+  for (const card of CARDS) {
+    if (!card.name || !/^lost soul/i.test(card.name)) continue;
+    const refs = scriptureRefs(card.name);
+    if (refs.length > 0) LS_INDEX.push({ card, refs, epithet: epithetOf(card.name) });
+  }
+  return LS_INDEX;
 }
 
 /* ------------------------------------------------------------------ */
@@ -207,6 +263,66 @@ function statusFor(n: number): ParsedLine["status"] {
   return n === 1 ? "resolved" : n > 1 ? "ambiguous" : "unresolved";
 }
 
+/** Scripture-ref rescue for otherwise-unresolved "Lost Soul …" lines.
+ *  Store descriptions freely reorder epithet/scripture and swap () for []
+ *  ("Lost Soul (Daniel 9:5) ''Covenant Breakers''" vs carddata's
+ *  'Lost Soul "Covenant Breakers" [Daniel 9:5]'), so name-shape matching
+ *  fails; the scripture ref is the stable token. Match primarily by ref
+ *  (within poolSets when a set abbrev parsed, else all sets); epithet is
+ *  only a tiebreaker. One hit → resolved; several → ambiguous (never
+ *  auto-pick); none → keep the base resolution. */
+function withLostSoulScripture(
+  base: Resolution,
+  rest: string,
+  poolSets: string[] | null,
+): Resolution {
+  if (base.status !== "unresolved") return base;
+  if (!/^lost soul/i.test(rest.trim())) return base;
+  const lineRefs = scriptureRefs(rest);
+  if (lineRefs.length === 0) return base;
+
+  let hits = lostSoulIndex().filter(
+    (e) =>
+      (poolSets === null || poolSets.includes(e.card.set)) &&
+      lineRefs.every((r) => e.refs.includes(r)),
+  );
+  if (hits.length === 0) return base;
+  if (hits.length > 1) {
+    const epithet = epithetOf(rest);
+    if (epithet !== null) {
+      const narrowed = hits.filter((e) => e.epithet === epithet);
+      if (narrowed.length === 1) hits = narrowed;
+    }
+  }
+  const cards = hits.map((e) => e.card);
+  return {
+    ...base,
+    candidates: toCandidates(cards, cards.length === 1 ? 0.9 : 0.5),
+    status: statusFor(cards.length),
+  };
+}
+
+/** "Or"-option parens: "(I & J+ or Promo)", "(I/J)". The whole paren failed
+ *  as one alias; split it into tokens and alias-resolve each independently.
+ *  Top-level separators first (or, comma) so multi-word aliases like
+ *  "I & J+" resolve whole before the tighter &// split. Tokens that don't
+ *  resolve are ignored. */
+function splitParenSets(
+  abbrev: string,
+  aliasCandidates: Map<string, string[]>,
+): string[] {
+  const sets: string[] = [];
+  for (const token of abbrev.split(/\s+or\s+|,/i).map((t) => t.trim()).filter(Boolean)) {
+    const whole = aliasCandidates.get(normalize(token));
+    if (whole) { sets.push(...whole); continue; }
+    for (const sub of token.split(/[&/]/).map((s) => s.trim()).filter(Boolean)) {
+      const subSets = aliasCandidates.get(normalize(sub));
+      if (subSets) sets.push(...subSets);
+    }
+  }
+  return [...new Set(sets)];
+}
+
 function resolveLine(
   rest: string,
   aliasCandidates: Map<string, string[]>,
@@ -242,13 +358,48 @@ function resolveLine(
     // to a global search (full line first, then the paren-stripped name).
     const fallback = fullHits.length > 0 ? fullHits : lookup(idx.global, nameKeyVariants(rest));
     const cands = toCandidates(fallback, fallback.length === 1 ? 0.7 : 0.4);
-    return { name: innerName, setAbbrev: abbrev, candidates: cands, status: statusFor(cands.length) };
+    return withLostSoulScripture(
+      { name: innerName, setAbbrev: abbrev, candidates: cands, status: statusFor(cands.length) },
+      rest,
+      aliasSets,
+    );
+  }
+
+  // Paren is not a single known set — maybe it's an option list of sets.
+  let orSets: string[] = [];
+  if (paren && abbrev !== null) {
+    orSets = splitParenSets(abbrev, aliasCandidates);
+    if (orSets.length > 0) {
+      const innerName = paren[1].trim();
+      let orHits: CardData[] = [];
+      for (const setCode of orSets) {
+        orHits.push(...lookup(idx.bySet.get(setCode), nameKeyVariants(innerName)));
+      }
+      orHits = [...new Set(orHits)];
+      const fullHits = lookup(idx.global, strictVariants(rest));
+      if (orHits.length > 0) {
+        // The source line itself offers alternatives — surface every print
+        // for a one-click pick, and NEVER auto-resolve (even a single hit
+        // still needs the admin to confirm which option the store meant).
+        const union = dedupeCandidates([
+          ...toCandidates(orHits, 0.5),
+          ...toCandidates(fullHits, 0.6),
+        ]);
+        return { name: innerName, setAbbrev: abbrev, candidates: union, status: "ambiguous" };
+      }
+      // No option-set contains the name → fall through to current behavior
+      // (paren stays part of the name).
+    }
   }
 
   // No trailing paren, or the paren is not a known set → whole line is the name.
   const hits = lookup(idx.global, nameKeyVariants(rest));
   const cands = toCandidates(hits, hits.length === 1 ? 0.7 : 0.4);
-  return { name: rest, setAbbrev: null, candidates: cands, status: statusFor(cands.length) };
+  return withLostSoulScripture(
+    { name: rest, setAbbrev: null, candidates: cands, status: statusFor(cands.length) },
+    rest,
+    orSets.length > 0 ? orSets : null,
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -262,8 +413,12 @@ export function parseDeckContents(
   const idx = cardIndex();
   const out: ParsedLine[] = [];
   let section: string | null = null;
+  const lines = htmlToLines(bodyHtml);
+  // Pre-section prose drop only applies when the description actually has
+  // section headers; otherwise everything is "before the first section".
+  const hasSections = lines.some((l) => sectionHeader(l) !== null);
 
-  for (const line of htmlToLines(bodyHtml)) {
+  for (const line of lines) {
     const header = sectionHeader(line);
     if (header) { section = header; continue; }
     // Prose/flavor-text heuristic: long sentence with no trailing paren.
@@ -271,7 +426,13 @@ export function parseDeckContents(
     if (!/[a-zA-Z]/.test(line)) continue;
 
     const { qty, rest } = parseQty(line);
-    out.push({ raw: line, qty, section, ...resolveLine(rest, aliasCandidates, idx) });
+    const res = resolveLine(rest, aliasCandidates, idx);
+    // Intro junk ("And check out these videos…") sits before the first
+    // section header; anything there that doesn't look like a card is
+    // dropped outright — same consumption semantics as the prose heuristic.
+    // Lines that DO resolve (or are ambiguous) as cards are kept.
+    if (hasSections && section === null && res.candidates.length === 0) continue;
+    out.push({ raw: line, qty, section, ...res });
   }
   return out;
 }
