@@ -100,6 +100,18 @@ export function isDecklistCutoff(line: string): boolean {
 /*  Alias candidates                                                   */
 /* ------------------------------------------------------------------ */
 
+/** Multi-set store abbreviations that can never live in set_aliases: the
+ *  table is strictly 1:1 (unique index on carddata_code, and the importer's
+ *  forward lookup depends on that direction), so these are parser-side only.
+ *  The usual containment disambiguation applies — e.g. "Son of God (I/J)"
+ *  resolves because only set I contains the card. */
+const SUPPLEMENTAL_ALIASES: Record<string, string[]> = {
+  "I/J": ["I", "J"],
+  "I/J/L": ["I", "J", "L"],
+  "I/J decks": ["I", "J"],
+  "P": ["Pmo-P1", "Pmo-P2", "Pmo-P3"],
+};
+
 export function buildAliasCandidates(
   rows: { carddata_code: string; shopify_abbrev: string }[],
 ): Map<string, string[]> {
@@ -116,6 +128,9 @@ export function buildAliasCandidates(
   // "(K)", "(PoC)", "(I/J+)" — which set_aliases doesn't key (it maps
   // carddata → store abbrev, not the reverse).
   for (const card of CARDS) add(card.set, card.set);
+  for (const [abbrev, codes] of Object.entries(SUPPLEMENTAL_ALIASES)) {
+    for (const code of codes) add(abbrev, code);
+  }
   return map;
 }
 

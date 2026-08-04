@@ -78,6 +78,33 @@ describe("buildAliasCandidates", () => {
     expect(ALIASES.get("poc")).toContain("PoC");
     expect(ALIASES.get("i/j+")).toContain("I/J+");
   });
+  it("merges the parser-side supplemental multi-set abbreviations", () => {
+    // set_aliases is strictly 1:1 (unique on carddata_code) — these can
+    // never be table rows.
+    expect(ALIASES.get("i/j")).toEqual(["I", "J"]);
+    expect(ALIASES.get("i/j/l")).toEqual(["I", "J", "L"]);
+    expect(ALIASES.get("i/j decks")).toEqual(["I", "J"]);
+    expect(ALIASES.get("p")).toEqual(["Pmo-P1", "Pmo-P2", "Pmo-P3"]);
+  });
+  it("supplemental aliases resolve via the usual containment disambiguation", () => {
+    const [sog, store, meek] = parseDeckContents(
+      "<p>Son of God (I/J)<br>Storehouse (P)<br>(7) Meek Lost Souls (I/J decks)</p>",
+      ALIASES,
+    );
+    // BOTH I and J print Son of God → containment keeps both, never
+    // auto-picks; the admin gets a one-click choice.
+    expect(sog.status).toBe("ambiguous");
+    expect(sog.candidates.map((c) => c.setCode).sort()).toEqual(["I", "J"]);
+    // Promo abbreviation "P" spans the three promo pools; only Pmo-P2 has it.
+    expect(store.status).toBe("resolved");
+    expect(store.candidates[0].cardKey).toBe("Storehouse (Promo)|Pmo-P2|Promo_Storehouse");
+    // The alias parses (qty + name + sets) even when the name matches no
+    // card — the meek souls land in the wizard's inline search.
+    expect(meek.qty).toBe(7);
+    expect(meek.name).toBe("Meek Lost Souls");
+    expect(meek.setAbbrev).toBe("I/J decks");
+    expect(meek.status).toBe("unresolved");
+  });
 });
 
 describe("htmlToLines / sectionHeader", () => {
