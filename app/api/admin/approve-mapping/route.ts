@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { hasPermission } from '@/utils/adminUtils';
 import { getSupabaseAdmin } from '@/lib/pricing/supabase-admin';
 import { regenerateCardPrices } from '@/lib/pricing/matching';
 
 export async function POST(request: NextRequest) {
+  if (!(await hasPermission('manage_shopify_imports'))) {
+    return NextResponse.json({ error: 'Shopify import permission required' }, { status: 403 });
+  }
   try {
     const { card_key, shopify_product_id } = await request.json();
     if (!card_key || !shopify_product_id) {

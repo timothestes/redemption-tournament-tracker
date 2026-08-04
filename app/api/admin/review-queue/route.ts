@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
+import { hasPermission } from '@/utils/adminUtils';
 import { getSupabaseAdmin } from '@/lib/pricing/supabase-admin';
 
 export async function GET() {
+  if (!(await hasPermission('manage_shopify_imports'))) {
+    return NextResponse.json({ error: 'Shopify import permission required' }, { status: 403 });
+  }
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
