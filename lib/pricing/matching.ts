@@ -7,6 +7,7 @@ import type { DuplicateGroupIndex, DuplicateGroup, DuplicateSibling } from '@/li
 import { normalizeAbility } from '@/lib/pricing/budgetPricing';
 import { CARDS } from '@/lib/cards/lookup';
 import { cardSku } from '@/lib/shopify/productFromCard';
+import { stripHtmlToText, abilityTextScore } from './abilityText';
 import type { CardRow, SetAlias, ShopifyProductRow, MatchResult, MatchingSummary } from './types';
 
 /**
@@ -579,7 +580,9 @@ let fuzzyDebugCount = 0;
  */
 async function pass3and4Fuzzy(
   card: CardRow,
-  shopifyAbbrev: string | undefined
+  shopifyAbbrev: string | undefined,
+  productById?: Map<string, ShopifyProductRow>,
+  useAbilityText: boolean = true
 ): Promise<MatchResult | null> {
   const supabase = getSupabaseAdmin();
   const cleanName = stripEmbeddedSet(card.name);
@@ -660,6 +663,19 @@ async function pass3and4Fuzzy(
       }
     }
 
+    // Ability-text signal: ADDITIVE ONLY. Empty/missing body_html or a disabled
+    // flag leaves boostedScore untouched — behavior is byte-identical to the
+    // pre-signal pipeline in those cases. Tiered like the tag boosts above.
+    if (useAbilityText && card.special_ability && productById) {
+      const row = productById.get(candidate.id);
+      const bodyText = row && row.body_html ? stripHtmlToText(row.body_html) : '';
+      if (bodyText) {
+        const overlap = abilityTextScore(card.special_ability, bodyText);
+        if (overlap >= 0.6) boostedScore += 0.15;
+        else if (overlap >= 0.35) boostedScore += 0.08;
+      }
+    }
+
     if (!bestCandidate || boostedScore > bestCandidate.boostedScore) {
       bestCandidate = { id: candidate.id, rawScore, boostedScore, title: candidateTitle };
     }
@@ -725,10 +741,12 @@ export async function runMatchingPipeline(options?: {
   setCodes?: string[];
   force?: boolean;
   dryRun?: boolean;
+  abilityText?: boolean;
 }): Promise<MatchingSummary> {
   const passes = options?.passes ?? [0, 1, 2, 3, 4];
   const force = options?.force ?? false;
   const dryRun = options?.dryRun ?? false;
+  const abilityTextEnabled = options?.abilityText !== false;
 
   log('Loading data...');
   const [cards, aliases, shopify, protectedKeys] = await Promise.all([
@@ -872,7 +890,7 @@ export async function runMatchingPipeline(options?: {
       const batch = needsFuzzy.slice(i, i + concurrency);
       const batchResults = await Promise.all(
         batch.map(({ card, shopifyAbbrev }) =>
-          pass3and4Fuzzy(card, shopifyAbbrev).then(match => ({ card, match }))
+          pass3and4Fuzzy(card, shopifyAbbrev, shopify.byId, abilityTextEnabled).then(match => ({ card, match }))
         )
       );
 
