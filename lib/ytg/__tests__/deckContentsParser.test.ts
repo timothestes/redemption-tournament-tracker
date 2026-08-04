@@ -262,6 +262,30 @@ describe("fixture: fiery-furnace.html (live store description)", () => {
   });
 });
 
+describe("fixture: rotation-jerusalem.html (prod-mirror body_html, worst tail offender)", () => {
+  // Pulled byte-identical from the shopify_products mirror (md5-verified);
+  // the storefront .js endpoint serves the same body_html.
+  const lines = parseDeckContents(fixture("rotation-jerusalem.html"), ALIASES);
+
+  it("emits exactly the 56 deck lines — the 21+ resolving tail card links are cut", () => {
+    expect(lines).toHaveLength(56);
+    expect(lines[0].raw).toBe("Son of God (I/J)");
+    expect(lines[lines.length - 1].raw).toBe("Strict Sabbath (GoC)"); // last Reserve card
+  });
+  it("tail card links never appear as deck lines (phantom-card guard)", () => {
+    // These are real, resolvable card names hyperlinked in the recommended
+    // tail — before the cutoff they would have silently joined the deck.
+    for (const phantom of [
+      "The Resurrection", "Good Seed", "Doom Speakers", "Three Nails",
+      "Saul of Tarsus", "Grapes of Wrath", "The Deceiver", "Sheol",
+    ]) {
+      expect(lines.some((l) => l.raw === phantom)).toBe(false);
+    }
+    // …while the deck's own Heroes-section line with a tail-ish name stays.
+    expect(byRaw(lines, "Resurrection Revealer (GoC)").section).toBe("Heroes");
+  });
+});
+
 describe("fixture: daniel-contender.html (live store description)", () => {
   const lines = parseDeckContents(fixture("daniel-contender.html"), ALIASES);
 
