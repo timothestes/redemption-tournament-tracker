@@ -30,6 +30,14 @@ const ART_VARIANT_PATTERNS = [
 ];
 
 /**
+ * Canonical card_key used across card_price_mappings, card_prices, and the
+ * WS-4 sale ledger. Single source of truth — do not string-build elsewhere.
+ */
+export function buildCardKey(name: string, set: string, imgFile: string): string {
+  return `${name}|${set}|${imgFile}`;
+}
+
+/**
  * Load card data from the build-time generated module.
  */
 export async function loadCardData(): Promise<CardRow[]> {
@@ -44,7 +52,7 @@ export async function loadCardData(): Promise<CardRow[]> {
     // (strength) into `rarity`. Unread today but kept for behavior parity.
     rarity: c.strength,
     special_ability: c.specialAbility,
-    card_key: `${c.name}|${c.set}|${c.imgFile}`,
+    card_key: buildCardKey(c.name, c.set, c.imgFile),
   }));
 }
 
