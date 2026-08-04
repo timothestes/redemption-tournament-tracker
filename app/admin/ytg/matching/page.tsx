@@ -1,16 +1,39 @@
-export const metadata = { title: "YTG Store — Matching" };
+import { getSupabaseAdmin } from '@/lib/pricing/supabase-admin';
+import MatchingDashboard from './components/MatchingDashboard';
+import BackfillPanel from './components/BackfillPanel';
+import ReviewQueue from './components/ReviewQueue';
 
-// WS-0 skeleton. WS-2 (deterministic matching + review queue) replaces
-// this file wholesale — nothing else in the shell needs to change.
-export default function MatchingPage() {
+export const metadata = { title: "YTG Store — Matching" };
+export const dynamic = 'force-dynamic';
+
+async function loadDashboardCounts(): Promise<{ byMethod: Record<string, number>; byStatus: Record<string, number> }> {
+  const supabase = getSupabaseAdmin();
+  const byMethod: Record<string, number> = {};
+  const byStatus: Record<string, number> = {};
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('card_price_mappings')
+      .select('match_method, status')
+      .range(offset, offset + pageSize - 1);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      const m = row.match_method ?? 'none';
+      byMethod[m] = (byMethod[m] ?? 0) + 1;
+      byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
+    }
+    if (!data || data.length < pageSize) break;
+  }
+  return { byMethod, byStatus };
+}
+
+export default async function MatchingPage() {
+  const counts = await loadDashboardCounts();
   return (
-    <div className="rounded-lg bg-card px-6 py-16 text-center">
-      <h2 className="text-lg font-semibold mb-1">Matching</h2>
-      <p className="text-sm text-muted-foreground max-w-md mx-auto">
-        The matching dashboard and keyboard-driven review queue are coming
-        soon. Cards will match to store products by SKU first, with fuzzy
-        passes as fallback.
-      </p>
+    <div className="space-y-6">
+      <MatchingDashboard byMethod={counts.byMethod} byStatus={counts.byStatus} />
+      <BackfillPanel />
+      <ReviewQueue />
     </div>
   );
 }
