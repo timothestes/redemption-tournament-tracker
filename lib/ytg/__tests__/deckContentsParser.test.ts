@@ -78,6 +78,33 @@ describe("buildAliasCandidates", () => {
     expect(ALIASES.get("poc")).toContain("PoC");
     expect(ALIASES.get("i/j+")).toContain("I/J+");
   });
+  it("merges the parser-side supplemental multi-set abbreviations", () => {
+    // set_aliases is strictly 1:1 (unique on carddata_code) — these can
+    // never be table rows.
+    expect(ALIASES.get("i/j")).toEqual(["I", "J"]);
+    expect(ALIASES.get("i/j/l")).toEqual(["I", "J", "L"]);
+    expect(ALIASES.get("i/j decks")).toEqual(["I", "J"]);
+    expect(ALIASES.get("p")).toEqual(["Pmo-P1", "Pmo-P2", "Pmo-P3"]);
+  });
+  it("supplemental aliases resolve via the usual containment disambiguation", () => {
+    const [sog, store, meek] = parseDeckContents(
+      "<p>Son of God (I/J)<br>Storehouse (P)<br>(7) Meek Lost Souls (I/J decks)</p>",
+      ALIASES,
+    );
+    // BOTH I and J print Son of God → containment keeps both, never
+    // auto-picks; the admin gets a one-click choice.
+    expect(sog.status).toBe("ambiguous");
+    expect(sog.candidates.map((c) => c.setCode).sort()).toEqual(["I", "J"]);
+    // Promo abbreviation "P" spans the three promo pools; only Pmo-P2 has it.
+    expect(store.status).toBe("resolved");
+    expect(store.candidates[0].cardKey).toBe("Storehouse (Promo)|Pmo-P2|Promo_Storehouse");
+    // The alias parses (qty + name + sets) even when the name matches no
+    // card — the meek souls land in the wizard's inline search.
+    expect(meek.qty).toBe(7);
+    expect(meek.name).toBe("Meek Lost Souls");
+    expect(meek.setAbbrev).toBe("I/J decks");
+    expect(meek.status).toBe("unresolved");
+  });
 });
 
 describe("htmlToLines / sectionHeader", () => {
@@ -91,6 +118,20 @@ describe("htmlToLines / sectionHeader", () => {
     expect(sectionHeader("Lost Souls")).toBe("Lost Souls");
     expect(sectionHeader("Babylon (TtC)")).toBeNull();
     expect(sectionHeader("Deck strategy and tips:")).toBeNull();
+  });
+  it("accepts trailing Card(s)/Card List filler on section headers", () => {
+    expect(sectionHeader("Dual-Alignment Cards")).toBe("Dual-Alignment Cards");
+    expect(sectionHeader("Heroes Card List")).toBe("Heroes Card List");
+    expect(sectionHeader("Evil Cards")).toBeNull(); // "evil" is not a section
+    const lines = parseDeckContents(
+      "<p>Heroes</p><p>Card List</p><p>Told to Take (TtC)</p><p>Dual-Alignment Cards</p><p>Measured Mien (TtC)</p>",
+      ALIASES,
+    );
+    // Bare "Card List" is consumed without changing the section.
+    expect(lines.map((l) => [l.raw, l.section])).toEqual([
+      ["Told to Take (TtC)", "Heroes"],
+      ["Measured Mien (TtC)", "Dual-Alignment Cards"],
+    ]);
   });
 });
 
@@ -127,6 +168,11 @@ describe("fixture: fiery-furnace.html (live store description)", () => {
     expect(lines).toHaveLength(57);
     expect(lines.reduce((s, l) => s + l.qty, 0)).toBe(59); // O.T. meek is x3
     expect(lines.some((l) => l.raw.startsWith("The story of Daniel"))).toBe(false);
+    const counts = { resolved: 0, ambiguous: 0, unresolved: 0 };
+    for (const l of lines) counts[l.status]++;
+    // Remaining: rarity-vocab lines (deferred), the I/J print choice, the
+    // same-set different-card Depraved, and the O.T. meek soul group.
+    expect(counts).toEqual({ resolved: 52, ambiguous: 4, unresolved: 1 });
   });
   it("resolves 'Son of God (K)' — identity set code + embedded-set card name", () => {
     const l = byRaw(lines, "Son of God (K)");
@@ -202,21 +248,188 @@ describe("fixture: fiery-furnace.html (live store description)", () => {
     expect(lines[0].status).toBe("ambiguous");
     expect(lines[0].candidates.length).toBeGreaterThanOrEqual(2);
   });
-  it("Lost Soul store-vs-carddata naming lands in manual resolution (spec expectation)", () => {
-    expect(byRaw(lines, "Contempt (TtC)").status).toBe("unresolved");
+  it("bare-epithet Lost Souls resolve section-aware within the aliased set", () => {
+    // In a Lost Souls section the store writes just epithet + set; carddata
+    // writes 'Lost Soul "Epithet" [ref]'.
+    const contempt = byRaw(lines, "Contempt (TtC)");
+    expect(contempt.section).toBe("Lost Souls");
+    expect(contempt.status).toBe("resolved");
+    expect(contempt.candidates[0].cardKey).toBe(
+      'Lost Soul "Contempt" [Daniel 12:2]|T2C|023-Lost-Soul-Contempt');
+    expect(byRaw(lines, "Stubborn (TtC)").candidates[0].cardKey).toBe(
+      'Lost Soul "Stubborn" [Daniel 9:6]|T2C|022-Lost-Soul-Stubborn');
+    // K-deck epithet — pool is the identity alias [K], so the K1P first-print
+    // twin is not a candidate.
+    const displeased = byRaw(lines, "Displeased (K)");
+    expect(displeased.status).toBe("resolved");
+    expect(displeased.candidates[0].setCode).toBe("K");
+  });
+  it("bare-epithet matching also reads Ki-era paren epithets, and stays section-gated", () => {
+    const [hopper, remnant, offSection] = parseDeckContents(
+      "<p>Lost Souls</p><p>Hopper (Ki)</p><p>Remnant (PoC)</p><p>Heroes</p><p>Remnant (PoC)</p>",
+      ALIASES,
+    );
+    // carddata: "Lost Soul II Chronicles 28:13 (Hopper)" — epithet in parens.
+    expect(hopper.status).toBe("resolved");
+    expect(hopper.candidates[0].cardKey).toBe(
+      "Lost Soul II Chronicles 28:13 (Hopper)|Ki|Lost_Soul_II_Chronicles_28_13_(Hopper)_(Ki)");
+    expect(remnant.status).toBe("resolved");
+    expect(remnant.candidates[0].cardName).toBe('Lost Soul "Remnant" [Jeremiah 31:8]');
+    // Same line outside a Lost Souls section: no epithet rescue.
+    expect(offSection.section).toBe("Heroes");
+    expect(offSection.status).toBe("unresolved");
+  });
+});
+
+describe("fixture: rotation-jerusalem.html (prod-mirror body_html, worst tail offender)", () => {
+  // Pulled byte-identical from the shopify_products mirror (md5-verified);
+  // the storefront .js endpoint serves the same body_html.
+  const lines = parseDeckContents(fixture("rotation-jerusalem.html"), ALIASES);
+
+  it("emits exactly the 56 deck lines — the 21+ resolving tail card links are cut", () => {
+    expect(lines).toHaveLength(56);
+    expect(lines[0].raw).toBe("Son of God (I/J)");
+    expect(lines[lines.length - 1].raw).toBe("Strict Sabbath (GoC)"); // last Reserve card
+    const counts = { resolved: 0, ambiguous: 0, unresolved: 0 };
+    for (const l of lines) counts[l.status]++;
+    // Remaining ambiguous are genuine multi-print choices (I/J, or-option);
+    // the one unresolved is the "(5) N.T. Meek Lost Souls (I/J)" group line.
+    expect(counts).toEqual({ resolved: 52, ambiguous: 3, unresolved: 1 });
+  });
+  it("tail card links never appear as deck lines (phantom-card guard)", () => {
+    // These are real, resolvable card names hyperlinked in the recommended
+    // tail — before the cutoff they would have silently joined the deck.
+    for (const phantom of [
+      "The Resurrection", "Good Seed", "Doom Speakers", "Three Nails",
+      "Saul of Tarsus", "Grapes of Wrath", "The Deceiver", "Sheol",
+    ]) {
+      expect(lines.some((l) => l.raw === phantom)).toBe(false);
+    }
+    // …while the deck's own Heroes-section line with a tail-ish name stays.
+    expect(byRaw(lines, "Resurrection Revealer (GoC)").section).toBe("Heroes");
+  });
+  it("resolves single halves of dual-sided GoC hero names", () => {
+    // carddata: "Mary, Mother of James / Mary, the Caregiver (GoC)" etc. —
+    // the store lists one side only.
+    const mary = byRaw(lines, "Mary, Mother of James (GoC)");
+    expect(mary.status).toBe("resolved");
+    expect(mary.candidates[0].cardKey).toBe(
+      "Mary, Mother of James / Mary, the Caregiver (GoC)|GoC|147-Mary-MoJ-R");
+    const andrew = byRaw(lines, "Andrew, First Called (GoC)");
+    expect(andrew.section).toBe("Reserve");
+    expect(andrew.status).toBe("resolved");
+    expect(andrew.candidates[0].cardName).toBe(
+      "Andrew, First Called / Andrew, Fisher of Men (GoC)");
+  });
+  it("Lost Souls section: epithet + scripture rescues work on this fixture too", () => {
+    const first = byRaw(lines, "The First (I/J+)");
+    expect(first.status).toBe("resolved");
+    expect(first.candidates[0].cardKey).toBe(
+      'Lost Soul "The First" [Luke 13:30]|I/J+|Lost-Soul-The-First-Luke_13_30-IJ');
+    // In-set epithet beats the cross-set name fallback: "Escape" is also an
+    // AW dominant, but (PC) + Lost Souls section means the TPC soul.
+    const escape = byRaw(lines, "Escape (PC)");
+    expect(escape.status).toBe("resolved");
+    expect(escape.candidates[0].cardName).toBe('Lost Soul "Escape" [II Timothy 2:26 - TPC]');
+    expect(escape.candidates[0].setCode).toBe("TPC");
+  });
+});
+
+describe("deterministic folds and qty formats (synthetic)", () => {
+  const first = (html: string) => parseDeckContents(html, ALIASES)[0];
+
+  it("folds & ↔ and, hyphen ↔ space; strips price tails", () => {
+    expect(first("<p>Shattered & Scorched (TtC)</p>").candidates[0].cardName)
+      .toBe("Shattered and Scorched");
+    expect(first("<p>Self Made (TtC)</p>").candidates[0].cardName).toBe("Self-Made");
+    const priced = first("<p>Told to Take (TtC) - $3.00</p>");
+    expect(priced.status).toBe("resolved");
+    expect(priced.candidates[0].cardName).toBe("Told to Take");
+  });
+  it("finds cards through the strip-all-parens fold ('Meshach (PoC)')", () => {
+    const l = first("<p>Meshach (PoC)</p>");
+    expect(l.status).toBe("resolved");
+    expect(l.candidates[0].cardKey).toBe("Meshach (Mishael) (PoC)|PoC|151-Meshach");
+  });
+  it("parses trailing xN and leading bare-number quantities", () => {
+    expect(first("<p>Told to Take (TtC) x3</p>").qty).toBe(3);
+    const bare = first("<p>3 Told to Take (TtC)</p>");
+    expect(bare.qty).toBe(3);
+    expect(bare.status).toBe("resolved");
+    // Digit-leading card names always win over the bare-number reading.
+    const famine = first("<p>7 Years of Famine (RR2)</p>");
+    expect(famine.qty).toBe(1);
+    expect(famine.candidates[0].cardName).toBe("7 Years of Famine [RR2]");
+  });
+  it("same-set print twins are the ONE sanctioned auto-pick", () => {
+    // LoC carries "Wall of Protection (LoC)" and "Wall of Protection
+    // (Promo)" — same card name, same set, different printings only. The
+    // own-set-suffix print wins. Genuinely different same-set cards (e.g.
+    // "Servants of the King (Sky)/(River)") still go ambiguous.
+    const wall = first("<p>Wall of Protection (LoC)</p>");
+    expect(wall.status).toBe("resolved");
+    expect(wall.candidates[0].cardKey).toBe(
+      "Wall of Protection (LoC)|LoC|LoC_027-Wall-of-Protection-R");
+    expect(first("<p>Servants of the King (TtC)</p>").status).toBe("ambiguous");
+  });
+  it("prefers the Errata printing over the Banned one", () => {
+    for (const html of ["<p>Endless Treasures (PoC)</p>", "<p>Endless Treasures</p>"]) {
+      const l = first(html);
+      expect(l.status).toBe("resolved");
+      expect(l.candidates[0].cardKey).toBe(
+        "Endless Treasures (Errata)|PoC|Endless-Treasures-R-errata");
+    }
+  });
+});
+
+describe("dual-sided half-name matching (synthetic)", () => {
+  it("matches both-halves queries order-insensitively", () => {
+    // carddata order is "the Chosen / the Builder"; the store reverses it.
+    const [l] = parseDeckContents(
+      "<p>Zerubbabel, the Builder / Zerubbabel, the Chosen (LoC)</p>", ALIASES);
+    expect(l.status).toBe("resolved");
+    expect(l.candidates[0].cardKey).toBe(
+      "Zerubbabel, the Chosen / Zerubbabel, the Builder (LoC)|LoC|LoC_107-Zerubbabel-UR");
+  });
+  it("matches a lone half against the dual card", () => {
+    const [l] = parseDeckContents("<p>Jehoshaphat, the Seeker (LoC)</p>", ALIASES);
+    expect(l.status).toBe("resolved");
+    expect(l.candidates[0].cardKey).toBe(
+      "Jehoshaphat, the Seeker / Jehoshaphat, the Meek (LoC)|LoC|LoC_067-Jehoshaphat");
   });
 });
 
 describe("fixture: daniel-contender.html (live store description)", () => {
   const lines = parseDeckContents(fixture("daniel-contender.html"), ALIASES);
 
-  it("resolution summary: 83 lines — 75 resolved, 2 ambiguous, 6 unresolved", () => {
-    // Was 86 lines with 68/1/17 before scripture matching, or-option parens
-    // and the pre-section prose drop.
-    expect(lines).toHaveLength(83);
+  it("resolution summary: 60 lines — 58 resolved, 2 ambiguous, 0 unresolved", () => {
+    // Was 86 lines with 68/1/17 before scripture matching, or-option parens,
+    // the pre-section prose drop and the post-decklist cutoff. 60 is the
+    // real physical deck (50 main + 10 Reserve section lines).
+    expect(lines).toHaveLength(60);
     const counts = { resolved: 0, ambiguous: 0, unresolved: 0 };
     for (const l of lines) counts[l.status]++;
-    expect(counts).toEqual({ resolved: 75, ambiguous: 2, unresolved: 6 });
+    expect(counts).toEqual({ resolved: 58, ambiguous: 2, unresolved: 0 });
+  });
+  it("hard-stops at 'Deck strategy and tips:' — tail card links never become deck lines", () => {
+    // The tail's recommended-cards section is per-line hyperlinked REAL card
+    // names; without the cutoff they'd resolve and silently join the deck.
+    expect(lines[lines.length - 1].raw).toBe("Servants of the King (River) (TtC)");
+    for (const raw of [
+      "Deck strategy and tips:", "OVERVIEW:", "THE OFFENSE:", "THE DEFENSE:",
+      "Michael, the Guardian (TtC)",           // recommended-cards tail, resolves
+      "Lost Soul (Job 30:26) “Darkness” (RoJ)", // ditto
+      "Raiders' Camp (2025 Promo)",
+    ]) {
+      expect(lines.some((l) => l.raw === raw)).toBe(false);
+    }
+  });
+  it("cutoff only arms after the first section header (intro lines can't wipe the parse)", () => {
+    const parsed = parseDeckContents(
+      "<p>Overview video linked below!</p><p>Dominants</p><p>Son of God (K)</p><p>THE OFFENSE:</p><p>Told to Take (TtC)</p>",
+      ALIASES,
+    );
+    expect(parsed.map((l) => l.raw)).toEqual(["Son of God (K)"]);
   });
   it("auto-drops intro junk before the first section header", () => {
     for (const raw of [
@@ -226,10 +439,6 @@ describe("fixture: daniel-contender.html (live store description)", () => {
     ]) {
       expect(lines.some((l) => l.raw === raw)).toBe(false);
     }
-    // Scope guard: prose AFTER the first section header is not auto-dropped —
-    // the review screen's explicit resolve-or-drop gate still owns those.
-    expect(byRaw(lines, "Deck strategy and tips:").status).toBe("unresolved");
-    expect(byRaw(lines, "OVERVIEW:").status).toBe("unresolved");
   });
   it("keeps pre-section lines that resolve as cards; no headers → nothing dropped", () => {
     // Card line before any section header must survive the prose drop.
@@ -260,13 +469,26 @@ describe("fixture: daniel-contender.html (live store description)", () => {
     expect(l.setAbbrev).toBe("I & J+ or Promo");
     expect(l.name).toBe("New Jerusalem");
     expect(l.status).toBe("ambiguous");
+    // Every Pmo-P2 New Jerusalem print qualifies for "or Promo" — the
+    // strip-all-parens fold surfaces the 2019/Nats winner prints too.
     expect(l.candidates.map((c) => c.cardKey).sort()).toEqual([
+      "New Jerusalem (2019) (Promo)|Pmo-P2|Promo_New-Jerusalem-Winner",
       "New Jerusalem (I/J+)|I/J+|New-Jerusalem-IJ",
+      "New Jerusalem (Nats Promo)|Pmo-P2|Promo_New-Jerusalem-Nationals",
       "New Jerusalem (Promo)|Pmo-P2|New_Jerusalem_(Promo)",
     ]);
   });
   it("or-split leaves non-option parens alone ('2025 Promo' has no delimiter)", () => {
-    expect(byRaw(lines, "Raiders' Camp (2025 Promo)").status).toBe("unresolved");
+    // Synthetic since the fixture's occurrence sits in the cut-off tail.
+    // Not an or-option paren; the strip-all-parens fold now surfaces every
+    // Raiders' Camp print instead — ambiguous, one click, never auto-picked.
+    const [l] = parseDeckContents("<p>Raiders' Camp (2025 Promo)</p>", ALIASES);
+    expect(l.status).toBe("ambiguous");
+    expect(l.candidates.map((c) => c.cardName).sort()).toEqual([
+      "Raiders' Camp",
+      "Raiders' Camp [2023 - Seasonal]",
+      "Raiders' Camp [2025 - District]",
+    ]);
   });
   it("folds doubled straight quotes to match carddata curly-quote names", () => {
     const l = byRaw(lines, "Lost Soul ''Idolaters'' [Daniel 3:7] (TtC)");
@@ -295,14 +517,17 @@ describe("fixture: daniel-contender.html (live store description)", () => {
       'Lost Soul "Foreigner" [Jeremiah 22:3]|PoC|128-Lost-Soul-Foreigner-(Jeremiah-22_3)');
   });
   it("handles multi-ref verses and rarity-suffixed brackets in carddata names", () => {
+    // Synthetic (these store shapes sat in the now-cut-off recommended tail).
     // Line "(James 4:6/Proverbs 3:34)" vs carddata "[James 4:6 / Proverbs 3:34 - RoJ]".
-    const humble = byRaw(lines, "Lost Soul (James 4:6/Proverbs 3:34) “Humble” (RoJ)");
+    const [humble, cg] = parseDeckContents(
+      "<p>Lost Soul (James 4:6/Proverbs 3:34) “Humble” (RoJ)<br>Lost Soul ''Color Guard'' (Jeremiah 13:10) (Roots)</p>",
+      ALIASES,
+    );
     expect(humble.status).toBe("resolved");
     expect(humble.candidates[0].cardKey).toBe(
       'Lost Soul "Humble" [James 4:6 / Proverbs 3:34 - RoJ]|RoJ|22-Lost-Soul-Humble-R');
     // Line "(Jeremiah 13:10)" vs carddata "[Jeremiah 13:10 - RR]" — set-scoped
     // to RR via Roots, so the Pri print with the same verse is not a candidate.
-    const cg = byRaw(lines, "Lost Soul ''Color Guard'' (Jeremiah 13:10) (Roots)");
     expect(cg.status).toBe("resolved");
     expect(cg.candidates[0].cardKey).toBe(
       'Lost Soul "Color Guard" [Jeremiah 13:10 - RR]|RR|016-Lost-Soul-Color-Guard');
@@ -328,8 +553,5 @@ describe("fixture: daniel-contender.html (live store description)", () => {
   it("attributes sections through 'Fortresses/Sites/Cities' and drops strategy prose", () => {
     expect(byRaw(lines, "Babylon (TtC)").section).toBe("Fortresses/Sites/Cities");
     expect(lines.some((l) => l.raw.includes("Banding is a central component"))).toBe(false);
-    // Known noise: the recommended-cards tail parses as real lines; the
-    // review screen's explicit resolve-or-drop gate is the mitigation.
-    expect(lines.some((l) => l.raw === "Michael, the Guardian (TtC)")).toBe(true);
   });
 });
