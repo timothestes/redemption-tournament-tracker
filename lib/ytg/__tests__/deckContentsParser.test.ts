@@ -202,8 +202,36 @@ describe("fixture: fiery-furnace.html (live store description)", () => {
     expect(lines[0].status).toBe("ambiguous");
     expect(lines[0].candidates.length).toBeGreaterThanOrEqual(2);
   });
-  it("Lost Soul store-vs-carddata naming lands in manual resolution (spec expectation)", () => {
-    expect(byRaw(lines, "Contempt (TtC)").status).toBe("unresolved");
+  it("bare-epithet Lost Souls resolve section-aware within the aliased set", () => {
+    // In a Lost Souls section the store writes just epithet + set; carddata
+    // writes 'Lost Soul "Epithet" [ref]'.
+    const contempt = byRaw(lines, "Contempt (TtC)");
+    expect(contempt.section).toBe("Lost Souls");
+    expect(contempt.status).toBe("resolved");
+    expect(contempt.candidates[0].cardKey).toBe(
+      'Lost Soul "Contempt" [Daniel 12:2]|T2C|023-Lost-Soul-Contempt');
+    expect(byRaw(lines, "Stubborn (TtC)").candidates[0].cardKey).toBe(
+      'Lost Soul "Stubborn" [Daniel 9:6]|T2C|022-Lost-Soul-Stubborn');
+    // K-deck epithet — pool is the identity alias [K], so the K1P first-print
+    // twin is not a candidate.
+    const displeased = byRaw(lines, "Displeased (K)");
+    expect(displeased.status).toBe("resolved");
+    expect(displeased.candidates[0].setCode).toBe("K");
+  });
+  it("bare-epithet matching also reads Ki-era paren epithets, and stays section-gated", () => {
+    const [hopper, remnant, offSection] = parseDeckContents(
+      "<p>Lost Souls</p><p>Hopper (Ki)</p><p>Remnant (PoC)</p><p>Heroes</p><p>Remnant (PoC)</p>",
+      ALIASES,
+    );
+    // carddata: "Lost Soul II Chronicles 28:13 (Hopper)" — epithet in parens.
+    expect(hopper.status).toBe("resolved");
+    expect(hopper.candidates[0].cardKey).toBe(
+      "Lost Soul II Chronicles 28:13 (Hopper)|Ki|Lost_Soul_II_Chronicles_28_13_(Hopper)_(Ki)");
+    expect(remnant.status).toBe("resolved");
+    expect(remnant.candidates[0].cardName).toBe('Lost Soul "Remnant" [Jeremiah 31:8]');
+    // Same line outside a Lost Souls section: no epithet rescue.
+    expect(offSection.section).toBe("Heroes");
+    expect(offSection.status).toBe("unresolved");
   });
 });
 

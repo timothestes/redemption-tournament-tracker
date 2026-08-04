@@ -209,15 +209,18 @@ function lookup(map: Map<string, CardData[]> | undefined, variants: string[]): C
 /* ------------------------------------------------------------------ */
 
 /** Book word + chapter:verse(-range). Book capture is deliberately just the
- *  immediately-preceding word (plus optional 1-3 numeral) so extraction is
- *  consistent between store lines ("(Daniel 9:5)") and carddata names
+ *  immediately-preceding word (plus optional 1-3 / I-III numeral, folded to
+ *  digits: carddata's L/Ki souls write "II Chronicles 28:13") so extraction
+ *  is consistent between store lines ("(Daniel 9:5)") and carddata names
  *  ("[Daniel 9:5]", "Lost Soul Jeremiah 13:10 (Color Guard)"). */
-const SCRIPTURE_RE = /(?:\b([1-3])\s+)?([A-Za-z][A-Za-z.]*)\s+(\d+):(\d+(?:\s*[-–]\s*\d+)?)/g;
+const SCRIPTURE_RE = /(?:\b([1-3]|III|II|I)\s+)?([A-Za-z][A-Za-z.]*)\s+(\d+):(\d+(?:\s*[-–]\s*\d+)?)/g;
+const ROMAN_BOOK_NUM: Record<string, string> = { I: "1", II: "2", III: "3" };
 
 function scriptureRefs(s: string): string[] {
   const out: string[] = [];
   for (const m of s.matchAll(SCRIPTURE_RE)) {
-    const book = `${m[1] ? `${m[1]} ` : ""}${m[2].toLowerCase().replace(/\./g, "")}`;
+    const num = m[1] ? `${ROMAN_BOOK_NUM[m[1]] ?? m[1]} ` : "";
+    const book = `${num}${m[2].toLowerCase().replace(/\./g, "")}`;
     const verse = m[4].replace(/\s*[-–]\s*/g, "-");
     out.push(`${book} ${m[3]}:${verse}`);
   }
@@ -230,6 +233,21 @@ function epithetOf(s: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+/** Card-side epithet: quoted span, else the Ki/Pri-era paren form —
+ *  "Lost Soul II Chronicles 28:13 (Hopper)" — skipping scripture refs and
+ *  short set-code suffixes like "(Ki)". */
+function cardEpithetOf(name: string): string | null {
+  const quoted = epithetOf(name);
+  if (quoted !== null) return quoted;
+  for (const m of name.matchAll(/\(([^()]+)\)/g)) {
+    const inner = m[1].trim();
+    if (/\d/.test(inner)) continue; // scripture ref / year
+    if (/^[A-Z][A-Za-z0-9]{0,4}$/.test(inner)) continue; // set-code-ish
+    return normalize(inner);
+  }
+  return null;
+}
+
 interface LostSoulEntry { card: CardData; refs: string[]; epithet: string | null }
 
 let LS_INDEX: LostSoulEntry[] | null = null;
@@ -240,7 +258,8 @@ function lostSoulIndex(): LostSoulEntry[] {
   for (const card of CARDS) {
     if (!card.name || !/^lost soul/i.test(card.name)) continue;
     const refs = scriptureRefs(card.name);
-    if (refs.length > 0) LS_INDEX.push({ card, refs, epithet: epithetOf(card.name) });
+    const epithet = cardEpithetOf(card.name);
+    if (refs.length > 0 || epithet !== null) LS_INDEX.push({ card, refs, epithet });
   }
   return LS_INDEX;
 }
@@ -324,6 +343,34 @@ function withLostSoulScripture(
   };
 }
 
+/** Bare-epithet rescue, only inside a Lost Souls section: store lines there
+ *  are mostly epithet + set — "Remnant (PoC)", "Hopper (Ki)", "Contempt
+ *  (TtC)" — while carddata writes 'Lost Soul "Remnant" [Jeremiah 31:8]'.
+ *  Match the line's name as an epithet among Lost Soul cards within the
+ *  aliased candidate sets. One hit → resolved; several → ambiguous (never
+ *  auto-pick); none → keep the base resolution. */
+function withLostSoulEpithet(
+  base: Resolution,
+  innerName: string,
+  poolSets: string[],
+  inLostSoulSection: boolean,
+): Resolution {
+  if (base.status !== "unresolved" || !inLostSoulSection) return base;
+  if (/^lost soul/i.test(innerName.trim())) return base;
+  const epithet = normalize(innerName);
+  if (!epithet) return base;
+  const hits = lostSoulIndex().filter(
+    (e) => poolSets.includes(e.card.set) && e.epithet === epithet,
+  );
+  if (hits.length === 0) return base;
+  const cards = hits.map((e) => e.card);
+  return {
+    ...base,
+    candidates: toCandidates(cards, cards.length === 1 ? 0.9 : 0.5),
+    status: statusFor(cards.length),
+  };
+}
+
 /** "Or"-option parens: "(I & J+ or Promo)", "(I/J)". The whole paren failed
  *  as one alias; split it into tokens and alias-resolve each independently.
  *  Top-level separators first (or, comma) so multi-word aliases like
@@ -349,7 +396,9 @@ function resolveLine(
   rest: string,
   aliasCandidates: Map<string, string[]>,
   idx: CardIndex,
+  section: string | null = null,
 ): Resolution {
+  const inLostSoulSection = section !== null && /lost soul/i.test(section);
   const paren = TRAILING_PAREN.exec(rest);
   const abbrev = paren ? paren[2].trim() : null;
   const aliasSets = abbrev ? aliasCandidates.get(normalize(abbrev)) : undefined;
@@ -380,11 +429,10 @@ function resolveLine(
     // to a global search (full line first, then the paren-stripped name).
     const fallback = fullHits.length > 0 ? fullHits : lookup(idx.global, nameKeyVariants(rest));
     const cands = toCandidates(fallback, fallback.length === 1 ? 0.7 : 0.4);
-    return withLostSoulScripture(
-      { name: innerName, setAbbrev: abbrev, candidates: cands, status: statusFor(cands.length) },
-      rest,
-      aliasSets,
-    );
+    let res: Resolution = { name: innerName, setAbbrev: abbrev, candidates: cands, status: statusFor(cands.length) };
+    res = withLostSoulScripture(res, rest, aliasSets);
+    res = withLostSoulEpithet(res, innerName, aliasSets, inLostSoulSection);
+    return res;
   }
 
   // Paren is not a single known set — maybe it's an option list of sets.
@@ -453,7 +501,7 @@ export function parseDeckContents(
     if (!/[a-zA-Z]/.test(line)) continue;
 
     const { qty, rest } = parseQty(line);
-    const res = resolveLine(rest, aliasCandidates, idx);
+    const res = resolveLine(rest, aliasCandidates, idx, section);
     // Intro junk ("And check out these videos…") sits before the first
     // section header; anything there that doesn't look like a card is
     // dropped outright — same consumption semantics as the prose heuristic.
