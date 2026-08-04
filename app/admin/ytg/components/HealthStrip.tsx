@@ -17,7 +17,7 @@ function timeAgo(iso: string | null): string {
 export default async function HealthStrip() {
   const supabase = getSupabaseAdmin();
 
-  const [freshness, productCount, totalMappings, confirmedMappings, needsReview, unmatched] =
+  const [freshness, productCount, totalMappings, confirmedMappings, noPriceExists, needsReview, unmatched] =
     await Promise.all([
       supabase
         .from("shopify_products")
@@ -34,6 +34,10 @@ export default async function HealthStrip() {
       supabase
         .from("card_price_mappings")
         .select("*", { count: "exact", head: true })
+        .eq("status", "no_price_exists"),
+      supabase
+        .from("card_price_mappings")
+        .select("*", { count: "exact", head: true })
         .eq("status", "needs_review"),
       supabase
         .from("card_price_mappings")
@@ -44,13 +48,23 @@ export default async function HealthStrip() {
   const oldestSync: string | null = freshness.data?.[0]?.last_synced_at ?? null;
   const total = totalMappings.count ?? 0;
   const confirmed = confirmedMappings.count ?? 0;
-  const matchedPct = total > 0 ? Math.round((confirmed / total) * 1000) / 10 : 0;
+  const notSold = noPriceExists.count ?? 0;
+  // Matched % is of SELLABLE cards only — no_price_exists rows are cards YTG
+  // deliberately doesn't sell, not matching failures ("81.7% matched" read as
+  // a problem when the missing 18.3% was all no_price_exists).
+  const sellable = total - notSold;
+  const matchedPct = sellable > 0 ? Math.round((confirmed / sellable) * 1000) / 10 : 0;
 
   // Each stat links to the tab that acts on it.
-  const stats = [
+  const stats: { label: string; value: string; sub?: string; href: string }[] = [
     { label: "Synced", value: timeAgo(oldestSync), href: "/admin/ytg/matching" },
     { label: "Products", value: (productCount.count ?? 0).toLocaleString(), href: "/admin/ytg/products" },
-    { label: "Matched", value: `${matchedPct}%`, href: "/admin/ytg/matching" },
+    {
+      label: "Matched",
+      value: `${matchedPct}% of sellable`,
+      sub: `${notSold.toLocaleString()} not sold by YTG`,
+      href: "/admin/ytg/matching",
+    },
     { label: "Needs review", value: (needsReview.count ?? 0).toLocaleString(), href: "/admin/ytg/matching" },
     { label: "Unmatched", value: (unmatched.count ?? 0).toLocaleString(), href: "/admin/ytg/matching" },
   ];
@@ -67,6 +81,9 @@ export default async function HealthStrip() {
             {s.label}
           </span>
           <span className="text-sm font-semibold">{s.value}</span>
+          {s.sub && (
+            <span className="block text-[10px] text-muted-foreground">{s.sub}</span>
+          )}
         </Link>
       ))}
     </div>
