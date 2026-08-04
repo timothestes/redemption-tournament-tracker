@@ -284,6 +284,42 @@ describe("fixture: rotation-jerusalem.html (prod-mirror body_html, worst tail of
     // …while the deck's own Heroes-section line with a tail-ish name stays.
     expect(byRaw(lines, "Resurrection Revealer (GoC)").section).toBe("Heroes");
   });
+  it("resolves single halves of dual-sided GoC hero names", () => {
+    // carddata: "Mary, Mother of James / Mary, the Caregiver (GoC)" etc. —
+    // the store lists one side only.
+    const mary = byRaw(lines, "Mary, Mother of James (GoC)");
+    expect(mary.status).toBe("resolved");
+    expect(mary.candidates[0].cardKey).toBe(
+      "Mary, Mother of James / Mary, the Caregiver (GoC)|GoC|147-Mary-MoJ-R");
+    const andrew = byRaw(lines, "Andrew, First Called (GoC)");
+    expect(andrew.section).toBe("Reserve");
+    expect(andrew.status).toBe("resolved");
+    expect(andrew.candidates[0].cardName).toBe(
+      "Andrew, First Called / Andrew, Fisher of Men (GoC)");
+  });
+  it("Lost Souls section: epithet + scripture rescues work on this fixture too", () => {
+    const first = byRaw(lines, "The First (I/J+)");
+    expect(first.status).toBe("resolved");
+    expect(first.candidates[0].cardKey).toBe(
+      'Lost Soul "The First" [Luke 13:30]|I/J+|Lost-Soul-The-First-Luke_13_30-IJ');
+  });
+});
+
+describe("dual-sided half-name matching (synthetic)", () => {
+  it("matches both-halves queries order-insensitively", () => {
+    // carddata order is "the Chosen / the Builder"; the store reverses it.
+    const [l] = parseDeckContents(
+      "<p>Zerubbabel, the Builder / Zerubbabel, the Chosen (LoC)</p>", ALIASES);
+    expect(l.status).toBe("resolved");
+    expect(l.candidates[0].cardKey).toBe(
+      "Zerubbabel, the Chosen / Zerubbabel, the Builder (LoC)|LoC|LoC_107-Zerubbabel-UR");
+  });
+  it("matches a lone half against the dual card", () => {
+    const [l] = parseDeckContents("<p>Jehoshaphat, the Seeker (LoC)</p>", ALIASES);
+    expect(l.status).toBe("resolved");
+    expect(l.candidates[0].cardKey).toBe(
+      "Jehoshaphat, the Seeker / Jehoshaphat, the Meek (LoC)|LoC|LoC_067-Jehoshaphat");
+  });
 });
 
 describe("fixture: daniel-contender.html (live store description)", () => {

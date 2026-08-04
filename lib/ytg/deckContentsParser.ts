@@ -152,17 +152,49 @@ function strictVariants(name: string): string[] {
   return [...new Set([normalize(folded), normalize(bracketsToParens(folded))])].filter(Boolean);
 }
 
-/** Full ladder, most-specific → loosest. Shared by the index and queries. */
-function nameKeyVariants(name: string): string[] {
-  const folded = name.replace(/''/g, '"');
-  const paren = bracketsToParens(folded);
-  return [...new Set([
+function baseKeyVariants(folded: string, paren: string): string[] {
+  return [
     normalize(folded),
     normalize(paren),
     normalize(stripEmbeddedSet(folded)),
     normalize(stripEmbeddedSet(paren)),
     loose(normalize(stripEmbeddedSet(paren))),
-  ])].filter(Boolean);
+  ];
+}
+
+/** Split on "/" outside any paren/bracket — dual-sided card names, not
+ *  scripture multi-refs ("[James 4:6 / Proverbs 3:34]") or set codes
+ *  ("(I/J+)"). */
+function splitTopLevelSlash(s: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let cur = "";
+  for (const ch of s) {
+    if (ch === "(" || ch === "[") depth++;
+    else if (ch === ")" || ch === "]") depth = Math.max(0, depth - 1);
+    if (ch === "/" && depth === 0) { parts.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  parts.push(cur);
+  return parts.map((p) => p.trim()).filter(Boolean);
+}
+
+/** Full ladder, most-specific → loosest. Shared by the index and queries. */
+function nameKeyVariants(name: string): string[] {
+  const folded = name.replace(/''/g, '"');
+  const paren = bracketsToParens(folded);
+  const keys = baseKeyVariants(folded, paren);
+  // Dual-sided names ("Jehoshaphat, the Seeker / Jehoshaphat, the Meek"):
+  // an order-insensitive both-halves key (the store sometimes reverses
+  // carddata's side order), then each half on its own (the store usually
+  // lists just one side). Per-half embedded sets are stripped so
+  // "… the Builder (LoC)" folds to "… the Builder".
+  const halves = splitTopLevelSlash(paren);
+  if (halves.length > 1) {
+    keys.push(halves.map((h) => normalize(stripEmbeddedSet(h))).sort().join(" / "));
+    for (const h of halves) keys.push(...baseKeyVariants(h, h));
+  }
+  return [...new Set(keys)].filter(Boolean);
 }
 
 interface CardIndex {
