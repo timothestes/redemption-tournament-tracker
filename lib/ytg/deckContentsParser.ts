@@ -168,6 +168,47 @@ function lookup(map: Map<string, CardData[]> | undefined, variants: string[]): C
 }
 
 /* ------------------------------------------------------------------ */
+/*  Lost Soul scripture-reference matching                             */
+/* ------------------------------------------------------------------ */
+
+/** Book word + chapter:verse(-range). Book capture is deliberately just the
+ *  immediately-preceding word (plus optional 1-3 numeral) so extraction is
+ *  consistent between store lines ("(Daniel 9:5)") and carddata names
+ *  ("[Daniel 9:5]", "Lost Soul Jeremiah 13:10 (Color Guard)"). */
+const SCRIPTURE_RE = /(?:\b([1-3])\s+)?([A-Za-z][A-Za-z.]*)\s+(\d+):(\d+(?:\s*[-–]\s*\d+)?)/g;
+
+function scriptureRefs(s: string): string[] {
+  const out: string[] = [];
+  for (const m of s.matchAll(SCRIPTURE_RE)) {
+    const book = `${m[1] ? `${m[1]} ` : ""}${m[2].toLowerCase().replace(/\./g, "")}`;
+    const verse = m[4].replace(/\s*[-–]\s*/g, "-");
+    out.push(`${book} ${m[3]}:${verse}`);
+  }
+  return out;
+}
+
+/** First quoted span, quote styles folded ('' doubled-singles, smart quotes). */
+function epithetOf(s: string): string | null {
+  const m = /"([^"]+)"/.exec(normalize(s.replace(/''/g, '"')));
+  return m ? m[1].trim() : null;
+}
+
+interface LostSoulEntry { card: CardData; refs: string[]; epithet: string | null }
+
+let LS_INDEX: LostSoulEntry[] | null = null;
+
+function lostSoulIndex(): LostSoulEntry[] {
+  if (LS_INDEX) return LS_INDEX;
+  LS_INDEX = [];
+  for (const card of CARDS) {
+    if (!card.name || !/^lost soul/i.test(card.name)) continue;
+    const refs = scriptureRefs(card.name);
+    if (refs.length > 0) LS_INDEX.push({ card, refs, epithet: epithetOf(card.name) });
+  }
+  return LS_INDEX;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Line grammar + resolution                                          */
 /* ------------------------------------------------------------------ */
 
@@ -207,6 +248,45 @@ function statusFor(n: number): ParsedLine["status"] {
   return n === 1 ? "resolved" : n > 1 ? "ambiguous" : "unresolved";
 }
 
+/** Scripture-ref rescue for otherwise-unresolved "Lost Soul …" lines.
+ *  Store descriptions freely reorder epithet/scripture and swap () for []
+ *  ("Lost Soul (Daniel 9:5) ''Covenant Breakers''" vs carddata's
+ *  'Lost Soul "Covenant Breakers" [Daniel 9:5]'), so name-shape matching
+ *  fails; the scripture ref is the stable token. Match primarily by ref
+ *  (within poolSets when a set abbrev parsed, else all sets); epithet is
+ *  only a tiebreaker. One hit → resolved; several → ambiguous (never
+ *  auto-pick); none → keep the base resolution. */
+function withLostSoulScripture(
+  base: Resolution,
+  rest: string,
+  poolSets: string[] | null,
+): Resolution {
+  if (base.status !== "unresolved") return base;
+  if (!/^lost soul/i.test(rest.trim())) return base;
+  const lineRefs = scriptureRefs(rest);
+  if (lineRefs.length === 0) return base;
+
+  let hits = lostSoulIndex().filter(
+    (e) =>
+      (poolSets === null || poolSets.includes(e.card.set)) &&
+      lineRefs.every((r) => e.refs.includes(r)),
+  );
+  if (hits.length === 0) return base;
+  if (hits.length > 1) {
+    const epithet = epithetOf(rest);
+    if (epithet !== null) {
+      const narrowed = hits.filter((e) => e.epithet === epithet);
+      if (narrowed.length === 1) hits = narrowed;
+    }
+  }
+  const cards = hits.map((e) => e.card);
+  return {
+    ...base,
+    candidates: toCandidates(cards, cards.length === 1 ? 0.9 : 0.5),
+    status: statusFor(cards.length),
+  };
+}
+
 function resolveLine(
   rest: string,
   aliasCandidates: Map<string, string[]>,
@@ -242,13 +322,21 @@ function resolveLine(
     // to a global search (full line first, then the paren-stripped name).
     const fallback = fullHits.length > 0 ? fullHits : lookup(idx.global, nameKeyVariants(rest));
     const cands = toCandidates(fallback, fallback.length === 1 ? 0.7 : 0.4);
-    return { name: innerName, setAbbrev: abbrev, candidates: cands, status: statusFor(cands.length) };
+    return withLostSoulScripture(
+      { name: innerName, setAbbrev: abbrev, candidates: cands, status: statusFor(cands.length) },
+      rest,
+      aliasSets,
+    );
   }
 
   // No trailing paren, or the paren is not a known set → whole line is the name.
   const hits = lookup(idx.global, nameKeyVariants(rest));
   const cands = toCandidates(hits, hits.length === 1 ? 0.7 : 0.4);
-  return { name: rest, setAbbrev: null, candidates: cands, status: statusFor(cands.length) };
+  return withLostSoulScripture(
+    { name: rest, setAbbrev: null, candidates: cands, status: statusFor(cands.length) },
+    rest,
+    null,
+  );
 }
 
 /* ------------------------------------------------------------------ */

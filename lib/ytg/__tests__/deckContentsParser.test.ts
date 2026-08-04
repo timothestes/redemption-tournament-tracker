@@ -247,10 +247,57 @@ describe("fixture: daniel-contender.html (live store description)", () => {
     expect(l.status).toBe("resolved");
     expect(l.candidates[0].cardKey).toBe('Lost Soul "Idolaters" [Daniel 3:7]|T2C|021-Lost-Soul-Idolaters');
   });
-  it("smart-double-quoted scripture Lost Souls with reordered names stay unresolved", () => {
-    const l = byRaw(lines, "Lost Soul (Psalm 78:22) “O.T. Only” (FoM)");
-    expect(l.setAbbrev).toBe("FoM");
-    expect(l.status).toBe("unresolved"); // carddata: Lost Soul "O.T. Only" [Psalm 78:22]
+  it("scripture-ref matching resolves reordered Lost Soul lines within the parsed set", () => {
+    // Store order "(ref) “epithet”" vs carddata 'Lost Soul "epithet" [ref]' —
+    // the scripture ref is the stable token.
+    const ot = byRaw(lines, "Lost Soul (Psalm 78:22) “O.T. Only” (FoM)");
+    expect(ot.setAbbrev).toBe("FoM");
+    expect(ot.status).toBe("resolved");
+    expect(ot.candidates[0].cardKey).toBe(
+      'Lost Soul "O.T. Only" [Psalm 78:22]|FoM|140-Lost_Soul_Psalm_78-22');
+
+    const cb = byRaw(lines, "Lost Soul (Daniel 9:5) ''Covenant Breakers'' (PoC)");
+    expect(cb.status).toBe("resolved");
+    expect(cb.candidates[0].cardKey).toBe(
+      'Lost Soul "Covenant Breakers" [Daniel 9:5]|PoC|164-Lost-Soul-Covenant-Breakers-(Daniel-9_5)');
+  });
+  it("epithet tiebreaks when one set has two souls on the same verse", () => {
+    // PoC has both "Foreigner" and "Orphans" on Jeremiah 22:3.
+    const l = byRaw(lines, "Lost Soul (Jeremiah 22:3) “Foreigner” (PoC)");
+    expect(l.status).toBe("resolved");
+    expect(l.candidates[0].cardKey).toBe(
+      'Lost Soul "Foreigner" [Jeremiah 22:3]|PoC|128-Lost-Soul-Foreigner-(Jeremiah-22_3)');
+  });
+  it("handles multi-ref verses and rarity-suffixed brackets in carddata names", () => {
+    // Line "(James 4:6/Proverbs 3:34)" vs carddata "[James 4:6 / Proverbs 3:34 - RoJ]".
+    const humble = byRaw(lines, "Lost Soul (James 4:6/Proverbs 3:34) “Humble” (RoJ)");
+    expect(humble.status).toBe("resolved");
+    expect(humble.candidates[0].cardKey).toBe(
+      'Lost Soul "Humble" [James 4:6 / Proverbs 3:34 - RoJ]|RoJ|22-Lost-Soul-Humble-R');
+    // Line "(Jeremiah 13:10)" vs carddata "[Jeremiah 13:10 - RR]" — set-scoped
+    // to RR via Roots, so the Pri print with the same verse is not a candidate.
+    const cg = byRaw(lines, "Lost Soul ''Color Guard'' (Jeremiah 13:10) (Roots)");
+    expect(cg.status).toBe("resolved");
+    expect(cg.candidates[0].cardKey).toBe(
+      'Lost Soul "Color Guard" [Jeremiah 13:10 - RR]|RR|016-Lost-Soul-Color-Guard');
+  });
+  it("scripture match with several hits and no deciding epithet stays ambiguous", () => {
+    // Synthetic: no epithet on the line → both PoC Jeremiah 22:3 souls listed.
+    const [l] = parseDeckContents("<p>Lost Soul (Jeremiah 22:3) (PoC)</p>", ALIASES);
+    expect(l.status).toBe("ambiguous");
+    expect(l.candidates.map((c) => c.cardName).sort()).toEqual([
+      'Lost Soul "Foreigner" [Jeremiah 22:3]',
+      'Lost Soul "Orphans" [Jeremiah 22:3]',
+    ]);
+  });
+  it("scripture match spans all sets when no set abbrev parsed; unknown refs stay unresolved", () => {
+    const lines = parseDeckContents(
+      "<p>Lost Soul (Psalm 78:22) ''O.T. Only''<br>Lost Soul (Hezekiah 99:99) ''Nobody''</p>",
+      ALIASES,
+    );
+    expect(lines[0].status).toBe("resolved");
+    expect(lines[0].candidates[0].setCode).toBe("FoM");
+    expect(lines[1].status).toBe("unresolved");
   });
   it("attributes sections through 'Fortresses/Sites/Cities' and drops strategy prose", () => {
     expect(byRaw(lines, "Babylon (TtC)").section).toBe("Fortresses/Sites/Cities");
