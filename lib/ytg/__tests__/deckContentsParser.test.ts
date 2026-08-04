@@ -159,11 +159,18 @@ describe("fixture: fiery-furnace.html (live store description)", () => {
     expect(l.status).toBe("ambiguous");
     expect(l.candidates.length).toBeGreaterThanOrEqual(2); // TxP print + GoC LR print
   });
-  it("'Christian Martyr (I/J)' — unknown paren stays in the name → unresolved", () => {
+  it("'Christian Martyr (I/J)' — option paren splits on '/' → ambiguous across I and J", () => {
+    // Was unresolved before or-option parens: "I/J" fails as ONE alias, but
+    // splits into I and J, both real sets containing the card. Never
+    // auto-picked — the admin gets a one-click choice.
     const l = byRaw(lines, "Christian Martyr (I/J)");
-    expect(l.setAbbrev).toBeNull();
-    expect(l.name).toBe("Christian Martyr (I/J)");
-    expect(l.status).toBe("unresolved");
+    expect(l.setAbbrev).toBe("I/J");
+    expect(l.name).toBe("Christian Martyr");
+    expect(l.status).toBe("ambiguous");
+    expect(l.candidates.map((c) => c.cardKey).sort()).toEqual([
+      "Christian Martyr (I)|I|Christian_Martyr_(I)",
+      "Christian Martyr (J)|J|Christian_Martyr_(J)",
+    ]);
   });
   it("ambiguous alias RoA←{RoA, RoA 3} disambiguated by containment", () => {
     const l = byRaw(lines, "Scattered (RoA)");
@@ -203,6 +210,14 @@ describe("fixture: fiery-furnace.html (live store description)", () => {
 describe("fixture: daniel-contender.html (live store description)", () => {
   const lines = parseDeckContents(fixture("daniel-contender.html"), ALIASES);
 
+  it("resolution summary: 83 lines — 75 resolved, 2 ambiguous, 6 unresolved", () => {
+    // Was 86 lines with 68/1/17 before scripture matching, or-option parens
+    // and the pre-section prose drop.
+    expect(lines).toHaveLength(83);
+    const counts = { resolved: 0, ambiguous: 0, unresolved: 0 };
+    for (const l of lines) counts[l.status]++;
+    expect(counts).toEqual({ resolved: 75, ambiguous: 2, unresolved: 6 });
+  });
   it("auto-drops intro junk before the first section header", () => {
     for (const raw of [
       "And check out these videos to find out more about this deck!",
@@ -237,10 +252,21 @@ describe("fixture: daniel-contender.html (live store description)", () => {
     expect(l.status).toBe("ambiguous");
     expect(l.candidates.map((c) => c.setCode).sort()).toEqual(["K", "K1P"]);
   });
-  it("'New Jerusalem (I & J+ or Promo)' — prose-ish paren → unresolved, paren kept", () => {
+  it("'New Jerusalem (I & J+ or Promo)' — or-option paren → ambiguous with per-set candidates", () => {
+    // "I & J+" resolves whole (before the &// sub-split) → I/J+; "Promo" →
+    // Pmo-P1/P2/P3. Only I/J+ and Pmo-P2 actually contain a New Jerusalem.
+    // Always ambiguous: the line itself offers alternatives — never auto-pick.
     const l = byRaw(lines, "New Jerusalem (I & J+ or Promo)");
-    expect(l.setAbbrev).toBeNull();
-    expect(l.status).toBe("unresolved");
+    expect(l.setAbbrev).toBe("I & J+ or Promo");
+    expect(l.name).toBe("New Jerusalem");
+    expect(l.status).toBe("ambiguous");
+    expect(l.candidates.map((c) => c.cardKey).sort()).toEqual([
+      "New Jerusalem (I/J+)|I/J+|New-Jerusalem-IJ",
+      "New Jerusalem (Promo)|Pmo-P2|New_Jerusalem_(Promo)",
+    ]);
+  });
+  it("or-split leaves non-option parens alone ('2025 Promo' has no delimiter)", () => {
+    expect(byRaw(lines, "Raiders' Camp (2025 Promo)").status).toBe("unresolved");
   });
   it("folds doubled straight quotes to match carddata curly-quote names", () => {
     const l = byRaw(lines, "Lost Soul ''Idolaters'' [Daniel 3:7] (TtC)");

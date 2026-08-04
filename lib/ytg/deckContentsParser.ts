@@ -141,6 +141,18 @@ function pushKey(map: Map<string, CardData[]>, key: string, card: CardData) {
   else map.set(key, [card]);
 }
 
+/** Strip a trailing paren/bracket that is exactly the card's OWN set code.
+ *  stripEmbeddedSet only handles short alphanumeric codes; names like
+ *  "New Jerusalem (I/J+)" (set I/J+) slip through and would otherwise never
+ *  be findable by their bare name within their set. */
+function ownSetStripped(name: string, set: string): string | null {
+  const esc = set.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`\\s*[(\\[]${esc}[)\\]]\\s*$`);
+  if (!re.test(name)) return null;
+  const stripped = name.replace(re, "").trim();
+  return stripped || null;
+}
+
 function cardIndex(): CardIndex {
   if (INDEX) return INDEX;
   const bySet = new Map<string, Map<string, CardData[]>>();
@@ -149,7 +161,10 @@ function cardIndex(): CardIndex {
     if (!card.name) continue;
     let setMap = bySet.get(card.set);
     if (!setMap) { setMap = new Map(); bySet.set(card.set, setMap); }
-    for (const key of nameKeyVariants(card.name)) {
+    const keys = nameKeyVariants(card.name);
+    const own = ownSetStripped(card.name, card.set);
+    if (own) keys.push(...nameKeyVariants(own));
+    for (const key of new Set(keys)) {
       pushKey(setMap, key, card);
       pushKey(global, key, card);
     }
@@ -287,6 +302,27 @@ function withLostSoulScripture(
   };
 }
 
+/** "Or"-option parens: "(I & J+ or Promo)", "(I/J)". The whole paren failed
+ *  as one alias; split it into tokens and alias-resolve each independently.
+ *  Top-level separators first (or, comma) so multi-word aliases like
+ *  "I & J+" resolve whole before the tighter &// split. Tokens that don't
+ *  resolve are ignored. */
+function splitParenSets(
+  abbrev: string,
+  aliasCandidates: Map<string, string[]>,
+): string[] {
+  const sets: string[] = [];
+  for (const token of abbrev.split(/\s+or\s+|,/i).map((t) => t.trim()).filter(Boolean)) {
+    const whole = aliasCandidates.get(normalize(token));
+    if (whole) { sets.push(...whole); continue; }
+    for (const sub of token.split(/[&/]/).map((s) => s.trim()).filter(Boolean)) {
+      const subSets = aliasCandidates.get(normalize(sub));
+      if (subSets) sets.push(...subSets);
+    }
+  }
+  return [...new Set(sets)];
+}
+
 function resolveLine(
   rest: string,
   aliasCandidates: Map<string, string[]>,
@@ -329,13 +365,40 @@ function resolveLine(
     );
   }
 
+  // Paren is not a single known set — maybe it's an option list of sets.
+  let orSets: string[] = [];
+  if (paren && abbrev !== null) {
+    orSets = splitParenSets(abbrev, aliasCandidates);
+    if (orSets.length > 0) {
+      const innerName = paren[1].trim();
+      let orHits: CardData[] = [];
+      for (const setCode of orSets) {
+        orHits.push(...lookup(idx.bySet.get(setCode), nameKeyVariants(innerName)));
+      }
+      orHits = [...new Set(orHits)];
+      const fullHits = lookup(idx.global, strictVariants(rest));
+      if (orHits.length > 0) {
+        // The source line itself offers alternatives — surface every print
+        // for a one-click pick, and NEVER auto-resolve (even a single hit
+        // still needs the admin to confirm which option the store meant).
+        const union = dedupeCandidates([
+          ...toCandidates(orHits, 0.5),
+          ...toCandidates(fullHits, 0.6),
+        ]);
+        return { name: innerName, setAbbrev: abbrev, candidates: union, status: "ambiguous" };
+      }
+      // No option-set contains the name → fall through to current behavior
+      // (paren stays part of the name).
+    }
+  }
+
   // No trailing paren, or the paren is not a known set → whole line is the name.
   const hits = lookup(idx.global, nameKeyVariants(rest));
   const cands = toCandidates(hits, hits.length === 1 ? 0.7 : 0.4);
   return withLostSoulScripture(
     { name: rest, setAbbrev: null, candidates: cands, status: statusFor(cands.length) },
     rest,
-    null,
+    orSets.length > 0 ? orSets : null,
   );
 }
 
