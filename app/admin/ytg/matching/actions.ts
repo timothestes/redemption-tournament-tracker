@@ -31,8 +31,11 @@ export async function planSkuBackfill(): Promise<{
   const supabase = getSupabaseAdmin();
   const pageSize = 1000;
 
-  // Confirmed mappings whose product is a Single with no SKU yet (!inner join
-  // makes the embedded filters constrain the parent rows).
+  // Confirmed mappings whose product is a Single (!inner join makes the
+  // embedded filters constrain the parent rows). NO sku-is-null prefilter:
+  // synced blank SKUs land as "" (empty string), so the "already has a SKU"
+  // decision belongs to planBackfillRows' trim check, which treats ""/null
+  // both as missing.
   const mappings: (BackfillMappingRow & { shopify_products: BackfillProductLite })[] = [];
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await supabase
@@ -41,7 +44,6 @@ export async function planSkuBackfill(): Promise<{
       .in('status', ['auto_matched', 'manual'])
       .not('shopify_product_id', 'is', null)
       .eq('shopify_products.product_type', 'Single')
-      .is('shopify_products.sku', null)
       .range(offset, offset + pageSize - 1);
     if (error) throw new Error(`planSkuBackfill mappings: ${error.message}`);
     mappings.push(...((data ?? []) as unknown as (BackfillMappingRow & { shopify_products: BackfillProductLite })[]));
@@ -57,7 +59,9 @@ export async function planSkuBackfill(): Promise<{
       .not('sku', 'is', null)
       .range(offset, offset + pageSize - 1);
     if (error) throw new Error(`planSkuBackfill skus: ${error.message}`);
-    for (const p of data ?? []) existingSkuOwners.set(p.sku, p.id);
+    for (const p of data ?? []) {
+      if ((p.sku ?? '').trim() !== '') existingSkuOwners.set(p.sku, p.id);
+    }
     if (!data || data.length < pageSize) break;
   }
 
