@@ -168,6 +168,11 @@ describe("fixture: fiery-furnace.html (live store description)", () => {
     expect(lines).toHaveLength(57);
     expect(lines.reduce((s, l) => s + l.qty, 0)).toBe(59); // O.T. meek is x3
     expect(lines.some((l) => l.raw.startsWith("The story of Daniel"))).toBe(false);
+    const counts = { resolved: 0, ambiguous: 0, unresolved: 0 };
+    for (const l of lines) counts[l.status]++;
+    // Remaining: rarity-vocab lines (deferred), the I/J print choice, the
+    // same-set different-card Depraved, and the O.T. meek soul group.
+    expect(counts).toEqual({ resolved: 52, ambiguous: 4, unresolved: 1 });
   });
   it("resolves 'Son of God (K)' — identity set code + embedded-set card name", () => {
     const l = byRaw(lines, "Son of God (K)");
@@ -285,6 +290,11 @@ describe("fixture: rotation-jerusalem.html (prod-mirror body_html, worst tail of
     expect(lines).toHaveLength(56);
     expect(lines[0].raw).toBe("Son of God (I/J)");
     expect(lines[lines.length - 1].raw).toBe("Strict Sabbath (GoC)"); // last Reserve card
+    const counts = { resolved: 0, ambiguous: 0, unresolved: 0 };
+    for (const l of lines) counts[l.status]++;
+    // Remaining ambiguous are genuine multi-print choices (I/J, or-option);
+    // the one unresolved is the "(5) N.T. Meek Lost Souls (I/J)" group line.
+    expect(counts).toEqual({ resolved: 52, ambiguous: 3, unresolved: 1 });
   });
   it("tail card links never appear as deck lines (phantom-card guard)", () => {
     // These are real, resolvable card names hyperlinked in the recommended
