@@ -71,7 +71,13 @@ export function sectionHeader(line: string): string | null {
   const stripped = line.replace(/:\s*$/, "").trim();
   if (!stripped || stripped.length > 60) return null;
   const parts = stripped.split("/").map((p) => p.trim().toLowerCase());
-  return parts.every((p) => SECTION_WORDS.has(p)) ? stripped : null;
+  const isSectionWord = (p: string): boolean => {
+    if (SECTION_WORDS.has(p)) return true;
+    // "Dual-Alignment Cards", "Heroes Card List" — trailing filler word.
+    const t = p.replace(/\s+(?:cards?( list)?)$/, "").trim();
+    return t !== p && t.length > 0 && SECTION_WORDS.has(t);
+  };
+  return parts.every(isSectionWord) ? stripped : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -554,6 +560,8 @@ export function parseDeckContents(
     if (section !== null && isDecklistCutoff(line)) break;
     const header = sectionHeader(line);
     if (header) { section = header; continue; }
+    // Bare "Card List" layout noise: consume without changing the section.
+    if (/^cards? list:?$/i.test(line.trim())) continue;
     // Prose/flavor-text heuristic: long sentence with no trailing paren.
     if (line.length > 90 && !/\)$/.test(line)) continue;
     if (!/[a-zA-Z]/.test(line)) continue;

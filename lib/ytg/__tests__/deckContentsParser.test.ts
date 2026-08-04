@@ -119,6 +119,20 @@ describe("htmlToLines / sectionHeader", () => {
     expect(sectionHeader("Babylon (TtC)")).toBeNull();
     expect(sectionHeader("Deck strategy and tips:")).toBeNull();
   });
+  it("accepts trailing Card(s)/Card List filler on section headers", () => {
+    expect(sectionHeader("Dual-Alignment Cards")).toBe("Dual-Alignment Cards");
+    expect(sectionHeader("Heroes Card List")).toBe("Heroes Card List");
+    expect(sectionHeader("Evil Cards")).toBeNull(); // "evil" is not a section
+    const lines = parseDeckContents(
+      "<p>Heroes</p><p>Card List</p><p>Told to Take (TtC)</p><p>Dual-Alignment Cards</p><p>Measured Mien (TtC)</p>",
+      ALIASES,
+    );
+    // Bare "Card List" is consumed without changing the section.
+    expect(lines.map((l) => [l.raw, l.section])).toEqual([
+      ["Told to Take (TtC)", "Heroes"],
+      ["Measured Mien (TtC)", "Dual-Alignment Cards"],
+    ]);
+  });
 });
 
 describe("line grammar", () => {
