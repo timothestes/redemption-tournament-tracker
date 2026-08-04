@@ -201,6 +201,16 @@ WS-1/2/3 run in parallel worktrees off `origin/main` after WS-0 merges (per CLAU
 - **Dry-run e2e:** with `SHOPIFY_WRITE_MOCK=1` / `YTG_INVENTORY_WRITES` unset, every flow completes and writes correct ledger/mapping rows (importer's mock-mode playbook; clean up rows after).
 - **Manual (verify skill):** gate behavior for non-permissioned user (404), tab deep-links, review-queue keyboard pass, one real tag-sync on a single set, one real sale + undo after scope grant.
 
+## Addendum 2026-08-04 — full-catalog parser audit (93 deck descriptions)
+
+Empirical audit of every deck product's `body_html` through the real parser. Decisions locked here:
+
+- **Reserve zone (supersedes "zone='main' only"):** 91/93 decks ship a ~10-card Reserve section ("50 card deck, 10 card Reserve" in Andy's own copy) — the box physically includes reserve. Wizard imports Reserve-section lines as `zone='reserve'` (maybeboard never used; `card_count` stays main-only per app convention). **WS-4's preview/decrement reads `zone IN ('main','reserve')`, summed per card_key** — the sale-items PK note anticipated this.
+- **Post-decklist cutoff:** 79/93 descriptions carry a "Deck strategy / YTG recommends" tail whose hyperlinked card names RESOLVE (525 lines across 71 decks) — without a hard parse-stop at the marker headings, phantom cards silently join decks. This is the parser's most safety-critical rule; a fixture test must prove tail cards are not emitted.
+- **`set_aliases` stays strictly 1:1** (unique index on `carddata_code`; the importer's forward lookup depends on it). Multi-set store abbreviations (`I/J`, `I/J/L`, `P`) live in a parser-side supplemental candidate map, never as table rows.
+- **Two products have no decklist** (`new-paragon-lost-souls`, plus a leftover `test-product` duplicate Andy should delete) — wizard shows "no decklist found", never an empty deck.
+- **Deferred parser classes** (wizard's inline search + candidate picker remain the fallback): rarity/variant vocabulary (Borderless/LR/UR preference), typo fuzzy-matching, cross-set bare names (one deck lists half its cards set-less).
+
 ## Risks & mitigations
 
 - **Shopify 2026-04 breaking changes** (`@idempotent`, `changeFromQuantity`) are load-bearing in WS-4's design, not afterthoughts — the CAS + idempotency-key protocol above is built on them.
