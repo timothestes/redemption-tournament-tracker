@@ -27,6 +27,8 @@ function makeProduct(overrides: Partial<ShopifyProductRow>): ShopifyProductRow {
     price: null,
     inventory_quantity: null,
     raw_json: null,
+    sku: null,
+    body_html: null,
     last_synced_at: new Date().toISOString(),
     ...overrides,
   };
