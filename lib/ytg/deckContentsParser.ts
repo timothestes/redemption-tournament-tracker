@@ -147,6 +147,16 @@ export function buildAliasCandidates(
 function loose(s: string): string {
   return s.replace(/[.,'"‘’“”]/g, "").replace(/\s+/g, " ").trim();
 }
+/** Loosest fold: &↔and, slash/dash/comma to space, trailing ?/* stripped.
+ *  Applied symmetrically (index + query) on top of loose(). */
+function fold(s: string): string {
+  return s
+    .replace(/&/g, " and ")
+    .replace(/[/–—-]/g, " ")
+    .replace(/[?*]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 function bracketsToParens(s: string): string {
   return s.replace(/\[/g, "(").replace(/\]/g, ")");
 }
@@ -159,12 +169,14 @@ function strictVariants(name: string): string[] {
 }
 
 function baseKeyVariants(folded: string, paren: string): string[] {
+  const loosest = loose(normalize(stripEmbeddedSet(paren)));
   return [
     normalize(folded),
     normalize(paren),
     normalize(stripEmbeddedSet(folded)),
     normalize(stripEmbeddedSet(paren)),
-    loose(normalize(stripEmbeddedSet(paren))),
+    loosest,
+    fold(loosest),
   ];
 }
 
@@ -200,6 +212,14 @@ function nameKeyVariants(name: string): string[] {
     keys.push(halves.map((h) => normalize(stripEmbeddedSet(h))).sort().join(" / "));
     for (const h of halves) keys.push(...baseKeyVariants(h, h));
   }
+  // Loosest: every parenthetical dropped — "Meshach (Mishael) (PoC)"
+  // becomes findable as plain "Meshach". Skipped when any paren holds a
+  // scripture ref: for Lost Souls the paren IS the card's identity, and
+  // dropping it would flatten every epithet-less soul onto one key.
+  const parenContents = paren.match(/\(([^()]*)\)/g) ?? [];
+  if (!parenContents.some((p) => /\d+:\d+/.test(p))) {
+    keys.push(normalize(paren.replace(/\s*\([^()]*\)/g, " ")));
+  }
   return [...new Set(keys)].filter(Boolean);
 }
 
@@ -228,6 +248,8 @@ function ownSetStripped(name: string, set: string): string | null {
   return stripped || null;
 }
 
+const ERRATA_SUFFIX_RE = /\s*\((?:errata|banned)\)\s*$/i;
+
 function cardIndex(): CardIndex {
   if (INDEX) return INDEX;
   const bySet = new Map<string, Map<string, CardData[]>>();
@@ -239,6 +261,9 @@ function cardIndex(): CardIndex {
     const keys = nameKeyVariants(card.name);
     const own = ownSetStripped(card.name, card.set);
     if (own) keys.push(...nameKeyVariants(own));
+    if (ERRATA_SUFFIX_RE.test(card.name)) {
+      keys.push(...nameKeyVariants(card.name.replace(ERRATA_SUFFIX_RE, "")));
+    }
     for (const key of new Set(keys)) {
       pushKey(setMap, key, card);
       pushKey(global, key, card);
@@ -246,6 +271,38 @@ function cardIndex(): CardIndex {
   }
   INDEX = { bySet, global };
   return INDEX;
+}
+
+/** When hits differ only by an (Errata)/(Banned) suffix, the store sells and
+ *  ships the errata printing — prefer it. */
+function preferErrata(hits: CardData[]): CardData[] {
+  if (hits.length < 2) return hits;
+  const errata = hits.filter((c) => /\(errata\)\s*$/i.test(c.name));
+  if (errata.length === 1 && hits.every((c) => ERRATA_SUFFIX_RE.test(c.name))) {
+    return errata;
+  }
+  return hits;
+}
+
+/** THE one sanctioned exception to never-auto-pick: several PRINTS of the
+ *  same card name within the SAME set — e.g. LoC carries both "Book of the
+ *  Law (LoC)" and "Book of the Law (Promo)". Prefer the print whose own-set
+ *  suffix strips clean to the queried name, else the suffix-less base
+ *  printing. Genuinely different same-set cards (disambiguators like
+ *  "(Sky)"/"(River)", dual variants) never collapse — the stripped name
+ *  must equal the queried name exactly. */
+function narrowSameSetTwins(hits: CardData[], innerName: string): CardData[] {
+  const set = hits[0].set;
+  if (!hits.every((c) => c.set === set)) return hits;
+  const want = normalize(innerName);
+  const ownSuffix = hits.filter((c) => {
+    const stripped = ownSetStripped(c.name, c.set);
+    return stripped !== null && normalize(stripped) === want;
+  });
+  if (ownSuffix.length === 1) return ownSuffix;
+  const base = hits.filter((c) => normalize(c.name) === want);
+  if (base.length === 1) return base;
+  return hits;
 }
 
 function lookup(map: Map<string, CardData[]> | undefined, variants: string[]): CardData[] {
@@ -328,8 +385,13 @@ function parseQty(line: string): { qty: number; rest: string } {
   if (m) return { qty: parseInt(m[1], 10), rest: m[2] };
   m = /^[xX](\d+)\s+(.+)$/.exec(line);
   if (m) return { qty: parseInt(m[1], 10), rest: m[2] };
+  m = /^(.+?)\s+[xX]\s*(\d+)$/.exec(line); // "Meek (J) x3"
+  if (m) return { qty: parseInt(m[2], 10), rest: m[1] };
   return { qty: 1, rest: line };
 }
+
+/** " - $3.00" style price tails some store lines carry. */
+const PRICE_SUFFIX_RE = /\s*[-–—]\s*\$\d+(?:\.\d{1,2})?\s*$/;
 
 const TRAILING_PAREN = /^(.*?)\s*\(([^()]+)\)$/;
 
@@ -474,7 +536,8 @@ function resolveLine(
     for (const setCode of aliasSets) {
       aliasHits.push(...lookup(idx.bySet.get(setCode), nameKeyVariants(innerName)));
     }
-    aliasHits = [...new Set(aliasHits)];
+    aliasHits = preferErrata([...new Set(aliasHits)]);
+    if (aliasHits.length > 1) aliasHits = narrowSameSetTwins(aliasHits, innerName);
     // Parse B — the whole line (paren included) is itself a card name.
     // Strict variants only: stripping variants would just re-derive parse A.
     const fullHits = lookup(idx.global, strictVariants(rest));
@@ -491,7 +554,9 @@ function resolveLine(
 
     // Set abbrev resolved but no candidate set contains the name — fall back
     // to a global search (full line first, then the paren-stripped name).
-    const fallback = fullHits.length > 0 ? fullHits : lookup(idx.global, nameKeyVariants(rest));
+    const fallback = preferErrata(
+      fullHits.length > 0 ? fullHits : lookup(idx.global, nameKeyVariants(rest)),
+    );
     const cands = toCandidates(fallback, fallback.length === 1 ? 0.7 : 0.4);
     let res: Resolution = { name: innerName, setAbbrev: abbrev, candidates: cands, status: statusFor(cands.length) };
     res = withLostSoulScripture(res, rest, aliasSets);
@@ -527,7 +592,7 @@ function resolveLine(
   }
 
   // No trailing paren, or the paren is not a known set → whole line is the name.
-  const hits = lookup(idx.global, nameKeyVariants(rest));
+  const hits = preferErrata(lookup(idx.global, nameKeyVariants(rest)));
   const cands = toCandidates(hits, hits.length === 1 ? 0.7 : 0.4);
   return withLostSoulScripture(
     { name: rest, setAbbrev: null, candidates: cands, status: statusFor(cands.length) },
@@ -566,8 +631,22 @@ export function parseDeckContents(
     if (line.length > 90 && !/\)$/.test(line)) continue;
     if (!/[a-zA-Z]/.test(line)) continue;
 
-    const { qty, rest } = parseQty(line);
-    const res = resolveLine(rest, aliasCandidates, idx, section);
+    let { qty, rest } = parseQty(line);
+    rest = rest.replace(PRICE_SUFFIX_RE, "");
+    let res = resolveLine(rest, aliasCandidates, idx, section);
+    // Leading bare number as qty ("3 N.T. Meek (I/J)") — but only when the
+    // full text resolves to nothing, so digit-leading card names like
+    // "7 Years of Famine" always win.
+    if (res.candidates.length === 0) {
+      const bare = /^(\d{1,2})\s+(.+)$/.exec(rest);
+      if (bare) {
+        const retry = resolveLine(bare[2], aliasCandidates, idx, section);
+        if (retry.candidates.length > 0) {
+          qty *= parseInt(bare[1], 10);
+          res = retry;
+        }
+      }
+    }
     // Intro junk ("And check out these videos…") sits before the first
     // section header; anything there that doesn't look like a card is
     // dropped outright — same consumption semantics as the prose heuristic.

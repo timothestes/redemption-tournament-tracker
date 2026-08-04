@@ -325,6 +325,53 @@ describe("fixture: rotation-jerusalem.html (prod-mirror body_html, worst tail of
   });
 });
 
+describe("deterministic folds and qty formats (synthetic)", () => {
+  const first = (html: string) => parseDeckContents(html, ALIASES)[0];
+
+  it("folds & ↔ and, hyphen ↔ space; strips price tails", () => {
+    expect(first("<p>Shattered & Scorched (TtC)</p>").candidates[0].cardName)
+      .toBe("Shattered and Scorched");
+    expect(first("<p>Self Made (TtC)</p>").candidates[0].cardName).toBe("Self-Made");
+    const priced = first("<p>Told to Take (TtC) - $3.00</p>");
+    expect(priced.status).toBe("resolved");
+    expect(priced.candidates[0].cardName).toBe("Told to Take");
+  });
+  it("finds cards through the strip-all-parens fold ('Meshach (PoC)')", () => {
+    const l = first("<p>Meshach (PoC)</p>");
+    expect(l.status).toBe("resolved");
+    expect(l.candidates[0].cardKey).toBe("Meshach (Mishael) (PoC)|PoC|151-Meshach");
+  });
+  it("parses trailing xN and leading bare-number quantities", () => {
+    expect(first("<p>Told to Take (TtC) x3</p>").qty).toBe(3);
+    const bare = first("<p>3 Told to Take (TtC)</p>");
+    expect(bare.qty).toBe(3);
+    expect(bare.status).toBe("resolved");
+    // Digit-leading card names always win over the bare-number reading.
+    const famine = first("<p>7 Years of Famine (RR2)</p>");
+    expect(famine.qty).toBe(1);
+    expect(famine.candidates[0].cardName).toBe("7 Years of Famine [RR2]");
+  });
+  it("same-set print twins are the ONE sanctioned auto-pick", () => {
+    // LoC carries "Wall of Protection (LoC)" and "Wall of Protection
+    // (Promo)" — same card name, same set, different printings only. The
+    // own-set-suffix print wins. Genuinely different same-set cards (e.g.
+    // "Servants of the King (Sky)/(River)") still go ambiguous.
+    const wall = first("<p>Wall of Protection (LoC)</p>");
+    expect(wall.status).toBe("resolved");
+    expect(wall.candidates[0].cardKey).toBe(
+      "Wall of Protection (LoC)|LoC|LoC_027-Wall-of-Protection-R");
+    expect(first("<p>Servants of the King (TtC)</p>").status).toBe("ambiguous");
+  });
+  it("prefers the Errata printing over the Banned one", () => {
+    for (const html of ["<p>Endless Treasures (PoC)</p>", "<p>Endless Treasures</p>"]) {
+      const l = first(html);
+      expect(l.status).toBe("resolved");
+      expect(l.candidates[0].cardKey).toBe(
+        "Endless Treasures (Errata)|PoC|Endless-Treasures-R-errata");
+    }
+  });
+});
+
 describe("dual-sided half-name matching (synthetic)", () => {
   it("matches both-halves queries order-insensitively", () => {
     // carddata order is "the Chosen / the Builder"; the store reverses it.
@@ -412,15 +459,26 @@ describe("fixture: daniel-contender.html (live store description)", () => {
     expect(l.setAbbrev).toBe("I & J+ or Promo");
     expect(l.name).toBe("New Jerusalem");
     expect(l.status).toBe("ambiguous");
+    // Every Pmo-P2 New Jerusalem print qualifies for "or Promo" — the
+    // strip-all-parens fold surfaces the 2019/Nats winner prints too.
     expect(l.candidates.map((c) => c.cardKey).sort()).toEqual([
+      "New Jerusalem (2019) (Promo)|Pmo-P2|Promo_New-Jerusalem-Winner",
       "New Jerusalem (I/J+)|I/J+|New-Jerusalem-IJ",
+      "New Jerusalem (Nats Promo)|Pmo-P2|Promo_New-Jerusalem-Nationals",
       "New Jerusalem (Promo)|Pmo-P2|New_Jerusalem_(Promo)",
     ]);
   });
   it("or-split leaves non-option parens alone ('2025 Promo' has no delimiter)", () => {
     // Synthetic since the fixture's occurrence sits in the cut-off tail.
+    // Not an or-option paren; the strip-all-parens fold now surfaces every
+    // Raiders' Camp print instead — ambiguous, one click, never auto-picked.
     const [l] = parseDeckContents("<p>Raiders' Camp (2025 Promo)</p>", ALIASES);
-    expect(l.status).toBe("unresolved");
+    expect(l.status).toBe("ambiguous");
+    expect(l.candidates.map((c) => c.cardName).sort()).toEqual([
+      "Raiders' Camp",
+      "Raiders' Camp [2023 - Seasonal]",
+      "Raiders' Camp [2025 - District]",
+    ]);
   });
   it("folds doubled straight quotes to match carddata curly-quote names", () => {
     const l = byRaw(lines, "Lost Soul ''Idolaters'' [Daniel 3:7] (TtC)");
