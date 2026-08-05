@@ -108,7 +108,7 @@ describe("playerProfile career history fieldSize", () => {
     expect(entry?.fieldPct).toBeCloseTo(expected, 10);
   });
 
-  it("matchRecord is this player's W-L(-D) for that specific year+format, from match data", () => {
+  it("matchRecord is this player's W-L-D for that specific year+format, from match data", () => {
     const key = "2025_T1 2-Player";
     const player = data.results[key][0].playerName;
 
@@ -119,7 +119,7 @@ describe("playerProfile career history fieldSize", () => {
       else if (m.winner) losses++;
       else draws++;
     }
-    const expected = draws > 0 ? `${wins}–${losses}–${draws}` : `${wins}–${losses}`;
+    const expected = `${wins}–${losses}–${draws}`;
 
     const p = playerProfile(data, player);
     const entry = p.placements.find((h) => h.year === 2025 && h.format === "T1 2-Player");

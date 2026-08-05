@@ -77,10 +77,14 @@ export function buildKey(year: number, format: string): string {
 
 // ── Ordinal helper ────────────────────────────────────────────────────────────
 
-/** Returns an ordinal string: 1 → "1st", 2 → "2nd", 3 → "3rd", else "nth". */
+/** Returns an ordinal string: 1 → "1st", 2 → "2nd", 3 → "3rd", 11-13 → "nth", else by last digit. */
 export function ordinal(n: number): string {
-  if (n === 1) return "1st";
-  if (n === 2) return "2nd";
-  if (n === 3) return "3rd";
-  return `${n}th`;
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
 }

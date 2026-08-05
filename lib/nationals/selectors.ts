@@ -108,7 +108,7 @@ export interface CareerHistoryEntry {
   fieldSize: number | null;
   /** (fieldSize - placement) / (fieldSize - 1) * 100, clamped 0-100; null if fieldSize is unknown or 1. */
   fieldPct: number | null;
-  /** This player's W-L(-D) record in that year+format, derived from match data; null if no match data exists for that key. */
+  /** This player's W-L-D record in that year+format, derived from match data; null if no match data exists for that key. */
   matchRecord: string | null;
 }
 
@@ -133,7 +133,7 @@ function countRoundOneField(matches: MatchEntry[] | undefined): number | null {
 }
 
 /**
- * Derives every player's W-L(-D) record for a single year+format from that
+ * Derives every player's W-L-D record for a single year+format from that
  * key's match data, keyed by player name. Mirrors the per-key record math in
  * playerProfile (Teams rounds collapse to one W/L/D by majority of their
  * per-pairing games), generalized to every player instead of one.
@@ -172,7 +172,7 @@ export function recordsForKey(matches: MatchEntry[] | undefined, format: string)
 
   const out: Record<string, string> = {};
   for (const [name, rec] of Object.entries(totals)) {
-    out[name] = rec.draws > 0 ? `${rec.wins}–${rec.losses}–${rec.draws}` : `${rec.wins}–${rec.losses}`;
+    out[name] = `${rec.wins}–${rec.losses}–${rec.draws}`;
   }
   return out;
 }
@@ -389,11 +389,7 @@ export function playerProfile(seed: NationalsData, name: string): PlayerProfile 
   // Attach each placement's year+format match record, now that recordByKey is built.
   for (const p of placements) {
     const rec = recordByKey[`${p.year}_${p.format}`];
-    p.matchRecord = rec
-      ? rec.draws > 0
-        ? `${rec.wins}–${rec.losses}–${rec.draws}`
-        : `${rec.wins}–${rec.losses}`
-      : null;
+    p.matchRecord = rec ? `${rec.wins}–${rec.losses}–${rec.draws}` : null;
   }
 
   // ── Multiplayer W/L/D (from multiWL map) ───────────────────────────────────
