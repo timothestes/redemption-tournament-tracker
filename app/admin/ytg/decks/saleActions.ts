@@ -13,6 +13,7 @@ import { getSupabaseAdmin } from "@/lib/pricing/supabase-admin";
 import { createClient } from "@/utils/supabase/server";
 import { getShopifyAccessToken, fetchProductInventory } from "@/lib/pricing/shopify";
 import { buildCardKey } from "@/lib/pricing/matching";
+import { pgrestInList } from "@/lib/pricing/helpers";
 import {
   getSingleLocationId, getInventoryItemIds, adjustAvailable, activateItem,
   idempotencyKey, inventoryWritesEnabled, isNotStockedError, isStaleCasError,
@@ -115,7 +116,7 @@ export async function previewSale(productId: string, qty: number): Promise<Previ
   const { data: mappings, error: mapErr } = await admin
     .from("card_price_mappings")
     .select("card_key, shopify_product_id")
-    .in("card_key", [...perKey.keys()])
+    .filter("card_key", "in", pgrestInList([...perKey.keys()]))
     .in("status", ["auto_matched", "manual"]);
   if (mapErr) return { success: false, error: mapErr.message };
 
@@ -484,7 +485,7 @@ const UNDO_CONFLICT_MSG =
 async function setItems(admin: any, saleId: string, cardKeys: string[], patch: Record<string, unknown>) {
   if (cardKeys.length === 0) return;
   await admin.from("ytg_deck_sale_items").update(patch)
-    .eq("sale_id", saleId).in("card_key", cardKeys);
+    .eq("sale_id", saleId).filter("card_key", "in", pgrestInList(cardKeys));
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -668,7 +669,7 @@ async function finishApplyPass(admin: any, token: string, locationId: string, sa
     const { data: flipped } = await admin
       .from("ytg_deck_sale_items").update({ status: "applying" })
       .eq("sale_id", saleId)
-      .in("card_key", batch.changes.map((c) => c.cardKey))
+      .filter("card_key", "in", pgrestInList(batch.changes.map((c) => c.cardKey)))
       .eq("status", "pending")
       .select("card_key");
     const owned = new Set((flipped ?? []).map((f: { card_key: string }) => f.card_key));
