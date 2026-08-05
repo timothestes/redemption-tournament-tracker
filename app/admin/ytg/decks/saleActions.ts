@@ -470,3 +470,445 @@ export async function listSales(): Promise<
     }),
   };
 }
+
+// ─── Apply / resume / retry / undo executors ────────────────────────────────
+
+const CONFLICT_MSG =
+  "live quantity moved between preview and apply (compare-and-swap rejected) — verify in Shopify, then retry";
+const RESUME_CONFLICT_MSG =
+  "live quantity matches neither anchor — a third party moved stock; resolve in Shopify";
+const UNDO_CONFLICT_MSG =
+  "live quantity moved since the sale — undo refused to stack stock; review in Shopify";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function setItems(admin: any, saleId: string, cardKeys: string[], patch: Record<string, unknown>) {
+  if (cardKeys.length === 0) return;
+  await admin.from("ytg_deck_sale_items").update(patch)
+    .eq("sale_id", saleId).in("card_key", cardKeys);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadItemStates(admin: any, saleId: string): Promise<
+  { success: true; items: (SaleItemState & { variantId: string | null; singleProductId: string | null })[] }
+  | { success: false; error: string }
+> {
+  const { data, error } = await admin
+    .from("ytg_deck_sale_items")
+    .select("card_key, status, delta, qty_before, qty_after, inventory_item_id, variant_id, single_product_id")
+    .eq("sale_id", saleId);
+  if (error) return { success: false, error: error.message };
+  return {
+    success: true,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items: (data ?? []).map((i: any) => ({
+      cardKey: i.card_key,
+      status: i.status as ItemStatus,
+      delta: i.delta,
+      qtyBefore: i.qty_before,
+      qtyAfter: i.qty_after,
+      inventoryItemId: i.inventory_item_id,
+      variantId: i.variant_id,
+      singleProductId: i.single_product_id,
+    })),
+  };
+}
+
+/**
+ * Resolve inventory_item_ids for adjustable items that still lack them and
+ * persist onto the rows (idempotent; resume re-runs this harmlessly).
+ * Items whose variant has no inventory item become 'error'.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveInventoryItemIds(admin: any, token: string, saleId: string): Promise<void> {
+  const loaded = await loadItemStates(admin, saleId);
+  if (loaded.success === false) return;
+  const need = loaded.items.filter(
+    (i) => (i.status === "pending" || i.status === "applying")
+      && i.inventoryItemId === null && i.variantId !== null,
+  );
+  if (need.length === 0) return;
+  const gidOf = (variantId: string) => `gid://shopify/ProductVariant/${variantId}`;
+  const map = await getInventoryItemIds(token, need.map((i) => gidOf(i.variantId as string)));
+  for (const i of need) {
+    const itemGid = map.get(gidOf(i.variantId as string));
+    if (itemGid) {
+      await admin.from("ytg_deck_sale_items")
+        .update({ inventory_item_id: itemGid })
+        .eq("sale_id", saleId).eq("card_key", i.cardKey);
+    } else {
+      await setItems(admin, saleId, [i.cardKey], {
+        status: "error", error: "variant has no inventory item in Shopify",
+      });
+    }
+  }
+}
+
+/**
+ * Execute one planned batch. The mutation is atomic — on userErrors, mark
+ * the offending changes (stale → conflict, not-stocked → activate then
+ * retry, other → error) and re-run the pruned remainder under its new
+ * (payload-derived) key. Bounded passes; leftovers become 'error'.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function runBatch(
+  admin: any, token: string, locationId: string, saleId: string, batch: PlannedBatch,
+): Promise<void> {
+  let changes = batch.changes.slice();
+  for (let pass = 0; pass < 4 && changes.length > 0; pass++) {
+    const invChanges: InventoryChange[] = changes.map((c) => ({
+      inventoryItemId: c.inventoryItemId, delta: c.delta, changeFromQuantity: c.changeFromQuantity,
+    }));
+    const key = idempotencyKey(batch.baseKey, invChanges);
+    const outcome = await adjustAvailable(token, {
+      idempotencyKey: key, locationId, changes: invChanges,
+    });
+
+    if (outcome.userErrors.length === 0) {
+      await setItems(admin, saleId, changes.map((c) => c.cardKey), { status: "applied", error: null });
+      return;
+    }
+
+    // Whole-mutation idempotency signals (no change index):
+    const concurrent = outcome.userErrors.some((e) => e.code === "IDEMPOTENCY_CONCURRENT_REQUEST");
+    if (concurrent) return; // another tab is applying this exact payload — leave 'applying', Resume reconciles
+    const prevFailed = outcome.userErrors.some(
+      (e) => e.code === "IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED" || e.code === "IDEMPOTENCY_KEY_PARAMETER_MISMATCH",
+    );
+    if (prevFailed) {
+      // The key is burned but nothing applied (previous attempt failed).
+      // changeFromQuantity remains the true guard — retry under a salted key.
+      const salted = `${batch.baseKey}:retry:${pass + 1}`;
+      const retry = await adjustAvailable(token, {
+        idempotencyKey: idempotencyKey(salted, invChanges), locationId, changes: invChanges,
+      });
+      if (retry.userErrors.length === 0) {
+        await setItems(admin, saleId, changes.map((c) => c.cardKey), { status: "applied", error: null });
+        return;
+      }
+      outcome.userErrors = retry.userErrors;
+    }
+
+    const failedIdx = new Set<number>();
+    const activations: { idx: number; inventoryItemId: string }[] = [];
+    let unattributed: InventoryUserError | null = null;
+    for (const e of outcome.userErrors) {
+      const idx = changeIndexOf(e);
+      if (idx === null || idx >= changes.length) { unattributed = e; continue; }
+      failedIdx.add(idx);
+      if (isNotStockedError(e)) {
+        activations.push({ idx, inventoryItemId: changes[idx].inventoryItemId });
+      } else if (isStaleCasError(e)) {
+        await setItems(admin, saleId, [changes[idx].cardKey], { status: "conflict", error: CONFLICT_MSG });
+      } else {
+        await setItems(admin, saleId, [changes[idx].cardKey], {
+          status: "error", error: `${e.code ?? "SHOPIFY_ERROR"}: ${e.message}`,
+        });
+      }
+    }
+    if (unattributed !== null && failedIdx.size === 0) {
+      await setItems(admin, saleId, changes.map((c) => c.cardKey), {
+        status: "error", error: `${unattributed.code ?? "SHOPIFY_ERROR"}: ${unattributed.message}`,
+      });
+      return;
+    }
+
+    // Never-activated items: inventoryActivate(available: 0) with the
+    // spec-pinned key, then the change goes back into the retry payload.
+    const reactivated = new Set<number>();
+    for (const a of activations) {
+      const act = await activateItem(token, {
+        idempotencyKey: `sale:${saleId}:activate:${a.inventoryItemId}`,
+        inventoryItemId: a.inventoryItemId, locationId,
+      });
+      if (act.userErrors.length === 0) reactivated.add(a.idx);
+      else await setItems(admin, saleId, [changes[a.idx].cardKey], {
+        status: "error", error: `activate failed: ${act.userErrors.map((e) => e.message).join("; ")}`,
+      });
+    }
+
+    // Atomicity: non-failing changes were NOT applied — re-run them, plus
+    // any freshly-activated ones. Pruned payload ⇒ new fingerprint ⇒ new key.
+    changes = changes.filter((c, idx) => !failedIdx.has(idx) || reactivated.has(idx));
+  }
+  if (changes.length > 0) {
+    await setItems(admin, saleId, changes.map((c) => c.cardKey), {
+      status: "error", error: "retry passes exhausted — use per-row Retry",
+    });
+  }
+}
+
+function isAccessDenied(e: unknown): boolean {
+  return e instanceof Error && /ACCESS_DENIED|access denied/i.test(e.message);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function degradeToDryRun(admin: any, saleId: string): Promise<void> {
+  // Scope not granted after all: revert in-flight items, park the sale as
+  // dry_run (visibly segregated, never applied, non-replayable — spec).
+  const { data: inflight } = await admin
+    .from("ytg_deck_sale_items").select("card_key")
+    .eq("sale_id", saleId).eq("status", "applying");
+  await setItems(admin, saleId, (inflight ?? []).map((i: { card_key: string }) => i.card_key), {
+    status: "pending", error: null,
+  });
+  await admin.from("ytg_deck_sales").update({ status: "dry_run" }).eq("id", saleId);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function finishApplyPass(admin: any, token: string, locationId: string, saleId: string): Promise<void> {
+  const loaded = await loadItemStates(admin, saleId);
+  if (loaded.success === false) return;
+  const plan = planApply(saleId, loaded.items);
+  await setItems(admin, saleId, plan.unresolvable, {
+    status: "error", error: "missing inventory item id or CAS anchors",
+  });
+  for (const batch of plan.batches) {
+    // CAS the batch's items pending→applying BEFORE the Shopify call —
+    // losing rows here means another tab owns them; skip those.
+    const { data: flipped } = await admin
+      .from("ytg_deck_sale_items").update({ status: "applying" })
+      .eq("sale_id", saleId)
+      .in("card_key", batch.changes.map((c) => c.cardKey))
+      .eq("status", "pending")
+      .select("card_key");
+    const owned = new Set((flipped ?? []).map((f: { card_key: string }) => f.card_key));
+    const ownedChanges = batch.changes.filter((c) => owned.has(c.cardKey));
+    if (ownedChanges.length === 0) continue;
+    await runBatch(admin, token, locationId, saleId, { ...batch, changes: ownedChanges });
+  }
+  // Sale status is DERIVED from items.
+  const after = await loadItemStates(admin, saleId);
+  if (after.success === false) return;
+  if (after.items.some((i) => i.status === "applying")) return; // concurrent tab still in flight
+  await admin.from("ytg_deck_sales")
+    .update({ status: deriveSaleStatus(after.items) })
+    .eq("id", saleId).eq("status", "applying");
+}
+
+export async function applySale(saleId: string): Promise<SaleResult> {
+  if (!(await hasPermission(PERM))) return { success: false, error: "forbidden" };
+  const admin = getSupabaseAdmin();
+  const { data: sale, error: saleErr } = await admin
+    .from("ytg_deck_sales").select("id, status").eq("id", saleId).maybeSingle();
+  if (saleErr) return { success: false, error: saleErr.message };
+  if (!sale) return { success: false, error: "sale not found" };
+  if (sale.status === "pending") {
+    // Crash between confirm-insert and claim: re-claim.
+    const { data: claimed } = await admin
+      .from("ytg_deck_sales").update({ status: "applying" })
+      .eq("id", saleId).eq("status", "pending").select("id");
+    if (!claimed || claimed.length === 0) return loadSaleView(admin, saleId);
+  } else if (sale.status !== "applying") {
+    return loadSaleView(admin, saleId); // terminal — just show it
+  }
+  if (inventoryWritesEnabled() === false) {
+    await degradeToDryRun(admin, saleId);
+    return loadSaleView(admin, saleId, "scope_missing");
+  }
+  try {
+    const token = await getShopifyAccessToken();
+    const locationId = await getSingleLocationId(token);
+    await resolveInventoryItemIds(admin, token, saleId);
+    await finishApplyPass(admin, token, locationId, saleId);
+  } catch (e) {
+    if (isAccessDenied(e)) {
+      await degradeToDryRun(admin, saleId);
+      return loadSaleView(admin, saleId, "scope_missing");
+    }
+    return { success: false, error: e instanceof Error ? e.message : "apply failed" };
+  }
+  return loadSaleView(admin, saleId);
+}
+
+export async function resumeSale(saleId: string): Promise<SaleResult> {
+  if (!(await hasPermission(PERM))) return { success: false, error: "forbidden" };
+  const admin = getSupabaseAdmin();
+  const { data: sale, error: saleErr } = await admin
+    .from("ytg_deck_sales").select("id, status").eq("id", saleId).maybeSingle();
+  if (saleErr) return { success: false, error: saleErr.message };
+  if (!sale) return { success: false, error: "sale not found" };
+  if (sale.status === "pending") return applySale(saleId);
+  if (sale.status !== "applying") return loadSaleView(admin, saleId);
+  if (inventoryWritesEnabled() === false) {
+    await degradeToDryRun(admin, saleId);
+    return loadSaleView(admin, saleId, "scope_missing");
+  }
+  try {
+    const token = await getShopifyAccessToken();
+    const locationId = await getSingleLocationId(token);
+    await resolveInventoryItemIds(admin, token, saleId);
+
+    // Oracle phase: 'applying' items are UNKNOWN — re-read live quantities.
+    const loaded = await loadItemStates(admin, saleId);
+    if (loaded.success === false) return { success: false, error: loaded.error };
+    const stranded = loaded.items.filter((i) => i.status === "applying");
+    if (stranded.length > 0) {
+      const live = await fetchProductInventory(
+        token,
+        [...new Set(stranded.map((i) => i.singleProductId).filter((x): x is string => Boolean(x)))],
+      );
+      const liveByCardKey = new Map<string, number>();
+      for (const i of stranded) {
+        const inv = i.singleProductId !== null ? live.get(i.singleProductId) : undefined;
+        if (inv !== undefined) liveByCardKey.set(i.cardKey, inv.inventory);
+      }
+      const plan = planResume(saleId, loaded.items, liveByCardKey);
+      await setItems(admin, saleId, plan.markApplied, { status: "applied", error: null });
+      await setItems(admin, saleId, plan.conflicts, { status: "conflict", error: RESUME_CONFLICT_MSG });
+      for (const batch of plan.reapply) {
+        // Same payload ⇒ same key ⇒ Shopify dedupes even if the original
+        // call arrived late (spec: "makes even the re-apply race safe").
+        await runBatch(admin, token, locationId, saleId, batch);
+      }
+    }
+    await finishApplyPass(admin, token, locationId, saleId);
+  } catch (e) {
+    if (isAccessDenied(e)) {
+      await degradeToDryRun(admin, saleId);
+      return loadSaleView(admin, saleId, "scope_missing");
+    }
+    return { success: false, error: e instanceof Error ? e.message : "resume failed" };
+  }
+  return loadSaleView(admin, saleId);
+}
+
+export type RetryResult =
+  | SaleResult
+  | { success: false; error: string; needsAck: true; qtyBefore: number; qtyAfter: number };
+
+/**
+ * Per-row retry for 'error'/'conflict' items: re-read live quantity (the
+ * spec's "after re-preview"), refresh the CAS anchors on the row, then a
+ * single-change adjust under a payload-derived key. Undo stays correct
+ * because qty_after is refreshed too.
+ */
+export async function retrySaleItem(
+  saleId: string, cardKey: string, ackNegative: boolean,
+): Promise<RetryResult> {
+  if (!(await hasPermission(PERM))) return { success: false, error: "forbidden" };
+  const admin = getSupabaseAdmin();
+  if (inventoryWritesEnabled() === false) {
+    return { success: false, error: "inventory writes are not enabled — retry is unavailable in dry-run" };
+  }
+  const { data: item, error: itemErr } = await admin
+    .from("ytg_deck_sale_items")
+    .select("card_key, status, delta, single_product_id, variant_id, inventory_item_id")
+    .eq("sale_id", saleId).eq("card_key", cardKey).maybeSingle();
+  if (itemErr) return { success: false, error: itemErr.message };
+  if (!item) return { success: false, error: "sale item not found" };
+  if (item.status !== "error" && item.status !== "conflict") {
+    return loadSaleView(admin, saleId);
+  }
+  if (!item.single_product_id) return { success: false, error: "item has no mapped product" };
+  try {
+    const token = await getShopifyAccessToken();
+    const locationId = await getSingleLocationId(token);
+    await resolveInventoryItemIds(admin, token, saleId);
+    const live = await fetchProductInventory(token, [item.single_product_id]);
+    const inv = live.get(item.single_product_id);
+    if (inv === undefined || inv.tracked === false) {
+      return { success: false, error: "product is gone or untracked in Shopify — fix in Matching/Shopify first" };
+    }
+    const qtyBefore = inv.inventory;
+    const qtyAfter = qtyBefore + item.delta;
+    if (qtyAfter < 0 && ackNegative !== true) {
+      return { success: false, error: "would go negative — acknowledge to proceed", needsAck: true, qtyBefore, qtyAfter };
+    }
+    const { data: fresh } = await admin
+      .from("ytg_deck_sale_items").select("inventory_item_id")
+      .eq("sale_id", saleId).eq("card_key", cardKey).maybeSingle();
+    const inventoryItemId: string | null = fresh ? fresh.inventory_item_id : null;
+    if (inventoryItemId === null) return { success: false, error: "no inventory item id for this variant" };
+    // CAS claim + refreshed anchors (the resume oracle keys off these).
+    const { data: claimed } = await admin
+      .from("ytg_deck_sale_items")
+      .update({ status: "applying", qty_before: qtyBefore, qty_after: qtyAfter, error: null })
+      .eq("sale_id", saleId).eq("card_key", cardKey)
+      .in("status", ["error", "conflict"]).select("card_key");
+    if (!claimed || claimed.length === 0) return loadSaleView(admin, saleId);
+    await runBatch(admin, token, locationId, saleId, {
+      n: 0,
+      baseKey: `sale:${saleId}:item:${inventoryItemId}`,
+      changes: [{ cardKey, inventoryItemId, delta: item.delta, changeFromQuantity: qtyBefore }],
+    });
+    const after = await loadItemStates(admin, saleId);
+    if (after.success === true && !after.items.some((i) => i.status === "applying")) {
+      await admin.from("ytg_deck_sales")
+        .update({ status: deriveSaleStatus(after.items) })
+        .eq("id", saleId).in("status", ["applied", "partial", "failed", "applying"]);
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "retry failed" };
+  }
+  return loadSaleView(admin, saleId);
+}
+
+export async function undoSale(saleId: string): Promise<SaleResult> {
+  if (!(await hasPermission(PERM))) return { success: false, error: "forbidden" };
+  const admin = getSupabaseAdmin();
+  if (inventoryWritesEnabled() === false) {
+    return { success: false, error: "inventory writes are not enabled — undo is unavailable" };
+  }
+  // Double-click/two-tab safe claim; a sale stranded in 'undoing' (crash)
+  // may re-enter — payload-derived keys make the re-run dedupe-safe.
+  const { data: claimed, error: claimErr } = await admin
+    .from("ytg_deck_sales").update({ status: "undoing" })
+    .eq("id", saleId).in("status", ["applied", "partial"]).select("id");
+  if (claimErr) return { success: false, error: claimErr.message };
+  if (!claimed || claimed.length === 0) {
+    const { data: cur } = await admin
+      .from("ytg_deck_sales").select("status").eq("id", saleId).maybeSingle();
+    if (!cur || cur.status !== "undoing") {
+      return { success: false, error: "sale is not undoable (only applied/partial sales can be undone, once)" };
+    }
+  }
+  try {
+    const token = await getShopifyAccessToken();
+    const locationId = await getSingleLocationId(token);
+    const loaded = await loadItemStates(admin, saleId);
+    if (loaded.success === false) return { success: false, error: loaded.error };
+    const plan = planUndo(saleId, loaded.items);
+    for (const batch of plan.batches) {
+      let changes = batch.changes.slice();
+      for (let pass = 0; pass < 3 && changes.length > 0; pass++) {
+        const invChanges: InventoryChange[] = changes.map((c) => ({
+          inventoryItemId: c.inventoryItemId, delta: c.delta, changeFromQuantity: c.changeFromQuantity,
+        }));
+        const outcome = await adjustAvailable(token, {
+          idempotencyKey: idempotencyKey(batch.baseKey, invChanges), locationId, changes: invChanges,
+        });
+        if (outcome.userErrors.length === 0) {
+          await setItems(admin, saleId, changes.map((c) => c.cardKey), { status: "undone", error: null });
+          changes = [];
+          break;
+        }
+        const failedIdx = new Set<number>();
+        for (const e of outcome.userErrors) {
+          const idx = changeIndexOf(e);
+          if (idx === null || idx >= changes.length) continue;
+          failedIdx.add(idx);
+          await setItems(admin, saleId, [changes[idx].cardKey], {
+            status: "undo_conflict",
+            error: isStaleCasError(e) ? UNDO_CONFLICT_MSG : `${e.code ?? "SHOPIFY_ERROR"}: ${e.message}`,
+          });
+        }
+        if (failedIdx.size === 0) {
+          // Whole-mutation failure (idempotency signal etc.) — leave items
+          // 'applied'; deriveUndoStatus lands on undo_partial below.
+          break;
+        }
+        changes = changes.filter((_, idx) => !failedIdx.has(idx));
+      }
+    }
+    const after = await loadItemStates(admin, saleId);
+    if (after.success === false) return { success: false, error: after.error };
+    await admin.from("ytg_deck_sales").update({
+      status: deriveUndoStatus(after.items),
+      undone_by: await actingUserId(),
+      undone_at: new Date().toISOString(),
+    }).eq("id", saleId).eq("status", "undoing");
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "undo failed" };
+  }
+  return loadSaleView(admin, saleId);
+}
