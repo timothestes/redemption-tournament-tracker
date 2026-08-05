@@ -79,3 +79,22 @@ export const UNSOLD_SETS = new Set([
   '1E', '1EU', '2E', '2ER', '3E',
   '10A', 'Fund',
 ]);
+
+/**
+ * Build a correctly-quoted PostgREST `in` filter list. postgrest-js's .in()
+ * wraps values containing ,() in double quotes but does NOT escape embedded
+ * double quotes — a card_key like `Lost Soul "Contempt" [Daniel 12:2]|...`
+ * corrupts the list and silently drops every value after it (previewSale saw
+ * 7/60 mappings). Use .filter(col, 'in', pgrestInList(values)) whenever the
+ * values can contain quotes (card_keys embed card names). Empty input yields
+ * "()" which PostgREST rejects — keep call-site non-empty guards.
+ */
+export function pgrestInList(values: string[]): string {
+  return (
+    '(' +
+    values
+      .map(v => '"' + v.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"')
+      .join(',') +
+    ')'
+  );
+}
