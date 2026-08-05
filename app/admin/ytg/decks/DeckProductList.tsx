@@ -87,6 +87,9 @@ export default function DeckProductList({ products }: { products: DeckProductRow
                 >
                   View deck
                 </Link>
+                <Link className="text-sm hover:underline" href={`/admin/ytg/decks/${p.productId}/sale`}>
+                  Record sale
+                </Link>
                 <Link className="text-sm hover:underline" href={`/admin/ytg/decks/${p.productId}`}>
                   Replace contents
                 </Link>
