@@ -30,7 +30,7 @@ build decks, look up rulings, and practice between tournaments.
 
 It is a single full-stack application covering the entire competitive lifecycle: **build a deck →
 validate it against official rules → register for an event → get paired → report scores → publish
-standings → practice online.**
+standings → play online against a real opponent.**
 
 <div align="center">
   <img src="docs/screenshots/deck-builder.jpg" alt="Deck builder showing a 153-card Type 2 deck with alignment breakdown, card type distribution, and estimated price" width="100%">
@@ -99,24 +99,58 @@ events, which makes this the only searchable archive of competitive Redemption d
   <img src="docs/screenshots/community-decks.jpg" alt="Community decks browser showing 396 public decks with cover cards, format badges, card counts, and estimated prices" width="100%">
 </div>
 
-### Online play
+### Online multiplayer
 
-A full canvas-rendered game client. Two players connect to an authoritative real-time server, and the
-board — territory, Land of Redemption, Land of Bondage, reserve, deck, discard, battle zone — stays in
-sync between them, with spectator support for streaming. Solo "goldfish" mode runs the same engine
-against no opponent for practice and deck testing.
+A full real-time game client — not a deck simulator bolted on, but live head-to-head play. Create a
+game, send the four-letter code or invite link, and your opponent's every move appears on your board
+as it happens: their hand count, their territory, cards entering battle. The screenshot below is a
+live game between two accounts — the action log on the right is recording both players' plays in
+real time.
 
 <div align="center">
-  <img src="docs/screenshots/play-board.jpg" alt="Online play board showing the Redemption game field with hand, reserve, deck, discard, Land of Bondage, and phase tracker" width="100%">
+  <img src="docs/screenshots/multiplayer-board.jpg" alt="Live two-player game: opponent's hand and territory at top, player's hand fanned at bottom, card preview and a real-time chat/action log recording both players' moves" width="100%">
+</div>
+
+Game state lives in SpacetimeDB, an authoritative real-time database — every move is a server-side
+reducer, so a laggy or malicious client can never desync the board. The client renders the full
+Redemption play field (territory, Land of Redemption, Land of Bondage, reserve, deck, discard,
+battle zone) on a React-Konva canvas, with turn phases, initiative prompts, dice rolls, undo, and
+in-game chat. Games can be public (listed in the open lobby) or private invite-only; spectators can
+watch any game by code, with opt-in hand sharing for streaming. A solo "goldfish" mode runs the same
+engine without an opponent for practice, and right-click card abilities automate common effects —
+token spawns, shuffle-and-draw, counters — straight from the card.
+
+<div align="center">
+  <img src="docs/screenshots/multiplayer-lobby.jpg" alt="Waiting room with the shareable game code NZMK, both player seats, a private invite-only toggle, and a Practice While You Wait option" width="100%">
+</div>
+
+### Retail integration (YTG Store)
+
+The community's card retailer, Your Turn Games, runs on Shopify — and this app doubles as its
+operations console. An admin area syncs the full 5,320-product catalog and matches every sellable
+product to its exact card printing through a multi-strategy pipeline (SKU, normalized names,
+promo and Lost-Soul-bracket fallbacks, manual overrides), with a review queue for anything
+ambiguous — currently **100% of sellable products matched**. New sets are imported to the store
+from card data; recorded deck sales decrement per-card inventory crash-safely.
+
+Players see the other side of it: every deck prices itself against live store stock, a min-price
+mode finds the cheapest legal printing of each card, and one click sends an entire decklist to the
+store cart.
+
+<div align="center">
+  <img src="docs/screenshots/ytg-admin.jpg" alt="YTG Store admin: 5,320 synced Shopify products, 100% of sellable matched, per-method match breakdown, SKU backfill, and an empty review queue" width="100%">
 </div>
 
 ### Mobile
 
-Players check pairings and standings on their phones at the table between rounds, so every tournament
-surface is built mobile-first — tables collapse to cards, tabs stay reachable, and nothing requires a
-horizontal scroll.
+Players live on their phones at tournaments — checking pairings between rounds, editing a deck in
+line for deck check — so every surface is built mobile-first. Tables collapse to cards, the deck
+builder becomes a thumb-driven three-tab editor with a persistent deck count, and nothing requires
+a horizontal scroll.
 
 <div align="center">
+  <img src="docs/screenshots/mobile-deck-builder.jpg" alt="Deck building on a phone: format chips, main/reserve/maybe tabs, card grid with quantity badges, and a bottom bar with save, search, and a live deck counter" width="380">
+  &nbsp;
   <img src="docs/screenshots/mobile-standings.jpg" alt="Standings on a phone screen, with each player rendered as a card showing rank, record, match points, and differential" width="380">
 </div>
 
@@ -127,8 +161,6 @@ horizontal scroll.
 - **Deck checks** — generates the official deck check sheets judges fill out at competitive events.
 - **The Forge** — a private card design and playtesting workspace for set designers, with card
   versioning, review proposals, and RLS-enforced secrecy between design teams.
-- **Card pricing** — matches every card against a retail catalog so decks show a real build cost, with
-  a "minimum price" mode that finds the cheapest legal printing of each card.
 - **Registration & QR join** — event registration, and joining a tournament by scanning a code.
 - **Excel export** — standings export into the community's existing macro-enabled tracker workbook.
 
@@ -139,8 +171,9 @@ horizontal scroll.
 ```
 Next.js 15 App Router (React 19, TypeScript)
 ├── Supabase              Postgres + Auth + Row Level Security on every table
-├── SpacetimeDB           authoritative real-time game state for online play
+├── SpacetimeDB           authoritative real-time game state for online multiplayer
 ├── React-Konva           canvas rendering for the game board
+├── Shopify Admin API     YTG store sync, price matching, inventory
 ├── Vercel Blob           card art storage
 ├── Upstash Redis         rate limiting
 ├── Resend                transactional email
