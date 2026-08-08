@@ -1,167 +1,226 @@
-# Tournament Bracket Web App
+<div align="center">
 
-## Getting Started
+# Redemption CCG App
 
-To run this project locally, follow these steps:
+**The tournament software, deck builder, and online play client for the Redemption trading card game.**
 
-### Prerequisites
+[![Live](https://img.shields.io/badge/live-redemptionccg.app-2ea043?style=flat-square)](https://redemptionccg.app)
+[![Next.js](https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3ecf8e?style=flat-square&logo=supabase)](https://supabase.com)
+[![SpacetimeDB](https://img.shields.io/badge/SpacetimeDB-realtime-8b5cf6?style=flat-square)](https://spacetimedb.com)
 
-Ensure you have the following installed on your machine:
+[**redemptionccg.app**](https://redemptionccg.app)
 
-- Node.js (latest version recommended)
-- npm (comes with Node.js)
-- Python (for the Flask API)
+</div>
 
-### Installation
+---
 
-1. **Clone the repository:**
+## What this is
 
-   ```bash
-   git clone https://github.com/timothestes/redemption-tournament-tracker
-   cd redemption-tournament-tracker
-   ```
+Redemption is a collectible card game that has been played competitively since 1995. Until recently
+its tournaments ran on paper: hand-written pairing sheets, spreadsheets passed between judges, and
+standings recalculated by hand between rounds. Deck legality was checked manually against a 100-page
+rulebook, and there was no way to build or share a decklist online.
 
-2. **Install dependencies:**
+This app replaced all of that. It is now the software the community actually uses to run its events —
+from weekly locals to regional qualifiers and the national championship — and the place players go to
+build decks, look up rulings, and practice between tournaments.
 
-   ```bash
-   npm install
-   ```
+It is a single full-stack application covering the entire competitive lifecycle: **build a deck →
+validate it against official rules → register for an event → get paired → report scores → publish
+standings → practice online.**
 
-### Running the Development Server
+<div align="center">
+  <img src="docs/screenshots/deck-builder.jpg" alt="Deck builder showing a 153-card Type 2 deck with alignment breakdown, card type distribution, and estimated price" width="100%">
+</div>
 
-To start the Next.js development server, run:
+---
 
-```bash
-npm run dev
+## By the numbers
+
+Production figures, August 2026:
+
+| | |
+|---|---|
+| **Registered players** | 363 |
+| **Monthly active users** | ~160 |
+| **Tournaments run** | 257, by 31 different hosts |
+| **Matches scored** | 3,300 across 731 rounds |
+| **Decks built** | 1,976 (128,831 card entries) |
+| **Cards indexed** | 5,691 across 48 sets |
+| **Running since** | March 2025 |
+
+For a game whose competitive scene numbers in the hundreds, this is a substantial share of the active
+player base — and effectively all of its organized play.
+
+---
+
+## Features
+
+### Swiss tournament engine
+
+The core of the app. Hosts create an event, add players, and the pairing engine handles the rest:
+Swiss pairings that avoid rematches, bye selection, forfeits, drop-outs, and the official tiebreaker
+chain. Standings recompute live as scores come in, and every placement can explain itself — tap the
+`?` next to a rank to see exactly which tiebreaker separated two players.
+
+Scoring follows the official Host Guide: 3 / 2 / 1.5 / 1 / 0 game score per round, with cumulative
+lost-soul differential as the secondary tiebreaker and head-to-head resolution in between. The full
+specification lives in [`prompt_context/algorithm.md`](prompt_context/algorithm.md).
+
+<div align="center">
+  <img src="docs/screenshots/standings.jpg" alt="Live standings table showing rank, player, W-L-T record, match points, differential, and byes for an 80-player tournament" width="100%">
+</div>
+
+Pairings are generated per round with printable pairing sheets and match slips for the table — the
+paper artifacts judges still need, produced from live data instead of by hand.
+
+<div align="center">
+  <img src="docs/screenshots/pairings.jpg" alt="Round 2 pairings view with table assignments, player names, result entry, and Print Pairings / Print Match Slips buttons" width="100%">
+</div>
+
+### Deck builder and card search
+
+All 5,691 printed cards, searchable by name, type, brigade, alignment, rarity, and legality, with
+combinable icon filters. Decks validate live against the official Deck Building Rules across every
+supported format — Limited, Unlimited, Type 2, and Paragon — so a deck that passes here passes deck
+check.
+
+<div align="center">
+  <img src="docs/screenshots/card-search.jpg" alt="Card search interface with filter panel for legality, alignment, rarity, card types, and brigade colors, showing 127 matching cards" width="100%">
+</div>
+
+Decks can be published, copied, and browsed. Nationals and regional decklists are published here after
+events, which makes this the only searchable archive of competitive Redemption decks that exists.
+
+<div align="center">
+  <img src="docs/screenshots/community-decks.jpg" alt="Community decks browser showing 396 public decks with cover cards, format badges, card counts, and estimated prices" width="100%">
+</div>
+
+### Online play
+
+A full canvas-rendered game client. Two players connect to an authoritative real-time server, and the
+board — territory, Land of Redemption, Land of Bondage, reserve, deck, discard, battle zone — stays in
+sync between them, with spectator support for streaming. Solo "goldfish" mode runs the same engine
+against no opponent for practice and deck testing.
+
+<div align="center">
+  <img src="docs/screenshots/play-board.jpg" alt="Online play board showing the Redemption game field with hand, reserve, deck, discard, Land of Bondage, and phase tracker" width="100%">
+</div>
+
+### Mobile
+
+Players check pairings and standings on their phones at the table between rounds, so every tournament
+surface is built mobile-first — tables collapse to cards, tabs stay reachable, and nothing requires a
+horizontal scroll.
+
+<div align="center">
+  <img src="docs/screenshots/mobile-standings.jpg" alt="Standings on a phone screen, with each player rendered as a card showing rank, record, match points, and differential" width="380">
+</div>
+
+### And more
+
+- **Card rulings** — official rulings synced from the community Discord (13,783 messages ingested),
+  triaged through an admin review queue, and surfaced inline on the cards they apply to.
+- **Deck checks** — generates the official deck check sheets judges fill out at competitive events.
+- **The Forge** — a private card design and playtesting workspace for set designers, with card
+  versioning, review proposals, and RLS-enforced secrecy between design teams.
+- **Card pricing** — matches every card against a retail catalog so decks show a real build cost, with
+  a "minimum price" mode that finds the cheapest legal printing of each card.
+- **Registration & QR join** — event registration, and joining a tournament by scanning a code.
+- **Excel export** — standings export into the community's existing macro-enabled tracker workbook.
+
+---
+
+## Architecture
+
+```
+Next.js 15 App Router (React 19, TypeScript)
+├── Supabase              Postgres + Auth + Row Level Security on every table
+├── SpacetimeDB           authoritative real-time game state for online play
+├── React-Konva           canvas rendering for the game board
+├── Vercel Blob           card art storage
+├── Upstash Redis         rate limiting
+├── Resend                transactional email
+└── Vercel                hosting
 ```
 
-This will start the server at `http://localhost:3000`.
+Server components and server actions talk to Postgres through `utils/supabase/server.ts`; client
+components use `utils/supabase/client.ts`. Authorization is enforced in the database rather than the
+application — every table has RLS, admin access runs through a Postgres role, and there are
+regression tests that assert an anonymous client cannot read private Forge or superuser data.
 
-### Building for Production
+Card data is generated into a typed module at build time from the community's canonical card file, so
+card lookups are a synchronous in-memory index rather than a query.
 
-To build the project for production, use:
+### Engineering worth calling out
 
-```bash
-npm run build
-```
+- **The pairing engine is spec-driven.** Official tournament rules were written up as an executable
+  specification first (`prompt_context/algorithm.md`), including the cases the official guide leaves
+  silent, then implemented against it. Head-to-head tiebreaks use "beat-all" semantics and re-run
+  after every removal from the tied group, which is the subtle part most implementations get wrong.
+- **One ranking function, three surfaces.** The standings tab, the printed sheet, and the published
+  public results page all call the same `orderByTiebreakers`, so they cannot disagree.
+- **Real-time state is authoritative server-side.** Game moves are reducers on SpacetimeDB, not client
+  writes — a disconnected or malicious client cannot desync the board.
+- **94 migrations, all forward.** Schema changes ship as numbered SQL migrations under
+  `supabase/migrations/`.
 
-### Starting the Production Server
+---
 
-After building, you can start the production server with:
+## Getting started
 
-```bash
-npm run start
-```
-
-## Paragon Format
-
-This project includes support for the Paragon format with 42 playable Paragons.
-
-### Updating Paragon Data
-
-Paragon data is synced from a Google Sheets source. To download the latest data:
-
-```bash
-make update-paragons
-```
-
-Or use the shorter alias:
+**Prerequisites:** Node.js 22+, a Supabase project.
 
 ```bash
-make paragons
+git clone https://github.com/timothestes/redemption-tournament-tracker
+cd redemption-tournament-tracker
+npm install
+cp .env.example .env.local   # fill in Supabase URL + keys
+npm run dev                  # http://localhost:3000
 ```
 
-This command will:
-1. Download the latest CSV data from Google Sheets
-2. Parse and validate the data
-3. Generate type-safe TypeScript definitions
-4. Output a list of all 42 Paragons
+| Command | |
+|---|---|
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm test` | Unit tests (Vitest) |
+| `npm run test:e2e` | End-to-end tests (Playwright) |
+| `make update-cards` | Pull the latest card data and regenerate TypeScript |
+| `make update-paragons` | Pull the latest Paragon data and regenerate TypeScript |
 
-### Paragon Images
+Database migrations live in `supabase/migrations/` and apply in numeric order.
 
-Place Paragon card images in `public/paragons/` directory. See `public/paragons/README.md` for details on naming conventions and image specifications.
+---
 
-I'd like you to implement a new feature: the print match slips button.
+## Repository layout
 
-It should go next to the "print round pairings" button.
+```
+app/                    Routes, server actions, and page-level components
+  decklist/             Deck builder, card search, community decks
+  tracker/              Tournament host interface
+  play/  goldfish/      Online and solo play
+  forge/                Private card design workspace
+  admin/                Admin tooling
+components/             Shared UI (shadcn/ui + Tailwind)
+lib/                    Domain logic — cards, tournaments, standings, pricing
+utils/tournament/       Pairing algorithm
+spacetimedb/            Real-time game module and schema
+supabase/migrations/    Schema history
+prompt_context/         Specifications: pairing algorithm, deck rules, design system
+docs/                   Design docs, specs, and the roadmap
+```
 
-Do you know what the concept of a match slip is?
+Key references are indexed in [`CLAUDE.md`](CLAUDE.md); the backlog lives in
+[`docs/roadmap.md`](docs/roadmap.md).
 
-Each player's name is clearly visible
+---
 
-It has a place to write each player's score
+## License
 
-Then it has a place for each player to write their signature.
+MIT — see [LICENSE](LICENSE).
 
-Do you think anything else should be included on a givne match slip
-
-We will want to let the host print it out easily
-
-
-## Implemented features:
-Tournament Tracker
-Deck building (with Paragon Support)
-Spotlight Mode
-YTG Add to Cart
-Min Price
-Cube Improvements
-Jayden Mode
-Official Deck Checks
-Goldfish Feature
-Spoiler Page
-Official Upcoming Tournaments
-Tournament Deck Publishing
-Card-specific rulings
-Card groupings
-AoD calculations
-
-
-## short term
-Fallow audit: https://github.com/fallow-rs/fallow
-Pre-bake duplicate card groups at build time (static JSON) instead of fetching from Supabase at runtime — eliminates cold-start connection pressure on deckcheck
-
-## long term
-add deck versioning
-add wishlist
-misc tournament tracker improvements
-- Joining a tournament via QR code
-- Linking your deck
-metagame snapshot
-Teaching new players how to play
-add animations to goldfish/play mode
-Cube builder
-Deck upvoting
-Offline intallable app on phone (Progressive Web app with offline capabilities)
-
-
-# play features
-save game, load game, invite to game?
-battle phase/zone could be better
-
-
-
-
-## Forge improvements
-
-Improve delete dialog box
-Deleting a card leads to 404 page
-Brigade boxes off color
-Clicking on card should let user edit that place easily
-Cactus copyright and artist not visible
-artist not editable
-Lost soul
-No identifier pill
-Have prebuilt template starters for each card type. Start with card type THEN prompt for ability instead of having ability be its own
-GE doesn't add icon box
-Hero/GE should have special handling to make hero icon on the left and enhancement icon on the right
-Curse/Covenant will need this handling
-Artifact not showing icon
-WTF is mark as placeholder...
-When creating a set, have default targets (ask for number of cards, have them approve initial card type targets)
-The target UI is crap
-Deckbuilding UI is crap
-UI to navigate forge is nonexistent
-deckbuilding UI is diff than deckbuilding UI everyone is used to
-some dropdowns don't have darkmode in mind at http://localhost:3000/forge/play/decks/new
-artwork loading for playtest cards is ROUGH.
-card has "playtesting" status but not able to be playtested. So dumb.
+Redemption is a trademark of Cactus Game Design. This is an independent community project; card
+images and card data are the property of their respective owners.
