@@ -56,6 +56,7 @@ import { findCard } from '@/lib/cards/lookup';
 import { compareCardsDefault } from '@/lib/cards/defaultSort';
 import { getEffectiveAbilities, isLostSoulCard, isHeroCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
+import { KeepOneModal } from '@/app/shared/components/KeepOneModal';
 import { Link2Off } from 'lucide-react';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
@@ -183,6 +184,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
   const [countPrompt, setCountPrompt] = useState<CountPromptRequest | null>(null);
   const [resurrectReq, setResurrectReq] = useState<{ sourceInstanceId: string; abilityIndex: number } | null>(null);
+  const [keepOneReq, setKeepOneReq] = useState<{ sourceInstanceId: string; abilityIndex: number } | null>(null);
 
   // Opens the "look at / reveal top N" peek modal for an own-deck inspection
   // ability. Shared by the fixed-count path (look_at_own_deck / reveal_own_deck)
@@ -286,6 +288,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     },
     beginCountPrompt: (req) => setCountPrompt(req),
     beginResurrectPrompt: (sourceInstanceId, abilityIndex) => setResurrectReq({ sourceInstanceId, abilityIndex }),
+    beginKeepOnePrompt: (sourceInstanceId, abilityIndex) => setKeepOneReq({ sourceInstanceId, abilityIndex }),
   }), [moveCard, moveCardsBatch, flipCard, revealCardInHand, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, openOwnDeckPeek, state.zones, dispatch]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components
@@ -3304,6 +3307,19 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           />
         );
       })()}
+
+      {keepOneReq && (
+        <KeepOneModal
+          hand={state.zones.hand}
+          onConfirm={(keepInstanceId) => {
+            // Empty hand confirms with '' — the reducer treats a missing
+            // keeper as a no-op rather than shuffling the whole hand away.
+            if (keepInstanceId) dispatch(gameActionCreators.keepOneShuffleDraw(keepInstanceId));
+            setKeepOneReq(null);
+          }}
+          onCancel={() => setKeepOneReq(null)}
+        />
+      )}
     </>
   );
 }

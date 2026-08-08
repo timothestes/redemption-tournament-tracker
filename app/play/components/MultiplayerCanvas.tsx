@@ -50,6 +50,7 @@ import { TargetCardOverlay } from '@/app/shared/components/TargetCardOverlay';
 import type { GameActions, TargetingRequest, CountPromptRequest } from '@/app/shared/types/gameActions';
 import { CountPromptDialog } from '@/app/shared/components/CountPromptDialog';
 import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
+import { KeepOneModal } from '@/app/shared/components/KeepOneModal';
 import { isHeroCard } from '@/lib/cards/cardAbilities';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
@@ -226,6 +227,7 @@ function describeOpponentAction(action: string, paramsJson: string): string {
     case 'random_hand_to_deck_bottom': return `send ${count} random card${plural} from your hand to the bottom of your deck`;
     case 'random_hand_to_deck_shuffle': return `shuffle ${count} random card${plural} from your hand into your deck`;
     case 'discard_reserve_characters': return 'discard all characters from your reserve';
+    case 'keep_one_shuffle_draw': return 'keep 1 card of your choice, shuffle the rest of your hand into your deck, and draw that many';
     default: return 'perform an action on your deck';
   }
 }
@@ -265,6 +267,7 @@ function describeRequesterAction(action: string, paramsJson: string): string {
     case 'random_hand_to_deck_bottom': return `send ${count} random from opponent's hand to bottom of deck`;
     case 'random_hand_to_deck_shuffle': return `shuffle ${count} random from opponent's hand into deck`;
     case 'discard_reserve_characters': return "discard all characters from opponent's reserve";
+    case 'keep_one_shuffle_draw': return 'opponent keeps 1, shuffles the rest of their hand, and draws that many';
     default: return 'action';
   }
 }
@@ -1319,6 +1322,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
   const [countPrompt, setCountPrompt] = useState<CountPromptRequest | null>(null);
   const [resurrectReq, setResurrectReq] = useState<{ sourceInstanceId: string; abilityIndex: number } | null>(null);
+  // Philip's Daughters. The caster's picker carries the source card; the
+  // responder's carries the request id it has to answer. Only one is ever set.
+  const [keepOneReq, setKeepOneReq] = useState<
+    | { mode: 'caster'; sourceInstanceId: string }
+    | { mode: 'responder'; requestId: string; sourceCardName?: string }
+    | null
+  >(null);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notePopover, setNotePopover] = useState<{
     cardIds: string[];
@@ -2103,6 +2113,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     },
     beginCountPrompt: (req) => setCountPrompt(req),
     beginResurrectPrompt: (sourceInstanceId, abilityIndex) => setResurrectReq({ sourceInstanceId, abilityIndex }),
+    beginKeepOnePrompt: (sourceInstanceId) => setKeepOneReq({ mode: 'caster', sourceInstanceId }),
   }), [gameState, findAnyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts, isMyFirstTurn, isOpponentFirstTurn, hasOpponent]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
@@ -2380,8 +2391,41 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       opponentId !== undefined && (targetZone === 'reserve' || targetZone === 'discard' || targetZone === 'banish')
         ? String(opponentId)
         : undefined;
-    if (ids.length > 0) gameState.moveCardsBatch(JSON.stringify(ids), targetZone, undefined, targetOwnerId, fromSource);
-  }, [opponentCards, gameState]);
+    if (ids.length === 0) return;
+    // Undo: send the cards back to the opponent's deck. move_card_to_top_of_deck,
+    // move_card_to_bottom_of_deck and shuffle_card_into_deck all route by the
+    // card's originalOwnerId and none of them gate on ownership, so the reverse
+    // lands in the opponent's deck without a second consent round-trip.
+    // 'top'/'bottom' restore the exact original order; 'random' had no
+    // meaningful order to restore, so those cards get reshuffled in instead.
+    if (undoStack) {
+      const verb = targetZone === 'hand' ? 'Drew' : targetZone === 'reserve' ? 'Reserved' : 'Discarded';
+      undoStack.push({
+        description: `${verb} ${ids.length} card${ids.length === 1 ? '' : 's'} from opponent's deck`,
+        reverseAction: () => {
+          // filter preserves order, so safe[0] is still the card that sat
+          // closest to the top (or, for 'bottom', furthest from the bottom).
+          const safe = ids.filter(id => reverseIsSafe(lookupForUndo(id)));
+          if (safe.length === 0) return false;
+          if (position === 'top') {
+            // Each topdeck unshifts, so walk backwards to leave safe[0] on top.
+            for (let i = safe.length - 1; i >= 0; i--) gameState.moveCardToTopOfDeck(BigInt(safe[i]));
+          } else if (position === 'bottom') {
+            // Each call takes the new bottom slot, so forward order rebuilds
+            // the original tail with safe[last] bottom-most again.
+            for (const id of safe) gameState.moveCardToBottomOfDeck(BigInt(id));
+          } else {
+            // Topdeck all but one, then let the final shuffleCardIntoDeck act
+            // as the single reshuffle for the whole deck.
+            for (let i = 0; i < safe.length - 1; i++) gameState.moveCardToTopOfDeck(BigInt(safe[i]));
+            gameState.shuffleCardIntoDeck(BigInt(safe[safe.length - 1]));
+          }
+          return true;
+        },
+      });
+    }
+    gameState.moveCardsBatch(JSON.stringify(ids), targetZone, undefined, targetOwnerId, fromSource);
+  }, [opponentCards, gameState, undoStack, lookupForUndo]);
 
   // ---- Shared Soul Deck handlers (Paragon). Pick N card IDs from the shared
   //      soul-deck by position, then reveal (→ shared LoB) or look (private). ----
@@ -8915,6 +8959,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   revealAutoHideRef.current = null;
                 }, 30_000);
               }
+              if (incomingSearchRequest.action === 'keep_one_shuffle_draw') {
+                // Philip's Daughters — we approve, then pick our OWN keeper and
+                // fire the target-half reducer ourselves. The caster can't do
+                // it for us: they can't see this hand.
+                setKeepOneReq({
+                  mode: 'responder',
+                  requestId: String(incomingSearchRequest.id),
+                  sourceCardName: gameState.opponentPlayer?.displayName
+                    ? `${gameState.opponentPlayer.displayName} played Philip’s Daughters`
+                    : undefined,
+                });
+              }
             }}
             onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
           />
@@ -9614,6 +9670,40 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               setResurrectReq(null);
             }}
             onCancel={() => setResurrectReq(null)}
+          />
+        );
+      })()}
+
+      {keepOneReq && (() => {
+        // Always the LOCAL hand, in both modes — each player picks their own
+        // keeper and never sees the other's.
+        const myZones = modalGameValue.zones as Record<string, GameCard[]>;
+        const hand = myZones['hand'] ?? [];
+        return (
+          <KeepOneModal
+            hand={hand}
+            isResponding={keepOneReq.mode === 'responder'}
+            sourceCardName={keepOneReq.mode === 'responder' ? keepOneReq.sourceCardName : undefined}
+            onConfirm={(keepInstanceId) => {
+              // An empty hand confirms with '' — skip the caster's reducer
+              // (nothing to shuffle) but still answer the responder request so
+              // it doesn't sit open forever.
+              if (keepOneReq.mode === 'caster') {
+                if (keepInstanceId) {
+                  gameState.keepOneShuffleDraw(
+                    BigInt(keepOneReq.sourceInstanceId),
+                    BigInt(keepInstanceId),
+                  );
+                }
+              } else {
+                gameState.opponentKeepOneShuffleDraw(
+                  BigInt(keepOneReq.requestId),
+                  keepInstanceId ? BigInt(keepInstanceId) : 0n,
+                );
+              }
+              setKeepOneReq(null);
+            }}
+            onCancel={() => setKeepOneReq(null)}
           />
         );
       })()}

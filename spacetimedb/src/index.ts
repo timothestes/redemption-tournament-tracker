@@ -4055,8 +4055,14 @@ function shuffleAndDrawForPlayerImpl(
   targetPlayer: any, // Player row — whose hand/deck to shuffle + draw
   shuffleCount: number,
   drawCount: number,
+  // Philip's Daughters (all_players_keep_one_shuffle_draw): when set, the
+  // selection stops being a random pick of `shuffleCount` and becomes "every
+  // hand card except this one", with the draw matching however many that turns
+  // out to be. shuffleCount/drawCount are ignored in that mode.
+  keepInstanceId?: bigint,
 ): { shuffled: number; drawn: number } {
-  if (shuffleCount < 0 || drawCount < 0) {
+  const keepMode = keepInstanceId !== undefined;
+  if (!keepMode && (shuffleCount < 0 || drawCount < 0)) {
     throw new SenderError('Invalid shuffle/draw counts');
   }
 
@@ -4068,22 +4074,37 @@ function shuffleAndDrawForPlayerImpl(
     (c: any) => c.ownerId === targetPlayer.id && c.zone === 'hand'
   );
 
-  // Hand shortage: shuffle whatever we have (could be 0).
-  const actualShuffle = Math.min(shuffleCount, handCards.length);
+  let pickedCards: any[];
+  if (keepMode) {
+    // The keeper must actually be in this player's hand — otherwise a stale or
+    // spoofed id would silently shuffle the whole hand away. An empty hand is
+    // the one legitimate case with no keeper: it's simply a no-op.
+    if (handCards.length > 0 && !handCards.some((c: any) => c.id === keepInstanceId)) {
+      throw new SenderError('Kept card is not in your hand');
+    }
+    // "Shuffle the rest" is deterministic, so no selection RNG is needed here;
+    // the deck reshuffle below still uses its own seeded pass.
+    pickedCards = handCards.filter((c: any) => c.id !== keepInstanceId);
+  } else {
+    // Hand shortage: shuffle whatever we have (could be 0).
+    // Seeded PRNG for shuffle selection
+    const rngCounter1 = game.rngCounter + 1n;
+    ctx.db.Game.id.update({ ...game, rngCounter: rngCounter1 });
+    const pickSeed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, targetPlayer.id, rngCounter1);
+    const pickRng = xorshift64(pickSeed);
 
-  // Seeded PRNG for shuffle selection
-  const rngCounter1 = game.rngCounter + 1n;
-  ctx.db.Game.id.update({ ...game, rngCounter: rngCounter1 });
-  const pickSeed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, targetPlayer.id, rngCounter1);
-  const pickRng = xorshift64(pickSeed);
-
-  // Fisher-Yates partial shuffle to pick random hand indices
-  const indices = handCards.map((_: any, i: number) => i);
-  for (let i = indices.length - 1; i > indices.length - 1 - actualShuffle && i > 0; i--) {
-    const j = Number(pickRng.next() % BigInt(i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
+    // Fisher-Yates partial shuffle to pick random hand indices
+    const picks = Math.min(shuffleCount, handCards.length);
+    const indices = handCards.map((_: any, i: number) => i);
+    for (let i = indices.length - 1; i > indices.length - 1 - picks && i > 0; i--) {
+      const j = Number(pickRng.next() % BigInt(i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    pickedCards = indices.slice(indices.length - picks).map((i: number) => handCards[i]);
   }
-  const pickedCards = indices.slice(indices.length - actualShuffle).map((i: number) => handCards[i]);
+  const actualShuffle = pickedCards.length;
+  // Keep mode draws back exactly what it shuffled away.
+  const actualDraw = keepMode ? actualShuffle : drawCount;
 
   // Move picked hand cards to deck (temporary zoneIndex — will be overwritten
   // by the reshuffle pass below).
@@ -4119,17 +4140,17 @@ function shuffleAndDrawForPlayerImpl(
   // Draw — short-deck draws as many as possible (drawCardsForPlayer handles it).
   const drawGame = ctx.db.Game.id.find(gameId);
   if (!drawGame) throw new SenderError('Game disappeared mid-reducer');
-  const drawResult = drawCardsForPlayer(ctx, drawGame, targetPlayer, drawCount);
+  const drawResult = drawCardsForPlayer(ctx, drawGame, targetPlayer, actualDraw);
 
   const finalGame = ctx.db.Game.id.find(gameId);
   if (finalGame) {
     logAction(
-      ctx, gameId, targetPlayer.id, 'SHUFFLE_AND_DRAW',
+      ctx, gameId, targetPlayer.id, keepMode ? 'KEEP_ONE_SHUFFLE_DRAW' : 'SHUFFLE_AND_DRAW',
       JSON.stringify({
         shuffled: actualShuffle,
-        requestedShuffle: shuffleCount,
+        requestedShuffle: keepMode ? actualShuffle : shuffleCount,
         drawn: drawResult.drawn,
-        requestedDraw: drawCount,
+        requestedDraw: actualDraw,
       }),
       finalGame.turnNumber, finalGame.currentPhase,
     );
@@ -4748,6 +4769,10 @@ export const execute_card_ability = spacetimedb.reducer(
         }
         return;
       }
+      case 'all_players_keep_one_shuffle_draw':
+        // Needs the caster's keeper choice, so the client opens a picker and
+        // fires keep_one_shuffle_draw instead of routing through here.
+        throw new SenderError('all_players_keep_one_shuffle_draw is dispatched by the client, not this reducer');
       case 'reveal_own_deck':
         throw new SenderError('reveal_own_deck is dispatched by the client, not this reducer');
       case 'look_at_own_deck':
@@ -5914,6 +5939,99 @@ export const opponent_shuffle_and_draw = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: keep_one_shuffle_draw
+// Caster half of all_players_keep_one_shuffle_draw (Philip's Daughters).
+// The caster picks their keeper client-side; the rest of their hand shuffles
+// into their deck and they draw that many back. A ZoneSearchRequest
+// (action='keep_one_shuffle_draw') then asks the opponent to do the same.
+//
+// Unlike Mayhem's opponent_shuffle_and_draw — where the cards are random so
+// the caster can fire the opponent's half — each player must choose their own
+// keeper, so the follow-up reducer is fired by the TARGET.
+// ---------------------------------------------------------------------------
+export const keep_one_shuffle_draw = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    sourceInstanceId: t.u64(),
+    keepInstanceId: t.u64(),
+  },
+  (ctx, { gameId, sourceInstanceId, keepInstanceId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const source = ctx.db.CardInstance.id.find(sourceInstanceId);
+    if (!source || source.gameId !== gameId) throw new SenderError('Source card not found');
+    if (!getEffectiveAbilities(source).some((a) => a.type === 'all_players_keep_one_shuffle_draw')) {
+      throw new SenderError('No such ability');
+    }
+
+    // Don't stack requests if the caster already has one pending. Checked
+    // before the effect so a rejected call can't half-apply — the reducer is
+    // transactional, but keeping the guard first makes the intent explicit.
+    const allPlayers = [...ctx.db.Player.player_game_id.filter(gameId)];
+    const opponent = allPlayers.find((p: any) => p.id !== player.id);
+    if (opponent) {
+      for (const req of ctx.db.ZoneSearchRequest.zone_search_request_game_id.filter(gameId)) {
+        if (req.requesterId === player.id && req.status === 'pending') {
+          throw new SenderError('You already have a pending request');
+        }
+      }
+    }
+
+    shuffleAndDrawForPlayerImpl(ctx, gameId, player, 0, 0, keepInstanceId);
+
+    if (opponent) {
+      ctx.db.ZoneSearchRequest.insert({
+        id: 0n,
+        gameId,
+        requesterId: player.id,
+        targetPlayerId: opponent.id,
+        zone: 'deck',
+        status: 'pending',
+        createdAt: ctx.timestamp,
+        action: 'keep_one_shuffle_draw',
+        actionParams: '{}',
+      });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: opponent_keep_one_shuffle_draw
+// Target half of Philip's Daughters, fired by the TARGET after they approve
+// the request and pick their own keeper. complete_zone_search only accepts the
+// requester, so this reducer clears the request row itself.
+// ---------------------------------------------------------------------------
+export const opponent_keep_one_shuffle_draw = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+    keepInstanceId: t.u64(),
+  },
+  (ctx, { gameId, requestId, keepInstanceId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Search request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.targetPlayerId !== player.id) throw new SenderError('Not your request to answer');
+    if (req.status !== 'approved') throw new SenderError('Search request not approved');
+    if (req.action !== 'keep_one_shuffle_draw') throw new SenderError('Wrong action type');
+
+    shuffleAndDrawForPlayerImpl(ctx, gameId, player, 0, 0, keepInstanceId);
+
+    ctx.db.ZoneSearchRequest.id.delete(requestId);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: three_nails_reset_execute
 // Authorised via an approved ZoneSearchRequest (action='three_nails_reset').
 // Banishes the source reset card (any card registered with a
@@ -5952,31 +6070,35 @@ export const three_nails_reset_execute = spacetimedb.reducer(
     }
 
     // Locate the reset card — verify it carries a three_nails_reset ability,
-    // is still in territory, and is owned by the requester.
+    // is still in a zone it can fire from, and is owned by the requester.
+    // Not territory-only: Three Nails (GoC) is an Artifact and A New Beginning
+    // (FoM) a Dominant, but A New Beginning [RR2] is a Good Enhancement played
+    // into battle, so the source can legitimately sit in the battle zone.
     const source = ctx.db.CardInstance.id.find(sourceInstanceId);
     if (
       !source ||
       source.gameId !== gameId ||
       source.ownerId !== player.id ||
       !getEffectiveAbilities(source).some((a) => a.type === 'three_nails_reset') ||
-      source.zone !== 'territory'
+      !ABILITY_SOURCE_ZONES.includes(source.zone)
     ) {
       // No-op path: the reset card was moved/negated mid-flight.
       logAction(
         ctx, gameId, player.id, 'THREE_NAILS_RESET_CANCELLED',
-        JSON.stringify({ reason: 'source_card_not_in_territory', cardName: source?.cardName }),
+        JSON.stringify({ reason: 'source_card_not_in_play', cardName: source?.cardName, zone: source?.zone }),
         game.turnNumber, game.currentPhase,
       );
       // Leave request cleanup to complete_zone_search (client responsibility).
       return;
     }
 
-    // Banish the reset card — clear in-play state before leaving territory.
-    clearCountersIfLeavingPlay(ctx, source.id, 'territory', 'banish');
+    // Banish the reset card — clear in-play state before it leaves its zone.
+    const sourceZone = source.zone;
+    clearCountersIfLeavingPlay(ctx, source.id, sourceZone, 'banish');
 
     ctx.db.CardInstance.id.update({
       ...source,
-      ...leavePlayFieldOverrides(source, 'territory', 'banish'),
+      ...leavePlayFieldOverrides(source, sourceZone, 'banish'),
       zone: 'banish',
       zoneIndex: 0n,
       posX: '',

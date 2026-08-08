@@ -103,4 +103,14 @@ export interface GameActions {
   // Hero returns to its own owner's Territory (ownerId unchanged).
   beginResurrectPrompt?(sourceInstanceId: string, abilityIndex: number): void;
   resurrectHeroes?(sourceInstanceId: string, abilityIndex: number, selectedInstanceIds: string[]): void;
+
+  // Philip's Daughters (`all_players_keep_one_shuffle_draw`). CardContextMenu
+  // calls beginKeepOnePrompt; the canvas shows KeepOneModal over the local
+  // player's own hand and on confirm invokes keepOneShuffleDraw with the card
+  // being kept. Everything else in that hand shuffles into the deck and the
+  // player draws that many back. In multiplayer the opponent is then asked to
+  // do the same on their own hand — each player picks their own keeper, so
+  // neither ever sees the other's choice before making it.
+  beginKeepOnePrompt?(sourceInstanceId: string, abilityIndex: number): void;
+  keepOneShuffleDraw?(sourceInstanceId: string, abilityIndex: number, keepInstanceId: string): void;
 }

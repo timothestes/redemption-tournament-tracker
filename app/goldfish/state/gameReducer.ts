@@ -9,6 +9,7 @@ import { buildInitialGameState } from './gameInitializer';
 import { refillSoulDeck } from '@/app/shared/paragon/refill';
 import {
   type CardAbility,
+  DEFAULT_ABILITY_SOURCE_ZONES,
   getAbilitiesForCard,
   getEffectiveAbilities,
   resolveTokenCard,
@@ -247,8 +248,7 @@ function imitateLostSoulInState(
 
   // Validate source is an Imitate Soul and in play.
   if (!source.cardName.startsWith('Lost Soul "Imitate"')) return state;
-  const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
-  if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+  if (!DEFAULT_ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
   // Validate target is a Lost Soul in LoB, and is a New Testament soul
   // (Imitate's rules text only permits copying N.T. Lost Souls).
@@ -347,40 +347,57 @@ function shuffleAndDrawInState(
   shuffleCount: number,
   drawCount: number,
   history: GameState[],
+  // Philip's Daughters (all_players_keep_one_shuffle_draw): when set, the pick
+  // becomes "every hand card except this one" and the draw matches whatever
+  // that count turns out to be. shuffleCount/drawCount are ignored.
+  keepInstanceId?: string,
 ): GameState {
+  const keepMode = keepInstanceId !== undefined;
+
   // Phase 1 — validate.
-  if (shuffleCount < 0 || drawCount < 0) return state;
+  if (!keepMode && (shuffleCount < 0 || drawCount < 0)) return state;
 
   // Phase 2 — build new zones in memory.
   const zones = cloneZones(state.zones);
 
-  // Pick up to shuffleCount random hand cards. Hand shortage: shuffle all.
-  const actualShuffle = Math.min(shuffleCount, zones.hand.length);
-  const handIndices = zones.hand.map((_c, i) => i);
-  // Fisher-Yates partial shuffle — indices at the tail are the picks.
-  for (let i = handIndices.length - 1; i > handIndices.length - 1 - actualShuffle && i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [handIndices[i], handIndices[j]] = [handIndices[j], handIndices[i]];
-  }
-  const pickedSet = new Set(handIndices.slice(handIndices.length - actualShuffle));
   const picked: GameCard[] = [];
   const remainingHand: GameCard[] = [];
-  zones.hand.forEach((card, i) => {
-    if (pickedSet.has(i)) {
-      picked.push({ ...card, zone: 'deck', isFlipped: true });
-    } else {
-      remainingHand.push(card);
+  if (keepMode) {
+    // An empty hand is a legitimate no-op; anything else must actually contain
+    // the keeper or the whole hand would be shuffled away by mistake.
+    if (zones.hand.length > 0 && !zones.hand.some(c => c.instanceId === keepInstanceId)) return state;
+    zones.hand.forEach((card) => {
+      if (card.instanceId === keepInstanceId) remainingHand.push(card);
+      else picked.push({ ...card, zone: 'deck', isFlipped: true });
+    });
+  } else {
+    // Pick up to shuffleCount random hand cards. Hand shortage: shuffle all.
+    const actualShuffle = Math.min(shuffleCount, zones.hand.length);
+    const handIndices = zones.hand.map((_c, i) => i);
+    // Fisher-Yates partial shuffle — indices at the tail are the picks.
+    for (let i = handIndices.length - 1; i > handIndices.length - 1 - actualShuffle && i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [handIndices[i], handIndices[j]] = [handIndices[j], handIndices[i]];
     }
-  });
+    const pickedSet = new Set(handIndices.slice(handIndices.length - actualShuffle));
+    zones.hand.forEach((card, i) => {
+      if (pickedSet.has(i)) {
+        picked.push({ ...card, zone: 'deck', isFlipped: true });
+      } else {
+        remainingHand.push(card);
+      }
+    });
+  }
   zones.hand = remainingHand;
 
   // Merge picked cards into deck and reshuffle entire deck.
   const mergedDeck = [...zones.deck, ...picked];
   zones.deck = shuffleArray(mergedDeck);
 
-  // Phase 3 — draw up to drawCount, respecting auto-route Lost Souls and hand limit.
-  // Short-deck draws as many as possible.
-  for (let i = 0; i < drawCount; i++) {
+  // Phase 3 — draw, respecting auto-route Lost Souls and hand limit. Keep mode
+  // draws back exactly what it shuffled away. Short-deck draws what it can.
+  const actualDraw = keepMode ? picked.length : drawCount;
+  for (let i = 0; i < actualDraw; i++) {
     if (zones.deck.length === 0) break;
     if (zones.hand.length >= HAND_LIMIT && !state.options.autoRouteLostSouls) break;
 
@@ -547,8 +564,12 @@ function threeNailsResetInState(
   const ownerId = source.ownerId;
   const SWEEP_ZONES: ZoneId[] = ['hand', 'territory', 'land-of-bondage'];
 
-  // Pull the source out of territory and route to banish (cleared in-play state).
-  zones.territory = zones.territory.filter(c => c.instanceId !== source.instanceId);
+  // Pull the source out of whichever zone it's in and route to banish (cleared
+  // in-play state). Not territory-only: Three Nails (GoC) is an Artifact and
+  // A New Beginning (FoM) a Dominant, but A New Beginning [RR2] is a Good
+  // Enhancement played into battle. Filtering only territory would leave the
+  // real card sitting in battle while a copy landed in banish.
+  zones[source.zone] = zones[source.zone].filter(c => c.instanceId !== source.instanceId);
   zones.banish = [
     ...zones.banish,
     {
@@ -625,8 +646,7 @@ function drawAndTopdeckSelfInState(
   history: GameState[],
 ): GameState {
   // Phase 1 — validate.
-  const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
-  if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+  if (!DEFAULT_ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
   // Phase 2 — build.
   const zones = cloneZones(state.zones);
@@ -1457,8 +1477,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       // CardContextMenu gate — a malformed dispatch from elsewhere still
       // no-ops here rather than leaving weird state. Includes Land of
       // Redemption so resting Heroes can trigger abilities.
-      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
-      if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+      if (!DEFAULT_ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
       // Registry keys match GameCard.cardName (includes the set suffix for the
       // v1 cards, e.g., "Two Possessed (GoC)"). The card's identifier field is
@@ -1527,6 +1546,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // Interactive picker — dispatched via the dedicated RESURRECT_HEROES
           // action which carries the selected card ids. No-op here.
           return state;
+        case 'all_players_keep_one_shuffle_draw':
+          // Interactive picker — dispatched via the dedicated
+          // KEEP_ONE_SHUFFLE_DRAW action which carries the kept card. No-op here.
+          return state;
         default: {
           const _exhaustive: never = ability;
           return state;
@@ -1546,8 +1569,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (!source) return state;
 
-      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
-      if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+      if (!DEFAULT_ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
       const ability = getEffectiveAbilities(source)[abilityIndex];
       if (!ability) return state;
@@ -1565,6 +1587,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const { cardInstanceIds } = action.payload;
       if (!Array.isArray(cardInstanceIds) || cardInstanceIds.length === 0) return state;
       return resurrectHeroesInState(state, cardInstanceIds, history);
+    }
+
+    case 'KEEP_ONE_SHUFFLE_DRAW': {
+      // Goldfish is single-seat, so only the source's owner is affected — the
+      // same convention all_players_shuffle_and_draw follows here.
+      const { keepInstanceId } = action.payload;
+      if (!keepInstanceId) return state;
+      return shuffleAndDrawInState(state, 'player1', 0, 0, history, keepInstanceId);
     }
 
     case 'IMITATE_LOST_SOUL': {
