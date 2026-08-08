@@ -62,6 +62,7 @@ import ImitateLostSoulReducer from "./imitate_lost_soul_reducer";
 import JoinAsSpectatorReducer from "./join_as_spectator_reducer";
 import JoinForgeGameReducer from "./join_forge_game_reducer";
 import JoinGameReducer from "./join_game_reducer";
+import KeepOneShuffleDrawReducer from "./keep_one_shuffle_draw_reducer";
 import KickSpectatorReducer from "./kick_spectator_reducer";
 import LeaveAsSpectatorReducer from "./leave_as_spectator_reducer";
 import LeaveGameReducer from "./leave_game_reducer";
@@ -75,6 +76,7 @@ import MoveCardToBottomOfDeckReducer from "./move_card_to_bottom_of_deck_reducer
 import MoveCardToTopOfDeckReducer from "./move_card_to_top_of_deck_reducer";
 import MoveCardsBatchReducer from "./move_cards_batch_reducer";
 import MoveOpponentCardReducer from "./move_opponent_card_reducer";
+import OpponentKeepOneShuffleDrawReducer from "./opponent_keep_one_shuffle_draw_reducer";
 import OpponentShuffleAndDrawReducer from "./opponent_shuffle_and_draw_reducer";
 import PassInitiativeReducer from "./pass_initiative_reducer";
 import PregameAcknowledgeFirstReducer from "./pregame_acknowledge_first_reducer";
@@ -430,6 +432,7 @@ const reducersSchema = __reducers(
   __reducerSchema("join_as_spectator", JoinAsSpectatorReducer),
   __reducerSchema("join_forge_game", JoinForgeGameReducer),
   __reducerSchema("join_game", JoinGameReducer),
+  __reducerSchema("keep_one_shuffle_draw", KeepOneShuffleDrawReducer),
   __reducerSchema("kick_spectator", KickSpectatorReducer),
   __reducerSchema("leave_as_spectator", LeaveAsSpectatorReducer),
   __reducerSchema("leave_game", LeaveGameReducer),
@@ -443,6 +446,7 @@ const reducersSchema = __reducers(
   __reducerSchema("move_card_to_top_of_deck", MoveCardToTopOfDeckReducer),
   __reducerSchema("move_cards_batch", MoveCardsBatchReducer),
   __reducerSchema("move_opponent_card", MoveOpponentCardReducer),
+  __reducerSchema("opponent_keep_one_shuffle_draw", OpponentKeepOneShuffleDrawReducer),
   __reducerSchema("opponent_shuffle_and_draw", OpponentShuffleAndDrawReducer),
   __reducerSchema("pass_initiative", PassInitiativeReducer),
   __reducerSchema("pregame_acknowledge_first", PregameAcknowledgeFirstReducer),

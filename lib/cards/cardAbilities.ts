@@ -31,6 +31,12 @@ export type CardAbility = AbilityBase & (
   | { type: 'spawn_token'; tokenName: string; count?: number; defaultZone?: ZoneId; spawnForOpponent?: boolean; cyclingTokenNames?: string[]; cyclingAllowedUsers?: string[] }
   | { type: 'shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'all_players_shuffle_and_draw'; shuffleCount: number; drawCount: number }
+  // Philip's Daughters: each player keeps 1 card of their choice, shuffles the
+  // rest of their hand into their deck, then draws that many back. Unlike
+  // all_players_shuffle_and_draw the counts aren't printed — they're whatever
+  // each hand happens to hold — so both sides pick their keeper in a modal
+  // before anything moves.
+  | { type: 'all_players_keep_one_shuffle_draw' }
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   // Player-chosen-count variant of look_at_own_deck (e.g. Angel of the Harvest's
@@ -194,6 +200,45 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   // discard picker; selected Heroes return to their own owner's Territory.
   'Emptying the Tombs (GoC)':                            [{ type: 'resurrect_heroes' }],
   'Redemption [2025 - National]':                        [{ type: 'resurrect_heroes' }],
+
+  // ---------------------------------------------------------------------------
+  // Roots 2 (RR2)
+  //
+  // Reading convention, inherited from the cards already registered above:
+  // printed "a deck" means an opponent's deck (The Ends of the Earth, Contagious
+  // Fear), while "of deck" with no article means your own (Herod's Temple).
+  // Cards whose only deck interaction is "take/play X from deck or Reserve" are
+  // deliberately absent — the deck menu's Search Deck already covers those.
+  // ---------------------------------------------------------------------------
+  // Reprint of Messenger of Satan (EC), already registered above with the same
+  // ability. X = # of good brigades in battle, so the count is player-chosen.
+  'Messenger of Satan [RR2]':                            [{ type: 'draw_bottom_of_deck_choose' }],
+  'Silas, the Bold [RR2]':                               [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  // "Reveal the bottom card of deck: If it is evil, …" — reveal only; the
+  // follow-up take/play is a manual drag, same as the other reveal cards.
+  'Evil Angel [RR2]':                                    [{ type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Shadow Spirit [RR2]':                                 [{ type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Seeker of the Lost [RR2]':                            [{ type: 'reveal_opponent_deck', position: 'top', count: 9 }],
+  'Wash Basin [RR2]':                                    [{ type: 'reveal_opponent_deck', position: 'bottom', count: 2 }],
+  'Children [RR2]':                                      [{ type: 'reserve_opponent_deck', position: 'top', count: 2 }],
+  'Pharaoh Neco [RR2]':                                  [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Plunderers [RR2]':                                    [{ type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  'Wonders Forgotten [RR2]':                             [{ type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  // Curse. The EE half ("Discard a card from opponent's deck") is played from
+  // hand, so hand joins the source zones the way Delivered's (Star) half does.
+  'Confusion of Mind [RR2]':                             [{ type: 'discard_opponent_deck', position: 'random', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  // Covenant — "A: You may create a Lost Soul token in each Land of Bondage."
+  // The identifier prints the token as ("Harvest", John 4:35), which is the
+  // same handcrafted token Lost Soul "Harvest" spawns. Exposed as two items so
+  // the player fires each Land separately; abilityLabel marks which is which.
+  'I Am Salvation [RR2]':                                [
+    { type: 'spawn_token', tokenName: 'Harvest Soul Token', defaultZone: 'land-of-bondage' },
+    { type: 'spawn_token', tokenName: 'Harvest Soul Token', defaultZone: 'land-of-bondage', spawnForOpponent: true },
+  ],
+  // "Each player must select a card from hand and shuffle the rest to draw X."
+  // X is the shuffled count, so it's Mayhem with a keep-one step and a dynamic
+  // draw instead of Mayhem's fixed 6/6.
+  'Philip’s Daughters [RR2]':                            [{ type: 'all_players_keep_one_shuffle_draw' }],
 };
 
 /**
@@ -482,12 +527,20 @@ export function abilityLabel(a: CardAbility): string {
   switch (a.type) {
     case 'spawn_token': {
       const n = a.count ?? 1;
-      return n > 1 ? `Create ${n}× ${a.tokenName}` : `Create ${a.tokenName}`;
+      const what = n > 1 ? `${n}× ${a.tokenName}` : a.tokenName;
+      // I Am Salvation lists both Lands of Bondage as separate menu items, so
+      // the destination has to be in the label or the two read identically.
+      // Cards that spawn into Territory (the default) stay unqualified.
+      if (a.spawnForOpponent) return `Create ${what} in opponent's Land of Bondage`;
+      if (a.defaultZone === 'land-of-bondage') return `Create ${what} in your Land of Bondage`;
+      return `Create ${what}`;
     }
     case 'shuffle_and_draw':
       return `Shuffle ${a.shuffleCount} from hand, draw ${a.drawCount}`;
     case 'all_players_shuffle_and_draw':
       return `All players shuffle ${a.shuffleCount} from hand, draw ${a.drawCount}`;
+    case 'all_players_keep_one_shuffle_draw':
+      return 'All players keep 1 from hand, shuffle the rest, draw that many…';
     case 'reveal_own_deck': {
       const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
       return `Reveal ${where} card${a.count === 1 ? '' : 's'} of deck`;

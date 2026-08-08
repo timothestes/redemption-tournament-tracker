@@ -560,3 +560,83 @@ describe('EXECUTE_CARD_ABILITY — discard_bottom_of_deck (The Gates of Hell)', 
     }
   });
 });
+
+describe("KEEP_ONE_SHUFFLE_DRAW (Philip's Daughters)", () => {
+  // Deck cards are distinct from hand cards so we can tell a redrawn card from
+  // a card that never left the hand.
+  function setup(handIds: string[], deckIds: string[]): GameState {
+    return makeState([
+      ...handIds.map(id => makeCard({ instanceId: id, cardName: 'Hand Card', zone: 'hand' })),
+      ...deckIds.map(id => makeCard({ instanceId: id, cardName: 'Deck Card', zone: 'deck', isFlipped: true })),
+    ]);
+  }
+
+  it('keeps the chosen card, shuffles the rest away, and redraws that many', () => {
+    const state = setup(['keep', 'a', 'b', 'c'], ['d1', 'd2', 'd3', 'd4', 'd5']);
+
+    const next = gameReducer(state, gameActions.keepOneShuffleDraw('keep'));
+
+    // Kept card never moved.
+    expect(next.zones.hand.some(c => c.instanceId === 'keep')).toBe(true);
+    // Three shuffled out, three drawn back, so the hand size is unchanged.
+    // The three CAN come back — they were shuffled in before the draw — so the
+    // invariant is the count, not which ids ended up where.
+    expect(next.zones.hand).toHaveLength(4);
+    // Deck: started 5, gained 3, lost 3 to the draw.
+    expect(next.zones.deck).toHaveLength(5);
+    // Nothing leaked into another zone.
+    expect(next.zones.hand.length + next.zones.deck.length).toBe(9);
+  });
+
+  it('leaves every card in the deck face-down and zoned to the deck', () => {
+    // Which specific ids land in the deck is up to the shuffle, so assert the
+    // property that must hold for all of them rather than for one card.
+    const state = setup(['keep', 'a', 'b'], ['d1', 'd2', 'd3', 'd4']);
+
+    const next = gameReducer(state, gameActions.keepOneShuffleDraw('keep'));
+
+    expect(next.zones.deck.length).toBeGreaterThan(0);
+    for (const c of next.zones.deck) {
+      expect(c.zone).toBe('deck');
+      expect(c.isFlipped).toBe(true);
+    }
+    // And drawn cards are face-up in hand.
+    for (const c of next.zones.hand) expect(c.isFlipped).toBe(false);
+  });
+
+  it('draws as many as it can when the deck is short', () => {
+    const state = setup(['keep', 'a', 'b', 'c'], ['d1']);
+
+    const next = gameReducer(state, gameActions.keepOneShuffleDraw('keep'));
+
+    // 3 shuffled in + 1 already there = 4 available, all 3 draws succeed.
+    expect(next.zones.hand).toHaveLength(4);
+    expect(next.zones.deck).toHaveLength(1);
+  });
+
+  it('is a no-op when only the kept card is in hand', () => {
+    const state = setup(['keep'], ['d1', 'd2']);
+
+    const next = gameReducer(state, gameActions.keepOneShuffleDraw('keep'));
+
+    expect(next.zones.hand.map(c => c.instanceId)).toEqual(['keep']);
+    expect(next.zones.deck).toHaveLength(2);
+  });
+
+  it('refuses (same state reference) when the kept card is not in hand', () => {
+    const state = setup(['a', 'b'], ['d1']);
+
+    expect(gameReducer(state, gameActions.keepOneShuffleDraw('not-in-hand'))).toBe(state);
+  });
+
+  it('ignores an empty keep id rather than shuffling the whole hand away', () => {
+    const state = setup(['a', 'b'], ['d1']);
+
+    expect(gameReducer(state, gameActions.keepOneShuffleDraw(''))).toBe(state);
+  });
+
+  it("Philip's Daughters is registered with the keep-one variant", () => {
+    expect(getEffectiveAbilities({ cardName: 'Philip’s Daughters [RR2]' }))
+      .toEqual([{ type: 'all_players_keep_one_shuffle_draw' }]);
+  });
+});

@@ -139,6 +139,7 @@ export type ActionType =
   | 'EXECUTE_CARD_ABILITY_WITH_COUNT'
   | 'REVEAL_CARD_IN_HAND'
   | 'RESURRECT_HEROES'
+  | 'KEEP_ONE_SHUFFLE_DRAW'
   | 'SET_CARD_OUTLINE'
   | 'IMITATE_LOST_SOUL'
   | 'STOP_IMITATING_LOST_SOUL';
@@ -165,6 +166,9 @@ export interface GameAction {
     /** Instance id of a target card chosen via the targeting overlay
      *  (currently only used by IMITATE_LOST_SOUL). */
     targetInstanceId?: string;
+    /** Hand card kept by KEEP_ONE_SHUFFLE_DRAW; the rest of that hand is
+     *  shuffled into the deck and redrawn. */
+    keepInstanceId?: string;
   };
 }
 
