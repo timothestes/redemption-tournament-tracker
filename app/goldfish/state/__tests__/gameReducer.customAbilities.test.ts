@@ -640,3 +640,42 @@ describe("KEEP_ONE_SHUFFLE_DRAW (Philip's Daughters)", () => {
       .toEqual([{ type: 'all_players_keep_one_shuffle_draw' }]);
   });
 });
+
+describe('three_nails_reset source zone', () => {
+  const act = (cardInstanceId: string, abilityIndex: number): GameAction =>
+    gameActions.executeCardAbility(cardInstanceId, abilityIndex);
+
+  it('banishes an Artifact reset card out of territory', () => {
+    const source = makeCard({ instanceId: 'nails', cardName: 'Three Nails (GoC)', zone: 'territory' });
+    const inHand = makeCard({ instanceId: 'h1', cardName: 'Hand Card', zone: 'hand' });
+    const state = makeState([source, inHand, ...Array.from({ length: 10 }, (_, i) =>
+      makeCard({ instanceId: `d${i}`, cardName: 'Deck Card', zone: 'deck', isFlipped: true }))]);
+
+    const next = gameReducer(state, act('nails', 0));
+
+    expect(next.zones.banish.map(c => c.instanceId)).toEqual(['nails']);
+    expect(next.zones.territory).toHaveLength(0);
+  });
+
+  it('banishes a battle-zone reset card out of battle, leaving no copy behind', () => {
+    // A New Beginning [RR2] is a Good Enhancement played into battle. Filtering
+    // only territory used to leave the real card in battle while banishing a copy.
+    const source = makeCard({ instanceId: 'anb', cardName: 'A New Beginning [RR2]', zone: 'battle' });
+    const state = makeState([source, ...Array.from({ length: 10 }, (_, i) =>
+      makeCard({ instanceId: `d${i}`, cardName: 'Deck Card', zone: 'deck', isFlipped: true }))]);
+
+    const next = gameReducer(state, act('anb', 0));
+
+    expect(next.zones.battle).toHaveLength(0);
+    expect(next.zones.banish.map(c => c.instanceId)).toEqual(['anb']);
+    // Exactly one copy of the card exists across every zone.
+    const all = Object.values(next.zones).flat().filter(c => c.instanceId === 'anb');
+    expect(all).toHaveLength(1);
+  });
+
+  it('all three reset printings are registered', () => {
+    for (const name of ['Three Nails (GoC)', 'A New Beginning (FoM)', 'A New Beginning [RR2]']) {
+      expect(getEffectiveAbilities({ cardName: name })).toContainEqual({ type: 'three_nails_reset' });
+    }
+  });
+});

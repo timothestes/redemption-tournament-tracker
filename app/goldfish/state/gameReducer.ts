@@ -9,6 +9,7 @@ import { buildInitialGameState } from './gameInitializer';
 import { refillSoulDeck } from '@/app/shared/paragon/refill';
 import {
   type CardAbility,
+  DEFAULT_ABILITY_SOURCE_ZONES,
   getAbilitiesForCard,
   getEffectiveAbilities,
   resolveTokenCard,
@@ -247,8 +248,7 @@ function imitateLostSoulInState(
 
   // Validate source is an Imitate Soul and in play.
   if (!source.cardName.startsWith('Lost Soul "Imitate"')) return state;
-  const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
-  if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+  if (!DEFAULT_ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
   // Validate target is a Lost Soul in LoB, and is a New Testament soul
   // (Imitate's rules text only permits copying N.T. Lost Souls).
@@ -564,8 +564,12 @@ function threeNailsResetInState(
   const ownerId = source.ownerId;
   const SWEEP_ZONES: ZoneId[] = ['hand', 'territory', 'land-of-bondage'];
 
-  // Pull the source out of territory and route to banish (cleared in-play state).
-  zones.territory = zones.territory.filter(c => c.instanceId !== source.instanceId);
+  // Pull the source out of whichever zone it's in and route to banish (cleared
+  // in-play state). Not territory-only: Three Nails (GoC) is an Artifact and
+  // A New Beginning (FoM) a Dominant, but A New Beginning [RR2] is a Good
+  // Enhancement played into battle. Filtering only territory would leave the
+  // real card sitting in battle while a copy landed in banish.
+  zones[source.zone] = zones[source.zone].filter(c => c.instanceId !== source.instanceId);
   zones.banish = [
     ...zones.banish,
     {
@@ -642,8 +646,7 @@ function drawAndTopdeckSelfInState(
   history: GameState[],
 ): GameState {
   // Phase 1 — validate.
-  const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
-  if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+  if (!DEFAULT_ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
   // Phase 2 — build.
   const zones = cloneZones(state.zones);
@@ -1474,8 +1477,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       // CardContextMenu gate — a malformed dispatch from elsewhere still
       // no-ops here rather than leaving weird state. Includes Land of
       // Redemption so resting Heroes can trigger abilities.
-      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
-      if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+      if (!DEFAULT_ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
       // Registry keys match GameCard.cardName (includes the set suffix for the
       // v1 cards, e.g., "Two Possessed (GoC)"). The card's identifier field is
@@ -1567,8 +1569,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (!source) return state;
 
-      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
-      if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+      if (!DEFAULT_ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
       const ability = getEffectiveAbilities(source)[abilityIndex];
       if (!ability) return state;

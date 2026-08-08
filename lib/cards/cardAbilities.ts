@@ -239,6 +239,12 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   // X is the shuffled count, so it's Mayhem with a keep-one step and a dynamic
   // draw instead of Mayhem's fixed 6/6.
   'Philip’s Daughters [RR2]':                            [{ type: 'all_players_keep_one_shuffle_draw' }],
+  // "If attacking, banish this card: Shuffle all cards and all hands. End the
+  // battle. Each player must draw 8." Same board reset as Three Nails (GoC)
+  // and A New Beginning (FoM) above — but this printing is a Good Enhancement
+  // played into battle, not an Artifact or Dominant sitting in territory, so
+  // the reset fires from the battle zone.
+  'A New Beginning [RR2]':                               [{ type: 'three_nails_reset' }],
 };
 
 /**

@@ -6070,31 +6070,35 @@ export const three_nails_reset_execute = spacetimedb.reducer(
     }
 
     // Locate the reset card — verify it carries a three_nails_reset ability,
-    // is still in territory, and is owned by the requester.
+    // is still in a zone it can fire from, and is owned by the requester.
+    // Not territory-only: Three Nails (GoC) is an Artifact and A New Beginning
+    // (FoM) a Dominant, but A New Beginning [RR2] is a Good Enhancement played
+    // into battle, so the source can legitimately sit in the battle zone.
     const source = ctx.db.CardInstance.id.find(sourceInstanceId);
     if (
       !source ||
       source.gameId !== gameId ||
       source.ownerId !== player.id ||
       !getEffectiveAbilities(source).some((a) => a.type === 'three_nails_reset') ||
-      source.zone !== 'territory'
+      !ABILITY_SOURCE_ZONES.includes(source.zone)
     ) {
       // No-op path: the reset card was moved/negated mid-flight.
       logAction(
         ctx, gameId, player.id, 'THREE_NAILS_RESET_CANCELLED',
-        JSON.stringify({ reason: 'source_card_not_in_territory', cardName: source?.cardName }),
+        JSON.stringify({ reason: 'source_card_not_in_play', cardName: source?.cardName, zone: source?.zone }),
         game.turnNumber, game.currentPhase,
       );
       // Leave request cleanup to complete_zone_search (client responsibility).
       return;
     }
 
-    // Banish the reset card — clear in-play state before leaving territory.
-    clearCountersIfLeavingPlay(ctx, source.id, 'territory', 'banish');
+    // Banish the reset card — clear in-play state before it leaves its zone.
+    const sourceZone = source.zone;
+    clearCountersIfLeavingPlay(ctx, source.id, sourceZone, 'banish');
 
     ctx.db.CardInstance.id.update({
       ...source,
-      ...leavePlayFieldOverrides(source, 'territory', 'banish'),
+      ...leavePlayFieldOverrides(source, sourceZone, 'banish'),
       zone: 'banish',
       zoneIndex: 0n,
       posX: '',
