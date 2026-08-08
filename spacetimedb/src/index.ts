@@ -5916,9 +5916,11 @@ export const opponent_shuffle_and_draw = spacetimedb.reducer(
 // ---------------------------------------------------------------------------
 // Reducer: three_nails_reset_execute
 // Authorised via an approved ZoneSearchRequest (action='three_nails_reset').
-// Banishes the source Three Nails (GoC), then for each player sweeps their
-// hand + territory + land-of-bondage into their deck (lost souls owned by
-// the shared paragon soul-deck route back there), reshuffles, and draws 8.
+// Banishes the source reset card (any card registered with a
+// three_nails_reset ability — Three Nails (GoC), A New Beginning (FoM)),
+// then for each player sweeps their hand + territory + land-of-bondage into
+// their deck (lost souls owned by the shared paragon soul-deck route back
+// there), reshuffles, and draws 8.
 // Dispatched by the requester after the opponent approves.
 // ---------------------------------------------------------------------------
 export const three_nails_reset_execute = spacetimedb.reducer(
@@ -5949,26 +5951,27 @@ export const three_nails_reset_execute = spacetimedb.reducer(
       throw new SenderError('Invalid actionParams');
     }
 
-    // Locate Three Nails (GoC) — verify still in territory and owned by requester
+    // Locate the reset card — verify it carries a three_nails_reset ability,
+    // is still in territory, and is owned by the requester.
     const source = ctx.db.CardInstance.id.find(sourceInstanceId);
     if (
       !source ||
       source.gameId !== gameId ||
       source.ownerId !== player.id ||
-      source.cardName !== 'Three Nails (GoC)' ||
+      !getEffectiveAbilities(source).some((a) => a.type === 'three_nails_reset') ||
       source.zone !== 'territory'
     ) {
-      // No-op path: Nails was moved/negated mid-flight.
+      // No-op path: the reset card was moved/negated mid-flight.
       logAction(
         ctx, gameId, player.id, 'THREE_NAILS_RESET_CANCELLED',
-        JSON.stringify({ reason: 'source_card_not_in_territory' }),
+        JSON.stringify({ reason: 'source_card_not_in_territory', cardName: source?.cardName }),
         game.turnNumber, game.currentPhase,
       );
       // Leave request cleanup to complete_zone_search (client responsibility).
       return;
     }
 
-    // Banish Three Nails (GoC) — clear in-play state before leaving territory.
+    // Banish the reset card — clear in-play state before leaving territory.
     clearCountersIfLeavingPlay(ctx, source.id, 'territory', 'banish');
 
     ctx.db.CardInstance.id.update({
@@ -5986,7 +5989,7 @@ export const three_nails_reset_execute = spacetimedb.reducer(
     const SWEEP_ZONES = new Set(['hand', 'territory', 'land-of-bondage']);
 
     // Track swept card IDs for defensive cascade below.
-    // Include the source (Three Nails) so accessories linked to it are also cleared.
+    // Include the source (the reset card) so accessories linked to it are also cleared.
     const sweptIds = new Set<bigint>([sourceInstanceId]);
 
     for (const card of [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)]) {
@@ -6037,7 +6040,7 @@ export const three_nails_reset_execute = spacetimedb.reducer(
     if (finalGame) {
       logAction(
         ctx, gameId, player.id, 'THREE_NAILS_RESET',
-        JSON.stringify({ requesterId: player.id.toString() }),
+        JSON.stringify({ requesterId: player.id.toString(), cardName: source.cardName }),
         finalGame.turnNumber, finalGame.currentPhase,
       );
     }

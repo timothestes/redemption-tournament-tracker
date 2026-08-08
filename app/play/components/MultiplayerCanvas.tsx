@@ -1912,10 +1912,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
       if (ability?.type === 'three_nails_reset') {
         // Requires opponent consent. On approve, the approvedSearchRequest
-        // effect dispatches three_nails_reset_execute.
+        // effect dispatches three_nails_reset_execute. cardName rides along so
+        // the approval banner + chat log can name the reset card (Three Nails
+        // vs A New Beginning).
         requestOpponentAction(
           'three_nails_reset',
-          JSON.stringify({ sourceInstanceId: sourceInstanceId.toString() }),
+          JSON.stringify({ sourceInstanceId: sourceInstanceId.toString(), cardName: source?.cardName }),
         );
         return;
       }
@@ -8822,26 +8824,33 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
-      {/* Three Nails (GoC) reset approval — floating in center of board */}
-      {incomingSearchRequest && incomingSearchRequest.action === 'three_nails_reset' && (
-        <BoardRequestBanner
-          maxWidth={460}
-          message={
-            <>
-              <strong style={{ color: '#c4955a' }}>
-                {gameState.opponentPlayer?.displayName ?? 'Opponent'}
-              </strong>{' '}
-              is activating <strong style={{ color: '#c4955a' }}>Three Nails (GoC)</strong> — shuffles all hands, territories, and lands of bondage; each player draws 8.
-            </>
-          }
-          affirmLabel="Approve"
-          onAffirm={() => {
-            approveZoneSearch(BigInt(incomingSearchRequest.id));
-            showGameToast('Three Nails reset approved');
-          }}
-          onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
-        />
-      )}
+      {/* Board reset approval (Three Nails / A New Beginning) — floating in center of board */}
+      {incomingSearchRequest && incomingSearchRequest.action === 'three_nails_reset' && (() => {
+        let resetCardName = 'Three Nails (GoC)';
+        try {
+          const p = JSON.parse(incomingSearchRequest.actionParams ?? '{}');
+          if (p.cardName) resetCardName = p.cardName;
+        } catch { /* legacy request without cardName */ }
+        return (
+          <BoardRequestBanner
+            maxWidth={460}
+            message={
+              <>
+                <strong style={{ color: '#c4955a' }}>
+                  {gameState.opponentPlayer?.displayName ?? 'Opponent'}
+                </strong>{' '}
+                is activating <strong style={{ color: '#c4955a' }}>{resetCardName}</strong> — shuffles all hands, territories, and lands of bondage; each player draws 8.
+              </>
+            }
+            affirmLabel="Approve"
+            onAffirm={() => {
+              approveZoneSearch(BigInt(incomingSearchRequest.id));
+              showGameToast(`${resetCardName} reset approved`);
+            }}
+            onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+          />
+        );
+      })()}
 
       {/* Priority request — floating in center of board between territories */}
       {incomingSearchRequest && incomingSearchRequest.zone === 'action-priority' && (

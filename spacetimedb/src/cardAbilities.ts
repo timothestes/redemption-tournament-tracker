@@ -106,6 +106,9 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'House of Samuel':                                     [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'Mount Sinai':                                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Faith of Isaac':                                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  // "If you control Noah's Ark, look at the top X cards of deck" — X = # of
+  // flood survivors you control (player picks the count; 8 survivors max).
+  'Japheth':                                             [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 8 }],
   'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
   'The Ends of the Earth (RoJ AB)':                      [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
   'The Ends of the Earth (RoJ)':                         [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
@@ -172,6 +175,10 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Harvest Time (GoC)':                                  [{ type: 'play_all_lost_souls' }],
   'Harvest Time [Fundraiser]':                           [{ type: 'play_all_lost_souls' }],
   'Three Nails (GoC)':                                   [{ type: 'three_nails_reset' }],
+  // "If it is your turn banish this card: Shuffle all cards in play, set-aside,
+  // and hands. Each player must draw 8. Begin a new turn." Same board reset as
+  // Three Nails (GoC) — the reset banishes the source card.
+  'A New Beginning (FoM)':                               [{ type: 'three_nails_reset' }],
   // "You may discard this card to discard all characters from a Reserve."
   // Surfaced as two menu items so the activating player picks which Reserve;
   // no in-menu target picker needed.

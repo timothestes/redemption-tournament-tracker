@@ -919,7 +919,14 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         case 'random_hand_to_deck_top': return `asked to send ${count} random card${plural} from ${targetName}'s hand to the top of their deck`;
         case 'random_hand_to_deck_bottom': return `asked to send ${count} random card${plural} from ${targetName}'s hand to the bottom of their deck`;
         case 'random_hand_to_deck_shuffle': return `asked to shuffle ${count} random card${plural} from ${targetName}'s hand into their deck`;
-        case 'three_nails_reset': return `asked to activate Three Nails (GoC) reset`;
+        case 'three_nails_reset': {
+          let name = 'Three Nails (GoC)';
+          try {
+            const p = data.actionParams ? JSON.parse(data.actionParams) : {};
+            if (p.cardName) name = p.cardName;
+          } catch { /* legacy request without cardName */ }
+          return `asked to activate ${name} reset`;
+        }
         case 'shuffle_and_draw': {
           let s = 0, d = 0;
           try {
@@ -965,10 +972,20 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     } catch { /* fall through */ }
   }
   if (actionType === 'THREE_NAILS_RESET') {
-    return 'activated Three Nails (GoC) reset — both players drew 8';
+    let name = 'Three Nails (GoC)';
+    try {
+      const p = JSON.parse(payload ?? '{}');
+      if (p.cardName) name = p.cardName;
+    } catch { /* legacy log without cardName */ }
+    return `activated ${name} reset — both players drew 8`;
   }
   if (actionType === 'THREE_NAILS_RESET_CANCELLED') {
-    return 'tried to activate Three Nails (GoC), but the source card was no longer in play';
+    let name = 'Three Nails (GoC)';
+    try {
+      const p = JSON.parse(payload ?? '{}');
+      if (p.cardName) name = p.cardName;
+    } catch { /* legacy log without cardName */ }
+    return `tried to activate ${name}, but the source card was no longer in play`;
   }
   if (actionType === 'IMITATE_LOST_SOUL') {
     try {
