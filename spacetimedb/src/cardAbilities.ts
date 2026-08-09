@@ -262,6 +262,172 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   // played into battle, not an Artifact or Dominant sitting in territory, so
   // the reset fires from the battle zone.
   'A New Beginning [RR2]':                               [{ type: 'three_nails_reset' }],
+
+  // ---------------------------------------------------------------------------
+  // Full-pool audit (all sets outside Roots 2)
+  //
+  // Same rule as the RR2 block above: automate what touches a hidden or ordered
+  // zone, creates tokens, or is multi-card bookkeeping; leave tutoring to the
+  // Search Deck menu. Printed "a deck" reads as an opponent's, "of deck" as your
+  // own. Curses take the hand override only when the deck effect sits on the
+  // EE: line (cf. Confusion of Mind [RR2]); an A:/ART:/"on activation" clause
+  // resolves in play and is already covered by DEFAULT_ABILITY_SOURCE_ZONES.
+  // ---------------------------------------------------------------------------
+
+  // Token creation
+  'Majestic Heavens (Promo)':                            [{ type: 'spawn_token', tokenName: 'Lost Soul Token NT (Majestic Heavens)', defaultZone: 'land-of-bondage', spawnForOpponent: true }, { type: 'spawn_token', tokenName: 'Lost Soul Token OT (Majestic Heavens)', defaultZone: 'land-of-bondage', spawnForOpponent: true }],
+
+  // Look at your own deck (private peek)
+  "Aaron, God's Mediator":                               [{ type: 'look_at_own_deck', position: 'bottom', count: 10, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Bless the Nations':                                   [{ type: 'look_at_own_deck', position: 'bottom', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  "Eve's Descendant (PoC)":                              [{ type: 'look_at_own_deck', position: 'bottom', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Foretelling Angel':                                   [{ type: 'look_at_own_deck', position: 'top', count: 3 }, { type: 'look_at_opponent_deck', position: 'top', count: 3 }],
+  'Heavenly Trance':                                     [{ type: 'look_at_own_deck', position: 'top', count: 1 }, { type: 'look_at_opponent_deck', position: 'top', count: 1 }],
+  'Honey from a Lion (CoW AB)':                          [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Honey from a Lion (CoW)':                             [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Hope':                                                [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'Joel (PoC)':                                          [{ type: 'look_at_own_deck', position: 'top', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Joseph, the Dreamer':                                 [{ type: 'look_at_own_deck', position: 'bottom', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  "Joseph's Silver Cup (PoC)":                           [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  "Pharaoh's Magicians":                                 [{ type: 'look_at_own_deck', position: 'top', count: 1 }],
+  'Philistine Soothsayers':                              [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Redeeming Branch':                                    [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Rhoda (Promo)':                                       [{ type: 'look_at_own_deck', position: 'top', count: 1 }],
+  'Stone Cut Without Hands':                             [{ type: 'look_at_own_deck', position: 'bottom', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Strong Demon (GoC)':                                  [{ type: 'look_at_own_deck', position: 'bottom', count: 3 }],
+  'Taking the Ark (1st Print - L)':                      [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Taking the Ark [L]':                                  [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Triumphal Entry':                                     [{ type: 'look_at_own_deck', position: 'bottom', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Zeresh':                                              [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+
+  // Look at your own deck, player-chosen count (maxCount = printed limit, or a closed card-pool set)
+  'Belt of Truth':                                       [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 1, maxCount: 6 }],
+  'Bezalel, the Builder':                                [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }],
+  'Evil Armor (GoC)':                                    [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 6 }],
+  'Fortunatus':                                          [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 8 }],
+  'Haggai (PoC)':                                        [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 12 }],
+  'Legion (Roots)':                                      [{ type: 'look_at_own_deck_choose', position: 'bottom', defaultCount: 3, maxCount: 6 }],
+  'Matthias (GoC)':                                      [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 27 }],
+  'Og, King of Bashan':                                  [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 9 }],
+  'Shealtiel, the Heir / Shealtiel, the Exilarch (LoC)': [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 2, maxCount: 11 }],
+  'The Mighty Warrior (FoM)':                            [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }],
+
+  // Reveal your own deck (public — broadcast to the opponent)
+  'Astrologers (PoC)':                                   [{ type: 'reveal_own_deck', position: 'top', count: 1 }, { type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Astrologers (TxP)':                                   [{ type: 'reveal_own_deck', position: 'top', count: 1 }, { type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Controlling Demon (J)':                               [{ type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Egyptian Magicians':                                  [{ type: 'reveal_own_deck', position: 'top', count: 1 }, { type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Egyptian Magicians (FoM)':                            [{ type: 'reveal_own_deck', position: 'top', count: 1 }, { type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Elymas the Sorcerer (EC)':                            [{ type: 'reveal_own_deck', position: 'top', count: 1 }, { type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Evil Armor (Pi)':                                     [{ type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Evil Spawn (Pi)':                                     [{ type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Inspection':                                          [{ type: 'reveal_own_deck', position: 'top', count: 1 }],
+  'Jambres (FoM)':                                       [{ type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Pestering Spirit':                                    [{ type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Sorcerers (RoJ AB)':                                  [{ type: 'reveal_own_deck', position: 'top', count: 1 }, { type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Sorcerers (RoJ)':                                     [{ type: 'reveal_own_deck', position: 'top', count: 1 }, { type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Tested by Joseph':                                    [{ type: 'reveal_own_deck', position: 'top', count: 5 }, { type: 'reveal_opponent_deck', position: 'top', count: 5 }],
+  'Wandering Spirit (GoC)':                              [{ type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+  'Wandering Spirit (TxP)':                              [{ type: 'reveal_own_deck', position: 'bottom', count: 1 }],
+
+  // Look at an opponent's deck
+  'Cut Off':                                             [{ type: 'look_at_opponent_deck', position: 'bottom', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'His Name':                                            [{ type: 'look_at_opponent_deck', position: 'bottom', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Joshua’s Scribes (Roots)':                            [{ type: 'look_at_opponent_deck', position: 'top', count: 7 }],
+  'Light in the Darkness':                               [{ type: 'look_at_opponent_deck', position: 'top', count: 3, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Mattan, Priiest of Baal (LoC)':                       [{ type: 'look_at_opponent_deck', position: 'top', count: 1 }],
+  'Prophets of Baal (PoC)':                              [{ type: 'look_at_opponent_deck', position: 'top', count: 1 }],
+  'Strength Revealed':                                   [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
+
+  // Reveal an opponent's deck
+  'House in Bethany':                                    [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
+  'Lost Soul Romans 3:23 (Revealer)':                    [{ type: 'reveal_opponent_deck', position: 'top', count: 2 }],
+  'Plague of Blood (PoC)':                               [{ type: 'reveal_opponent_deck', position: 'top', count: 3 }],
+  'Plague of Flies (LoC)':                               [{ type: 'reveal_opponent_deck', position: 'top', count: 4 }],
+  'Samaritan Water Jar':                                 [{ type: 'reveal_opponent_deck', position: 'top', count: 3 }, { type: 'reveal_opponent_deck', position: 'top', count: 9 }],
+  'Servants of the King [River]':                        [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
+  'Servants of the King [River] [T2C AB]':               [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
+  'Warning Against Rebellion':                           [{ type: 'reveal_opponent_deck', position: 'top', count: 5 }],
+  'Warning Against Rebellion (CoW AB)':                  [{ type: 'reveal_opponent_deck', position: 'top', count: 5 }],
+  'Wickedness Removed':                                  [{ type: 'reveal_opponent_deck', position: 'top', count: 5 }],
+
+  // Discard from an opponent's deck
+  'Amminadab, the Generous / Amminadab, the Gracious (LoC)': [{ type: 'discard_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Amram, Moses’ Father (Roots)':                        [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Angel of the Harvest':                                [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Begging to go Back':                                  [{ type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  'Begging to go Back [IR]':                             [{ type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  'Beheaded':                                            [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  "Cupbearer's Complaints":                              [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Drusilla':                                            [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Egyptian Horsemen':                                   [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Egyptian Spear':                                      [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Egyptian Warden [IR]':                                [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Egyptian Wise Men [IR]':                              [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Eldad':                                               [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Famished':                                            [{ type: 'discard_opponent_deck', position: 'top', count: 3 }],
+  'Given Over to Egypt':                                 [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Given to Egypt (Roots)':                              [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Huge Egyptian':                                       [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Lost Soul "Deck Discard" [Hosea 13:2 - LR]':          [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Lost Soul Hosea 13:2 (Deck Discarder)':               [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Manna (PoC)':                                         [{ type: 'discard_opponent_deck', position: 'bottom', count: 1 }],
+  'Necromancer':                                         [{ type: 'discard_opponent_deck', position: 'bottom', count: 1 }],
+  'Out of Egypt':                                        [{ type: 'discard_opponent_deck', position: 'bottom', count: 1 }],
+  'Panic Demon (Gold)':                                  [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  "Pharaoh's Cupbearer [IR]":                            [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  "Pharaoh's Dream":                                     [{ type: 'discard_opponent_deck', position: 'top', count: 3 }],
+  "Pharaoh's Gifts":                                     [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  "Pharaoh's Throne Room [IR]":                          [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Pithom':                                              [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Pithom (Roots)':                                      [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Plague of Boils (LoC)':                               [{ type: 'discard_opponent_deck', position: 'top', count: 5 }],
+  'Plague of Hail (GoC)':                                [{ type: 'discard_opponent_deck', position: 'top', count: 5 }],
+  'Plague of Locusts':                                   [{ type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  'Queen Tahpenes':                                      [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Raamses':                                             [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Ram, the Exalter / Ram, the Uplifted (LoC)':          [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Rash Oath':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1 }, { type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  'Salome (TxP)':                                        [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Send for Egyptians':                                  [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Slave to Egypt':                                      [{ type: 'discard_opponent_deck', position: 'top', count: 3 }],
+  'Stealing':                                            [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Stormy Seas':                                         [{ type: 'discard_opponent_deck', position: 'top', count: 1 }, { type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  'Stronghold in the Desert':                            [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Taskmaster (FoM)':                                    [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'The Exodus':                                          [{ type: 'discard_opponent_deck', position: 'bottom', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'The Hard-Hearted Pharaoh (CoW AB)':                   [{ type: 'discard_opponent_deck', position: 'top', count: 1 }, { type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  'The Hard-Hearted Pharaoh (CoW)':                      [{ type: 'discard_opponent_deck', position: 'top', count: 1 }, { type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  'The Outcasts':                                        [{ type: 'discard_opponent_deck', position: 'top', count: 1 }, { type: 'discard_opponent_deck', position: 'bottom', count: 1 }],
+  'Third Seal (Famine) (RoJ AB)':                        [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Third Seal, Famine (RoJ)':                            [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Treasures of War':                                    [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Turn to Egypt':                                       [{ type: 'discard_opponent_deck', position: 'top', count: 2 }],
+  "Warrior's Spear":                                     [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+
+  // Reserve from an opponent's deck
+  'Bartimaeus (2022 - Regional)':                        [{ type: 'reserve_opponent_deck', position: 'top', count: 1 }],
+  'Citizens of Sychar (GoC)':                            [{ type: 'reserve_opponent_deck', position: 'bottom', count: 1 }],
+  'Nadab, the Wicked':                                   [{ type: 'reserve_opponent_deck', position: 'bottom', count: 1 }],
+  'Ridicule (GoC)':                                      [{ type: 'reserve_opponent_deck', position: 'top', count: 2, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Samaritan Water Jar (GoC)':                           [{ type: 'reserve_opponent_deck', position: 'top', count: 3 }],
+  'Simon of Cyrene (Roots)':                             [{ type: 'reserve_opponent_deck', position: 'top', count: 1 }],
+  'The Good Samaritan (GoC)':                            [{ type: 'reserve_opponent_deck', position: 'top', count: 1 }],
+  'Watchful Servant (GoC)':                              [{ type: 'reserve_opponent_deck', position: 'bottom', count: 1 }],
+
+  // Reserve the top of your own deck
+  'Conspiring Herodians (GoC)':                          [{ type: 'reserve_top_of_deck', count: 1 }],
+
+  // Discard the bottom of your own deck (Lost Souls route into play)
+  'Foolish Builder (GoC)':                               [{ type: 'discard_bottom_of_deck' }],
+
+  // Draw = distinct brigades in the opponent's revealed hand
+  'Damsel with Spirit of Divination (TxP)':              [{ type: 'draw_brigades', alignment: 'good' }],
+
+  // Return Heroes from discard piles to play
+  'Everlasting Beings':                                  [{ type: 'resurrect_heroes' }],
+  'Raising of the Saints (Wa)':                          [{ type: 'resurrect_heroes' }],
+  'Valley of Dry Bones':                                 [{ type: 'resurrect_heroes' }],
 };
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {
@@ -556,6 +722,34 @@ export const TOKEN_CARD_DATA: Record<string, TokenCardData> = {
     identifier: 'Generic, Nativity, Angel',
     specialAbility: '',
     reference: 'Luke 2:13',
+  },
+  // Majestic Heavens (Promo) prints two Lost Soul tokens — one N.T., one O.T.
+  // Both are real Promo cards; metadata mirrored from lib/cards/generated/cardData.
+  'Lost Soul Token NT (Majestic Heavens)': {
+    name: 'Lost Soul Token NT (Majestic Heavens)',
+    set: 'Pmo-P2',
+    imgFile: 'Lost-Soul-Token-Majestic-Heavens-NT',
+    cardType: 'Lost Soul Token',
+    brigade: '',
+    strength: '',
+    toughness: '',
+    alignment: 'Neutral',
+    identifier: '',
+    specialAbility: '',
+    reference: 'New Testament',
+  },
+  'Lost Soul Token OT (Majestic Heavens)': {
+    name: 'Lost Soul Token OT (Majestic Heavens)',
+    set: 'Pmo-P2',
+    imgFile: 'Lost-Soul-Token-Majestic-Heavens-OT',
+    cardType: 'Lost Soul Token',
+    brigade: '',
+    strength: '',
+    toughness: '',
+    alignment: 'Neutral',
+    identifier: '',
+    specialAbility: '',
+    reference: 'Old Testament',
   },
 };
 
