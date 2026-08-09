@@ -374,6 +374,47 @@ describe('hasUsableAbilityInZone', () => {
   });
 });
 
+describe('player-chosen-count (*_choose) abilities', () => {
+  const CHOOSE_TYPES = [
+    'look_at_own_deck_choose',
+    'reveal_own_deck_choose',
+    'look_at_opponent_deck_choose',
+    'reveal_opponent_deck_choose',
+    'discard_opponent_deck_choose',
+  ];
+  const chooseEntries = Object.entries(CARD_ABILITIES).flatMap(([name, abilities]) =>
+    abilities
+      .filter((a) => CHOOSE_TYPES.includes(a.type))
+      .map((a) => [name, a] as [string, typeof a & { defaultCount: number; maxCount: number }]),
+  );
+
+  it('covers every card that has one', () => {
+    expect(chooseEntries.length).toBeGreaterThan(0);
+  });
+
+  // The count prompt seeds itself with defaultCount and clamps to maxCount, so a
+  // default above the cap would open the dialog already past its own limit.
+  it('never seeds a default above its own cap', () => {
+    const bad = chooseEntries
+      .filter(([, a]) => a.defaultCount > a.maxCount)
+      .map(([name, a]) => `${name}: default ${a.defaultCount} > max ${a.maxCount}`);
+    expect(bad).toEqual([]);
+  });
+
+  it('has a positive, finite cap', () => {
+    const bad = chooseEntries
+      .filter(([, a]) => !Number.isInteger(a.maxCount) || a.maxCount < 1)
+      .map(([name, a]) => `${name}: maxCount ${a.maxCount}`);
+    expect(bad).toEqual([]);
+  });
+
+  it('renders a label ending in an ellipsis, marking it as prompting for input', () => {
+    for (const [name, a] of chooseEntries) {
+      expect(abilityLabel(a), name).toMatch(/…$/);
+    }
+  });
+});
+
 describe('getEffectiveAbilities', () => {
   it('returns base abilities when not imitating', () => {
     const out = getEffectiveAbilities({
