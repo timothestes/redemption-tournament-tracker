@@ -82,7 +82,10 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'The Accumulator (GoC)':                               [{ type: 'spawn_token', tokenName: 'Wicked Spirit Token', count: 7 }],
   'The Proselytizers (GoC)':                             [{ type: 'spawn_token', tokenName: 'Proselyte Token' }],
   'The Church of Christ (GoC)':                          [{ type: 'spawn_token', tokenName: 'Follower Token' }],
-  'Angel of the Harvest (GoC)':                          [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }, { type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }],
+  // "You may create a Lost Soul token in opponent's Land of Bondage." The token
+  // belongs in the OPPONENT's Land of Bondage, same as the Lost Soul "Harvest"
+  // entries below — it was previously spawning into the caster's own territory.
+  'Angel of the Harvest (GoC)':                          [{ type: 'spawn_token', tokenName: 'Harvest Soul Token', defaultZone: 'land-of-bondage', spawnForOpponent: true }, { type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }],
   'The Heavenly Host (GoC)':                             [{ type: 'spawn_token', tokenName: 'Heavenly Host Token', cyclingTokenNames: ['Heavenly Host Token (Blue)', 'Heavenly Host Token (Purple)', 'Heavenly Host Token (Silver)'], cyclingAllowedUsers: ['jaychambers'] }],
   'Kingdom of the Divine':                               [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
   'Kingdom of the Divine [T2C AB]':                      [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
@@ -112,15 +115,24 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Chaldeans [T2C]':                                     [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
   'Laban, the Deal Breaker (Roots)':                     [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
   'Divination [K]':                                      [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Divination (1st Print - K)':                          [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  // TxP reprint words it as "look at the top six cards of deck" — same peek,
+  // then take one evil card; the return-order clause is manual either way.
+  'Divination (TxP)':                                    [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
   'House of Samuel':                                     [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'Mount Sinai':                                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Faith of Isaac':                                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'Faith of Isaac (CoW AB)':                             [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   // "If you control Noah's Ark, look at the top X cards of deck" — X = # of
   // flood survivors you control (player picks the count; 8 survivors max).
   'Japheth':                                             [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 8 }],
+  'Japheth (CoW AB)':                                    [{ type: 'look_at_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 8 }],
   'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
   'The Ends of the Earth (RoJ AB)':                      [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
   'The Ends of the Earth (RoJ)':                         [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
+  // Promo printing reveals the top 3, NOT the 9 of the RR2 printing below —
+  // same card name, different printed count.
+  'Seeker of the Lost':                                  [{ type: 'reveal_opponent_deck', position: 'top', count: 3 }],
   'Matthew the Publican / Matthew (Levi) (GoC)':         [{ type: 'draw_brigades', alignment: 'total' }],
   // Reveal opponent's hand: draw X = distinct evil brigades (Ahijah limit 3).
   'Ahijah, Cloak Tearer':                                [{ type: 'draw_brigades', alignment: 'evil', limit: 3 }],
@@ -131,6 +143,10 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'The Divining Damsel [Fundraiser]':                    [{ type: 'draw_brigades', alignment: 'good', limit: 6 }],
   'The Lying Prophet':                                   [{ type: 'draw_brigades', alignment: 'good' }],
   'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  // Kings printing discards ONE card ("the top card from opponent's draw pile"),
+  // unlike the RR2 printing's 2. The paired "draw the top card from your draw
+  // pile" half is left to the deck menu.
+  'Plunderers':                                          [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
   // (Star) — "Reserve the top card of a deck". Surfaced as opponent-deck
   // since that's the impactful play; user can still manually move from
   // own deck via the deck-search modal.
@@ -159,12 +175,14 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'David, the Psalmist (CoW AB)':                        [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Prophets of Gibeath (Promo)':                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   "David's Spies [K]":                                   [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  "David's Spies (1st Print - K)":                       [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Servants by the River [T2C AB]':                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Servants by the River [T2C]':                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'The Angel of His Presence [T2C AB]':                  [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'The Angel of His Presence [T2C]':                     [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'The Three Visitors':                                  [{ type: 'look_at_own_deck', position: 'top', count: 9 }],
   'Women of Israel [L]':                                 [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'Women of Israel (1st Print - L)':                     [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   "Herod's Temple (GoC)":                                [{ type: 'reserve_top_of_deck', count: 1 }],
   "Herod's Temple [2022 - GoC P]":                       [{ type: 'reserve_top_of_deck', count: 1 }],
   'Treacherous Land':                                    [{ type: 'draw_bottom_of_deck', count: 1 }],
@@ -191,6 +209,11 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   // and hands. Each player must draw 8. Begin a new turn." Same board reset as
   // Three Nails (GoC) — the reset banishes the source card.
   'A New Beginning (FoM)':                               [{ type: 'three_nails_reset' }],
+  // The original Patriarchs printing of the same reset: "ALL players shuffle ALL
+  // cards in the field of play, set-aside areas and their hands back into their
+  // draw pile … ALL players Draw 8." A Good Enhancement, so it fires from the
+  // battle zone — the path #293 unblocked for the RR2 printing.
+  'A New Beginning':                                     [{ type: 'three_nails_reset' }],
   // "You may discard this card to discard all characters from a Reserve."
   // Surfaced as two menu items so the activating player picks which Reserve;
   // no in-menu target picker needed.
