@@ -13,6 +13,7 @@ import {
   hoverEnter,
   hoverLeave,
 } from './SubMenuActionRow';
+import { anchorContextMenu } from './contextMenuPosition';
 
 interface DeckContextMenuProps {
   x: number;
@@ -173,9 +174,19 @@ export function DeckContextMenu({
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const submenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const MENU_WIDTH = 200;
-  const rightAligned = x + MENU_WIDTH > window.innerWidth;
-  const menuLeft = rightAligned ? Math.max(0, x - MENU_WIDTH) : x;
+  // Measure the rendered menu, then anchor it on the cursor. Measuring matters:
+  // the menu's height changes with the Draw X expander and the opponent-deck
+  // variant, and a guessed height is what used to pin the menu to a fixed line.
+  const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const { width, height } = menu.getBoundingClientRect();
+    const { left, top } = anchorContextMenu(x, y, { width, height }, { width: window.innerWidth, height: window.innerHeight });
+    setPos({ left, top, ready: true });
+    // Re-measure when Draw X expands: the taller menu keeps the same anchor if
+    // it still fits, and only lifts if the expander pushed it off the bottom.
+  }, [x, y, showDrawX]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -200,8 +211,8 @@ export function DeckContextMenu({
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
-        left: menuLeft,
-        top: Math.min(y, window.innerHeight - 300),
+        left: pos.left,
+        top: pos.top,
         background: 'var(--gf-bg)',
         border: '1px solid var(--gf-border)',
         borderRadius: 6,
@@ -209,6 +220,7 @@ export function DeckContextMenu({
         zIndex: 900,
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
         whiteSpace: 'nowrap',
+        visibility: pos.ready ? 'visible' : 'hidden',
       }}
     >
       <button style={ITEM_STYLE} onClick={onSearchDeck} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
