@@ -2109,6 +2109,35 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         if (source) gameState.logLookAtTop(n, source.cardName, ability.position);
         return;
       }
+      if (ability?.type === 'reveal_own_deck_choose') {
+        // Public counterpart of look_at_own_deck_choose — same peek modal the
+        // fixed-count reveal_own_deck uses, so the opponent sees it too.
+        const n = Math.min(count, ability.maxCount);
+        setPeekState({
+          position: ability.position,
+          count: n,
+          cardIds: sampleDeckCardIds(ability.position, n),
+          source: { cardName: source!.cardName },
+        });
+        return;
+      }
+      if (
+        ability?.type === 'look_at_opponent_deck_choose'
+        || ability?.type === 'reveal_opponent_deck_choose'
+        || ability?.type === 'discard_opponent_deck_choose'
+      ) {
+        // Same opponent-consent flow as the fixed-count variants — the request
+        // payload already carries an arbitrary count, so the only difference is
+        // where the number comes from.
+        const n = Math.min(count, ability.maxCount);
+        const verb =
+          ability.type === 'look_at_opponent_deck_choose' ? 'look'
+          : ability.type === 'reveal_opponent_deck_choose' ? 'reveal'
+          : 'discard';
+        const action = `${verb}_deck_${ability.position}`;
+        requestOpponentAction(action, JSON.stringify({ count: n }));
+        return;
+      }
       gameState.executeCardAbilityWithCount(sourceInstanceId, abilityIndex, count);
     },
     beginCountPrompt: (req) => setCountPrompt(req),

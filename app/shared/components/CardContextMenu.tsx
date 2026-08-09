@@ -306,13 +306,28 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
                       },
                       onCancel: () => {},
                     });
-                  } else if (ability.type === 'look_at_own_deck_choose') {
+                  } else if (
+                    ability.type === 'look_at_own_deck_choose'
+                    || ability.type === 'reveal_own_deck_choose'
+                    || ability.type === 'look_at_opponent_deck_choose'
+                    || ability.type === 'reveal_opponent_deck_choose'
+                    || ability.type === 'discard_opponent_deck_choose'
+                  ) {
+                    // All five player-chosen-count abilities share one prompt;
+                    // the canvas decides what to do with the number (local peek
+                    // vs opponent-consent request) when it comes back.
+                    const verb =
+                      ability.type.startsWith('look') ? 'Look at'
+                      : ability.type.startsWith('reveal') ? 'Reveal'
+                      : 'Discard';
+                    const whose = ability.type.includes('opponent') ? "opponent's deck" : 'deck';
+                    const where = ability.position === 'random' ? 'X random' : `${ability.position} X`;
                     actions.beginCountPrompt?.({
-                      title: `Look at ${ability.position === 'random' ? 'X random' : `${ability.position} X`} cards of deck (limit ${ability.maxCount})`,
+                      title: `${verb} ${where} cards of ${whose} (limit ${ability.maxCount})`,
                       cardName: card.cardName,
                       defaultCount: ability.defaultCount,
                       maxCount: ability.maxCount,
-                      confirmVerb: 'Look at',
+                      confirmVerb: verb,
                       onConfirm: (count) => {
                         actions.executeCardAbilityWithCount?.(card.instanceId, index, count);
                       },

@@ -4779,6 +4779,14 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('look_at_own_deck is dispatched by the client, not this reducer');
       case 'look_at_own_deck_choose':
         throw new SenderError('look_at_own_deck_choose is dispatched by the client, not this reducer');
+      case 'reveal_own_deck_choose':
+        throw new SenderError('reveal_own_deck_choose is dispatched by the client, not this reducer');
+      case 'look_at_opponent_deck_choose':
+        throw new SenderError('look_at_opponent_deck_choose is dispatched by the client, not this reducer');
+      case 'reveal_opponent_deck_choose':
+        throw new SenderError('reveal_opponent_deck_choose is dispatched by the client, not this reducer');
+      case 'discard_opponent_deck_choose':
+        throw new SenderError('discard_opponent_deck_choose is dispatched by the client, not this reducer');
       case 'look_at_opponent_deck':
         throw new SenderError('look_at_opponent_deck is dispatched by the client, not this reducer');
       case 'reveal_opponent_deck':

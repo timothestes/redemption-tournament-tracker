@@ -48,6 +48,18 @@ export type CardAbility = AbilityBase & (
   // defaultCount and capped at maxCount; like look_at_own_deck it's modal-driven
   // client-side (intercepted in the canvas, never routed through the reducer).
   | { type: 'look_at_own_deck_choose'; position: 'top' | 'bottom' | 'random'; defaultCount: number; maxCount: number }
+  // The remaining three cells of the choose grid (own/opponent × look/reveal,
+  // plus discard). Cards printing "top X" where X is a board-state count you
+  // control — "X = # of your Armor of God Enhancements" — with a printed or
+  // card-pool-derived cap. All four choose types are dispatched CLIENT-side
+  // like look_at_own_deck_choose: the menu opens a count prompt, then the
+  // canvas either opens the peek locally (own deck) or forwards the chosen
+  // count through the existing opponent-consent flow, whose request payload
+  // already carries an arbitrary count. No reducer is involved.
+  | { type: 'reveal_own_deck_choose'; position: 'top' | 'bottom' | 'random'; defaultCount: number; maxCount: number }
+  | { type: 'look_at_opponent_deck_choose'; position: 'top' | 'bottom' | 'random'; defaultCount: number; maxCount: number }
+  | { type: 'reveal_opponent_deck_choose'; position: 'top' | 'bottom' | 'random'; defaultCount: number; maxCount: number }
+  | { type: 'discard_opponent_deck_choose'; position: 'top' | 'bottom' | 'random'; defaultCount: number; maxCount: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reveal_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'discard_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
@@ -428,6 +440,27 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Everlasting Beings':                                  [{ type: 'resurrect_heroes' }],
   'Raising of the Saints (Wa)':                          [{ type: 'resurrect_heroes' }],
   'Valley of Dry Bones':                                 [{ type: 'resurrect_heroes' }],
+
+  // ---------------------------------------------------------------------------
+  // Player-chosen count — opponent-facing and reveal variants
+  //
+  // Only cards whose ceiling is printed on the card ("limit N") or enforced by
+  // the engine (Outsiders: X = cards in your hand, bounded by HAND_LIMIT).
+  // Cards whose X needs a card-pool census — Michal, Aaron's Staff, Egyptian
+  // Treasures, Claudia, Eve (FoM) — are deliberately left out until someone
+  // rules on the ceiling: a guessed maxCount silently truncates the effect.
+  //
+  // Angel of Revelation reveals "each player's deck", so it gets one entry per
+  // deck rather than a combined shape.
+  // ---------------------------------------------------------------------------
+  'The Seventy Elders':                                  [{ type: 'reveal_opponent_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }],
+  'Wash Basin':                                          [{ type: 'reveal_opponent_deck_choose', position: 'bottom', defaultCount: 2, maxCount: 2 }],
+  'the gods of Egypt [IR]':                              [{ type: 'discard_opponent_deck_choose', position: 'top', defaultCount: 3, maxCount: 5 }],
+  'Sabbath Breaker [Gray/Pale Green]':                   [{ type: 'look_at_opponent_deck_choose', position: 'top', defaultCount: 3, maxCount: 6 }],
+  'Angel of Revelation (RoJ)':                           [{ type: 'reveal_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }, { type: 'reveal_opponent_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }],
+  'Angel of Revelation (RoJ AB)':                        [{ type: 'reveal_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }, { type: 'reveal_opponent_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }],
+  'Outsiders (Gray/Pale Green) (RoJ)':                   [{ type: 'look_at_opponent_deck_choose', position: 'top', defaultCount: 5, maxCount: 16 }],
+  'Outsiders (Gray/Pale Green) (RoJ AB)':                [{ type: 'look_at_opponent_deck_choose', position: 'top', defaultCount: 5, maxCount: 16 }],
 };
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {

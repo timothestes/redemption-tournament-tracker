@@ -279,8 +279,19 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         if (found) { source = found; break; }
       }
       const ability = source ? getEffectiveAbilities(source)[abilityIndex] : undefined;
-      if (ability?.type === 'look_at_own_deck_choose') {
+      if (ability?.type === 'look_at_own_deck_choose' || ability?.type === 'reveal_own_deck_choose') {
+        // Goldfish is single-player, so look and reveal collapse to the same
+        // modal — matching how the fixed-count pair is handled above.
         openOwnDeckPeek(ability.position, Math.min(count, ability.maxCount), source);
+        return;
+      }
+      if (
+        ability?.type === 'look_at_opponent_deck_choose'
+        || ability?.type === 'reveal_opponent_deck_choose'
+        || ability?.type === 'discard_opponent_deck_choose'
+      ) {
+        // No opponent in goldfish — same no-op as the fixed-count opponent
+        // abilities in gameReducer's ability switch.
         return;
       }
       dispatch(gameActionCreators.executeCardAbilityWithCount(cardId, abilityIndex, count));
