@@ -152,17 +152,9 @@ interface DeckPeekModalProps {
   isPrivateLook?: boolean;
   /** Zone to look up peeked cards in. Defaults to 'deck'. */
   sourceZone?: ZoneId;
-  /**
-   * When true, dismissing the modal (X / Escape / click-away) leaves the deck
-   * order untouched instead of returning the revealed cards to the top. Callers
-   * that reveal from the bottom or a random position pass this so a revealed
-   * bottom card isn't silently relocated to the top (and drawn next). The
-   * explicit footer buttons still reorder.
-   */
-  preserveOnDismiss?: boolean;
 }
 
-export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, isPrivateLook, sourceZone = 'deck', preserveOnDismiss = false }: DeckPeekModalProps) {
+export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, isPrivateLook, sourceZone = 'deck' }: DeckPeekModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, shuffleCardIntoDeck } = actions;
@@ -274,13 +266,13 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     onClose();
   };
 
-  // Dismissing without an explicit choice (X / Escape / click-away). For a
-  // bottom or random reveal, returning cards to the top would relocate the
-  // revealed bottom card and cause it to be drawn next — so those callers pass
-  // preserveOnDismiss to leave the deck untouched.
+  // Dismissing without an explicit choice (X / Escape / click-away) leaves the
+  // deck untouched: peeking never moves cards, so doing nothing is what puts
+  // them back where they came from. Reordering here instead would relocate a
+  // bottom/random peek to the top and hand it to the next draw. The footer
+  // buttons remain the way to say "put these somewhere else".
   const handleDismiss = () => {
-    if (preserveOnDismiss) { onClose?.(); return; }
-    handleCloseAction('top');
+    onClose?.();
   };
 
   useEffect(() => {
@@ -295,7 +287,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [hasRemaining, remainingIds, selectedIds.size]);
+  }, [onClose, selectedIds.size]);
 
   // Outside-click / outside-right-click behavior. The backdrop is
   // pointer-events: none so cards underneath can fire hover previews, so we
@@ -325,7 +317,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [onClose, readyForClose, didDragRef, hasRemaining, remainingIds]);
+  }, [onClose, readyForClose, didDragRef]);
 
   // Track pointer down card to distinguish click from drag on pointer up
   const pointerDownCardRef = useRef<string | null>(null);
