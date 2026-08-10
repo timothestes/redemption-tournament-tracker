@@ -96745,5 +96745,22 @@
     "reference": "Psalm 78:11-12",
     "alignment": "Evil",
     "legality": "Rotation"
+  },
+  {
+    "name": "Philosophy [2026 - Worker]",
+    "set": "Pmo-P3",
+    "imgFile": "Philosophy-Worker",
+    "officialSet": "Promo",
+    "type": "GE/EE",
+    "brigade": "White (Gray)",
+    "strength": "3 (2)",
+    "toughness": "2 (3)",
+    "class": "",
+    "identifier": "",
+    "specialAbility": "GE: Negate an evil Enhancement. You may discard an evil card from a hand. / EE: Negate a good Enhancement. You may discard a good card from a hand.",
+    "rarity": "National",
+    "reference": "I Corinthians 1:20",
+    "alignment": "Neutral",
+    "legality": "Rotation"
   }
 ]
