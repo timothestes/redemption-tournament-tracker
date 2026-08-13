@@ -10,7 +10,7 @@ IMPORTANT RULES:
 - For multi-day events, set both start_date and end_date
 - Confidence is 0-1: use 1.0 for clearly parsed listings, lower for ambiguous ones
 - For formats, extract each game format and its entry fee separately
-- title should be "{City}, {State} {Tournament Type}" (e.g., "Arcadia, CA Local (Open)")
+- title should be "{City}, {State} {Tournament Type}" (e.g., "Arcadia, CA Seasonal")
 - If a field is not present, use null
 - Return ONLY valid JSON, no markdown fences or explanation
 
@@ -18,7 +18,7 @@ OUTPUT SCHEMA (JSON array):
 [
   {
     "title": "string",
-    "tournament_type": "string | null (e.g., 'Local (Open)', 'District', 'State')",
+    "tournament_type": "string | null (e.g., 'Seasonal', 'State', 'Regional', 'National'; older listings may say 'Local (Open)', 'Local (Closed)' or 'District' — copy whatever the page shows, do not translate it)",
     "start_date": "YYYY-MM-DD",
     "end_date": "YYYY-MM-DD | null",
     "start_time": "string | null (e.g., '10:00 AM')",
