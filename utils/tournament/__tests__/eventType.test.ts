@@ -29,15 +29,16 @@ describe("normalizeTier", () => {
     expect(normalizeTier("Redemption National")).toBe("National");
   });
 
-  it("keeps the open/closed distinction on Local", () => {
-    expect(normalizeTier("Local (Open)")).toBe("Local (Open)");
-    expect(normalizeTier("Local (Closed)")).toBe("Local (Closed)");
-    expect(normalizeTier("local")).toBe("Local (Open)");
+  it("maps the levels the 2026 guide retired onto Seasonal", () => {
+    expect(normalizeTier("Local (Open)")).toBe("Seasonal");
+    expect(normalizeTier("Local (Closed)")).toBe("Seasonal");
+    expect(normalizeTier("local")).toBe("Seasonal");
+    expect(normalizeTier("District")).toBe("Seasonal");
   });
 
   it("passes through the plain tiers", () => {
     expect(normalizeTier("State")).toBe("State");
-    expect(normalizeTier("District")).toBe("District");
+    expect(normalizeTier("Seasonal")).toBe("Seasonal");
   });
 
   it("returns null rather than guessing on unknown or empty input", () => {
@@ -129,10 +130,10 @@ describe("renameForEventType", () => {
   it("rebuilds from created_at when the name is free-form", () => {
     const out = renameForEventType(
       "Friday Night Redemption",
-      { tier: "Local (Open)", category: "Type 2", city: null, state: null },
+      { tier: "Seasonal", category: "Type 2", city: null, state: null },
       UNLIMITED.created_at
     );
-    expect(out).toMatch(/^\w{3} \d{1,2}, \d{4} Local \(Open\) Type 2 Tournament$/);
+    expect(out).toMatch(/^\w{3} \d{1,2}, \d{4} Seasonal Type 2 Tournament$/);
   });
 
   it("applies the location when falling back on a free-form name", () => {

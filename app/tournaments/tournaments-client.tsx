@@ -55,6 +55,13 @@ function toDateKey(dateStr: string): string {
   return dateStr; // already YYYY-MM-DD
 }
 
+// Seasonal replaced Local and District in the 2026 Host Guide, but listings
+// sanctioned under the old levels are still on the calendar — they share the
+// Seasonal color rather than keeping a retired one of their own.
+function isSeasonal(t: string): boolean {
+  return t.includes("seasonal") || t.includes("district") || t.includes("local");
+}
+
 function getTypeBadgeClasses(type: string | null): string {
   const t = (type || "").toLowerCase();
   if (t.includes("regional") || t.includes("national")) {
@@ -63,7 +70,7 @@ function getTypeBadgeClasses(type: string | null): string {
   if (t.includes("state")) {
     return "bg-primary/10 text-primary";
   }
-  if (t.includes("district")) {
+  if (isSeasonal(t)) {
     return "bg-blue-500/15 text-blue-700 dark:text-blue-400";
   }
   return "bg-muted text-muted-foreground";
@@ -77,7 +84,7 @@ function getTypeDotColor(type: string | null): string {
   if (t.includes("state")) {
     return "bg-primary";
   }
-  if (t.includes("district")) {
+  if (isSeasonal(t)) {
     return "bg-blue-500";
   }
   return "bg-muted-foreground/50";
@@ -527,20 +534,16 @@ function CalendarView({
       {/* Legend */}
       <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground">
         <div className="flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+          Seasonal
+        </div>
+        <div className="flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-primary" />
           State
         </div>
         <div className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-          District
-        </div>
-        <div className="flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
           Regional
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
-          Local
         </div>
       </div>
 
