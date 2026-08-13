@@ -163,16 +163,21 @@ const TopNav: React.FC = () => {
     { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf", label: "Lost Souls (B&W)" },
   ];
 
+  // Host files live on cactusgamedesign.com/downloads. As of the 2026 Host Guide
+  // there are two applications — with prize pack support, or promos only at a
+  // lower fee — so they get distinct labels instead of two "Hosting Application"
+  // rows.
   const hostResources = [
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/Redemption_Host_Guide_2025.pdf", label: "Hosting Guide" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/05/Redemption-Tournament-Host-Application-2025-1.pdf", label: "Hosting Application" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Redemption-Tournament-Host-Application-2025-08.pdf", label: "Hosting Application" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/host_sign_in_sheets.pdf", label: "Sign In Sheet" },
+    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/Redemption_Host_Guide_2026-1.pdf", label: "Hosting Guide" },
+    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/host_instructions.pdf", label: "Host Instructions" },
+    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/Redemption-Tournament-Host-Application-2027_With_Prize_Pack_Support.pdf", label: "Hosting Application (with Prize Packs)" },
+    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/Redemption-Tournament-Host-Application-2027_WITHOUT_Prize_Pack_Support.pdf", label: "Hosting Application (Promos Only)" },
+    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/host_sign_in_sheets-1.pdf", label: "Sign In Sheet" },
     { href: "https://landofredemption.com/wp-content/uploads/2026/07/t1_deck_check_v2.pdf", label: "T1 Deck Check Sheet" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-T1.pdf", label: "T1 Reserve List" },
     { href: "https://landofredemption.com/wp-content/uploads/2026/07/t2_deck_check_v2.pdf", label: "T2 Deck Check Sheet" },
     { href: "https://landofredemption.com/wp-content/uploads/2026/07/T2-Reserve-list.pdf", label: "T2 Reserve List" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/host_winners_list.pdf", label: "Winners Form" },
+    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/host_winners_list-2.pdf", label: "Winners Form" },
   ];
 
   return (
