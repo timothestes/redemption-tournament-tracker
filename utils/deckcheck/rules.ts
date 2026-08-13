@@ -787,7 +787,14 @@ export function checkCharacterAliasLimit(
 
 /**
  * Rule: t1-quantity-vanilla — Vanilla single-brigade Heroes, Evil Characters,
- * and Enhancements are limited to 3 copies each.
+ * and Enhancements are limited to 1 copy each.
+ *
+ * Deck Construction & Format Specific Rules 2.0 (8/13/2026) made Type 1
+ * singleton: "All other cards have a maximum of 1 of each in a deck", with only
+ * meek Lost Souls exempt. That retired the 3-copy allowance these cards had
+ * under Deck Building Rules 1.3. Paragon shares this check and agrees — Paragon
+ * Format Rules 1.2 p.3: "You may not include more than 1 copy of any card in
+ * your deck."
  */
 export function checkVanillaLimit(
   _mainDeckCards: ResolvedCard[],
@@ -809,11 +816,11 @@ export function checkVanillaLimit(
     if (vanillaCards.length === 0) continue;
 
     const totalQty = vanillaCards.reduce((sum, c) => sum + c.quantity, 0);
-    if (totalQty > 3) {
+    if (totalQty > 1) {
       issues.push({
         type: "error",
         rule: "t1-quantity-vanilla",
-        message: `"${group.canonicalName}" (vanilla, single-brigade) — max 3 copies allowed, found ${totalQty}.`,
+        message: `"${group.canonicalName}" — max 1 copy allowed, found ${totalQty}.`,
         cards: [group.canonicalName],
       });
     }

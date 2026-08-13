@@ -1318,7 +1318,37 @@ describe("Rule: checkSpecialAbilityLimit (t1-quantity-special-ability)", () => {
 });
 
 describe("Rule: checkVanillaLimit (t1-quantity-vanilla)", () => {
-  it("passes for 3 copies of vanilla single-brigade Hero", () => {
+  it("passes for 1 copy of vanilla single-brigade Hero", () => {
+    const card = makeCard({
+      name: "Vanilla Hero",
+      type: "Hero",
+      brigade: "Blue",
+      specialAbility: "",
+      quantity: 1,
+    });
+    const groups = [makeGroup("Vanilla Hero", [card])];
+    expect(checkVanillaLimit([], [], groups)).toHaveLength(0);
+  });
+
+  it("fails for 2 copies of vanilla single-brigade Hero", () => {
+    const card = makeCard({
+      name: "Vanilla Hero",
+      type: "Hero",
+      brigade: "Blue",
+      specialAbility: "",
+      quantity: 2,
+    });
+    const groups = [makeGroup("Vanilla Hero", [card])];
+    const issues = checkVanillaLimit([], [], groups);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].rule).toBe("t1-quantity-vanilla");
+    expect(issues[0].message).toContain("max 1 copy");
+    expect(issues[0].message).toContain("found 2");
+  });
+
+  // 3 copies were legal under Deck Building Rules 1.3 — the exact case the
+  // checker used to wave through and 2.0 makes illegal.
+  it("fails for 3 copies, the allowance 1.3 used to grant", () => {
     const card = makeCard({
       name: "Vanilla Hero",
       type: "Hero",
@@ -1327,23 +1357,7 @@ describe("Rule: checkVanillaLimit (t1-quantity-vanilla)", () => {
       quantity: 3,
     });
     const groups = [makeGroup("Vanilla Hero", [card])];
-    expect(checkVanillaLimit([], [], groups)).toHaveLength(0);
-  });
-
-  it("fails for 4 copies of vanilla single-brigade Hero", () => {
-    const card = makeCard({
-      name: "Vanilla Hero",
-      type: "Hero",
-      brigade: "Blue",
-      specialAbility: "",
-      quantity: 4,
-    });
-    const groups = [makeGroup("Vanilla Hero", [card])];
-    const issues = checkVanillaLimit([], [], groups);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].rule).toBe("t1-quantity-vanilla");
-    expect(issues[0].message).toContain("max 3");
-    expect(issues[0].message).toContain("found 4");
+    expect(checkVanillaLimit([], [], groups)).toHaveLength(1);
   });
 
   it("applies to Evil Characters", () => {
