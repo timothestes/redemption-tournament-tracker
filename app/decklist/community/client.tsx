@@ -351,6 +351,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             <option value="">All Formats</option>
             <option value="Limited">Limited</option>
             <option value="Unlimited">Unlimited</option>
+            <option value="Teams">Teams</option>
             <option value="T2">T2</option>
             <option value="Paragon">Paragon</option>
           </select>

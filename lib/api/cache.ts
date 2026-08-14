@@ -114,6 +114,9 @@ export function deckFormatFilterFor(format: string): DeckFormatFilter {
   if (norm === "T2") return { kind: "in", values: ["Type 2", "T2"] };
   if (norm === "Unlimited") return { kind: "in", values: ["Unlimited", "Classic"] };
   if (norm === "Paragon") return { kind: "eq", value: "Paragon" };
+  // Teams needs its own branch, not the Limited fallthrough: Teams decks are
+  // stored as "Teams" and a Teams query must not return the Limited pile.
+  if (norm === "Teams") return { kind: "eq", value: "Teams" };
   // Limited (the default): decks with null format default to Limited in the
   // UI, so include them here too.
   return { kind: "or", clause: "format.is.null,format.in.(Type 1,Limited)" };

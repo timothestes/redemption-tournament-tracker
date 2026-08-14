@@ -32,9 +32,11 @@ export function categoryDefaults(category: string): CategoryDefaults {
   if (c.includes("paragon"))
     return { deck_format: "Paragon", max_score: 5, round_length: 40 };
   // Teams is built to Type 1 deck rules (per the hosting guide), so it wins at
-  // 5 souls — not 7. Checked before Type 2 so it never falls through.
+  // 5 souls — not 7. Checked before Type 2 so it never falls through. Its own
+  // format since DBR 2.0 gave Teams a ban list of its own; the deck rules are
+  // otherwise Limited's.
   if (c.includes("teams"))
-    return { deck_format: "Limited", max_score: 5, round_length: 60 };
+    return { deck_format: "Teams", max_score: 5, round_length: 60 };
   if (c.includes("type 2") || c.includes("type2"))
     return { deck_format: "T2", max_score: 7, round_length: 75 };
   if (c.includes("draft"))

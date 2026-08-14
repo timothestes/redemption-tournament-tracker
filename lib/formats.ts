@@ -4,7 +4,7 @@
  * Spec: docs/superpowers/specs/2026-07-25-format-restructure-design.md
  */
 
-export type FormatId = 'Limited' | 'Unlimited' | 'T2' | 'Paragon';
+export type FormatId = 'Limited' | 'Unlimited' | 'Teams' | 'T2' | 'Paragon';
 export type PoolId = 'rotation' | 'all' | 'paragon';
 
 export interface BannedCardDef {
@@ -72,14 +72,31 @@ const T2_BAN_LIST: BannedCardDef[] = [
   { name: 'Harvest Time [Fundraiser]', set: 'Fund', note: 'Harvest Time (Gospel of Christ, fundraiser printing)' },
 ];
 
+// Type 1 Teams Limited ban list: Type 1's, plus Burial and High Places. As
+// with Harvest Time, the Fundraiser printing of Burial carries the same name
+// and ability text as the Gospel of Christ one, so the ban covers both.
+const TEAMS_BAN_LIST: BannedCardDef[] = [
+  ...LIMITED_BAN_LIST,
+  { name: 'Burial (GoC)', set: 'GoC', note: 'Burial (Gospel of Christ)' },
+  { name: 'Burial [Fundraiser]', set: 'Fund', note: 'Burial (Gospel of Christ, fundraiser printing)' },
+  { name: 'High Places (LoC)', set: 'LoC', note: 'High Places (Lineage of Christ)' },
+];
+
+// Teams is one of the six categories DBR 2.0 recognizes, and decks are built
+// to Type 1 Limited rules — same sizes, same pool, same validator (dispatch is
+// by `family`) — differing only in the ban list. The Teams-specific rules in
+// the guide ("All Lost Souls are considered meek for Teams play", shared Land
+// of Redemption, one Dominant per team) govern play, not construction, so
+// nothing in the rules engine changes.
 export const FORMATS: Record<FormatId, FormatDef> = {
   Limited:   { id: 'Limited',   label: 'Limited',   badge: 'L',  family: 'T1',      main: { min: 50,  max: 70 },  reserveMax: 10, pool: 'rotation', banList: LIMITED_BAN_LIST },
   Unlimited: { id: 'Unlimited', label: 'Unlimited', badge: 'U',  family: 'T1',      main: { min: 50,  max: 70 },  reserveMax: 10, pool: 'all',      banList: DANIEL_COW },
+  Teams:     { id: 'Teams',     label: 'Teams',     badge: 'TM', family: 'T1',      main: { min: 50,  max: 70 },  reserveMax: 10, pool: 'rotation', banList: TEAMS_BAN_LIST },
   T2:        { id: 'T2',        label: 'T2',        badge: 'T2', family: 'T2',      main: { min: 100, max: 140 }, reserveMax: 20, pool: 'rotation', banList: T2_BAN_LIST },
   Paragon:   { id: 'Paragon',   label: 'Paragon',   badge: 'P',  family: 'Paragon', main: { min: 40,  max: 40 },  reserveMax: 10, pool: 'paragon',  banList: [] },
 };
 
-export const FORMAT_IDS: FormatId[] = ['Limited', 'Unlimited', 'T2', 'Paragon'];
+export const FORMAT_IDS: FormatId[] = ['Limited', 'Unlimited', 'Teams', 'T2', 'Paragon'];
 
 /**
  * Predicate satisfied by both ResolvedCard (deckcheck) and CardData (raw card
@@ -120,14 +137,20 @@ export function isBannedInFormat(card: BanMatchable, id: FormatId): boolean {
 
 /**
  * Map any historical or current format string to a canonical FormatId.
- * Precedence is load-bearing: paragon → type 2 → unlimited/classic → Limited.
- * ('Classic' was the old name for the all-cards pool.) Unlike the matchmaking
- * normalizer in lib/deck-format.ts (untouched), this does NOT treat 'multi'
- * as T2 — no stored value needs it and it would misclassify "Type 1 Multiplayer".
+ * Precedence is load-bearing: paragon → teams → type 2 → unlimited/classic →
+ * Limited. ('Classic' was the old name for the all-cards pool.) Unlike the
+ * matchmaking normalizer in lib/deck-format.ts (untouched), this does NOT treat
+ * 'multi' as T2 — no stored value needs it and it would misclassify "Type 1
+ * Multiplayer".
+ *
+ * Teams sits above type 2 and unlimited because the listing strings that carry
+ * it read "Type 1 - Teams": matching on 'teams' first keeps the category from
+ * falling through to plain Limited.
  */
 export function normalizeFormat(s: string | null | undefined): FormatId {
   const fmt = (s ?? '').toLowerCase();
   if (fmt.includes('paragon')) return 'Paragon';
+  if (fmt.includes('teams')) return 'Teams';
   if (fmt.includes('type 2') || fmt.includes('type2') || fmt === 't2') return 'T2';
   if (fmt.includes('unlimited') || fmt.includes('classic')) return 'Unlimited';
   return 'Limited';
