@@ -187,6 +187,33 @@ export const Player = __t.object("Player", {
 });
 export type Player = __Infer<typeof Player>;
 
+export const PregameIdleTimeout = __t.object("PregameIdleTimeout", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  gameId: __t.u64(),
+});
+export type PregameIdleTimeout = __Infer<typeof PregameIdleTimeout>;
+
+export const PregameStar = __t.object("PregameStar", {
+  id: __t.u64(),
+  gameId: __t.u64(),
+  seat: __t.u64(),
+  cardInstanceId: __t.u64(),
+  slot: __t.u64(),
+  resolved: __t.bool(),
+});
+export type PregameStar = __Infer<typeof PregameStar>;
+
+export const PregameState = __t.object("PregameState", {
+  gameId: __t.u64(),
+  activeSeat: __t.u64(),
+  starsDone0: __t.bool(),
+  starsDone1: __t.bool(),
+  soulsDone0: __t.bool(),
+  soulsDone1: __t.bool(),
+});
+export type PregameState = __Infer<typeof PregameState>;
+
 export const RevealTimeout = __t.object("RevealTimeout", {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),
