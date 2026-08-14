@@ -21,6 +21,7 @@ import {
   DEFAULT_ABILITY_SOURCE_ZONES,
 } from '@/lib/cards/cardAbilities';
 import { virtualToScreen } from '@/app/shared/layout/virtualCanvas';
+import StarOfDavidIcon from './StarOfDavidIcon';
 import type { ZoneRect } from '../layout/multiplayerLayout';
 
 // Sits below ZoneBrowseModal's overlay (z 500) so a deck/reserve browse opened
@@ -126,9 +127,14 @@ export default function PregameRail({
     </div>
   );
 
-  const heading = (text: string) => (
-    <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase',
+  // `star` marks the headings that are about (Star) abilities — the same
+  // hexagram the eligible cards wear in hand. The Lost Souls step never gets
+  // it; that step isn't about stars.
+  const heading = (text: string, star = false) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5,
+                  fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase',
                   color: 'rgba(232, 213, 163, 0.55)' }}>
+      {star && <StarOfDavidIcon size={12} />}
       {text}
     </div>
   );
@@ -189,7 +195,7 @@ export default function PregameRail({
   if (!hasSubmitted) {
     return wrapper(
       <>
-        {heading('Pre-Game Phase · Stars')}
+        {heading('Pre-Game Phase · Stars', true)}
         {handStars.length === 0 ? (
           <div style={{ fontSize: 12 }}>No star cards in hand.</div>
         ) : (
@@ -213,7 +219,7 @@ export default function PregameRail({
   }
 
   const current = queue.find((s) => !s.resolved);
-  if (!current) return wrapper(<>{heading('Pre-Game Phase · Stars')}<div style={{ fontSize: 12 }}>Resolving…</div></>);
+  if (!current) return wrapper(<>{heading('Pre-Game Phase · Stars', true)}<div style={{ fontSize: 12 }}>Resolving…</div></>);
 
   // Map the UNFILTERED ability list and disable out-of-zone entries. Both the
   // client dispatcher and the server index the full array, so filtering first
@@ -225,8 +231,12 @@ export default function PregameRail({
 
   return wrapper(
     <>
-      {heading('Pre-Game Phase · Stars')}
-      <div style={{ fontSize: 13, color: '#e8d5a3' }}>{current.cardName}</div>
+      {heading('Pre-Game Phase · Stars', true)}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6,
+                    fontSize: 13, color: '#e8d5a3' }}>
+        <StarOfDavidIcon size={13} />
+        {current.cardName}
+      </div>
       <div style={{ fontSize: 11, color: 'rgba(232, 213, 163, 0.75)', lineHeight: 1.4 }}>
         {current.specialAbility}
       </div>

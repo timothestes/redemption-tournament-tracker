@@ -68,6 +68,11 @@ import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 import BattleResolutionUI from './BattleResolutionUI';
 import PregameRail from './PregameRail';
+import {
+  STAR_OF_DAVID_UP_TRIANGLE,
+  STAR_OF_DAVID_DOWN_TRIANGLE,
+  STAR_OF_DAVID_VIEWBOX,
+} from './StarOfDavidIcon';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
@@ -1617,6 +1622,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       (gameState.pregameStars ?? []).some((s: PregameStar) => s.seat === mySeatForPregame),
     [gameState.pregameStars, mySeatForPregame],
   );
+
+  // My star-selection window is open. One gate for all three surfaces it
+  // drives: the click-to-pick intercept, the on-card eligibility marker, and
+  // the order badges.
+  const starWindowOpen =
+    !isSpectator && pregameStep === 'stars' && myPregameWindow && !myStarsSubmitted;
 
   // The star cards I've clicked in hand, in pick order. Lives here rather than
   // inside PregameRail because both the hand's Konva order badges and the
@@ -4869,11 +4880,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // (un-picking) can't also trip the meek double-click. Star detection
       // reads the row's OWN specialAbility — never findCard(), which is blind
       // to Forge cards.
-      if (
-        !isSpectator && pregameStep === 'stars' && myPregameWindow &&
-        !myStarsSubmitted && card.zone === 'hand' &&
-        isStarAbilityText(card.specialAbility)
-      ) {
+      if (starWindowOpen && card.zone === 'hand' && isStarAbilityText(card.specialAbility)) {
         toggleStarPick(BigInt(card.instanceId));
         return;
       }
@@ -4886,8 +4893,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         clearSelection();
       }
     },
-    [selectedIds, clearSelection, toggleSelect, isSpectator, pregameStep,
-     myPregameWindow, myStarsSubmitted, toggleStarPick],
+    [selectedIds, clearSelection, toggleSelect, starWindowOpen, toggleStarPick],
   );
 
   const handleCardContextMenu = useCallback(
@@ -8179,49 +8185,109 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     />
                   );
                 })}
-                {/* Pre-game star pick order — a gold badge in the card's
-                    top-left corner, drawn over the hand so the fan's overlap
-                    can't hide it. Same badge language as the HAND count chip
-                    (dark fill, gold stroke, Cinzel numeral). Non-listening so
-                    the click still lands on the card underneath. */}
-                {starPickOrder.length > 0 && handCards.map((card, i) => {
+                {/* Pre-game star cues, drawn over the hand so the fan's
+                    overlap can't hide them. Two signals in opposite top
+                    corners, so they never collide:
+                      · top-RIGHT, a Star of David — this card carries a (Star)
+                        ability, i.e. clicking it picks it. Deliberately
+                        subordinate: smaller than the numeral, no gold ring,
+                        no glow.
+                      · top-LEFT, a gold numeral — this card is picked Nth.
+                        Same badge language as the HAND count chip.
+                    The group is non-listening, so the click that picks the
+                    card still reaches the card underneath. */}
+                {(starWindowOpen || starPickOrder.length > 0) && handCards.map((card, i) => {
                   const pos = positions[i];
-                  if (!pos) return null;
+                  if (!pos || dealingIds.has(String(card.id))) return null;
                   const order = starPickOrder.indexOf(card.id);
-                  if (order < 0 || dealingIds.has(String(card.id))) return null;
+                  // Same detection as the click intercept: the row's OWN
+                  // ability text, never findCard().
+                  const eligible = starWindowOpen && isStarAbilityText(card.specialAbility);
+                  if (order < 0 && !eligible) return null;
                   const r = 12 * fsGrowth(13);
+                  // Star disc, inscribed in the top-right corner the way the
+                  // numeral is inscribed top-left — and a step smaller than it,
+                  // so the pick order stays the louder signal. The hexagram is
+                  // mapped from the shared 24-grid geometry about its centre
+                  // (12,12), circumradius 11.
+                  const sr = 11 * fsGrowth(13);
+                  const k = (sr * 0.78) / (STAR_OF_DAVID_VIEWBOX / 2 - 1);
+                  const scx = handCardWidth - sr;
+                  const starPoints = (src: readonly number[]) =>
+                    src.map((v, n) => (n % 2 === 0
+                      ? scx + (v - STAR_OF_DAVID_VIEWBOX / 2) * k
+                      : sr + (v - STAR_OF_DAVID_VIEWBOX / 2) * k));
                   return (
                     <Group
-                      key={`star-pick-${String(card.id)}`}
+                      key={`star-cue-${String(card.id)}`}
                       x={pos.x}
                       y={pos.y}
                       rotation={pos.rotation}
                       listening={false}
                     >
-                      <Circle
-                        x={r}
-                        y={r}
-                        radius={r}
-                        fill="rgba(10, 8, 5, 0.92)"
-                        stroke="#c4955a"
-                        strokeWidth={2}
-                        shadowColor="#c4955a"
-                        shadowBlur={8}
-                        shadowOpacity={0.7}
-                        perfectDrawEnabled={false}
-                      />
-                      <Text
-                        text={String(order + 1)}
-                        fontSize={fs(13)}
-                        fontStyle="bold"
-                        fontFamily="Cinzel, Georgia, serif"
-                        fill="#e8d5a3"
-                        width={r * 2}
-                        height={r * 2}
-                        align="center"
-                        verticalAlign="middle"
-                        perfectDrawEnabled={false}
-                      />
+                      {eligible && (
+                        <>
+                          {/* Opaque ground. Card art runs from near-white title
+                              bands to dark illustration, and a translucent disc
+                              left the gold hexagram invisible over the pale
+                              half. */}
+                          <Circle
+                            x={scx}
+                            y={sr}
+                            radius={sr}
+                            fill="rgba(10, 8, 5, 0.92)"
+                            perfectDrawEnabled={false}
+                          />
+                          {/* Two closed triangles from the shared point sets.
+                              The dark hairline keeps the interlaced edges
+                              readable where they cross — a canvas fill can't do
+                              the icon's evenodd hollow centre. */}
+                          <Line
+                            points={starPoints(STAR_OF_DAVID_UP_TRIANGLE)}
+                            closed
+                            fill="#e8d5a3"
+                            stroke="rgba(10, 8, 5, 0.9)"
+                            strokeWidth={k * 0.8}
+                            perfectDrawEnabled={false}
+                          />
+                          <Line
+                            points={starPoints(STAR_OF_DAVID_DOWN_TRIANGLE)}
+                            closed
+                            fill="#e8d5a3"
+                            stroke="rgba(10, 8, 5, 0.9)"
+                            strokeWidth={k * 0.8}
+                            perfectDrawEnabled={false}
+                          />
+                        </>
+                      )}
+                      {order >= 0 && (
+                        <>
+                          <Circle
+                            x={r}
+                            y={r}
+                            radius={r}
+                            fill="rgba(10, 8, 5, 0.92)"
+                            stroke="#c4955a"
+                            strokeWidth={2}
+                            shadowColor="#c4955a"
+                            shadowBlur={8}
+                            shadowOpacity={0.7}
+                            perfectDrawEnabled={false}
+                          />
+                          <Text
+                            text={String(order + 1)}
+                            fontSize={fs(13)}
+                            fontStyle="bold"
+                            fontFamily="Cinzel, Georgia, serif"
+                            fill="#e8d5a3"
+                            width={r * 2}
+                            height={r * 2}
+                            align="center"
+                            verticalAlign="middle"
+                            perfectDrawEnabled={false}
+                          />
+                        </>
+                      )}
                     </Group>
                   );
                 })}
