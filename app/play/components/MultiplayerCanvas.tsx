@@ -31,6 +31,7 @@ import { COUNTER_COLORS } from '../../goldfish/types';
 import type {
   CardInstance,
   CardCounter,
+  PregameStar,
 } from '@/lib/spacetimedb/module_bindings/types';
 import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
 import { CardNotePopover } from './CardNotePopover';
@@ -66,12 +67,14 @@ import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLay
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 import BattleResolutionUI from './BattleResolutionUI';
+import PregameRail from './PregameRail';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
 import { gameCardIsWarrior, gameCardIsWeapon } from '@/app/goldfish/utils/equipClass';
 import { findCard, isSite } from '@/lib/cards/lookup';
+import { isStarAbilityText } from '@/lib/cards/starCards';
 import { compareCardsDefault } from '@/lib/cards/defaultSort';
 import { normalizeDeckFormat } from '@/lib/deck-format';
 import { SOUL_DECK_BACK_IMG } from '@/app/shared/paragon/soulDeck';
@@ -1564,6 +1567,56 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // (Same pattern as rawBattleActiveRef above.)
   const findAnyCardByIdRef = useRef(findAnyCardById);
   findAnyCardByIdRef.current = findAnyCardById;
+
+  // ---- REG Pre-Game Phase (star reveals, then Lost Soul activation) ----
+  // These sub-steps run with game.status === 'playing', so pregamePhase — not
+  // status — is what identifies them.
+  const pregameStep: 'stars' | 'souls' | undefined =
+    gameState.game?.pregamePhase === 'stars' ? 'stars'
+    : gameState.game?.pregamePhase === 'souls' ? 'souls'
+    : undefined;
+
+  const myPregameWindow =
+    !!gameState.pregameState && !!gameState.myPlayer &&
+    gameState.pregameState.activeSeat === gameState.myPlayer.seat;
+
+  // Star detection reads each row's OWN specialAbility, never findCard() —
+  // Forge cards are absent from the public card index.
+  const myHandStars = useMemo(() => (myCards['hand'] ?? [])
+    .filter(c => isStarAbilityText(c.specialAbility))
+    .map(c => ({
+      instanceId: c.id, cardName: c.cardName,
+      specialAbility: c.specialAbility, imitatingName: c.imitatingName,
+    })), [myCards]);
+
+  const myActivatableSouls = useMemo(() => (myCards['land-of-bondage'] ?? [])
+    .filter(c => (c.specialAbility ?? '') !== '')
+    .map(c => ({ instanceId: c.id, cardName: c.cardName })),
+    [myCards]);
+
+  const activeStarQueue = useMemo(() => {
+    const seat = gameState.pregameState?.activeSeat;
+    if (seat === undefined) return [];
+    return (gameState.pregameStars ?? [])
+      .filter((s: PregameStar) => s.seat === seat)
+      .map((s: PregameStar) => {
+        const card = findAnyCardById(String(s.cardInstanceId));
+        return {
+          starId: s.id, cardInstanceId: s.cardInstanceId, resolved: s.resolved,
+          cardName: card?.cardName ?? '', specialAbility: card?.specialAbility ?? '',
+          imitatingName: card?.imitatingName,
+        };
+      });
+  }, [gameState.pregameState, gameState.pregameStars, findAnyCardById]);
+
+  // The server rejects a second submission per seat, so any row of mine means
+  // my selection window is closed and the resolve queue is what's live.
+  const mySeatForPregame = gameState.myPlayer?.seat;
+  const myStarsSubmitted = useMemo(
+    () => mySeatForPregame !== undefined &&
+      (gameState.pregameStars ?? []).some((s: PregameStar) => s.seat === mySeatForPregame),
+    [gameState.pregameStars, mySeatForPregame],
+  );
 
   // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel).
   // Resolve the live card (by instanceId) from the current zone data so fields like
@@ -8435,6 +8488,39 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onResolveBattle={gameState.resolveBattle}
           onEndBattle={gameState.endBattle}
           onSurrenderSoul={gameState.surrenderSoul}
+        />
+      )}
+
+      {/* ================================================================
+          REG Pre-Game Phase rail (star reveals, then Lost Soul activation).
+          Mounted here, not client.tsx, because its wrapper is inset-0 over
+          the canvas viewport — the same reason BattleResolutionUI lives
+          here. The wrapper is pointer-events:none so the board, the
+          toolbar and every modal stay fully interactive while it shows.
+          ================================================================ */}
+      {pregameStep && !isSpectator && (
+        <PregameRail
+          step={pregameStep}
+          isMyWindow={myPregameWindow}
+          opponentName={gameState.opponentPlayer?.displayName || 'Opponent'}
+          handStars={myHandStars}
+          queue={activeStarQueue}
+          activatableSouls={myActivatableSouls}
+          hasSubmitted={myStarsSubmitted}
+          autoRouteLostSouls={gameState.myPlayer?.autoRouteLostSouls ?? true}
+          onSubmitStars={gameState.pregameSubmitStars}
+          onResolveStar={gameState.pregameResolveStar}
+          onFinishSouls={gameState.pregameFinishSouls}
+          // Route through multiplayerActions, not gameState, so modal-driven
+          // ability types (look_at_own_deck — the type all four star-half
+          // registry entries use) are intercepted client-side. The raw
+          // reducer throws SenderError for those.
+          onExecuteAbility={(instanceId, abilityIndex) =>
+            multiplayerActions.executeCardAbility(String(instanceId), abilityIndex)}
+          // No card-highlight state exists in this component, so the soul
+          // chips are labels only — the rail already tells the player to
+          // right-click the soul itself.
+          onHighlightCard={() => {}}
         />
       )}
 
