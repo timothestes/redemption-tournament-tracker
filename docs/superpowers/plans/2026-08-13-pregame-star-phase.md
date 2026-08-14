@@ -1973,6 +1973,7 @@ Open the PR against `main` with a body that states:
 - **The round clock now starts when the pre-game ends**, not at the reveal.
 - **`execute_card_ability` now honours per-ability `sourceZones`** — a behaviour change that makes `Delivered` and 22 other pre-existing hand-legal entries actually fireable from hand, as their registry entries always intended.
 - **4 star cards gained `'hand'`** (The Coming Prince, Sign of Jonah, The Thankful Leper (GoC), The Three Visitors), with the 12 excluded in-play-half cards listed and the reasoning stated.
+- **Known consequence, flagged not fixed:** those 4 are now right-clickable from hand at *any* point in the game, not only during the pre-game star phase. `sourceZones` is a static registry property with no notion of phase. Star abilities are rules-wise pre-game-only, so this is permissive — consistent with the app enforcing no timing rules anywhere (it already allows playing Dominants during the pre-game, which REG forbids). Gating it would mean teaching `CardContextMenu` about `pregamePhase`.
 - **Forge star cards are out of scope** — their `specialAbility` is blanked on the public STDB row, so the star step auto-skips in Forge games.
 - **Do not merge without a paired prod plan:** merging publishes the prod module, which needs a Vercel deploy carrying the regenerated bindings, scheduled together, with open sessions needing a refresh.
 
