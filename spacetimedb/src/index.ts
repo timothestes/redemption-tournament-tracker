@@ -1226,6 +1226,19 @@ function finishPregame(ctx: any, gameId: bigint): void {
     1n, 'draw');
 }
 
+// Games are never deleted — the concede paths only set status:'finished' — so
+// finishPregame never runs for an abandoned pre-game. All three pre-game
+// tables are public, so orphan rows would sit in every client's table cache.
+function clearPregameRows(ctx: any, gameId: bigint): void {
+  for (const row of ctx.db.PregameStar.pregame_star_game_id.filter(gameId)) {
+    ctx.db.PregameStar.id.delete(row.id);
+  }
+  ctx.db.PregameState.gameId.delete(gameId);
+  for (const timeout of ctx.db.PregameIdleTimeout.pregame_idle_timeout_game_id.filter(gameId)) {
+    ctx.db.PregameIdleTimeout.scheduledId.delete(timeout.scheduledId);
+  }
+}
+
 // Shared "start the game" transition, used by both the both-players-acked path
 // (pregame_acknowledge_first) and the server-side backstop
 // (handle_reveal_timeout). Assumes `game` is in the 'revealing' phase with
@@ -1235,10 +1248,8 @@ function startGameFromReveal(ctx: any, game: any, fallbackWinnerPlayerId: bigint
   const gameId = game.id;
   const chosenSeat = game.currentTurn;
   const winnerSeat = game.rollWinner === '0' ? 0n : 1n;
-  let chosenName = 'Player ' + (Number(chosenSeat) + 1);
   let winnerPlayerId = fallbackWinnerPlayerId;
   for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
-    if (p.seat === chosenSeat) chosenName = p.displayName;
     if (p.seat === winnerSeat) winnerPlayerId = p.id;
   }
 
@@ -2017,6 +2028,7 @@ export const resign_game = spacetimedb.reducer(
     if (!game) throw new SenderError('Game not found');
 
     ctx.db.Game.id.update({ ...game, status: 'finished' });
+    clearPregameRows(ctx, gameId);
 
     logAction(
       ctx,
@@ -2097,6 +2109,7 @@ export const handle_disconnect_timeout = spacetimedb.reducer(
         } else {
           // Waiting/pregame: end game immediately
           ctx.db.Game.id.update({ ...game, status: 'finished' });
+          clearPregameRows(ctx, arg.gameId);
           logAction(
             ctx,
             arg.gameId,
@@ -2131,6 +2144,9 @@ export const claim_timeout_victory = spacetimedb.reducer(
     if (!player.isConnected) throw new SenderError('Only the connected player can claim victory');
 
     ctx.db.Game.id.update({ ...game, status: 'finished', disconnectTimeoutFired: false });
+    // Reachable mid-pre-game: the 5-minute disconnect grace applies at
+    // status:'playing', which is exactly what the star/soul steps run under.
+    clearPregameRows(ctx, gameId);
     logAction(ctx, gameId, player.id, 'TIMEOUT', JSON.stringify({ reason: 'claimed_by_opponent' }), game.turnNumber, game.currentPhase);
   }
 );
@@ -2437,6 +2453,8 @@ export const cleanup_stale_games = spacetimedb.reducer(
 
         if ((now - latestActionTime) > THIRTY_MIN_MICROS) {
           ctx.db.Game.id.update({ ...game, status: 'finished' });
+          // A game abandoned during the star/soul steps is still 'playing'.
+          clearPregameRows(ctx, game.id);
         }
         continue;
       }
@@ -2468,6 +2486,7 @@ export const cleanup_stale_games = spacetimedb.reducer(
       for (const player of [...ctx.db.Player.player_game_id.filter(gameId)]) {
         ctx.db.Player.id.delete(player.id);
       }
+      clearPregameRows(ctx, gameId);
       ctx.db.Game.id.delete(gameId);
     }
   }
@@ -2491,6 +2510,12 @@ export const set_phase = spacetimedb.reducer(
     const player = findPlayerBySender(ctx, gameId);
     let game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+
+    // The REG Pre-Game Phase runs with status:'playing', so turn machinery has
+    // to be gated on pregamePhase instead. '' = pre-game over, turn 1 is live.
+    if (game.pregamePhase !== '') {
+      throw new SenderError('The Pre-Game Phase is still in progress');
+    }
 
     if (player.seat !== game.currentTurn) {
       throw new SenderError('Not your turn');
@@ -2542,6 +2567,12 @@ export const end_turn = spacetimedb.reducer(
     const player = findPlayerBySender(ctx, gameId);
     let game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+
+    // The REG Pre-Game Phase runs with status:'playing', so turn machinery has
+    // to be gated on pregamePhase instead. '' = pre-game over, turn 1 is live.
+    if (game.pregamePhase !== '') {
+      throw new SenderError('The Pre-Game Phase is still in progress');
+    }
 
     if (player.seat !== game.currentTurn) {
       throw new SenderError('Not your turn');
