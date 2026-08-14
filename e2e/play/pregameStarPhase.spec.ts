@@ -68,11 +68,6 @@ async function makeStarDeck(deckId: string) {
   if (updErr) throw new Error(`deck card_count update failed: ${updErr.message}`);
 }
 
-/** The rail panel — the parent of its heading div, so its chips are in scope. */
-function railPanel(page: Page, heading: string) {
-  return page.getByText(heading, { exact: true }).locator("xpath=..");
-}
-
 /**
  * Whichever of the two player pages currently owns the star window. Only the
  * active seat's rail renders the submit buttons, and which seat goes first is
@@ -117,9 +112,8 @@ async function readBoard(page: Page, imgFragment: string): Promise<BoardGeometry
         const r = n.getClientRect();
         return { x: box.left + r.x + r.width / 2, y: box.top + r.y + r.height / 2 };
       })
-      // Right-most first: the rail sits over the bottom-LEFT of the canvas and
-      // overlaps the left end of the hand row, so the left-most hand cards are
-      // genuinely unreachable by a real click.
+      // Right-most first — the fan overlaps left-to-right, so only the
+      // right-most card exposes its full face to a real click.
       .sort((a: any, b: any) => b.x - a.x);
     const handLabel = (stage.find("Text") as any[]).find((t: any) => t.text() === "HAND");
     const handTop = handLabel ? box.top + handLabel.getClientRect().y : null;
@@ -193,29 +187,39 @@ test.describe("REG pre-game star phase", () => {
       await expect(active.locator('button[title="Draw (D)"]')).toBeVisible();
 
       // --- 3. The board is interactive under the rail -----------------------
-      const rail = railPanel(active, "Pre-Game Phase · Stars");
-      const chipsBefore = await rail.locator("span").count();
-      expect(chipsBefore).toBeGreaterThan(1);
-
       const geo = await readBoard(active, STAR_CARD.img);
       expect(geo.cards.length, "no face-up star cards found on the board").toBeGreaterThan(0);
+      const handTop = geo.handTop ?? geo.cards[0].y;
       const handCard = geo.cards[0];
       // Drop into my territory: the open band above the hand row and below the
-      // battle area, well clear of the rail's bottom-left panel.
+      // battle area. The rail now docks just above the hand row, so aim well
+      // right of its panel.
       const drop = {
-        x: geo.stage.left + geo.stage.width * 0.35,
-        y: (geo.handTop ?? handCard.y) - 180,
+        x: geo.stage.left + geo.stage.width * 0.55,
+        y: handTop - 180,
       };
       await dragBoard(active, handCard, drop);
 
-      // The rail's chips are derived from star cards in MY hand, so one fewer
-      // chip proves the server accepted a real board drag out of the hand.
+      // A card sitting above the hand row proves the server accepted a real
+      // board drag out of the hand — i.e. the rail overlay swallowed nothing.
       await expect
-        .poll(async () => rail.locator("span").count(), { timeout: 20_000 })
-        .toBe(chipsBefore - 1);
+        .poll(
+          async () =>
+            (await readBoard(active, STAR_CARD.img)).cards.filter(
+              (c) => c.y < handTop - 60,
+            ).length,
+          { timeout: 20_000 },
+        )
+        .toBeGreaterThan(0);
 
       // --- 4. Reveal one star, its ability is hand-legal --------------------
-      await rail.locator("span").first().click();
+      // Stars are picked by clicking the card itself in the hand — the rail no
+      // longer carries name chips. A real mouse click, for the same reason the
+      // drag above uses one.
+      const afterDrag = await readBoard(active, STAR_CARD.img);
+      const stillInHand = afterDrag.cards.find((c) => c.y >= handTop - 60);
+      expect(stillInHand, "no star card left in hand to click").toBeTruthy();
+      await active.mouse.click(stillInHand!.x, stillInHand!.y);
       const revealBtn = active.getByRole("button", { name: /^Reveal 1 star$/i });
       await expect(revealBtn).toBeVisible();
       await revealBtn.click();

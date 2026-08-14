@@ -8,13 +8,20 @@
 // buttons opt back in; Konva hit-tests on its own canvas element, so a
 // click-through DOM overlay never intercepts board clicks. Same technique as
 // BattleResolutionUI.tsx.
+//
+// The panel is anchored to the hand zone's top edge (virtualToScreen, same
+// idiom as BattleResolutionUI) instead of the viewport corner: the star step
+// is driven by clicking the star cards in the hand, so the panel must never
+// sit on top of them. Both territories are empty during the pre-game, so the
+// space above the hand row is free in Standard and Paragon alike.
 
-import { useState } from 'react';
 import {
   getEffectiveAbilities,
   abilityLabel,
   DEFAULT_ABILITY_SOURCE_ZONES,
 } from '@/lib/cards/cardAbilities';
+import { virtualToScreen } from '@/app/shared/layout/virtualCanvas';
+import type { ZoneRect } from '../layout/multiplayerLayout';
 
 // Sits below ZoneBrowseModal's overlay (z 500) so a deck/reserve browse opened
 // from a star ability is never covered, and above the canvas. BattleResolutionUI
@@ -22,7 +29,11 @@ import {
 const RAIL_Z = 450;
 
 const PANEL: React.CSSProperties = {
-  pointerEvents: 'auto',
+  // The panel body itself stays click-through — only its chips and buttons opt
+  // back in. It now floats over the Land of Bondage rather than the dead
+  // bottom-left corner, and the souls step asks the player to right-click souls
+  // that may sit underneath it.
+  pointerEvents: 'none',
   background: 'rgba(10, 8, 5, 0.94)',
   border: '1px solid rgba(196, 149, 90, 0.45)',
   borderRadius: 6,
@@ -61,11 +72,14 @@ const ACTION: React.CSSProperties = {
   color: '#e8d5a3',
 };
 
+/** Gap in virtual px between the panel's bottom edge and the hand zone's top. */
+const HAND_CLEARANCE = 10;
+
 interface PregameRailProps {
   step: 'stars' | 'souls';
   isMyWindow: boolean;
   opponentName: string;
-  /** Star cards in my hand, for the selection chips. */
+  /** Star cards in my hand — the rail only needs to know whether I have any. */
   handStars: Array<{ instanceId: bigint; cardName: string; specialAbility: string; imitatingName?: string }>;
   /** Submitted stars for the active seat, ascending by slot. */
   queue: Array<{ starId: bigint; cardInstanceId: bigint; resolved: boolean; cardName: string; specialAbility: string; imitatingName?: string }>;
@@ -74,6 +88,14 @@ interface PregameRailProps {
   /** True when I have submitted my star selection this window. */
   hasSubmitted: boolean;
   autoRouteLostSouls: boolean;
+  /** My hand zone (virtual coords) — the panel docks above it. */
+  handRect: ZoneRect;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  /** Star cards I've clicked in hand, in pick order. Owned by MultiplayerCanvas
+   *  so the hand's order badges and this panel's submit button agree. */
+  selection: bigint[];
   onSubmitStars: (ids: bigint[]) => void;
   onResolveStar: (starId: bigint) => void;
   onFinishSouls: () => void;
@@ -83,21 +105,24 @@ interface PregameRailProps {
 
 export default function PregameRail({
   step, isMyWindow, opponentName, handStars, queue, activatableSouls,
-  hasSubmitted, autoRouteLostSouls,
+  hasSubmitted, autoRouteLostSouls, handRect, scale, offsetX, offsetY, selection,
   onSubmitStars, onResolveStar, onFinishSouls, onExecuteAbility, onHighlightCard,
 }: PregameRailProps) {
-  const [selection, setSelection] = useState<bigint[]>([]);
-
-  const toggle = (id: bigint) =>
-    setSelection((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+  // Anchor point = the hand zone's top-left corner, lifted clear of it. The
+  // panel is translated up by its own height so its BOTTOM edge lands there,
+  // whatever the content's height.
+  const anchor = virtualToScreen(
+    handRect.x + 12, handRect.y - HAND_CLEARANCE, scale, offsetX, offsetY,
+  );
 
   // The whole wrapper is click-through; only chips and buttons opt back in.
   // Konva hit-tests on its own canvas, so this never blocks board interaction.
   const wrapper = (children: React.ReactNode) => (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: RAIL_Z }}>
-      <div style={{ position: 'absolute', left: 12, bottom: 12, ...PANEL }}>{children}</div>
+      <div style={{ position: 'absolute', left: anchor.x, top: anchor.y,
+                    transform: 'translateY(-100%)', ...PANEL }}>
+        {children}
+      </div>
     </div>
   );
 
@@ -168,22 +193,12 @@ export default function PregameRail({
         {handStars.length === 0 ? (
           <div style={{ fontSize: 12 }}>No star cards in hand.</div>
         ) : (
-          <>
-            <div style={{ fontSize: 12 }}>
-              Choose the star cards to reveal. They resolve in the order you pick them.
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', overflowX: 'auto' }}>
-              {handStars.map((c) => {
-                const order = selection.indexOf(c.instanceId);
-                return (
-                  <span key={c.instanceId.toString()} style={CHIP(order >= 0)}
-                        onClick={() => toggle(c.instanceId)}>
-                    {order >= 0 ? `${order + 1}. ` : ''}{c.cardName}
-                  </span>
-                );
-              })}
-            </div>
-          </>
+          // The picked cards carry a numbered gold badge in the hand itself, so
+          // the panel no longer repeats them as name chips.
+          <div style={{ fontSize: 12 }}>
+            Click the star cards in your hand to reveal them. They resolve in the
+            order you pick them.
+          </div>
         )}
         <div style={{ display: 'flex', gap: 8 }}>
           {selection.length > 0 && (

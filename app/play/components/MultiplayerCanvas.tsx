@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Stage, Layer, Rect, Text, Group, Line, Image as KonvaImage } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Line, Circle, Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 
@@ -1617,6 +1617,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       (gameState.pregameStars ?? []).some((s: PregameStar) => s.seat === mySeatForPregame),
     [gameState.pregameStars, mySeatForPregame],
   );
+
+  // The star cards I've clicked in hand, in pick order. Lives here rather than
+  // inside PregameRail because both the hand's Konva order badges and the
+  // rail's submit button read the same list.
+  const [starPicks, setStarPicks] = useState<bigint[]>([]);
+
+  const toggleStarPick = useCallback((id: bigint) => {
+    setStarPicks(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }, []);
+
+  // Drop picks for cards that have left my hand (dragged out, moved by an
+  // ability) so a stale id can never reach the submit reducer.
+  const starPickOrder = useMemo(() => {
+    if (starPicks.length === 0) return starPicks;
+    const inHand = new Set(myHandStars.map(c => c.instanceId));
+    return starPicks.filter(id => inHand.has(id));
+  }, [starPicks, myHandStars]);
+
+  // Clear the list whenever the selection window isn't open — after submitting,
+  // when the window passes to the opponent, and when the pre-game ends.
+  useEffect(() => {
+    if (pregameStep === 'stars' && myPregameWindow && !myStarsSubmitted) return;
+    setStarPicks(prev => (prev.length === 0 ? prev : []));
+  }, [pregameStep, myPregameWindow, myStarsSubmitted]);
 
   // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel).
   // Resolve the live card (by instanceId) from the current zone data so fields like
@@ -4838,6 +4863,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Universal card click handler — shift-click toggles selection
   const handleCardClick = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
+      // REG pre-game star step: while my selection window is open, clicking a
+      // star card in my hand picks it for the reveal instead of touching
+      // marquee selection. Ahead of the left-click counter so a second click
+      // (un-picking) can't also trip the meek double-click. Star detection
+      // reads the row's OWN specialAbility — never findCard(), which is blind
+      // to Forge cards.
+      if (
+        !isSpectator && pregameStep === 'stars' && myPregameWindow &&
+        !myStarsSubmitted && card.zone === 'hand' &&
+        isStarAbilityText(card.specialAbility)
+      ) {
+        toggleStarPick(BigInt(card.instanceId));
+        return;
+      }
       if (e.evt.button === 0) leftClicksSinceContextMenuRef.current += 1;
       if (e.evt.shiftKey) {
         toggleSelect(card.instanceId);
@@ -4847,7 +4886,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         clearSelection();
       }
     },
-    [selectedIds, clearSelection, toggleSelect],
+    [selectedIds, clearSelection, toggleSelect, isSpectator, pregameStep,
+     myPregameWindow, myStarsSubmitted, toggleStarPick],
   );
 
   const handleCardContextMenu = useCallback(
@@ -8119,7 +8159,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       cardHeight={handCardHeight}
                       image={getCardImage(card)}
                       {...(getTargetingProps(gameCard) ?? {})}
-                      isSelected={isSelected(idStr)}
+                      // A pre-game star pick borrows the same golden outline.
+                      // It rides inside the card's own Konva group, so it
+                      // tracks the node through the hand-reflow glide.
+                      isSelected={isSelected(idStr) || starPickOrder.includes(card.id)}
                       isDraggable={!isSpectator}
                       hoverProgress={hoveredInstanceId === idStr ? hoverProgress : 0}
                       lobArrivalGlow={dealGlowIds.has(idStr)}
@@ -8134,6 +8177,52 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
                     />
+                  );
+                })}
+                {/* Pre-game star pick order — a gold badge in the card's
+                    top-left corner, drawn over the hand so the fan's overlap
+                    can't hide it. Same badge language as the HAND count chip
+                    (dark fill, gold stroke, Cinzel numeral). Non-listening so
+                    the click still lands on the card underneath. */}
+                {starPickOrder.length > 0 && handCards.map((card, i) => {
+                  const pos = positions[i];
+                  if (!pos) return null;
+                  const order = starPickOrder.indexOf(card.id);
+                  if (order < 0 || dealingIds.has(String(card.id))) return null;
+                  const r = 12 * fsGrowth(13);
+                  return (
+                    <Group
+                      key={`star-pick-${String(card.id)}`}
+                      x={pos.x}
+                      y={pos.y}
+                      rotation={pos.rotation}
+                      listening={false}
+                    >
+                      <Circle
+                        x={r}
+                        y={r}
+                        radius={r}
+                        fill="rgba(10, 8, 5, 0.92)"
+                        stroke="#c4955a"
+                        strokeWidth={2}
+                        shadowColor="#c4955a"
+                        shadowBlur={8}
+                        shadowOpacity={0.7}
+                        perfectDrawEnabled={false}
+                      />
+                      <Text
+                        text={String(order + 1)}
+                        fontSize={fs(13)}
+                        fontStyle="bold"
+                        fontFamily="Cinzel, Georgia, serif"
+                        fill="#e8d5a3"
+                        width={r * 2}
+                        height={r * 2}
+                        align="center"
+                        verticalAlign="middle"
+                        perfectDrawEnabled={false}
+                      />
+                    </Group>
                   );
                 })}
                 <DealLayer sprites={dealSprites} onLanded={completeDeal} />
@@ -8508,6 +8597,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           activatableSouls={myActivatableSouls}
           hasSubmitted={myStarsSubmitted}
           autoRouteLostSouls={gameState.myPlayer?.autoRouteLostSouls ?? true}
+          // The panel floats just above the hand row rather than in the
+          // viewport's bottom-left corner, where it covered the cards the
+          // player now clicks to pick their stars.
+          handRect={myHandRect}
+          scale={scale}
+          offsetX={offsetX}
+          offsetY={offsetY}
+          selection={starPickOrder}
           onSubmitStars={gameState.pregameSubmitStars}
           onResolveStar={gameState.pregameResolveStar}
           onFinishSouls={gameState.pregameFinishSouls}
