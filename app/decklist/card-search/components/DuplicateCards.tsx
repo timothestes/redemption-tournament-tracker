@@ -3,7 +3,7 @@
 import React from 'react';
 import type { DuplicateSibling } from '@/lib/duplicateCards';
 import type { Card } from '../utils';
-import { PARAGON_EXCLUDED_SETS } from '@/lib/formats';
+import { isBannedInFormat, PARAGON_EXCLUDED_SETS, type FormatId } from '@/lib/formats';
 
 interface DuplicateCardsProps {
   siblings: DuplicateSibling[];
@@ -13,6 +13,8 @@ interface DuplicateCardsProps {
   onNavigate?: (card: Card) => void;
   /** Current legality mode — siblings not matching this are dimmed. null = show all */
   legalityFilter?: string | null;
+  /** Format the deck is being built in — decides what "Banned" means */
+  legalityFormat?: FormatId;
   /** Full card list (unfiltered) for legality checking */
   allCards?: Card[];
   /** Callback for hover preview on desktop */
@@ -23,10 +25,11 @@ interface DuplicateCardsProps {
  * Check if a card passes a legality filter.
  * Mirrors the logic in client.tsx lines 795-842.
  */
-function passesLegalityFilter(card: Card, mode: string): boolean {
+function passesLegalityFilter(card: Card, mode: string, format: FormatId): boolean {
   if (mode === 'Unlimited') return true;
   if (mode === 'Limited') return card.legality === 'Rotation';
-  if (mode === 'Banned') return card.legality === 'Banned';
+  // Per-format since DBR 2.0 — see isBannedInFormat.
+  if (mode === 'Banned') return isBannedInFormat(card, format);
   if (mode === 'Scrolls') return card.legality !== 'Rotation' && card.legality !== 'Banned';
   if (mode === 'Paragon') {
     if (card.type.toLowerCase().includes('lost soul')) return false;
@@ -103,6 +106,7 @@ export function DuplicateCards({
   visibleCards,
   onNavigate,
   legalityFilter,
+  legalityFormat = 'Limited',
   allCards,
   onHoverSibling,
 }: DuplicateCardsProps) {
@@ -127,7 +131,7 @@ export function DuplicateCards({
       let passesLegality = true;
       if (legalityFilter && matchedCards.length > 0) {
         passesLegality = matchedCards.some((c) =>
-          passesLegalityFilter(c, legalityFilter)
+          passesLegalityFilter(c, legalityFilter, legalityFormat)
         );
       }
       if (legalityFilter && matchedCards.length === 0) {
@@ -147,7 +151,7 @@ export function DuplicateCards({
         passesLegality,
       };
     });
-  }, [siblings, allCardsIndex, visibleCardsIndex, legalityFilter]);
+  }, [siblings, allCardsIndex, visibleCardsIndex, legalityFilter, legalityFormat]);
 
   // Filter out siblings that don't pass legality when a filter is active
   const displaySiblings = legalityFilter

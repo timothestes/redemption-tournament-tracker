@@ -10,6 +10,7 @@ import { useIsAdmin } from "../../../hooks/useIsAdmin";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { createRuling, updateRuling, deleteRuling } from "../../admin/rulings/actions";
 import { DuplicateCards, DuplicateCardsMobile } from "./components/DuplicateCards";
+import type { FormatId } from "@/lib/formats";
 import type { Card } from "./utils";
 import type { DeckZone } from "./types/deck";
 
@@ -531,6 +532,7 @@ export default function ModalWithClose({
   getCardQuantity,
   activeDeckTab = "main", // Default to main if not provided
   legalityFilter = null,
+  legalityFormat = "Limited",
   allCards,
   collectionQuantities = null,
   onAdjustCollection = null,
@@ -547,6 +549,8 @@ export default function ModalWithClose({
   activeDeckTab?: string;
   /** Current legality filter for duplicate cards. null = show all. */
   legalityFilter?: string | null;
+  /** Format the deck is being built in — decides what "Banned" means. */
+  legalityFormat?: FormatId;
   /** Full unfiltered card list for legality checking of duplicates */
   allCards?: Card[];
   /** Owned quantities keyed by `name|set|imgFile`. null = collection unavailable (signed out). */
@@ -1374,6 +1378,7 @@ export default function ModalWithClose({
                   visibleCards={visibleCards}
                   allCards={allCards}
                   legalityFilter={legalityFilter}
+                  legalityFormat={legalityFormat}
                   onNavigate={(card) => setModalCard(card)}
                 />
               )}

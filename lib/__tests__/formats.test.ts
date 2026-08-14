@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeFormat, normalizeTournamentFormat, FORMATS, FORMAT_IDS, PARAGON_EXCLUDED_SETS } from '../formats';
+import { normalizeFormat, normalizeTournamentFormat, FORMATS, FORMAT_IDS, isBannedInFormat, PARAGON_EXCLUDED_SETS } from '../formats';
 import { CARDS } from '../cards/lookup';
 import { matchesBanListEntry } from '@/utils/deckcheck/rules';
 
@@ -74,6 +74,27 @@ describe('ban list entries match real card rows', () => {
   it.each(ALL_BAN_ENTRIES)('$format: $entry.note matches at least one row in CARDS', ({ entry }) => {
     const matches = CARDS.filter((card) => matchesBanListEntry(card, entry));
     expect(matches.length).toBeGreaterThan(0);
+  });
+});
+
+// What the card browser's "Banned" chip asks. Since DBR 2.0 the answer depends
+// on the format, so the same card gives different answers.
+describe('isBannedInFormat', () => {
+  const cardRow = (name: string) => {
+    const row = CARDS.find((c) => c.name === name);
+    expect(row, `no card row named "${name}"`).toBeDefined();
+    return row!;
+  };
+
+  it.each([
+    ['Daniel (CoW)', { Limited: true, Unlimited: true, T2: true, Paragon: false }],
+    ['Lost Soul "Imitate" [III John 1:11]', { Limited: true, Unlimited: false, T2: true, Paragon: false }],
+    ['Harvest Time (GoC)', { Limited: false, Unlimited: false, T2: true, Paragon: false }],
+    ['Ephesian Widow', { Limited: false, Unlimited: false, T2: false, Paragon: false }],
+  ] as const)('%s', (name, expected) => {
+    for (const id of FORMAT_IDS) {
+      expect(isBannedInFormat(cardRow(name), id), `${name} in ${id}`).toBe(expected[id]);
+    }
   });
 });
 
