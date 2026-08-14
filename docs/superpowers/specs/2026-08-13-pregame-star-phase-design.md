@@ -67,9 +67,9 @@ the existing turn-1 Draw Phase transition, which simply moves later.
 - No changes to the roll / choose-first / reveal ceremony, which stays exactly as it is.
 - No production SpacetimeDB publish (see §12).
 
-**Open decision carried into the plan:** whether to add `'hand'` to `sourceZones` on the 19
-star cards whose registered star ability is currently unfireable from hand. See §7.3. The
-design as written assumes **no registry change**, and §7.3 states exactly what that costs.
+**Decided:** the 19 star cards whose registered star ability is currently unfireable from hand
+get `'hand'` added to `sourceZones`, and the server is fixed to honour per-ability
+`sourceZones` overrides. See §7.3.
 
 ---
 
@@ -412,27 +412,55 @@ The server enforces the same restriction independently: `ABILITY_SOURCE_ZONES`
 throws `'Source card must be in play'`. The 23 hand-legal entries only work today because they
 are all types the client intercepts and never sends to that reducer.
 
-**As designed (no registry change): 18 of 244 star cards get a working shortcut.** The other
-226 are manual — the player reads the text and performs the effect with normal board actions,
-exactly as they do today. The rail shows the greyed entry with a tooltip explaining it is not
-available from hand, matching the context menu rather than diverging from it.
+**Decision: add `'hand'` to `sourceZones` on those 19 entries**, in both registry copies
+(`lib/cards/cardAbilities.ts` and `spacetimedb/src/cardAbilities.ts`, which the existing parity
+test keeps in sync). This changes no ability *semantics* — `sourceZones` encodes **which zone
+an ability can be fired from**, not what the effect does. Those are unrelated properties, and
+conflating them is what made an earlier pass at this misread the cards.
 
-**The alternative** is to add `'hand'` to `sourceZones` on those 19 entries, plus `'hand'` to
-the server's `ABILITY_SOURCE_ZONES` for the non-intercepted types. This is what makes the
-feature's flagship interaction actually work for the automatable cards. It is a mechanical
-registry edit that changes no ability *semantics* — `sourceZones` encodes **which zone an
-ability can be fired from**, not what the effect does. That distinction matters: an earlier
-review of this design conflated "the effect puts a card in hand" with "the ability is fireable
-from hand", and they are unrelated properties.
+Excluded from the edit: the 12 registered star cards whose entry encodes the card's **in-play**
+half rather than its star half — Manna (PoC), The Outcasts, Ram (LoC), Destructive Sin (GoC),
+Choked Seed (GoC), Redeeming Branch, Strong Demon (GoC), Shealtiel (LoC), Out of Egypt,
+Conspiring Herodians (GoC), Foolish Builder (GoC), Balaam's Prophecy. Firing those during the
+star phase would resolve the wrong ability. **Implementation must re-derive this 12-card list
+from the card text and the registry entry rather than trusting it verbatim**, and report the
+final split (added / excluded) in the PR.
 
-Note that 12 of the 37 registered star cards encode the card's **in-play** half, not its star
-half (Manna (PoC), The Outcasts, Ram (LoC), Destructive Sin (GoC), Choked Seed (GoC),
-Redeeming Branch, Strong Demon (GoC), Shealtiel (LoC), Out of Egypt, Conspiring Herodians
-(GoC), Foolish Builder (GoC), Balaam's Prophecy). Those must **never** be offered during the
-star phase regardless of which option is chosen — firing them would resolve the wrong ability.
+### 7.4 The server must honour per-ability `sourceZones`
 
-**This decision is deferred to the user and does not block the rest of the plan.** Both
-branches produce the same rail; only the disabled-vs-enabled state of ≤19 buttons differs.
+`execute_card_ability` checks a flat list and never consults the ability's own override, even
+though the server registry carries the field (`spacetimedb/src/index.ts:4720-4724`):
+
+```ts
+if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
+  throw new SenderError('Source card must be in play');
+}
+```
+
+This is already inconsistent with the client: `Delivered` declares
+`sourceZones: ['hand', ...]` (`spacetimedb/src/cardAbilities.ts:154`) and would still be
+rejected from hand. It goes unnoticed only because every currently-hand-legal type is
+intercepted client-side and never reaches this reducer. Adding 19 more hand-legal entries
+makes it reachable.
+
+The fix is **not** to add `'hand'` to the global `ABILITY_SOURCE_ZONES` — that would let any
+ability fire from hand. It is to move the zone check *below* the ability lookup and honour the
+override, mirroring `CardContextMenu`:
+
+```ts
+const allowedZones = ability.sourceZones ?? ABILITY_SOURCE_ZONES;
+if (!allowedZones.includes(source.zone)) {
+  throw new SenderError('Source card must be in play');
+}
+```
+
+Applied to `execute_card_ability` (`:4722`) and `execute_card_ability_with_count` (`:4854`)
+only. The special-purpose gates — `resurrect_heroes` (`:4903`), `imitate_lost_soul` (`:5011`),
+`matthew_draw_brigades` (`:2908`) — are not star paths and stay as they are.
+
+This is a genuine behaviour change to existing cards (it makes `Delivered` and the other 22
+pre-existing hand-legal entries actually fireable from hand server-side, as their registry
+entries always intended). Call it out in the PR.
 
 ---
 
