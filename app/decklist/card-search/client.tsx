@@ -18,7 +18,7 @@ import { DeckBuilderConfig, PUBLIC_BUILDER_CONFIG, BuilderConfigProvider } from 
 import { readStickyFilters, writeStickyFilters, type AltArtMode } from "./stickyFilters";
 import { hasAbReprint } from "@/lib/cards/lookup";
 import { compareCardsDefault } from "@/lib/cards/defaultSort";
-import { normalizeFormat, PARAGON_EXCLUDED_SETS } from "@/lib/formats";
+import { isBannedInFormat, normalizeFormat, PARAGON_EXCLUDED_SETS } from "@/lib/formats";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
@@ -1033,7 +1033,10 @@ export default function CardSearchClient({
         .filter((c) => {
           if (legalityMode === 'Unlimited') return true;
           if (legalityMode === 'Limited') return c.legality === 'Rotation';
-          if (legalityMode === 'Banned') return c.legality === 'Banned';
+          // Banned is answered per format, not by the card's own flag: DBR 2.0
+          // gave each category its own ban list, so what counts as banned
+          // depends on the deck being built.
+          if (legalityMode === 'Banned') return isBannedInFormat(c, normalizeFormat(deck.format));
           if (legalityMode === 'Scrolls') return c.legality !== 'Rotation' && c.legality !== 'Banned';
           if (legalityMode === 'Paragon') {
             // Paragon format: exclude Lost Souls (not allowed in Paragon)
@@ -1694,6 +1697,7 @@ export default function CardSearchClient({
           getCardQuantity={getCardQuantity}
           activeDeckTab={activeDeckTab}
           legalityFilter={legalityMode}
+          legalityFormat={normalizeFormat(deck.format)}
           allCards={cards}
           collectionQuantities={collectionAvailable ? collectionQuantities : null}
           onAdjustCollection={collectionAvailable ? adjustCollectionQuantity : null}

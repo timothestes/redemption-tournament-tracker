@@ -82,6 +82,43 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 export const FORMAT_IDS: FormatId[] = ['Limited', 'Unlimited', 'T2', 'Paragon'];
 
 /**
+ * Predicate satisfied by both ResolvedCard (deckcheck) and CardData (raw card
+ * database) — the 3 fields a ban-list entry can match on.
+ */
+export type BanMatchable = { name: string; set: string; reference: string };
+
+/**
+ * Match a card against a single ban-list entry. Reference entries (covering
+ * all printings of a scripture reference) match on card.reference alone;
+ * name+set entries match name AND set case-insensitively with EXACT
+ * equality — no startsWith/canonicalName fuzzing, since each entry is keyed
+ * directly to a real row in the card database (see the regression guard in
+ * lib/__tests__/formats.test.ts).
+ */
+export function matchesBanListEntry(
+  card: BanMatchable,
+  entry: BannedCardDef
+): boolean {
+  if (entry.reference !== undefined) {
+    return card.reference === entry.reference;
+  }
+  return (
+    card.name.toLowerCase() === entry.name.toLowerCase() &&
+    card.set.toLowerCase() === (entry.set ?? '').toLowerCase()
+  );
+}
+
+/**
+ * Is this card banned in the given format? Since DBR 2.0 the answer depends on
+ * the format — the Imitate Lost Soul is banned in Limited and T2 but legal in
+ * Unlimited, Harvest Time only in T2 — so the card browser has to ask per
+ * format rather than reading the card's own legality flag.
+ */
+export function isBannedInFormat(card: BanMatchable, id: FormatId): boolean {
+  return FORMATS[id].banList.some((entry) => matchesBanListEntry(card, entry));
+}
+
+/**
  * Map any historical or current format string to a canonical FormatId.
  * Precedence is load-bearing: paragon → type 2 → unlimited/classic → Limited.
  * ('Classic' was the old name for the all-cards pool.) Unlike the matchmaking

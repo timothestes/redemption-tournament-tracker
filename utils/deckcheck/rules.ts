@@ -1,5 +1,5 @@
 import { ResolvedCard, DeckCheckIssue, CardGroup } from "./types";
-import { FormatDef, BannedCardDef, PARAGON_EXCLUDED_SETS } from "@/lib/formats";
+import { FormatDef, PARAGON_EXCLUDED_SETS, matchesBanListEntry } from "@/lib/formats";
 
 // ---------------------------------------------------------------------------
 // Helper predicates
@@ -858,32 +858,11 @@ export function checkSitesCitiesLimit(
   return issues;
 }
 
-/**
- * Predicate satisfied by both ResolvedCard (deckcheck) and CardData (raw card
- * database) — the 3 fields a ban-list entry can match on.
- */
-type BanMatchable = Pick<ResolvedCard, "name" | "set" | "reference">;
-
-/**
- * Match a card against a single ban-list entry. Reference entries (covering
- * all printings of a scripture reference) match on card.reference alone;
- * name+set entries match name AND set case-insensitively with EXACT
- * equality — no startsWith/canonicalName fuzzing, since each entry is keyed
- * directly to a real row in the card database (see the regression guard in
- * lib/__tests__/formats.test.ts).
- */
-export function matchesBanListEntry(
-  card: BanMatchable,
-  entry: BannedCardDef
-): boolean {
-  if (entry.reference !== undefined) {
-    return card.reference === entry.reference;
-  }
-  return (
-    card.name.toLowerCase() === entry.name.toLowerCase() &&
-    card.set.toLowerCase() === (entry.set ?? "").toLowerCase()
-  );
-}
+// The matcher moved to lib/formats.ts so the card browser can ask "is this
+// card banned in the format I'm building?" without importing the deck-check
+// rules engine. Re-exported here: this has been its public home since the
+// format restructure, and callers (and tests) still import it from here.
+export { matchesBanListEntry };
 
 /**
  * Rule: banned-card — every card is checked against the format's explicit
