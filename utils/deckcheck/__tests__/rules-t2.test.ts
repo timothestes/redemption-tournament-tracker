@@ -1154,7 +1154,9 @@ describe("checkGoodEvilBalance", () => {
 // (T2's banList is deliberately empty; see lib/formats.ts).
 // ===========================================================================
 
-describe("banned-card in T2 (unchanged pool-legality behavior)", () => {
+// DBR 2.0 gave T2 its own ban list, so these cards are now named outright
+// rather than falling through to the pool test.
+describe("banned-card in T2", () => {
   const daniel = makeCard({
     name: "Daniel (CoW)",
     set: "CoW [Ban]",
@@ -1163,19 +1165,37 @@ describe("banned-card in T2 (unchanged pool-legality behavior)", () => {
     type: "Hero",
   });
 
-  it("checkFormatBanList is a no-op (empty banList) and checkPoolLegality still fires", () => {
-    expect(checkFormatBanList(FORMATS.T2, [daniel], [])).toEqual([]);
-    const poolIssues = checkPoolLegality(FORMATS.T2, [daniel], []);
-    expect(poolIssues.some((i) => i.rule === "pool-legality")).toBe(true);
+  // Rotation-legal, so the pool test can't catch it — only the ban list can.
+  const harvestTime = makeCard({
+    name: "Harvest Time (GoC)",
+    set: "GoC",
+    legality: "Rotation",
+    officialSet: "Gospel of Christ",
+    type: "Good Enhancement",
   });
 
-  it("is wired into validateT2Rules as a no-op — only pool-legality reports this card", () => {
+  it("reports Daniel as banned-card, and pool-legality yields to it", () => {
+    const banIssues = checkFormatBanList(FORMATS.T2, [daniel], []);
+    expect(banIssues).toHaveLength(1);
+    expect(banIssues[0].message).toBe('"Daniel (CoW)" (CoW [Ban]) is banned in T2.');
+    expect(checkPoolLegality(FORMATS.T2, [daniel], [])).toEqual([]);
+  });
+
+  it("catches Harvest Time, which is Rotation-legal and banned in T2 only", () => {
+    const banIssues = checkFormatBanList(FORMATS.T2, [harvestTime], []);
+    expect(banIssues).toHaveLength(1);
+    expect(banIssues[0].rule).toBe("banned-card");
+    expect(checkFormatBanList(FORMATS.Limited, [harvestTime], [])).toEqual([]);
+    expect(checkPoolLegality(FORMATS.Limited, [harvestTime], [])).toEqual([]);
+  });
+
+  it("is wired into validateT2Rules", () => {
     const mainDeck = makeValidMainDeck(100, [daniel]);
     const cardGroups = [makeGroup("Daniel (CoW)", [daniel])];
     const issues = validateT2Rules(FORMATS.T2, mainDeck, [], cardGroups);
     const danielIssues = issues.filter((i) => i.cards?.includes("Daniel (CoW)"));
-    expect(danielIssues.every((i) => i.rule !== "banned-card")).toBe(true);
-    expect(danielIssues.some((i) => i.rule === "pool-legality")).toBe(true);
+    expect(danielIssues.some((i) => i.rule === "banned-card")).toBe(true);
+    expect(danielIssues.every((i) => i.rule !== "pool-legality")).toBe(true);
   });
 });
 

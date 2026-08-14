@@ -34,7 +34,25 @@ const CARD_BY_NAME_SET = new Map<string, CardData>();
 const CARD_BY_NAME = new Map<string, CardData>();
 const CARD_BY_NAME_LOWER = new Map<string, CardData>();
 
+// Card-data errata, keyed `name|set`. Deck Construction & Format Specific
+// Rules 2.0 (8/13/2026) unbanned Ephesian Widow, but the generated data still
+// carries the pre-2.0 flag from upstream (set "TPC [Ban]", legality "Banned"),
+// and legality !== 'Rotation' is exactly what keeps a card out of the Limited
+// and T2 pools — so without this the card stays unplayable no matter what the
+// ban lists say. It lives here rather than in the generated artifact so it
+// survives `make update-cards`; delete the entry once upstream re-flags it.
+//
+// Only cards whose pool membership actually changed belong here. Samuel (RoA)
+// and the Proverbs 22:14 Lost Souls were unbanned too, but they are
+// old-format printings that were never in the Limited/T2 pool to begin with,
+// so their legality flag is not what excludes them.
+const LEGALITY_OVERRIDES: Readonly<Record<string, string>> = {
+  'Ephesian Widow|TPC [Ban]': 'Rotation',
+};
+
 for (const card of CARDS) {
+  const override = LEGALITY_OVERRIDES[`${card.name}|${card.set}`];
+  if (override !== undefined) card.legality = override;
   CARD_BY_KEY.set(`${card.name}|${card.set}|${card.imgFile}`, card);
   CARD_BY_NAME_SET.set(`${card.name}|${card.set}`, card);
   CARD_BY_NAME.set(card.name, card);
