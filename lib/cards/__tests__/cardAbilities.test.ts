@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { findCard } from '../lookup';
 import {
   CARD_ABILITIES,
+  DEFAULT_ABILITY_SOURCE_ZONES,
   SPECIAL_TOKEN_CARDS,
   abilityLabel,
   getAbilitiesForCard,
@@ -454,5 +455,48 @@ describe('getEffectiveAbilities', () => {
     expect(out).toHaveLength(2);
     expect(out[0]?.type).toBe('three_nails_reset');
     expect(out[1]?.type).toBe('reveal_own_deck');
+  });
+});
+
+describe('star abilities are fireable from hand', () => {
+  const STAR_HALF_CARDS = [
+    'The Coming Prince',
+    'Sign of Jonah',
+    'The Thankful Leper (GoC)',
+    'The Three Visitors',
+  ];
+
+  // These 12 star cards have a registry entry that encodes the card's IN-PLAY
+  // clause (EE/EC/GE/HERO/TOP/Artifact), not its STAR clause. Firing them from
+  // hand during the pre-game star phase would resolve the wrong ability.
+  const IN_PLAY_HALF_CARDS = [
+    "Balaam's Prophecy",
+    'Destructive Sin (GoC)',
+    'Choked Seed (GoC)',
+    'Redeeming Branch',
+    'Strong Demon (GoC)',
+    'Shealtiel, the Heir / Shealtiel, the Exilarch (LoC)',
+    'Manna (PoC)',
+    'Out of Egypt',
+    'Ram, the Exalter / Ram, the Uplifted (LoC)',
+    'The Outcasts',
+    'Conspiring Herodians (GoC)',
+    'Foolish Builder (GoC)',
+  ];
+
+  it.each(STAR_HALF_CARDS)('%s can fire from hand', (name) => {
+    const abilities = CARD_ABILITIES[name];
+    expect(abilities, `${name} missing from registry`).toBeDefined();
+    for (const a of abilities) {
+      expect(a.sourceZones ?? DEFAULT_ABILITY_SOURCE_ZONES).toContain('hand');
+    }
+  });
+
+  it.each(IN_PLAY_HALF_CARDS)('%s stays in-play only', (name) => {
+    const abilities = CARD_ABILITIES[name];
+    expect(abilities, `${name} missing from registry`).toBeDefined();
+    for (const a of abilities) {
+      expect(a.sourceZones ?? DEFAULT_ABILITY_SOURCE_ZONES).not.toContain('hand');
+    }
   });
 });
