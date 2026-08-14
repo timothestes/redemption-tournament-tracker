@@ -1,6 +1,6 @@
 import spacetimedb from './schema';
 export default spacetimedb;
-import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, RevealTimeout, setRevealTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer } from './schema';
+import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, RevealTimeout, setRevealTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer, PregameIdleTimeout, setPregameIdleTimeoutReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
@@ -19,6 +19,13 @@ import {
   simplifyLostSoulName,
   type CardAbility,
 } from './cardAbilities';
+import {
+  advancePregameFlow,
+  markDone,
+  type PregameProgress,
+  type PregameStep,
+  type Seat,
+} from './pregameFlow';
 
 // Auto-reveal duration for cards that land in a hand via a move whose log
 // payload reveals the card identity (cross-player moves, face-up moves, etc.).
@@ -35,6 +42,23 @@ const HAND_LIMIT = 16;
 // abilities). Shared across every ability-source gate below; per-ability
 // explicit sourceZones overrides are untouched by this list.
 const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption', 'battle'];
+
+// Star cards lead their special ability with "(Star)" or "STAR:". Mirrors
+// lib/cards/starCards.ts — keep the two in sync. Read a CardInstance row's own
+// specialAbility, never a card-index lookup.
+//
+// NOTE: Forge cards blank specialAbility on the public row (the leak spine in
+// app/forge/lib/playSerialize.ts), so forge star cards are invisible here and
+// the star step auto-skips for them. Known limitation, see the design doc.
+const STAR_ABILITY_RE = /^\s*(\(star\)|star:)/i;
+function isStarAbilityText(text: string): boolean {
+  return STAR_ABILITY_RE.test(text ?? '');
+}
+
+// Backstop only — the REG Pre-Game Phase is untimed by design. Long enough
+// that a thinking player is never cut off, short enough that a departed one
+// cannot hang the game.
+const PREGAME_IDLE_MICROS = 180_000_000n; // 3 minutes
 
 // ---------------------------------------------------------------------------
 // Forge playtest games (Phase 2.3)
@@ -1071,6 +1095,137 @@ function scheduleRevealTimeout(ctx: any, gameId: bigint): void {
   });
 }
 
+// ---------------------------------------------------------------------------
+// REG Pre-Game Phase helpers (steps 2 and 3: star reveals, then Lost Soul
+// activation). The game is already status='playing' here — Game.pregamePhase
+// ('stars' | 'souls') is what distinguishes the pre-game from turn 1.
+// ---------------------------------------------------------------------------
+
+// Arm the pre-game idle backstop. Deletes any prior row for this game first —
+// insert-only re-arming would accumulate rows and let a stale one fire 180s
+// after a player's FIRST click, skipping a seat that acted seconds ago (the
+// row carries only gameId, so stale and live rows are indistinguishable at
+// fire time). Mirrors scheduleRevealTimeout.
+function schedulePregameIdleTimeout(ctx: any, gameId: bigint): void {
+  for (const timeout of ctx.db.PregameIdleTimeout.pregame_idle_timeout_game_id.filter(gameId)) {
+    ctx.db.PregameIdleTimeout.scheduledId.delete(timeout.scheduledId);
+  }
+  ctx.db.PregameIdleTimeout.insert({
+    scheduledId: 0n,
+    scheduledAt: ScheduleAt.time(ctx.timestamp.microsSinceUnixEpoch + PREGAME_IDLE_MICROS),
+    gameId,
+  });
+}
+
+function seatHoldsStarInHand(ctx: any, gameId: bigint, seat: Seat): boolean {
+  const player = [...ctx.db.Player.player_game_id.filter(gameId)]
+    .find((p: any) => p.seat === BigInt(seat));
+  if (!player) return false;
+  for (const card of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+    if (card.ownerId === player.id && card.zone === 'hand' && isStarAbilityText(card.specialAbility)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function seatControlsActivatableSoul(ctx: any, gameId: bigint, seat: Seat): boolean {
+  const player = [...ctx.db.Player.player_game_id.filter(gameId)]
+    .find((p: any) => p.seat === BigInt(seat));
+  if (!player) return false;
+  for (const card of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+    if (
+      card.ownerId === player.id &&
+      card.zone === 'land-of-bondage' &&
+      isLostSoulRow(card) &&
+      (card.specialAbility ?? '') !== ''
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function readPregameProgress(state: any): PregameProgress {
+  return {
+    starsDone0: state.starsDone0,
+    starsDone1: state.starsDone1,
+    soulsDone0: state.soulsDone0,
+    soulsDone1: state.soulsDone1,
+  };
+}
+
+// The single place the pre-game cursor moves. Always re-reads the Game row —
+// callers may hold a stale snapshot (cf. checkAndApplyWin). Writes
+// Game.pregamePhase in lock-step with the progress flags, in this transaction.
+function advancePregame(ctx: any, gameId: bigint): void {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) return;
+  const state = ctx.db.PregameState.gameId.find(gameId);
+  if (!state) return;
+
+  const step: PregameStep = game.pregamePhase === 'souls' ? 'souls' : 'stars';
+  const firstSeat: Seat = game.currentTurn === 0n ? 0 : 1;
+
+  const result = advancePregameFlow(step, firstSeat, readPregameProgress(state), {
+    hasStarInHand: (seat) => seatHoldsStarInHand(ctx, gameId, seat),
+    controlsActivatableSoul: (seat) => seatControlsActivatableSoul(ctx, gameId, seat),
+  });
+
+  if (result.kind === 'complete') {
+    ctx.db.PregameState.gameId.update({
+      ...state,
+      ...result.progress,
+    });
+    finishPregame(ctx, gameId);
+    return;
+  }
+
+  ctx.db.PregameState.gameId.update({
+    ...state,
+    ...result.progress,
+    activeSeat: BigInt(result.activeSeat),
+  });
+  if (game.pregamePhase !== result.step) {
+    const latest = ctx.db.Game.id.find(gameId);
+    if (latest) ctx.db.Game.id.update({ ...latest, pregamePhase: result.step });
+  }
+  schedulePregameIdleTimeout(ctx, gameId);
+}
+
+// Ends the REG Pre-Game Phase and begins turn 1. Takes a gameId and re-reads,
+// because advancePregame may have just written pregamePhase — a caller
+// snapshot would revert it.
+function finishPregame(ctx: any, gameId: bigint): void {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) return;
+
+  for (const row of ctx.db.PregameStar.pregame_star_game_id.filter(gameId)) {
+    ctx.db.PregameStar.id.delete(row.id);
+  }
+  ctx.db.PregameState.gameId.delete(gameId);
+  for (const timeout of ctx.db.PregameIdleTimeout.pregame_idle_timeout_game_id.filter(gameId)) {
+    ctx.db.PregameIdleTimeout.scheduledId.delete(timeout.scheduledId);
+  }
+
+  const chosenSeat = game.currentTurn;
+  let chosenName = 'Player ' + (Number(chosenSeat) + 1);
+  let firstPlayerId = 0n;
+  for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
+    if (p.seat === chosenSeat) { chosenName = p.displayName; firstPlayerId = p.id; }
+  }
+
+  ctx.db.Game.id.update({
+    ...game,
+    pregamePhase: '',
+    playingStartedAtMicros: ctx.timestamp.microsSinceUnixEpoch,
+  });
+
+  logAction(ctx, gameId, firstPlayerId, 'GAME_STARTED',
+    JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
+    1n, 'draw');
+}
+
 // Shared "start the game" transition, used by both the both-players-acked path
 // (pregame_acknowledge_first) and the server-side backstop
 // (handle_reveal_timeout). Assumes `game` is in the 'revealing' phase with
@@ -1094,20 +1249,36 @@ function startGameFromReveal(ctx: any, game: any, fallbackWinnerPlayerId: bigint
     initializeSoulDeck(ctx, game);
   }
 
+  // status flips to 'playing' as it always has (so every status-gated reducer
+  // and the 5-minute disconnect grace keep working), but pregamePhase now
+  // enters the REG Pre-Game Phase instead of clearing. playingStartedAtMicros
+  // stays 0 — the round clock starts in finishPregame, with turn 1.
   ctx.db.Game.id.update({
     ...game,
     pregameReady0: true,
     pregameReady1: true,
     status: 'playing',
-    pregamePhase: '',
+    pregamePhase: 'stars',
     currentPhase: 'draw',
     turnNumber: 1n,
-    playingStartedAtMicros: ctx.timestamp.microsSinceUnixEpoch,
+    playingStartedAtMicros: 0n,
   });
 
-  logAction(ctx, gameId, winnerPlayerId, 'GAME_STARTED',
-    JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
-    1n, 'draw');
+  ctx.db.PregameState.insert({
+    gameId,
+    activeSeat: chosenSeat,
+    starsDone0: false,
+    starsDone1: false,
+    soulsDone0: false,
+    soulsDone1: false,
+  });
+
+  logAction(ctx, gameId, winnerPlayerId, 'PREGAME_STAR_PHASE',
+    JSON.stringify({ firstSeat: chosenSeat.toString() }), 1n, 'draw');
+
+  // Cascades through both auto-skips; may complete the pre-game outright when
+  // neither player has a star card or an ability-bearing Lost Soul.
+  advancePregame(ctx, gameId);
 }
 
 // ---------------------------------------------------------------------------
@@ -2017,6 +2188,39 @@ export const handle_reveal_timeout = spacetimedb.reducer(
 );
 
 setRevealTimeoutReducer(handle_reveal_timeout);
+
+// ---------------------------------------------------------------------------
+// Scheduled reducer: handle_pregame_idle_timeout
+// The Pre-Game Phase is untimed by design; this only stops an idle or departed
+// player from hanging the game. Force-completes the active seat's sub-step.
+// ---------------------------------------------------------------------------
+export const handle_pregame_idle_timeout = spacetimedb.reducer(
+  { arg: PregameIdleTimeout.rowType },
+  (ctx, { arg }) => {
+    const game = ctx.db.Game.id.find(arg.gameId);
+    if (!game) return;
+    if (game.status !== 'playing') return;
+    if (game.pregamePhase !== 'stars' && game.pregamePhase !== 'souls') return;
+
+    const state = ctx.db.PregameState.gameId.find(arg.gameId);
+    if (!state) return;
+
+    const step: PregameStep = game.pregamePhase === 'souls' ? 'souls' : 'stars';
+    const seat: Seat = state.activeSeat === 0n ? 0 : 1;
+
+    ctx.db.PregameState.gameId.update({
+      ...state,
+      ...markDone(readPregameProgress(state), step, seat),
+    });
+
+    logAction(ctx, arg.gameId, 0n, 'PREGAME_IDLE_SKIP',
+      JSON.stringify({ seat: seat.toString(), step }), game.turnNumber, game.currentPhase);
+
+    advancePregame(ctx, arg.gameId);
+  }
+);
+
+setPregameIdleTimeoutReducer(handle_pregame_idle_timeout);
 
 // ---------------------------------------------------------------------------
 // Scheduled reducer: cleanup_stale_games
