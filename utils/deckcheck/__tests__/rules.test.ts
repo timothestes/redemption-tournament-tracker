@@ -2342,18 +2342,26 @@ describe("banned-card (checkFormatBanList)", () => {
     expect(poolIssues).toEqual([]);
   });
 
-  it("does not flag the same card in Unlimited (empty ban list, all-cards pool)", () => {
-    expect(checkFormatBanList(FORMATS.Unlimited, [daniel], [])).toEqual([]);
+  // Daniel is the one card DBR 2.0 bans in Unlimited, where every other card
+  // is legal and the pool test never runs.
+  it("flags the same card in Unlimited, which bans Daniel and nothing else", () => {
+    const issues = checkFormatBanList(FORMATS.Unlimited, [daniel], []);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].message).toBe('"Daniel (CoW)" (CoW [Ban]) is banned in Unlimited.');
     expect(checkPoolLegality(FORMATS.Unlimited, [daniel], [])).toEqual([]);
   });
 
-  it("in T2, falls through to pool-legality (unchanged behavior) with no banned-card", () => {
-    expect(checkFormatBanList(FORMATS.T2, [daniel], [])).toEqual([]);
-    const poolIssues = checkPoolLegality(FORMATS.T2, [daniel], []);
-    expect(poolIssues.some((i) => i.rule === "pool-legality")).toBe(true);
+  it("in T2, reports banned-card and lets pool-legality stand down", () => {
+    const issues = checkFormatBanList(FORMATS.T2, [daniel], []);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].rule).toBe("banned-card");
+    expect(checkPoolLegality(FORMATS.T2, [daniel], [])).toEqual([]);
   });
 
-  it("matches the reference entry for both Lost Souls (Two Liner) and (Three Liner) in Limited", () => {
+  // The Proverbs 22:14 souls came off every ban list in DBR 2.0. They stay out
+  // of Limited because they are old-format prints outside the pool, which is
+  // the pool test's job, not the ban list's.
+  it("no longer bans the Proverbs 22:14 Lost Souls, leaving them to pool-legality", () => {
     const twoLiner = makeCard({
       name: "Lost Souls (Two Liner)",
       set: "Main [Ban]",
@@ -2370,9 +2378,12 @@ describe("banned-card (checkFormatBanList)", () => {
       type: "Lost Soul",
       reference: "Proverbs 22:14",
     });
-    const issues = checkFormatBanList(FORMATS.Limited, [twoLiner, threeLiner], []);
-    expect(issues).toHaveLength(2);
-    expect(issues.every((i) => i.rule === "banned-card")).toBe(true);
+    expect(checkFormatBanList(FORMATS.Limited, [twoLiner, threeLiner], [])).toEqual([]);
+    const poolIssues = checkPoolLegality(FORMATS.Limited, [twoLiner, threeLiner], []);
+    expect(poolIssues).toHaveLength(2);
+    expect(poolIssues.every((i) => i.rule === "pool-legality")).toBe(true);
+    // Legal in Unlimited now — nothing there bans them.
+    expect(checkFormatBanList(FORMATS.Unlimited, [twoLiner, threeLiner], [])).toEqual([]);
   });
 
   it("skips quantity-0 and card-not-found stub cards", () => {

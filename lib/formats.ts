@@ -29,26 +29,53 @@ export interface FormatDef {
 // Limited/T2 pool test; Paragon's excluded sets cover the rest. banList adds
 // explicit, print-specific bans on top of that (see BannedCardDef).
 //
-// The 9 legality:'Banned' printings below are Limited's explicit ban list.
-// Unlimited, T2, and Paragon deliberately leave banList EMPTY: Unlimited is
-// wild-west by decision (spec §1), and T2/Paragon already exclude these same
-// printings via the pool-legality rotation/excluded-set test — an
-// intentional asymmetry with Limited, not an oversight.
-const LIMITED_BAN_LIST: BannedCardDef[] = [
+// Ban lists follow Deck Construction & Format Specific Rules 2.0 (published
+// 8/13/2026), which replaced 1.3's single global list with one per category.
+// Two things that changed here:
+//
+//   - Unlimited and T2 are no longer empty. "In Unlimited play, all cards are
+//     legal" except Daniel, and T2's list is Limited's plus Harvest Time.
+//   - The lists no longer mirror the card data's legality:'Banned' flag.
+//     Some banned cards are Rotation-legal printings that only an explicit
+//     entry stops (the Imitate Lost Soul, Harvest Time), and some
+//     legality:'Banned' rows are no longer banned anywhere — Samuel (RoA)
+//     and the Proverbs 22:14 Lost Souls are simply old-format cards outside
+//     the Limited/T2 pool, which the pool test already handles.
+//
+// Entries match on name+set, or on reference to catch every printing. Prefer
+// name+set unless the verse belongs to one card only: III John 1:11 is shared
+// with Imitating Evil and John 4:35 with the "Harvest" Lost Soul, so those
+// list their printings individually.
+
+// Banned in every constructed category.
+const DANIEL_COW: BannedCardDef[] = [
   { name: 'Daniel (CoW)', set: 'CoW [Ban]', note: 'Daniel (Cloud of Witnesses)' },
   { name: 'Daniel (CoW AB)', set: 'CoW (AB)', note: 'Daniel (Cloud of Witnesses, AB)' },
-  { name: 'Endless Treasures (Banned)', set: 'PoC [Ban]', note: 'Endless Treasures (Prophecies of Christ)' },
-  { name: 'Ephesian Widow', set: 'TPC [Ban]', note: 'Ephesian Widow (Persecuted Church)' },
+];
+
+// Type 1 Limited ban list.
+const LIMITED_BAN_LIST: BannedCardDef[] = [
+  ...DANIEL_COW,
+  { name: 'Endless Treasures (Banned)', set: 'PoC [Ban]', note: 'Endless Treasures with the draw ability (Prophecies of Christ) — the errata printing stays legal' },
+  { name: 'Lost Soul "Imitate" [III John 1:11]', set: 'RoJ', note: 'Lost Soul "Imitate" (Revelation of John)' },
+  { name: 'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]', set: 'RoJ (AB)', note: 'Lost Soul "Imitate" (Revelation of John, AB)' },
   { name: 'Mourn and Weep', set: 'PoC [Ban]', note: 'Mourn and Weep (Prophecies of Christ)' },
-  { name: 'Samuel (RoA)', set: 'RoA [Ban]', note: 'Samuel (Rock of Ages)' },
   { name: 'The Foretelling Angel (PC)', set: 'TPC', note: 'The Foretelling Angel (Persecuted Church)' },
-  { reference: 'Proverbs 22:14', name: 'Lost Soul', note: 'Lost Soul "Proverbs 22:14" (all printings)' },
+];
+
+// Type 2 Limited ban list: Type 1's, plus Harvest Time. The Fundraiser
+// printing carries the same name and the same ability text as the Gospel of
+// Christ one, so the ban covers both.
+const T2_BAN_LIST: BannedCardDef[] = [
+  ...LIMITED_BAN_LIST,
+  { name: 'Harvest Time (GoC)', set: 'GoC', note: 'Harvest Time (Gospel of Christ)' },
+  { name: 'Harvest Time [Fundraiser]', set: 'Fund', note: 'Harvest Time (Gospel of Christ, fundraiser printing)' },
 ];
 
 export const FORMATS: Record<FormatId, FormatDef> = {
   Limited:   { id: 'Limited',   label: 'Limited',   badge: 'L',  family: 'T1',      main: { min: 50,  max: 70 },  reserveMax: 10, pool: 'rotation', banList: LIMITED_BAN_LIST },
-  Unlimited: { id: 'Unlimited', label: 'Unlimited', badge: 'U',  family: 'T1',      main: { min: 50,  max: 70 },  reserveMax: 10, pool: 'all',      banList: [] },
-  T2:        { id: 'T2',        label: 'T2',        badge: 'T2', family: 'T2',      main: { min: 100, max: 140 }, reserveMax: 20, pool: 'rotation', banList: [] },
+  Unlimited: { id: 'Unlimited', label: 'Unlimited', badge: 'U',  family: 'T1',      main: { min: 50,  max: 70 },  reserveMax: 10, pool: 'all',      banList: DANIEL_COW },
+  T2:        { id: 'T2',        label: 'T2',        badge: 'T2', family: 'T2',      main: { min: 100, max: 140 }, reserveMax: 20, pool: 'rotation', banList: T2_BAN_LIST },
   Paragon:   { id: 'Paragon',   label: 'Paragon',   badge: 'P',  family: 'Paragon', main: { min: 40,  max: 40 },  reserveMax: 10, pool: 'paragon',  banList: [] },
 };
 
