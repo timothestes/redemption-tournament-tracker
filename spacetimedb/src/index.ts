@@ -2289,7 +2289,9 @@ export const pregame_submit_stars = spacetimedb.reducer(
       ctx.timestamp.microsSinceUnixEpoch + THIRTY_SECONDS_MICROS
     );
 
-    const names: string[] = [];
+    // {name, img} per star so the chat log renders each as a hoverable card
+    // link — ChatPanel's HoverableCard degrades to plain text without an image.
+    const revealed: Array<{ name: string; img: string }> = [];
     for (let i = 0; i < ids.length; i++) {
       let instanceId: bigint;
       try {
@@ -2320,7 +2322,7 @@ export const pregame_submit_stars = spacetimedb.reducer(
         revealExpiresAt,
         revealStartedAt: ctx.timestamp,
       });
-      names.push(card.cardName);
+      revealed.push({ name: card.cardName, img: card.cardImgFile });
     }
 
     if (ids.length === 0) {
@@ -2335,7 +2337,7 @@ export const pregame_submit_stars = spacetimedb.reducer(
     }
 
     logAction(ctx, gameId, player.id, 'PREGAME_STARS_REVEALED',
-      JSON.stringify({ seat: player.seat.toString(), names }), 1n, 'draw');
+      JSON.stringify({ seat: player.seat.toString(), cards: revealed }), 1n, 'draw');
     schedulePregameIdleTimeout(ctx, gameId);
   }
 );
@@ -2362,7 +2364,11 @@ export const pregame_resolve_star = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(target.cardInstanceId);
     logAction(ctx, gameId, player.id, 'PREGAME_STAR_RESOLVED',
-      JSON.stringify({ seat: player.seat.toString(), name: card ? card.cardName : '' }),
+      JSON.stringify({
+        seat: player.seat.toString(),
+        cardName: card ? card.cardName : '',
+        cardImgFile: card ? card.cardImgFile : '',
+      }),
       1n, 'draw');
 
     if (mine.length === 1) {
