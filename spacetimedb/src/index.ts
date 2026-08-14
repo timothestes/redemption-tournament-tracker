@@ -4716,13 +4716,6 @@ export const execute_card_ability = spacetimedb.reducer(
     // Ownership intentionally not enforced — either player may activate a
     // card's right-click ability; effects route to the activator (player).
 
-    // Abilities only fire when the source card is in play. Matches the
-    // client-side menu gate but the server enforces independently.
-    // LoR included so resting Heroes (Angel of the Harvest, etc.) can spawn.
-    if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
-      throw new SenderError('Source card must be in play');
-    }
-
     // Registry keys match cardName (e.g., "Two Possessed (GoC)"). The
     // identifier field is a taxonomy descriptor and is not unique enough.
     // Use effective abilities so imitated souls' right-click abilities
@@ -4730,6 +4723,16 @@ export const execute_card_ability = spacetimedb.reducer(
     const abilities = getEffectiveAbilities(source);
     const ability = abilities[Number(abilityIndex)];
     if (!ability) throw new SenderError('No such ability');
+
+    // Abilities only fire when the source card is in play. Matches the
+    // client-side menu gate but the server enforces independently.
+    // LoR included so resting Heroes (Angel of the Harvest, etc.) can spawn.
+    // An entry may widen that set with its own sourceZones (e.g. (Star)
+    // abilities used from hand during the Pre-Game Phase).
+    const allowedZones = ability.sourceZones ?? ABILITY_SOURCE_ZONES;
+    if (!allowedZones.includes(source.zone)) {
+      throw new SenderError('Source card must be in play');
+    }
 
     // Phase 2 — dispatch.
     switch (ability.type) {
@@ -4851,13 +4854,15 @@ export const execute_card_ability_with_count = spacetimedb.reducer(
     // Ownership intentionally not enforced — either player may activate a
     // card's right-click ability; effects route to the activator (player).
 
-    if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
-      throw new SenderError('Source card must be in play');
-    }
-
     const abilities = getEffectiveAbilities(source);
     const ability = abilities[Number(abilityIndex)];
     if (!ability) throw new SenderError('No such ability');
+
+    // Per-ability sourceZones override — see execute_card_ability.
+    const allowedZones = ability.sourceZones ?? ABILITY_SOURCE_ZONES;
+    if (!allowedZones.includes(source.zone)) {
+      throw new SenderError('Source card must be in play');
+    }
 
     if (ability.type !== 'draw_bottom_of_deck_choose') {
       throw new SenderError('Ability does not accept a chosen count');
