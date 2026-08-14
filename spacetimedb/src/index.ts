@@ -2222,6 +2222,168 @@ export const handle_pregame_idle_timeout = spacetimedb.reducer(
 
 setPregameIdleTimeoutReducer(handle_pregame_idle_timeout);
 
+// Shared validation for the REG Pre-Game Phase sub-steps. Returns the acting
+// player, whose seat must be the one whose window is open.
+function assertPregameActor(ctx: any, gameId: bigint, expectedPhase: PregameStep) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+  if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+  if (game.pregamePhase !== expectedPhase) {
+    throw new SenderError('Not in the ' + expectedPhase + ' phase');
+  }
+  const state = ctx.db.PregameState.gameId.find(gameId);
+  if (!state) throw new SenderError('Pre-game state not found');
+  const player = findPlayerBySender(ctx, gameId);
+  if (player.seat !== state.activeSeat) throw new SenderError('Not your pre-game window');
+  return { game, state, player };
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_submit_stars
+// REG: "players may reveal any number of star cards from their hand to use the
+// star ability." The whole set is revealed at once, then resolved one at a
+// time in the order chosen. An empty list is the explicit "no stars" answer.
+// ---------------------------------------------------------------------------
+const MAX_PREGAME_STARS = 16; // hand limit — no legal submission exceeds it
+
+export const pregame_submit_stars = spacetimedb.reducer(
+  { gameId: t.u64(), cardInstanceIds: t.string() },
+  (ctx, { gameId, cardInstanceIds }) => {
+    const { state, player } = assertPregameActor(ctx, gameId, 'stars');
+
+    const already = [...ctx.db.PregameStar.pregame_star_game_id.filter(gameId)]
+      .filter((r: any) => r.seat === player.seat);
+    if (already.length > 0) throw new SenderError('Stars already submitted');
+
+    let ids: string[];
+    try {
+      const parsed = JSON.parse(cardInstanceIds);
+      if (!Array.isArray(parsed)) throw new Error('not an array');
+      ids = parsed.map((v: any) => String(v));
+    } catch {
+      throw new SenderError('Invalid star selection');
+    }
+    if (ids.length > MAX_PREGAME_STARS) throw new SenderError('Too many stars selected');
+    if (new Set(ids).size !== ids.length) throw new SenderError('Duplicate star selected');
+
+    // Same 30s flash reveal_card_in_hand applies, so the star lights up in the
+    // normal treatment. revealExpiresAt is a Timestamp, not raw micros.
+    const THIRTY_SECONDS_MICROS = 30_000_000n;
+    const revealExpiresAt = new Timestamp(
+      ctx.timestamp.microsSinceUnixEpoch + THIRTY_SECONDS_MICROS
+    );
+
+    const names: string[] = [];
+    for (let i = 0; i < ids.length; i++) {
+      let instanceId: bigint;
+      try {
+        instanceId = BigInt(ids[i]);
+      } catch {
+        throw new SenderError('Invalid star selection');
+      }
+      const card = ctx.db.CardInstance.id.find(instanceId);
+      if (!card) throw new SenderError('Card not found');
+      if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+      if (card.ownerId !== player.id) throw new SenderError('Not your card');
+      if (card.zone !== 'hand') throw new SenderError('Star cards must be revealed from hand');
+      if (!isStarAbilityText(card.specialAbility)) throw new SenderError('Not a star card');
+
+      ctx.db.PregameStar.insert({
+        id: 0n,
+        gameId,
+        seat: player.seat,
+        cardInstanceId: instanceId,
+        slot: BigInt(i),
+        resolved: false,
+      });
+
+      // The opponent's authoritative view is the PregameStar rows above — this
+      // 30s flag is allowed to expire mid-phase.
+      ctx.db.CardInstance.id.update({
+        ...card,
+        revealExpiresAt,
+        revealStartedAt: ctx.timestamp,
+      });
+      names.push(card.cardName);
+    }
+
+    if (ids.length === 0) {
+      ctx.db.PregameState.gameId.update({
+        ...state,
+        ...markDone(readPregameProgress(state), 'stars', state.activeSeat === 0n ? 0 : 1),
+      });
+      logAction(ctx, gameId, player.id, 'PREGAME_STARS_NONE',
+        JSON.stringify({ seat: player.seat.toString() }), 1n, 'draw');
+      advancePregame(ctx, gameId);
+      return;
+    }
+
+    logAction(ctx, gameId, player.id, 'PREGAME_STARS_REVEALED',
+      JSON.stringify({ seat: player.seat.toString(), names }), 1n, 'draw');
+    schedulePregameIdleTimeout(ctx, gameId);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_resolve_star
+// Stars resolve in the order the player chose. Order is enforced here, not
+// merely presented in the UI.
+// ---------------------------------------------------------------------------
+export const pregame_resolve_star = spacetimedb.reducer(
+  { gameId: t.u64(), starId: t.u64() },
+  (ctx, { gameId, starId }) => {
+    const { state, player } = assertPregameActor(ctx, gameId, 'stars');
+
+    const mine = [...ctx.db.PregameStar.pregame_star_game_id.filter(gameId)]
+      .filter((r: any) => r.seat === player.seat && !r.resolved)
+      .sort((a: any, b: any) => (a.slot < b.slot ? -1 : a.slot > b.slot ? 1 : 0));
+    if (mine.length === 0) throw new SenderError('No stars left to resolve');
+
+    const target = mine[0];
+    if (target.id !== starId) throw new SenderError('Stars must resolve in the chosen order');
+
+    ctx.db.PregameStar.id.update({ ...target, resolved: true });
+
+    const card = ctx.db.CardInstance.id.find(target.cardInstanceId);
+    logAction(ctx, gameId, player.id, 'PREGAME_STAR_RESOLVED',
+      JSON.stringify({ seat: player.seat.toString(), name: card ? card.cardName : '' }),
+      1n, 'draw');
+
+    if (mine.length === 1) {
+      ctx.db.PregameState.gameId.update({
+        ...state,
+        ...markDone(readPregameProgress(state), 'stars', state.activeSeat === 0n ? 0 : 1),
+      });
+      advancePregame(ctx, gameId);
+      return;
+    }
+    schedulePregameIdleTimeout(ctx, gameId);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_finish_souls
+// REG step 3 — a single acknowledgement per player. Activation itself happens
+// through the normal right-click menu ('land-of-bondage' is already an ability
+// source zone); this only closes the window.
+// ---------------------------------------------------------------------------
+export const pregame_finish_souls = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const { state, player } = assertPregameActor(ctx, gameId, 'souls');
+
+    ctx.db.PregameState.gameId.update({
+      ...state,
+      ...markDone(readPregameProgress(state), 'souls', state.activeSeat === 0n ? 0 : 1),
+    });
+
+    logAction(ctx, gameId, player.id, 'PREGAME_SOULS_DONE',
+      JSON.stringify({ seat: player.seat.toString() }), 1n, 'draw');
+
+    advancePregame(ctx, gameId);
+  }
+);
+
 // ---------------------------------------------------------------------------
 // Scheduled reducer: cleanup_stale_games
 // ---------------------------------------------------------------------------
