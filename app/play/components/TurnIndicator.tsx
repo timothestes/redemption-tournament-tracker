@@ -93,6 +93,18 @@ const PHASE_LABELS: Record<string, string> = {
   discard: 'Discard',
 };
 
+// REG Pre-Game Phase sub-steps. Kept separate from PHASE_ORDER/PHASE_LABELS so
+// the normal turn phases are untouched.
+const PREGAME_STEPS = ['stars', 'souls'] as const;
+const PREGAME_LABELS: Record<string, string> = {
+  stars: 'Stars',
+  souls: 'Lost Souls',
+};
+// Vertical room the chips (and the pill behind them) give up to the PRE-GAME
+// PHASE caption above them. Both must use it or the pill's top border cuts
+// through the caption. Caption + chips total ~36px inside the fixed 48px bar.
+const PREGAME_CAPTION_GAP = 10;
+
 // Fluid type scale — keeps the bar legible on Retina laptops (small logical
 // viewport, high DPI) without growing chunky on large monitors. Each clamp()
 // floors near the original design size and grows ~1.2-1.3x at typical widths.
@@ -152,6 +164,10 @@ interface TurnIndicatorProps {
   readOnly?: boolean;
   /** Spectator-only: request the players reveal their hands (replaces CONCEDE slot). */
   onRequestHandReveal?: () => void;
+  /** When set, the phase row is replaced by the REG Pre-Game Phase treatment.
+   *  'stars' = star reveals, 'souls' = Lost Soul activation. Undefined during
+   *  normal play. */
+  pregameStep?: 'stars' | 'souls';
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +204,7 @@ export default function TurnIndicator({
   onCancelPauseRequest,
   readOnly = false,
   onRequestHandReveal,
+  pregameStep,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -197,6 +214,9 @@ export default function TurnIndicator({
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
   const currentIdx = PHASE_ORDER.indexOf(currentPhase as GamePhase);
+  // The sliding pill measures whichever row is rendered. During the pre-game
+  // that's the two-chip row, otherwise the five-phase row.
+  const activeKey: string = pregameStep ?? currentPhase;
   const isFirstPhase = currentIdx <= 0;
   const isLastPhase = currentIdx >= PHASE_ORDER.length - 1;
 
@@ -241,16 +261,16 @@ export default function TurnIndicator({
   }, []);
 
   useLayoutEffect(() => {
-    const btn = buttonRefs.current[currentPhase];
+    const btn = buttonRefs.current[activeKey];
     if (!btn) return;
     setActiveBounds({ left: btn.offsetLeft, width: btn.offsetWidth });
     hasMeasuredRef.current = true;
-  }, [currentPhase]);
+  }, [activeKey]);
 
   // Remeasure on viewport changes and font load (Cinzel can shift widths).
   useEffect(() => {
     const remeasure = () => {
-      const btn = buttonRefs.current[currentPhase];
+      const btn = buttonRefs.current[activeKey];
       if (!btn) return;
       setActiveBounds({ left: btn.offsetLeft, width: btn.offsetWidth });
     };
@@ -267,7 +287,7 @@ export default function TurnIndicator({
       window.removeEventListener('resize', remeasure);
       observer?.disconnect();
     };
-  }, [currentPhase]);
+  }, [activeKey]);
 
   const myName: string = myPlayer?.displayName ?? 'You';
   const opponentName: string = opponentPlayer?.displayName ?? 'Opponent';
@@ -598,7 +618,10 @@ export default function TurnIndicator({
             aria-hidden
             style={{
               position: 'absolute',
-              top: 0,
+              // The pre-game chips sit lower to clear the PRE-GAME PHASE
+              // caption; the pill drops with them so its top edge doesn't cut
+              // through that caption. No effect during normal play.
+              top: pregameStep ? PREGAME_CAPTION_GAP : 0,
               bottom: 0,
               left: 0,
               width: activeBounds.width,
@@ -635,7 +658,61 @@ export default function TurnIndicator({
             }}
           />
 
-          {PHASE_ORDER.map((phase) => {
+          {/* REG Pre-Game Phase treatment — a caption plus two static chips in
+              place of the five turn phases, so the star/soul steps are never
+              mistaken for the Upkeep Phase. The chips are not buttons: the
+              server drives the step. */}
+          {pregameStep && (
+            <>
+              <span
+                style={{
+                  position: 'absolute',
+                  // lineHeight 1 pins the caption's box to its font size, so the
+                  // clearance below it doesn't drift with Cinzel's leading as
+                  // the fluid type scale grows.
+                  top: -3,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: FZ.caption,
+                  lineHeight: 1,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(232, 213, 163, 0.55)',
+                  whiteSpace: 'nowrap',
+                  pointerEvents: 'none',
+                }}
+              >
+                Pre-Game Phase
+              </span>
+              {PREGAME_STEPS.map((step) => {
+                const isActive = step === pregameStep;
+                return (
+                  <span
+                    key={step}
+                    ref={(el) => { buttonRefs.current[step] = el as any; }}
+                    style={{
+                      position: 'relative',
+                      padding: '4px 10px',
+                      marginTop: PREGAME_CAPTION_GAP,
+                      fontFamily: 'var(--font-cinzel), Georgia, serif',
+                      fontSize: FZ.ui,
+                      letterSpacing: '0.07em',
+                      textTransform: 'uppercase',
+                      color: isActive ? '#e8d5a3' : 'rgba(232, 213, 163, 0.35)',
+                      transition: 'color 0.24s ease-out',
+                      whiteSpace: 'nowrap',
+                      zIndex: 1,
+                    }}
+                  >
+                    {PREGAME_LABELS[step]}
+                  </span>
+                );
+              })}
+            </>
+          )}
+
+          {!pregameStep && PHASE_ORDER.map((phase) => {
             const isActive = phase === currentPhase;
             const canClick = isMyTurn && !isActive;
 
@@ -679,8 +756,9 @@ export default function TurnIndicator({
           })}
         </div>
 
-        {/* Next phase / End Turn arrow */}
-        <button
+        {/* Next phase / End Turn arrow. Hidden during the pre-game: the turn
+            machinery is server-gated there, so it would be a false affordance. */}
+        {!pregameStep && <button
           onClick={readOnly ? undefined : handleNextPhase}
           disabled={readOnly || !isMyTurn}
           title={isLastPhase ? 'End turn' : 'Next phase'}
@@ -699,10 +777,10 @@ export default function TurnIndicator({
           onMouseLeave={(e) => { if (isMyTurn) e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)'; }}
         >
           &#x276F;
-        </button>
+        </button>}
 
         {/* End Turn button */}
-        {!readOnly && <button
+        {!readOnly && !pregameStep && <button
           onClick={onEndTurn}
           disabled={!isMyTurn}
           title={isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"}
