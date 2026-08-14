@@ -582,8 +582,11 @@ export default function TurnIndicator({
           minWidth: 0,
         }}
       >
-        {/* Previous phase arrow */}
-        <button
+        {/* Previous phase arrow — hidden during the pre-game alongside the next
+            arrow and END TURN. set_phase is server-gated while pregamePhase is
+            set, so it is a false affordance, and hiding only one of the pair
+            leaves the pre-game chips visually off-centre. */}
+        {!pregameStep && <button
           onClick={readOnly ? undefined : handlePrevPhase}
           disabled={readOnly || !isMyTurn || isFirstPhase}
           title="Previous phase"
@@ -602,7 +605,7 @@ export default function TurnIndicator({
           onMouseLeave={(e) => { if (isMyTurn && !isFirstPhase) e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)'; }}
         >
           &#x276E;
-        </button>
+        </button>}
 
         <div
           ref={phaseRowRef}
