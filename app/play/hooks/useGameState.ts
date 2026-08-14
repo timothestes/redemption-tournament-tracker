@@ -14,6 +14,8 @@ import type {
   DisconnectTimeout,
   Emote,
   ForgeGame,
+  PregameState,
+  PregameStar,
 } from '@/lib/spacetimedb/module_bindings/types';
 import type { GameCard } from '@/app/goldfish/types';
 import { useStableAdaptedCards } from '../utils/cardAdapter';
@@ -32,6 +34,8 @@ type SpectatorRow = Spectator;
 type DisconnectTimeoutRow = DisconnectTimeout;
 type EmoteRow = Emote;
 type ForgeGameRow = ForgeGame;
+type PregameStateRow = PregameState;
+type PregameStarRow = PregameStar;
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -144,6 +148,14 @@ export interface GameState {
   pregameAcknowledgeFirst: () => void;
   pregameSkipToReveal: (chosenSeat: bigint) => void;
   pregameChangeDeck: (deckId: string, deckData: string, paragon: string) => void;
+  // Pre-game star / Lost Soul sub-phase state + actions
+  /** The game's pre-game sub-phase row, or null before the server creates it. */
+  pregameState: PregameStateRow | null;
+  /** This game's star reveals, ascending by resolution slot. */
+  pregameStars: PregameStarRow[];
+  pregameSubmitStars: (cardInstanceIds: bigint[]) => void;
+  pregameResolveStar: (starId: bigint) => void;
+  pregameFinishSouls: () => void;
   // Rematch actions
   requestRematch: (deckId: string, deckData: string, paragon: string, format: string) => void;
   respondRematch: (accepted: boolean, deckId: string, deckData: string, paragon: string, format: string) => void;
@@ -232,12 +244,26 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
   const [forgeGameRows] = useTable(
     tables.ForgeGame.where(r => r.gameId.eq(gameId)),
   ) as [ForgeGameRow[], boolean];
+  const [pregameStateRows] = useTable(
+    tables.PregameState.where(r => r.gameId.eq(gameId)),
+  ) as [PregameStateRow[], boolean];
+  const [pregameStarRows] = useTable(
+    tables.PregameStar.where(r => r.gameId.eq(gameId)),
+  ) as [PregameStarRow[], boolean];
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
   // Only require core tables (game, player, cards) — chat/actions/spectators can load async
   const isLoading = !(gamesLoading && playersLoading && cardsLoading);
 
   const isForgeGame = forgeGameRows.length > 0;
+
+  // One PregameState row per game (gameId is unique), so the first row is it.
+  const pregameState = pregameStateRows[0] ?? null;
+
+  const pregameStars = useMemo(
+    () => [...pregameStarRows].sort((a, b) => (a.slot < b.slot ? -1 : a.slot > b.slot ? 1 : 0)),
+    [pregameStarRows],
+  );
 
   // ---------------------------------------------------------------------------
   // Derived state
@@ -815,6 +841,22 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     conn?.reducers.pregameChangeDeck({ gameId, deckId, deckData, paragon });
   }, [conn, gameId]);
 
+  const pregameSubmitStars = useCallback((cardInstanceIds: bigint[]) => {
+    // JSON.stringify throws on raw BigInt — send the ids as strings.
+    conn?.reducers.pregameSubmitStars({
+      gameId,
+      cardInstanceIds: JSON.stringify(cardInstanceIds.map((id) => id.toString())),
+    });
+  }, [conn, gameId]);
+
+  const pregameResolveStar = useCallback((starId: bigint) => {
+    conn?.reducers.pregameResolveStar({ gameId, starId });
+  }, [conn, gameId]);
+
+  const pregameFinishSouls = useCallback(() => {
+    conn?.reducers.pregameFinishSouls({ gameId });
+  }, [conn, gameId]);
+
   const requestRematch = useCallback((deckId: string, deckData: string, paragon: string, format: string) => {
     conn?.reducers.requestRematch({ gameId, deckId, deckData, paragon, format });
   }, [conn, gameId]);
@@ -1041,6 +1083,11 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     pregameAcknowledgeFirst,
     pregameSkipToReveal,
     pregameChangeDeck,
+    pregameState,
+    pregameStars,
+    pregameSubmitStars,
+    pregameResolveStar,
+    pregameFinishSouls,
     requestRematch,
     respondRematch,
     cancelRematch,
@@ -1123,6 +1170,12 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
   const [allEmotes] = useTable(
     tables.Emote.where((e) => e.gameId.eq(effectiveGameId)),
   ) as [EmoteRow[], boolean];
+  const [pregameStateRows] = useTable(
+    tables.PregameState.where((r) => r.gameId.eq(effectiveGameId)),
+  ) as [PregameStateRow[], boolean];
+  const [pregameStarRows] = useTable(
+    tables.PregameStar.where((r) => r.gameId.eq(effectiveGameId)),
+  ) as [PregameStarRow[], boolean];
 
   const isLoading = !(gamesLoading && playersLoading && cardsLoading);
 
@@ -1246,6 +1299,14 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
   const incomingSearchRequest = null;
   const approvedSearchRequest = null;
 
+  // One PregameState row per game (gameId is unique), so the first row is it.
+  const pregameState = pregameStateRows[0] ?? null;
+
+  const pregameStars = useMemo(
+    () => [...pregameStarRows].sort((a, b) => (a.slot < b.slot ? -1 : a.slot > b.slot ? 1 : 0)),
+    [pregameStarRows],
+  );
+
   // ---------------------------------------------------------------------------
   // No-op action stubs (spectators cannot mutate game state)
   // ---------------------------------------------------------------------------
@@ -1355,6 +1416,11 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     pregameAcknowledgeFirst: noop,
     pregameSkipToReveal: noopBigint,
     pregameChangeDeck: useCallback((_deckId: string, _deckData: string, _paragon: string) => {}, []),
+    pregameState,
+    pregameStars,
+    pregameSubmitStars: useCallback((_cardInstanceIds: bigint[]) => {}, []),
+    pregameResolveStar: noopBigint,
+    pregameFinishSouls: noop,
     requestRematch: useCallback((_deckId: string, _deckData: string, _paragon: string, _format: string) => {}, []),
     respondRematch: useCallback((_accepted: boolean, _deckId: string, _deckData: string, _paragon: string, _format: string) => {}, []),
     cancelRematch: useCallback(() => {}, []),
