@@ -11,6 +11,7 @@ describe('normalizeFormat', () => {
     ['Unlimited', 'Unlimited'], ['Type 1 Unlimited', 'Unlimited'], ['Classic', 'Unlimited'], ['classic', 'Unlimited'],
     ['Paragon', 'Paragon'], ['Paragon Type 1', 'Paragon'], ['paragon', 'Paragon'],
     ['Type 1 Limited', 'Limited'], ['Single', 'Limited'],
+    ['Teams', 'Teams'], ['Type 1 - Teams', 'Teams'], ['type 1 teams', 'Teams'],
   ])('maps %j to %s', (input, expected) => {
     expect(normalizeFormat(input as string | null | undefined)).toBe(expected);
   });
@@ -46,11 +47,25 @@ describe('FORMATS registry', () => {
     ]);
     // T2 is Limited's list plus Harvest Time (both printings).
     expect(FORMATS.T2.banList.length).toBe(FORMATS.Limited.banList.length + 2);
+    // Teams is Limited's list plus Burial (both printings) and High Places.
+    expect(FORMATS.Teams.banList.length).toBe(FORMATS.Limited.banList.length + 3);
     for (const entry of FORMATS.Limited.banList) {
       expect(FORMATS.T2.banList).toContainEqual(entry);
+      expect(FORMATS.Teams.banList).toContainEqual(entry);
     }
     // Paragon governs its pool with excluded sets, not a ban list.
     expect(FORMATS.Paragon.banList).toEqual([]);
+  });
+
+  // Teams is Type 1 Limited deck construction throughout — the ban list is the
+  // only thing that differs, so every other constant must match Limited's.
+  it('builds Teams to Type 1 Limited rules', () => {
+    expect(FORMATS.Teams.main).toEqual(FORMATS.Limited.main);
+    expect(FORMATS.Teams.reserveMax).toBe(FORMATS.Limited.reserveMax);
+    expect(FORMATS.Teams.pool).toBe(FORMATS.Limited.pool);
+    // family drives which validator runs (utils/deckcheck/index.ts), so this
+    // is what routes Teams through the Type 1 rules.
+    expect(FORMATS.Teams.family).toBe(FORMATS.Limited.family);
   });
   it('paragon excluded sets carried over', () => {
     expect(PARAGON_EXCLUDED_SETS.has('Cloud of Witnesses')).toBe(true);
@@ -87,10 +102,12 @@ describe('isBannedInFormat', () => {
   };
 
   it.each([
-    ['Daniel (CoW)', { Limited: true, Unlimited: true, T2: true, Paragon: false }],
-    ['Lost Soul "Imitate" [III John 1:11]', { Limited: true, Unlimited: false, T2: true, Paragon: false }],
-    ['Harvest Time (GoC)', { Limited: false, Unlimited: false, T2: true, Paragon: false }],
-    ['Ephesian Widow', { Limited: false, Unlimited: false, T2: false, Paragon: false }],
+    ['Daniel (CoW)', { Limited: true, Unlimited: true, Teams: true, T2: true, Paragon: false }],
+    ['Lost Soul "Imitate" [III John 1:11]', { Limited: true, Unlimited: false, Teams: true, T2: true, Paragon: false }],
+    ['Harvest Time (GoC)', { Limited: false, Unlimited: false, Teams: false, T2: true, Paragon: false }],
+    ['Burial (GoC)', { Limited: false, Unlimited: false, Teams: true, T2: false, Paragon: false }],
+    ['High Places (LoC)', { Limited: false, Unlimited: false, Teams: true, T2: false, Paragon: false }],
+    ['Ephesian Widow', { Limited: false, Unlimited: false, Teams: false, T2: false, Paragon: false }],
   ] as const)('%s', (name, expected) => {
     for (const id of FORMAT_IDS) {
       expect(isBannedInFormat(cardRow(name), id), `${name} in ${id}`).toBe(expected[id]);
