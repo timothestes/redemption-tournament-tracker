@@ -16,7 +16,12 @@
 - **Never stage broadly.** `git add <specific files>` only — never `git add -A`, `.`, or `-a`.
 - **Dev SpacetimeDB module only.** `.github/workflows/deploy-spacetimedb.yml` publishes `redemption-multiplayer-dev` for any non-`main` branch. Never publish `redemption-multiplayer`. Never merge this branch without a separate prod decision.
 - **Read `spacetimedb/CLAUDE.md` before writing any SpacetimeDB code.** Indexes go in table OPTIONS (1st arg) and this repo uses `accessor:`, not `name:`. All u64 values are BigInt literals (`0n`). `.insert()` returns the row, not an id.
-- **Test runner:** `npx vitest run <path>` from the worktree root. There is no `typecheck` script — use `npx tsc --noEmit`.
+- **Test runner:** `node node_modules/vitest/vitest.mjs run <path>` from the worktree root.
+  **Do NOT use `npx vitest`** — `node_modules/.bin/vitest` is missing here, so npx fetches a
+  newer vitest that needs `node:util.styleText` (Node ≥20.12) while this machine runs Node
+  v20.11.0. It dies with a `SyntaxError` at startup, before any test runs, and the failure
+  looks nothing like a test failure. The local vitest 4.0.18 is installed and works.
+- There is no `typecheck` script — use `npx tsc --noEmit` (tsc is installed locally and fine).
 - **Never build while the dev server runs** (shared `.next`). Use `NEXT_DIST_DIR=.next-build npm run build` if a build is needed at all; prefer `npx tsc --noEmit`.
 - **Star detection reads `CardInstance.specialAbility`**, never `findCard(cardName)` — Forge cards are absent from the public card index.
 - **Registry edits touch both copies** (`lib/cards/cardAbilities.ts` and `spacetimedb/src/cardAbilities.ts`); the parity test in `lib/cards/__tests__/cardAbilities.test.ts` enforces it.
@@ -130,7 +135,7 @@ describe('isStarAbilityText', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run lib/cards/__tests__/starCards.test.ts`
+Run: `node node_modules/vitest/vitest.mjs run lib/cards/__tests__/starCards.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/cards/starCards"`.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -161,7 +166,7 @@ export function isStarAbilityText(specialAbility: string | null | undefined): bo
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run lib/cards/__tests__/starCards.test.ts`
+Run: `node node_modules/vitest/vitest.mjs run lib/cards/__tests__/starCards.test.ts`
 Expected: PASS, 6 tests.
 
 If the 244 assertion fails, the card data has changed since the audit. Do **not** loosen the assertion — update the number and note the delta in the commit message.
@@ -242,7 +247,7 @@ Ensure `CARD_ABILITIES` and `DEFAULT_ABILITY_SOURCE_ZONES` are in the file's exi
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run lib/cards/__tests__/cardAbilities.test.ts -t "fireable from hand"`
+Run: `node node_modules/vitest/vitest.mjs run lib/cards/__tests__/cardAbilities.test.ts -t "fireable from hand"`
 Expected: FAIL — the 4 STAR_HALF_CARDS assertions fail (`expected [...] to contain 'hand'`). The 12 IN_PLAY assertions should already pass.
 
 - [ ] **Step 3: Add `'hand'` to the 4 entries in both registry copies**
@@ -270,7 +275,7 @@ Add a short comment above the group in `lib/cards/cardAbilities.ts`:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `npx vitest run lib/cards/__tests__/cardAbilities.test.ts`
+Run: `node node_modules/vitest/vitest.mjs run lib/cards/__tests__/cardAbilities.test.ts`
 Expected: PASS — including the pre-existing lib↔spacetimedb parity test, which fails loudly if only one copy was edited.
 
 - [ ] **Step 5: Commit**
@@ -337,7 +342,7 @@ Find the same flat check at roughly `:4854` and apply the same reordering, using
 - [ ] **Step 3: Verify no other call site regressed**
 
 Run: `cd /Users/timestes/projects/rtt-star-phase && rg -n "ABILITY_SOURCE_ZONES" spacetimedb/src/index.ts`
-Expected: the `const` definition, plus the two edited sites now reading `ability.sourceZones ?? ABILITY_SOURCE_ZONES`, plus the untouched special-purpose gates in `resurrect_heroes`, `imitate_lost_soul`, and `matthew_draw_brigades`. Those three are not star paths — leave them.
+Expected **8 hits**: the `const` definition (`:37`), the two edited sites now reading `ability.sourceZones ?? ABILITY_SOURCE_ZONES`, and **five** untouched special-purpose gates — `matthew_draw_brigades`, `resurrect_heroes`, `imitate_lost_soul`, plus two inside compound conditions in `three_nails_reset_execute` and `discard_reserve_characters_execute`. None of the five is a star path (verified: no card using `three_nails_reset` — Three Nails (GoC), A New Beginning and its variants — has a star ability). Leave all five alone.
 
 - [ ] **Step 4: Type-check the module**
 
@@ -481,7 +486,7 @@ describe('markDone', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/timestes/projects/rtt-star-phase && npx vitest run spacetimedb/__tests__/pregameFlow.test.ts`
+Run: `cd /Users/timestes/projects/rtt-star-phase && node node_modules/vitest/vitest.mjs run spacetimedb/__tests__/pregameFlow.test.ts`
 Expected: FAIL — `Failed to resolve import "../src/pregameFlow"`.
 
 - [ ] **Step 3: Write the implementation**
@@ -574,7 +579,7 @@ export function advancePregameFlow(
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd /Users/timestes/projects/rtt-star-phase && npx vitest run spacetimedb/__tests__/pregameFlow.test.ts`
+Run: `cd /Users/timestes/projects/rtt-star-phase && node node_modules/vitest/vitest.mjs run spacetimedb/__tests__/pregameFlow.test.ts`
 Expected: PASS, 9 tests.
 
 - [ ] **Step 5: Commit**
@@ -1948,7 +1953,7 @@ git commit -m "test(play): e2e for the pre-game star phase"
 
 ```bash
 cd /Users/timestes/projects/rtt-star-phase
-npx vitest run
+node node_modules/vitest/vitest.mjs run
 npx tsc --noEmit
 ```
 
