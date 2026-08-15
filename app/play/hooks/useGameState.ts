@@ -189,6 +189,18 @@ export interface GameState {
   endBattle: () => void;
   resolveBattle: () => void;
   surrenderSoul: (cardInstanceId: bigint) => void;
+
+  /** Phase Stops */
+  /** Viewer's own stop phases (spectator: always []). */
+  myStops: string[];
+  /** '' = no hold. */
+  holdPhase: string;
+  /** Non-active seat while holding, else null. */
+  holdSeat: bigint | null;
+  /** From the timeout row's `scheduledAt`. */
+  holdDeadlineMicros: bigint | null;
+  setTurnStop: (phase: string, enabled: boolean) => void;
+  releaseTurnStop: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +262,12 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
   const [pregameStarRows] = useTable(
     tables.PregameStar.where(r => r.gameId.eq(gameId)),
   ) as [PregameStarRow[], boolean];
+  const [turnStopRows] = useTable(
+    tables.TurnStop.where((r) => r.gameId.eq(gameId)),
+  ) as [any[], boolean];
+  const [stopHoldTimeoutRows] = useTable(
+    tables.StopHoldTimeout.where((r) => r.gameId.eq(gameId)),
+  ) as [any[], boolean];
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
   // Only require core tables (game, player, cards) — chat/actions/spectators can load async
@@ -316,6 +334,32 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     () => (game && myPlayer ? game.currentTurn === myPlayer.seat : false),
     [game, myPlayer],
   );
+
+  // ---- Phase Stops (opponent-turn priority stops) ----
+  const turnStopRow = turnStopRows[0] ?? null;
+
+  const myStops = useMemo(() => {
+    if (!turnStopRow || !myPlayer) return [] as string[];
+    const csv: string = myPlayer.seat === 0n ? turnStopRow.seat0Stops : turnStopRow.seat1Stops;
+    return csv ? csv.split(',') : [];
+  }, [turnStopRow, myPlayer]);
+
+  const holdPhase: string = turnStopRow?.holdPhase ?? '';
+
+  // The holding seat is always the non-active seat.
+  const holdSeat = useMemo(() => {
+    if (!game || holdPhase === '') return null;
+    return game.currentTurn === 0n ? 1n : 0n;
+  }, [game, holdPhase]);
+
+  const holdDeadlineMicros = useMemo(() => {
+    if (holdPhase === '') return null;
+    const row = stopHoldTimeoutRows[0];
+    if (!row) return null;
+    const sched: any = row.scheduledAt;
+    if (sched?.tag !== 'Time') return null;
+    return sched.value.microsSinceUnixEpoch as bigint;
+  }, [stopHoldTimeoutRows, holdPhase]);
 
   // Cards for this game, grouped by owner and zone
   const gameCards = useMemo(
@@ -656,6 +700,17 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
 
   const endTurn = useCallback(() => {
     conn?.reducers.endTurn({ gameId });
+  }, [conn, gameId]);
+
+  const setTurnStop = useCallback(
+    (phase: string, enabled: boolean) => {
+      conn?.reducers.setTurnStop({ gameId, phase, enabled });
+    },
+    [conn, gameId],
+  );
+
+  const releaseTurnStop = useCallback(() => {
+    conn?.reducers.releaseTurnStop({ gameId });
   }, [conn, gameId]);
 
   const rollDice = useCallback(
@@ -1117,6 +1172,14 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     reorderHand,
     reorderLob,
     isForgeGame,
+
+    // Phase Stops
+    myStops,
+    holdPhase,
+    holdSeat,
+    holdDeadlineMicros,
+    setTurnStop,
+    releaseTurnStop,
   };
 }
 
@@ -1176,6 +1239,12 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
   const [pregameStarRows] = useTable(
     tables.PregameStar.where((r) => r.gameId.eq(effectiveGameId)),
   ) as [PregameStarRow[], boolean];
+  const [turnStopRows] = useTable(
+    tables.TurnStop.where((r) => r.gameId.eq(effectiveGameId)),
+  ) as [any[], boolean];
+  const [stopHoldTimeoutRows] = useTable(
+    tables.StopHoldTimeout.where((r) => r.gameId.eq(effectiveGameId)),
+  ) as [any[], boolean];
 
   const isLoading = !(gamesLoading && playersLoading && cardsLoading);
 
@@ -1216,6 +1285,26 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     () => (game && seat0Player ? game.currentTurn === seat0Player.seat : false),
     [game, seat0Player],
   );
+
+  // ---- Phase Stops (opponent-turn priority stops) ----
+  const turnStopRow = turnStopRows[0] ?? null;
+
+  const holdPhase: string = turnStopRow?.holdPhase ?? '';
+
+  // The holding seat is always the non-active seat.
+  const holdSeat = useMemo(() => {
+    if (!game || holdPhase === '') return null;
+    return game.currentTurn === 0n ? 1n : 0n;
+  }, [game, holdPhase]);
+
+  const holdDeadlineMicros = useMemo(() => {
+    if (holdPhase === '') return null;
+    const row = stopHoldTimeoutRows[0];
+    if (!row) return null;
+    const sched: any = row.scheduledAt;
+    if (sched?.tag !== 'Time') return null;
+    return sched.value.microsSinceUnixEpoch as bigint;
+  }, [stopHoldTimeoutRows, holdPhase]);
 
   const myCards = useMemo(
     () =>
@@ -1447,6 +1536,14 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     endBattle: noop,
     resolveBattle: noop,
     surrenderSoul: noopBigint,
+
+    // Phase Stops — spectators render holds but cannot set/release stops
+    myStops: [] as string[],
+    holdPhase,
+    holdSeat,
+    holdDeadlineMicros,
+    setTurnStop: useCallback((_p: string, _e: boolean) => {}, []),
+    releaseTurnStop: noop,
   };
 }
 
