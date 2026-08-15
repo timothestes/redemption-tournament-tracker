@@ -3337,7 +3337,7 @@ export const enter_battle = spacetimedb.reducer(
     logAction(
       ctx, gameId, player.id, 'ENTER_BATTLE',
       JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, from: fromZone }),
-      game.turnNumber, game.currentPhase,
+      game.turnNumber, engageBattleStop ? 'battle' : game.currentPhase,
     );
     if (engageBattleStop) engageHold(ctx, gameId, 'battle');
   },
@@ -3526,8 +3526,13 @@ export const surrender_soul = spacetimedb.reducer(
       ctx.db.Game.id.update({ ...latestGame, currentPhase: 'discard' });
       logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latestGame.turnNumber, 'discard');
 
-      const stopPhase = scanForStop(ctx, latestGame, 3, 4);
-      if (stopPhase !== null) engageHold(ctx, gameId, stopPhase);
+      // A winning 5th-soul rescue (moveLostSoulToLor -> checkAndApplyWin,
+      // above) may have already flipped status to 'finished' — never engage
+      // a hold on a game that just ended.
+      if (latestGame.status === 'playing') {
+        const stopPhase = scanForStop(ctx, latestGame, 3, 4);
+        if (stopPhase !== null) engageHold(ctx, gameId, stopPhase);
+      }
     }
   },
 );
