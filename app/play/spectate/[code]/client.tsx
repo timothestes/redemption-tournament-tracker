@@ -542,6 +542,8 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                   opponentScore={opponentScore}
                   timerDisplay={gameTimer.formatted}
                   timerVisible={gameTimer.isTimerVisible}
+                  holdPhase={gameState.holdPhase}
+                  holdDeadlineMicros={gameState.holdDeadlineMicros}
                   onRequestHandReveal={
                     gameId !== null && conn
                       ? () => conn.reducers.requestSpectatorHandReveal({ gameId })
