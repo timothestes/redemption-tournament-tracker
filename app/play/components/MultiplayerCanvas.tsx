@@ -8675,6 +8675,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onResolveBattle={gameState.resolveBattle}
           onEndBattle={gameState.endBattle}
           onSurrenderSoul={gameState.surrenderSoul}
+          holdPhase={gameState.holdPhase}
         />
       )}
 

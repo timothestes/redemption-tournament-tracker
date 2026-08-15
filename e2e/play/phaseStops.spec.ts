@@ -9,7 +9,9 @@ import { login, hostGame, joinGame, bothReachPlaying } from "../spectator/playHe
 // the seeded deck has no star cards and no Lost Souls.
 //
 // The four scenarios:
-//   1. Battle stop end-to-end — set → hold → active is frozen → PASS → end turn.
+//   1. Battle stop end-to-end — set → hold → active is frozen (E17: the
+//      battle band's ⚑ Win Battle / ↩ End Battle are disabled too) → PASS →
+//      end turn.
 //   2. E3  — a draw stop set on the opponent's turn fires at the NEXT flip.
 //   3. E6  — the holder toggling the held phase off releases the hold.
 //   4. E16 — the enter_battle band-open rule fires an unfired battle stop.
@@ -359,6 +361,36 @@ test.describe("Phase Stops", () => {
       await expectHoldEngaged(idle, active, "battle");
       await active.screenshot({ path: "test-results/phase-stops-hold-active.png" });
       await idle.screenshot({ path: "test-results/phase-stops-hold-holder.png" });
+
+      // --- 2b. E17: the battle band's conclude buttons are dead while held --
+      // The band is already open here — applyPhaseTransition stamps
+      // battleState:'active' the moment the phase becomes 'battle', which is
+      // what just fired the stop. enter_battle is NOT one of the five
+      // hold-gated reducers (spec §5.4), so dragging a card in is legal even
+      // while held and puts a card in the band without touching the hold —
+      // and without it, ⚑ Win Battle never renders (attacker-only + requires
+      // a non-empty band).
+      await dragHandCardIntoBand(active);
+      await expect.poll(() => cardsInBand(active), { timeout: 10_000 }).toBeGreaterThan(0);
+
+      const winBattleBtn = active.getByRole("button", { name: /Win Battle/ });
+      const endBattleBtn = active.getByRole("button", { name: /End Battle/ });
+      await expect(winBattleBtn).toBeVisible();
+      await expect(winBattleBtn).toBeDisabled();
+      await expect(endBattleBtn).toBeDisabled();
+
+      // Force-clicking the disabled buttons must not dispatch — no reducer
+      // call, so no SenderError, so no unhandled-rejection pageerror (the
+      // original E17 bug — see task-11-report.md §4.1).
+      const battlePageErrors: string[] = [];
+      active.on("pageerror", (e) => battlePageErrors.push(String(e)));
+      await winBattleBtn.click({ force: true }).catch(() => {});
+      await endBattleBtn.click({ force: true }).catch(() => {});
+      await active.waitForTimeout(500);
+      expect(battlePageErrors).toEqual([]);
+      // Dead clicks: the card is still sitting in the band, the hold is still up.
+      await expect.poll(() => cardsInBand(active), { timeout: 5_000 }).toBeGreaterThan(0);
+      await expect(heldBtn(active)).toBeVisible();
 
       // --- 3. The active player cannot move the turn on ---------------------
       // The brief asks for the "The turn is held" SenderError toast here. It is

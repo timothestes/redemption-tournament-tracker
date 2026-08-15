@@ -20,6 +20,7 @@ import type {
 import type { GameCard } from '@/app/goldfish/types';
 import { useStableAdaptedCards } from '../utils/cardAdapter';
 import type { ForgeResolverMap } from '../utils/forgeResolver';
+import { showGameToast } from '@/app/shared/components/GameToast';
 
 // ---------------------------------------------------------------------------
 // Row types inferred from the generated type objects
@@ -36,6 +37,18 @@ type EmoteRow = Emote;
 type ForgeGameRow = ForgeGame;
 type PregameStateRow = PregameState;
 type PregameStarRow = PregameStar;
+
+// ---------------------------------------------------------------------------
+// Phase Stops (spec §5.4): setPhase/endTurn/endBattle/resolveBattle/
+// surrenderSoul are hold-gated server-side and reject with a SenderError
+// whose message is already user-facing ("The turn is held — waiting on
+// {name}"). conn.reducers.X() returns a Promise (DbConnectionImpl.
+// callReducer) — without a .catch() the rejection is an unhandled promise
+// rejection with no client-side surface at all.
+// ---------------------------------------------------------------------------
+function toastReducerError(e: unknown): void {
+  showGameToast(e instanceof Error ? e.message : 'Action refused');
+}
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -693,13 +706,13 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
 
   const setPhase = useCallback(
     (phase: string) => {
-      conn?.reducers.setPhase({ gameId, phase });
+      conn?.reducers.setPhase({ gameId, phase }).catch(toastReducerError);
     },
     [conn, gameId],
   );
 
   const endTurn = useCallback(() => {
-    conn?.reducers.endTurn({ gameId });
+    conn?.reducers.endTurn({ gameId }).catch(toastReducerError);
   }, [conn, gameId]);
 
   const setTurnStop = useCallback(
@@ -1041,16 +1054,16 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
   );
 
   const endBattle = useCallback(() => {
-    conn?.reducers.endBattle({ gameId });
+    conn?.reducers.endBattle({ gameId }).catch(toastReducerError);
   }, [conn, gameId]);
 
   const resolveBattle = useCallback(() => {
-    conn?.reducers.resolveBattle({ gameId });
+    conn?.reducers.resolveBattle({ gameId }).catch(toastReducerError);
   }, [conn, gameId]);
 
   const surrenderSoul = useCallback(
     (cardInstanceId: bigint) => {
-      conn?.reducers.surrenderSoul({ gameId, cardInstanceId });
+      conn?.reducers.surrenderSoul({ gameId, cardInstanceId }).catch(toastReducerError);
     },
     [conn, gameId],
   );
