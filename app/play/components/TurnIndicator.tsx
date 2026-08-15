@@ -242,7 +242,7 @@ export default function TurnIndicator({
   // active player → "held against me"; non-active player → "I am the holder".
   const iAmHolder = isHeld && !isMyTurn && !readOnly;
   const heldAgainstMe = isHeld && isMyTurn && !readOnly;
-  const canToggleStops = !isMyTurn && !readOnly && !pregameStep && !isFinished;
+  const canToggleStops = !isMyTurn && !readOnly && !pregameStep && !isFinished && !!onToggleStop;
 
   // Countdown — recomputed from the server deadline each tick (reconnect-safe;
   // ScheduleAt timestamps are objects, micros → ms via Number(x / 1000n)).
