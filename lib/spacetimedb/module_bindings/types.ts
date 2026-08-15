@@ -254,6 +254,23 @@ export const SpectatorHandRequestExpiry = __t.object("SpectatorHandRequestExpiry
 });
 export type SpectatorHandRequestExpiry = __Infer<typeof SpectatorHandRequestExpiry>;
 
+export const StopHoldTimeout = __t.object("StopHoldTimeout", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  gameId: __t.u64(),
+  phase: __t.string(),
+});
+export type StopHoldTimeout = __Infer<typeof StopHoldTimeout>;
+
+export const TurnStop = __t.object("TurnStop", {
+  gameId: __t.u64(),
+  seat0Stops: __t.string(),
+  seat1Stops: __t.string(),
+  holdPhase: __t.string(),
+  firedPhases: __t.string(),
+});
+export type TurnStop = __Infer<typeof TurnStop>;
+
 export const ZoneSearchRequest = __t.object("ZoneSearchRequest", {
   id: __t.u64(),
   gameId: __t.u64(),
