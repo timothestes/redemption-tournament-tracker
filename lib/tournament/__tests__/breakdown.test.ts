@@ -13,6 +13,7 @@ function deck(
 ): BreakdownDeckInput {
   return {
     deckId,
+    participantId: deckId,
     playerName: deckId,
     place,
     cards: cards.map(([name, zone, quantity]) => ({
@@ -225,11 +226,27 @@ describe('buildBreakdown', () => {
     expect(result.cards).toHaveLength(2);
   });
 
-  it('carries a shared decklist’s other players through', () => {
+  // Two players can bring the same list — it happened at the 2026 Nationals.
+  // That list occupied two seats in the field and can take two slots in a cut,
+  // so it counts twice. The unit of analysis is the entry, not the distinct
+  // list, and the two entries surface as 100% neighbours rather than one of
+  // them being collapsed away.
+  it('counts two players on one decklist as two entries', () => {
+    const shared: [string, string, number][] = [
+      ['Angel of the Lord (J)', 'main', 1],
+      ['The Second Coming', 'main', 1],
+    ];
     const result = buildBreakdown([
-      { ...deck('a', 4, [['Angel of the Lord (J)', 'main', 1]]), alsoPlayedBy: ['Nic'] },
+      { ...deck('luke', 4, shared), deckId: 'shared-deck', participantId: 'p-luke' },
+      { ...deck('nic', 9, shared), deckId: 'shared-deck', participantId: 'p-nic' },
     ]);
-    expect(result.decks[0].alsoPlayedBy).toEqual(['Nic']);
+
+    expect(result.deckCount).toBe(2);
+    expect(result.decks.map((d) => d.participantId)).toEqual(['p-luke', 'p-nic']);
+    // Both entries play it, so it is at 100% of the field, not 50%.
+    const card = result.cards.find((c) => c.name === 'Angel of the Lord');
+    expect(card?.deckIndexes).toHaveLength(2);
+    expect(result.decks[0].neighbors[0].similarity).toBe(1);
   });
 
   it('returns an empty shape for a field with no decks', () => {

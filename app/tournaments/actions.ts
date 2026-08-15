@@ -291,52 +291,36 @@ export async function loadTournamentBreakdownAction(tournamentId: string): Promi
     else cardsByDeck.set(row.deck_id, [row]);
   }
 
-  // Two participants can point at one published deck — at the 2026 Nationals,
-  // two players in the same family are both linked to one list. Counting that
-  // deck twice would inflate every card in it and break the "% of field"
-  // denominator, so a decklist counts once and is attributed to its best
-  // finish, with the other players named rather than dropped.
-  const byDeckId = new Map<string, BreakdownDeckInput>();
-  for (const link of links ?? []) {
-    const deckId: string | null = (link as any).published_deck_id;
-    if (!deckId) continue;
-    const participant: any = byParticipant.get((link as any).participant_id);
-    const name: string | null = participant?.name ?? null;
-    const place: number | null = participant?.place ?? null;
-
-    const existing = byDeckId.get(deckId);
-    if (!existing) {
-      byDeckId.set(deckId, {
-        deckId,
-        playerName: name,
-        place,
-        alsoPlayedBy: [],
-        cards: (cardsByDeck.get(deckId) ?? []).map((c: any) => ({
+  // The unit of analysis is the entry, not the distinct list. Two participants
+  // can point at one published deck — at the 2026 Nationals two players brought
+  // the same list — and that list genuinely occupied two seats in the field,
+  // played its matches twice, and can take two slots in a Top 16. Collapsing it
+  // would understate it and put "% of field" over the wrong denominator.
+  //
+  // Keyed by participant rather than deck: the ids must be unique per entry,
+  // and the two rows are what let Deck DNA show the pair as 100% neighbours
+  // instead of silently hiding one player.
+  const deckInputs: BreakdownDeckInput[] = (links ?? [])
+    .filter((link: any) => Boolean(link.published_deck_id))
+    .map((link: any) => {
+      const participant: any = byParticipant.get(link.participant_id);
+      return {
+        deckId: link.published_deck_id as string,
+        participantId: link.participant_id as string,
+        playerName: participant?.name ?? null,
+        place: participant?.place ?? null,
+        cards: (cardsByDeck.get(link.published_deck_id) ?? []).map((c: any) => ({
           name: c.card_name,
           set: c.card_set,
           imgFile: c.card_img_file,
           quantity: c.quantity,
           zone: c.zone,
         })),
-      });
-      continue;
-    }
-
-    const existingPlace = existing.place ?? Infinity;
-    if ((place ?? Infinity) < existingPlace) {
-      if (existing.playerName) existing.alsoPlayedBy!.push(existing.playerName);
-      existing.playerName = name;
-      existing.place = place;
-    } else if (name) {
-      existing.alsoPlayedBy!.push(name);
-    }
-  }
-
-  // Empty lists would drag every "% of field" denominator down without
-  // contributing a single card.
-  const deckInputs: BreakdownDeckInput[] = [...byDeckId.values()].filter(
-    (deck) => deck.cards.length > 0,
-  );
+      };
+    })
+    // Empty lists would drag every "% of field" denominator down without
+    // contributing a single card.
+    .filter((deck: BreakdownDeckInput) => deck.cards.length > 0);
 
   return {
     success: true,
