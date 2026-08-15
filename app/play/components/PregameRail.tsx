@@ -160,10 +160,15 @@ export default function PregameRail({
     return wrapper(
       <>
         {heading('Pre-Game Phase')}
+        {/* A star window is two waits, not one. Once rows exist for the active
+            seat they have submitted — the names are right there below this
+            line — and what's left is watching them resolve one at a time. */}
         <div style={BODY}>
-          {step === 'stars'
-            ? `Waiting for ${opponentName} to reveal stars…`
-            : `Waiting for ${opponentName} to activate Lost Souls…`}
+          {step === 'souls'
+            ? `Waiting for ${opponentName} to activate Lost Souls…`
+            : queue.length === 0
+              ? `Waiting for ${opponentName} to reveal stars…`
+              : `Waiting for ${opponentName} to resolve their stars…`}
         </div>
         {queue.length > 0 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
