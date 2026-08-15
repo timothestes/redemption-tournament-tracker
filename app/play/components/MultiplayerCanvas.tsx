@@ -68,11 +68,7 @@ import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 import BattleResolutionUI from './BattleResolutionUI';
 import PregameRail from './PregameRail';
-import {
-  STAR_OF_DAVID_UP_TRIANGLE,
-  STAR_OF_DAVID_DOWN_TRIANGLE,
-  STAR_OF_DAVID_VIEWBOX,
-} from './StarOfDavidIcon';
+import { STAR_OF_DAVID_IMG, STAR_OF_DAVID_INSET } from './StarOfDavidIcon';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
@@ -841,6 +837,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   const myHandRect = mpLayout?.zones.playerHand ?? null;
   const opponentHandRect = mpLayout?.zones.opponentHand ?? null;
+  // Anchor for the Pre-Game rail. Battle never overlaps the pre-game, so the
+  // plain territory rect is the right one in every format.
+  const myTerritoryRect = mpLayout?.zones.playerTerritory ?? null;
 
   // Player-hand card dimensions: capped so the card bottom always stays
   // above the floating toolbar reserve. On narrow viewports the mainCard
@@ -1158,6 +1157,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     };
     img.src = SOUL_DECK_BACK_IMG;
   }, [normalizedFormat]);
+
+  // Star of David badge art (Pre-Game star cue). Same load-once idiom as the
+  // Soul Deck back above; the badge simply doesn't draw until it's ready.
+  const starIconRef = useRef<HTMLImageElement | null>(null);
+  const [starIconReady, setStarIconReady] = useState(false);
+  useEffect(() => {
+    if (starIconRef.current) return;
+    const img = new window.Image();
+    img.onload = () => {
+      starIconRef.current = img;
+      setStarIconReady(true);
+    };
+    img.src = STAR_OF_DAVID_IMG;
+  }, []);
 
   // ---- Hover state ----
   const [hoveredInstanceId, setHoveredInstanceId] = useState<string | null>(null);
@@ -8207,16 +8220,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   const r = 12 * fsGrowth(13);
                   // Star disc, inscribed in the top-right corner the way the
                   // numeral is inscribed top-left — and a step smaller than it,
-                  // so the pick order stays the louder signal. The hexagram is
-                  // mapped from the shared 24-grid geometry about its centre
-                  // (12,12), circumradius 11.
+                  // so the pick order stays the louder signal.
                   const sr = 11 * fsGrowth(13);
-                  const k = (sr * 0.78) / (STAR_OF_DAVID_VIEWBOX / 2 - 1);
                   const scx = handCardWidth - sr;
-                  const starPoints = (src: readonly number[]) =>
-                    src.map((v, n) => (n % 2 === 0
-                      ? scx + (v - STAR_OF_DAVID_VIEWBOX / 2) * k
-                      : sr + (v - STAR_OF_DAVID_VIEWBOX / 2) * k));
+                  // Hexagram box, centred in the disc. The asset is taller than
+                  // it is wide, so height drives the fit and width follows its
+                  // aspect ratio — the same contain behaviour the DOM icon gets
+                  // for free from objectFit.
+                  const starH = sr * 2 * STAR_OF_DAVID_INSET;
+                  const starIcon = starIconRef.current;
+                  const starW = starIcon
+                    ? starH * (starIcon.naturalWidth / starIcon.naturalHeight)
+                    : starH;
                   return (
                     <Group
                       key={`star-cue-${String(card.id)}`}
@@ -8225,37 +8240,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       rotation={pos.rotation}
                       listening={false}
                     >
-                      {eligible && (
+                      {eligible && starIconReady && starIcon && (
                         <>
-                          {/* Opaque ground. Card art runs from near-white title
-                              bands to dark illustration, and a translucent disc
-                              left the gold hexagram invisible over the pale
-                              half. */}
+                          {/* Opaque white ground. Card art runs from near-white
+                              title bands to dark illustration, so the disc — not
+                              the hexagram — is what carries the badge against
+                              both halves. */}
                           <Circle
                             x={scx}
                             y={sr}
                             radius={sr}
-                            fill="rgba(10, 8, 5, 0.92)"
+                            fill="#ffffff"
                             perfectDrawEnabled={false}
                           />
-                          {/* Two closed triangles from the shared point sets.
-                              The dark hairline keeps the interlaced edges
-                              readable where they cross — a canvas fill can't do
-                              the icon's evenodd hollow centre. */}
-                          <Line
-                            points={starPoints(STAR_OF_DAVID_UP_TRIANGLE)}
-                            closed
-                            fill="#e8d5a3"
-                            stroke="rgba(10, 8, 5, 0.9)"
-                            strokeWidth={k * 0.8}
-                            perfectDrawEnabled={false}
-                          />
-                          <Line
-                            points={starPoints(STAR_OF_DAVID_DOWN_TRIANGLE)}
-                            closed
-                            fill="#e8d5a3"
-                            stroke="rgba(10, 8, 5, 0.9)"
-                            strokeWidth={k * 0.8}
+                          <KonvaImage
+                            image={starIcon}
+                            x={scx - starW / 2}
+                            y={sr - starH / 2}
+                            width={starW}
+                            height={starH}
+                            listening={false}
                             perfectDrawEnabled={false}
                           />
                         </>
@@ -8653,7 +8657,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           here. The wrapper is pointer-events:none so the board, the
           toolbar and every modal stay fully interactive while it shows.
           ================================================================ */}
-      {pregameStep && !isSpectator && (
+      {pregameStep && !isSpectator && myTerritoryRect && (
         <PregameRail
           step={pregameStep}
           isMyWindow={myPregameWindow}
@@ -8663,10 +8667,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           activatableSouls={myActivatableSouls}
           hasSubmitted={myStarsSubmitted}
           autoRouteLostSouls={gameState.myPlayer?.autoRouteLostSouls ?? true}
-          // The panel floats just above the hand row rather than in the
-          // viewport's bottom-left corner, where it covered the cards the
-          // player now clicks to pick their stars.
-          handRect={myHandRect}
+          // Centred in my (empty) territory: the hand holds the star cards to
+          // click and the Land of Bondage holds the souls to right-click, so
+          // the panel can sit over neither.
+          territoryRect={myTerritoryRect}
           scale={scale}
           offsetX={offsetX}
           offsetY={offsetY}

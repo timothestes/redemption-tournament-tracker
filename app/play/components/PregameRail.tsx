@@ -9,11 +9,13 @@
 // click-through DOM overlay never intercepts board clicks. Same technique as
 // BattleResolutionUI.tsx.
 //
-// The panel is anchored to the hand zone's top edge (virtualToScreen, same
-// idiom as BattleResolutionUI) instead of the viewport corner: the star step
-// is driven by clicking the star cards in the hand, so the panel must never
-// sit on top of them. Both territories are empty during the pre-game, so the
-// space above the hand row is free in Standard and Paragon alike.
+// The panel is centred in the player's own territory (virtualToScreen, same
+// idiom as BattleResolutionUI) rather than pinned to a viewport corner. That
+// zone is the only large area free in BOTH pre-game steps: the star step is
+// driven by clicking cards in the hand, and the souls step by right-clicking
+// souls in the Land of Bondage — the row directly above the hand — so anchoring
+// to either would cover the very cards the step asks the player to click. Both
+// territories are empty during the pre-game, in Standard and Paragon alike.
 
 import {
   getEffectiveAbilities,
@@ -31,10 +33,10 @@ const RAIL_Z = 450;
 
 const PANEL: React.CSSProperties = {
   // The panel body itself stays click-through — only its chips and buttons opt
-  // back in. It now floats over the Land of Bondage rather than the dead
-  // bottom-left corner, and the souls step asks the player to right-click souls
-  // that may sit underneath it.
+  // back in.
   pointerEvents: 'none',
+  textAlign: 'center',
+  alignItems: 'center',
   background: 'rgba(10, 8, 5, 0.94)',
   border: '1px solid rgba(196, 149, 90, 0.45)',
   borderRadius: 6,
@@ -73,9 +75,6 @@ const ACTION: React.CSSProperties = {
   color: '#e8d5a3',
 };
 
-/** Gap in virtual px between the panel's bottom edge and the hand zone's top. */
-const HAND_CLEARANCE = 10;
-
 interface PregameRailProps {
   step: 'stars' | 'souls';
   isMyWindow: boolean;
@@ -89,8 +88,8 @@ interface PregameRailProps {
   /** True when I have submitted my star selection this window. */
   hasSubmitted: boolean;
   autoRouteLostSouls: boolean;
-  /** My hand zone (virtual coords) — the panel docks above it. */
-  handRect: ZoneRect;
+  /** My territory zone (virtual coords) — the panel centres in it. */
+  territoryRect: ZoneRect;
   scale: number;
   offsetX: number;
   offsetY: number;
@@ -106,14 +105,15 @@ interface PregameRailProps {
 
 export default function PregameRail({
   step, isMyWindow, opponentName, handStars, queue, activatableSouls,
-  hasSubmitted, autoRouteLostSouls, handRect, scale, offsetX, offsetY, selection,
+  hasSubmitted, autoRouteLostSouls, territoryRect, scale, offsetX, offsetY, selection,
   onSubmitStars, onResolveStar, onFinishSouls, onExecuteAbility, onHighlightCard,
 }: PregameRailProps) {
-  // Anchor point = the hand zone's top-left corner, lifted clear of it. The
-  // panel is translated up by its own height so its BOTTOM edge lands there,
-  // whatever the content's height.
+  // Anchor point = the centre of my territory. The panel is translated back by
+  // half its own size so it stays centred whatever the content's height.
   const anchor = virtualToScreen(
-    handRect.x + 12, handRect.y - HAND_CLEARANCE, scale, offsetX, offsetY,
+    territoryRect.x + territoryRect.width / 2,
+    territoryRect.y + territoryRect.height / 2,
+    scale, offsetX, offsetY,
   );
 
   // The whole wrapper is click-through; only chips and buttons opt back in.
@@ -121,7 +121,7 @@ export default function PregameRail({
   const wrapper = (children: React.ReactNode) => (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: RAIL_Z }}>
       <div style={{ position: 'absolute', left: anchor.x, top: anchor.y,
-                    transform: 'translateY(-100%)', ...PANEL }}>
+                    transform: 'translate(-50%, -50%)', ...PANEL }}>
         {children}
       </div>
     </div>

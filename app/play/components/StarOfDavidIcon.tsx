@@ -1,26 +1,27 @@
 'use client';
 
 /**
- * Star of David (hexagram) — the visual cue for REG (Star) abilities during the
- * Pre-Game Phase.
+ * Star of David — the visual cue for REG (Star) abilities during the Pre-Game
+ * Phase: the printed blue hexagram centred on a white disc.
  *
- * Drawn as two overlapping equilateral triangles in a single path with
- * `fillRule="evenodd"`, so the shared centre hexagon has winding count 2 and
- * renders hollow — matching the printed symbol rather than a solid star.
+ * The hexagram is the real asset rather than drawn geometry. Its interlaced
+ * form (hollow centre hexagon plus a hollow triangle inside each point) is not
+ * two filled triangles, and a canvas fill cannot express it — an earlier gold
+ * two-triangle approximation read as a solid star at badge size.
  *
- * Uses `currentColor` so callers tint it from the surrounding text colour
- * (gold #e8d5a3 / accent #c4955a in the play UI) instead of hard-coding a fill.
+ * The white disc is what makes it legible on card art, which runs from
+ * near-white title bands to dark illustration.
  *
- * The Konva canvas cannot mount this component; the equivalent on-card badge is
- * drawn with Konva primitives from STAR_OF_DAVID_POINTS below, so both surfaces
- * share one geometry definition.
+ * The Konva canvas cannot mount this component; the on-card badge draws the
+ * same disc-plus-image with Konva primitives from STAR_OF_DAVID_IMG below, so
+ * both surfaces share one asset.
  */
 
-/** Circumradius-11 hexagram points on a 24×24 grid, centre (12, 12). */
-export const STAR_OF_DAVID_UP_TRIANGLE = [12, 1, 21.53, 17.5, 2.47, 17.5] as const;
-export const STAR_OF_DAVID_DOWN_TRIANGLE = [12, 23, 2.47, 6.5, 21.53, 6.5] as const;
-/** Nominal viewBox edge the point sets above are expressed in. */
-export const STAR_OF_DAVID_VIEWBOX = 24;
+/** Public path of the hexagram asset — shared with the Konva on-card badge. */
+export const STAR_OF_DAVID_IMG = '/gameplay/star_of_david.webp';
+
+/** Hexagram width as a fraction of the disc diameter, both surfaces. */
+export const STAR_OF_DAVID_INSET = 0.72;
 
 export default function StarOfDavidIcon({
   size = 14,
@@ -33,21 +34,31 @@ export default function StarOfDavidIcon({
   style?: React.CSSProperties;
 }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${STAR_OF_DAVID_VIEWBOX} ${STAR_OF_DAVID_VIEWBOX}`}
-      fill="currentColor"
+    <span
       role={title ? 'img' : undefined}
+      aria-label={title}
       aria-hidden={title ? undefined : true}
-      focusable="false"
-      style={{ display: 'inline-block', verticalAlign: 'text-bottom', flexShrink: 0, ...style }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: '#ffffff',
+        flexShrink: 0,
+        verticalAlign: 'text-bottom',
+        ...style,
+      }}
     >
-      {title ? <title>{title}</title> : null}
-      <path
-        fillRule="evenodd"
-        d="M12 1 L21.53 17.5 L2.47 17.5 Z M12 23 L2.47 6.5 L21.53 6.5 Z"
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={STAR_OF_DAVID_IMG}
+        alt=""
+        width={Math.round(size * STAR_OF_DAVID_INSET)}
+        height={Math.round(size * STAR_OF_DAVID_INSET)}
+        style={{ display: 'block', objectFit: 'contain' }}
       />
-    </svg>
+    </span>
   );
 }
