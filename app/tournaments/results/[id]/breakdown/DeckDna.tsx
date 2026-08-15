@@ -76,7 +76,7 @@ export default function DeckDna({ breakdown }: { breakdown: TournamentBreakdown 
 
       <ul className="space-y-2">
         {decks.map((deck) => (
-          <li key={deck.deckId} className="rounded-xl bg-card px-4 py-3">
+          <li key={deck.participantId} className="rounded-xl bg-card px-4 py-3">
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               <div className="flex min-w-0 items-baseline gap-2">
                 <span className="text-sm font-semibold text-muted-foreground tabular-nums">
@@ -88,9 +88,11 @@ export default function DeckDna({ breakdown }: { breakdown: TournamentBreakdown 
                 >
                   {deck.playerName ?? "Unnamed"}
                 </Link>
-                {deck.alsoPlayedBy.length > 0 && (
-                  <span className="truncate text-xs text-muted-foreground">
-                    also {deck.alsoPlayedBy.join(", ")}
+                {/* Two players bringing one list is a real finding, not a
+                    duplicate row — call it out where it happens. */}
+                {deck.neighbors[0]?.similarity === 1 && (
+                  <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Same list as {deck.neighbors[0].playerName ?? "another player"}
                   </span>
                 )}
               </div>

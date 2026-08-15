@@ -26,18 +26,18 @@ export interface BreakdownCardInput {
 
 export interface BreakdownDeckInput {
   deckId: string;
+  /** Unique per entry — two players can bring the same deckId. */
+  participantId: string;
   playerName: string | null;
   place: number | null;
-  /** Other players linked to this same decklist. Usually empty. */
-  alsoPlayedBy?: string[];
   cards: BreakdownCardInput[];
 }
 
 export interface BreakdownDeck {
   deckId: string;
+  participantId: string;
   playerName: string | null;
   place: number | null;
-  alsoPlayedBy: string[];
   mainSize: number;
   reserveSize: number;
   lostSouls: number;
@@ -47,7 +47,12 @@ export interface BreakdownDeck {
   /** Share of the deck's distinct cards that are unique to it, 0–1. */
   spice: number;
   /** Closest decks by Jaccard overlap on distinct cards, nearest first. */
-  neighbors: { deckId: string; playerName: string | null; similarity: number }[];
+  neighbors: {
+    deckId: string;
+    participantId: string;
+    playerName: string | null;
+    similarity: number;
+  }[];
 }
 
 export interface BreakdownCard {
@@ -277,6 +282,7 @@ export function buildBreakdown(input: BreakdownDeckInput[]): TournamentBreakdown
         const union = keys.size + otherKeys.size - shared;
         return {
           deckId: other.deckId,
+          participantId: other.participantId,
           playerName: other.playerName,
           similarity: union === 0 ? 0 : shared / union,
         };
@@ -287,9 +293,9 @@ export function buildBreakdown(input: BreakdownDeckInput[]): TournamentBreakdown
 
     return {
       deckId: deck.deckId,
+      participantId: deck.participantId,
       playerName: deck.playerName,
       place: deck.place,
-      alsoPlayedBy: deck.alsoPlayedBy ?? [],
       mainSize: deckStats[index].mainSize,
       reserveSize: deckStats[index].reserveSize,
       lostSouls: deckStats[index].lostSouls,
