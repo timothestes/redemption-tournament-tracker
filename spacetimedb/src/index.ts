@@ -1117,18 +1117,6 @@ function schedulePregameIdleTimeout(ctx: any, gameId: bigint): void {
   });
 }
 
-function seatHoldsStarInHand(ctx: any, gameId: bigint, seat: Seat): boolean {
-  const player = [...ctx.db.Player.player_game_id.filter(gameId)]
-    .find((p: any) => p.seat === BigInt(seat));
-  if (!player) return false;
-  for (const card of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
-    if (card.ownerId === player.id && card.zone === 'hand' && isStarAbilityText(card.specialAbility)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 function seatControlsActivatableSoul(ctx: any, gameId: bigint, seat: Seat): boolean {
   const player = [...ctx.db.Player.player_game_id.filter(gameId)]
     .find((p: any) => p.seat === BigInt(seat));
@@ -1168,7 +1156,6 @@ function advancePregame(ctx: any, gameId: bigint): void {
   const firstSeat: Seat = game.currentTurn === 0n ? 0 : 1;
 
   const result = advancePregameFlow(step, firstSeat, readPregameProgress(state), {
-    hasStarInHand: (seat) => seatHoldsStarInHand(ctx, gameId, seat),
     controlsActivatableSoul: (seat) => seatControlsActivatableSoul(ctx, gameId, seat),
   });
 

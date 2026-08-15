@@ -5,7 +5,23 @@
  * one implementation and cannot diverge.
  *
  * REG order: the selected first player acts first in BOTH steps, then the
- * other seat. A seat with nothing to do is skipped server-side.
+ * other seat.
+ *
+ * The two steps treat "nothing to do" differently, and the difference is about
+ * hidden information rather than convenience:
+ *
+ * - Souls auto-skips. The Land of Bondage is face up, so both players can
+ *   already see whether a seat controls an activatable Lost Soul. Skipping
+ *   tells the opponent nothing they couldn't read off the board.
+ * - Stars does NOT. A hand is hidden, and an instantly-skipped star window
+ *   announces "no stars in that hand" by timing alone. So the window opens for
+ *   both seats every game and the client answers it — after a randomized pause
+ *   when the hand is empty, so the two cases look alike from across the table.
+ *   The client cannot fake this on its own: the opponent's view follows server
+ *   state, so the window has to genuinely open.
+ *
+ * An open star window is backstopped by the pre-game idle timeout, so a closed
+ * or disconnected client can't park the game on one.
  */
 
 export type Seat = 0 | 1;
@@ -19,8 +35,6 @@ export interface PregameProgress {
 }
 
 export interface PregameEligibility {
-  /** Does this seat hold at least one star card in hand? */
-  hasStarInHand(seat: Seat): boolean;
   /** Does this seat control at least one Lost Soul with ability text? */
   controlsActivatableSoul(seat: Seat): boolean;
 }
@@ -62,10 +76,8 @@ export function advancePregameFlow(
   if (step === 'stars') {
     for (const seat of order) {
       if (isDone(next, 'stars', seat)) continue;
-      if (eligibility.hasStarInHand(seat)) {
-        return { kind: 'await', step: 'stars', activeSeat: seat, progress: next };
-      }
-      next = markDone(next, 'stars', seat); // auto-skip: nothing to reveal
+      // Unconditional — an empty hand still gets a window. See the header.
+      return { kind: 'await', step: 'stars', activeSeat: seat, progress: next };
     }
   }
 

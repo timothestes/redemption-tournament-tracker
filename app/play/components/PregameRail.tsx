@@ -18,6 +18,7 @@
 // aligning to the battle band, not to the screen.) Both territories are empty
 // during the pre-game, so the centre of the board is free.
 
+import { useEffect, useRef, useState } from 'react';
 import {
   getEffectiveAbilities,
   abilityLabel,
@@ -67,6 +68,16 @@ const BODY: React.CSSProperties = {
   color: 'rgba(232, 213, 163, 0.92)',
   textWrap: 'balance',
 };
+
+// A hand with no stars has nothing to decide, so the panel eventually decides
+// for the player rather than parking the game on a one-button screen until they
+// happen to notice it. It deliberately does NOT submit on sight: the opponent
+// cannot see your hand, only how long you took, and an instant reveal would
+// announce "no stars" every single time. The wait is re-rolled per window inside
+// the range a real player's picking takes, so both cases look alike across the
+// table. Only the empty hand is on a timer — see `autoSubmits` below.
+const AUTO_SUBMIT_MIN_MS = 6000;
+const AUTO_SUBMIT_MAX_MS = 15000;
 
 const CHIP = (selected: boolean): React.CSSProperties => ({
   pointerEvents: 'auto',
@@ -131,6 +142,49 @@ export default function PregameRail({
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, onCardMouseEnter, onCardMouseLeave } =
     useModalCardHover(200, { setPreviewCard, isLoupeVisible, keepPreviewOnLeave: true });
+
+  // Only an empty hand auto-submits. A player holding stars is mid-decision, and
+  // a timer firing under them would throw away picks they'd already made.
+  const autoSubmits =
+    isMyWindow && step === 'stars' && !hasSubmitted && handStars.length === 0;
+
+  // One submit per window, whichever gets there first. `hasSubmitted` doesn't
+  // flip until the server answers, so without this the button and the timer can
+  // both fire during the reducer's round-trip.
+  const submitOnceRef = useRef(false);
+  const onSubmitStarsRef = useRef(onSubmitStars);
+  onSubmitStarsRef.current = onSubmitStars;
+  const submitStars = (ids: bigint[]) => {
+    if (submitOnceRef.current) return;
+    submitOnceRef.current = true;
+    onSubmitStarsRef.current(ids);
+  };
+
+  // Keyed on `autoSubmits` alone, so the delay is rolled once when the empty
+  // hand's window opens — depending on the callback would re-roll it (and extend
+  // the wait) every time a reconnect swapped the connection underneath.
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!autoSubmits) {
+      setSecondsLeft(null);
+      return;
+    }
+    const ms = AUTO_SUBMIT_MIN_MS + Math.random() * (AUTO_SUBMIT_MAX_MS - AUTO_SUBMIT_MIN_MS);
+    const deadline = Date.now() + ms;
+    setSecondsLeft(Math.ceil(ms / 1000));
+    const tick = setInterval(() => {
+      setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+    }, 250);
+    const fire = setTimeout(() => {
+      if (submitOnceRef.current) return;
+      submitOnceRef.current = true;
+      onSubmitStarsRef.current([]);
+    }, ms);
+    return () => {
+      clearInterval(tick);
+      clearTimeout(fire);
+    };
+  }, [autoSubmits]);
 
   // The whole wrapper is click-through; only chips and buttons opt back in.
   // Konva hit-tests on its own canvas, so this never blocks board interaction.
@@ -241,12 +295,17 @@ export default function PregameRail({
         )}
         <div style={{ display: 'flex', gap: 8 }}>
           {selection.length > 0 && (
-            <button style={ACTION} onClick={() => onSubmitStars(selection)}>
+            <button style={ACTION} onClick={() => submitStars(selection)}>
               Reveal {selection.length} star{selection.length === 1 ? '' : 's'}
             </button>
           )}
-          <button style={ACTION} onClick={() => onSubmitStars([])}>No stars</button>
+          <button style={ACTION} onClick={() => submitStars([])}>No stars</button>
         </div>
+        {secondsLeft !== null && (
+          <div style={{ ...BODY, fontSize: 11, color: 'rgba(232, 213, 163, 0.5)' }}>
+            Continuing automatically in {secondsLeft}s
+          </div>
+        )}
       </>,
     );
   }
