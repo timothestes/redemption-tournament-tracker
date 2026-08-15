@@ -147,11 +147,17 @@ export default function PregameRail({
   // `star` marks the headings that are about (Star) abilities — the same
   // hexagram the eligible cards wear in hand. The Lost Souls step never gets
   // it; that step isn't about stars.
+  //
+  // This is the panel's title, so it outranks the body copy below it — brighter
+  // and larger, not the dim 11px caption it started as. Tracking eases off as
+  // the size goes up: wide letterspacing buys legibility on small caps and costs
+  // it on large ones.
   const heading = (text: string, star = false) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6,
-                  fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase',
-                  color: 'rgba(232, 213, 163, 0.65)' }}>
-      {star && <StarOfDavidIcon size={13} />}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8,
+                  fontSize: 17, fontWeight: 600, letterSpacing: '0.08em',
+                  textTransform: 'uppercase', lineHeight: 1.2,
+                  color: '#e8d5a3' }}>
+      {star && <StarOfDavidIcon size={18} />}
       {text}
     </div>
   );
@@ -261,8 +267,9 @@ export default function PregameRail({
       {heading('Pre-Game Phase · Stars', true)}
       {/* The name only. The card's own text is a paragraph of small caps that
           dwarfed the panel, and the player is holding the card — they can read
-          it there, or hover it. */}
-      <div style={{ fontSize: 16, color: '#e8d5a3', lineHeight: 1.3 }}>
+          it there, or hover it. It stays a step above the heading: the heading
+          says where you are, this says what you're resolving. */}
+      <div style={{ fontSize: 20, color: '#e8d5a3', lineHeight: 1.3 }}>
         {current.cardName}
       </div>
       {abilities.length > 0 && (
