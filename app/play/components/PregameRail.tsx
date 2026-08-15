@@ -9,13 +9,13 @@
 // click-through DOM overlay never intercepts board clicks. Same technique as
 // BattleResolutionUI.tsx.
 //
-// The panel is centred in the player's own territory (virtualToScreen, same
-// idiom as BattleResolutionUI) rather than pinned to a viewport corner. That
-// zone is the only large area free in BOTH pre-game steps: the star step is
-// driven by clicking cards in the hand, and the souls step by right-clicking
-// souls in the Land of Bondage — the row directly above the hand — so anchoring
-// to either would cover the very cards the step asks the player to click. Both
-// territories are empty during the pre-game, in Standard and Paragon alike.
+// The panel floats in the middle of the board (virtualToScreen, same idiom as
+// BattleResolutionUI) rather than pinned to a viewport corner: its bottom edge
+// rests just above the seam between the two halves. Everything the pre-game
+// asks the player to click lives on their own half — star cards in the hand,
+// Lost Souls in the Land of Bondage directly above it — so the panel stays out
+// of that half entirely and settles into the empty opponent territory. See the
+// mount site in MultiplayerCanvas for why the seam is one rect in both formats.
 
 import {
   getEffectiveAbilities,
@@ -31,6 +31,9 @@ import type { ZoneRect } from '../layout/multiplayerLayout';
 // uses 600, which would float over that modal — deliberately not copied.
 const RAIL_Z = 450;
 
+/** Gap in virtual px between the panel's bottom edge and the board's seam. */
+const SEAM_CLEARANCE = 14;
+
 const PANEL: React.CSSProperties = {
   // The panel body itself stays click-through — only its chips and buttons opt
   // back in.
@@ -43,11 +46,26 @@ const PANEL: React.CSSProperties = {
   boxShadow: '0 6px 20px rgba(0, 0, 0, 0.6)',
   color: '#e8d5a3',
   fontFamily: 'var(--font-cinzel), Georgia, serif',
-  padding: '10px 12px',
-  maxWidth: 'min(560px, 46vw)',
+  padding: '14px 20px',
+  // Narrow enough that a sentence breaks into short, scannable lines.
+  width: 'max-content',
+  maxWidth: 'min(420px, 34vw)',
   display: 'flex',
   flexDirection: 'column',
-  gap: 8,
+  gap: 10,
+};
+
+// Prose. Cinzel has no true lowercase — every glyph is a capital — so it turns
+// instructions into a wall of caps that has to be read letter by letter. Georgia
+// carries the sentences; Cinzel stays on headings, names and buttons, the same
+// split BattleResolutionUI uses. `balance` evens the line lengths so a sentence
+// never strands one or two words on the last line.
+const BODY: React.CSSProperties = {
+  fontFamily: 'Georgia, serif',
+  fontSize: 14,
+  lineHeight: 1.5,
+  color: 'rgba(232, 213, 163, 0.92)',
+  textWrap: 'balance',
 };
 
 const CHIP = (selected: boolean): React.CSSProperties => ({
@@ -80,16 +98,18 @@ interface PregameRailProps {
   isMyWindow: boolean;
   opponentName: string;
   /** Star cards in my hand — the rail only needs to know whether I have any. */
-  handStars: Array<{ instanceId: bigint; cardName: string; specialAbility: string; imitatingName?: string }>;
+  handStars: Array<{ instanceId: bigint; cardName: string; imitatingName?: string }>;
   /** Submitted stars for the active seat, ascending by slot. */
-  queue: Array<{ starId: bigint; cardInstanceId: bigint; resolved: boolean; cardName: string; specialAbility: string; imitatingName?: string }>;
+  queue: Array<{ starId: bigint; cardInstanceId: bigint; resolved: boolean; cardName: string; imitatingName?: string }>;
   /** Lost Souls I control that carry ability text. */
   activatableSouls: Array<{ instanceId: bigint; cardName: string }>;
   /** True when I have submitted my star selection this window. */
   hasSubmitted: boolean;
   autoRouteLostSouls: boolean;
-  /** My territory zone (virtual coords) — the panel centres in it. */
-  territoryRect: ZoneRect;
+  /** Virtual x the panel centres on — the play area's midline. */
+  anchorX: number;
+  /** Virtual y the panel's BOTTOM edge rests above — the board's seam. */
+  anchorBottomY: number;
   scale: number;
   offsetX: number;
   offsetY: number;
@@ -105,15 +125,14 @@ interface PregameRailProps {
 
 export default function PregameRail({
   step, isMyWindow, opponentName, handStars, queue, activatableSouls,
-  hasSubmitted, autoRouteLostSouls, territoryRect, scale, offsetX, offsetY, selection,
+  hasSubmitted, autoRouteLostSouls, anchorX, anchorBottomY, scale, offsetX, offsetY, selection,
   onSubmitStars, onResolveStar, onFinishSouls, onExecuteAbility, onHighlightCard,
 }: PregameRailProps) {
-  // Anchor point = the centre of my territory. The panel is translated back by
-  // half its own size so it stays centred whatever the content's height.
+  // The panel is translated back by half its width and all of its height, so it
+  // stays centred on the midline with its bottom on the seam whatever the
+  // content's size — the star step's height changes as the queue advances.
   const anchor = virtualToScreen(
-    territoryRect.x + territoryRect.width / 2,
-    territoryRect.y + territoryRect.height / 2,
-    scale, offsetX, offsetY,
+    anchorX, anchorBottomY - SEAM_CLEARANCE, scale, offsetX, offsetY,
   );
 
   // The whole wrapper is click-through; only chips and buttons opt back in.
@@ -121,7 +140,7 @@ export default function PregameRail({
   const wrapper = (children: React.ReactNode) => (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: RAIL_Z }}>
       <div style={{ position: 'absolute', left: anchor.x, top: anchor.y,
-                    transform: 'translate(-50%, -50%)', ...PANEL }}>
+                    transform: 'translate(-50%, -100%)', ...PANEL }}>
         {children}
       </div>
     </div>
@@ -131,10 +150,10 @@ export default function PregameRail({
   // hexagram the eligible cards wear in hand. The Lost Souls step never gets
   // it; that step isn't about stars.
   const heading = (text: string, star = false) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5,
-                  fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase',
-                  color: 'rgba(232, 213, 163, 0.55)' }}>
-      {star && <StarOfDavidIcon size={12} />}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase',
+                  color: 'rgba(232, 213, 163, 0.65)' }}>
+      {star && <StarOfDavidIcon size={13} />}
       {text}
     </div>
   );
@@ -143,7 +162,7 @@ export default function PregameRail({
     return wrapper(
       <>
         {heading('Pre-Game Phase')}
-        <div style={{ fontSize: 12 }}>
+        <div style={BODY}>
           {step === 'stars'
             ? `Waiting for ${opponentName} to reveal stars…`
             : `Waiting for ${opponentName} to activate Lost Souls…`}
@@ -166,16 +185,16 @@ export default function PregameRail({
       <>
         {heading('Pre-Game Phase · Lost Souls')}
         {activatableSouls.length === 0 ? (
-          <div style={{ fontSize: 12 }}>
+          <div style={BODY}>
             {autoRouteLostSouls
               ? 'No Lost Souls with abilities to activate.'
               : 'Auto-routing is off — any Lost Souls you drew are still in your hand.'}
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 12 }}>
-              Activate abilities on the Lost Souls you control, then finish.
-              Right-click a soul for its abilities.
+            <div style={BODY}>
+              Right-click a Lost Soul you control to activate its ability, then
+              finish.
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {activatableSouls.map((s) => (
@@ -197,13 +216,13 @@ export default function PregameRail({
       <>
         {heading('Pre-Game Phase · Stars', true)}
         {handStars.length === 0 ? (
-          <div style={{ fontSize: 12 }}>No star cards in hand.</div>
+          <div style={BODY}>No star cards in hand.</div>
         ) : (
           // The picked cards carry a numbered gold badge in the hand itself, so
           // the panel no longer repeats them as name chips.
-          <div style={{ fontSize: 12 }}>
-            Click the star cards in your hand to reveal them. They resolve in the
-            order you pick them.
+          <div style={BODY}>
+            Click the star cards in your hand. They resolve in the order you
+            pick them.
           </div>
         )}
         <div style={{ display: 'flex', gap: 8 }}>
@@ -219,7 +238,7 @@ export default function PregameRail({
   }
 
   const current = queue.find((s) => !s.resolved);
-  if (!current) return wrapper(<>{heading('Pre-Game Phase · Stars', true)}<div style={{ fontSize: 12 }}>Resolving…</div></>);
+  if (!current) return wrapper(<>{heading('Pre-Game Phase · Stars', true)}<div style={BODY}>Resolving…</div></>);
 
   // Map the UNFILTERED ability list and disable out-of-zone entries. Both the
   // client dispatcher and the server index the full array, so filtering first
@@ -232,13 +251,11 @@ export default function PregameRail({
   return wrapper(
     <>
       {heading('Pre-Game Phase · Stars', true)}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6,
-                    fontSize: 13, color: '#e8d5a3' }}>
-        <StarOfDavidIcon size={13} />
+      {/* The name only. The card's own text is a paragraph of small caps that
+          dwarfed the panel, and the player is holding the card — they can read
+          it there, or hover it. */}
+      <div style={{ fontSize: 16, color: '#e8d5a3', lineHeight: 1.3 }}>
         {current.cardName}
-      </div>
-      <div style={{ fontSize: 11, color: 'rgba(232, 213, 163, 0.75)', lineHeight: 1.4 }}>
-        {current.specialAbility}
       </div>
       {abilities.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

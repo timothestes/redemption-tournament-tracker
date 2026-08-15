@@ -837,9 +837,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   const myHandRect = mpLayout?.zones.playerHand ?? null;
   const opponentHandRect = mpLayout?.zones.opponentHand ?? null;
-  // Anchor for the Pre-Game rail. Battle never overlaps the pre-game, so the
-  // plain territory rect is the right one in every format.
+  // Anchors for the Pre-Game rail: centred on the play area's midline, bottom
+  // edge resting on the seam between the two halves. `divider` is the seam in
+  // BOTH formats — Paragon collapses it to a zero-height rect sitting exactly
+  // at the shared Land of Bondage band's top edge, so the panel clears that
+  // band without a format branch. Battle never overlaps the pre-game.
   const myTerritoryRect = mpLayout?.zones.playerTerritory ?? null;
+  const pregameSeamY = mpLayout?.zones.divider.y ?? null;
 
   // Player-hand card dimensions: capped so the card bottom always stays
   // above the floating toolbar reserve. On narrow viewports the mainCard
@@ -1603,8 +1607,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const myHandStars = useMemo(() => (myCards['hand'] ?? [])
     .filter(c => isStarAbilityText(c.specialAbility))
     .map(c => ({
-      instanceId: c.id, cardName: c.cardName,
-      specialAbility: c.specialAbility, imitatingName: c.imitatingName,
+      instanceId: c.id, cardName: c.cardName, imitatingName: c.imitatingName,
     })), [myCards]);
 
   const myActivatableSouls = useMemo(() => (myCards['land-of-bondage'] ?? [])
@@ -1621,8 +1624,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         const card = findAnyCardById(String(s.cardInstanceId));
         return {
           starId: s.id, cardInstanceId: s.cardInstanceId, resolved: s.resolved,
-          cardName: card?.cardName ?? '', specialAbility: card?.specialAbility ?? '',
-          imitatingName: card?.imitatingName,
+          cardName: card?.cardName ?? '', imitatingName: card?.imitatingName,
         };
       });
   }, [gameState.pregameState, gameState.pregameStars, findAnyCardById]);
@@ -8657,7 +8659,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           here. The wrapper is pointer-events:none so the board, the
           toolbar and every modal stay fully interactive while it shows.
           ================================================================ */}
-      {pregameStep && !isSpectator && myTerritoryRect && (
+      {pregameStep && !isSpectator && myTerritoryRect && pregameSeamY !== null && (
         <PregameRail
           step={pregameStep}
           isMyWindow={myPregameWindow}
@@ -8667,10 +8669,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           activatableSouls={myActivatableSouls}
           hasSubmitted={myStarsSubmitted}
           autoRouteLostSouls={gameState.myPlayer?.autoRouteLostSouls ?? true}
-          // Centred in my (empty) territory: the hand holds the star cards to
-          // click and the Land of Bondage holds the souls to right-click, so
-          // the panel can sit over neither.
-          territoryRect={myTerritoryRect}
+          // Above the seam, off my own half entirely: the hand holds the star
+          // cards to click and the Land of Bondage the souls to right-click.
+          anchorX={myTerritoryRect.x + myTerritoryRect.width / 2}
+          anchorBottomY={pregameSeamY}
           scale={scale}
           offsetX={offsetX}
           offsetY={offsetY}
