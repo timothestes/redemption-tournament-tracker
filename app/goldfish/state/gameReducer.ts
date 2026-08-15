@@ -17,6 +17,7 @@ import {
   isNewTestamentLostSoul,
   isCharacterCard,
   isHeroCard,
+  hasReferenceBook,
 } from '@/lib/cards/cardAbilities';
 import { findCard } from '@/lib/cards/lookup';
 
@@ -515,6 +516,52 @@ function playAllLostSoulsInState(
     revealUntil: undefined,
   }));
   zones['land-of-bondage'] = [...zones['land-of-bondage'], ...moved];
+
+  return { ...state, zones, history };
+}
+
+function bandHeroesFromDeckInState(
+  state: GameState,
+  source: GameCard,
+  ability: Extract<CardAbility, { type: 'band_heroes_from_deck' }>,
+  history: GameState[],
+): GameState {
+  // Goldfish is single-seat, so the activator is always the source's owner —
+  // the same convention playAllLostSoulsInState uses just above. There's no
+  // Field of Battle here (app/goldfish/layout/zoneLayout.ts never renders one),
+  // so the band lands in Territory, the only free-form play area.
+  const ownerId = source.ownerId;
+  const heroes = state.zones.deck.filter(
+    c => c.ownerId === ownerId
+      && isHeroCard(c)
+      && hasReferenceBook(c.reference, ability.referenceBook),
+  );
+  if (heroes.length === 0) return state;
+
+  // Lay them out as a wrapped row rather than the diagonal cascade staggerSlots
+  // produces — a Genesis deck can put a dozen Heroes on the table at once, and
+  // a cascade would run them off the zone. Column/row pitch mirrors the canvas'
+  // own territory autogrid (CARD_WIDTH 120 plus a gap; rows overlap at roughly
+  // cardHeight * 0.35).
+  const COLS = 8;
+  const COL_W = 130;
+  const ROW_H = 62;
+  const BASE_X = 100;
+  const BASE_Y = 120;
+
+  const movingIds = new Set(heroes.map(c => c.instanceId));
+  const banded: GameCard[] = heroes.map((c, i) => ({
+    ...c,
+    zone: 'territory' as ZoneId,
+    isFlipped: false,
+    revealUntil: undefined,
+    posX: BASE_X + (i % COLS) * COL_W,
+    posY: BASE_Y + Math.floor(i / COLS) * ROW_H,
+  }));
+
+  const zones = cloneZones(state.zones);
+  zones.deck = zones.deck.filter(c => !movingIds.has(c.instanceId));
+  zones.territory = [...zones.territory, ...banded];
 
   return { ...state, zones, history };
 }
@@ -1530,6 +1577,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return setCardOutlineInState(state, source, ability, history);
         case 'play_all_lost_souls':
           return playAllLostSoulsInState(state, source, history);
+        case 'band_heroes_from_deck':
+          return bandHeroesFromDeckInState(state, source, ability, history);
         case 'draw_brigades':
           // Reads the opponent's revealed hand — meaningless in single-player
           // goldfish. Dispatched client-side in multiplayer. No-op here.

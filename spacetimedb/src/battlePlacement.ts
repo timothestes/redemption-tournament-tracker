@@ -47,6 +47,41 @@ function collides(a: Pos, taken: Pos[]): boolean {
  * The scan is capped so a pathologically full board can't loop forever; past
  * the cap it falls back to the last raw grid cell tried.
  */
+// ── Mass-band row (band_heroes_from_deck) ──────────────────────────────────
+// Creation of the World drops a whole deck's worth of Genesis Heroes into the
+// Field of Battle at once. Unlike the auto-return fan above, this lands in the
+// 'battle' band — a strip barely taller than one card — so the group is a
+// single horizontal row, packed tight against the RIGHT end of the band. The
+// left portion stays clear rather than the arrivals spreading edge to edge and
+// swamping the band.
+
+/** Left-most anchor a banded Hero may take. */
+export const BAND_LEFT_EDGE = 0.02;
+/** Right-most anchor a banded Hero may take — one card width shy of the edge,
+ *  so the card body stays inside the band. */
+export const BAND_RIGHT_EDGE = 0.93;
+/** Comfortable centre-to-centre spacing: one card width (~0.065 of the band's
+ *  width at the reference layout) plus a hair of gap. */
+export const BAND_PITCH = 0.075;
+/** Vertical anchor for the row, in the activator's own coordinate frame. */
+export const BAND_ROW_Y = 0.05;
+
+/**
+ * X anchors for `count` cards packed tight against the right end of the band,
+ * in reading order (index 0 is left-most, the last index sits on
+ * BAND_RIGHT_EDGE). Uses the comfortable pitch when the group fits and
+ * compresses into an overlapping fan when it doesn't, so a 20-Hero band never
+ * runs off the left edge.
+ */
+export function bandRowSlots(count: number): number[] {
+  if (count <= 0) return [];
+  if (count === 1) return [BAND_RIGHT_EDGE];
+  const available = BAND_RIGHT_EDGE - BAND_LEFT_EDGE;
+  const pitch = Math.min(BAND_PITCH, available / (count - 1));
+  const startX = BAND_RIGHT_EDGE - (count - 1) * pitch;
+  return Array.from({ length: count }, (_, i) => startX + i * pitch);
+}
+
 export function makeFreeSpotAllocator(occupied: Pos[] = []): () => Pos {
   const taken: Pos[] = [...occupied];
   let i = 0;

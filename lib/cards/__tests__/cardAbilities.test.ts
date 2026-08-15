@@ -16,14 +16,17 @@ import {
   isNewTestamentLostSoul,
   isCharacterCard,
   isHeroCard,
+  hasReferenceBook,
   getEffectiveAbilities,
   hasUsableAbilityInZone,
 } from '../cardAbilities';
+import { CARDS } from '../lookup';
 import {
   IMITATE_SOUL_IMAGES as serverImitateImages,
   IMITATE_ORIGINAL_IMG,
   isNewTestamentLostSoul as serverIsNewTestamentLostSoul,
   isHeroCard as serverIsHeroCard,
+  hasReferenceBook as serverHasReferenceBook,
 } from '@/spacetimedb/src/cardAbilities';
 
 describe('CARD_ABILITIES registry', () => {
@@ -213,6 +216,57 @@ describe('isHeroCard', () => {
     for (const s of samples) {
       expect(serverIsHeroCard(s)).toBe(isHeroCard(s));
     }
+  });
+});
+
+describe('hasReferenceBook', () => {
+  it('matches the leading book of a reference, case- and space-insensitively', () => {
+    expect(hasReferenceBook('Genesis 2:7', 'Genesis')).toBe(true);
+    expect(hasReferenceBook('  genesis 49:27 ', 'Genesis')).toBe(true);
+    expect(hasReferenceBook('Genesis 17:4-5', 'Genesis')).toBe(true);
+  });
+
+  it('rejects other books and empty input', () => {
+    expect(hasReferenceBook('I Samuel 17:50', 'Genesis')).toBe(false);
+    expect(hasReferenceBook('Revelation 12:9', 'Genesis')).toBe(false);
+    expect(hasReferenceBook('', 'Genesis')).toBe(false);
+    expect(hasReferenceBook('Genesis 1:1', '')).toBe(false);
+  });
+
+  it('lib and spacetimedb copies behave identically', () => {
+    const samples: Array<[string, string]> = [
+      ['Genesis 2:7', 'Genesis'], ['I Samuel 17:50', 'Genesis'], ['', 'Genesis'], ['Genesis 1:1', ''],
+    ];
+    for (const [ref, book] of samples) {
+      expect(serverHasReferenceBook(ref, book)).toBe(hasReferenceBook(ref, book));
+    }
+  });
+});
+
+describe('band_heroes_from_deck — Creation of the World', () => {
+  it('is registered on the Patriarchs printing only', () => {
+    // "Creation of the World (Roots)" is a different card — blue, "each player
+    // may play up to 3 animals, O.T. angels and/or Genesis humans".
+    expect(CARD_ABILITIES['Creation of the World'])
+      .toEqual([{ type: 'band_heroes_from_deck', referenceBook: 'Genesis' }]);
+    expect(CARD_ABILITIES['Creation of the World (Roots)']).toBeUndefined();
+  });
+
+  it('the referenceBook matches real Genesis Heroes and nothing else', () => {
+    // Guards the predicate against a carddata reformat: if references ever stop
+    // leading with the book, or the Hero type strings change, this goes red.
+    const matches = CARDS.filter(c => isHeroCard(c) && hasReferenceBook(c.reference, 'Genesis'));
+    expect(matches.length).toBeGreaterThan(50);
+    expect(matches.some(c => c.name === 'Adam')).toBe(true);
+    expect(matches.some(c => c.name.startsWith('Melchizedek'))).toBe(true);
+    expect(matches.every(c => c.reference.toLowerCase().startsWith('genesis'))).toBe(true);
+    // The card itself is a Good Enhancement, so it can never band itself.
+    expect(matches.some(c => c.name === 'Creation of the World')).toBe(false);
+  });
+
+  it('labels the menu item with the book it pulls', () => {
+    expect(abilityLabel({ type: 'band_heroes_from_deck', referenceBook: 'Genesis' }))
+      .toBe('Band all Genesis Heroes from deck into battle');
   });
 });
 

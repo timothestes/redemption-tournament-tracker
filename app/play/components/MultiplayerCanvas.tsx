@@ -52,7 +52,7 @@ import type { GameActions, TargetingRequest, CountPromptRequest } from '@/app/sh
 import { CountPromptDialog } from '@/app/shared/components/CountPromptDialog';
 import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
 import { KeepOneModal } from '@/app/shared/components/KeepOneModal';
-import { isHeroCard } from '@/lib/cards/cardAbilities';
+import { isHeroCard, hasReferenceBook } from '@/lib/cards/cardAbilities';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
@@ -2102,6 +2102,38 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     }
                   }
                 }
+                return true;
+              },
+            });
+          }
+        }
+        gameState.executeCardAbility(sourceInstanceId, abilityIndex);
+        return;
+      }
+      if (ability?.type === 'band_heroes_from_deck') {
+        // Capture the Heroes the server is about to pull so undo can put them
+        // back. Same predicate as bandHeroesFromDeckImpl, over MY deck — the
+        // effect always follows the activator, and the activator is us.
+        if (undoStack) {
+          const ids = (myCards['deck'] ?? [])
+            .filter(c => isHeroCard(c) && hasReferenceBook(c.reference, ability.referenceBook))
+            .map(c => c.id);
+          if (ids.length > 0) {
+            const sourceName = source?.cardName ?? 'card';
+            undoStack.push({
+              description: `Banded ${ids.length} ${ability.referenceBook} Heroes via ${sourceName}`,
+              reverseAction: () => {
+                // Guard per Hero: skip any that has since been deleted. All
+                // share one owner and one destination, so — as in the
+                // play_all_lost_souls reverse above — move all but the last
+                // with moveCard and let shuffleCardIntoDeck handle the final
+                // one, which reshuffles the deck exactly once.
+                const safe = ids.filter(id => reverseIsSafe(lookupForUndo(String(id))));
+                if (safe.length === 0) return false;
+                for (let i = 0; i < safe.length - 1; i++) {
+                  gameState.moveCard(safe[i], 'deck');
+                }
+                gameState.shuffleCardIntoDeck(safe[safe.length - 1]);
                 return true;
               },
             });

@@ -497,6 +497,30 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       );
     } catch { /* fall through */ }
   }
+  if (actionType === 'BAND_HEROES_FROM_DECK' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = Number(data.count ?? 0);
+      const book: string = data.referenceBook ?? '';
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const cards: { name: string; img: string }[] = Array.isArray(data.cards) ? data.cards : [];
+      const noun = count === 1 ? 'Hero' : 'Heroes';
+      // Banded Heroes land face-up in the Field of Battle, so the list is
+      // public — no viewer-only gate like the deck-peek entries above.
+      return (
+        <>
+          banded {count} {book ? `${book} ` : ''}{noun} from deck into battle
+          {cards.length > 0 ? <>: <CardNameList cards={cards} /></> : null}
+          {sourceName ? (
+            <>
+              {' '}via <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
   if (actionType === 'RESURRECT_HEROES' && payload) {
     try {
       const data = JSON.parse(payload);

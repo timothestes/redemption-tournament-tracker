@@ -679,3 +679,60 @@ describe('three_nails_reset source zone', () => {
     }
   });
 });
+
+describe('band_heroes_from_deck — Creation of the World', () => {
+  const act = (cardInstanceId: string, abilityIndex: number): GameAction =>
+    gameActions.executeCardAbility(cardInstanceId, abilityIndex);
+
+  const genesisHero = (id: string, reference = 'Genesis 2:7') =>
+    makeCard({ instanceId: id, cardName: `Hero ${id}`, type: 'Hero', reference, zone: 'deck', isFlipped: true });
+
+  it('bands every Genesis Hero out of the deck (goldfish has no battle zone, so: Territory)', () => {
+    const source = makeCard({ instanceId: 'cotw', cardName: 'Creation of the World', type: 'GE', zone: 'territory' });
+    const state = makeState([
+      source,
+      genesisHero('adam', 'Genesis 2:7'),
+      genesisHero('eve', 'Genesis 3:20'),
+      makeCard({ instanceId: 'david', cardName: 'David', type: 'Hero', reference: 'I Samuel 17:50', zone: 'deck' }),
+      makeCard({ instanceId: 'ge', cardName: 'Some Enhancement', type: 'GE', reference: 'Genesis 1:1', zone: 'deck' }),
+    ]);
+
+    const next = gameReducer(state, act('cotw', 0));
+
+    expect(next.zones.territory.map(c => c.instanceId).sort()).toEqual(['adam', 'cotw', 'eve']);
+    // Non-Genesis Hero and the Genesis non-Hero both stay put.
+    expect(next.zones.deck.map(c => c.instanceId).sort()).toEqual(['david', 'ge']);
+  });
+
+  it('turns the banded Heroes face up and lays them out in a wrapped row', () => {
+    const source = makeCard({ instanceId: 'cotw', cardName: 'Creation of the World', type: 'GE', zone: 'territory' });
+    const heroes = Array.from({ length: 10 }, (_, i) => genesisHero(`h${i}`));
+    const next = gameReducer(makeState([source, ...heroes]), act('cotw', 0));
+
+    const banded = next.zones.territory.filter(c => c.instanceId !== 'cotw');
+    expect(banded).toHaveLength(10);
+    expect(banded.every(c => c.isFlipped === false)).toBe(true);
+    // 8 per row: the 9th wraps back to the first column on a new row.
+    expect(banded[0].posX).toBe(banded[8].posX);
+    expect(banded[8].posY).toBeGreaterThan(banded[0].posY!);
+    // No two Heroes share a slot.
+    const slots = new Set(banded.map(c => `${c.posX},${c.posY}`));
+    expect(slots.size).toBe(10);
+  });
+
+  it('leaves state untouched when the deck holds no Genesis Heroes', () => {
+    const source = makeCard({ instanceId: 'cotw', cardName: 'Creation of the World', type: 'GE', zone: 'territory' });
+    const state = makeState([
+      source,
+      makeCard({ instanceId: 'david', cardName: 'David', type: 'Hero', reference: 'I Samuel 17:50', zone: 'deck' }),
+    ]);
+
+    expect(gameReducer(state, act('cotw', 0))).toBe(state);
+  });
+
+  it('only the Patriarchs printing is registered — the Roots card is a different effect', () => {
+    expect(getEffectiveAbilities({ cardName: 'Creation of the World' }))
+      .toEqual([{ type: 'band_heroes_from_deck', referenceBook: 'Genesis' }]);
+    expect(getEffectiveAbilities({ cardName: 'Creation of the World (Roots)' })).toEqual([]);
+  });
+});

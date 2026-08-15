@@ -72,6 +72,15 @@ export type CardAbility = AbilityBase & (
   | { type: 'discard_characters_from_reserve'; target: 'self' | 'opponent' }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
   | { type: 'play_all_lost_souls' }
+  // Creation of the World: "Take all Heroes having a Genesis reference out of
+  // your draw pile and band them into the Field of Battle." `referenceBook` is
+  // matched against the Hero's printed reference (see hasReferenceBook).
+  // "Your" draw pile is the ACTIVATOR's, matching every other ability here —
+  // execute_card_ability deliberately doesn't enforce ownership, so effects
+  // route to whoever fired the menu item. Lands in the 'battle' band in
+  // multiplayer (opening it if closed, exactly as a manual drag does);
+  // goldfish has no battle zone, so it bands into Territory instead.
+  | { type: 'band_heroes_from_deck'; referenceBook: string }
   | { type: 'three_nails_reset' }
   | { type: 'imitate_lost_soul' }
   | { type: 'draw_and_topdeck_self' }
@@ -214,6 +223,9 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Three Woes [Fundraiser - Serialized]':                [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
   'Harvest Time (GoC)':                                  [{ type: 'play_all_lost_souls' }],
   'Harvest Time [Fundraiser]':                           [{ type: 'play_all_lost_souls' }],
+  // The Patriarchs (green) printing only — "Creation of the World (Roots)" is a
+  // different card (blue, "each player may play up to 3 …") and stays unregistered.
+  'Creation of the World':                               [{ type: 'band_heroes_from_deck', referenceBook: 'Genesis' }],
   'Three Nails (GoC)':                                   [{ type: 'three_nails_reset' }],
   // "If it is your turn banish this card: Shuffle all cards in play, set-aside,
   // and hands. Each player must draw 8. Begin a new turn." Same board reset as
@@ -595,6 +607,19 @@ export function isCharacterCard(card: { type?: string; cardType?: string }): boo
 export function isHeroCard(card: { type?: string; cardType?: string }): boolean {
   const t = (card.type ?? card.cardType ?? '').toLowerCase();
   return t.includes('hero');
+}
+
+/**
+ * True when a card's printed reference cites `book` — the match rule for
+ * band_heroes_from_deck ("Heroes having a Genesis reference"). Every reference
+ * in carddata leads with its book ("Genesis 2:7", "I Samuel 17:50"), and no
+ * card cites Genesis anywhere but first, so a prefix test on the trimmed,
+ * lowercased string is exact here and can't be fooled by a chapter:verse.
+ * Duplicate of lib/cards/cardAbilities.ts.
+ */
+export function hasReferenceBook(reference: string, book: string): boolean {
+  if (!reference || !book) return false;
+  return reference.trim().toLowerCase().startsWith(book.trim().toLowerCase());
 }
 
 export interface TokenCardData {
