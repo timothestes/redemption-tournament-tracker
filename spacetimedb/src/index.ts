@@ -1696,6 +1696,12 @@ export const respond_rematch = spacetimedb.reducer(
         playingStartedAtMicros: 0n,
       });
 
+      // Phase Stops: rematch reuses the same gameId (in-place reset), so the
+      // stop/hold rows must be cleared here or a hold stranded by a mid-hold
+      // concede/win wedges the next game (spec §6.6, E11). This is what
+      // enforces "all stops off each game."
+      clearStopHoldRows(ctx, gameId);
+
       logAction(ctx, gameId, player.id, 'REMATCH_STARTED',
         JSON.stringify({ result0: r0, result1: r1, winner }),
         0n, 'pregame');
@@ -2542,6 +2548,7 @@ export const cleanup_stale_games = spacetimedb.reducer(
           ctx.db.Game.id.update({ ...game, status: 'finished' });
           // A game abandoned during the star/soul steps is still 'playing'.
           clearPregameRows(ctx, game.id);
+          clearStopHoldRows(ctx, game.id);
         }
         continue;
       }
@@ -2574,6 +2581,7 @@ export const cleanup_stale_games = spacetimedb.reducer(
         ctx.db.Player.id.delete(player.id);
       }
       clearPregameRows(ctx, gameId);
+      clearStopHoldRows(ctx, gameId);
       ctx.db.Game.id.delete(gameId);
     }
   }
