@@ -1825,6 +1825,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onRequestPause={handleRequestPause}
             onRequestResume={handleRequestResume}
             onCancelPauseRequest={handleCancelPauseRequest}
+            myStops={gameState.myStops}
+            holdPhase={gameState.holdPhase}
+            holdDeadlineMicros={gameState.holdDeadlineMicros}
+            onToggleStop={gameState.setTurnStop}
+            onReleaseStop={gameState.releaseTurnStop}
           />
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1856,6 +1861,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             } satisfies GameActions}
             mode="multiplayer"
             isMyTurn={gameState.isMyTurn}
+            isTurnHeld={gameState.holdPhase !== ''}
             isSpreadHand={isSpreadHand}
             onToggleSpreadHand={toggleSpreadHand}
             deckCount={gameState.myCards['deck']?.length ?? 0}

@@ -140,6 +140,10 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   RESOLVE_BATTLE: 'resolved the battle',
   SURRENDER_SOUL: 'gave up a lost soul',
   BATTLE_END: 'ended the battle',
+  // Phase Stops — payloads rendered in formatActionType; these are the
+  // parse-failure fallbacks.
+  STOP_HOLD: 'stopped the turn',
+  STOP_RELEASE: 'passed',
 };
 
 function HoverableCard({ name, img }: { name: string; img?: string }) {
@@ -174,6 +178,22 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       return `rolled a d${data.sides} → ${data.result}`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'STOP_HOLD' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const label = typeof data.phase === 'string' && data.phase
+        ? data.phase.charAt(0).toUpperCase() + data.phase.slice(1)
+        : 'a phase';
+      return `⏸ stopped the turn at ${label}`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'STOP_RELEASE' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.reason === 'timeout') return '▶ stop timed out — turn resumes';
+      return '▶ passed — turn resumes';
     } catch { /* fall through */ }
   }
   if (actionType === 'GAME_STARTED' && payload) {

@@ -60,6 +60,10 @@ export interface GameToolbarProps {
   onSendEmote?: (kind: string) => void;
   /** Game is finished — keep toolbar active for review but disable end turn. */
   isFinished?: boolean;
+  /** Phase Stops: a hold is freezing turn progression (multiplayer only).
+   *  Disables End Turn for the active player and hides Priority for the
+   *  holder — requesting a window you already hold is noise. */
+  isTurnHeld?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +91,7 @@ export function GameToolbar({
   onPassInitiative,
   onSendEmote,
   isFinished,
+  isTurnHeld,
 }: GameToolbarProps) {
   const isMultiplayer = mode === 'multiplayer';
   const disabled = isMultiplayer && !isMyTurn && !isFinished;
@@ -205,8 +210,9 @@ export function GameToolbar({
       label: 'End Turn',
       onClick: onEndTurn ?? (() => {}),
       shortcut: '',
+      disabled: !!isTurnHeld,
       pushRight: true,
-    }] : isMultiplayer && !isMyTurn && !isFinished ? [{
+    }] : isMultiplayer && !isMyTurn && !isFinished && !isTurnHeld ? [{
       icon: Hand,
       key: 'priority',
       label: 'Priority',
