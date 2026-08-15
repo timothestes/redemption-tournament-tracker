@@ -16,6 +16,7 @@ import {
   isNewTestamentLostSoul,
   isCharacterCard,
   isHeroCard,
+  hasReferenceBook,
   simplifyLostSoulName,
   type CardAbility,
 } from './cardAbilities';
@@ -5023,6 +5024,107 @@ function playAllLostSoulsImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: bandHeroesFromDeckImpl
+// Creation of the World: "Take all Heroes having a Genesis reference out of
+// your draw pile and band them into the Field of Battle." Pulls from the
+// ACTIVATOR's deck — execute_card_ability deliberately doesn't enforce
+// ownership, so the effect follows whoever fired the menu item — and sends
+// every match into the battle band in one transaction. Opening a closed band
+// mirrors enter_battle exactly (attacker is whoever's turn it is, not the
+// activator), so this is indistinguishable from dragging the Heroes in by
+// hand. Deck zoneIndex gaps are left behind, same as playAllLostSoulsImpl.
+// ---------------------------------------------------------------------------
+
+// Band row geometry, in the owner-relative normalized units posX/posY store
+// (app/play/utils/coordinateTransforms.ts). The band is only ~1.5 card heights
+// tall, so the whole effect is one horizontal row on the activator's half.
+// BAND_CARD_W is a card's width as a fraction of the band's width at the
+// reference layout (~98 / ~1500).
+const BAND_CARD_W = 0.065;
+const BAND_ROW_Y = 0.05;
+const BAND_RIGHT_EDGE = 0.93;
+
+/** Evenly spaced x slots for `count` cards starting at `startX`. Uses a
+ *  comfortable one-card pitch when there's room and compresses into an
+ *  overlapping fan when there isn't, so a big band never runs off the edge. */
+function bandRowSlots(startX: number, count: number): number[] {
+  const span = Math.max(BAND_RIGHT_EDGE - startX, 0);
+  const step = count > 1 ? Math.min(BAND_CARD_W + 0.01, span / (count - 1)) : 0;
+  return Array.from({ length: count }, (_, i) => startX + i * step);
+}
+
+function bandHeroesFromDeckImpl(
+  ctx: any,
+  source: any,
+  ability: Extract<CardAbility, { type: 'band_heroes_from_deck' }>,
+  player: any,
+  gameId: bigint,
+) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+  if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+  // Same battle-state gate enter_battle applies to a manual drag.
+  if (game.battleState === 'awaiting-soul') {
+    throw new SenderError('Battle is resolving a soul surrender');
+  }
+
+  const myCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    (c: any) => c.ownerId === player.id,
+  );
+  // Deck order preserved so the band reads the way the deck was stacked.
+  const heroes = myCards
+    .filter((c: any) =>
+      c.zone === 'deck'
+      && isHeroCard({ cardType: c.cardType })
+      && hasReferenceBook(c.reference, ability.referenceBook))
+    .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+  if (heroes.length === 0) return;
+
+  // Start to the right of whatever the activator already has in the band so an
+  // existing band isn't buried under the new arrivals.
+  let startX = 0.03;
+  for (const c of myCards) {
+    if (c.zone !== 'battle') continue;
+    const x = Number(c.posX);
+    if (Number.isFinite(x)) startX = Math.max(startX, x + BAND_CARD_W + 0.01);
+  }
+  startX = Math.min(startX, BAND_RIGHT_EDGE);
+  const slots = bandRowSlots(startX, heroes.length);
+
+  if (game.battleState === '') {
+    ctx.db.Game.id.update({
+      ...game,
+      battleState: 'active',
+      battleAttackerSeat: game.currentTurn.toString(),
+      lastBattlePlayBySeat: '',
+    });
+  }
+
+  const banded: { name: string; img: string }[] = [];
+  for (let i = 0; i < heroes.length; i++) {
+    const hero = heroes[i];
+    writeBattleEntryMove(ctx, gameId, hero, String(slots[i]), String(BAND_ROW_Y));
+    banded.push({ name: hero.cardName, img: hero.cardImgFile });
+  }
+
+  // Re-read: the open above and every writeBattleEntryMove's stampBattleEntry
+  // wrote the Game row, so the `game` snapshot is stale by now.
+  const latest = ctx.db.Game.id.find(gameId);
+  logAction(
+    ctx, gameId, player.id, 'BAND_HEROES_FROM_DECK',
+    JSON.stringify({
+      sourceCardName: source.cardName,
+      sourceCardImgFile: source.cardImgFile,
+      referenceBook: ability.referenceBook,
+      count: banded.length,
+      cards: banded,
+    }),
+    latest ? latest.turnNumber : game.turnNumber,
+    latest ? latest.currentPhase : game.currentPhase,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Helper: discardCharactersFromReserveImpl
 // Called by execute_card_ability when ability.type === 'discard_characters_from_reserve'.
 // Discards every character (Hero / Evil Character) from the chosen player's
@@ -5217,6 +5319,8 @@ export const execute_card_ability = spacetimedb.reducer(
         return setCardOutlineImpl(ctx, source, ability, player, gameId);
       case 'play_all_lost_souls':
         return playAllLostSoulsImpl(ctx, source, player, gameId);
+      case 'band_heroes_from_deck':
+        return bandHeroesFromDeckImpl(ctx, source, ability, player, gameId);
       case 'draw_and_topdeck_self':
         return drawAndTopdeckSelfImpl(ctx, source, player, gameId);
       case 'draw_brigades':
