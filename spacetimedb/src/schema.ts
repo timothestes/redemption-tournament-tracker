@@ -592,6 +592,54 @@ export const PregameIdleTimeout = table(
 );
 
 // ---------------------------------------------------------------------------
+// 20. TurnStop — Phase Stops (opponent-turn priority stops). One row per game,
+//     inserted lazily on the first set_turn_stop call — absence of a row means
+//     "no stops, no hold". Deliberately a separate table, NOT Game columns:
+//     adding a column would change the game row's BSATN shape and break
+//     deployed clients' subscriptions during the publish window (cf. ForgeGame
+//     / PregameState above). See
+//     docs/superpowers/specs/2026-08-15-phase-stops-design.md.
+// ---------------------------------------------------------------------------
+export const TurnStop = table(
+  { name: 'turn_stop', public: true },
+  {
+    gameId: t.u64().primaryKey(),
+    seat0Stops: t.string().default(''),  // csv of phases seat 0 stops on (fires during seat 1's turn)
+    seat1Stops: t.string().default(''),  // csv of phases seat 1 stops on (fires during seat 0's turn)
+    holdPhase: t.string().default(''),   // '' | phase currently holding the turn
+    firedPhases: t.string().default(''), // csv of phases whose stop already fired this turn; reset at turn flip
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 21. StopHoldTimeout (scheduled table) — 60s liveness backstop for a hold.
+//     At most one row per game (delete-then-insert arming). `phase` is a
+//     stale-row guard: the handler no-ops unless it matches the live holdPhase.
+// ---------------------------------------------------------------------------
+
+let _handleStopHoldTimeout: any;
+export const setStopHoldTimeoutReducer = (reducer: any) => {
+  _handleStopHoldTimeout = reducer;
+};
+
+export const StopHoldTimeout = table(
+  {
+    name: 'stop_hold_timeout',
+    public: true,
+    scheduled: () => _handleStopHoldTimeout,
+    indexes: [
+      { accessor: 'stop_hold_timeout_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+    ],
+  },
+  {
+    scheduledId: t.u64().primaryKey().autoInc(),
+    scheduledAt: t.scheduleAt(),
+    gameId: t.u64(),
+    phase: t.string(),
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Schema export
 // ---------------------------------------------------------------------------
 const spacetimedb = schema({
@@ -617,6 +665,8 @@ const spacetimedb = schema({
   PregameState,
   PregameStar,
   PregameIdleTimeout,
+  TurnStop,
+  StopHoldTimeout,
 });
 
 export default spacetimedb;
