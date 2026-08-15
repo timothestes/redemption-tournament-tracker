@@ -9,20 +9,18 @@
 // click-through DOM overlay never intercepts board clicks. Same technique as
 // BattleResolutionUI.tsx.
 //
-// The panel floats in the middle of the board (virtualToScreen, same idiom as
-// BattleResolutionUI) rather than pinned to a viewport corner: its bottom edge
-// rests just above the seam between the two halves. Everything the pre-game
-// asks the player to click lives on their own half — star cards in the hand,
-// Lost Souls in the Land of Bondage directly above it — so the panel stays out
-// of that half entirely and settles into the empty opponent territory. See the
-// mount site in MultiplayerCanvas for why the seam is one rect in both formats.
+// Placement copies AwaitingSoulUI in BattleResolutionUI.tsx, the play UI's house
+// idiom for a mid-board panel: dead centre vertically (`top: 50%`), and
+// horizontally on `centerX` — the play mat's midline in screen px, passed in by
+// the mount site. Not the viewport's midline: the sidebar piles and the chat
+// column both live on the right, so viewport centring sits visibly right of the
+// board. Both territories are empty during the pre-game, so the centre is free.
 
 import {
   getEffectiveAbilities,
   abilityLabel,
   DEFAULT_ABILITY_SOURCE_ZONES,
 } from '@/lib/cards/cardAbilities';
-import { virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { useModalCardHover, ModalCardHoverPreview } from '@/app/shared/components/ModalCardHoverPreview';
 import StarOfDavidIcon from './StarOfDavidIcon';
@@ -32,27 +30,26 @@ import StarOfDavidIcon from './StarOfDavidIcon';
 // uses 600, which would float over that modal — deliberately not copied.
 const RAIL_Z = 450;
 
-/** Gap in virtual px between the panel's bottom edge and the board's seam. */
-const SEAM_CLEARANCE = 14;
-
+// Chrome copied from AwaitingSoulUI's panel so the two read as the same object
+// in the same place. A fixed width also means the panel doesn't resize under the
+// cursor as the star queue advances.
 const PANEL: React.CSSProperties = {
   // The panel body itself stays click-through — only its chips and buttons opt
   // back in.
   pointerEvents: 'none',
-  textAlign: 'center',
-  alignItems: 'center',
-  background: 'rgba(10, 8, 5, 0.94)',
-  border: '1px solid rgba(196, 149, 90, 0.45)',
-  borderRadius: 6,
-  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.6)',
+  background: 'rgba(14, 10, 6, 0.97)',
+  border: '1px solid rgba(107, 78, 39, 0.3)',
+  borderRadius: 10,
+  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.5)',
   color: '#e8d5a3',
   fontFamily: 'var(--font-cinzel), Georgia, serif',
-  padding: '14px 20px',
-  // Narrow enough that a sentence breaks into short, scannable lines.
-  width: 'max-content',
-  maxWidth: 'min(420px, 34vw)',
+  padding: '20px 24px',
+  textAlign: 'center',
+  maxWidth: 420,
+  width: '90vw',
   display: 'flex',
   flexDirection: 'column',
+  alignItems: 'center',
   gap: 10,
 };
 
@@ -107,13 +104,8 @@ interface PregameRailProps {
   /** True when I have submitted my star selection this window. */
   hasSubmitted: boolean;
   autoRouteLostSouls: boolean;
-  /** Virtual x the panel centres on — the play area's midline. */
-  anchorX: number;
-  /** Virtual y the panel's BOTTOM edge rests above — the board's seam. */
-  anchorBottomY: number;
-  scale: number;
-  offsetX: number;
-  offsetY: number;
+  /** The play mat's horizontal midline in screen px. */
+  centerX: number;
   /** Star cards I've clicked in hand, in pick order. Owned by MultiplayerCanvas
    *  so the hand's order badges and this panel's submit button agree. */
   selection: bigint[];
@@ -126,7 +118,7 @@ interface PregameRailProps {
 
 export default function PregameRail({
   step, isMyWindow, opponentName, handStars, queue, activatableSouls,
-  hasSubmitted, autoRouteLostSouls, anchorX, anchorBottomY, scale, offsetX, offsetY, selection,
+  hasSubmitted, autoRouteLostSouls, centerX, selection,
   onSubmitStars, onResolveStar, onFinishSouls, onExecuteAbility, onHighlightCard,
 }: PregameRailProps) {
   // The opponent's revealed stars are named but not on any board the viewer can
@@ -138,21 +130,14 @@ export default function PregameRail({
   // as a star), which is why the hook's plain getCardImageUrl is safe here.
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, onCardMouseEnter, onCardMouseLeave } =
-    useModalCardHover(200, { setPreviewCard, isLoupeVisible });
-
-  // The panel is translated back by half its width and all of its height, so it
-  // stays centred on the midline with its bottom on the seam whatever the
-  // content's size — the star step's height changes as the queue advances.
-  const anchor = virtualToScreen(
-    anchorX, anchorBottomY - SEAM_CLEARANCE, scale, offsetX, offsetY,
-  );
+    useModalCardHover(200, { setPreviewCard, isLoupeVisible, keepPreviewOnLeave: true });
 
   // The whole wrapper is click-through; only chips and buttons opt back in.
   // Konva hit-tests on its own canvas, so this never blocks board interaction.
   const wrapper = (children: React.ReactNode) => (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: RAIL_Z }}>
-      <div style={{ position: 'absolute', left: anchor.x, top: anchor.y,
-                    transform: 'translate(-50%, -100%)', ...PANEL }}>
+      <div style={{ position: 'absolute', left: centerX, top: '50%',
+                    transform: 'translate(-50%, -50%)', ...PANEL }}>
         {children}
       </div>
       <ModalCardHoverPreview hover={hover} />

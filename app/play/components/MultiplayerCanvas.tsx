@@ -837,13 +837,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   const myHandRect = mpLayout?.zones.playerHand ?? null;
   const opponentHandRect = mpLayout?.zones.opponentHand ?? null;
-  // Anchors for the Pre-Game rail: centred on the play area's midline, bottom
-  // edge resting on the seam between the two halves. `divider` is the seam in
-  // BOTH formats — Paragon collapses it to a zero-height rect sitting exactly
-  // at the shared Land of Bondage band's top edge, so the panel clears that
-  // band without a format branch. Battle never overlaps the pre-game.
   const myTerritoryRect = mpLayout?.zones.playerTerritory ?? null;
-  const pregameSeamY = mpLayout?.zones.divider.y ?? null;
 
   // Player-hand card dimensions: capped so the card bottom always stays
   // above the floating toolbar reserve. On narrow viewports the mainCard
@@ -8660,7 +8654,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           here. The wrapper is pointer-events:none so the board, the
           toolbar and every modal stay fully interactive while it shows.
           ================================================================ */}
-      {pregameStep && !isSpectator && myTerritoryRect && pregameSeamY !== null && (
+      {pregameStep && !isSpectator && myTerritoryRect && (
         <PregameRail
           step={pregameStep}
           isMyWindow={myPregameWindow}
@@ -8670,13 +8664,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           activatableSouls={myActivatableSouls}
           hasSubmitted={myStarsSubmitted}
           autoRouteLostSouls={gameState.myPlayer?.autoRouteLostSouls ?? true}
-          // Above the seam, off my own half entirely: the hand holds the star
-          // cards to click and the Land of Bondage the souls to right-click.
-          anchorX={myTerritoryRect.x + myTerritoryRect.width / 2}
-          anchorBottomY={pregameSeamY}
-          scale={scale}
-          offsetX={offsetX}
-          offsetY={offsetY}
+          // The play mat's midline, exactly as BattleResolutionUI derives its
+          // own `centerX` — viewport centring sits right of the board.
+          centerX={virtualToScreen(
+            myTerritoryRect.x + myTerritoryRect.width / 2, myTerritoryRect.y,
+            scale, offsetX, offsetY,
+          ).x}
           selection={starPickOrder}
           onSubmitStars={gameState.pregameSubmitStars}
           onResolveStar={gameState.pregameResolveStar}
