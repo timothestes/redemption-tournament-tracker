@@ -717,13 +717,13 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
 
   const setTurnStop = useCallback(
     (phase: string, enabled: boolean) => {
-      conn?.reducers.setTurnStop({ gameId, phase, enabled });
+      conn?.reducers.setTurnStop({ gameId, phase, enabled }).catch(toastReducerError);
     },
     [conn, gameId],
   );
 
   const releaseTurnStop = useCallback(() => {
-    conn?.reducers.releaseTurnStop({ gameId });
+    conn?.reducers.releaseTurnStop({ gameId }).catch(toastReducerError);
   }, [conn, gameId]);
 
   const rollDice = useCallback(
