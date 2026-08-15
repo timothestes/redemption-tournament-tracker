@@ -5,6 +5,7 @@ import TopNav from "@/components/top-nav";
 import SponsorFooter from "@/components/sponsor-footer";
 import { TrophyIcon } from "@/components/trophy-icon";
 import { loadPublicResultsAction } from "../../actions";
+import ResultsTabs from "./ResultsTabs";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -95,6 +96,8 @@ export default async function TournamentResultsPage({ params }: PageProps) {
             )}
           </div>
         </div>
+
+        <ResultsTabs tournamentId={id} active="standings" showBreakdown={showDecklists} />
 
         {result.standings.length === 0 ? (
           <p className="text-sm text-muted-foreground">No standings recorded.</p>
