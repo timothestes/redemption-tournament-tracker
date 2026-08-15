@@ -1624,7 +1624,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         const card = findAnyCardById(String(s.cardInstanceId));
         return {
           starId: s.id, cardInstanceId: s.cardInstanceId, resolved: s.resolved,
-          cardName: card?.cardName ?? '', imitatingName: card?.imitatingName,
+          cardName: card?.cardName ?? '', cardImgFile: card?.cardImgFile ?? '',
+          imitatingName: card?.imitatingName,
         };
       });
   }, [gameState.pregameState, gameState.pregameStars, findAnyCardById]);

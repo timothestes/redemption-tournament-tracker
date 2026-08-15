@@ -23,8 +23,9 @@ import {
   DEFAULT_ABILITY_SOURCE_ZONES,
 } from '@/lib/cards/cardAbilities';
 import { virtualToScreen } from '@/app/shared/layout/virtualCanvas';
+import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
+import { useModalCardHover, ModalCardHoverPreview } from '@/app/shared/components/ModalCardHoverPreview';
 import StarOfDavidIcon from './StarOfDavidIcon';
-import type { ZoneRect } from '../layout/multiplayerLayout';
 
 // Sits below ZoneBrowseModal's overlay (z 500) so a deck/reserve browse opened
 // from a star ability is never covered, and above the canvas. BattleResolutionUI
@@ -100,7 +101,7 @@ interface PregameRailProps {
   /** Star cards in my hand — the rail only needs to know whether I have any. */
   handStars: Array<{ instanceId: bigint; cardName: string; imitatingName?: string }>;
   /** Submitted stars for the active seat, ascending by slot. */
-  queue: Array<{ starId: bigint; cardInstanceId: bigint; resolved: boolean; cardName: string; imitatingName?: string }>;
+  queue: Array<{ starId: bigint; cardInstanceId: bigint; resolved: boolean; cardName: string; cardImgFile: string; imitatingName?: string }>;
   /** Lost Souls I control that carry ability text. */
   activatableSouls: Array<{ instanceId: bigint; cardName: string }>;
   /** True when I have submitted my star selection this window. */
@@ -128,6 +129,17 @@ export default function PregameRail({
   hasSubmitted, autoRouteLostSouls, anchorX, anchorBottomY, scale, offsetX, offsetY, selection,
   onSubmitStars, onResolveStar, onFinishSouls, onExecuteAbility, onHighlightCard,
 }: PregameRailProps) {
+  // The opponent's revealed stars are named but not on any board the viewer can
+  // hover — they go straight from the opponent's hand to this list. The shared
+  // hook gives them the same two-tier preview a browse modal's cards get: the
+  // loupe pane updates on every hover, and only when the pane is collapsed does
+  // the floating tooltip appear after a beat. Forge cards can't reach this list
+  // (the world-readable row blanks specialAbility, so nothing there ever reads
+  // as a star), which is why the hook's plain getCardImageUrl is safe here.
+  const { setPreviewCard, isLoupeVisible } = useCardPreview();
+  const { hover, onCardMouseEnter, onCardMouseLeave } =
+    useModalCardHover(200, { setPreviewCard, isLoupeVisible });
+
   // The panel is translated back by half its width and all of its height, so it
   // stays centred on the midline with its bottom on the seam whatever the
   // content's size — the star step's height changes as the queue advances.
@@ -143,6 +155,7 @@ export default function PregameRail({
                     transform: 'translate(-50%, -100%)', ...PANEL }}>
         {children}
       </div>
+      <ModalCardHoverPreview hover={hover} />
     </div>
   );
 
@@ -168,9 +181,14 @@ export default function PregameRail({
             : `Waiting for ${opponentName} to activate Lost Souls…`}
         </div>
         {queue.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
             {queue.map((s) => (
-              <span key={s.starId.toString()} style={CHIP(!s.resolved)}>
+              <span
+                key={s.starId.toString()}
+                style={CHIP(!s.resolved)}
+                onMouseEnter={(e) => onCardMouseEnter(s.cardImgFile, s.cardName, e)}
+                onMouseLeave={onCardMouseLeave}
+              >
                 {s.resolved ? '✓ ' : ''}{s.cardName}
               </span>
             ))}
