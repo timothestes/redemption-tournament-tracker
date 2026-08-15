@@ -1157,7 +1157,7 @@ function advancePregame(ctx: any, gameId: bigint): void {
 
   const result = advancePregameFlow(step, firstSeat, readPregameProgress(state), {
     controlsActivatableSoul: (seat) => seatControlsActivatableSoul(ctx, gameId, seat),
-  });
+  }, normalizeFormat(game.format) !== 'Paragon');
 
   if (result.kind === 'complete') {
     ctx.db.PregameState.gameId.update({
@@ -1271,11 +1271,18 @@ function startGameFromReveal(ctx: any, game: any, fallbackWinnerPlayerId: bigint
     soulsDone1: false,
   });
 
-  logAction(ctx, gameId, winnerPlayerId, 'PREGAME_STAR_PHASE',
-    JSON.stringify({ firstSeat: chosenSeat.toString() }), 1n, 'draw');
+  // Paragon completes the phase inside the advancePregame below without ever
+  // opening a window, so announcing it would leave a "began the pre-game phase"
+  // line in chat for something no one saw. The rows above are still written and
+  // then torn down by finishPregame in this same transaction — one code path,
+  // and no client observes the intermediate state.
+  if (normalizeFormat(game.format) !== 'Paragon') {
+    logAction(ctx, gameId, winnerPlayerId, 'PREGAME_STAR_PHASE',
+      JSON.stringify({ firstSeat: chosenSeat.toString() }), 1n, 'draw');
+  }
 
-  // Cascades through both auto-skips; may complete the pre-game outright when
-  // neither player has a star card or an ability-bearing Lost Soul.
+  // Cascades through the souls auto-skip, and completes outright in Paragon or
+  // once both seats have answered.
   advancePregame(ctx, gameId);
 }
 

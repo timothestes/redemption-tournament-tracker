@@ -112,11 +112,11 @@ interface PregameRailProps {
   handStars: Array<{ instanceId: bigint; cardName: string; imitatingName?: string }>;
   /** Submitted stars for the active seat, ascending by slot. */
   queue: Array<{ starId: bigint; cardInstanceId: bigint; resolved: boolean; cardName: string; cardImgFile: string; imitatingName?: string }>;
-  /** Lost Souls I control that carry ability text. */
+  /** Lost Souls I control that carry ability text. Only the count is used —
+   *  an empty list finishes the window instead of drawing a panel. */
   activatableSouls: Array<{ instanceId: bigint; cardName: string }>;
   /** True when I have submitted my star selection this window. */
   hasSubmitted: boolean;
-  autoRouteLostSouls: boolean;
   /** Star cards I've clicked in hand, in pick order. Owned by MultiplayerCanvas
    *  so the hand's order badges and this panel's submit button agree. */
   selection: bigint[];
@@ -124,13 +124,12 @@ interface PregameRailProps {
   onResolveStar: (starId: bigint) => void;
   onFinishSouls: () => void;
   onExecuteAbility: (instanceId: bigint, abilityIndex: number) => void;
-  onHighlightCard: (instanceId: bigint) => void;
 }
 
 export default function PregameRail({
   step, isMyWindow, opponentName, handStars, queue, activatableSouls,
-  hasSubmitted, autoRouteLostSouls, selection,
-  onSubmitStars, onResolveStar, onFinishSouls, onExecuteAbility, onHighlightCard,
+  hasSubmitted, selection,
+  onSubmitStars, onResolveStar, onFinishSouls, onExecuteAbility,
 }: PregameRailProps) {
   // The opponent's revealed stars are named but not on any board the viewer can
   // hover — they go straight from the opponent's hand to this list. The shared
@@ -185,6 +184,23 @@ export default function PregameRail({
       clearTimeout(fire);
     };
   }, [autoSubmits]);
+
+  // Nothing to activate means nothing to show — don't make the player dismiss an
+  // empty panel. The server already skips this window when the seat controls no
+  // ability-bearing Lost Soul, so this covers the residual case where the two
+  // disagree. No randomized pause here, unlike the star window: the Land of
+  // Bondage is face up, so how fast this answers reveals nothing the opponent
+  // can't already see.
+  const autoFinishSouls =
+    isMyWindow && step === 'souls' && activatableSouls.length === 0;
+  const finishOnceRef = useRef(false);
+  const onFinishSoulsRef = useRef(onFinishSouls);
+  onFinishSoulsRef.current = onFinishSouls;
+  useEffect(() => {
+    if (!autoFinishSouls || finishOnceRef.current) return;
+    finishOnceRef.current = true;
+    onFinishSoulsRef.current();
+  }, [autoFinishSouls]);
 
   // The whole wrapper is click-through; only chips and buttons opt back in.
   // Konva hit-tests on its own canvas, so this never blocks board interaction.
@@ -249,31 +265,15 @@ export default function PregameRail({
   }
 
   if (step === 'souls') {
+    // The effect above is finishing this window; drawing a panel for the frame
+    // or two before the server answers would flash an empty box.
+    if (activatableSouls.length === 0) return null;
     return wrapper(
       <>
         {heading('Pre-Game Phase · Lost Souls')}
-        {activatableSouls.length === 0 ? (
-          <div style={BODY}>
-            {autoRouteLostSouls
-              ? 'No Lost Souls with abilities to activate.'
-              : 'Auto-routing is off — any Lost Souls you drew are still in your hand.'}
-          </div>
-        ) : (
-          <>
-            <div style={BODY}>
-              Right-click a Lost Soul you control to activate its ability, then
-              finish.
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {activatableSouls.map((s) => (
-                <span key={s.instanceId.toString()} style={CHIP(false)}
-                      onClick={() => onHighlightCard(s.instanceId)}>
-                  {s.cardName}
-                </span>
-              ))}
-            </div>
-          </>
-        )}
+        {/* No name chips. The souls are face up in the Land of Bondage right
+            below this panel, so listing them here only repeated the board. */}
+        <div style={BODY}>Activate any Lost Souls you control.</div>
         <button style={ACTION} onClick={onFinishSouls}>Done</button>
       </>,
     );

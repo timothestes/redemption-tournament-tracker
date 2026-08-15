@@ -91,6 +91,22 @@ describe('advancePregameFlow', () => {
     expect(r.step).toBe('souls');
   });
 
+  // Paragon has no REG Pre-Game Phase. Without this the anti-leak change above
+  // would open two star windows in every Paragon game — windows nobody can
+  // answer, since Paragon's souls are shared and carry no ability text.
+  it('completes immediately when the phase does not apply (Paragon)', () => {
+    const r = advancePregameFlow('stars', 0, FRESH, eligibility([true, true]), false);
+    expect(r.kind).toBe('complete');
+    expect(r.progress).toEqual({
+      starsDone0: true, starsDone1: true, soulsDone0: true, soulsDone1: true,
+    });
+  });
+
+  it('still runs the phase when `applies` is omitted', () => {
+    const r = advancePregameFlow('stars', 0, FRESH, eligibility([false, false]));
+    expect(r.kind).toBe('await');
+  });
+
   it('completes from the souls step when both seats are done', () => {
     const done = { starsDone0: true, starsDone1: true, soulsDone0: true, soulsDone1: false };
     const r = advancePregameFlow('souls', 0, done, eligibility([true, false]));

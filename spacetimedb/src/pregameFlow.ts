@@ -22,6 +22,14 @@
  *
  * An open star window is backstopped by the pre-game idle timeout, so a closed
  * or disconnected client can't park the game on one.
+ *
+ * Paragon opts out of the whole phase (`applies: false`). Its Lost Souls are a
+ * shared 21-card pile owned by neither seat and carrying no ability text, so
+ * the souls step could never open there in the first place; skipping the star
+ * step too keeps Paragon's pre-game the shared-soul-deck setup it already is,
+ * rather than taxing every game with two star windows nobody can answer. There
+ * is no leak in skipping: the format is public, so both players know up front
+ * that no star window is coming.
  */
 
 export type Seat = 0 | 1;
@@ -68,7 +76,18 @@ export function advancePregameFlow(
   firstSeat: Seat,
   progress: PregameProgress,
   eligibility: PregameEligibility,
+  /** Whether the REG Pre-Game Phase runs in this game at all. False for
+   *  Paragon — see the header. Defaults true so a new call site that forgets
+   *  it gets the standard phase rather than silently skipping one. */
+  applies = true,
 ): PregameAdvance {
+  if (!applies) {
+    return {
+      kind: 'complete',
+      progress: { starsDone0: true, starsDone1: true, soulsDone0: true, soulsDone1: true },
+    };
+  }
+
   const otherSeat: Seat = firstSeat === 0 ? 1 : 0;
   const order: Seat[] = [firstSeat, otherSeat];
   let next = progress;

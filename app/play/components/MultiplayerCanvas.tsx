@@ -8662,7 +8662,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           queue={activeStarQueue}
           activatableSouls={myActivatableSouls}
           hasSubmitted={myStarsSubmitted}
-          autoRouteLostSouls={gameState.myPlayer?.autoRouteLostSouls ?? true}
           selection={starPickOrder}
           onSubmitStars={gameState.pregameSubmitStars}
           onResolveStar={gameState.pregameResolveStar}
@@ -8673,10 +8672,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           // reducer throws SenderError for those.
           onExecuteAbility={(instanceId, abilityIndex) =>
             multiplayerActions.executeCardAbility(String(instanceId), abilityIndex)}
-          // No card-highlight state exists in this component, so the soul
-          // chips are labels only — the rail already tells the player to
-          // right-click the soul itself.
-          onHighlightCard={() => {}}
         />
       )}
 
