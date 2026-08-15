@@ -16,6 +16,12 @@ interface ModalCardHoverOptions {
   setPreviewCard?: (card: { cardName: string; cardImgFile: string; isMeek?: boolean } | null) => void;
   /** When true, skip the delayed tooltip (loupe handles it) */
   isLoupeVisible?: boolean;
+  /** Leave the last hovered card in the loupe after the cursor moves off.
+   *  Right for a handful of card names in running text — you hover a name to
+   *  read the card, then look at the loupe, and blanking it on leave means it's
+   *  gone before you get there (how the chat log's names already behave). Wrong
+   *  for a grid of card images, where the loupe should track the cursor. */
+  keepPreviewOnLeave?: boolean;
 }
 
 export function useModalCardHover(delay = 400, options?: ModalCardHoverOptions) {
@@ -89,8 +95,10 @@ export function useModalCardHover(delay = 400, options?: ModalCardHoverOptions) 
     setHoveredCardId(null);
     stopAnimation();
 
-    // Clear the loupe panel
-    optionsRef.current?.setPreviewCard?.(null);
+    // Clear the loupe panel, unless the caller wants the card to linger.
+    if (!optionsRef.current?.keepPreviewOnLeave) {
+      optionsRef.current?.setPreviewCard?.(null);
+    }
   }, [stopAnimation]);
 
   return { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave };

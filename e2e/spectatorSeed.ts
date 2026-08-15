@@ -14,6 +14,11 @@ export const admin = adminAvailable
 // findCard() enriches these into game card data during loadDeckForGame. Each is
 // seeded at a quantity that totals ~50 cards so the opening-hand draw (8 cards)
 // works when a game reaches the `playing` state.
+//
+// NOTE: none of these cards has a (Star)/STAR: ability and none is a Lost Soul,
+// so the REG Pre-Game Phase auto-skips both sub-steps and the game reaches turn 1
+// without extra clicks. If you add a star card or a Lost Soul here, the pregame
+// will pause for input and bothReachPlaying() will hang.
 const SAMPLE_CARDS: Array<{ name: string; set: string; img: string; qty: number }> = [
   { name: "Angel at Shur (Wa)", set: "War", img: "Angel_at_Shur_(Wa)", qty: 10 },
   { name: "Angel at the Tomb (Wa)", set: "War", img: "Angel_at_the_Tomb_(Wa)", qty: 10 },

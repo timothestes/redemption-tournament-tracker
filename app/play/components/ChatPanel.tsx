@@ -120,6 +120,15 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   LEAVE_GAME: 'left the game',
   UPDATE_CARD_POSITION: 'repositioned a card',
   PREGAME_ROLL: 'rolled for first player',
+  // REG Pre-Game Phase. PREGAME_STARS_REVEALED / PREGAME_STAR_RESOLVED carry
+  // card payloads rendered in formatActionType; these are the parse-failure
+  // fallbacks.
+  PREGAME_STAR_PHASE: 'began the pre-game phase',
+  PREGAME_STARS_REVEALED: 'revealed star cards',
+  PREGAME_STARS_NONE: 'revealed no star cards',
+  PREGAME_STAR_RESOLVED: 'resolved a star card',
+  PREGAME_SOULS_DONE: 'finished activating Lost Souls',
+  PREGAME_IDLE_SKIP: 'ran out of time in the pre-game phase',
   PLAYER_JOINED: 'joined the game',
   GAME_CREATED: 'created the game',
   REMATCH_REQUESTED: 'wants to play again',
@@ -180,6 +189,34 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const winnerRoll = data.winner === '0' ? data.result0 : data.result1;
       const loserRoll = data.winner === '0' ? data.result1 : data.result0;
       return `won the roll: ${winnerRoll} vs ${loserRoll}`;
+    } catch { /* fall through */ }
+  }
+  // REG Pre-Game Phase: name the star cards, hoverable like every other card
+  // reference in the log. The payload carries {name, img} per card because
+  // HoverableCard degrades to plain text without an image.
+  if (actionType === 'PREGAME_STARS_REVEALED' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const cards = Array.isArray(data.cards) ? data.cards : [];
+      if (cards.length > 0) {
+        return (
+          <>
+            revealed <CardNameList cards={cards} /> for the star{cards.length === 1 ? '' : 's'}
+          </>
+        );
+      }
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'PREGAME_STAR_RESOLVED' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) {
+        return (
+          <>
+            resolved the star on <HoverableCard name={data.cardName} img={data.cardImgFile} />
+          </>
+        );
+      }
     } catch { /* fall through */ }
   }
   if (actionType === 'DRAW_MULTIPLE') {

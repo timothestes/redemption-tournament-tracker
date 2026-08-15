@@ -1,6 +1,6 @@
 import spacetimedb from './schema';
 export default spacetimedb;
-import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, RevealTimeout, setRevealTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer } from './schema';
+import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, RevealTimeout, setRevealTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer, PregameIdleTimeout, setPregameIdleTimeoutReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
@@ -19,6 +19,13 @@ import {
   simplifyLostSoulName,
   type CardAbility,
 } from './cardAbilities';
+import {
+  advancePregameFlow,
+  markDone,
+  type PregameProgress,
+  type PregameStep,
+  type Seat,
+} from './pregameFlow';
 
 // Auto-reveal duration for cards that land in a hand via a move whose log
 // payload reveals the card identity (cross-player moves, face-up moves, etc.).
@@ -35,6 +42,23 @@ const HAND_LIMIT = 16;
 // abilities). Shared across every ability-source gate below; per-ability
 // explicit sourceZones overrides are untouched by this list.
 const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption', 'battle'];
+
+// Star cards lead their special ability with "(Star)" or "STAR:". Mirrors
+// lib/cards/starCards.ts — keep the two in sync. Read a CardInstance row's own
+// specialAbility, never a card-index lookup.
+//
+// NOTE: Forge cards blank specialAbility on the public row (the leak spine in
+// app/forge/lib/playSerialize.ts), so forge star cards are invisible here and
+// the star step auto-skips for them. Known limitation, see the design doc.
+const STAR_ABILITY_RE = /^\s*(\(star\)|star:)/i;
+function isStarAbilityText(text: string): boolean {
+  return STAR_ABILITY_RE.test(text ?? '');
+}
+
+// Backstop only — the REG Pre-Game Phase is untimed by design. Long enough
+// that a thinking player is never cut off, short enough that a departed one
+// cannot hang the game.
+const PREGAME_IDLE_MICROS = 180_000_000n; // 3 minutes
 
 // ---------------------------------------------------------------------------
 // Forge playtest games (Phase 2.3)
@@ -1071,6 +1095,137 @@ function scheduleRevealTimeout(ctx: any, gameId: bigint): void {
   });
 }
 
+// ---------------------------------------------------------------------------
+// REG Pre-Game Phase helpers (steps 2 and 3: star reveals, then Lost Soul
+// activation). The game is already status='playing' here — Game.pregamePhase
+// ('stars' | 'souls') is what distinguishes the pre-game from turn 1.
+// ---------------------------------------------------------------------------
+
+// Arm the pre-game idle backstop. Deletes any prior row for this game first —
+// insert-only re-arming would accumulate rows and let a stale one fire 180s
+// after a player's FIRST click, skipping a seat that acted seconds ago (the
+// row carries only gameId, so stale and live rows are indistinguishable at
+// fire time). Mirrors scheduleRevealTimeout.
+function schedulePregameIdleTimeout(ctx: any, gameId: bigint): void {
+  for (const timeout of ctx.db.PregameIdleTimeout.pregame_idle_timeout_game_id.filter(gameId)) {
+    ctx.db.PregameIdleTimeout.scheduledId.delete(timeout.scheduledId);
+  }
+  ctx.db.PregameIdleTimeout.insert({
+    scheduledId: 0n,
+    scheduledAt: ScheduleAt.time(ctx.timestamp.microsSinceUnixEpoch + PREGAME_IDLE_MICROS),
+    gameId,
+  });
+}
+
+function seatControlsActivatableSoul(ctx: any, gameId: bigint, seat: Seat): boolean {
+  const player = [...ctx.db.Player.player_game_id.filter(gameId)]
+    .find((p: any) => p.seat === BigInt(seat));
+  if (!player) return false;
+  for (const card of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+    if (
+      card.ownerId === player.id &&
+      card.zone === 'land-of-bondage' &&
+      isLostSoulRow(card) &&
+      (card.specialAbility ?? '') !== ''
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function readPregameProgress(state: any): PregameProgress {
+  return {
+    starsDone0: state.starsDone0,
+    starsDone1: state.starsDone1,
+    soulsDone0: state.soulsDone0,
+    soulsDone1: state.soulsDone1,
+  };
+}
+
+// The single place the pre-game cursor moves. Always re-reads the Game row —
+// callers may hold a stale snapshot (cf. checkAndApplyWin). Writes
+// Game.pregamePhase in lock-step with the progress flags, in this transaction.
+function advancePregame(ctx: any, gameId: bigint): void {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) return;
+  const state = ctx.db.PregameState.gameId.find(gameId);
+  if (!state) return;
+
+  const step: PregameStep = game.pregamePhase === 'souls' ? 'souls' : 'stars';
+  const firstSeat: Seat = game.currentTurn === 0n ? 0 : 1;
+
+  const result = advancePregameFlow(step, firstSeat, readPregameProgress(state), {
+    controlsActivatableSoul: (seat) => seatControlsActivatableSoul(ctx, gameId, seat),
+  }, normalizeFormat(game.format) !== 'Paragon');
+
+  if (result.kind === 'complete') {
+    ctx.db.PregameState.gameId.update({
+      ...state,
+      ...result.progress,
+    });
+    finishPregame(ctx, gameId);
+    return;
+  }
+
+  ctx.db.PregameState.gameId.update({
+    ...state,
+    ...result.progress,
+    activeSeat: BigInt(result.activeSeat),
+  });
+  if (game.pregamePhase !== result.step) {
+    const latest = ctx.db.Game.id.find(gameId);
+    if (latest) ctx.db.Game.id.update({ ...latest, pregamePhase: result.step });
+  }
+  schedulePregameIdleTimeout(ctx, gameId);
+}
+
+// Ends the REG Pre-Game Phase and begins turn 1. Takes a gameId and re-reads,
+// because advancePregame may have just written pregamePhase — a caller
+// snapshot would revert it.
+function finishPregame(ctx: any, gameId: bigint): void {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) return;
+
+  for (const row of ctx.db.PregameStar.pregame_star_game_id.filter(gameId)) {
+    ctx.db.PregameStar.id.delete(row.id);
+  }
+  ctx.db.PregameState.gameId.delete(gameId);
+  for (const timeout of ctx.db.PregameIdleTimeout.pregame_idle_timeout_game_id.filter(gameId)) {
+    ctx.db.PregameIdleTimeout.scheduledId.delete(timeout.scheduledId);
+  }
+
+  const chosenSeat = game.currentTurn;
+  let chosenName = 'Player ' + (Number(chosenSeat) + 1);
+  let firstPlayerId = 0n;
+  for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
+    if (p.seat === chosenSeat) { chosenName = p.displayName; firstPlayerId = p.id; }
+  }
+
+  ctx.db.Game.id.update({
+    ...game,
+    pregamePhase: '',
+    playingStartedAtMicros: ctx.timestamp.microsSinceUnixEpoch,
+  });
+
+  logAction(ctx, gameId, firstPlayerId, 'GAME_STARTED',
+    JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
+    1n, 'draw');
+}
+
+// Games are never deleted — the concede paths only set status:'finished' — so
+// finishPregame never runs for an abandoned pre-game. All three pre-game
+// tables are public, so orphan rows would sit in every client's table cache.
+function clearPregameRows(ctx: any, gameId: bigint): void {
+  for (const row of ctx.db.PregameStar.pregame_star_game_id.filter(gameId)) {
+    ctx.db.PregameStar.id.delete(row.id);
+  }
+  ctx.db.PregameState.gameId.delete(gameId);
+  for (const timeout of ctx.db.PregameIdleTimeout.pregame_idle_timeout_game_id.filter(gameId)) {
+    ctx.db.PregameIdleTimeout.scheduledId.delete(timeout.scheduledId);
+  }
+}
+
 // Shared "start the game" transition, used by both the both-players-acked path
 // (pregame_acknowledge_first) and the server-side backstop
 // (handle_reveal_timeout). Assumes `game` is in the 'revealing' phase with
@@ -1080,10 +1235,8 @@ function startGameFromReveal(ctx: any, game: any, fallbackWinnerPlayerId: bigint
   const gameId = game.id;
   const chosenSeat = game.currentTurn;
   const winnerSeat = game.rollWinner === '0' ? 0n : 1n;
-  let chosenName = 'Player ' + (Number(chosenSeat) + 1);
   let winnerPlayerId = fallbackWinnerPlayerId;
   for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
-    if (p.seat === chosenSeat) chosenName = p.displayName;
     if (p.seat === winnerSeat) winnerPlayerId = p.id;
   }
 
@@ -1094,20 +1247,43 @@ function startGameFromReveal(ctx: any, game: any, fallbackWinnerPlayerId: bigint
     initializeSoulDeck(ctx, game);
   }
 
+  // status flips to 'playing' as it always has (so every status-gated reducer
+  // and the 5-minute disconnect grace keep working), but pregamePhase now
+  // enters the REG Pre-Game Phase instead of clearing. playingStartedAtMicros
+  // stays 0 — the round clock starts in finishPregame, with turn 1.
   ctx.db.Game.id.update({
     ...game,
     pregameReady0: true,
     pregameReady1: true,
     status: 'playing',
-    pregamePhase: '',
+    pregamePhase: 'stars',
     currentPhase: 'draw',
     turnNumber: 1n,
-    playingStartedAtMicros: ctx.timestamp.microsSinceUnixEpoch,
+    playingStartedAtMicros: 0n,
   });
 
-  logAction(ctx, gameId, winnerPlayerId, 'GAME_STARTED',
-    JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
-    1n, 'draw');
+  ctx.db.PregameState.insert({
+    gameId,
+    activeSeat: chosenSeat,
+    starsDone0: false,
+    starsDone1: false,
+    soulsDone0: false,
+    soulsDone1: false,
+  });
+
+  // Paragon completes the phase inside the advancePregame below without ever
+  // opening a window, so announcing it would leave a "began the pre-game phase"
+  // line in chat for something no one saw. The rows above are still written and
+  // then torn down by finishPregame in this same transaction — one code path,
+  // and no client observes the intermediate state.
+  if (normalizeFormat(game.format) !== 'Paragon') {
+    logAction(ctx, gameId, winnerPlayerId, 'PREGAME_STAR_PHASE',
+      JSON.stringify({ firstSeat: chosenSeat.toString() }), 1n, 'draw');
+  }
+
+  // Cascades through the souls auto-skip, and completes outright in Paragon or
+  // once both seats have answered.
+  advancePregame(ctx, gameId);
 }
 
 // ---------------------------------------------------------------------------
@@ -1846,6 +2022,7 @@ export const resign_game = spacetimedb.reducer(
     if (!game) throw new SenderError('Game not found');
 
     ctx.db.Game.id.update({ ...game, status: 'finished' });
+    clearPregameRows(ctx, gameId);
 
     logAction(
       ctx,
@@ -1926,6 +2103,7 @@ export const handle_disconnect_timeout = spacetimedb.reducer(
         } else {
           // Waiting/pregame: end game immediately
           ctx.db.Game.id.update({ ...game, status: 'finished' });
+          clearPregameRows(ctx, arg.gameId);
           logAction(
             ctx,
             arg.gameId,
@@ -1960,6 +2138,9 @@ export const claim_timeout_victory = spacetimedb.reducer(
     if (!player.isConnected) throw new SenderError('Only the connected player can claim victory');
 
     ctx.db.Game.id.update({ ...game, status: 'finished', disconnectTimeoutFired: false });
+    // Reachable mid-pre-game: the 5-minute disconnect grace applies at
+    // status:'playing', which is exactly what the star/soul steps run under.
+    clearPregameRows(ctx, gameId);
     logAction(ctx, gameId, player.id, 'TIMEOUT', JSON.stringify({ reason: 'claimed_by_opponent' }), game.turnNumber, game.currentPhase);
   }
 );
@@ -2019,6 +2200,207 @@ export const handle_reveal_timeout = spacetimedb.reducer(
 setRevealTimeoutReducer(handle_reveal_timeout);
 
 // ---------------------------------------------------------------------------
+// Scheduled reducer: handle_pregame_idle_timeout
+// The Pre-Game Phase is untimed by design; this only stops an idle or departed
+// player from hanging the game. Force-completes the active seat's sub-step.
+// ---------------------------------------------------------------------------
+export const handle_pregame_idle_timeout = spacetimedb.reducer(
+  { arg: PregameIdleTimeout.rowType },
+  (ctx, { arg }) => {
+    const game = ctx.db.Game.id.find(arg.gameId);
+    if (!game) return;
+    if (game.status !== 'playing') return;
+    if (game.pregamePhase !== 'stars' && game.pregamePhase !== 'souls') return;
+
+    const state = ctx.db.PregameState.gameId.find(arg.gameId);
+    if (!state) return;
+
+    const step: PregameStep = game.pregamePhase === 'souls' ? 'souls' : 'stars';
+    const seat: Seat = state.activeSeat === 0n ? 0 : 1;
+
+    ctx.db.PregameState.gameId.update({
+      ...state,
+      ...markDone(readPregameProgress(state), step, seat),
+    });
+
+    logAction(ctx, arg.gameId, 0n, 'PREGAME_IDLE_SKIP',
+      JSON.stringify({ seat: seat.toString(), step }), game.turnNumber, game.currentPhase);
+
+    advancePregame(ctx, arg.gameId);
+  }
+);
+
+setPregameIdleTimeoutReducer(handle_pregame_idle_timeout);
+
+// Shared validation for the REG Pre-Game Phase sub-steps. Returns the acting
+// player, whose seat must be the one whose window is open.
+function assertPregameActor(ctx: any, gameId: bigint, expectedPhase: PregameStep) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+  if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+  if (game.pregamePhase !== expectedPhase) {
+    throw new SenderError('Not in the ' + expectedPhase + ' phase');
+  }
+  const state = ctx.db.PregameState.gameId.find(gameId);
+  if (!state) throw new SenderError('Pre-game state not found');
+  const player = findPlayerBySender(ctx, gameId);
+  if (player.seat !== state.activeSeat) throw new SenderError('Not your pre-game window');
+  return { game, state, player };
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_submit_stars
+// REG: "players may reveal any number of star cards from their hand to use the
+// star ability." The whole set is revealed at once, then resolved one at a
+// time in the order chosen. An empty list is the explicit "no stars" answer.
+// ---------------------------------------------------------------------------
+const MAX_PREGAME_STARS = 16; // hand limit — no legal submission exceeds it
+
+export const pregame_submit_stars = spacetimedb.reducer(
+  { gameId: t.u64(), cardInstanceIds: t.string() },
+  (ctx, { gameId, cardInstanceIds }) => {
+    const { state, player } = assertPregameActor(ctx, gameId, 'stars');
+
+    const already = [...ctx.db.PregameStar.pregame_star_game_id.filter(gameId)]
+      .filter((r: any) => r.seat === player.seat);
+    if (already.length > 0) throw new SenderError('Stars already submitted');
+
+    let ids: string[];
+    try {
+      const parsed = JSON.parse(cardInstanceIds);
+      if (!Array.isArray(parsed)) throw new Error('not an array');
+      ids = parsed.map((v: any) => String(v));
+    } catch {
+      throw new SenderError('Invalid star selection');
+    }
+    if (ids.length > MAX_PREGAME_STARS) throw new SenderError('Too many stars selected');
+    if (new Set(ids).size !== ids.length) throw new SenderError('Duplicate star selected');
+
+    // Same 30s flash reveal_card_in_hand applies, so the star lights up in the
+    // normal treatment. revealExpiresAt is a Timestamp, not raw micros.
+    const THIRTY_SECONDS_MICROS = 30_000_000n;
+    const revealExpiresAt = new Timestamp(
+      ctx.timestamp.microsSinceUnixEpoch + THIRTY_SECONDS_MICROS
+    );
+
+    // {name, img} per star so the chat log renders each as a hoverable card
+    // link — ChatPanel's HoverableCard degrades to plain text without an image.
+    const revealed: Array<{ name: string; img: string }> = [];
+    for (let i = 0; i < ids.length; i++) {
+      let instanceId: bigint;
+      try {
+        instanceId = BigInt(ids[i]);
+      } catch {
+        throw new SenderError('Invalid star selection');
+      }
+      const card = ctx.db.CardInstance.id.find(instanceId);
+      if (!card) throw new SenderError('Card not found');
+      if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+      if (card.ownerId !== player.id) throw new SenderError('Not your card');
+      if (card.zone !== 'hand') throw new SenderError('Star cards must be revealed from hand');
+      if (!isStarAbilityText(card.specialAbility)) throw new SenderError('Not a star card');
+
+      ctx.db.PregameStar.insert({
+        id: 0n,
+        gameId,
+        seat: player.seat,
+        cardInstanceId: instanceId,
+        slot: BigInt(i),
+        resolved: false,
+      });
+
+      // The opponent's authoritative view is the PregameStar rows above — this
+      // 30s flag is allowed to expire mid-phase.
+      ctx.db.CardInstance.id.update({
+        ...card,
+        revealExpiresAt,
+        revealStartedAt: ctx.timestamp,
+      });
+      revealed.push({ name: card.cardName, img: card.cardImgFile });
+    }
+
+    if (ids.length === 0) {
+      ctx.db.PregameState.gameId.update({
+        ...state,
+        ...markDone(readPregameProgress(state), 'stars', state.activeSeat === 0n ? 0 : 1),
+      });
+      logAction(ctx, gameId, player.id, 'PREGAME_STARS_NONE',
+        JSON.stringify({ seat: player.seat.toString() }), 1n, 'draw');
+      advancePregame(ctx, gameId);
+      return;
+    }
+
+    logAction(ctx, gameId, player.id, 'PREGAME_STARS_REVEALED',
+      JSON.stringify({ seat: player.seat.toString(), cards: revealed }), 1n, 'draw');
+    schedulePregameIdleTimeout(ctx, gameId);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_resolve_star
+// Stars resolve in the order the player chose. Order is enforced here, not
+// merely presented in the UI.
+// ---------------------------------------------------------------------------
+export const pregame_resolve_star = spacetimedb.reducer(
+  { gameId: t.u64(), starId: t.u64() },
+  (ctx, { gameId, starId }) => {
+    const { state, player } = assertPregameActor(ctx, gameId, 'stars');
+
+    const mine = [...ctx.db.PregameStar.pregame_star_game_id.filter(gameId)]
+      .filter((r: any) => r.seat === player.seat && !r.resolved)
+      .sort((a: any, b: any) => (a.slot < b.slot ? -1 : a.slot > b.slot ? 1 : 0));
+    if (mine.length === 0) throw new SenderError('No stars left to resolve');
+
+    const target = mine[0];
+    if (target.id !== starId) throw new SenderError('Stars must resolve in the chosen order');
+
+    ctx.db.PregameStar.id.update({ ...target, resolved: true });
+
+    const card = ctx.db.CardInstance.id.find(target.cardInstanceId);
+    logAction(ctx, gameId, player.id, 'PREGAME_STAR_RESOLVED',
+      JSON.stringify({
+        seat: player.seat.toString(),
+        cardName: card ? card.cardName : '',
+        cardImgFile: card ? card.cardImgFile : '',
+      }),
+      1n, 'draw');
+
+    if (mine.length === 1) {
+      ctx.db.PregameState.gameId.update({
+        ...state,
+        ...markDone(readPregameProgress(state), 'stars', state.activeSeat === 0n ? 0 : 1),
+      });
+      advancePregame(ctx, gameId);
+      return;
+    }
+    schedulePregameIdleTimeout(ctx, gameId);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_finish_souls
+// REG step 3 — a single acknowledgement per player. Activation itself happens
+// through the normal right-click menu ('land-of-bondage' is already an ability
+// source zone); this only closes the window.
+// ---------------------------------------------------------------------------
+export const pregame_finish_souls = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const { state, player } = assertPregameActor(ctx, gameId, 'souls');
+
+    ctx.db.PregameState.gameId.update({
+      ...state,
+      ...markDone(readPregameProgress(state), 'souls', state.activeSeat === 0n ? 0 : 1),
+    });
+
+    logAction(ctx, gameId, player.id, 'PREGAME_SOULS_DONE',
+      JSON.stringify({ seat: player.seat.toString() }), 1n, 'draw');
+
+    advancePregame(ctx, gameId);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Scheduled reducer: cleanup_stale_games
 // ---------------------------------------------------------------------------
 const FIVE_MIN_MICROS = 300_000_000n;
@@ -2071,6 +2453,8 @@ export const cleanup_stale_games = spacetimedb.reducer(
 
         if ((now - latestActionTime) > THIRTY_MIN_MICROS) {
           ctx.db.Game.id.update({ ...game, status: 'finished' });
+          // A game abandoned during the star/soul steps is still 'playing'.
+          clearPregameRows(ctx, game.id);
         }
         continue;
       }
@@ -2102,6 +2486,7 @@ export const cleanup_stale_games = spacetimedb.reducer(
       for (const player of [...ctx.db.Player.player_game_id.filter(gameId)]) {
         ctx.db.Player.id.delete(player.id);
       }
+      clearPregameRows(ctx, gameId);
       ctx.db.Game.id.delete(gameId);
     }
   }
@@ -2125,6 +2510,12 @@ export const set_phase = spacetimedb.reducer(
     const player = findPlayerBySender(ctx, gameId);
     let game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+
+    // The REG Pre-Game Phase runs with status:'playing', so turn machinery has
+    // to be gated on pregamePhase instead. '' = pre-game over, turn 1 is live.
+    if (game.pregamePhase !== '') {
+      throw new SenderError('The Pre-Game Phase is still in progress');
+    }
 
     if (player.seat !== game.currentTurn) {
       throw new SenderError('Not your turn');
@@ -2176,6 +2567,12 @@ export const end_turn = spacetimedb.reducer(
     const player = findPlayerBySender(ctx, gameId);
     let game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+
+    // The REG Pre-Game Phase runs with status:'playing', so turn machinery has
+    // to be gated on pregamePhase instead. '' = pre-game over, turn 1 is live.
+    if (game.pregamePhase !== '') {
+      throw new SenderError('The Pre-Game Phase is still in progress');
+    }
 
     if (player.seat !== game.currentTurn) {
       throw new SenderError('Not your turn');
@@ -4716,13 +5113,6 @@ export const execute_card_ability = spacetimedb.reducer(
     // Ownership intentionally not enforced — either player may activate a
     // card's right-click ability; effects route to the activator (player).
 
-    // Abilities only fire when the source card is in play. Matches the
-    // client-side menu gate but the server enforces independently.
-    // LoR included so resting Heroes (Angel of the Harvest, etc.) can spawn.
-    if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
-      throw new SenderError('Source card must be in play');
-    }
-
     // Registry keys match cardName (e.g., "Two Possessed (GoC)"). The
     // identifier field is a taxonomy descriptor and is not unique enough.
     // Use effective abilities so imitated souls' right-click abilities
@@ -4730,6 +5120,16 @@ export const execute_card_ability = spacetimedb.reducer(
     const abilities = getEffectiveAbilities(source);
     const ability = abilities[Number(abilityIndex)];
     if (!ability) throw new SenderError('No such ability');
+
+    // Abilities only fire when the source card is in play. Matches the
+    // client-side menu gate but the server enforces independently.
+    // LoR included so resting Heroes (Angel of the Harvest, etc.) can spawn.
+    // An entry may widen that set with its own sourceZones (e.g. (Star)
+    // abilities used from hand during the Pre-Game Phase).
+    const allowedZones = ability.sourceZones ?? ABILITY_SOURCE_ZONES;
+    if (!allowedZones.includes(source.zone)) {
+      throw new SenderError('Source card must be in play');
+    }
 
     // Phase 2 — dispatch.
     switch (ability.type) {
@@ -4851,13 +5251,15 @@ export const execute_card_ability_with_count = spacetimedb.reducer(
     // Ownership intentionally not enforced — either player may activate a
     // card's right-click ability; effects route to the activator (player).
 
-    if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
-      throw new SenderError('Source card must be in play');
-    }
-
     const abilities = getEffectiveAbilities(source);
     const ability = abilities[Number(abilityIndex)];
     if (!ability) throw new SenderError('No such ability');
+
+    // Per-ability sourceZones override — see execute_card_ability.
+    const allowedZones = ability.sourceZones ?? ABILITY_SOURCE_ZONES;
+    if (!allowedZones.includes(source.zone)) {
+      throw new SenderError('Source card must be in play');
+    }
 
     if (ability.type !== 'draw_bottom_of_deck_choose') {
       throw new SenderError('Ability does not accept a chosen count');

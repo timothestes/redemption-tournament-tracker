@@ -83,7 +83,10 @@ import PregameAcknowledgeFirstReducer from "./pregame_acknowledge_first_reducer"
 import PregameAcknowledgeRollReducer from "./pregame_acknowledge_roll_reducer";
 import PregameChangeDeckReducer from "./pregame_change_deck_reducer";
 import PregameChooseFirstReducer from "./pregame_choose_first_reducer";
+import PregameFinishSoulsReducer from "./pregame_finish_souls_reducer";
+import PregameResolveStarReducer from "./pregame_resolve_star_reducer";
 import PregameSkipToRevealReducer from "./pregame_skip_to_reveal_reducer";
+import PregameSubmitStarsReducer from "./pregame_submit_stars_reducer";
 import RandomHandToZoneReducer from "./random_hand_to_zone_reducer";
 import RandomOpponentHandToZoneReducer from "./random_opponent_hand_to_zone_reducer";
 import RandomReserveToZoneReducer from "./random_reserve_to_zone_reducer";
@@ -148,6 +151,9 @@ import ForgeGameRow from "./forge_game_table";
 import GameRow from "./game_table";
 import GameActionRow from "./game_action_table";
 import PlayerRow from "./player_table";
+import PregameIdleTimeoutRow from "./pregame_idle_timeout_table";
+import PregameStarRow from "./pregame_star_table";
+import PregameStateRow from "./pregame_state_table";
 import RevealTimeoutRow from "./reveal_timeout_table";
 import SpectatorRow from "./spectator_table";
 import SpectatorBanRow from "./spectator_ban_table";
@@ -316,6 +322,45 @@ const tablesSchema = __schema({
       { name: 'player_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PlayerRow),
+  PregameIdleTimeout: __table({
+    name: 'pregame_idle_timeout',
+    indexes: [
+      { accessor: 'pregame_idle_timeout_game_id', name: 'pregame_idle_timeout_game_id_idx_btree', algorithm: 'btree', columns: [
+        'gameId',
+      ] },
+      { accessor: 'scheduledId', name: 'pregame_idle_timeout_scheduled_id_idx_btree', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'pregame_idle_timeout_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, PregameIdleTimeoutRow),
+  PregameStar: __table({
+    name: 'pregame_star',
+    indexes: [
+      { accessor: 'pregame_star_game_id', name: 'pregame_star_game_id_idx_btree', algorithm: 'btree', columns: [
+        'gameId',
+      ] },
+      { accessor: 'id', name: 'pregame_star_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'pregame_star_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PregameStarRow),
+  PregameState: __table({
+    name: 'pregame_state',
+    indexes: [
+      { accessor: 'gameId', name: 'pregame_state_game_id_idx_btree', algorithm: 'btree', columns: [
+        'gameId',
+      ] },
+    ],
+    constraints: [
+      { name: 'pregame_state_game_id_key', constraint: 'unique', columns: ['gameId'] },
+    ],
+  }, PregameStateRow),
   RevealTimeout: __table({
     name: 'reveal_timeout',
     indexes: [
@@ -453,7 +498,10 @@ const reducersSchema = __reducers(
   __reducerSchema("pregame_acknowledge_roll", PregameAcknowledgeRollReducer),
   __reducerSchema("pregame_change_deck", PregameChangeDeckReducer),
   __reducerSchema("pregame_choose_first", PregameChooseFirstReducer),
+  __reducerSchema("pregame_finish_souls", PregameFinishSoulsReducer),
+  __reducerSchema("pregame_resolve_star", PregameResolveStarReducer),
   __reducerSchema("pregame_skip_to_reveal", PregameSkipToRevealReducer),
+  __reducerSchema("pregame_submit_stars", PregameSubmitStarsReducer),
   __reducerSchema("random_hand_to_zone", RandomHandToZoneReducer),
   __reducerSchema("random_opponent_hand_to_zone", RandomOpponentHandToZoneReducer),
   __reducerSchema("random_reserve_to_zone", RandomReserveToZoneReducer),

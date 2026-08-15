@@ -1197,6 +1197,15 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     gameState.game?.status === 'playing'
   );
 
+  // REG Pre-Game Phase steps 2 and 3. These run with status === 'playing', so
+  // they render through the playing branch below (which mounts GameToolbar —
+  // Search Deck / Draw / Shuffle / Undo, all of which the phase needs), not
+  // through the ceremony or awaiting-start branches above.
+  const pregameStep: 'stars' | 'souls' | undefined =
+    pregamePhase === 'stars' ? 'stars'
+    : pregamePhase === 'souls' ? 'souls'
+    : undefined;
+
   // Whether we've requested a rematch and are waiting for the opponent's response
   const rematchPending = (() => {
     const reqBy = gameState.game?.rematchRequestedBy ?? '';
@@ -1798,6 +1807,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             opponentPlayer={gameState.opponentPlayer}
             opponentConnectionStatus={gameState.opponentConnectionStatus}
             isMyTurn={gameState.isMyTurn}
+            pregameStep={pregameStep}
             onSetPhase={gameState.setPhase}
             onEndTurn={requestEndTurn}
             onConcede={gameState.resignGame}

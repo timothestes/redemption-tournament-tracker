@@ -27,7 +27,8 @@ export const Game = table(
     isPublic: t.bool(),
     lobbyMessage: t.string(),
     createdByName: t.string(),
-    pregamePhase: t.string(),     // "" | "rolling" | "choosing" | "revealing"
+    pregamePhase: t.string(),     // "" | "rolling" | "choosing" | "revealing" | "stars" | "souls"
+                                  // 'stars'/'souls' run with status='playing' — see pregameFlow.ts
     pregameReady0: t.bool(),      // seat 0 ready (reused for roll ack)
     pregameReady1: t.bool(),      // seat 1 ready (reused for roll ack)
     rollWinner: t.string(),       // "" | "0" | "1" — string to avoid 0n ambiguity
@@ -515,6 +516,82 @@ export const CleanupSchedule = table(
 );
 
 // ---------------------------------------------------------------------------
+// 17. PregameState — one row per game, live only during the REG Pre-Game
+//     Phase sub-steps ('stars' / 'souls'). Row absent = pre-game complete.
+//     Deliberately a separate table, NOT Game columns: adding a column would
+//     change the game row's BSATN shape and break deployed clients' game
+//     subscriptions during the publish window (cf. ForgeGame above).
+//
+//     The current step is NOT stored here — Game.pregamePhase is the single
+//     source of truth for it. This table holds only whose window is open and
+//     the per-seat progress flags.
+// ---------------------------------------------------------------------------
+export const PregameState = table(
+  { name: 'pregame_state', public: true },
+  {
+    gameId: t.u64().primaryKey(),
+    activeSeat: t.u64(),          // 0 or 1 — seat whose window is open
+    starsDone0: t.bool(),
+    starsDone1: t.bool(),
+    soulsDone0: t.bool(),
+    soulsDone1: t.bool(),
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 18. PregameStar — one row per star card a player revealed, in the order they
+//     chose to resolve them. Public: revealing is REG's cost for using a star
+//     ability, so opponents and spectators must see the set. These rows (not
+//     CardInstance.revealExpiresAt) back the opponent's view, because the
+//     phase is untimed and the per-card reveal expires after 30s.
+// ---------------------------------------------------------------------------
+export const PregameStar = table(
+  {
+    name: 'pregame_star',
+    public: true,
+    indexes: [
+      { accessor: 'pregame_star_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+    ],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    gameId: t.u64(),
+    seat: t.u64(),
+    cardInstanceId: t.u64(),
+    slot: t.u64(),                // 0-based resolution order
+    resolved: t.bool(),
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 19. PregameIdleTimeout (scheduled table)
+//     The Pre-Game Phase is deliberately untimed, so this is a long backstop
+//     only: it force-completes the active seat's sub-step so an idle or
+//     departed player cannot hang the game.
+// ---------------------------------------------------------------------------
+
+let _handlePregameIdleTimeout: any;
+export const setPregameIdleTimeoutReducer = (reducer: any) => {
+  _handlePregameIdleTimeout = reducer;
+};
+
+export const PregameIdleTimeout = table(
+  {
+    name: 'pregame_idle_timeout',
+    public: true,
+    scheduled: () => _handlePregameIdleTimeout,
+    indexes: [
+      { accessor: 'pregame_idle_timeout_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+    ],
+  },
+  {
+    scheduledId: t.u64().primaryKey().autoInc(),
+    scheduledAt: t.scheduleAt(),
+    gameId: t.u64(),
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Schema export
 // ---------------------------------------------------------------------------
 const spacetimedb = schema({
@@ -537,6 +614,9 @@ const spacetimedb = schema({
   ForgeConfig,
   ForgeSeatAuth,
   CleanupSchedule,
+  PregameState,
+  PregameStar,
+  PregameIdleTimeout,
 });
 
 export default spacetimedb;

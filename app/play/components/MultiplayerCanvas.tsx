@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Stage, Layer, Rect, Text, Group, Line, Image as KonvaImage } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Line, Circle, Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 
@@ -31,6 +31,7 @@ import { COUNTER_COLORS } from '../../goldfish/types';
 import type {
   CardInstance,
   CardCounter,
+  PregameStar,
 } from '@/lib/spacetimedb/module_bindings/types';
 import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
 import { CardNotePopover } from './CardNotePopover';
@@ -66,12 +67,15 @@ import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLay
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 import BattleResolutionUI from './BattleResolutionUI';
+import PregameRail from './PregameRail';
+import { STAR_OF_DAVID_IMG, STAR_OF_DAVID_INSET } from './StarOfDavidIcon';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
 import { gameCardIsWarrior, gameCardIsWeapon } from '@/app/goldfish/utils/equipClass';
 import { findCard, isSite } from '@/lib/cards/lookup';
+import { isStarAbilityText } from '@/lib/cards/starCards';
 import { compareCardsDefault } from '@/lib/cards/defaultSort';
 import { normalizeDeckFormat } from '@/lib/deck-format';
 import { SOUL_DECK_BACK_IMG } from '@/app/shared/paragon/soulDeck';
@@ -1151,6 +1155,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     img.src = SOUL_DECK_BACK_IMG;
   }, [normalizedFormat]);
 
+  // Star of David badge art (Pre-Game star cue). Same load-once idiom as the
+  // Soul Deck back above; the badge simply doesn't draw until it's ready.
+  const starIconRef = useRef<HTMLImageElement | null>(null);
+  const [starIconReady, setStarIconReady] = useState(false);
+  useEffect(() => {
+    if (starIconRef.current) return;
+    const img = new window.Image();
+    img.onload = () => {
+      starIconRef.current = img;
+      setStarIconReady(true);
+    };
+    img.src = STAR_OF_DAVID_IMG;
+  }, []);
+
   // ---- Hover state ----
   const [hoveredInstanceId, setHoveredInstanceId] = useState<string | null>(null);
   const [hoveredCard, setHoveredCard] = useState<GameCard | null>(null);
@@ -1564,6 +1582,86 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // (Same pattern as rawBattleActiveRef above.)
   const findAnyCardByIdRef = useRef(findAnyCardById);
   findAnyCardByIdRef.current = findAnyCardById;
+
+  // ---- REG Pre-Game Phase (star reveals, then Lost Soul activation) ----
+  // These sub-steps run with game.status === 'playing', so pregamePhase — not
+  // status — is what identifies them.
+  const pregameStep: 'stars' | 'souls' | undefined =
+    gameState.game?.pregamePhase === 'stars' ? 'stars'
+    : gameState.game?.pregamePhase === 'souls' ? 'souls'
+    : undefined;
+
+  const myPregameWindow =
+    !!gameState.pregameState && !!gameState.myPlayer &&
+    gameState.pregameState.activeSeat === gameState.myPlayer.seat;
+
+  // Star detection reads each row's OWN specialAbility, never findCard() —
+  // Forge cards are absent from the public card index.
+  const myHandStars = useMemo(() => (myCards['hand'] ?? [])
+    .filter(c => isStarAbilityText(c.specialAbility))
+    .map(c => ({
+      instanceId: c.id, cardName: c.cardName, imitatingName: c.imitatingName,
+    })), [myCards]);
+
+  const myActivatableSouls = useMemo(() => (myCards['land-of-bondage'] ?? [])
+    .filter(c => (c.specialAbility ?? '') !== '')
+    .map(c => ({ instanceId: c.id, cardName: c.cardName })),
+    [myCards]);
+
+  const activeStarQueue = useMemo(() => {
+    const seat = gameState.pregameState?.activeSeat;
+    if (seat === undefined) return [];
+    return (gameState.pregameStars ?? [])
+      .filter((s: PregameStar) => s.seat === seat)
+      .map((s: PregameStar) => {
+        const card = findAnyCardById(String(s.cardInstanceId));
+        return {
+          starId: s.id, cardInstanceId: s.cardInstanceId, resolved: s.resolved,
+          cardName: card?.cardName ?? '', cardImgFile: card?.cardImgFile ?? '',
+          imitatingName: card?.imitatingName,
+        };
+      });
+  }, [gameState.pregameState, gameState.pregameStars, findAnyCardById]);
+
+  // The server rejects a second submission per seat, so any row of mine means
+  // my selection window is closed and the resolve queue is what's live.
+  const mySeatForPregame = gameState.myPlayer?.seat;
+  const myStarsSubmitted = useMemo(
+    () => mySeatForPregame !== undefined &&
+      (gameState.pregameStars ?? []).some((s: PregameStar) => s.seat === mySeatForPregame),
+    [gameState.pregameStars, mySeatForPregame],
+  );
+
+  // My star-selection window is open. One gate for all three surfaces it
+  // drives: the click-to-pick intercept, the on-card eligibility marker, and
+  // the order badges.
+  const starWindowOpen =
+    !isSpectator && pregameStep === 'stars' && myPregameWindow && !myStarsSubmitted;
+
+  // The star cards I've clicked in hand, in pick order. Lives here rather than
+  // inside PregameRail because both the hand's Konva order badges and the
+  // rail's submit button read the same list.
+  const [starPicks, setStarPicks] = useState<bigint[]>([]);
+
+  const toggleStarPick = useCallback((id: bigint) => {
+    setStarPicks(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }, []);
+
+  // Drop picks for cards that have left my hand (dragged out, moved by an
+  // ability) so a stale id can never reach the submit reducer.
+  const starPickOrder = useMemo(() => {
+    if (starPicks.length === 0) return starPicks;
+    const inHand = new Set(myHandStars.map(c => c.instanceId));
+    return starPicks.filter(id => inHand.has(id));
+  }, [starPicks, myHandStars]);
+
+  // Clear the list whenever the selection window isn't open — after submitting,
+  // when the window passes to the opponent, and when the pre-game ends.
+  useEffect(() => {
+    if (pregameStep === 'stars' && myPregameWindow && !myStarsSubmitted) return;
+    setStarPicks(prev => (prev.length === 0 ? prev : []));
+  }, [pregameStep, myPregameWindow, myStarsSubmitted]);
 
   // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel).
   // Resolve the live card (by instanceId) from the current zone data so fields like
@@ -4785,6 +4883,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Universal card click handler — shift-click toggles selection
   const handleCardClick = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
+      // REG pre-game star step: while my selection window is open, clicking a
+      // star card in my hand picks it for the reveal instead of touching
+      // marquee selection. Ahead of the left-click counter so a second click
+      // (un-picking) can't also trip the meek double-click. Star detection
+      // reads the row's OWN specialAbility — never findCard(), which is blind
+      // to Forge cards.
+      if (starWindowOpen && card.zone === 'hand' && isStarAbilityText(card.specialAbility)) {
+        toggleStarPick(BigInt(card.instanceId));
+        return;
+      }
       if (e.evt.button === 0) leftClicksSinceContextMenuRef.current += 1;
       if (e.evt.shiftKey) {
         toggleSelect(card.instanceId);
@@ -4794,7 +4902,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         clearSelection();
       }
     },
-    [selectedIds, clearSelection, toggleSelect],
+    [selectedIds, clearSelection, toggleSelect, starWindowOpen, toggleStarPick],
   );
 
   const handleCardContextMenu = useCallback(
@@ -8066,7 +8174,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       cardHeight={handCardHeight}
                       image={getCardImage(card)}
                       {...(getTargetingProps(gameCard) ?? {})}
-                      isSelected={isSelected(idStr)}
+                      // A pre-game star pick borrows the same golden outline.
+                      // It rides inside the card's own Konva group, so it
+                      // tracks the node through the hand-reflow glide.
+                      isSelected={isSelected(idStr) || starPickOrder.includes(card.id)}
                       isDraggable={!isSpectator}
                       hoverProgress={hoveredInstanceId === idStr ? hoverProgress : 0}
                       lobArrivalGlow={dealGlowIds.has(idStr)}
@@ -8081,6 +8192,103 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
                     />
+                  );
+                })}
+                {/* Pre-game star cues, drawn over the hand so the fan's
+                    overlap can't hide them. Two signals in opposite top
+                    corners, so they never collide:
+                      · top-RIGHT, a Star of David — this card carries a (Star)
+                        ability, i.e. clicking it picks it. Deliberately
+                        subordinate: smaller than the numeral, no gold ring,
+                        no glow.
+                      · top-LEFT, a gold numeral — this card is picked Nth.
+                        Same badge language as the HAND count chip.
+                    The group is non-listening, so the click that picks the
+                    card still reaches the card underneath. */}
+                {(starWindowOpen || starPickOrder.length > 0) && handCards.map((card, i) => {
+                  const pos = positions[i];
+                  if (!pos || dealingIds.has(String(card.id))) return null;
+                  const order = starPickOrder.indexOf(card.id);
+                  // Same detection as the click intercept: the row's OWN
+                  // ability text, never findCard().
+                  const eligible = starWindowOpen && isStarAbilityText(card.specialAbility);
+                  if (order < 0 && !eligible) return null;
+                  const r = 12 * fsGrowth(13);
+                  // Star disc, inscribed in the top-right corner the way the
+                  // numeral is inscribed top-left — and a step smaller than it,
+                  // so the pick order stays the louder signal.
+                  const sr = 11 * fsGrowth(13);
+                  const scx = handCardWidth - sr;
+                  // Hexagram box, centred in the disc. The asset is taller than
+                  // it is wide, so height drives the fit and width follows its
+                  // aspect ratio — the same contain behaviour the DOM icon gets
+                  // for free from objectFit.
+                  const starH = sr * 2 * STAR_OF_DAVID_INSET;
+                  const starIcon = starIconRef.current;
+                  const starW = starIcon
+                    ? starH * (starIcon.naturalWidth / starIcon.naturalHeight)
+                    : starH;
+                  return (
+                    <Group
+                      key={`star-cue-${String(card.id)}`}
+                      x={pos.x}
+                      y={pos.y}
+                      rotation={pos.rotation}
+                      listening={false}
+                    >
+                      {eligible && starIconReady && starIcon && (
+                        <>
+                          {/* Opaque white ground. Card art runs from near-white
+                              title bands to dark illustration, so the disc — not
+                              the hexagram — is what carries the badge against
+                              both halves. */}
+                          <Circle
+                            x={scx}
+                            y={sr}
+                            radius={sr}
+                            fill="#ffffff"
+                            perfectDrawEnabled={false}
+                          />
+                          <KonvaImage
+                            image={starIcon}
+                            x={scx - starW / 2}
+                            y={sr - starH / 2}
+                            width={starW}
+                            height={starH}
+                            listening={false}
+                            perfectDrawEnabled={false}
+                          />
+                        </>
+                      )}
+                      {order >= 0 && (
+                        <>
+                          <Circle
+                            x={r}
+                            y={r}
+                            radius={r}
+                            fill="rgba(10, 8, 5, 0.92)"
+                            stroke="#c4955a"
+                            strokeWidth={2}
+                            shadowColor="#c4955a"
+                            shadowBlur={8}
+                            shadowOpacity={0.7}
+                            perfectDrawEnabled={false}
+                          />
+                          <Text
+                            text={String(order + 1)}
+                            fontSize={fs(13)}
+                            fontStyle="bold"
+                            fontFamily="Cinzel, Georgia, serif"
+                            fill="#e8d5a3"
+                            width={r * 2}
+                            height={r * 2}
+                            align="center"
+                            verticalAlign="middle"
+                            perfectDrawEnabled={false}
+                          />
+                        </>
+                      )}
+                    </Group>
                   );
                 })}
                 <DealLayer sprites={dealSprites} onLanded={completeDeal} />
@@ -8435,6 +8643,35 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onResolveBattle={gameState.resolveBattle}
           onEndBattle={gameState.endBattle}
           onSurrenderSoul={gameState.surrenderSoul}
+        />
+      )}
+
+      {/* ================================================================
+          REG Pre-Game Phase rail (star reveals, then Lost Soul activation).
+          Mounted here, not client.tsx, because its wrapper is inset-0 over
+          the canvas viewport — the same reason BattleResolutionUI lives
+          here. The wrapper is pointer-events:none so the board, the
+          toolbar and every modal stay fully interactive while it shows.
+          ================================================================ */}
+      {pregameStep && !isSpectator && (
+        <PregameRail
+          step={pregameStep}
+          isMyWindow={myPregameWindow}
+          opponentName={gameState.opponentPlayer?.displayName || 'Opponent'}
+          handStars={myHandStars}
+          queue={activeStarQueue}
+          activatableSouls={myActivatableSouls}
+          hasSubmitted={myStarsSubmitted}
+          selection={starPickOrder}
+          onSubmitStars={gameState.pregameSubmitStars}
+          onResolveStar={gameState.pregameResolveStar}
+          onFinishSouls={gameState.pregameFinishSouls}
+          // Route through multiplayerActions, not gameState, so modal-driven
+          // ability types (look_at_own_deck — the type all four star-half
+          // registry entries use) are intercepted client-side. The raw
+          // reducer throws SenderError for those.
+          onExecuteAbility={(instanceId, abilityIndex) =>
+            multiplayerActions.executeCardAbility(String(instanceId), abilityIndex)}
         />
       )}
 

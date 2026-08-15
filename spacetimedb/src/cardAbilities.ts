@@ -167,12 +167,16 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   "Balaam's Prophecy":                                   [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   'Fruit of the Land':                                   [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'Intervening of Prophecy':                             [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
-  'The Coming Prince':                                   [{ type: 'look_at_own_deck', position: 'top', count: 1 }, { type: 'underdeck_top_of_deck', count: 1 }],
+  // (Star) abilities are used from hand during the REG Pre-Game Phase, so their
+  // registered entry takes the hand override. Only entries encoding the card's
+  // STAR clause qualify — the 12 star cards whose entry encodes their in-play
+  // clause (Manna (PoC), The Outcasts, Redeeming Branch, …) deliberately do not.
+  'The Coming Prince':                                   [{ type: 'look_at_own_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }, { type: 'underdeck_top_of_deck', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Abed-nego (Azariah) (PoC)':                           [{ type: 'underdeck_top_of_deck', count: 1 }],
-  'Sign of Jonah':                                       [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'Sign of Jonah':                                       [{ type: 'look_at_own_deck', position: 'top', count: 3, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Virgin Birth':                                        [{ type: 'look_at_own_deck', position: 'top', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Eve, Mother of All (Roots)':                          [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
-  'The Thankful Leper (GoC)':                            [{ type: 'look_at_own_deck', position: 'top', count: 10 }],
+  'The Thankful Leper (GoC)':                            [{ type: 'look_at_own_deck', position: 'top', count: 10, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'David (Roots)':                                       [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'Malachi, the Loved':                                  [{ type: 'look_at_own_deck', position: 'top', count: 4 }],
   'Malachi, the Loved [T2C AB]':                         [{ type: 'look_at_own_deck', position: 'top', count: 4 }],
@@ -186,7 +190,7 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Servants by the River [T2C]':                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'The Angel of His Presence [T2C AB]':                  [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'The Angel of His Presence [T2C]':                     [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
-  'The Three Visitors':                                  [{ type: 'look_at_own_deck', position: 'top', count: 9 }],
+  'The Three Visitors':                                  [{ type: 'look_at_own_deck', position: 'top', count: 9, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Women of Israel [L]':                                 [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Women of Israel (1st Print - L)':                     [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   "Herod's Temple (GoC)":                                [{ type: 'reserve_top_of_deck', count: 1 }],

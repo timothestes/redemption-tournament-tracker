@@ -409,6 +409,14 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   ) ?? (gameState.allGames ?? []).find((g: any) => g.code === code);
   const status = game?.status;
 
+  // REG Pre-Game Phase steps 2 and 3 run with status === 'playing', so the
+  // board branch below already covers them; this only re-labels the header.
+  const pregamePhase = gameState.game?.pregamePhase;
+  const pregameStep: 'stars' | 'souls' | undefined =
+    pregamePhase === 'stars' ? 'stars'
+    : pregamePhase === 'souls' ? 'souls'
+    : undefined;
+
   const myScore = gameState.myCards['land-of-redemption']?.length ?? 0;
   const opponentScore = gameState.opponentCards['land-of-redemption']?.length ?? 0;
 
@@ -527,6 +535,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                   opponentPlayer={gameState.opponentPlayer}
                   opponentConnectionStatus={gameState.opponentConnectionStatus}
                   isMyTurn={false}
+                  pregameStep={pregameStep}
                   onSetPhase={() => {}}
                   onEndTurn={() => {}}
                   myScore={myScore}
