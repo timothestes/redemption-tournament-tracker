@@ -21,8 +21,8 @@ import { login, hostGame, joinGame, bothReachPlaying } from "../spectator/playHe
 //   - Scenario 1's "active player clicks End Turn → error toast": every UI
 //     path into a hold-guarded reducer is DISABLED for the active player
 //     (TurnIndicator End Turn, GameToolbar End Turn, all five phase buttons,
-//     both arrows), so the SenderError never fires and there is no
-//     reducer-error toast surface in the play client at all. Asserted as:
+//     both arrows), so the guarded reducer is never called and its
+//     toastReducerError catch (useGameState.ts) never fires. Asserted as:
 //     the controls are disabled, and clicking through them changes nothing.
 //   - Scenario 4's "drags an attacker into the band during preparation": the
 //     band is phase-driven since the battle-zone redesign (isBattleBandActive
@@ -380,8 +380,10 @@ test.describe("Phase Stops", () => {
       await expect(endBattleBtn).toBeDisabled();
 
       // Force-clicking the disabled buttons must not dispatch — no reducer
-      // call, so no SenderError, so no unhandled-rejection pageerror (the
-      // original E17 bug — see task-11-report.md §4.1).
+      // call, so no SenderError, so no unhandled-rejection pageerror (this
+      // was the original E17 bug: before isTurnHeld gated these buttons,
+      // force-clicking them dispatched a rejected reducer call that
+      // surfaced as an unhandled-rejection pageerror).
       const battlePageErrors: string[] = [];
       active.on("pageerror", (e) => battlePageErrors.push(String(e)));
       await winBattleBtn.click({ force: true }).catch(() => {});
@@ -395,9 +397,10 @@ test.describe("Phase Stops", () => {
       // --- 3. The active player cannot move the turn on ---------------------
       // The brief asks for the "The turn is held" SenderError toast here. It is
       // unreachable: the client disables every path into the guarded reducers
-      // rather than letting them throw, and the play client has no
-      // reducer-error toast surface. The equivalent assertion is that the
-      // controls are dead and the state does not budge.
+      // rather than letting them throw, so the toastReducerError catch these
+      // reducers now have (useGameState.ts) never gets a rejection to toast.
+      // The equivalent assertion is that the controls are dead and the state
+      // does not budge.
       await expect(heldBtn(active)).toBeDisabled();
       await expect(toolbarEndTurnBtn(active)).toBeDisabled();
       for (const phase of ["draw", "upkeep", "preparation", "discard"] as Phase[]) {
