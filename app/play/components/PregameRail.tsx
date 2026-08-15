@@ -9,12 +9,14 @@
 // click-through DOM overlay never intercepts board clicks. Same technique as
 // BattleResolutionUI.tsx.
 //
-// Placement copies AwaitingSoulUI in BattleResolutionUI.tsx, the play UI's house
-// idiom for a mid-board panel: dead centre vertically (`top: 50%`), and
-// horizontally on `centerX` — the play mat's midline in screen px, passed in by
-// the mount site. Not the viewport's midline: the sidebar piles and the chat
-// column both live on the right, so viewport centring sits visibly right of the
-// board. Both territories are empty during the pre-game, so the centre is free.
+// Placement is the play UI's house idiom for a floating panel, shared with
+// PauseConsentToast, SpectatorHandRequestBanner and GameOverOverlay: dead centre
+// of the container, `top/left: 50%` with `translate(-50%, -50%)`. GameToolbar
+// centres itself the same way and is a sibling of the canvas in that container,
+// so the panel and the toolbar share one vertical axis — the thing the eye
+// actually checks. (AwaitingSoulUI takes a computed `centerX` instead, but it is
+// aligning to the battle band, not to the screen.) Both territories are empty
+// during the pre-game, so the centre of the board is free.
 
 import {
   getEffectiveAbilities,
@@ -104,8 +106,6 @@ interface PregameRailProps {
   /** True when I have submitted my star selection this window. */
   hasSubmitted: boolean;
   autoRouteLostSouls: boolean;
-  /** The play mat's horizontal midline in screen px. */
-  centerX: number;
   /** Star cards I've clicked in hand, in pick order. Owned by MultiplayerCanvas
    *  so the hand's order badges and this panel's submit button agree. */
   selection: bigint[];
@@ -118,7 +118,7 @@ interface PregameRailProps {
 
 export default function PregameRail({
   step, isMyWindow, opponentName, handStars, queue, activatableSouls,
-  hasSubmitted, autoRouteLostSouls, centerX, selection,
+  hasSubmitted, autoRouteLostSouls, selection,
   onSubmitStars, onResolveStar, onFinishSouls, onExecuteAbility, onHighlightCard,
 }: PregameRailProps) {
   // The opponent's revealed stars are named but not on any board the viewer can
@@ -136,7 +136,7 @@ export default function PregameRail({
   // Konva hit-tests on its own canvas, so this never blocks board interaction.
   const wrapper = (children: React.ReactNode) => (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: RAIL_Z }}>
-      <div style={{ position: 'absolute', left: centerX, top: '50%',
+      <div style={{ position: 'absolute', left: '50%', top: '50%',
                     transform: 'translate(-50%, -50%)', ...PANEL }}>
         {children}
       </div>

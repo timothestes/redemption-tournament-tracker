@@ -837,7 +837,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   const myHandRect = mpLayout?.zones.playerHand ?? null;
   const opponentHandRect = mpLayout?.zones.opponentHand ?? null;
-  const myTerritoryRect = mpLayout?.zones.playerTerritory ?? null;
 
   // Player-hand card dimensions: capped so the card bottom always stays
   // above the floating toolbar reserve. On narrow viewports the mainCard
@@ -8654,7 +8653,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           here. The wrapper is pointer-events:none so the board, the
           toolbar and every modal stay fully interactive while it shows.
           ================================================================ */}
-      {pregameStep && !isSpectator && myTerritoryRect && (
+      {pregameStep && !isSpectator && (
         <PregameRail
           step={pregameStep}
           isMyWindow={myPregameWindow}
@@ -8664,12 +8663,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           activatableSouls={myActivatableSouls}
           hasSubmitted={myStarsSubmitted}
           autoRouteLostSouls={gameState.myPlayer?.autoRouteLostSouls ?? true}
-          // The play mat's midline, exactly as BattleResolutionUI derives its
-          // own `centerX` — viewport centring sits right of the board.
-          centerX={virtualToScreen(
-            myTerritoryRect.x + myTerritoryRect.width / 2, myTerritoryRect.y,
-            scale, offsetX, offsetY,
-          ).x}
           selection={starPickOrder}
           onSubmitStars={gameState.pregameSubmitStars}
           onResolveStar={gameState.pregameResolveStar}
