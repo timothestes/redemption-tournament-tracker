@@ -5,7 +5,7 @@ import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
 import { isLeavingPlayField } from './playField';
-import { makeFreeSpotAllocator } from './battlePlacement';
+import { makeFreeSpotAllocator, bandRowSlots, BAND_ROW_Y } from './battlePlacement';
 import { resolveDestinationOwnerId, resolveHomeOwnerId, type OwnerRouting } from './cardOwnership';
 import {
   getAbilitiesForCard,
@@ -5033,26 +5033,8 @@ function playAllLostSoulsImpl(
 // mirrors enter_battle exactly (attacker is whoever's turn it is, not the
 // activator), so this is indistinguishable from dragging the Heroes in by
 // hand. Deck zoneIndex gaps are left behind, same as playAllLostSoulsImpl.
+// Row geometry lives in battlePlacement.ts (bandRowSlots) so it's unit-tested.
 // ---------------------------------------------------------------------------
-
-// Band row geometry, in the owner-relative normalized units posX/posY store
-// (app/play/utils/coordinateTransforms.ts). The band is only ~1.5 card heights
-// tall, so the whole effect is one horizontal row on the activator's half.
-// BAND_CARD_W is a card's width as a fraction of the band's width at the
-// reference layout (~98 / ~1500).
-const BAND_CARD_W = 0.065;
-const BAND_ROW_Y = 0.05;
-const BAND_RIGHT_EDGE = 0.93;
-
-/** Evenly spaced x slots for `count` cards starting at `startX`. Uses a
- *  comfortable one-card pitch when there's room and compresses into an
- *  overlapping fan when there isn't, so a big band never runs off the edge. */
-function bandRowSlots(startX: number, count: number): number[] {
-  const span = Math.max(BAND_RIGHT_EDGE - startX, 0);
-  const step = count > 1 ? Math.min(BAND_CARD_W + 0.01, span / (count - 1)) : 0;
-  return Array.from({ length: count }, (_, i) => startX + i * step);
-}
-
 function bandHeroesFromDeckImpl(
   ctx: any,
   source: any,
@@ -5080,16 +5062,11 @@ function bandHeroesFromDeckImpl(
     .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
   if (heroes.length === 0) return;
 
-  // Start to the right of whatever the activator already has in the band so an
-  // existing band isn't buried under the new arrivals.
-  let startX = 0.03;
-  for (const c of myCards) {
-    if (c.zone !== 'battle') continue;
-    const x = Number(c.posX);
-    if (Number.isFinite(x)) startX = Math.max(startX, x + BAND_CARD_W + 0.01);
-  }
-  startX = Math.min(startX, BAND_RIGHT_EDGE);
-  const slots = bandRowSlots(startX, heroes.length);
+  // One tight row packed against the right end of the band, deliberately
+  // independent of what's already banded: the arrivals always claim the same
+  // predictable strip instead of chasing existing cards rightward and
+  // eventually spilling off the edge.
+  const slots = bandRowSlots(heroes.length);
 
   if (game.battleState === '') {
     ctx.db.Game.id.update({
