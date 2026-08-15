@@ -1217,6 +1217,17 @@ function finishPregame(ctx: any, gameId: bigint): void {
   logAction(ctx, gameId, firstPlayerId, 'GAME_STARTED',
     JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
     1n, 'draw');
+
+  // Phase Stops: turn 1 starts here (no end_turn runs), so run the same
+  // turn-start draw-stop check as the turn flip. A draw stop toggled during
+  // the star/soul pregame fires at the top of turn 1.
+  const stopRow = ctx.db.TurnStop.gameId.find(gameId);
+  if (stopRow) {
+    const stopsCsv = game.currentTurn === 0n ? stopRow.seat1Stops : stopRow.seat0Stops;
+    if (firstStopInRange(-1, 0, stopsCsv, stopRow.firedPhases) !== null) {
+      engageHold(ctx, gameId, 'draw');
+    }
+  }
 }
 
 // Games are never deleted — the concede paths only set status:'finished' — so
@@ -2701,6 +2712,43 @@ setStopHoldTimeoutReducer(handle_stop_hold_timeout);
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
+// Helper: applyPhaseTransition
+// The single phase-write path shared by set_phase and the Phase Stops snaps.
+// Runs the leave-battle auto-return and enter-battle band-open side effects,
+// writes currentPhase, logs SET_PHASE — exactly what a direct phase click
+// does, so a stop-snap is indistinguishable from the player clicking P.
+// ---------------------------------------------------------------------------
+function applyPhaseTransition(ctx: any, gameId: bigint, actingPlayerId: bigint, targetPhase: string): void {
+  let game = ctx.db.Game.id.find(gameId);
+  if (!game) return;
+  const oldPhase = game.currentPhase;
+
+  // Leaving battle auto-closes any open band; runBattleAutoReturn writes the
+  // Game row, so re-read before the currentPhase write below (stale-spread
+  // hazard — same comment as the original set_phase body).
+  if (oldPhase === 'battle' && targetPhase !== 'battle' && game.battleState !== '') {
+    runBattleAutoReturn(ctx, gameId, actingPlayerId);
+    game = ctx.db.Game.id.find(gameId) ?? game;
+  }
+
+  if (targetPhase === 'battle' && oldPhase !== 'battle' && game.battleState === '') {
+    // Entering the battle phase opens the band — same step enter_battle
+    // performs when the band starts closed.
+    ctx.db.Game.id.update({
+      ...game,
+      currentPhase: targetPhase,
+      battleState: 'active',
+      battleAttackerSeat: game.currentTurn.toString(),
+      lastBattlePlayBySeat: '',
+    });
+  } else {
+    ctx.db.Game.id.update({ ...game, currentPhase: targetPhase });
+  }
+
+  logAction(ctx, gameId, actingPlayerId, 'SET_PHASE', JSON.stringify({ phase: targetPhase }), game.turnNumber, targetPhase);
+}
+
+// ---------------------------------------------------------------------------
 // Reducer: set_phase
 // ---------------------------------------------------------------------------
 export const set_phase = spacetimedb.reducer(
@@ -2728,33 +2776,19 @@ export const set_phase = spacetimedb.reducer(
       throw new SenderError('Invalid phase: ' + phase);
     }
 
-    const oldPhase = game.currentPhase;
+    // Phase Stops: refuse any movement while a hold is active (spec §5.4),
+    // then scan forward movement for the first unfired stop (spec §5.1–5.2).
+    assertTurnNotHeld(ctx, gameId);
 
-    // Leaving the battle phase auto-closes any open battle (spec §7) — same
-    // hook end_turn runs. runBattleAutoReturn does its own Game write
-    // (clearing battleState/battleAttackerSeat/lastBattlePlayBySeat); re-read
-    // before the currentPhase write below or that write would resurrect
-    // battleState by spreading the stale pre-return snapshot.
-    if (oldPhase === 'battle' && phase !== 'battle' && game.battleState !== '') {
-      runBattleAutoReturn(ctx, gameId, player.id);
-      game = ctx.db.Game.id.find(gameId) ?? game;
+    const oldIdx = (STOP_PHASES as readonly string[]).indexOf(game.currentPhase);
+    const newIdx = (STOP_PHASES as readonly string[]).indexOf(phase);
+    let stopPhase: string | null = null;
+    if (newIdx > oldIdx) {
+      stopPhase = scanForStop(ctx, game, oldIdx, newIdx);
     }
 
-    if (phase === 'battle' && oldPhase !== 'battle' && game.battleState === '') {
-      // Entering the battle phase opens the band (spec §4) — the same open
-      // step enter_battle performs when the band starts closed.
-      ctx.db.Game.id.update({
-        ...game,
-        currentPhase: phase,
-        battleState: 'active',
-        battleAttackerSeat: game.currentTurn.toString(),
-        lastBattlePlayBySeat: '',
-      });
-    } else {
-      ctx.db.Game.id.update({ ...game, currentPhase: phase });
-    }
-
-    logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase }), game.turnNumber, phase);
+    applyPhaseTransition(ctx, gameId, player.id, stopPhase ?? phase);
+    if (stopPhase !== null) engageHold(ctx, gameId, stopPhase);
   }
 );
 
@@ -2779,6 +2813,7 @@ export const end_turn = spacetimedb.reducer(
     if (player.seat !== game.currentTurn) {
       throw new SenderError('Not your turn');
     }
+    assertTurnNotHeld(ctx, gameId);
 
     // Battles cannot span turns (spec §7): auto-return before this reducer's
     // own Game write below. runBattleAutoReturn mutates the Game row (clears
@@ -2788,6 +2823,17 @@ export const end_turn = spacetimedb.reducer(
     if (game.battleState !== '') {
       runBattleAutoReturn(ctx, gameId, player.id);
       game = ctx.db.Game.id.find(gameId) ?? game;
+    }
+
+    // Phase Stops: a stop in the remaining phases snaps the turn there
+    // instead of ending it — End Turn must be pressed again after release
+    // (spec §5.3). The auto-return above already closed any open band.
+    const endTurnFromIdx = (STOP_PHASES as readonly string[]).indexOf(game.currentPhase);
+    const endTurnStop = scanForStop(ctx, game, endTurnFromIdx, 4);
+    if (endTurnStop !== null) {
+      applyPhaseTransition(ctx, gameId, player.id, endTurnStop);
+      engageHold(ctx, gameId, endTurnStop);
+      return;
     }
 
     const nextSeat = game.currentTurn === 0n ? 1n : 0n;
@@ -2821,6 +2867,18 @@ export const end_turn = spacetimedb.reducer(
     }
 
     logAction(ctx, gameId, player.id, 'END_TURN', JSON.stringify({ newTurn: newTurnNumber.toString() }), newTurnNumber, 'draw');
+
+    // Phase Stops: fired stops reset at every successful flip; then the NEW
+    // non-active seat (the caller) may have a draw stop — their 3 cards are
+    // already drawn, the hold sits between the draw and any advance (E3).
+    const stopRow = ctx.db.TurnStop.gameId.find(gameId);
+    if (stopRow) {
+      ctx.db.TurnStop.gameId.update({ ...stopRow, firedPhases: '' });
+      const newNonActiveStops = nextSeat === 0n ? stopRow.seat1Stops : stopRow.seat0Stops;
+      if (firstStopInRange(-1, 0, newNonActiveStops, '') !== null) {
+        engageHold(ctx, gameId, 'draw');
+      }
+    }
   }
 );
 
@@ -3096,6 +3154,7 @@ export const end_battle = spacetimedb.reducer(
     if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
     if (game.battleState === '') throw new SenderError('No battle in progress');
     const player = findPlayerBySender(ctx, gameId); // either player; also blocks spectators
+    assertTurnNotHeld(ctx, gameId);
     const isTurnPlayer = player.seat === game.currentTurn;
     const wasBattlePhase = game.currentPhase === 'battle';
     runBattleAutoReturn(ctx, gameId, player.id);
@@ -3109,6 +3168,12 @@ export const end_battle = spacetimedb.reducer(
       if (latest) {
         ctx.db.Game.id.update({ ...latest, currentPhase: 'discard' });
         logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latest.turnNumber, 'discard');
+
+        // Phase Stops: battle→discard is forward movement — an unfired discard
+        // stop lands the game on discard HELD (spec §5.7, E15). The battle
+        // itself already concluded above.
+        const stopPhase = scanForStop(ctx, latest, 3, 4);
+        if (stopPhase !== null) engageHold(ctx, gameId, stopPhase);
       }
     }
   }
@@ -3234,9 +3299,32 @@ export const enter_battle = spacetimedb.reducer(
     if (game.battleState === 'awaiting-soul') {
       throw new SenderError('Battle is resolving a soul surrender');
     }
+    // Phase Stops band-open rule (spec §5.7): opening the band IS the attack
+    // starting. Turn-player open + opponent has an unfired battle stop +
+    // phase hasn't passed battle → snap currentPhase to battle (skipping
+    // set_phase's enter-battle side effect — the band-open below IS it),
+    // engage the hold after the open, and let the attacker's card commit.
+    // Non-turn-player calls (blocking, joining) never trigger stops.
+    let engageBattleStop = false;
     if (game.battleState === '') {
+      if (player.seat === game.currentTurn && game.pregamePhase === '') {
+        const stopRow = ctx.db.TurnStop.gameId.find(gameId);
+        if (stopRow && stopRow.holdPhase === '') {
+          const stopsCsv = game.currentTurn === 0n ? stopRow.seat1Stops : stopRow.seat0Stops;
+          const curIdx = (STOP_PHASES as readonly string[]).indexOf(game.currentPhase);
+          const battleIdx = (STOP_PHASES as readonly string[]).indexOf('battle');
+          if (
+            curIdx <= battleIdx &&
+            parseStops(stopsCsv).includes('battle') &&
+            !parseStops(stopRow.firedPhases).includes('battle')
+          ) {
+            engageBattleStop = true;
+          }
+        }
+      }
       ctx.db.Game.id.update({
         ...game,
+        currentPhase: engageBattleStop ? 'battle' : game.currentPhase,
         battleState: 'active',
         battleAttackerSeat: game.currentTurn.toString(),
         lastBattlePlayBySeat: '',
@@ -3251,6 +3339,7 @@ export const enter_battle = spacetimedb.reducer(
       JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, from: fromZone }),
       game.turnNumber, game.currentPhase,
     );
+    if (engageBattleStop) engageHold(ctx, gameId, 'battle');
   },
 );
 
@@ -3328,6 +3417,7 @@ export const resolve_battle = spacetimedb.reducer(
   { gameId: t.u64() },
   (ctx, { gameId }) => {
     const player = findPlayerBySender(ctx, gameId);
+    assertTurnNotHeld(ctx, gameId);
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
     if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
@@ -3375,6 +3465,7 @@ export const surrender_soul = spacetimedb.reducer(
   },
   (ctx, { gameId, cardInstanceId }) => {
     const player = findPlayerBySender(ctx, gameId);
+    assertTurnNotHeld(ctx, gameId);
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
     if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
@@ -3434,6 +3525,9 @@ export const surrender_soul = spacetimedb.reducer(
     if (latestGame && latestGame.currentPhase === 'battle') {
       ctx.db.Game.id.update({ ...latestGame, currentPhase: 'discard' });
       logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latestGame.turnNumber, 'discard');
+
+      const stopPhase = scanForStop(ctx, latestGame, 3, 4);
+      if (stopPhase !== null) engageHold(ctx, gameId, stopPhase);
     }
   },
 );
