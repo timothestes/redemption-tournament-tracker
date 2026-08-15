@@ -1,6 +1,6 @@
 import spacetimedb from './schema';
 export default spacetimedb;
-import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, RevealTimeout, setRevealTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer, PregameIdleTimeout, setPregameIdleTimeoutReducer } from './schema';
+import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, RevealTimeout, setRevealTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer, PregameIdleTimeout, setPregameIdleTimeoutReducer, StopHoldTimeout, setStopHoldTimeoutReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
@@ -27,6 +27,7 @@ import {
   type PregameStep,
   type Seat,
 } from './pregameFlow';
+import { STOP_PHASES, parseStops, toggleStop, firstStopInRange } from './stopFlow';
 
 // Auto-reveal duration for cards that land in a hand via a move whose log
 // payload reveals the card identity (cross-player moves, face-up moves, etc.).
@@ -60,6 +61,10 @@ function isStarAbilityText(text: string): boolean {
 // that a thinking player is never cut off, short enough that a departed one
 // cannot hang the game.
 const PREGAME_IDLE_MICROS = 180_000_000n; // 3 minutes
+
+// Phase Stops: how long a hold lasts before the server auto-releases it.
+// Liveness backstop (spec §12 — tunable after live play).
+const STOP_HOLD_TIMEOUT_MICROS = 60_000_000n; // 60s
 
 // ---------------------------------------------------------------------------
 // Forge playtest games (Phase 2.3)
@@ -1225,6 +1230,87 @@ function clearPregameRows(ctx: any, gameId: bigint): void {
   for (const timeout of ctx.db.PregameIdleTimeout.pregame_idle_timeout_game_id.filter(gameId)) {
     ctx.db.PregameIdleTimeout.scheduledId.delete(timeout.scheduledId);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Phase Stops helpers (opponent-turn priority stops).
+// docs/superpowers/specs/2026-08-15-phase-stops-design.md §5–§6.
+// The stopping seat is always the non-active seat; no column stores it.
+// ---------------------------------------------------------------------------
+
+// Arm the 60s hold backstop. Delete-then-insert so at most one row exists per
+// game (the schedulePregameIdleTimeout idiom — stale rows are otherwise
+// indistinguishable at fire time beyond the phase guard).
+function armStopHoldTimeout(ctx: any, gameId: bigint, phase: string): void {
+  for (const row of ctx.db.StopHoldTimeout.stop_hold_timeout_game_id.filter(gameId)) {
+    ctx.db.StopHoldTimeout.scheduledId.delete(row.scheduledId);
+  }
+  ctx.db.StopHoldTimeout.insert({
+    scheduledId: 0n,
+    scheduledAt: ScheduleAt.time(ctx.timestamp.microsSinceUnixEpoch + STOP_HOLD_TIMEOUT_MICROS),
+    gameId,
+    phase,
+  });
+}
+
+// Lifecycle cleanup: rematch accept + cleanup_stale_games (both branches).
+// Without this a hold stranded by a mid-hold game end wedges the rematch —
+// the timeout handler early-returns on finished games (spec §6.6).
+function clearStopHoldRows(ctx: any, gameId: bigint): void {
+  ctx.db.TurnStop.gameId.delete(gameId);
+  for (const row of ctx.db.StopHoldTimeout.stop_hold_timeout_game_id.filter(gameId)) {
+    ctx.db.StopHoldTimeout.scheduledId.delete(row.scheduledId);
+  }
+}
+
+// Hold guard for the five blocked reducers (spec §5.4). Card plays never call
+// this — the honor system stands.
+function assertTurnNotHeld(ctx: any, gameId: bigint): void {
+  const stopRow = ctx.db.TurnStop.gameId.find(gameId);
+  if (!stopRow || stopRow.holdPhase === '') return;
+  const game = ctx.db.Game.id.find(gameId);
+  let stopperName = 'your opponent';
+  if (game) {
+    const stopperSeat = game.currentTurn === 0n ? 1n : 0n;
+    for (const p of ctx.db.Player.player_game_id.filter(gameId)) {
+      if (p.seat === stopperSeat) stopperName = p.displayName;
+    }
+  }
+  throw new SenderError('The turn is held — waiting on ' + stopperName);
+}
+
+// First qualifying stop for a forward movement by the active player's turn
+// from index `fromIdx` (exclusive) to `toIdx` (inclusive), or null. Reads the
+// NON-ACTIVE seat's stop set — stops apply to the opponent's turn only.
+function scanForStop(ctx: any, game: any, fromIdx: number, toIdx: number): string | null {
+  const stopRow = ctx.db.TurnStop.gameId.find(game.id);
+  if (!stopRow || stopRow.holdPhase !== '') return null;
+  const stopsCsv = game.currentTurn === 0n ? stopRow.seat1Stops : stopRow.seat0Stops;
+  return firstStopInRange(fromIdx, toIdx, stopsCsv, stopRow.firedPhases);
+}
+
+// Engage a hold at `phase`: mark fired, set holdPhase, arm the backstop, log
+// STOP_HOLD attributed to the stopping (non-active) player. Callers have
+// already moved the game onto `phase`.
+function engageHold(ctx: any, gameId: bigint, phase: string): void {
+  const stopRow = ctx.db.TurnStop.gameId.find(gameId);
+  if (!stopRow) return;
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) return;
+  ctx.db.TurnStop.gameId.update({
+    ...stopRow,
+    holdPhase: phase,
+    firedPhases: toggleStop(stopRow.firedPhases, phase, true),
+  });
+  armStopHoldTimeout(ctx, gameId, phase);
+  const stopperSeat = game.currentTurn === 0n ? 1n : 0n;
+  let stopper: any = null;
+  for (const p of ctx.db.Player.player_game_id.filter(gameId)) {
+    if (p.seat === stopperSeat) stopper = p;
+  }
+  logAction(ctx, gameId, stopper ? stopper.id : 0n, 'STOP_HOLD',
+    JSON.stringify({ phase, stopperName: stopper ? stopper.displayName : 'Opponent' }),
+    game.turnNumber, phase);
 }
 
 // Shared "start the game" transition, used by both the both-players-acked path
@@ -2494,6 +2580,113 @@ export const cleanup_stale_games = spacetimedb.reducer(
 );
 
 setCleanupStaleGamesReducer(cleanup_stale_games);
+
+// ---------------------------------------------------------------------------
+// Phase Stops reducers
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Reducer: set_turn_stop
+// Toggle the caller's stop marker for a phase of the OPPONENT's turn. Lazy
+// row insert; toggles are never logged (they'd leak intent — spec §6.1).
+// status 'playing' includes the star/soul pregame (pregamePhase !== ''),
+// which deliberately lets players prep turn-1 stops; holds cannot engage
+// mid-pregame because every phase mover throws during pregame.
+// ---------------------------------------------------------------------------
+export const set_turn_stop = spacetimedb.reducer(
+  { gameId: t.u64(), phase: t.string(), enabled: t.bool() },
+  (ctx, { gameId, phase, enabled }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+    if (!(STOP_PHASES as readonly string[]).includes(phase)) {
+      throw new SenderError('Invalid phase: ' + phase);
+    }
+
+    let stopRow = ctx.db.TurnStop.gameId.find(gameId);
+    if (!stopRow) {
+      stopRow = ctx.db.TurnStop.insert({
+        gameId, seat0Stops: '', seat1Stops: '', holdPhase: '', firedPhases: '',
+      });
+    }
+
+    const isSeat0 = player.seat === 0n;
+    const updated: any = {
+      ...stopRow,
+      seat0Stops: isSeat0 ? toggleStop(stopRow.seat0Stops, phase, enabled) : stopRow.seat0Stops,
+      seat1Stops: isSeat0 ? stopRow.seat1Stops : toggleStop(stopRow.seat1Stops, phase, enabled),
+    };
+
+    // Removing the stop you are currently holding on is a "never mind" — it
+    // must also release the hold or the game wedges behind it (spec §6.1, E6).
+    const callerIsNonActive = player.seat !== game.currentTurn;
+    if (!enabled && callerIsNonActive && stopRow.holdPhase === phase) {
+      updated.holdPhase = '';
+      for (const row of ctx.db.StopHoldTimeout.stop_hold_timeout_game_id.filter(gameId)) {
+        ctx.db.StopHoldTimeout.scheduledId.delete(row.scheduledId);
+      }
+      logAction(ctx, gameId, player.id, 'STOP_RELEASE',
+        JSON.stringify({ phase, reason: 'toggle-off' }),
+        game.turnNumber, game.currentPhase);
+    }
+
+    ctx.db.TurnStop.gameId.update(updated);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: release_turn_stop ("Pass")
+// Only the stopping (non-active) seat may release — the active player cannot
+// dismiss their opponent's window (spec §6.2).
+// ---------------------------------------------------------------------------
+export const release_turn_stop = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    const stopRow = ctx.db.TurnStop.gameId.find(gameId);
+    if (!stopRow || stopRow.holdPhase === '') {
+      throw new SenderError('No stop is holding the turn');
+    }
+    if (player.seat === game.currentTurn) {
+      throw new SenderError('Only the stopping player can release the hold');
+    }
+    const releasedPhase = stopRow.holdPhase;
+    ctx.db.TurnStop.gameId.update({ ...stopRow, holdPhase: '' });
+    for (const row of ctx.db.StopHoldTimeout.stop_hold_timeout_game_id.filter(gameId)) {
+      ctx.db.StopHoldTimeout.scheduledId.delete(row.scheduledId);
+    }
+    logAction(ctx, gameId, player.id, 'STOP_RELEASE',
+      JSON.stringify({ phase: releasedPhase, reason: 'manual' }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Scheduled reducer: handle_stop_hold_timeout
+// Defensive early-returns, never throws (the handle_pregame_idle_timeout
+// pattern). `arg.phase` mismatch = stale row → no-op. The scheduled row
+// self-deletes after the reducer runs.
+// ---------------------------------------------------------------------------
+export const handle_stop_hold_timeout = spacetimedb.reducer(
+  { arg: StopHoldTimeout.rowType },
+  (ctx, { arg }) => {
+    const game = ctx.db.Game.id.find(arg.gameId);
+    if (!game) return;
+    if (game.status !== 'playing') return;
+    const stopRow = ctx.db.TurnStop.gameId.find(arg.gameId);
+    if (!stopRow || stopRow.holdPhase === '') return;
+    if (stopRow.holdPhase !== arg.phase) return;
+    ctx.db.TurnStop.gameId.update({ ...stopRow, holdPhase: '' });
+    logAction(ctx, arg.gameId, 0n, 'STOP_RELEASE',
+      JSON.stringify({ phase: arg.phase, reason: 'timeout' }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+setStopHoldTimeoutReducer(handle_stop_hold_timeout);
 
 // ===========================================================================
 // Turn / Phase reducers
