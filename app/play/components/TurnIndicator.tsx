@@ -933,6 +933,28 @@ export default function TurnIndicator({
             </button>
           )
         )}
+
+        {/* Spectators can never act, so this is a non-interactive status span —
+            not a button — but still surfaces the hold + countdown (spec §8.4). */}
+        {readOnly && isHeld && !pregameStep && (
+          <span
+            style={{
+              marginLeft: 10,
+              padding: '5px 12px',
+              background: 'rgba(245, 158, 11, 0.10)',
+              border: '1px solid rgba(245, 158, 11, 0.45)',
+              borderRadius: 4,
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: FZ.ui,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: '#fbbf24',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {`Held${holdSecondsLeft != null ? ` · ${holdSecondsLeft}s` : ''}`}
+          </span>
+        )}
       </div>
 
       {/* ================================================================
