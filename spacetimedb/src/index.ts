@@ -1300,9 +1300,13 @@ function scanForStop(ctx: any, game: any, fromIdx: number, toIdx: number): strin
   return firstStopInRange(fromIdx, toIdx, stopsCsv, stopRow.firedPhases);
 }
 
-// Engage a hold at `phase`: mark fired, set holdPhase, arm the backstop, log
-// STOP_HOLD attributed to the stopping (non-active) player. Callers have
-// already moved the game onto `phase`.
+// Engage a hold AT THE GATE before `phase` (rev 3: gate-between-phases —
+// storage is unchanged, holdPhase = P now MEANS "held at the gate before P"):
+// mark fired, set holdPhase, arm the backstop, log STOP_HOLD attributed to
+// the stopping (non-active) player. Callers have already halted the game at
+// the boundary — currentPhase stays on the phase before the gate (or is left
+// untouched if the gate is the very next phase); the turn does NOT enter
+// `phase`. Release (releaseHold, below) is what crosses the gate.
 function engageHold(ctx: any, gameId: bigint, phase: string): void {
   const stopRow = ctx.db.TurnStop.gameId.find(gameId);
   if (!stopRow) return;
@@ -1322,6 +1326,53 @@ function engageHold(ctx: any, gameId: bigint, phase: string): void {
   logAction(ctx, gameId, stopper ? stopper.id : 0n, 'STOP_HOLD',
     JSON.stringify({ phase, stopperName: stopper ? stopper.displayName : 'Opponent' }),
     game.turnNumber, phase);
+}
+
+// Release the hold and cross the gate (rev 3 / R3). Shared by all three
+// release triggers: release_turn_stop (manual Pass), the set_turn_stop
+// toggle-off "never mind" special case, and handle_stop_hold_timeout. Reads
+// stopRow fresh (callers that also touch TurnStop, e.g. the toggle-off CSV
+// write, must write BEFORE calling this so the read here reflects both
+// changes). No-op if nothing is currently held.
+//
+// After clearing the hold and logging STOP_RELEASE, the gate is crossed on
+// the CURRENT-TURN player's behalf via applyPhaseTransition — passing a
+// battle gate is what opens the band, exactly like the turn player clicking
+// through it themselves. Skipped when currentPhase already equals the
+// released phase (the draw-gate exception: end_turn's flip and finishPregame
+// write currentPhase:'draw' and draw the 3 cards BEFORE engaging the hold —
+// holding before the flip would invert the holder seat — so there is nothing
+// left to cross), and skipped once the game has left 'playing' (a hold
+// stranded by a win/concede mid-hold) or is still mid pregame.
+function releaseHold(
+  ctx: any,
+  gameId: bigint,
+  reason: 'manual' | 'toggle-off' | 'timeout',
+  actorPlayerId: bigint,
+): void {
+  const stopRow = ctx.db.TurnStop.gameId.find(gameId);
+  if (!stopRow || stopRow.holdPhase === '') return;
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) return;
+
+  const releasedPhase = stopRow.holdPhase;
+  ctx.db.TurnStop.gameId.update({ ...stopRow, holdPhase: '' });
+  for (const row of ctx.db.StopHoldTimeout.stop_hold_timeout_game_id.filter(gameId)) {
+    ctx.db.StopHoldTimeout.scheduledId.delete(row.scheduledId);
+  }
+  logAction(ctx, gameId, actorPlayerId, 'STOP_RELEASE',
+    JSON.stringify({ phase: releasedPhase, reason }),
+    game.turnNumber, game.currentPhase);
+
+  if (game.currentPhase !== releasedPhase && game.status === 'playing' && game.pregamePhase === '') {
+    let activePlayer: any = null;
+    for (const p of ctx.db.Player.player_game_id.filter(gameId)) {
+      if (p.seat === game.currentTurn) activePlayer = p;
+    }
+    if (activePlayer) {
+      applyPhaseTransition(ctx, gameId, activePlayer.id, releasedPhase);
+    }
+  }
 }
 
 // Shared "start the game" transition, used by both the both-players-acked path
@@ -2631,33 +2682,31 @@ export const set_turn_stop = spacetimedb.reducer(
     }
 
     const isSeat0 = player.seat === 0n;
-    const updated: any = {
+    const wasHoldingOnThisPhase = stopRow.holdPhase === phase;
+    ctx.db.TurnStop.gameId.update({
       ...stopRow,
       seat0Stops: isSeat0 ? toggleStop(stopRow.seat0Stops, phase, enabled) : stopRow.seat0Stops,
       seat1Stops: isSeat0 ? stopRow.seat1Stops : toggleStop(stopRow.seat1Stops, phase, enabled),
-    };
+    });
 
     // Removing the stop you are currently holding on is a "never mind" — it
-    // must also release the hold or the game wedges behind it (spec §6.1, E6).
+    // must also release the hold (and, rev 3: cross the gate) or the game
+    // wedges behind it (spec §6.1, E6). releaseHold re-reads TurnStop, so it
+    // sees the CSV write above plus the still-set holdPhase, and folds both
+    // into one final row.
     const callerIsNonActive = player.seat !== game.currentTurn;
-    if (!enabled && callerIsNonActive && stopRow.holdPhase === phase) {
-      updated.holdPhase = '';
-      for (const row of ctx.db.StopHoldTimeout.stop_hold_timeout_game_id.filter(gameId)) {
-        ctx.db.StopHoldTimeout.scheduledId.delete(row.scheduledId);
-      }
-      logAction(ctx, gameId, player.id, 'STOP_RELEASE',
-        JSON.stringify({ phase, reason: 'toggle-off' }),
-        game.turnNumber, game.currentPhase);
+    if (!enabled && callerIsNonActive && wasHoldingOnThisPhase) {
+      releaseHold(ctx, gameId, 'toggle-off', player.id);
     }
-
-    ctx.db.TurnStop.gameId.update(updated);
   }
 );
 
 // ---------------------------------------------------------------------------
 // Reducer: release_turn_stop ("Pass")
 // Only the stopping (non-active) seat may release — the active player cannot
-// dismiss their opponent's window (spec §6.2).
+// dismiss their opponent's window (spec §6.2). Rev 3: releasing also crosses
+// the gate (releaseHold / R3) — the turn advances into the phase that was
+// gated.
 // ---------------------------------------------------------------------------
 export const release_turn_stop = spacetimedb.reducer(
   { gameId: t.u64() },
@@ -2672,14 +2721,7 @@ export const release_turn_stop = spacetimedb.reducer(
     if (player.seat === game.currentTurn) {
       throw new SenderError('Only the stopping player can release the hold');
     }
-    const releasedPhase = stopRow.holdPhase;
-    ctx.db.TurnStop.gameId.update({ ...stopRow, holdPhase: '' });
-    for (const row of ctx.db.StopHoldTimeout.stop_hold_timeout_game_id.filter(gameId)) {
-      ctx.db.StopHoldTimeout.scheduledId.delete(row.scheduledId);
-    }
-    logAction(ctx, gameId, player.id, 'STOP_RELEASE',
-      JSON.stringify({ phase: releasedPhase, reason: 'manual' }),
-      game.turnNumber, game.currentPhase);
+    releaseHold(ctx, gameId, 'manual', player.id);
   }
 );
 
@@ -2687,7 +2729,9 @@ export const release_turn_stop = spacetimedb.reducer(
 // Scheduled reducer: handle_stop_hold_timeout
 // Defensive early-returns, never throws (the handle_pregame_idle_timeout
 // pattern). `arg.phase` mismatch = stale row → no-op. The scheduled row
-// self-deletes after the reducer runs.
+// self-deletes after the reducer runs. releaseHold's own gate-crossing write
+// is wrapped in try/catch: this scheduled backstop must stay throw-free even
+// if something unexpected goes wrong crossing the gate.
 // ---------------------------------------------------------------------------
 export const handle_stop_hold_timeout = spacetimedb.reducer(
   { arg: StopHoldTimeout.rowType },
@@ -2698,10 +2742,11 @@ export const handle_stop_hold_timeout = spacetimedb.reducer(
     const stopRow = ctx.db.TurnStop.gameId.find(arg.gameId);
     if (!stopRow || stopRow.holdPhase === '') return;
     if (stopRow.holdPhase !== arg.phase) return;
-    ctx.db.TurnStop.gameId.update({ ...stopRow, holdPhase: '' });
-    logAction(ctx, arg.gameId, 0n, 'STOP_RELEASE',
-      JSON.stringify({ phase: arg.phase, reason: 'timeout' }),
-      game.turnNumber, game.currentPhase);
+    try {
+      releaseHold(ctx, arg.gameId, 'timeout', 0n);
+    } catch {
+      // Never let the scheduled backstop throw (spec §6.6).
+    }
   }
 );
 
@@ -2713,10 +2758,13 @@ setStopHoldTimeoutReducer(handle_stop_hold_timeout);
 
 // ---------------------------------------------------------------------------
 // Helper: applyPhaseTransition
-// The single phase-write path shared by set_phase and the Phase Stops snaps.
-// Runs the leave-battle auto-return and enter-battle band-open side effects,
-// writes currentPhase, logs SET_PHASE — exactly what a direct phase click
-// does, so a stop-snap is indistinguishable from the player clicking P.
+// The single phase-write path shared by set_phase, end_turn's forced halt,
+// and rev 3's gate release (releaseHold / R3) — used both for the legitimate
+// phases a turn crosses BEFORE a gate and for entering a gated phase once
+// release lets the turn through it. Runs the leave-battle auto-return and
+// enter-battle band-open side effects, writes currentPhase, logs SET_PHASE —
+// exactly what a direct phase click does, so a gate crossing is
+// indistinguishable from the player clicking through it.
 // ---------------------------------------------------------------------------
 function applyPhaseTransition(ctx: any, gameId: bigint, actingPlayerId: bigint, targetPhase: string): void {
   let game = ctx.db.Game.id.find(gameId);
@@ -2776,8 +2824,15 @@ export const set_phase = spacetimedb.reducer(
       throw new SenderError('Invalid phase: ' + phase);
     }
 
-    // Phase Stops: refuse any movement while a hold is active (spec §5.4),
-    // then scan forward movement for the first unfired stop (spec §5.1–5.2).
+    // Phase Stops rev 3 (gate-between-phases, R1): refuse any movement while
+    // a hold is active (spec §5.4), then scan forward movement for the first
+    // unfired GATE strictly after the current phase, up to and including the
+    // target. No gate → complete the jump exactly as requested. A gate found
+    // at index g means the turn may legitimately cross the phases before it
+    // (their enter/leave effects run via applyPhaseTransition to PHASES[g-1])
+    // but halts AT THE BOUNDARY — it does not enter the gated phase. If the
+    // gate is the very next phase (g-1 === oldIdx) there is nothing to cross:
+    // no phase write at all, just the hold.
     assertTurnNotHeld(ctx, gameId);
 
     const oldIdx = (STOP_PHASES as readonly string[]).indexOf(game.currentPhase);
@@ -2787,8 +2842,15 @@ export const set_phase = spacetimedb.reducer(
       stopPhase = scanForStop(ctx, game, oldIdx, newIdx);
     }
 
-    applyPhaseTransition(ctx, gameId, player.id, stopPhase ?? phase);
-    if (stopPhase !== null) engageHold(ctx, gameId, stopPhase);
+    if (stopPhase !== null) {
+      const gateIdx = (STOP_PHASES as readonly string[]).indexOf(stopPhase);
+      if (gateIdx - 1 > oldIdx) {
+        applyPhaseTransition(ctx, gameId, player.id, STOP_PHASES[gateIdx - 1]);
+      }
+      engageHold(ctx, gameId, stopPhase);
+    } else {
+      applyPhaseTransition(ctx, gameId, player.id, phase);
+    }
   }
 );
 
@@ -2825,13 +2887,19 @@ export const end_turn = spacetimedb.reducer(
       game = ctx.db.Game.id.find(gameId) ?? game;
     }
 
-    // Phase Stops: a stop in the remaining phases snaps the turn there
-    // instead of ending it — End Turn must be pressed again after release
-    // (spec §5.3). The auto-return above already closed any open band.
+    // Phase Stops rev 3 (R2): a gate in the remaining phases halts End Turn
+    // BEFORE the gated phase instead of ending the turn — same halt rule as
+    // R1 (cross the legitimate phases before the gate, only if that's beyond
+    // the current phase; then hold) — End Turn must be pressed again once the
+    // gate is released and any further gates are cleared. The auto-return
+    // above already closed any open band.
     const endTurnFromIdx = (STOP_PHASES as readonly string[]).indexOf(game.currentPhase);
     const endTurnStop = scanForStop(ctx, game, endTurnFromIdx, 4);
     if (endTurnStop !== null) {
-      applyPhaseTransition(ctx, gameId, player.id, endTurnStop);
+      const gateIdx = (STOP_PHASES as readonly string[]).indexOf(endTurnStop);
+      if (gateIdx - 1 > endTurnFromIdx) {
+        applyPhaseTransition(ctx, gameId, player.id, STOP_PHASES[gateIdx - 1]);
+      }
       engageHold(ctx, gameId, endTurnStop);
       return;
     }
@@ -2868,9 +2936,13 @@ export const end_turn = spacetimedb.reducer(
 
     logAction(ctx, gameId, player.id, 'END_TURN', JSON.stringify({ newTurn: newTurnNumber.toString() }), newTurnNumber, 'draw');
 
-    // Phase Stops: fired stops reset at every successful flip; then the NEW
-    // non-active seat (the caller) may have a draw stop — their 3 cards are
-    // already drawn, the hold sits between the draw and any advance (E3).
+    // Phase Stops rev 3: fired stops reset at every successful flip; then the
+    // NEW non-active seat (the caller) may have a draw stop. This is the one
+    // gate that is unchanged from rev 2 (flip-then-hold, E3): the flip above
+    // has already written currentPhase:'draw' and drawn the 3 cards BEFORE
+    // this check — holding before the flip would invert the holder seat — so
+    // currentPhase and holdPhase both land on 'draw' together. releaseHold
+    // (R3) sees currentPhase already === 'draw' and no-ops the crossing.
     const stopRow = ctx.db.TurnStop.gameId.find(gameId);
     if (stopRow) {
       ctx.db.TurnStop.gameId.update({ ...stopRow, firedPhases: '' });
@@ -3166,14 +3238,18 @@ export const end_battle = spacetimedb.reducer(
       // Same hazard end_turn/set_phase call out above.
       const latest = ctx.db.Game.id.find(gameId);
       if (latest) {
-        ctx.db.Game.id.update({ ...latest, currentPhase: 'discard' });
-        logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latest.turnNumber, 'discard');
-
-        // Phase Stops: battle→discard is forward movement — an unfired discard
-        // stop lands the game on discard HELD (spec §5.7, E15). The battle
-        // itself already concluded above.
+        // Phase Stops rev 3 (R4): check the discard gate BEFORE writing
+        // discard — an unfired discard stop holds the turn at the gate
+        // (currentPhase stays 'battle', band already closed via the
+        // auto-return above; no currentPhase write, no SET_PHASE log).
+        // Release (R3) is what actually enters discard.
         const stopPhase = scanForStop(ctx, latest, 3, 4);
-        if (stopPhase !== null) engageHold(ctx, gameId, stopPhase);
+        if (stopPhase !== null) {
+          engageHold(ctx, gameId, stopPhase);
+        } else {
+          ctx.db.Game.id.update({ ...latest, currentPhase: 'discard' });
+          logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latest.turnNumber, 'discard');
+        }
       }
     }
   }
@@ -3299,32 +3375,39 @@ export const enter_battle = spacetimedb.reducer(
     if (game.battleState === 'awaiting-soul') {
       throw new SenderError('Battle is resolving a soul surrender');
     }
-    // Phase Stops band-open rule (spec §5.7): opening the band IS the attack
-    // starting. Turn-player open + opponent has an unfired battle stop +
-    // phase hasn't passed battle → snap currentPhase to battle (skipping
-    // set_phase's enter-battle side effect — the band-open below IS it),
-    // engage the hold after the open, and let the attacker's card commit.
-    // Non-turn-player calls (blocking, joining) never trigger stops.
-    let engageBattleStop = false;
-    if (game.battleState === '') {
-      if (player.seat === game.currentTurn && game.pregamePhase === '') {
-        const stopRow = ctx.db.TurnStop.gameId.find(gameId);
-        if (stopRow && stopRow.holdPhase === '') {
-          const stopsCsv = game.currentTurn === 0n ? stopRow.seat1Stops : stopRow.seat0Stops;
-          const curIdx = (STOP_PHASES as readonly string[]).indexOf(game.currentPhase);
-          const battleIdx = (STOP_PHASES as readonly string[]).indexOf('battle');
-          if (
-            curIdx <= battleIdx &&
-            parseStops(stopsCsv).includes('battle') &&
-            !parseStops(stopRow.firedPhases).includes('battle')
-          ) {
-            engageBattleStop = true;
-          }
+    // Phase Stops rev 3 band-open gate (spec §5.5/R5): opening the band IS
+    // entering the battle phase's gate. Turn-player open + opponent has an
+    // unfired battle stop + currentPhase index is STRICTLY LESS than
+    // battle's (curIdx === battleIdx no longer qualifies — a stop set while
+    // already in battle waits for next turn, spec §5.6; no retro-fire) →
+    // engage the hold and return WITHOUT opening the band or moving the
+    // card. Reducers are transactional (spacetimedb/CLAUDE.md) — an
+    // engage-then-throw would roll back the hold along with everything else,
+    // so instead of throwing we let the reducer return successfully having
+    // moved nothing; the STOP_HOLD log entry (inside engageHold) is the
+    // record, and the client's optimistic drag just snaps back like any
+    // other refused move. Non-turn-player calls (blocking, joining) never
+    // trigger this.
+    if (game.battleState === '' && player.seat === game.currentTurn && game.pregamePhase === '') {
+      const stopRow = ctx.db.TurnStop.gameId.find(gameId);
+      if (stopRow && stopRow.holdPhase === '') {
+        const stopsCsv = game.currentTurn === 0n ? stopRow.seat1Stops : stopRow.seat0Stops;
+        const curIdx = (STOP_PHASES as readonly string[]).indexOf(game.currentPhase);
+        const battleIdx = (STOP_PHASES as readonly string[]).indexOf('battle');
+        if (
+          curIdx < battleIdx &&
+          parseStops(stopsCsv).includes('battle') &&
+          !parseStops(stopRow.firedPhases).includes('battle')
+        ) {
+          engageHold(ctx, gameId, 'battle');
+          return;
         }
       }
+    }
+
+    if (game.battleState === '') {
       ctx.db.Game.id.update({
         ...game,
-        currentPhase: engageBattleStop ? 'battle' : game.currentPhase,
         battleState: 'active',
         battleAttackerSeat: game.currentTurn.toString(),
         lastBattlePlayBySeat: '',
@@ -3337,9 +3420,8 @@ export const enter_battle = spacetimedb.reducer(
     logAction(
       ctx, gameId, player.id, 'ENTER_BATTLE',
       JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, from: fromZone }),
-      game.turnNumber, engageBattleStop ? 'battle' : game.currentPhase,
+      game.turnNumber, game.currentPhase,
     );
-    if (engageBattleStop) engageHold(ctx, gameId, 'battle');
   },
 );
 
@@ -3523,15 +3605,22 @@ export const surrender_soul = spacetimedb.reducer(
     // here would resurrect battleState. Same idiom as end_battle above.
     const latestGame = ctx.db.Game.id.find(gameId);
     if (latestGame && latestGame.currentPhase === 'battle') {
-      ctx.db.Game.id.update({ ...latestGame, currentPhase: 'discard' });
-      logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latestGame.turnNumber, 'discard');
-
       // A winning 5th-soul rescue (moveLostSoulToLor -> checkAndApplyWin,
       // above) may have already flipped status to 'finished' — never engage
-      // a hold on a game that just ended.
+      // a hold on a game that just ended (the existing gate); write discard
+      // unconditionally in that case for consistent phase bookkeeping.
+      // Phase Stops rev 3 (R4): otherwise check the discard gate BEFORE
+      // writing discard — gated holds at the battle boundary (band already
+      // closed above), release (R3) is what enters discard.
+      let stopPhase: string | null = null;
       if (latestGame.status === 'playing') {
-        const stopPhase = scanForStop(ctx, latestGame, 3, 4);
-        if (stopPhase !== null) engageHold(ctx, gameId, stopPhase);
+        stopPhase = scanForStop(ctx, latestGame, 3, 4);
+      }
+      if (stopPhase !== null) {
+        engageHold(ctx, gameId, stopPhase);
+      } else {
+        ctx.db.Game.id.update({ ...latestGame, currentPhase: 'discard' });
+        logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase: 'discard' }), latestGame.turnNumber, 'discard');
       }
     }
   },
