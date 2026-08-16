@@ -93,6 +93,8 @@ privacy (see §12 Risks).
 
 ## 3. State machine
 
+*The land-then-hold transition below is superseded by rev 3 — see §13.*
+
 Hold state is a single string column, `holdPhase`, on a new per-game row
 (`''` = no hold). Firing history for the current turn is `firedPhases`.
 
@@ -206,7 +208,7 @@ per game.
 
 Let `stops` = the non-active seat's stop set, `fired` = `firedPhases`.
 
-1. **Forward `set_phase`** from index `i` to index `j > i` (indices in
+1. *(superseded by rev 3 — see §13)* **Forward `set_phase`** from index `i` to index `j > i` (indices in
    `PHASE_ORDER = [draw, upkeep, preparation, battle, discard]`): scan phases
    at indices `i+1 … j` **in order**; the first phase `P` with
    `P ∈ stops && P ∉ fired` wins. The game lands on `P` (not `j`), exactly as
@@ -218,7 +220,7 @@ Let `stops` = the non-active seat's stop set, `fired` = `firedPhases`.
    jump completes normally.
 2. **Backward or same-phase `set_phase`**: never engages a stop. Backward
    movement is a correction, not turn progression.
-3. **`end_turn`** from index `i`: first the existing auto-return runs if
+3. *(superseded by rev 3 — see §13)* **`end_turn`** from index `i`: first the existing auto-return runs if
    `battleState !== ''` (`index.ts:2587-2590`), closing any open band. Then
    scan indices `i+1 … 4` (through `discard`). A qualifying phase snaps the
    game there and holds — **the turn does not end**; after release the active
@@ -500,7 +502,7 @@ nudge; stops are the mechanical guarantee), pause system, initiative system.
 | E1 | Active player jumps draw→discard; opponent stops on upkeep **and** battle | Snap to upkeep, hold. After release the player is *in upkeep*; a later jump to discard can still hold at battle (unfired). One hold per movement. |
 | E2 | End Turn from battle, stop on discard | Auto-return closes the band first (§5.3), then snap to discard, hold. Turn does not end; End Turn must be clicked again after release. |
 | E3 | I end my turn; I have a `draw` stop set | My opponent's turn starts, their 3 cards auto-draw, then the hold engages *for me* at their draw. Working as designed (it's their turn; my stop); the PASS caption (§8.1) keeps it from reading as a freeze. |
-| E4 | Stop toggled on for the phase the turn is already in | No retro-fire (§5.6). Fires on next entry — except a battle stop, which the band-open rule (§5.7) can still fire if the attack hasn't started. |
+| E4 | Stop toggled on for the phase the turn is already in | *(superseded — see §13)* No retro-fire (§5.6). Fires on next entry — except a battle stop, which the band-open rule (§5.7) can still fire if the attack hasn't started. |
 | E5 | Backward jump battle→preparation, then forward to battle again; battle stop already fired this turn | No re-fire (`fired`). Stop fires again next turn. |
 | E6 | Stopping player toggles the held phase off mid-hold | Hold releases (§6.1 special case), timeout row deleted. |
 | E7 | Stopping player disconnects mid-hold | 60s backstop releases the hold regardless; the existing disconnect-timeout machinery handles the game itself. No deadlock. |
@@ -511,8 +513,8 @@ nudge; stops are the mechanical guarantee), pause system, initiative system.
 | E12 | Spectator loads mid-hold | All state in public rows; banner + countdown render from scratch. Reconnect same. |
 | E13 | Active player spams Enter/phase clicks during hold | `SenderError` toast each time; no state change. |
 | E14 | All 5 phases stopped, opponent never passes | Worst case +5×60s per turn. Griefing bounded by the backstop; see §12. |
-| E15 | Active player enters battle phase, immediately presses End Battle | `end_battle`'s battle→discard advance runs the scan (§5.7): an unfired discard stop lands the game on discard **held**. The pre-rev-2 design let this skip the stop entirely. |
-| E16 | Active player drags an attacker into the band during preparation (never touching the phase bar) | `enter_battle` snaps the phase to battle, engages the opponent's unfired battle stop, and the band opens with the attacker committed (§5.7). The defender gets their window before responding. |
+| E15 | Active player enters battle phase, immediately presses End Battle | *(superseded — see §13)* `end_battle`'s battle→discard advance runs the scan (§5.7): an unfired discard stop lands the game on discard **held**. The pre-rev-2 design let this skip the stop entirely. |
+| E16 | Active player drags an attacker into the band during preparation (never touching the phase bar) | *(superseded — see §13)* `enter_battle` snaps the phase to battle, engages the opponent's unfired battle stop, and the band opens with the attacker committed (§5.7). The defender gets their window before responding. |
 | E17 | Attacker tries to resolve/end the battle during the hold | `end_battle` / `resolve_battle` / `surrender_soul` all throw while held (§5.4). The battle concludes only after the stopper passes (or the backstop fires). |
 | E18 | Battle fought inside the hold window ends with the *stopper* surrendering a soul | The stopper presses Pass, then `surrender_soul` — two taps. The hold guard applies to both players uniformly (§5.4). |
 
@@ -581,8 +583,10 @@ session to confirm the E10 degradation mode is as benign as believed.
 
 ## 13. Rev 3 (2026-08-15) — gate-between-phases correction
 
-Product correction from the owner, overriding §5.1/§5.7 above: **a stop is a
-gate on the boundary INTO a phase, not a pause on the phase itself.** The turn
+Product correction from the owner, superseding everything above that assumes
+land-then-hold — the §3 state-machine diagram, §5 rules 1 and 3, §5.7, and
+edge-case rows E4, E15, and E16: **a stop is a gate on the boundary INTO a
+phase, not a pause on the phase itself.** The turn
 halts *before* entering the gated phase, and the gated phase's enter side
 effects — most visibly, the battle band opening — happen only on release.
 Rev 2's "land on P, then hold" gave the active player the phase's benefits
