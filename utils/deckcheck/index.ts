@@ -7,6 +7,7 @@ import {
 } from "./types";
 import { findCard } from "./cardDatabase";
 import { resolveCardIdentity } from "./sameCard";
+import { matchOfficialDeck } from "./officialDecks";
 import { getFormatDef } from "@/lib/formats";
 import {
   validateT1Rules,
@@ -292,14 +293,27 @@ export async function checkDeck(
   const allResolvedCards = [...mainDeckCards, ...reserveCards];
   const cardGroups = buildCardGroups(allResolvedCards);
 
-  // Step 4: Run rules based on format
-  const ruleIssues =
-    def.family === "Paragon"
-      ? validateParagonRules(def, mainDeckCards, reserveCards, cardGroups)
-      : def.family === "T2"
-        ? validateT2Rules(def, mainDeckCards, reserveCards, cardGroups)
-        : validateT1Rules(def, mainDeckCards, reserveCards, cardGroups);
-  issues.push(...ruleIssues);
+  // Step 4: Run rules based on format — unless this is one of the official
+  // preconstructed decks, which are legal as printed and exempt by content
+  // (see officialDecks.ts). Any edit changes the fingerprint and drops the
+  // deck back onto the format's rules.
+  const officialDeck = matchOfficialDeck(allResolvedCards);
+
+  if (officialDeck) {
+    issues.push({
+      type: "info",
+      rule: "official-deck",
+      message: `${officialDeck.name} is an official preconstructed deck — exempt from constructed deck-building rules. Changing any card makes it a regular deck, checked normally.`,
+    });
+  } else {
+    const ruleIssues =
+      def.family === "Paragon"
+        ? validateParagonRules(def, mainDeckCards, reserveCards, cardGroups)
+        : def.family === "T2"
+          ? validateT2Rules(def, mainDeckCards, reserveCards, cardGroups)
+          : validateT1Rules(def, mainDeckCards, reserveCards, cardGroups);
+    issues.push(...ruleIssues);
+  }
 
   // Step 5: Build stats
   const mainDeckSize = mainDeckCards.reduce((sum, c) => sum + c.quantity, 0);
