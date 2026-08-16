@@ -186,7 +186,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const label = typeof data.phase === 'string' && data.phase
         ? data.phase.charAt(0).toUpperCase() + data.phase.slice(1)
         : 'a phase';
-      return `⏸ stopped the turn at ${label}`;
+      return `⏸ stopped the turn before ${label}`;
     } catch { /* fall through */ }
   }
   if (actionType === 'STOP_RELEASE' && payload) {

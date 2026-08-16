@@ -1048,7 +1048,7 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
 
   const enterBattle = useCallback(
     (cardInstanceId: bigint, posX: string, posY: string) => {
-      conn?.reducers.enterBattle({ gameId, cardInstanceId, posX, posY });
+      conn?.reducers.enterBattle({ gameId, cardInstanceId, posX, posY }).catch(toastReducerError);
     },
     [conn, gameId],
   );

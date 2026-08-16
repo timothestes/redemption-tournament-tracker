@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { PHASE_ORDER } from '@/app/goldfish/types';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import type { GamePhase } from '@/app/shared/types/gameCard';
@@ -118,6 +118,106 @@ const FZ = {
   headline: 'clamp(18px, 0.6vw + 12px, 22px)',  // formerly 18 (arrows, modal headlines)
   score: 'clamp(20px, 0.8vw + 14px, 26px)',     // formerly 20 (score numbers)
 } as const;
+
+// ---------------------------------------------------------------------------
+// PhaseGate — a between-phase gate marker (Phase Stops rev 3). A stop is a
+// gate on the boundary INTO a phase, not a marker on the phase itself, so
+// these render as slim hit targets in the gaps of the phase row (and before
+// Draw), one per phase, rather than as decoration on the phase buttons.
+// A wide invisible hit target keeps the gap tappable on mobile; the slim
+// bar inside it carries the actual visual state.
+// ---------------------------------------------------------------------------
+
+function PhaseGate({
+  phase,
+  hasStop,
+  isHeldPhase,
+  canToggle,
+  opponentName,
+  onToggle,
+}: {
+  phase: string;
+  /** The viewer has an armed (not-yet-fired) stop on this phase. */
+  hasStop: boolean;
+  /** The turn is currently held at the gate before this phase. */
+  isHeldPhase: boolean;
+  /** Old canToggleStops conditions — opponent's turn, not read-only/pregame/finished. */
+  canToggle: boolean;
+  opponentName: string;
+  onToggle: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const label = PHASE_LABELS[phase] ?? phase;
+
+  // Precedence: an engaged hold outranks an armed stop, which outranks the
+  // faint "you could toggle here" affordance. Nothing renders otherwise —
+  // "unarmed otherwise = invisible" per spec.
+  let barColor = 'transparent';
+  let barGlow: string | undefined;
+  let barAnimation: string | undefined;
+  if (isHeldPhase) {
+    barColor = '#fbbf24';
+    barGlow = '0 0 8px rgba(245, 158, 11, 0.85)';
+    barAnimation = 'stopHoldPulse 1s ease-in-out infinite';
+  } else if (hasStop) {
+    barColor = '#c4955a';
+    barGlow = '0 0 6px rgba(196, 149, 90, 0.6)';
+  } else if (canToggle) {
+    // Discoverability affordance: faintly visible whenever toggling is
+    // possible, even with no stop armed yet. Quiet — no animation, just a
+    // small hover brighten (matches the rest of the bar's hover language).
+    barColor = hovered ? 'rgba(196, 149, 90, 0.55)' : 'rgba(196, 149, 90, 0.28)';
+  }
+  const isVisible = isHeldPhase || hasStop || canToggle;
+  const isInteractive = canToggle;
+
+  return (
+    <button
+      type="button"
+      data-testid={`phase-gate-${phase}`}
+      onClick={isInteractive ? onToggle : undefined}
+      disabled={!isInteractive}
+      title={
+        isInteractive
+          ? (hasStop ? `Remove stop before ${label}` : `Stop before ${label} on ${opponentName}'s turn`)
+          : undefined
+      }
+      onMouseEnter={isInteractive ? () => setHovered(true) : undefined}
+      onMouseLeave={isInteractive ? () => setHovered(false) : undefined}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 16,
+        minWidth: 16,
+        alignSelf: 'stretch',
+        flexShrink: 0,
+        padding: 0,
+        margin: 0,
+        background: 'transparent',
+        border: 'none',
+        cursor: isInteractive ? 'pointer' : 'default',
+        zIndex: 1,
+      }}
+    >
+      {isVisible && (
+        <span
+          aria-hidden
+          style={{
+            width: 3,
+            height: '60%',
+            borderRadius: 2,
+            background: barColor,
+            boxShadow: barGlow,
+            animation: barAnimation,
+            transition: 'background 0.15s, box-shadow 0.15s',
+          }}
+        />
+      )}
+    </button>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -264,8 +364,8 @@ export default function TurnIndicator({
     onToggleStop(phase, enabling);
     showGameToast(
       enabling
-        ? `Stop set: ${PHASE_LABELS[phase]}. ${opponentName}'s turn will pause there — tap again to remove.`
-        : `Stop removed: ${PHASE_LABELS[phase]}.`,
+        ? `Stop set: before ${PHASE_LABELS[phase]}. ${opponentName}'s turn will pause there — tap again to remove.`
+        : `Stop removed: before ${PHASE_LABELS[phase]}.`,
     );
   };
 
@@ -773,68 +873,57 @@ export default function TurnIndicator({
             const hasMyStop = myStops.includes(phase);
 
             return (
-              <button
-                key={phase}
-                ref={(el) => { buttonRefs.current[phase] = el; }}
-                onClick={() => {
-                  if (readOnly) return;
-                  if (canToggleStops) { handleToggleStop(phase); return; }
-                  if (canClick) onSetPhase(phase);
-                }}
-                disabled={readOnly || (!canToggleStops && !isMyTurn) || heldAgainstMe}
-                title={
-                  canToggleStops
-                    ? (hasMyStop ? `Remove stop on ${PHASE_LABELS[phase]}` : `Stop here on ${opponentName}'s turn`)
-                    : PHASE_LABELS[phase]
-                }
-                style={{
-                  position: 'relative',
-                  padding: '4px 10px',
-                  background: 'transparent',
-                  border: isHeldPhase ? '1px solid rgba(245, 158, 11, 0.7)' : '1px solid transparent',
-                  borderRadius: 20,
-                  cursor: canClick || canToggleStops ? 'pointer' : 'default',
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: FZ.ui,
-                  letterSpacing: '0.07em',
-                  textTransform: 'uppercase',
-                  color: isHeldPhase
-                    ? '#fbbf24'
-                    : isActive
-                    ? '#e8d5a3'
-                    : isMyTurn
-                    ? 'rgba(232, 213, 163, 0.45)'
-                    : 'rgba(150, 150, 160, 0.35)',
-                  transition: 'color 0.24s ease-out',
-                  whiteSpace: 'nowrap',
-                  zIndex: 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (canClick) e.currentTarget.style.color = '#e8d5a3';
-                }}
-                onMouseLeave={(e) => {
-                  if (canClick) e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)';
-                }}
-              >
-                {PHASE_LABELS[phase]}
-                {(hasMyStop || isHeldPhase) && (
-                  <span
-                    aria-hidden
-                    style={{
-                      position: 'absolute',
-                      bottom: -1,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 5,
-                      height: 5,
-                      borderRadius: '50%',
-                      background: isHeldPhase ? '#fbbf24' : '#c4955a',
-                      boxShadow: isHeldPhase ? '0 0 6px rgba(245, 158, 11, 0.9)' : '0 0 4px rgba(196, 149, 90, 0.7)',
-                      animation: isHeldPhase ? 'stopHoldPulse 1s ease-in-out infinite' : undefined,
-                    }}
-                  />
-                )}
-              </button>
+              <Fragment key={phase}>
+                {/* Gate marker — sits BEFORE this phase's button (the gate is
+                    on the boundary INTO the phase, not the phase itself). */}
+                <PhaseGate
+                  phase={phase}
+                  hasStop={hasMyStop}
+                  isHeldPhase={isHeldPhase}
+                  canToggle={canToggleStops}
+                  opponentName={opponentName}
+                  onToggle={() => handleToggleStop(phase)}
+                />
+                <button
+                  ref={(el) => { buttonRefs.current[phase] = el; }}
+                  onClick={() => {
+                    if (readOnly) return;
+                    if (canClick) onSetPhase(phase);
+                  }}
+                  disabled={readOnly || !isMyTurn || heldAgainstMe}
+                  title={PHASE_LABELS[phase]}
+                  style={{
+                    position: 'relative',
+                    padding: '4px 10px',
+                    background: 'transparent',
+                    border: isHeldPhase ? '1px solid rgba(245, 158, 11, 0.7)' : '1px solid transparent',
+                    borderRadius: 20,
+                    cursor: canClick ? 'pointer' : 'default',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                    fontSize: FZ.ui,
+                    letterSpacing: '0.07em',
+                    textTransform: 'uppercase',
+                    color: isHeldPhase
+                      ? '#fbbf24'
+                      : isActive
+                      ? '#e8d5a3'
+                      : isMyTurn
+                      ? 'rgba(232, 213, 163, 0.45)'
+                      : 'rgba(150, 150, 160, 0.35)',
+                    transition: 'color 0.24s ease-out',
+                    whiteSpace: 'nowrap',
+                    zIndex: 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (canClick) e.currentTarget.style.color = '#e8d5a3';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (canClick) e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)';
+                  }}
+                >
+                  {PHASE_LABELS[phase]}
+                </button>
+              </Fragment>
             );
           })}
         </div>
@@ -900,7 +989,7 @@ export default function TurnIndicator({
               disabled={!isMyTurn || heldAgainstMe}
               title={
                 heldAgainstMe
-                  ? `Held — ${opponentName} stopped at ${PHASE_LABELS[holdPhase] ?? holdPhase}`
+                  ? `Held — ${opponentName} stopped before ${PHASE_LABELS[holdPhase] ?? holdPhase}${holdSecondsLeft != null ? ` · ${holdSecondsLeft}s` : ''}`
                   : isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"
               }
               style={{
