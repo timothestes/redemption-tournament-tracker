@@ -4,18 +4,20 @@ import {
   splitBrigades,
   type BreakdownDeckInput,
 } from '../breakdown';
-import { topCutSize } from '../topCut';
+import { topCutSize, cutIndexesByEvent, rankedDeckCount } from '../topCut';
 
 function deck(
   deckId: string,
   place: number | null,
   cards: [name: string, zone: string, quantity: number][],
+  event?: { id: string; name: string; endedAt: string | null },
 ): BreakdownDeckInput {
   return {
     deckId,
     participantId: deckId,
     playerName: deckId,
     place,
+    event: event ?? null,
     cards: cards.map(([name, zone, quantity]) => ({
       name,
       set: null,
@@ -25,6 +27,9 @@ function deck(
     })),
   };
 }
+
+const NATS = { id: 'nats', name: 'Nationals', endedAt: '2026-07-24T23:00:00Z' };
+const LOCAL = { id: 'local', name: 'Local', endedAt: '2026-06-01T18:00:00Z' };
 
 describe('splitBrigades', () => {
   it('splits a multi-brigade card into every colour it names', () => {
@@ -92,6 +97,52 @@ describe('topCutSize', () => {
 
   it('never exceeds the field', () => {
     expect(topCutSize(6, 8)).toBe(6);
+  });
+});
+
+describe('cutIndexesByEvent', () => {
+  const ranked = (places: (number | null)[], eventIds?: (string | null)[]) =>
+    places.map((place, i) => ({ place, eventId: eventIds?.[i] }));
+
+  it('ranks the whole pool when no deck carries an event', () => {
+    // The single-tournament page: one group, so this is a plain top-N.
+    const cut = cutIndexesByEvent(ranked([3, 1, 4, 2]), 2);
+    expect([...cut].sort()).toEqual([1, 3]);
+  });
+
+  it('leaves decks with no recorded finish out of the cut', () => {
+    const cut = cutIndexesByEvent(ranked([1, null, 2]), 8);
+    expect([...cut].sort()).toEqual([0, 2]);
+  });
+
+  it('draws the cut inside each event rather than across the pool', () => {
+    // Two events; the local event's winner placed 1st there but would rank
+    // below Nationals' top four if the pool were ranked as one field.
+    const cut = cutIndexesByEvent(
+      ranked([1, 2, 3, 4, 1, 2], ['n', 'n', 'n', 'n', 'l', 'l']),
+      0.5,
+    );
+    // Top half of each: Nationals #1–2, local #1.
+    expect([...cut].sort((a, b) => a - b)).toEqual([0, 1, 4]);
+  });
+
+  // The reason cross-event cuts are fractions and not counts. With "top 8"
+  // applied per event, a 4-player event would contribute its entire field to
+  // the cut and outweigh the larger event it is pooled with.
+  it('does not let a small event flood the cut', () => {
+    const places = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2];
+    const events = [...Array(10).fill('big'), 'small', 'small'];
+    const cut = cutIndexesByEvent(ranked(places, events), 0.25);
+
+    const fromBig = [...cut].filter((i) => i < 10).length;
+    const fromSmall = [...cut].filter((i) => i >= 10).length;
+    expect(fromBig).toBe(3); // round(10 * 0.25)
+    expect(fromSmall).toBe(1); // round(2 * 0.25) floors to 0, clamped to 1
+    expect(fromSmall).toBeLessThan(fromBig);
+  });
+
+  it('counts only placed decks as rankable', () => {
+    expect(rankedDeckCount(ranked([1, null, 3, null]))).toBe(2);
   });
 });
 
@@ -247,6 +298,57 @@ describe('buildBreakdown', () => {
     const card = result.cards.find((c) => c.name === 'Angel of the Lord');
     expect(card?.deckIndexes).toHaveLength(2);
     expect(result.decks[0].neighbors[0].similarity).toBe(1);
+  });
+
+  // ─── Cross-event pooling (the Metagame view) ───────────────────────
+
+  it('summarises the events feeding a pool, newest first', () => {
+    const result = buildBreakdown([
+      deck('a', 1, [['Angel of the Lord (J)', 'main', 1]], LOCAL),
+      deck('b', 1, [['Angel of the Lord (J)', 'main', 1]], NATS),
+      deck('c', 2, [['Angel of the Lord (J)', 'main', 1]], NATS),
+    ]);
+
+    expect(result.events.map((e) => [e.name, e.deckCount])).toEqual([
+      ['Nationals', 2],
+      ['Local', 1],
+    ]);
+  });
+
+  it('reports no events for a single-tournament pool', () => {
+    const result = buildBreakdown([deck('a', 1, [['Angel of the Lord (J)', 'main', 1]])]);
+    expect(result.events).toEqual([]);
+  });
+
+  it('pools entries from different events into one card row', () => {
+    const result = buildBreakdown([
+      deck('a', 1, [['Son of God (J)', 'main', 1]], NATS),
+      deck('b', 1, [['Son of God [Fundraiser]', 'main', 1]], LOCAL),
+    ]);
+
+    const card = result.cards.find((c) => c.name === 'Son of God');
+    expect(card?.deckIndexes).toHaveLength(2);
+    // Both events' entries count toward the same denominator.
+    expect(result.deckCount).toBe(2);
+  });
+
+  it('names the event a neighbouring list came from', () => {
+    const shared: [string, string, number][] = [
+      ['Angel of the Lord (J)', 'main', 1],
+      ['The Second Coming', 'main', 1],
+    ];
+    const result = buildBreakdown([
+      deck('a', 1, shared, NATS),
+      deck('b', 1, shared, LOCAL),
+    ]);
+
+    // A near-identical list from another event is the finding worth surfacing,
+    // so the neighbour carries its origin rather than just a player name.
+    expect(result.decks[0].neighbors[0]).toMatchObject({
+      eventName: 'Local',
+      similarity: 1,
+    });
+    expect(result.decks[0].event?.name).toBe('Nationals');
   });
 
   it('returns an empty shape for a field with no decks', () => {

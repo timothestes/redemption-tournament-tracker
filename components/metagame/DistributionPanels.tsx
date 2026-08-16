@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { TournamentBreakdown } from "@/lib/tournament/breakdown";
 import { brigadeSwatch, brigadeRank } from "@/lib/tournament/brigadeColors";
-import type { DerivedCard } from "./client";
+import type { DerivedCard } from "@/lib/tournament/derive";
 
 /**
  * Brigade, card-type, Lost Soul and reserve distributions.

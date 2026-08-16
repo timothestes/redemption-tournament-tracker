@@ -3,9 +3,11 @@
 import { createClient } from "@/utils/supabase/server";
 import { getSupabaseAdmin } from "@/lib/pricing/supabase-admin";
 import { normalizeTournamentFormat, type FormatId } from "@/lib/formats";
+import type { MetagameFormatId } from "@/lib/tournament/metagameFilters";
 import {
   buildBreakdown,
   type BreakdownDeckInput,
+  type BreakdownEvent,
   type TournamentBreakdown,
 } from "@/lib/tournament/breakdown";
 
@@ -196,6 +198,65 @@ export async function loadPublicResultsAction(tournamentId: string): Promise<
   };
 }
 
+// PostgREST caps a response at 1000 rows and says nothing when it truncates —
+// an unpaginated read of a 62-deck field returns a quarter of the cards and
+// every frequency built on it is wrong by a factor of four.
+const PAGE_SIZE = 1000;
+
+// `.in()` becomes a query string, so a long id list becomes a long URL. At ~37
+// characters per uuid, a few hundred decks would exceed what the server will
+// accept, which matters for the cross-event pool rather than for one event.
+const ID_CHUNK = 200;
+
+/**
+ * Every row matching `column IN (ids)`: chunked to keep the URL short, paged to
+ * defeat the row cap.
+ *
+ * Returns null on a query error, which callers treat as a failed load rather
+ * than as an empty result — reporting "no cards" for what was really a failed
+ * query is the one outcome worse than an error, since it looks like data.
+ */
+async function fetchAllByIds(
+  admin: any,
+  table: string,
+  columns: string,
+  column: string,
+  ids: string[],
+): Promise<any[] | null> {
+  const rows: any[] = [];
+
+  for (let start = 0; start < ids.length; start += ID_CHUNK) {
+    const chunk = ids.slice(start, start + ID_CHUNK);
+
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data, error } = await admin
+        .from(table)
+        .select(columns)
+        .in(column, chunk)
+        // A stable order is what makes .range() paging coherent; without it
+        // Postgres may return overlapping or skipped rows between pages.
+        .order("id", { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (error) {
+        console.error(`Error loading ${table}:`, error);
+        return null;
+      }
+      if (!data || data.length === 0) break;
+      rows.push(...data);
+      if (data.length < PAGE_SIZE) break;
+    }
+  }
+
+  return rows;
+}
+
+const DECK_CARD_COLUMNS = "deck_id, card_name, card_set, card_img_file, quantity, zone";
+
+function fetchDeckCards(admin: any, deckIds: string[]): Promise<any[] | null> {
+  return fetchAllByIds(admin, "deck_cards", DECK_CARD_COLUMNS, "deck_id", deckIds);
+}
+
 export interface TournamentBreakdownResult {
   name: string;
   category: string | null;
@@ -262,27 +323,8 @@ export async function loadTournamentBreakdownAction(tournamentId: string): Promi
     };
   }
 
-  // PostgREST caps a response at 1000 rows. A 62-deck field is ~4200 card rows,
-  // so an unpaginated read silently returns a quarter of the data and every
-  // frequency below is wrong by a factor of four — page until short.
-  const PAGE_SIZE = 1000;
-  const cardRows: any[] = [];
-  for (let offset = 0; ; offset += PAGE_SIZE) {
-    const { data: page, error: pageError } = await admin
-      .from("deck_cards")
-      .select("deck_id, card_name, card_set, card_img_file, quantity, zone")
-      .in("deck_id", deckIds)
-      .order("id", { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
-
-    if (pageError) {
-      console.error("Error loading deck cards for breakdown:", pageError);
-      return { success: false };
-    }
-    if (!page || page.length === 0) break;
-    cardRows.push(...page);
-    if (page.length < PAGE_SIZE) break;
-  }
+  const cardRows = await fetchDeckCards(admin, deckIds);
+  if (cardRows === null) return { success: false };
 
   const cardsByDeck = new Map<string, any[]>();
   for (const row of cardRows) {
@@ -329,6 +371,142 @@ export async function loadTournamentBreakdownAction(tournamentId: string): Promi
     deckFormat: normalizeTournamentFormat(tournament.deck_format),
     endedAt: tournament.ended_at,
     fieldSize: (participants ?? []).length,
+    breakdown: buildBreakdown(deckInputs),
+  };
+}
+
+// ─── Cross-event metagame ────────────────────────────────────────────
+//
+// Same gate as the single-event breakdown, same aggregation, wider net: every
+// published event inside a window whose deck format matches. The unit stays the
+// entry, so a 62-list Nationals weighs twenty times a 3-list local — which is
+// the honest weighting, and why the contributing events are always named on the
+// page rather than summed into an anonymous total.
+
+export interface MetagameResult {
+  format: MetagameFormatId;
+  days: number;
+  /** Everyone who played in the contributing events, submitted or not. */
+  fieldSize: number;
+  /**
+   * Events that published lists in the window but in a different format. The
+   * empty state needs this to say "nothing here yet" rather than implying the
+   * whole window is bare.
+   */
+  otherFormatEvents: number;
+  breakdown: TournamentBreakdown;
+}
+
+export async function loadMetagameAction(
+  format: MetagameFormatId,
+  days: number,
+): Promise<{ success: false } | ({ success: true } & MetagameResult)> {
+  const admin = getSupabaseAdmin();
+
+  let query = admin
+    .from("tournaments")
+    .select("id, name, deck_format, ended_at")
+    .eq("results_published", true)
+    .eq("decklists_published", true)
+    // The view is indexed by time, so an event with no recorded end date cannot
+    // be placed in any window — including "all time", where showing it would
+    // make the windowed views look like they were dropping data.
+    .not("ended_at", "is", null);
+
+  if (days > 0) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    query = query.gte("ended_at", cutoff.toISOString());
+  }
+
+  const { data: tournaments, error } = await query;
+  if (error || !tournaments) {
+    console.error("Error loading metagame tournaments:", error);
+    return { success: false };
+  }
+
+  // Format lives as free text ('Limited', 'T1', 'Type 2', …), so the match runs
+  // through the canonical normalizer rather than against the stored string.
+  const matching = tournaments.filter(
+    (t: any) => normalizeTournamentFormat(t.deck_format) === format,
+  );
+  const otherFormatEvents = tournaments.length - matching.length;
+
+  const empty = (): { success: true } & MetagameResult => ({
+    success: true,
+    format,
+    days,
+    fieldSize: 0,
+    otherFormatEvents,
+    breakdown: buildBreakdown([]),
+  });
+
+  if (matching.length === 0) return empty();
+
+  const tournamentIds = matching.map((t: any) => t.id);
+  const eventById = new Map<string, BreakdownEvent>(
+    matching.map((t: any) => [t.id, { id: t.id, name: t.name, endedAt: t.ended_at }]),
+  );
+
+  const [participants, links] = await Promise.all([
+    fetchAllByIds(admin, "participants", "id, name, place, tournament_id", "tournament_id", tournamentIds),
+    fetchAllByIds(
+      admin,
+      "tournament_decklists",
+      "participant_id, published_deck_id, tournament_id",
+      "tournament_id",
+      tournamentIds,
+    ),
+  ]);
+
+  if (participants === null || links === null) return { success: false };
+
+  const byParticipant = new Map(participants.map((p: any) => [p.id, p]));
+  const deckIds = links
+    .map((l: any) => l.published_deck_id)
+    .filter((id: string | null): id is string => Boolean(id));
+
+  if (deckIds.length === 0) {
+    return { ...empty(), fieldSize: participants.length };
+  }
+
+  const cardRows = await fetchDeckCards(admin, deckIds);
+  if (cardRows === null) return { success: false };
+
+  const cardsByDeck = new Map<string, any[]>();
+  for (const row of cardRows) {
+    const list = cardsByDeck.get(row.deck_id);
+    if (list) list.push(row);
+    else cardsByDeck.set(row.deck_id, [row]);
+  }
+
+  const deckInputs: BreakdownDeckInput[] = links
+    .filter((link: any) => Boolean(link.published_deck_id))
+    .map((link: any) => {
+      const participant: any = byParticipant.get(link.participant_id);
+      return {
+        deckId: link.published_deck_id as string,
+        participantId: link.participant_id as string,
+        playerName: participant?.name ?? null,
+        place: participant?.place ?? null,
+        event: eventById.get(link.tournament_id) ?? null,
+        cards: (cardsByDeck.get(link.published_deck_id) ?? []).map((c: any) => ({
+          name: c.card_name,
+          set: c.card_set,
+          imgFile: c.card_img_file,
+          quantity: c.quantity,
+          zone: c.zone,
+        })),
+      };
+    })
+    .filter((deck: BreakdownDeckInput) => deck.cards.length > 0);
+
+  return {
+    success: true,
+    format,
+    days,
+    fieldSize: participants.length,
+    otherFormatEvents,
     breakdown: buildBreakdown(deckInputs),
   };
 }

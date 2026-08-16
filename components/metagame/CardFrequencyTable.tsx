@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { getCardImageUrl } from "@/app/shared/utils/cardImageUrl";
 import type { BreakdownDeck } from "@/lib/tournament/breakdown";
-import type { DerivedCard } from "./client";
+import type { DerivedCard } from "@/lib/tournament/derive";
 import TopCutControl from "./TopCutControl";
 
 type SortKey = "decks" | "copies" | "delta" | "reserve" | "name";
@@ -33,6 +33,8 @@ export default function CardFrequencyTable({
   topCut,
   onTopCutChange,
   rankedDeckCount,
+  cutOptions,
+  perEventCut = false,
 }: {
   cards: DerivedCard[];
   deckCount: number;
@@ -41,6 +43,8 @@ export default function CardFrequencyTable({
   topCut: number;
   onTopCutChange: (value: number) => void;
   rankedDeckCount: number;
+  cutOptions?: { value: number; label: string }[];
+  perEventCut?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [zone, setZone] = useState<ZoneFilter>("all");
@@ -159,6 +163,8 @@ export default function CardFrequencyTable({
             onChange={onTopCutChange}
             cutSize={cutSize}
             rankedDeckCount={rankedDeckCount}
+            options={cutOptions}
+            perEvent={perEventCut}
           />
         )}
       </header>
@@ -391,6 +397,13 @@ function CardDetail({
       .slice(0, 5);
   }, [card.deckIndexes, decks]);
 
+  // Only worth printing when the pool spans more than one event; otherwise it
+  // is the same string on every line.
+  const showEvents = useMemo(
+    () => new Set(decks.map((deck) => deck.event?.id).filter(Boolean)).size > 1,
+    [decks],
+  );
+
   return (
     <div className="bg-foreground/[0.03] px-3 py-4 sm:px-4">
       <div className="grid gap-5 sm:grid-cols-2">
@@ -432,9 +445,17 @@ function CardDetail({
             </h3>
             <ul className="mt-2 space-y-1.5">
               {playedBy.map((deck) => (
-                <li key={deck.deckId} className="flex items-baseline justify-between gap-3">
+                // Keyed by participant, not deck: two players can submit the
+                // same published list, and across events two entries can share
+                // a deck id outright.
+                <li key={deck.participantId} className="flex items-baseline justify-between gap-3">
                   <span className="min-w-0 flex-1 truncate text-xs text-foreground">
                     {deck.playerName ?? "Unnamed"}
+                    {/* A finish is only readable next to the field it was
+                        earned in — #1 of six is not #1 of seventy-two. */}
+                    {showEvents && deck.event && (
+                      <span className="ml-1 text-muted-foreground/70">{deck.event.name}</span>
+                    )}
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                     {deck.place === null ? "—" : `#${deck.place}`}
