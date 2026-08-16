@@ -34,6 +34,10 @@ export default function DeckDna({ breakdown }: { breakdown: TournamentBreakdown 
 
   const maxSpice = Math.max(...breakdown.decks.map((d) => d.spice), 0.0001);
 
+  // With one event in the pool the name is the same on every row, and the
+  // header above already says so — it only earns its space when it varies.
+  const showEvents = breakdown.events.length > 1;
+
   return (
     <section className="space-y-4">
       <header className="space-y-2">
@@ -96,8 +100,17 @@ export default function DeckDna({ breakdown }: { breakdown: TournamentBreakdown 
                   </span>
                 )}
               </div>
-              <div className="text-xs text-muted-foreground tabular-nums">
-                {deck.mainSize} main · {deck.reserveSize} reserve · {deck.lostSouls} souls
+              <div className="flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground tabular-nums">
+                {/* Across events a placement is meaningless without its field,
+                    so the event rides alongside it. */}
+                {showEvents && deck.event && (
+                  <span className="truncate font-medium not-italic text-muted-foreground/80">
+                    {deck.event.name}
+                  </span>
+                )}
+                <span>
+                  {deck.mainSize} main · {deck.reserveSize} reserve · {deck.lostSouls} souls
+                </span>
               </div>
             </div>
 
@@ -125,6 +138,16 @@ export default function DeckDna({ breakdown }: { breakdown: TournamentBreakdown 
                     {deck.neighbors
                       .map((n) => `${n.playerName ?? "Unnamed"} ${Math.round(n.similarity * 100)}%`)
                       .join(" · ")}
+                    {/* A near-identical list from a different event is the most
+                        interesting thing this panel can find — say so. */}
+                    {deck.neighbors[0] &&
+                      deck.neighbors[0].similarity >= 0.6 &&
+                      deck.neighbors[0].eventName &&
+                      deck.neighbors[0].eventName !== deck.event?.name && (
+                        <span className="ml-1 text-muted-foreground/70">
+                          (from {deck.neighbors[0].eventName})
+                        </span>
+                      )}
                   </span>
                 )}
               </div>

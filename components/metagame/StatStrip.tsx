@@ -16,12 +16,18 @@ export default function StatStrip({
   fieldSize: number;
 }) {
   const coverage = fieldSize === 0 ? 0 : Math.round((breakdown.deckCount / fieldSize) * 100);
+  const eventCount = breakdown.events.length;
+
+  const coverageNote =
+    fieldSize > breakdown.deckCount ? `${coverage}% of ${fieldSize} players` : "the full field";
 
   const tiles = [
     {
       value: breakdown.deckCount.toLocaleString(),
       label: "Decklists",
-      note: fieldSize > breakdown.deckCount ? `${coverage}% of ${fieldSize} players` : "the full field",
+      // Across events the event count is the first thing that qualifies the
+      // number — two hundred lists from one tournament is not a metagame.
+      note: eventCount > 1 ? `${coverageNote} · ${eventCount} events` : coverageNote,
     },
     {
       value: breakdown.distinctCards.toLocaleString(),

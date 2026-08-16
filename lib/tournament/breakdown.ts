@@ -24,12 +24,26 @@ export interface BreakdownCardInput {
   zone: DeckZone;
 }
 
+/**
+ * The event an entry came from.
+ *
+ * Absent when the whole pool is one tournament — the single-event page has
+ * nothing to disambiguate. Present on the cross-event Metagame view, where a
+ * placement is only readable next to the field it was earned in.
+ */
+export interface BreakdownEvent {
+  id: string;
+  name: string;
+  endedAt: string | null;
+}
+
 export interface BreakdownDeckInput {
   deckId: string;
   /** Unique per entry — two players can bring the same deckId. */
   participantId: string;
   playerName: string | null;
   place: number | null;
+  event?: BreakdownEvent | null;
   cards: BreakdownCardInput[];
 }
 
@@ -38,6 +52,7 @@ export interface BreakdownDeck {
   participantId: string;
   playerName: string | null;
   place: number | null;
+  event: BreakdownEvent | null;
   mainSize: number;
   reserveSize: number;
   lostSouls: number;
@@ -51,6 +66,7 @@ export interface BreakdownDeck {
     deckId: string;
     participantId: string;
     playerName: string | null;
+    eventName: string | null;
     similarity: number;
   }[];
 }
@@ -91,6 +107,11 @@ export interface TournamentBreakdown {
   brigades: BreakdownSlice[];
   types: BreakdownSlice[];
   alignments: BreakdownSlice[];
+  /**
+   * Events contributing entries, newest first. Empty when the pool carries no
+   * event tags at all, which is the single-tournament case.
+   */
+  events: (BreakdownEvent & { deckCount: number })[];
 }
 
 const CANONICAL_BRIGADE: Record<string, string> = {
@@ -284,6 +305,7 @@ export function buildBreakdown(input: BreakdownDeckInput[]): TournamentBreakdown
           deckId: other.deckId,
           participantId: other.participantId,
           playerName: other.playerName,
+          eventName: other.event?.name ?? null,
           similarity: union === 0 ? 0 : shared / union,
         };
       })
@@ -296,6 +318,7 @@ export function buildBreakdown(input: BreakdownDeckInput[]): TournamentBreakdown
       participantId: deck.participantId,
       playerName: deck.playerName,
       place: deck.place,
+      event: deck.event ?? null,
       mainSize: deckStats[index].mainSize,
       reserveSize: deckStats[index].reserveSize,
       lostSouls: deckStats[index].lostSouls,
@@ -331,6 +354,21 @@ export function buildBreakdown(input: BreakdownDeckInput[]): TournamentBreakdown
     if (alignment) tally(alignmentTally, alignment, card);
   }
 
+  // Which events fed this pool, and how much each contributed — the reader
+  // needs that to judge whether "the metagame" is one big event or several.
+  const eventTally = new Map<string, BreakdownEvent & { deckCount: number }>();
+  for (const deck of decksInput) {
+    if (!deck.event) continue;
+    const existing = eventTally.get(deck.event.id);
+    if (existing) existing.deckCount += 1;
+    else eventTally.set(deck.event.id, { ...deck.event, deckCount: 1 });
+  }
+  const events = [...eventTally.values()].sort((a, b) => {
+    const aTime = a.endedAt ? new Date(a.endedAt).getTime() : 0;
+    const bTime = b.endedAt ? new Date(b.endedAt).getTime() : 0;
+    return bTime - aTime || a.name.localeCompare(b.name);
+  });
+
   const toSlices = (source: Map<string, { decks: Set<number>; copies: number }>): BreakdownSlice[] =>
     [...source.entries()]
       .map(([label, value]) => ({ label, decks: value.decks.size, copies: value.copies }))
@@ -348,5 +386,6 @@ export function buildBreakdown(input: BreakdownDeckInput[]): TournamentBreakdown
     brigades: toSlices(brigadeTally),
     types: toSlices(typeTally),
     alignments: toSlices(alignmentTally),
+    events,
   };
 }

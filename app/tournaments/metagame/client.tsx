@@ -9,16 +9,22 @@ import CardFrequencyTable from "@/components/metagame/CardFrequencyTable";
 import StaplesScatter from "@/components/metagame/StaplesScatter";
 import DistributionPanels from "@/components/metagame/DistributionPanels";
 import DeckDna from "@/components/metagame/DeckDna";
+import { CROSS_EVENT_CUTS } from "@/components/metagame/TopCutControl";
 
-export type ViewKey = "cards" | "meta" | "decks";
+type ViewKey = "cards" | "meta" | "decks";
 
 const VIEWS: { key: ViewKey; label: string; blurb: string }[] = [
-  { key: "cards", label: "Cards", blurb: "What the field played" },
-  { key: "meta", label: "Metagame", blurb: "What separated the top tables" },
+  { key: "cards", label: "Cards", blurb: "What the format plays" },
+  { key: "meta", label: "Performance", blurb: "What the winning decks played differently" },
   { key: "decks", label: "Decks", blurb: "How the lists relate to each other" },
 ];
 
-export default function BreakdownClient({
+/**
+ * The pooled view. Identical to the single-event breakdown but for the cut:
+ * across events it is drawn inside each field and then pooled, so a small
+ * event's leaderboard cannot outweigh a large one's. See `cutIndexesByEvent`.
+ */
+export default function MetagameClient({
   breakdown,
   fieldSize,
 }: {
@@ -26,10 +32,8 @@ export default function BreakdownClient({
   fieldSize: number;
 }) {
   const [view, setView] = useState<ViewKey>("cards");
-  const [topCut, setTopCut] = useState<number>(8);
+  const [topCut, setTopCut] = useState<number>(0.25);
 
-  // One event, so `cutIndexesByEvent` collapses to ranking the whole field —
-  // the decks here carry no event tag and fall into a single group.
   const cutSet = useMemo(
     () => cutIndexesByEvent(breakdown.decks, topCut),
     [breakdown.decks, topCut],
@@ -48,7 +52,7 @@ export default function BreakdownClient({
       <div>
         <div
           role="tablist"
-          aria-label="Breakdown views"
+          aria-label="Metagame views"
           className="flex w-full gap-1 rounded-lg bg-muted/50 p-1"
         >
           {VIEWS.map((entry) => {
@@ -85,6 +89,8 @@ export default function BreakdownClient({
           topCut={topCut}
           onTopCutChange={setTopCut}
           rankedDeckCount={rankedCount}
+          cutOptions={CROSS_EVENT_CUTS}
+          perEventCut
         />
       )}
 
@@ -97,6 +103,8 @@ export default function BreakdownClient({
             topCut={topCut}
             onTopCutChange={setTopCut}
             rankedDeckCount={rankedCount}
+            cutOptions={CROSS_EVENT_CUTS}
+            perEventCut
           />
           <DistributionPanels breakdown={breakdown} cards={cards} />
         </div>

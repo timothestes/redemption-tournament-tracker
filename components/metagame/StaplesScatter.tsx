@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { DerivedCard } from "./client";
+import type { DerivedCard } from "@/lib/tournament/derive";
 import TopCutControl from "./TopCutControl";
 
 /**
@@ -30,6 +30,8 @@ export default function StaplesScatter({
   topCut,
   onTopCutChange,
   rankedDeckCount,
+  cutOptions,
+  perEventCut = false,
 }: {
   cards: DerivedCard[];
   deckCount: number;
@@ -37,6 +39,8 @@ export default function StaplesScatter({
   topCut: number;
   onTopCutChange: (value: number) => void;
   rankedDeckCount: number;
+  cutOptions?: { value: number; label: string }[];
+  perEventCut?: boolean;
 }) {
   const [minDecks, setMinDecks] = useState(4);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -124,6 +128,8 @@ export default function StaplesScatter({
             onChange={onTopCutChange}
             cutSize={cutSize}
             rankedDeckCount={rankedDeckCount}
+            options={cutOptions}
+            perEvent={perEventCut}
           />
           <div className="flex items-center gap-2">
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import TopNav from "@/components/top-nav";
 import SponsorFooter from "@/components/sponsor-footer";
 import { loadPublicResultsIndexAction } from "../actions";
+import ResultsSectionTabs from "@/components/metagame/ResultsSectionTabs";
 
 export const metadata = {
   title: "Tournament Results | Redemption CCG",
@@ -79,7 +80,11 @@ export default async function TournamentResultsIndexPage() {
           Published standings from completed tournaments.
         </p>
 
-        <div className="mt-6 space-y-2">
+        <div className="mt-6">
+          <ResultsSectionTabs active="events" />
+        </div>
+
+        <div className="space-y-2">
           {events.map((e) => {
             const dateLabel = formatEndedAt(e.endedAt);
             return (
