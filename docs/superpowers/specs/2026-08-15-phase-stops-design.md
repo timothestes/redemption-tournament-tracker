@@ -1,7 +1,7 @@
 # Phase Stops — Opponent-Turn Priority Stops — Design Spec
 
 **Date:** 2026-08-15
-**Status:** Design rev 2 (post adversarial review)
+**Status:** Design rev 3 (gate-between-phases correction — see §13)
 **Scope:** Multiplayer only (`/play`). Goldfish is untouched. Spectators see holds but can never set stops.
 
 > Adapted from MTGO's "stops" and Arena's phase-bar stop markers: a player flags
@@ -576,3 +576,84 @@ session to confirm the E10 degradation mode is as benign as believed.
   of their own.
 - **The 60s constant is a guess.** Too short burns real decisions; too long
   rewards stalling. It's one constant; tune after live play.
+
+---
+
+## 13. Rev 3 (2026-08-15) — gate-between-phases correction
+
+Product correction from the owner, overriding §5.1/§5.7 above: **a stop is a
+gate on the boundary INTO a phase, not a pause on the phase itself.** The turn
+halts *before* entering the gated phase, and the gated phase's enter side
+effects — most visibly, the battle band opening — happen only on release.
+Rev 2's "land on P, then hold" gave the active player the phase's benefits
+before the stopper ever got their window; the gate model is what a stop was
+always meant to be.
+
+Storage and schema are **unchanged**. `TurnStop` still keys stops by the gated
+phase name; `holdPhase = P` now *means* "held at the gate before P";
+`firedPhases` is unchanged (once per phase per turn, reset at flip, marked when
+the gate engages).
+
+**The five semantic deltas:**
+
+1. **Advancing into a gated phase halts short of it.** With a battle gate,
+   `set_phase(draw → battle)` legitimately crosses upkeep and preparation
+   (their enter/leave effects run) and then stops: `currentPhase` is still
+   `preparation`, the pill sits on Preparation, the hold is engaged, and the
+   band is **not** open. PASS auto-enters battle and opens the band with no
+   further clicks from the active player.
+2. **`end_turn` halts too, and does not end the turn.** End Turn from draw with
+   a battle gate transitions to *preparation* — crossing upkeep and preparation
+   in one hop, with the band-open side effect suppressed so no phantom band
+   appears — then holds before battle. The turn is not ended.
+3. **Every release path crosses the gate.** `release_turn_stop` (PASS), the
+   `set_turn_stop` toggle-off special case, and the 60s timeout all run one
+   shared `releaseHold`, which then advances the turn *into* the released phase
+   on the turn player's behalf. Toggling a held gate off is therefore an
+   auto-advance, identical in effect to PASS.
+4. **The band-open rule refuses instead of firing late.** A turn player's
+   band-opening `enter_battle` while the opponent has an unfired battle gate
+   and `currentPhase` is strictly before battle engages the hold and returns
+   **without moving the card or opening the band** — reducers are
+   transactional, so engage-then-throw would roll the hold back; the card
+   simply snaps back like any refused optimistic drag. Any *subsequent*
+   band-opening drag during an active hold throws (`assertTurnNotHeld`) and
+   surfaces as an error toast. `currentPhase === 'battle'` no longer triggers
+   anything: a stop set while already in battle waits for next turn (no
+   retro-fire, §5.6), so rev 2's E4 battle exception is gone. Release then
+   enters battle, opens the band, and a re-drag succeeds. `end_battle` /
+   `surrender_soul` likewise hold at the discard gate with `currentPhase` left
+   on `battle` rather than writing discard.
+5. **The draw gate is unchanged.** `end_turn`'s flip and `finishPregame` stay
+   flip-then-hold: the hold sits at the top of draw *after* the auto-draw,
+   because holding before the flip would invert which seat is holding.
+   Release is a no-op transition there (`currentPhase === releasedPhase`).
+
+**Visuals and copy (§8).** The phase buttons revert to plain own-turn jump /
+opponent-turn inert — the toggle overload and the on-button dot markers are
+gone. In their place, five between-phase **gate markers** (`PhaseGate`,
+`data-testid="phase-gate-{phase}"`): one before the Draw button and one in each
+gap between adjacent phase buttons, the gate in front of P toggling the
+viewer's stop on P. A slim vertical bar inside a 16px invisible hit target —
+solid amber-gold `#c4955a` when armed, amber `#fbbf24` + `stopHoldPulse` while
+holding, a faint `rgba(196,149,90,0.28)` outline whenever toggling is possible
+(discoverability was the complaint), invisible otherwise. All copy moves from
+"at {Phase}" to "**before {Phase}**": gate tooltips, the toggle toasts, the
+active player's hold caption, and the `STOP_HOLD` chat line ("⏸ stopped the
+turn before {Phase}"). The sliding pill is unaffected — gates are siblings of
+the buttons, and `buttonRefs` stays buttons-only.
+
+**Testing (supersedes §10's E2E bullet).** `spacetimedb/__tests__/stopFlow.test.ts`
+is untouched (the pure module did not change). The two-browser suite
+`e2e/play/phaseStops.spec.ts` is rewritten to the gate model: arming clicks
+target the gate markers, scenario 1 asserts the halt in preparation with the
+band shut and PASS auto-entering battle, scenario 3 asserts the toggle-off
+auto-advance, and scenario 4 asserts the discard gate holding with the band
+still open (E17's dead conclude buttons moved here — a battle gate's hold has
+no band) plus the error toast on a band-open drag during a hold. One
+limitation is recorded there: R5's *silent* pre-battle refusal is not reachable
+from the client, because the band is phase-driven (`isBattleBandActive`) and
+`findZoneAtPosition` only yields the `battle` zone while the band is on screen,
+so no drop during preparation can reach `enter_battle` at all. The reachable
+half of the same guard — `assertTurnNotHeld` inside `enter_battle` — is what
+the suite drives.
