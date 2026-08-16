@@ -2765,8 +2765,24 @@ setStopHoldTimeoutReducer(handle_stop_hold_timeout);
 // enter-battle band-open side effects, writes currentPhase, logs SET_PHASE —
 // exactly what a direct phase click does, so a gate crossing is
 // indistinguishable from the player clicking through it.
+//
+// `opts.openBattleBand` (default true) governs ONLY whether landing on
+// 'battle' also opens the band. R1/R2's g-1 CROSSING calls (a turn legally
+// passing through battle on its way to a gate further out — e.g. End Turn
+// from preparation with a discard gate) pass `{ openBattleBand: false }`:
+// currentPhase becomes 'battle' but battleState is left untouched ('') — no
+// player attacked, so no band should open. Direct set_phase targets and the
+// release path (releaseHold) keep the default: passing a battle GATE is
+// what opens the band.
 // ---------------------------------------------------------------------------
-function applyPhaseTransition(ctx: any, gameId: bigint, actingPlayerId: bigint, targetPhase: string): void {
+function applyPhaseTransition(
+  ctx: any,
+  gameId: bigint,
+  actingPlayerId: bigint,
+  targetPhase: string,
+  opts?: { openBattleBand?: boolean },
+): void {
+  const openBattleBand = opts?.openBattleBand ?? true;
   let game = ctx.db.Game.id.find(gameId);
   if (!game) return;
   const oldPhase = game.currentPhase;
@@ -2779,7 +2795,7 @@ function applyPhaseTransition(ctx: any, gameId: bigint, actingPlayerId: bigint, 
     game = ctx.db.Game.id.find(gameId) ?? game;
   }
 
-  if (targetPhase === 'battle' && oldPhase !== 'battle' && game.battleState === '') {
+  if (openBattleBand && targetPhase === 'battle' && oldPhase !== 'battle' && game.battleState === '') {
     // Entering the battle phase opens the band — same step enter_battle
     // performs when the band starts closed.
     ctx.db.Game.id.update({
@@ -2845,7 +2861,9 @@ export const set_phase = spacetimedb.reducer(
     if (stopPhase !== null) {
       const gateIdx = (STOP_PHASES as readonly string[]).indexOf(stopPhase);
       if (gateIdx - 1 > oldIdx) {
-        applyPhaseTransition(ctx, gameId, player.id, STOP_PHASES[gateIdx - 1]);
+        // Crossing through battle on the way to a gate further out is not an
+        // attack — suppress the band-open (IMPORTANT 2 fix).
+        applyPhaseTransition(ctx, gameId, player.id, STOP_PHASES[gateIdx - 1], { openBattleBand: false });
       }
       engageHold(ctx, gameId, stopPhase);
     } else {
@@ -2898,7 +2916,9 @@ export const end_turn = spacetimedb.reducer(
     if (endTurnStop !== null) {
       const gateIdx = (STOP_PHASES as readonly string[]).indexOf(endTurnStop);
       if (gateIdx - 1 > endTurnFromIdx) {
-        applyPhaseTransition(ctx, gameId, player.id, STOP_PHASES[gateIdx - 1]);
+        // Crossing through battle on the way to a gate further out (e.g.
+        // discard) is not an attack — suppress the band-open (IMPORTANT 2 fix).
+        applyPhaseTransition(ctx, gameId, player.id, STOP_PHASES[gateIdx - 1], { openBattleBand: false });
       }
       engageHold(ctx, gameId, endTurnStop);
       return;
@@ -3387,8 +3407,19 @@ export const enter_battle = spacetimedb.reducer(
     // moved nothing; the STOP_HOLD log entry (inside engageHold) is the
     // record, and the client's optimistic drag just snaps back like any
     // other refused move. Non-turn-player calls (blocking, joining) never
-    // trigger this.
+    // trigger this — a stopping player may still drag into an ALREADY-OPEN
+    // band even mid-hold (that branch is untouched below).
     if (game.battleState === '' && player.seat === game.currentTurn && game.pregamePhase === '') {
+      // Critical fix: any active hold — the one this drag would otherwise
+      // engage below, OR a hold at an unrelated phase (e.g. draw) — must
+      // block the turn player from opening the band at all. Without this, a
+      // SECOND drag (the gate already fired, holdPhase !== '') falls through
+      // the `stopRow.holdPhase === ''` check below and opens the band/moves
+      // the card, committing the attack inside the very window the gate
+      // created. Throwing here is safe: nothing has been written yet in this
+      // reducer.
+      assertTurnNotHeld(ctx, gameId);
+
       const stopRow = ctx.db.TurnStop.gameId.find(gameId);
       if (stopRow && stopRow.holdPhase === '') {
         const stopsCsv = game.currentTurn === 0n ? stopRow.seat1Stops : stopRow.seat0Stops;

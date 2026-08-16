@@ -606,7 +606,7 @@ export const TurnStop = table(
     gameId: t.u64().primaryKey(),
     seat0Stops: t.string().default(''),  // csv of phases seat 0 stops on (fires during seat 1's turn)
     seat1Stops: t.string().default(''),  // csv of phases seat 1 stops on (fires during seat 0's turn)
-    holdPhase: t.string().default(''),   // '' | phase currently holding the turn
+    holdPhase: t.string().default(''),   // '' | phase before which the turn is held (the gate)
     firedPhases: t.string().default(''), // csv of phases whose stop already fired this turn; reset at turn flip
   }
 );
