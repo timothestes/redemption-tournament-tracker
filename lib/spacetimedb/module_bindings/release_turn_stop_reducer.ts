@@ -12,5 +12,5 @@ import {
 
 export default {
   gameId: __t.u64(),
-  advance: __t.bool(),
+  denied: __t.bool(),
 };

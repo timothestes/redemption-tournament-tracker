@@ -19,26 +19,25 @@ import { login, hostGame, joinGame, bothReachPlaying } from "../spectator/playHe
 //     the Priority button — "X requests action priority before you move to
 //     P" / "...before you end your turn" — with Grant/Deny. There is no PASS
 //     button and no Held caption; the stopper has no release affordance.
-//   - Grant lifts the hold and LEAVES THE TURN WHERE IT HALTED (honor-system
-//     window; the active player continues manually and nothing re-fires).
-//   - Deny lifts the hold and RESUMES THE HALTED MOVEMENT toward its original
-//     destination (holdResume): a denied battle-gate phase click enters
-//     battle and opens the band; a denied end-gate End Turn completes the
-//     flip.
+//   - Grant and Deny BOTH only lift the hold — the turn stays exactly where
+//     it halted, and the active player redoes their move themselves (the
+//     spent gate lets it through). They differ only in the logged courtesy.
+//     The 60s backstop release behaves the same way.
 //
 // The four scenarios:
 //   1. Battle gate via a phase click — arm → jump halts in PREPARATION with
-//      the band shut → active controls are dead → Deny enters battle and
-//      opens the band.
+//      the band shut → active controls are dead → Deny lifts the hold with
+//      the turn still in preparation → re-clicking Battle enters it.
 //   2. End gate — no draw gate exists; End Turn crosses to Discard (battle
 //      band suppressed on the crossing) and halts before the flip; Deny
-//      completes the flip.
+//      stays on Discard; pressing End Turn again completes the flip.
 //   3. Grant path + one-shot — a preparation gate halts in Upkeep; Grant
-//      lifts the hold WITHOUT advancing; the active player re-clicks
+//      lifts the hold without advancing; the active player re-clicks
 //      Preparation and nothing re-fires (the stop was consumed).
 //   4. Discard gate at the battle boundary (E17: band open, conclude buttons
-//      dead) + a re-armed gate proving re-toggle re-fires + a band-opening
-//      drag during a hold refused with the "has priority" toast.
+//      dead; Deny leaves the turn on Battle with the band intact) + a
+//      re-armed gate proving re-toggle re-fires + a band-opening drag during
+//      a hold refused with the "has priority" toast.
 //
 // Requires SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL and a
 // SpacetimeDB dev module carrying the rev 4 Phase Stops reducers/tables.
@@ -422,7 +421,7 @@ async function twoPlayerGame(
 // ---------------------------------------------------------------------------
 
 test.describe("Phase Stops", () => {
-  test("a battle gate halts in preparation; Deny enters battle and opens the band", async ({
+  test("a battle gate halts in preparation; after Deny the redone click enters battle", async ({
     browser,
   }) => {
     requireSeed();
@@ -468,18 +467,25 @@ test.describe("Phase Stops", () => {
       await expect(phaseBtn(active, "preparation")).toHaveCSS("color", PHASE_ACTIVE);
       expect(await bandOpen(active)).toBe(false);
 
-      // --- 4. Deny resumes the halted movement: the turn ENTERS battle ------
+      // --- 4. Deny only lifts the hold: the turn STAYS in preparation -------
       await denyBtn(active).click();
       await expectHoldCleared(active);
+      await moveMouseAway(active);
+      await expect(phaseBtn(active, "preparation")).toHaveCSS("color", PHASE_ACTIVE);
+      expect(await bandOpen(active)).toBe(false);
+      // One-shot: the stopper's gate is back to the faint outline, NOT gold.
+      await moveMouseAway(idle);
+      await expect.poll(() => gateColor(idle, "battle"), { timeout: 10_000 }).toMatch(GATE_FAINT);
+
+      // Redoing the move goes through — the spent gate does not re-fire.
+      await phaseBtn(active, "battle").click();
       await moveMouseAway(active);
       await expect(phaseBtn(active, "battle")).toHaveCSS("color", PHASE_ACTIVE, {
         timeout: 25_000,
       });
+      await expect(holdPrompt(active)).toHaveCount(0);
       await expect.poll(() => bandOpen(active), { timeout: 25_000 }).toBe(true);
       await expect.poll(() => bandOpen(idle), { timeout: 25_000 }).toBe(true);
-      // One-shot: the stopper's gate is back to the faint outline, NOT gold.
-      await moveMouseAway(idle);
-      await expect.poll(() => gateColor(idle, "battle"), { timeout: 10_000 }).toMatch(GATE_FAINT);
 
       // The freshly opened band is a live drop target.
       await dragHandCardIntoBand(active);
@@ -494,7 +500,7 @@ test.describe("Phase Stops", () => {
     }
   });
 
-  test("the end gate halts End Turn before the flip; Deny completes it (and no draw gate exists)", async ({
+  test("the end gate halts End Turn before the flip; a second End Turn completes it (and no draw gate exists)", async ({
     browser,
   }) => {
     requireSeed();
@@ -521,8 +527,15 @@ test.describe("Phase Stops", () => {
       expect(await bandOpen(idle)).toBe(false);
       await active.screenshot({ path: "test-results/phase-stops-end-gate.png" });
 
-      // Deny resumes the End Turn: the flip completes with no further clicks.
+      // Deny only lifts the hold: the turn stays on Discard, unflipped.
       await denyBtn(active).click();
+      await expectHoldCleared(active);
+      await moveMouseAway(active);
+      await expect(phaseBtn(active, "discard")).toHaveCSS("color", PHASE_ACTIVE);
+
+      // Pressing End Turn again completes the flip — the spent end gate lets
+      // it through.
+      await endTurnBtn(active).click();
       await waitForTurn(idle);
       await expect(endTurnBtn(active)).toHaveCount(0, { timeout: 25_000 });
       // One-shot, seen from the new turn's perspective: the former stopper is
@@ -631,13 +644,23 @@ test.describe("Phase Stops", () => {
       await expect(holdPrompt(active)).toBeVisible();
       await active.screenshot({ path: "test-results/phase-stops-discard-gate-held.png" });
 
-      // --- 5. Deny resumes into discard, auto-returning the band ------------
+      // --- 5. Deny lifts the hold with the turn still on Battle -------------
+      // The band (and its attacker) survives; the conclude buttons come back
+      // to life; re-clicking Discard then advances for real, auto-returning
+      // the band.
       await denyBtn(active).click();
       await expectHoldCleared(active);
+      await moveMouseAway(active);
+      await expect(phaseBtn(active, "battle")).toHaveCSS("color", PHASE_ACTIVE);
+      await expect.poll(() => cardsInBand(active), { timeout: 10_000 }).toBeGreaterThan(0);
+      await expect(active.getByRole("button", { name: /Win Battle/ })).toBeEnabled();
+
+      await phaseBtn(active, "discard").click();
       await moveMouseAway(active);
       await expect(phaseBtn(active, "discard")).toHaveCSS("color", PHASE_ACTIVE, {
         timeout: 25_000,
       });
+      await expect(holdPrompt(active)).toHaveCount(0);
       await expect.poll(() => bandOpen(active), { timeout: 25_000 }).toBe(false);
 
       // ===================================================================
@@ -686,13 +709,18 @@ test.describe("Phase Stops", () => {
       await expect(holdPrompt(active)).toBeVisible();
       await active.screenshot({ path: "test-results/phase-stops-held-band-open.png" });
 
-      // --- 9. Deny enters discard and closes the band -----------------------
+      // --- 9. Deny lifts the hold; re-clicking Discard closes out the turn --
       await denyBtn(active).click();
       await expectHoldCleared(active);
+      await moveMouseAway(active);
+      await expect(phaseBtn(active, "battle")).toHaveCSS("color", PHASE_ACTIVE);
+
+      await phaseBtn(active, "discard").click();
       await moveMouseAway(active);
       await expect(phaseBtn(active, "discard")).toHaveCSS("color", PHASE_ACTIVE, {
         timeout: 25_000,
       });
+      await expect(holdPrompt(active)).toHaveCount(0);
       await expect.poll(() => bandOpen(active), { timeout: 25_000 }).toBe(false);
     } finally {
       await game.dispose();

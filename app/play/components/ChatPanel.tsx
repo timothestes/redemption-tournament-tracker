@@ -194,8 +194,8 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       if (data.reason === 'grant') return '▶ granted action priority';
-      if (data.reason === 'deny') return '▶ declined the stop — turn resumes';
-      if (data.reason === 'timeout') return '▶ stop timed out — turn resumes';
+      if (data.reason === 'deny') return '▶ declined the priority request';
+      if (data.reason === 'timeout') return '▶ priority request timed out';
       return '▶ passed — turn resumes'; // legacy rev-3 reasons (manual / toggle-off)
     } catch { /* fall through */ }
   }

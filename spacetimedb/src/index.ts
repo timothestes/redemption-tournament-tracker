@@ -1293,13 +1293,12 @@ function scanForStop(ctx: any, game: any, fromIdx: number, toIdx: number): strin
 // Engage a hold AT the gate `phase` ('upkeep'..'discard' = before that phase,
 // 'end' = before the turn flip). One-shot (rev 4): tripping consumes the stop
 // — it is removed from the stopping seat's set as the hold engages, so it
-// must be re-toggled to fire again. `resumeTarget` records where the halted
-// movement was going (a phase name, or 'end'); releaseHold's Deny/timeout
-// path resumes toward it. Callers have already halted the game at the
-// boundary — currentPhase stays on the phase before the gate (or is left
+// must be re-toggled to fire again. Callers have already halted the game at
+// the boundary — currentPhase stays on the phase before the gate (or is left
 // untouched if the gate is the very next boundary); the turn does NOT cross
-// the gate. Release (releaseHold, below) is what happens next.
-function engageHold(ctx: any, gameId: bigint, phase: string, resumeTarget: string): void {
+// the gate. Release (releaseHold, below) only ever lifts the hold — the
+// active player redoes their halted move themselves.
+function engageHold(ctx: any, gameId: bigint, phase: string): void {
   const stopRow = ctx.db.TurnStop.gameId.find(gameId);
   if (!stopRow) return;
   const game = ctx.db.Game.id.find(gameId);
@@ -1308,7 +1307,7 @@ function engageHold(ctx: any, gameId: bigint, phase: string, resumeTarget: strin
   ctx.db.TurnStop.gameId.update({
     ...stopRow,
     holdPhase: phase,
-    holdResume: resumeTarget,
+    holdResume: '',
     seat0Stops: stopperIsSeat0 ? toggleStop(stopRow.seat0Stops, phase, false) : stopRow.seat0Stops,
     seat1Stops: stopperIsSeat0 ? stopRow.seat1Stops : toggleStop(stopRow.seat1Stops, phase, false),
   });
@@ -1325,15 +1324,10 @@ function engageHold(ctx: any, gameId: bigint, phase: string, resumeTarget: strin
 
 // Release the hold (rev 4). Two triggers: release_turn_stop (the active
 // player answering the priority prompt — Grant or Deny) and
-// handle_stop_hold_timeout. Grant lifts the hold and leaves the turn where
-// it halted — the stopper takes their window on the honor system (exactly
-// like the Priority button's request flow) and the active player continues
-// manually; the stop was consumed at trip, so continuing won't re-fire it.
-// Deny and timeout lift the hold AND resume the halted movement toward the
-// stored holdResume target on the current-turn player's behalf — further
-// armed gates on the way still trip, each opening a fresh prompt. The resume
-// is skipped once the game has left 'playing' (a hold stranded by a
-// win/concede mid-hold) or is still mid pregame.
+// handle_stop_hold_timeout. Every release ONLY lifts the hold — the turn
+// stays exactly where it halted, and the active player redoes their move
+// themselves (the stop was consumed at trip, so it won't re-fire). Grant vs
+// Deny vs timeout differ only in the STOP_RELEASE log line.
 function releaseHold(
   ctx: any,
   gameId: bigint,
@@ -1346,9 +1340,6 @@ function releaseHold(
   if (!game) return;
 
   const releasedGate = stopRow.holdPhase;
-  // Legacy rev-3 rows mid-hold at deploy time have no holdResume; the gate
-  // itself is the best resume target ('draw' holds no-op via the guard below).
-  const resumeTarget = stopRow.holdResume || releasedGate;
   ctx.db.TurnStop.gameId.update({ ...stopRow, holdPhase: '', holdResume: '' });
   for (const row of ctx.db.StopHoldTimeout.stop_hold_timeout_game_id.filter(gameId)) {
     ctx.db.StopHoldTimeout.scheduledId.delete(row.scheduledId);
@@ -1356,17 +1347,6 @@ function releaseHold(
   logAction(ctx, gameId, actorPlayerId, 'STOP_RELEASE',
     JSON.stringify({ phase: releasedGate, reason }),
     game.turnNumber, game.currentPhase);
-
-  if (reason === 'grant') return;
-  if (game.status !== 'playing' || game.pregamePhase !== '') return;
-  if (resumeTarget === game.currentPhase) return;
-  let activePlayer: any = null;
-  for (const p of ctx.db.Player.player_game_id.filter(gameId)) {
-    if (p.seat === game.currentTurn) activePlayer = p;
-  }
-  if (activePlayer) {
-    resumeMovement(ctx, gameId, activePlayer, resumeTarget);
-  }
 }
 
 // Shared "start the game" transition, used by both the both-players-acked path
@@ -2689,16 +2669,16 @@ export const set_turn_stop = spacetimedb.reducer(
 
 // ---------------------------------------------------------------------------
 // Reducer: release_turn_stop
-// The ACTIVE player answers the priority prompt (rev 4): advance=false is
-// Grant (lift the hold, stay put — the stopper takes their window on the
-// honor system), advance=true is Deny (lift the hold and resume the halted
-// movement toward its stored destination). The stopper has no release
-// affordance — their stop was consumed when it tripped, and the 60s backstop
-// covers an unresponsive active player.
+// The ACTIVE player answers the priority prompt (rev 4). Grant and Deny both
+// only lift the hold — the turn stays where it halted and the active player
+// redoes their move themselves; the two differ only in the logged courtesy
+// (granted vs declined the window). The stopper has no release affordance —
+// their stop was consumed when it tripped, and the 60s backstop covers an
+// unresponsive active player.
 // ---------------------------------------------------------------------------
 export const release_turn_stop = spacetimedb.reducer(
-  { gameId: t.u64(), advance: t.bool() },
-  (ctx, { gameId, advance }) => {
+  { gameId: t.u64(), denied: t.bool() },
+  (ctx, { gameId, denied }) => {
     const player = findPlayerBySender(ctx, gameId);
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
@@ -2709,7 +2689,7 @@ export const release_turn_stop = spacetimedb.reducer(
     if (player.seat !== game.currentTurn) {
       throw new SenderError('Only the active player can answer the priority request');
     }
-    releaseHold(ctx, gameId, advance ? 'deny' : 'grant', player.id);
+    releaseHold(ctx, gameId, denied ? 'deny' : 'grant', player.id);
   }
 );
 
@@ -2717,9 +2697,9 @@ export const release_turn_stop = spacetimedb.reducer(
 // Scheduled reducer: handle_stop_hold_timeout
 // Defensive early-returns, never throws (the handle_pregame_idle_timeout
 // pattern). `arg.phase` mismatch = stale row → no-op. The scheduled row
-// self-deletes after the reducer runs. releaseHold's own gate-crossing write
-// is wrapped in try/catch: this scheduled backstop must stay throw-free even
-// if something unexpected goes wrong crossing the gate.
+// self-deletes after the reducer runs. The releaseHold call stays wrapped in
+// try/catch: this scheduled backstop must remain throw-free even if
+// something unexpected goes wrong releasing the hold.
 // ---------------------------------------------------------------------------
 export const handle_stop_hold_timeout = spacetimedb.reducer(
   { arg: StopHoldTimeout.rowType },
@@ -2801,17 +2781,17 @@ function applyPhaseTransition(
 // ---------------------------------------------------------------------------
 // Helper: resumeMovement
 // The single forward-movement engine (rev 4), shared by set_phase, end_turn,
-// the battle→discard advance (end_battle / surrender_soul), and releaseHold's
-// Deny/timeout path. Moves the turn toward `target` — a phase name, or 'end'
-// for the turn flip — honoring the first armed gate on the way: cross the
-// phases before the gate (band-open suppressed — crossing battle en route is
-// not an attack), then halt and hold, storing `target` so a Deny resumes the
-// SAME movement (an End Turn halted at the battle gate continues to the flip,
-// not into a phantom battle). No gate → complete the movement: enter the
-// target phase (a battle TARGET opens the band, exactly like clicking it) or
-// perform the turn flip. Backward set_phase moves scan an empty boundary
-// range and fall through to the plain transition. Callers have already
-// validated turn/hold/pregame.
+// and the battle→discard advance (end_battle / surrender_soul). Moves the
+// turn toward `target` — a phase name, or 'end' for the turn flip — honoring
+// the first armed gate on the way: cross the phases before the gate
+// (band-open suppressed — crossing battle en route is not an attack), then
+// halt and hold. No gate → complete the movement: enter the target phase (a
+// battle TARGET opens the band, exactly like clicking it) or perform the
+// turn flip. A release never advances — once the prompt is answered, the
+// active player redoes the halted move and the consumed gate lets it
+// through. Backward set_phase moves scan an empty boundary range and fall
+// through to the plain transition. Callers have already validated
+// turn/hold/pregame.
 // ---------------------------------------------------------------------------
 function resumeMovement(ctx: any, gameId: bigint, actingPlayer: any, target: string): void {
   const game = ctx.db.Game.id.find(gameId);
@@ -2824,7 +2804,7 @@ function resumeMovement(ctx: any, gameId: bigint, actingPlayer: any, target: str
     if (b - 1 > curIdx) {
       applyPhaseTransition(ctx, gameId, actingPlayer.id, TURN_PHASES[b - 1], { openBattleBand: false });
     }
-    engageHold(ctx, gameId, gate, target);
+    engageHold(ctx, gameId, gate);
     return;
   }
   if (target === 'end') {
@@ -3402,9 +3382,9 @@ export const enter_battle = spacetimedb.reducer(
         const curIdx = (TURN_PHASES as readonly string[]).indexOf(game.currentPhase);
         const battleIdx = (TURN_PHASES as readonly string[]).indexOf('battle');
         if (curIdx < battleIdx && parseStops(stopsCsv).includes('battle')) {
-          // Resume target 'battle': a Deny on this prompt completes what the
-          // drag intended — enters the battle phase and opens the band.
-          engageHold(ctx, gameId, 'battle', 'battle');
+          // Once the prompt is answered the gate is spent, so re-dragging
+          // (or clicking Battle) goes through.
+          engageHold(ctx, gameId, 'battle');
           return;
         }
       }

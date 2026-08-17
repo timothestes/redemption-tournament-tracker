@@ -698,33 +698,34 @@ Held caption, no PASS button, and the stopper has no release affordance at
 all — their gate marker pulses amber for the duration and their stop is
 already spent.
 
-- **Grant** (`release_turn_stop(advance:false)`): the hold lifts and the turn
-  **stays where it halted**. The stopper takes their window on the honor
-  system — exactly the existing Priority-button contract — and the active
-  player continues manually whenever both are ready. Nothing re-fires.
-- **Deny** (`release_turn_stop(advance:true)`): the hold lifts and the halted
-  movement **resumes toward its original destination**. `TurnStop.holdResume`
-  (new column, appended last for in-place migration) stores that destination
-  when the hold engages: the `set_phase` target, `'battle'` for a gated
-  band-open drag, `'discard'` for the battle-conclusion advance, `'end'` for
-  End Turn. A denied battle-gate *phase click* therefore enters battle and
-  opens the band, while a denied battle-gate *End Turn* continues to the flip
-  — no phantom band from a move the player never made. Further armed gates on
-  the resume path trip normally, each with a fresh prompt.
-- **Timeout** (60s backstop, unchanged plumbing): auto-deny.
+- **Grant** (`release_turn_stop(denied:false)`) and **Deny**
+  (`release_turn_stop(denied:true)`) both ONLY lift the hold — the turn
+  **stays exactly where it halted** (owner correction on top of the initial
+  rev 4 cut, which had Deny auto-resume the halted movement). The stopper
+  takes their window on the honor system — exactly the existing
+  Priority-button contract — and the active player **redoes their move
+  themselves**; the consumed gate lets it through. Grant vs Deny differ only
+  in the logged courtesy ("granted action priority" vs "declined the
+  priority request").
+- **Timeout** (60s backstop, unchanged plumbing): same — lifts the hold,
+  nothing advances.
+- `TurnStop.holdResume` (appended-last column) shipped with the auto-resume
+  cut and is now **unused** (always written `''`); it stays because
+  auto-migration cannot drop columns.
 - Only the **active** player may call `release_turn_stop` now (rev 3 allowed
   only the non-active player — inverted). The toggle-off release special case
   is deleted; toggling during a hold only arms/disarms future boundaries.
 
 **Server shape.** One shared movement engine, `resumeMovement(ctx, gameId,
 actingPlayer, target)`, now backs `set_phase`, `end_turn` (target `'end'`),
-the `end_battle`/`surrender_soul` battle→discard advance, and `releaseHold`'s
-deny/timeout resume: scan boundaries `(cur, target]` for the first armed gate
-→ cross to the gate's near side (`openBattleBand:false` — crossing battle en
-route is not an attack) and hold, else complete the movement
-(`applyPhaseTransition`, or `performTurnFlip` — the flip body extracted from
-`end_turn` — for `'end'`). `assertTurnNotHeld`'s message is now "The turn is
-held — {stopper} has priority".
+and the `end_battle`/`surrender_soul` battle→discard advance: scan boundaries
+`(cur, target]` for the first armed gate → cross to the gate's near side
+(`openBattleBand:false` — crossing battle en route is not an attack) and
+hold, else complete the movement (`applyPhaseTransition`, or
+`performTurnFlip` — the flip body extracted from `end_turn` — for `'end'`).
+`releaseHold` never calls it — a release only clears the hold row and logs.
+`assertTurnNotHeld`'s message is now "The turn is held — {stopper} has
+priority".
 
 **Visuals and copy.** Gate markers keep rev 3's geometry minus the draw gate,
 plus `phase-gate-end` after the Discard button. Marker states are unchanged,
@@ -739,10 +740,12 @@ status span. Chat log: STOP_HOLD → "⏸ requests priority before {Phase}" /
 
 **Testing.** `stopFlow.test.ts` rewritten for the boundary-index scan and the
 gate list (16 cases). The two-browser e2e suite is rewritten to rev 4:
-(1) battle gate halts in preparation, Deny enters battle + opens the band,
-spent gate goes faint; (2) no `phase-gate-draw` exists, the end gate halts End
-Turn on discard with the band suppressed on the crossing, Deny completes the
-flip; (3) Grant lifts the hold *without* advancing and a re-click of the gated
-phase sails through (one-shot); (4) discard gate at the battle boundary (E17
-dead conclude buttons), a re-armed spent gate re-fires, and a band-open drag
-during a hold is refused with the "has priority" toast.
+(1) battle gate halts in preparation, Deny stays put, the redone Battle click
+enters it (band opens) with no re-fire; (2) no `phase-gate-draw` exists, the
+end gate halts End Turn on discard with the band suppressed on the crossing,
+a second End Turn completes the flip; (3) Grant lifts the hold without
+advancing and a re-click of the gated phase sails through (one-shot);
+(4) discard gate at the battle boundary (E17 dead conclude buttons; Deny
+leaves the turn on battle with the band intact), a re-armed spent gate
+re-fires, and a band-open drag during a hold is refused with the "has
+priority" toast.

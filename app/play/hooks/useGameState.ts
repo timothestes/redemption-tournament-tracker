@@ -213,8 +213,9 @@ export interface GameState {
   /** From the timeout row's `scheduledAt`. */
   holdDeadlineMicros: bigint | null;
   setTurnStop: (phase: string, enabled: boolean) => void;
-  /** Active player answers the priority prompt: advance=false Grant, true Deny. */
-  releaseTurnStop: (advance: boolean) => void;
+  /** Active player answers the priority prompt (Grant: denied=false, Deny:
+   *  denied=true). Either way the hold just lifts — nothing advances. */
+  releaseTurnStop: (denied: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -724,8 +725,8 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
   );
 
   const releaseTurnStop = useCallback(
-    (advance: boolean) => {
-      conn?.reducers.releaseTurnStop({ gameId, advance }).catch(toastReducerError);
+    (denied: boolean) => {
+      conn?.reducers.releaseTurnStop({ gameId, denied }).catch(toastReducerError);
     },
     [conn, gameId],
   );
@@ -1560,7 +1561,7 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     holdSeat,
     holdDeadlineMicros,
     setTurnStop: useCallback((_p: string, _e: boolean) => {}, []),
-    releaseTurnStop: useCallback((_advance: boolean) => {}, []),
+    releaseTurnStop: useCallback((_denied: boolean) => {}, []),
   };
 }
 

@@ -608,7 +608,7 @@ export const TurnStop = table(
     seat1Stops: t.string().default(''),  // csv of gates seat 1 has armed (fire during seat 0's turn); one-shot — consumed on trip
     holdPhase: t.string().default(''),   // '' | gate holding the turn ('upkeep'..'discard' = before that phase; 'end' = before the turn flip)
     firedPhases: t.string().default(''), // unused since rev 4 (one-shot gates consume themselves); kept so live rows migrate in place
-    holdResume: t.string().default(''),  // while holding: the halted move's destination phase, or 'end' (Deny/timeout resumes toward it). Appended last — auto-migration only appends.
+    holdResume: t.string().default(''),  // unused (a release never advances — the active player redoes the move); kept because auto-migration cannot drop columns
   }
 );
 

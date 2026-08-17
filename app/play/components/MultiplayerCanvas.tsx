@@ -9226,11 +9226,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       {/* Phase Stop hold (rev 4) — a tripped gate IS a priority request, so it
           uses the same prompt as the Priority button, shown to the active
-          player. Grant lifts the hold and stays put (the stopper takes their
-          window on the honor system; the stop was consumed when it tripped);
-          Deny lifts it AND resumes the halted movement into the gated phase
-          (or the turn flip, for the end-of-turn gate). The 60s server backstop
-          auto-denies if the prompt is ignored. */}
+          player. Grant and Deny both just lift the hold — the turn stays
+          where it halted and the active player redoes their move (the stop
+          was consumed when it tripped, so it won't re-fire); they differ only
+          in the courtesy logged to the opponent. The 60s server backstop
+          releases on its own if the prompt is ignored. */}
       {!isSpectator && gameState.holdPhase !== '' && gameState.isMyTurn && (
         <BoardRequestBanner
           message={
@@ -9256,7 +9256,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             gameState.releaseTurnStop(false);
             showGameToast('Action priority granted — continue when ready');
           }}
-          onDeny={() => gameState.releaseTurnStop(true)}
+          onDeny={() => {
+            gameState.releaseTurnStop(true);
+            showGameToast('Priority declined — continue when ready');
+          }}
         />
       )}
 
