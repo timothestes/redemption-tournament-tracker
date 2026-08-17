@@ -268,6 +268,7 @@ export const TurnStop = __t.object("TurnStop", {
   seat1Stops: __t.string(),
   holdPhase: __t.string(),
   firedPhases: __t.string(),
+  holdResume: __t.string(),
 });
 export type TurnStop = __Infer<typeof TurnStop>;
 

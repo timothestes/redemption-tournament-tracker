@@ -16,4 +16,5 @@ export default __t.row({
   seat1Stops: __t.string().name("seat_1_stops"),
   holdPhase: __t.string().name("hold_phase"),
   firedPhases: __t.string().name("fired_phases"),
+  holdResume: __t.string().name("hold_resume"),
 });

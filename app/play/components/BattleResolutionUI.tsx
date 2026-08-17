@@ -542,15 +542,11 @@ export default function BattleResolutionUI({
   // game.currentTurn (enter_battle) and a hold always belongs to the
   // non-active seat, so during a hold the attacker is always the held party
   // and the defender is always the holder. The title mirrors the server's
-  // own SenderError text (assertTurnNotHeld) rather than TurnIndicator's
-  // "Held — X stopped at Y" phrasing — that phrasing starts with the same
-  // "Held" prefix TurnIndicator's own End Turn button title uses, which the
-  // e2e suite locates by prefix (button[title^="Held"]); the server's own
-  // wording says the same thing without colliding, and is exactly what the
-  // item-2 toast would show if this call ever got through anyway.
+  // own SenderError text (assertTurnNotHeld) — exactly what the toast would
+  // show if this call ever got through anyway.
   const isTurnHeld = holdPhase !== '';
   const holdTitle = isTurnHeld
-    ? `The turn is held — waiting on ${isAttacker ? opponentPlayerName : myPlayerName}`
+    ? `The turn is held — ${isAttacker ? opponentPlayerName : myPlayerName} has priority`
     : undefined;
 
   return (

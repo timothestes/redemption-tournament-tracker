@@ -1829,7 +1829,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             holdPhase={gameState.holdPhase}
             holdDeadlineMicros={gameState.holdDeadlineMicros}
             onToggleStop={gameState.setTurnStop}
-            onReleaseStop={gameState.releaseTurnStop}
           />
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>

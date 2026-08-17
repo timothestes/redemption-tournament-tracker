@@ -92,6 +92,7 @@ const PHASE_LABELS: Record<string, string> = {
   preparation: 'Preparation',
   battle: 'Battle',
   discard: 'Discard',
+  end: 'End of Turn', // the 'end' gate — the boundary after discard, before the flip
 };
 
 // REG Pre-Game Phase sub-steps. Kept separate from PHASE_ORDER/PHASE_LABELS so
@@ -120,12 +121,12 @@ const FZ = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// PhaseGate — a between-phase gate marker (Phase Stops rev 3). A stop is a
-// gate on the boundary INTO a phase, not a marker on the phase itself, so
-// these render as slim hit targets in the gaps of the phase row (and before
-// Draw), one per phase, rather than as decoration on the phase buttons.
-// A wide invisible hit target keeps the gap tappable on mobile; the slim
-// bar inside it carries the actual visual state.
+// PhaseGate — a between-phase gate marker (Phase Stops). A stop is a one-shot
+// gate on a turn boundary, so these render as slim hit targets in the gaps of
+// the phase row — before Upkeep/Preparation/Battle/Discard, plus the 'end'
+// gate after Discard (before the turn flip). There is no gate before Draw
+// (the flip auto-draws). A wide invisible hit target keeps the gap tappable
+// on mobile; the slim bar inside it carries the actual visual state.
 // ---------------------------------------------------------------------------
 
 function PhaseGate({
@@ -269,16 +270,14 @@ interface TurnIndicatorProps {
    *  'stars' = star reveals, 'souls' = Lost Soul activation. Undefined during
    *  normal play. */
   pregameStep?: 'stars' | 'souls';
-  /** Phase Stops: phases of the opponent's turn the VIEWER has a stop on. */
+  /** Phase Stops: gates of the opponent's turn the VIEWER has armed. */
   myStops?: string[];
-  /** Phase Stops: phase currently holding the turn ('' = no hold). */
+  /** Phase Stops: gate currently holding the turn ('' = no hold). */
   holdPhase?: string;
   /** Phase Stops: server deadline (micros since epoch) when the hold auto-releases. */
   holdDeadlineMicros?: bigint | null;
-  /** Phase Stops: toggle the viewer's stop for a phase (non-active player only). */
+  /** Phase Stops: toggle the viewer's gate for a boundary (non-active player only). */
   onToggleStop?: (phase: string, enabled: boolean) => void;
-  /** Phase Stops: release the viewer's active hold ("Pass"). */
-  onReleaseStop?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +319,6 @@ export default function TurnIndicator({
   holdPhase = '',
   holdDeadlineMicros = null,
   onToggleStop,
-  onReleaseStop,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -338,9 +336,8 @@ export default function TurnIndicator({
 
   // ---- Phase Stops ----
   const isHeld = holdPhase !== '';
-  // The hold always belongs to the non-active seat, so on this client:
-  // active player → "held against me"; non-active player → "I am the holder".
-  const iAmHolder = isHeld && !isMyTurn && !readOnly;
+  // While held, the active player answers via the center-board priority
+  // prompt (MultiplayerCanvas) — the bar only disables movement affordances.
   const heldAgainstMe = isHeld && isMyTurn && !readOnly;
   const canToggleStops = !isMyTurn && !readOnly && !pregameStep && !isFinished && !!onToggleStop;
 
@@ -364,7 +361,7 @@ export default function TurnIndicator({
     onToggleStop(phase, enabling);
     showGameToast(
       enabling
-        ? `Stop set: before ${PHASE_LABELS[phase]}. ${opponentName}'s turn will pause there — tap again to remove.`
+        ? `Stop set: before ${PHASE_LABELS[phase]}. ${opponentName} will be prompted there — it fires once.`
         : `Stop removed: before ${PHASE_LABELS[phase]}.`,
     );
   };
@@ -875,15 +872,18 @@ export default function TurnIndicator({
             return (
               <Fragment key={phase}>
                 {/* Gate marker — sits BEFORE this phase's button (the gate is
-                    on the boundary INTO the phase, not the phase itself). */}
-                <PhaseGate
-                  phase={phase}
-                  hasStop={hasMyStop}
-                  isHeldPhase={isHeldPhase}
-                  canToggle={canToggleStops}
-                  opponentName={opponentName}
-                  onToggle={() => handleToggleStop(phase)}
-                />
+                    on the boundary INTO the phase). No gate before Draw: the
+                    turn flip auto-draws, so there is no boundary to stop on. */}
+                {phase !== 'draw' && (
+                  <PhaseGate
+                    phase={phase}
+                    hasStop={hasMyStop}
+                    isHeldPhase={isHeldPhase}
+                    canToggle={canToggleStops}
+                    opponentName={opponentName}
+                    onToggle={() => handleToggleStop(phase)}
+                  />
+                )}
                 <button
                   ref={(el) => { buttonRefs.current[phase] = el; }}
                   onClick={() => {
@@ -926,6 +926,19 @@ export default function TurnIndicator({
               </Fragment>
             );
           })}
+
+          {/* The 'end' gate — the boundary AFTER Discard, before the turn
+              flip. Stops End Turn for one last window. */}
+          {!pregameStep && (
+            <PhaseGate
+              phase="end"
+              hasStop={myStops.includes('end')}
+              isHeldPhase={isHeld && holdPhase === 'end'}
+              canToggle={canToggleStops}
+              opponentName={opponentName}
+              onToggle={() => handleToggleStop('end')}
+            />
+          )}
         </div>
 
         {/* Next phase / End Turn arrow. Hidden during the pre-game: the turn
@@ -951,76 +964,46 @@ export default function TurnIndicator({
           &#x276F;
         </button>}
 
-        {/* End Turn slot: PASS (I hold), End Turn (normal / held-against-me), or nothing. */}
+        {/* End Turn. While the turn is held the center-board priority prompt
+            is the surface — this button just disables (the server refuses
+            movement until the prompt is answered). */}
         {!readOnly && !pregameStep && (
-          iAmHolder ? (
-            <button
-              onClick={onReleaseStop}
-              title="Your stop — act, then pass."
-              style={{
-                marginLeft: 10,
-                padding: '5px 12px',
-                background: 'rgba(245, 158, 11, 0.15)',
-                border: '1px solid rgba(245, 158, 11, 0.6)',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: FZ.ui,
-                letterSpacing: '0.07em',
-                textTransform: 'uppercase',
-                color: '#fbbf24',
-                transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-                whiteSpace: 'nowrap',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(245, 158, 11, 0.28)';
-                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.9)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(245, 158, 11, 0.15)';
-                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.6)';
-              }}
-            >
-              {`Pass${holdSecondsLeft != null ? ` · ${holdSecondsLeft}s` : ''}`}
-            </button>
-          ) : (
-            <button
-              onClick={onEndTurn}
-              disabled={!isMyTurn || heldAgainstMe}
-              title={
-                heldAgainstMe
-                  ? `Held — ${opponentName} stopped before ${PHASE_LABELS[holdPhase] ?? holdPhase}${holdSecondsLeft != null ? ` · ${holdSecondsLeft}s` : ''}`
-                  : isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"
-              }
-              style={{
-                marginLeft: 10,
-                padding: '5px 12px',
-                background: isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.15)' : 'transparent',
-                border: `1px solid ${isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.45)' : 'rgba(107, 78, 39, 0.25)'}`,
-                borderRadius: 4,
-                cursor: isMyTurn && !heldAgainstMe ? 'pointer' : 'default',
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: FZ.ui,
-                letterSpacing: '0.07em',
-                textTransform: 'uppercase',
-                color: isMyTurn && !heldAgainstMe ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)',
-                transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-                whiteSpace: 'nowrap',
-              }}
-              onMouseEnter={(e) => {
-                if (!isMyTurn || heldAgainstMe) return;
-                e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
-                e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
-              }}
-              onMouseLeave={(e) => {
-                if (!isMyTurn || heldAgainstMe) return;
-                e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
-                e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
-              }}
-            >
-              {heldAgainstMe ? `Held${holdSecondsLeft != null ? ` · ${holdSecondsLeft}s` : ''}` : 'End Turn'}
-            </button>
-          )
+          <button
+            onClick={onEndTurn}
+            disabled={!isMyTurn || heldAgainstMe}
+            title={
+              heldAgainstMe
+                ? 'Answer the priority request first'
+                : isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"
+            }
+            style={{
+              marginLeft: 10,
+              padding: '5px 12px',
+              background: isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.15)' : 'transparent',
+              border: `1px solid ${isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.45)' : 'rgba(107, 78, 39, 0.25)'}`,
+              borderRadius: 4,
+              cursor: isMyTurn && !heldAgainstMe ? 'pointer' : 'default',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: FZ.ui,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: isMyTurn && !heldAgainstMe ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)',
+              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+              whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={(e) => {
+              if (!isMyTurn || heldAgainstMe) return;
+              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
+              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
+            }}
+            onMouseLeave={(e) => {
+              if (!isMyTurn || heldAgainstMe) return;
+              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
+            }}
+          >
+            End Turn
+          </button>
         )}
 
         {/* Spectators can never act, so this is a non-interactive status span —

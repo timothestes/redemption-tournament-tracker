@@ -604,10 +604,11 @@ export const TurnStop = table(
   { name: 'turn_stop', public: true },
   {
     gameId: t.u64().primaryKey(),
-    seat0Stops: t.string().default(''),  // csv of phases seat 0 stops on (fires during seat 1's turn)
-    seat1Stops: t.string().default(''),  // csv of phases seat 1 stops on (fires during seat 0's turn)
-    holdPhase: t.string().default(''),   // '' | phase before which the turn is held (the gate)
-    firedPhases: t.string().default(''), // csv of phases whose stop already fired this turn; reset at turn flip
+    seat0Stops: t.string().default(''),  // csv of gates seat 0 has armed (fire during seat 1's turn); one-shot — consumed on trip
+    seat1Stops: t.string().default(''),  // csv of gates seat 1 has armed (fire during seat 0's turn); one-shot — consumed on trip
+    holdPhase: t.string().default(''),   // '' | gate holding the turn ('upkeep'..'discard' = before that phase; 'end' = before the turn flip)
+    firedPhases: t.string().default(''), // unused since rev 4 (one-shot gates consume themselves); kept so live rows migrate in place
+    holdResume: t.string().default(''),  // while holding: the halted move's destination phase, or 'end' (Deny/timeout resumes toward it). Appended last — auto-migration only appends.
   }
 );
 

@@ -142,8 +142,8 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   BATTLE_END: 'ended the battle',
   // Phase Stops — payloads rendered in formatActionType; these are the
   // parse-failure fallbacks.
-  STOP_HOLD: 'stopped the turn',
-  STOP_RELEASE: 'passed',
+  STOP_HOLD: 'requested action priority',
+  STOP_RELEASE: 'resolved a priority request',
 };
 
 function HoverableCard({ name, img }: { name: string; img?: string }) {
@@ -183,17 +183,20 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'STOP_HOLD' && payload) {
     try {
       const data = JSON.parse(payload);
+      if (data.phase === 'end') return '⏸ requests priority before the turn ends';
       const label = typeof data.phase === 'string' && data.phase
         ? data.phase.charAt(0).toUpperCase() + data.phase.slice(1)
         : 'a phase';
-      return `⏸ stopped the turn before ${label}`;
+      return `⏸ requests priority before ${label}`;
     } catch { /* fall through */ }
   }
   if (actionType === 'STOP_RELEASE' && payload) {
     try {
       const data = JSON.parse(payload);
+      if (data.reason === 'grant') return '▶ granted action priority';
+      if (data.reason === 'deny') return '▶ declined the stop — turn resumes';
       if (data.reason === 'timeout') return '▶ stop timed out — turn resumes';
-      return '▶ passed — turn resumes';
+      return '▶ passed — turn resumes'; // legacy rev-3 reasons (manual / toggle-off)
     } catch { /* fall through */ }
   }
   if (actionType === 'GAME_STARTED' && payload) {

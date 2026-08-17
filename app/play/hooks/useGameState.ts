@@ -213,7 +213,8 @@ export interface GameState {
   /** From the timeout row's `scheduledAt`. */
   holdDeadlineMicros: bigint | null;
   setTurnStop: (phase: string, enabled: boolean) => void;
-  releaseTurnStop: () => void;
+  /** Active player answers the priority prompt: advance=false Grant, true Deny. */
+  releaseTurnStop: (advance: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -722,9 +723,12 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     [conn, gameId],
   );
 
-  const releaseTurnStop = useCallback(() => {
-    conn?.reducers.releaseTurnStop({ gameId }).catch(toastReducerError);
-  }, [conn, gameId]);
+  const releaseTurnStop = useCallback(
+    (advance: boolean) => {
+      conn?.reducers.releaseTurnStop({ gameId, advance }).catch(toastReducerError);
+    },
+    [conn, gameId],
+  );
 
   const rollDice = useCallback(
     (sides: bigint) => {
@@ -1556,7 +1560,7 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     holdSeat,
     holdDeadlineMicros,
     setTurnStop: useCallback((_p: string, _e: boolean) => {}, []),
-    releaseTurnStop: noop,
+    releaseTurnStop: useCallback((_advance: boolean) => {}, []),
   };
 }
 
