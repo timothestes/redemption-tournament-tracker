@@ -135,6 +135,15 @@ const BATTLE_GUIDANCE_CUE_OPACITY_MIN = 0.35;
 const BATTLE_GUIDANCE_CUE_OPACITY_MAX = 0.6;
 const BATTLE_GUIDANCE_CUE_PULSE_DURATION = 0.8;
 
+// Phase Stops: display labels for the gated phase in the hold prompt ('end'
+// is phrased as "before you end your turn" instead).
+const STOP_GATE_LABELS: Record<string, string> = {
+  upkeep: 'Upkeep',
+  preparation: 'Preparation',
+  battle: 'Battle',
+  discard: 'Discard',
+};
+
 /** All zone keys that can be a drop target. */
 type DropZoneKey = string;
 
@@ -8675,6 +8684,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onResolveBattle={gameState.resolveBattle}
           onEndBattle={gameState.endBattle}
           onSurrenderSoul={gameState.surrenderSoul}
+          holdPhase={gameState.holdPhase}
         />
       )}
 
@@ -9211,6 +9221,45 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             showGameToast('Action priority granted');
           }}
           onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+        />
+      )}
+
+      {/* Phase Stop hold (rev 4) — a tripped gate IS a priority request, so it
+          uses the same prompt as the Priority button, shown to the active
+          player. Grant and Deny both just lift the hold — the turn stays
+          where it halted and the active player redoes their move (the stop
+          was consumed when it tripped, so it won't re-fire); they differ only
+          in the courtesy logged to the opponent. The 60s server backstop
+          releases on its own if the prompt is ignored. */}
+      {!isSpectator && gameState.holdPhase !== '' && gameState.isMyTurn && (
+        <BoardRequestBanner
+          message={
+            <>
+              <strong style={{ color: '#c4955a' }}>
+                {gameState.opponentPlayer?.displayName ?? 'Opponent'}
+              </strong>{' '}
+              requests action priority before you{' '}
+              {gameState.holdPhase === 'end' ? (
+                <>end your turn</>
+              ) : (
+                <>
+                  move to{' '}
+                  <strong style={{ color: '#c4955a' }}>
+                    {STOP_GATE_LABELS[gameState.holdPhase] ?? gameState.holdPhase}
+                  </strong>
+                </>
+              )}
+            </>
+          }
+          affirmLabel="Grant"
+          onAffirm={() => {
+            gameState.releaseTurnStop(false);
+            showGameToast('Action priority granted — continue when ready');
+          }}
+          onDeny={() => {
+            gameState.releaseTurnStop(true);
+            showGameToast('Priority declined — continue when ready');
+          }}
         />
       )}
 

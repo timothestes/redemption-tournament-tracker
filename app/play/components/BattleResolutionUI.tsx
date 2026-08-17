@@ -75,6 +75,11 @@ interface BattleResolutionUIProps {
   onResolveBattle: () => void;
   onEndBattle: () => void;
   onSurrenderSoul: (cardInstanceId: bigint) => void;
+  /** Phase Stops: phase currently holding the turn ('' = no hold). end_battle/
+   *  resolve_battle/surrender_soul are all hold-gated server-side for BOTH
+   *  players (spec §5.4) — the conclude buttons below are disabled to match
+   *  rather than dispatch a doomed reducer call. */
+  holdPhase: string;
 }
 
 const BUTTON_COPY: Record<ResolutionAction, { label: string }> = {
@@ -91,11 +96,26 @@ const TONE_STYLE: Record<Tone, { border: string; bg: string; bgHover: string; co
   neutral: { border: 'rgba(196, 149, 90, 0.45)', bg: 'rgba(14, 10, 6, 0.6)', bgHover: 'rgba(107, 78, 39, 0.35)', color: '#e8d5a3' },
 };
 
-function ResolutionButton({ label, tone, onClick }: { label: string; tone: Tone; onClick: () => void }) {
+function ResolutionButton({
+  label,
+  tone,
+  onClick,
+  disabled,
+  title,
+}: {
+  label: string;
+  tone: Tone;
+  onClick: () => void;
+  /** Phase Stops: true while a hold blocks the reducer this button dispatches. */
+  disabled?: boolean;
+  title?: string;
+}) {
   const t = TONE_STYLE[tone];
   return (
     <button
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={title}
       style={{
         padding: '6px 14px',
         background: t.bg,
@@ -107,12 +127,13 @@ function ResolutionButton({ label, tone, onClick }: { label: string; tone: Tone;
         fontWeight: 600,
         letterSpacing: '0.05em',
         whiteSpace: 'nowrap',
-        cursor: 'pointer',
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
         boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
         transition: 'background 0.15s, border-color 0.15s',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = t.bgHover; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = t.bg; }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = t.bgHover; }}
+      onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.background = t.bg; }}
     >
       {label}
     </button>
@@ -459,6 +480,7 @@ export default function BattleResolutionUI({
   onResolveBattle,
   onEndBattle,
   onSurrenderSoul,
+  holdPhase,
 }: BattleResolutionUIProps) {
   // Guards against a double-fire from a fast repeat click while the pick is
   // in flight (self-review requirement, Task 14). Resets whenever the
@@ -514,6 +536,19 @@ export default function BattleResolutionUI({
   const isAttacker = mySeat !== '' && mySeat === attackerSeat;
   const isDefender = mySeat !== '' && attackerSeat !== '' && mySeat !== attackerSeat;
 
+  // Phase Stops (spec §5.4): end_battle/resolve_battle are hold-gated
+  // server-side for EITHER player, so disable the row rather than dispatch a
+  // doomed reducer call. battleAttackerSeat is always stamped from
+  // game.currentTurn (enter_battle) and a hold always belongs to the
+  // non-active seat, so during a hold the attacker is always the held party
+  // and the defender is always the holder. The title mirrors the server's
+  // own SenderError text (assertTurnNotHeld) — exactly what the toast would
+  // show if this call ever got through anyway.
+  const isTurnHeld = holdPhase !== '';
+  const holdTitle = isTurnHeld
+    ? `The turn is held — ${isAttacker ? opponentPlayerName : myPlayerName} has priority`
+    : undefined;
+
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
       <div
@@ -530,17 +565,35 @@ export default function BattleResolutionUI({
         }}
       >
         {isAttacker && bandHasCards && (
-          <ResolutionButton label={BUTTON_COPY['claim-victory'].label} tone="gold" onClick={onResolveBattle} />
+          <ResolutionButton
+            label={BUTTON_COPY['claim-victory'].label}
+            tone="gold"
+            onClick={onResolveBattle}
+            disabled={isTurnHeld}
+            title={holdTitle}
+          />
         )}
         {/* End Battle is attacker-only (owner direction): two side-by-side
             actions confused defenders — their one call during a battle is
             🏳 Battle Lost. The attacker (= turn player) keeps the no-stakes
             close; phase change / end turn remain the server-side hatches. */}
         {isAttacker && (
-          <ResolutionButton label={BUTTON_COPY['end-battle'].label} tone="neutral" onClick={onEndBattle} />
+          <ResolutionButton
+            label={BUTTON_COPY['end-battle'].label}
+            tone="neutral"
+            onClick={onEndBattle}
+            disabled={isTurnHeld}
+            title={holdTitle}
+          />
         )}
         {isDefender && bandHasCards && (
-          <ResolutionButton label={BUTTON_COPY['battle-lost'].label} tone="red" onClick={onResolveBattle} />
+          <ResolutionButton
+            label={BUTTON_COPY['battle-lost'].label}
+            tone="red"
+            onClick={onResolveBattle}
+            disabled={isTurnHeld}
+            title={holdTitle}
+          />
         )}
       </div>
     </div>
