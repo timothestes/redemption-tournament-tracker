@@ -6,7 +6,6 @@ import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlo
 import { GiCrossedSwords, GiAnvil } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
-import { PiPencilLineBold } from "react-icons/pi";
 import { TbCardsFilled, TbSearch } from "react-icons/tb";
 import Image from "next/image";
 import Link from "next/link";
@@ -17,6 +16,7 @@ import { createClient } from "../utils/supabase/client";
 import { getUserSafe } from "../utils/supabase/getUserSafe";
 import { signOutAction } from "../app/actions";
 import { useIsAdmin } from "../hooks/useIsAdmin";
+import { RESOURCE_SECTIONS } from "../lib/resources";
 // Hidden until Nationals 2026 registration reopens next year — see commented nav link below.
 // import { NATIONALS_CONFIG } from "../app/config/nationals";
 
@@ -150,35 +150,8 @@ const TopNav: React.FC = () => {
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
   ];
 
-  const tournamentResources = [
-    { href: "https://landofredemption.com/wp-content/uploads/2026/03/REG_PDF_11.0.0.pdf", label: "REG (Official Rulebook)", icon: PiPencilLineBold },
-    { href: "https://landofredemption.com/wp-content/uploads/2026/03/ORDIR_PDF_7.0.0.pdf", label: "ORDIR (Dictionary)", icon: FaBookOpen },
-    { href: "https://landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf", label: "Deck Building Rules", icon: TbCardsFilled },
-  ];
-
-  const paragonResources = [
-    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Paragons-v1.pdf", label: "Paragon Cards" },
-    { href: "https://landofredemption.com/wp-content/uploads/2026/07/Redemption-Paragon-Format-Rules.pdf", label: "Paragon Rules" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-Color-v1.pdf", label: "Lost Souls (Color)" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf", label: "Lost Souls (B&W)" },
-  ];
-
-  // Host files live on cactusgamedesign.com/downloads. As of the 2026 Host Guide
-  // there are two applications — with prize pack support, or promos only at a
-  // lower fee — so they get distinct labels instead of two "Hosting Application"
-  // rows.
-  const hostResources = [
-    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/Redemption_Host_Guide_2026-1.pdf", label: "Hosting Guide" },
-    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/host_instructions.pdf", label: "Host Instructions" },
-    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/Redemption-Tournament-Host-Application-2027_With_Prize_Pack_Support.pdf", label: "Hosting Application (with Prize Packs)" },
-    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/Redemption-Tournament-Host-Application-2027_WITHOUT_Prize_Pack_Support.pdf", label: "Hosting Application (Promos Only)" },
-    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/host_sign_in_sheets-1.pdf", label: "Sign In Sheet" },
-    { href: "https://landofredemption.com/wp-content/uploads/2026/07/t1_deck_check_v2.pdf", label: "T1 Deck Check Sheet" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-T1.pdf", label: "T1 Reserve List" },
-    { href: "https://landofredemption.com/wp-content/uploads/2026/07/t2_deck_check_v2.pdf", label: "T2 Deck Check Sheet" },
-    { href: "https://landofredemption.com/wp-content/uploads/2026/07/T2-Reserve-list.pdf", label: "T2 Reserve List" },
-    { href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/host_winners_list-2.pdf", label: "Winners Form" },
-  ];
+  // The document lists themselves live in lib/resources.ts so this dropdown and
+  // the /resources page can never drift apart.
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
@@ -520,66 +493,52 @@ const TopNav: React.FC = () => {
               {isResourcesOpen && (
                 <div className="absolute left-0 mt-2 w-72 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
                   <div className="py-2">
-                    {/* Tournament Resources */}
-                    <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Tournament Resources
-                    </div>
-                    {tournamentResources.map((resource) => {
-                      const Icon = resource.icon;
-                      return (
-                        <a
-                          key={resource.href}
-                          href={resource.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
-                        >
-                          <Icon className="w-4 h-4" />
-                          {resource.label}
-                        </a>
-                      );
-                    })}
-
-                    {/* Card Rulings */}
+                    {/* Shareable index of everything below */}
                     <Link
-                      href="/rulings"
+                      href="/resources"
                       onClick={() => setIsResourcesOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
                     >
-                      <FaBookOpen className="w-4 h-4" />
-                      Card Rulings
+                      <HiDocumentText className="w-4 h-4" />
+                      All Resources
                     </Link>
 
-                    {/* Paragon Resources */}
-                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
-                      Paragon Resources
-                    </div>
-                    {paragonResources.map((resource) => (
-                      <a
-                        key={resource.href}
-                        href={resource.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
-                      >
-                        {resource.label}
-                      </a>
-                    ))}
-
-                    {/* Host Resources */}
-                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
-                      Host Resources
-                    </div>
-                    {hostResources.map((resource) => (
-                      <a
-                        key={resource.href}
-                        href={resource.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
-                      >
-                        {resource.label}
-                      </a>
+                    {RESOURCE_SECTIONS.map((section) => (
+                      <div key={section.id}>
+                        <div className="px-4 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
+                          {section.title}
+                        </div>
+                        {section.links.map((resource) => {
+                          const Icon = resource.icon;
+                          const content = (
+                            <>
+                              {Icon && <Icon className="w-4 h-4 shrink-0" />}
+                              {resource.label}
+                            </>
+                          );
+                          const linkClass = "flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted";
+                          return resource.internal ? (
+                            <Link
+                              key={resource.href}
+                              href={resource.href}
+                              onClick={() => setIsResourcesOpen(false)}
+                              className={linkClass}
+                            >
+                              {content}
+                            </Link>
+                          ) : (
+                            <a
+                              key={resource.href}
+                              href={resource.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={linkClass}
+                            >
+                              {content}
+                            </a>
+                          );
+                        })}
+                      </div>
                     ))}
 
                     {/* Report a Bug */}
@@ -916,63 +875,52 @@ const TopNav: React.FC = () => {
 
               {isResourcesOpen && (
                 <div className="mt-2 ml-8 space-y-1">
-                  <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Tournament Resources
-                  </div>
-                  {tournamentResources.map((resource) => {
-                    const Icon = resource.icon;
-                    return (
-                      <a
-                        key={resource.href}
-                        href={resource.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
-                      >
-                        <Icon className="w-4 h-4" />
-                        {resource.label}
-                      </a>
-                    );
-                  })}
-
-                  {/* Card Rulings */}
+                  {/* Shareable index of everything below */}
                   <Link
-                    href="/rulings"
+                    href="/resources"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-muted"
                   >
-                    <FaBookOpen className="w-4 h-4" />
-                    Card Rulings
+                    <HiDocumentText className="w-4 h-4" />
+                    All Resources
                   </Link>
 
-                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
-                    Paragon Resources
-                  </div>
-                  {paragonResources.map((resource) => (
-                    <a
-                      key={resource.href}
-                      href={resource.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
-                    >
-                      {resource.label}
-                    </a>
-                  ))}
-
-                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
-                    Host Resources
-                  </div>
-                  {hostResources.map((resource) => (
-                    <a
-                      key={resource.href}
-                      href={resource.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
-                    >
-                      {resource.label}
-                    </a>
+                  {RESOURCE_SECTIONS.map((section) => (
+                    <div key={section.id} className="space-y-1">
+                      <div className="px-3 py-1 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
+                        {section.title}
+                      </div>
+                      {section.links.map((resource) => {
+                        const Icon = resource.icon;
+                        const content = (
+                          <>
+                            {Icon && <Icon className="w-4 h-4 shrink-0" />}
+                            {resource.label}
+                          </>
+                        );
+                        const linkClass = "flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted";
+                        return resource.internal ? (
+                          <Link
+                            key={resource.href}
+                            href={resource.href}
+                            onClick={closeMobileMenu}
+                            className={linkClass}
+                          >
+                            {content}
+                          </Link>
+                        ) : (
+                          <a
+                            key={resource.href}
+                            href={resource.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={linkClass}
+                          >
+                            {content}
+                          </a>
+                        );
+                      })}
+                    </div>
                   ))}
 
                   {/* Report a Bug */}
