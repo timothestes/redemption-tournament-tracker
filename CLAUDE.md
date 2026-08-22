@@ -50,6 +50,7 @@ make update-cards        # Download latest carddata.txt and regenerate TypeScrip
 | Deck Building Rules (v1.3) | landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf |
 | Design system | `prompt_context/design_system.md` |
 | Forge card versioning | `prompt_context/forge_versioning.md` — autosave vs proposals vs versions, who sees what, where the "why" lives |
+| Forge set promotion ("big red button") | `docs/superpowers/specs/2026-08-22-forge-public-set-release-design.md` + `app/forge/lib/promote.ts`; overlay `scripts/data/forge-released.json` via `make pull-forge-releases` |
 | Goldfish mode | `prompt_context/goldfish_practice_mode.md` |
 | Goldfish design system | `prompt_context/goldfish_design_system.md` |
 | Multiplayer design spec | `docs/superpowers/specs/2026-03-23-multiplayer-spacetimedb-design.md` |

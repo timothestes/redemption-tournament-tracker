@@ -11,6 +11,7 @@ describe("lifecycleCopy", () => {
       draft: "Draft",
       playtesting: "In playtest",
       approved: "Final",
+      promoted: "Public",
       archived: "Shelved",
     });
   });

@@ -7,6 +7,7 @@ export const STATUS_LABEL: Record<string, string> = {
   draft: "Draft",
   playtesting: "In playtest",
   approved: "Final",
+  promoted: "Public",
   archived: "Shelved",
 };
 
@@ -20,6 +21,7 @@ export const STATUS_BADGE_CLASS: Record<string, string> = {
   draft: "border-border bg-muted/60 text-muted-foreground",
   playtesting: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
   approved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  promoted: "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400",
   archived: "border-dashed text-muted-foreground",
 };
 

@@ -26,6 +26,18 @@ function reqWith(ids: string) {
   return new Request(`http://localhost/forge/api/export?ids=${ids}`);
 }
 
+// Minimal chainable supabase stub: every query resolves to no rows (the route
+// reads forge_public_releases to adopt released identity — none in these tests).
+function supabaseStub() {
+  const result = Promise.resolve({ data: [] });
+  const q: any = {
+    select: () => q, eq: () => q, in: () => q,
+    order: () => result,
+    then: result.then.bind(result),
+  };
+  return { from: () => q };
+}
+
 describe("GET /forge/api/export", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -37,13 +49,13 @@ describe("GET /forge/api/export", () => {
   });
 
   it("returns 404 when no ids are given", async () => {
-    asMock(requireForge).mockResolvedValue({ supabase: {}, user: { id: "u1" }, role: "elder" });
+    asMock(requireForge).mockResolvedValue({ supabase: supabaseStub(), user: { id: "u1" }, role: "elder" });
     const res = await GET(reqWith(""));
     expect(res.status).toBe(404);
   });
 
   it("returns 404 when the only selected set has no readable cards", async () => {
-    asMock(requireForge).mockResolvedValue({ supabase: {}, user: { id: "u1" }, role: "elder" });
+    asMock(requireForge).mockResolvedValue({ supabase: supabaseStub(), user: { id: "u1" }, role: "elder" });
     asMock(getSet).mockResolvedValue({ id: "s1", name: "Test Set", slug: "TST" });
     asMock(listSetWorkingCards).mockResolvedValue([]);
     const res = await GET(reqWith("s1"));
@@ -52,7 +64,7 @@ describe("GET /forge/api/export", () => {
   });
 
   it("builds a zip with carddata.txt, setlist.txt and the finished image", async () => {
-    asMock(requireForge).mockResolvedValue({ supabase: {}, user: { id: "u1" }, role: "elder" });
+    asMock(requireForge).mockResolvedValue({ supabase: supabaseStub(), user: { id: "u1" }, role: "elder" });
     asMock(getSet).mockResolvedValue({ id: "s1", name: "End of Time", slug: "EoT" });
     asMock(listSetWorkingCards).mockResolvedValue([
       {
@@ -88,7 +100,7 @@ describe("GET /forge/api/export", () => {
   });
 
   it("skips a set the caller can't read (getSet null) but exports the readable one", async () => {
-    asMock(requireForge).mockResolvedValue({ supabase: {}, user: { id: "u1" }, role: "elder" });
+    asMock(requireForge).mockResolvedValue({ supabase: supabaseStub(), user: { id: "u1" }, role: "elder" });
     asMock(getSet).mockImplementation(async (id: string) =>
       id === "ok" ? { id: "ok", name: "Readable", slug: "RD" } : null,
     );

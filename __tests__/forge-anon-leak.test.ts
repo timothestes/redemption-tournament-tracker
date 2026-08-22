@@ -17,6 +17,7 @@ const FORGE_TABLES = [
   "playtest_members", "forge_invites", "forge_audit", "forge_cards",
   "forge_sets", "forge_set_elders", "forge_set_grants", "card_versions",
   "card_proposals", "card_comments", "forge_decks", "forge_card_art_candidates",
+  "forge_public_releases", "forge_public_release_cards", "forge_deck_migration_backups",
 ];
 
 // Built per test, not once in the describe body: vitest still evaluates the
@@ -94,6 +95,13 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_add_art_candidate", { p_card_id: "00000000-0000-0000-0000-000000000000", p_key: "x" }],
     ["forge_delete_art_candidate", { p_candidate_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_candidate_art_key", { p_card_id: "00000000-0000-0000-0000-000000000000", p_candidate_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_promote_set", { p_set_id: "00000000-0000-0000-0000-000000000000", p_set_code: "X", p_official_set: "X", p_rows: [] }],
+    ["forge_abort_release", { p_release_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_set_release_image_transform", { p_release_id: "00000000-0000-0000-0000-000000000000", p_card_id: "00000000-0000-0000-0000-000000000000", p_transform: null }],
+    ["forge_mark_release_image_uploaded", { p_release_id: "00000000-0000-0000-0000-000000000000", p_card_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_mark_release_live", { p_release_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_count_release_decks", { p_release_id: "00000000-0000-0000-0000-000000000000" }],
+    ["forge_migrate_release_decks", { p_release_id: "00000000-0000-0000-0000-000000000000" }],
   ];
 
   for (const [fn, args] of FORGE_RPCS) {

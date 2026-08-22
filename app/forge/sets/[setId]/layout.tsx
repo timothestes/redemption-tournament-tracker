@@ -26,8 +26,13 @@ export default async function SetLayout({ children, params }: { children: React.
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold">{set.name}</h1>
           {set.isPrivate && <PrivateBadge />}
+          {set.status === "released" && (
+            <span className="rounded-full border border-emerald-600/40 bg-emerald-600/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              Released
+            </span>
+          )}
         </div>
-        <SetTabs setId={setId} />
+        <SetTabs setId={setId} showPromote={ctx.role === "superadmin"} />
       </div>
       <SetRealtime setId={setId} />
       {children}
