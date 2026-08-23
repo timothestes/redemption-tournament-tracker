@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  CARD_TYPES, ALIGNMENTS, BRIGADES, CLASSES, ICONS,
+  CARD_TYPES, ALIGNMENTS, BRIGADES, CLASSES, ICONS, RARITIES,
   type DesignCard, type CardType, type Brigade,
 } from "@/app/forge/lib/designCard";
 import StatInput from "./StatInput";
@@ -82,6 +82,22 @@ export default function CardDetailsFields({
           className="rounded-md border bg-background px-3 py-2 text-sm">
           <option value="">—</option>
           {ALIGNMENTS.map((a) => <option key={a} value={a}>{a === "Good_Evil" ? "Good/Evil" : a}</option>)}
+        </select>
+      </label>
+
+      {/* Rarity */}
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium">Rarity</span>
+        <select value={snapshot.rarity ?? ""}
+          onChange={(e) => update({ rarity: e.target.value || undefined })}
+          className="rounded-md border bg-background px-3 py-2 text-sm">
+          <option value="">—</option>
+          {/* An imported/legacy value outside the curated list (e.g. "Legacy Rare")
+              still needs a slot so we don't silently blank it out. */}
+          {snapshot.rarity && !(RARITIES as readonly string[]).includes(snapshot.rarity) && (
+            <option value={snapshot.rarity}>{snapshot.rarity}</option>
+          )}
+          {RARITIES.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
       </label>
 
