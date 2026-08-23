@@ -1,0 +1,21 @@
+[
+  {
+    "name": "Might of Angels",
+    "set": "Pmo-2026",
+    "imgFile": "Might_of_Angels_(Pmo-2026)",
+    "officialSet": "Promo2026",
+    "type": "GE",
+    "brigade": "Silver",
+    "strength": "7",
+    "toughness": "0",
+    "class": "",
+    "identifier": "",
+    "specialAbility": "Negate an evil card. Hero may band to an angel from hand, territory, deck, or Reserve.",
+    "rarity": "Promo",
+    "reference": "II Thessalonians 1:7",
+    "alignment": "Good",
+    "legality": "Rotation",
+    "releaseId": "89000f66-8b0b-4965-9a79-05fb9a3ce226",
+    "setCode": "Pmo-2026"
+  }
+]
