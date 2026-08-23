@@ -95,7 +95,7 @@ describe.runIf(ENABLED)("Forge anon-leak guardrail", () => {
     ["forge_add_art_candidate", { p_card_id: "00000000-0000-0000-0000-000000000000", p_key: "x" }],
     ["forge_delete_art_candidate", { p_candidate_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_candidate_art_key", { p_card_id: "00000000-0000-0000-0000-000000000000", p_candidate_id: "00000000-0000-0000-0000-000000000000" }],
-    ["forge_promote_set", { p_set_id: "00000000-0000-0000-0000-000000000000", p_set_code: "X", p_official_set: "X", p_rows: [] }],
+    ["forge_promote_set", { p_set_id: "00000000-0000-0000-0000-000000000000", p_set_code: "X", p_official_set: "X", p_rows: [], p_close_set: true }],
     ["forge_abort_release", { p_release_id: "00000000-0000-0000-0000-000000000000" }],
     ["forge_set_release_image_transform", { p_release_id: "00000000-0000-0000-0000-000000000000", p_card_id: "00000000-0000-0000-0000-000000000000", p_transform: null }],
     ["forge_mark_release_image_uploaded", { p_release_id: "00000000-0000-0000-0000-000000000000", p_card_id: "00000000-0000-0000-0000-000000000000" }],
