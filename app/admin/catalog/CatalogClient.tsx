@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import TopNav from "../../../components/top-nav";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -172,6 +172,13 @@ export default function CatalogClient({
   // imgVersions.json. Keyed on imgFile (not the selected card) so a co-owner's
   // preview stays busted too if the admin selects it later in the session.
   const [replacedAt, setReplacedAt] = useState<Record<string, number>>({});
+  // Staleness guard: createImageBitmap decode time scales with file size, so a
+  // slow decode of an earlier pick can resolve after a later, faster pick and
+  // silently overwrite it with the wrong file. Bumped on every new selection
+  // and whenever selection state is reset out from under an in-flight decode
+  // (card switch, successful replace); a decode only commits state if its
+  // captured generation still matches.
+  const fileSelectGen = useRef(0);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -243,6 +250,9 @@ export default function CatalogClient({
     setOverrides(row ? { ...(row.fields as Partial<Record<EditableField, string>>) } : {});
     setNote(row?.note ?? "");
     // Reset the image panel's in-progress upload for the newly selected card.
+    // Bump the gen first so a decode still in flight from the previous card
+    // can't resurrect stale preview state after this reset.
+    fileSelectGen.current++;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setSelectedFile(null);
     setFileDims(null);
@@ -324,14 +334,20 @@ export default function CatalogClient({
     const f = e.target.files?.[0];
     e.target.value = ""; // allow re-selecting the same file after a replace or a mistake
     if (!f) return;
+    const gen = ++fileSelectGen.current;
     setImgError(null);
     setImgSuccess(null);
     let bmp: ImageBitmap;
     try {
       bmp = await createImageBitmap(f);
     } catch {
+      if (gen !== fileSelectGen.current) return; // superseded by a newer selection — don't clobber its state
       setImgError("Could not read this image file.");
       return;
+    }
+    if (gen !== fileSelectGen.current) {
+      bmp.close?.();
+      return; // a newer selection (or a card switch) already resolved/reset — discard this stale decode
     }
     const aspect = bmp.width / bmp.height;
     const cls: ImageClass =
@@ -386,6 +402,9 @@ export default function CatalogClient({
       setImgSuccess(
         `Replaced (v${version}, ${body.method}${body.upscaled ? ", upscaled — low-res source" : ""})`
       );
+      // Bump the gen so a decode still in flight from a pick made during the
+      // POST can't resurrect stale preview state after this reset.
+      fileSelectGen.current++;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setSelectedFile(null);
       setFileDims(null);
