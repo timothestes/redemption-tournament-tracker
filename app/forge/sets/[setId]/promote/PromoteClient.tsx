@@ -14,6 +14,7 @@ import {
   type PromoteReport, type ReleaseState, type ImageAuditRow, type PromoteIssue,
 } from "@/app/forge/lib/promote";
 import { PRINTER_PRESETS, type ReleaseImageTransform } from "@/app/forge/lib/catalogRow";
+import { sameSelection } from "@/app/forge/lib/releaseSelection";
 
 const BATCH_SIZE = 8;
 
@@ -21,9 +22,9 @@ const btn = "rounded-md border px-3 py-1.5 text-sm transition-colors hover:bg-mu
 const btnRed = "rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50";
 const panel = "rounded-lg border bg-card p-4";
 
-type Props = { setId: string; setName: string; initialRelease: ReleaseState | null };
+type Props = { setId: string; setName: string; setStatus: string; initialRelease: ReleaseState | null };
 
-export default function PromoteClient({ setId, setName, initialRelease }: Props) {
+export default function PromoteClient({ setId, setName, setStatus, initialRelease }: Props) {
   const router = useRouter();
   const [release, setRelease] = useState<ReleaseState | null>(initialRelease);
   const [newWave, setNewWave] = useState(false);
@@ -44,6 +45,8 @@ export default function PromoteClient({ setId, setName, initialRelease }: Props)
         <PreflightSection
           setId={setId}
           setName={setName}
+          setStatus={setStatus}
+          identityLocked={done}
           defaultSetCode={done ? release!.setCode : ""}
           defaultOfficialSet={done ? release!.officialSet : setName}
           onPromoted={refresh}
@@ -124,13 +127,16 @@ function IssueList({ issues, tone, onRename }: {
 // Preflight + the red button
 // ---------------------------------------------------------------------------
 
-function PreflightSection({ setId, setName, defaultSetCode = "", defaultOfficialSet, onPromoted }: {
-  setId: string; setName: string; defaultSetCode?: string; defaultOfficialSet?: string;
+function PreflightSection({ setId, setName, setStatus, identityLocked, defaultSetCode = "", defaultOfficialSet, onPromoted }: {
+  setId: string; setName: string; setStatus: string; identityLocked: boolean;
+  defaultSetCode?: string; defaultOfficialSet?: string;
   onPromoted: () => Promise<void>;
 }) {
   const [setCode, setSetCode] = useState(defaultSetCode);
   const [officialSet, setOfficialSet] = useState(defaultOfficialSet ?? setName);
   const [report, setReport] = useState<PromoteReport | null>(null);
+  const [selected, setSelected] = useState<string[] | null>(null); // null → server default
+  const [closeSet, setCloseSet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -140,9 +146,13 @@ function PreflightSection({ setId, setName, defaultSetCode = "", defaultOfficial
     setBusy(true);
     setError(null);
     try {
-      const r = await getPromoteReport(setId, setCode, officialSet);
+      const r = await getPromoteReport(setId, setCode, officialSet, selected ?? undefined);
       setReport(r);
       if (!r) setError("Could not read the set.");
+      else {
+        setSelected(r.selectedCardIds);
+        setCloseSet(r.closeEligible && setStatus !== "released");
+      }
     } finally {
       setBusy(false);
     }
@@ -166,7 +176,7 @@ function PreflightSection({ setId, setName, defaultSetCode = "", defaultOfficial
     setBusy(true);
     setError(null);
     try {
-      const res = await promoteSet(setId, setCode, officialSet);
+      const res = await promoteSet(setId, setCode, officialSet, selected ?? undefined, closeSet);
       if (res.ok === false) {
         setError(res.error);
       } else {
@@ -177,15 +187,18 @@ function PreflightSection({ setId, setName, defaultSetCode = "", defaultOfficial
     }
   };
 
-  const ready = report !== null && report.blockers.length === 0;
+  const dirty =
+    report !== null && selected !== null && !sameSelection(selected, report.selectedCardIds);
+  const ready = report !== null && report.blockers.length === 0 && !dirty;
 
   return (
     <div className="space-y-4">
       <div className={panel}>
         <h2 className="text-sm font-semibold">Release identity</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          The set code becomes the catalog’s short set value; the official name is its display name.
-          Both are frozen at promote time.
+          {identityLocked
+            ? "Locked to this set's earlier release — waves keep one catalog identity."
+            : "The set code becomes the catalog’s short set value; the official name is its display name. Both are frozen at promote time."}
         </p>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <label className="text-xs">
@@ -195,7 +208,9 @@ function PreflightSection({ setId, setName, defaultSetCode = "", defaultOfficial
               onChange={(e) => { setSetCode(e.target.value); setReport(null); }}
               placeholder="e.g. EoT"
               maxLength={16}
-              className="w-32 rounded-md border bg-background px-2 py-1.5 text-sm"
+              readOnly={identityLocked}
+              disabled={identityLocked}
+              className={`w-32 rounded-md border bg-background px-2 py-1.5 text-sm${identityLocked ? " opacity-70" : ""}`}
             />
           </label>
           <label className="text-xs">
@@ -203,7 +218,9 @@ function PreflightSection({ setId, setName, defaultSetCode = "", defaultOfficial
             <input
               value={officialSet}
               onChange={(e) => { setOfficialSet(e.target.value); setReport(null); }}
-              className="w-64 rounded-md border bg-background px-2 py-1.5 text-sm"
+              readOnly={identityLocked}
+              disabled={identityLocked}
+              className={`w-64 rounded-md border bg-background px-2 py-1.5 text-sm${identityLocked ? " opacity-70" : ""}`}
             />
           </label>
           <button type="button" className={btn} onClick={runPreflight} disabled={busy || !setCode.trim()}>
@@ -222,6 +239,44 @@ function PreflightSection({ setId, setName, defaultSetCode = "", defaultOfficial
             {report.excludedPromoted > 0 && <>{report.excludedPromoted} already promoted. </>}
             Promote freezes each card’s <em>approved</em> version — never the working draft.
           </p>
+          <div className="mt-3 space-y-1">
+            {report.roster.map((r) => {
+              const isSel = (selected ?? report.selectedCardIds).includes(r.cardId);
+              return (
+                <label key={r.cardId} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={r.group === "approved" ? isSel : false}
+                    disabled={r.group !== "approved" || busy}
+                    onChange={() => {
+                      const cur = selected ?? report.selectedCardIds;
+                      setSelected(isSel ? cur.filter((id) => id !== r.cardId) : [...cur, r.cardId]);
+                    }}
+                  />
+                  <span className={r.group === "approved" ? "" : "text-muted-foreground"}>{r.title}</span>
+                  {r.group === "unapproved" && (
+                    <span className="text-xs text-muted-foreground">not final — can’t be included</span>
+                  )}
+                  {r.group === "promoted" && (
+                    <span className="text-xs text-muted-foreground">already released</span>
+                  )}
+                </label>
+              );
+            })}
+            <button
+              type="button" className={`${btn} mt-1`} disabled={busy}
+              onClick={() =>
+                setSelected(report.roster.filter((r) => r.group === "approved").map((r) => r.cardId))
+              }
+            >
+              Select all final cards
+            </button>
+            {dirty && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Selection changed — run preflight again to refresh the report.
+              </p>
+            )}
+          </div>
           <div className="mt-3 space-y-3">
             <IssueList issues={report.blockers} tone="blocker" onRename={rename} />
             <IssueList issues={report.warnings} tone="warning" />
@@ -272,6 +327,27 @@ function PreflightSection({ setId, setName, defaultSetCode = "", defaultOfficial
             This freezes the release manifest and marks every card promoted. Card <em>data</em> stays
             member-only until images are processed; the image step publishes them irreversibly.
           </p>
+          <p className="mt-2 text-sm">
+            Releasing <span className="font-semibold">{report.selectedCardIds.length}</span> of{" "}
+            <span className="font-semibold">{report.totalReleasable}</span> remaining card
+            {report.totalReleasable === 1 ? "" : "s"}.
+          </p>
+          {setStatus !== "released" && (
+            <label className="mt-2 flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={closeSet}
+                disabled={!report.closeEligible || busy}
+                onChange={(e) => setCloseSet(e.target.checked)}
+              />
+              Close the set after this release (no new cards)
+              {!report.closeEligible && (
+                <span className="text-xs text-muted-foreground">
+                  — {report.totalReleasable - report.selectedCardIds.length} card(s) not in this release; the set stays open
+                </span>
+              )}
+            </label>
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <input
               value={confirmText}
@@ -285,7 +361,7 @@ function PreflightSection({ setId, setName, defaultSetCode = "", defaultOfficial
               disabled={busy || confirmText.trim() !== setCode.trim()}
               onClick={promote}
             >
-              {busy ? "Promoting…" : `Promote ${report.eligibleCount} cards`}
+              {busy ? "Promoting…" : `Promote ${report.selectedCardIds.length} card${report.selectedCardIds.length === 1 ? "" : "s"}`}
             </button>
           </div>
         </div>
