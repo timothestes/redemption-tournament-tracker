@@ -6,6 +6,14 @@ import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { CARDS, type CardData } from "@/lib/cards/lookup";
 import { getCardImageUrl } from "@/app/shared/utils/cardImageUrl";
+import {
+  CARD_IMAGE_WIDTH,
+  CARD_IMAGE_HEIGHT,
+  CARD_IMAGE_ASPECT,
+  AUTO_RESIZE_TOLERANCE,
+  PRINTER_PRESETS,
+  type ReleaseImageTransform,
+} from "@/app/forge/lib/catalogRow";
 import { EDITABLE_FIELDS, type EditableField } from "./lib/editorShared";
 import { diffPending, type BundledOverlay, type PendingItem } from "./lib/pendingDiff";
 import {
@@ -41,6 +49,11 @@ const MULTILINE_FIELDS: ReadonlySet<EditableField> = new Set(["specialAbility", 
 
 const SEARCH_MIN_CHARS = 2;
 const SEARCH_MAX_RESULTS = 30;
+
+type ImageClass = "exact" | "resize" | "crop";
+type PresetKey = keyof typeof PRINTER_PRESETS;
+const FRAME_WIDTH = 172;
+const FRAME_HEIGHT = 247;
 
 /* ------------------------------------------------------------------ */
 /*  Small presentational bits                                          */
@@ -86,6 +99,38 @@ function PendingKindBadge({ kind }: { kind: PendingItem["kind"] }) {
   );
 }
 
+/** Exact final framing for a crop decision, in a fixed card-shaped frame — the
+ *  fractional-rect math mirrors promote's CropPreviewBox. */
+function ImageFramePreview({ src, transform }: { src: string; transform: ReleaseImageTransform }) {
+  const style =
+    transform.mode === "preset"
+      ? (() => {
+          const rect = PRINTER_PRESETS[transform.preset];
+          return {
+            width: `${(1 / rect.width) * 100}%`,
+            height: `${(1 / rect.height) * 100}%`,
+            marginLeft: `${(-rect.x / rect.width) * 100}%`,
+            marginTop: `${(-rect.y / rect.height) * 100}%`,
+            maxWidth: "none",
+          } as const;
+        })()
+      : null;
+  return (
+    <div
+      className="relative overflow-hidden rounded-md border border-border bg-muted"
+      style={{ width: FRAME_WIDTH, height: FRAME_HEIGHT }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        className={style ? "absolute" : "h-full w-full object-cover"}
+        style={style ?? undefined}
+      />
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
@@ -97,7 +142,7 @@ export default function CatalogClient({
 }) {
   const [tab, setTab] = useState<Tab>("edit");
   const [dbOverrides, setDbOverrides] = useState<OverrideRow[]>(initial.overrides);
-  const [dbImageVersions] = useState<ImageVersionRow[]>(initial.imageVersions);
+  const [dbImageVersions, setDbImageVersions] = useState<ImageVersionRow[]>(initial.imageVersions);
 
   // Search (edit tab)
   const [query, setQuery] = useState("");
@@ -111,6 +156,22 @@ export default function CatalogClient({
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Image panel (Task 11, spec §6/§7 F2).
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileDims, setFileDims] = useState<{ width: number; height: number } | null>(null);
+  const [imageClass, setImageClass] = useState<ImageClass | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [transform, setTransform] = useState<ReleaseImageTransform | null>(null);
+  const [imgNote, setImgNote] = useState("");
+  const [replacing, setReplacing] = useState(false);
+  const [imgError, setImgError] = useState<string | null>(null);
+  const [imgSuccess, setImgSuccess] = useState<string | null>(null);
+  // imgFile -> Date.now() of a successful replace this session, so the preview
+  // busts past the browser's own cache even before a redeploy regenerates
+  // imgVersions.json. Keyed on imgFile (not the selected card) so a co-owner's
+  // preview stays busted too if the admin selects it later in the session.
+  const [replacedAt, setReplacedAt] = useState<Record<string, number>>({});
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -135,6 +196,30 @@ export default function CatalogClient({
     );
   }, [dbOverrides, selectedCard]);
 
+  // Co-owners (F2) — other catalog cards sharing this image file. Replacing it
+  // changes their art too.
+  const coOwners = useMemo(() => {
+    if (!selectedCard) return [];
+    return CARDS.filter(
+      (c) => c.imgFile === selectedCard.imgFile && !(c.name === selectedCard.name && c.set === selectedCard.set)
+    );
+  }, [selectedCard]);
+
+  const currentVersion = useMemo(() => {
+    if (!selectedCard) return 0;
+    return dbImageVersions.find((r) => r.img_file === selectedCard.imgFile)?.version ?? 0;
+  }, [selectedCard, dbImageVersions]);
+
+  const currentSrc = useMemo(() => {
+    if (!selectedCard) return "";
+    const base = getCardImageUrl(selectedCard.imgFile);
+    const ts = replacedAt[selectedCard.imgFile];
+    if (!ts) return base;
+    return `${base}${base.includes("?") ? "&" : "?"}ts=${ts}`;
+  }, [selectedCard, replacedAt]);
+
+  const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL ?? "";
+
   const pending = useMemo(
     () =>
       diffPending(
@@ -157,6 +242,16 @@ export default function CatalogClient({
     const row = dbOverrides.find((o) => o.card_name === card.name && o.set_code === card.set);
     setOverrides(row ? { ...(row.fields as Partial<Record<EditableField, string>>) } : {});
     setNote(row?.note ?? "");
+    // Reset the image panel's in-progress upload for the newly selected card.
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(null);
+    setFileDims(null);
+    setImageClass(null);
+    setPreviewUrl(null);
+    setTransform(null);
+    setImgNote("");
+    setImgError(null);
+    setImgSuccess(null);
   }
 
   function applyOverride(field: EditableField) {
@@ -223,6 +318,85 @@ export default function CatalogClient({
     setOverrides({});
     setNote("");
     setSaving(false);
+  }
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file after a replace or a mistake
+    if (!f) return;
+    setImgError(null);
+    setImgSuccess(null);
+    let bmp: ImageBitmap;
+    try {
+      bmp = await createImageBitmap(f);
+    } catch {
+      setImgError("Could not read this image file.");
+      return;
+    }
+    const aspect = bmp.width / bmp.height;
+    const cls: ImageClass =
+      bmp.width === CARD_IMAGE_WIDTH && bmp.height === CARD_IMAGE_HEIGHT && f.type === "image/jpeg"
+        ? "exact"
+        : Math.abs(aspect - CARD_IMAGE_ASPECT) / CARD_IMAGE_ASPECT <= AUTO_RESIZE_TOLERANCE
+          ? "resize"
+          : "crop";
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(f);
+    setFileDims({ width: bmp.width, height: bmp.height });
+    setImageClass(cls);
+    setPreviewUrl(URL.createObjectURL(f));
+    setTransform(cls === "crop" ? { mode: "cover" } : null);
+  }
+
+  async function handleReplace() {
+    if (!selectedCard || !selectedFile) return;
+    setReplacing(true);
+    setImgError(null);
+    setImgSuccess(null);
+    let res: Response;
+    try {
+      const form = new FormData();
+      form.set("name", selectedCard.name);
+      form.set("set", selectedCard.set);
+      if (transform) form.set("transform", JSON.stringify(transform));
+      if (imgNote) form.set("note", imgNote);
+      form.set("file", selectedFile);
+      res = await fetch("/admin/catalog/api/image", { method: "POST", body: form });
+    } catch {
+      setImgError("Network error — retry.");
+      setReplacing(false);
+      return;
+    }
+    let body: { ok?: boolean; version?: number; method?: string; upscaled?: boolean; error?: string };
+    try {
+      body = await res.json();
+    } catch {
+      setImgError(`Replace failed (${res.status}).`);
+      setReplacing(false);
+      return;
+    }
+    if (res.ok && body.ok && typeof body.version === "number") {
+      const imgFile = selectedCard.imgFile;
+      const version = body.version;
+      setDbImageVersions((prev) => [
+        ...prev.filter((r) => r.img_file !== imgFile),
+        { img_file: imgFile, version, note: imgNote.trim() || null, updated_at: new Date().toISOString() },
+      ]);
+      setReplacedAt((prev) => ({ ...prev, [imgFile]: Date.now() }));
+      setImgSuccess(
+        `Replaced (v${version}, ${body.method}${body.upscaled ? ", upscaled — low-res source" : ""})`
+      );
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setSelectedFile(null);
+      setFileDims(null);
+      setImageClass(null);
+      setPreviewUrl(null);
+      setTransform(null);
+      setImgNote("");
+    } else {
+      setImgError(body.error ?? `Replace failed (${res.status}).`);
+    }
+    setReplacing(false);
   }
 
   return (
@@ -425,6 +599,120 @@ export default function CatalogClient({
                           </button>
                         )}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Image panel (Task 11, spec §6/§7 F2) */}
+                  <div className="w-full space-y-4 xl:w-72">
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Current image
+                      </p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={currentSrc}
+                        alt=""
+                        className="w-full max-w-[172px] rounded-md border border-border bg-muted object-cover"
+                        style={{ aspectRatio: `${CARD_IMAGE_WIDTH} / ${CARD_IMAGE_HEIGHT}` }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {currentVersion === 0 ? (
+                          "Never replaced."
+                        ) : (
+                          <>
+                            Version {currentVersion} &middot;{" "}
+                            <a
+                              href={`${blobBase}/card-images-archive/${selectedCard.imgFile}.v${currentVersion - 1}.jpg`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline hover:text-foreground"
+                            >
+                              previous version
+                            </a>
+                          </>
+                        )}
+                      </p>
+                    </div>
+
+                    {coOwners.length > 0 && (
+                      <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-950/40">
+                        <p className="text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+                          This image also serves:{" "}
+                          {coOwners.map((c, i) => (
+                            <span key={`${c.name}|${c.set}`} className="font-medium">
+                              {i > 0 ? ", " : ""}
+                              {c.name} ({c.set})
+                            </span>
+                          ))}
+                          {" "}&mdash; replacing it changes those cards too.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 rounded-lg border border-border p-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Replace image
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        disabled={replacing}
+                        className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-foreground hover:file:bg-muted/80 disabled:opacity-50"
+                      />
+
+                      {selectedFile && fileDims && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">
+                            {fileDims.width}&times;{fileDims.height} &mdash; {imageClass}
+                          </p>
+                          {previewUrl && imageClass !== "crop" && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={previewUrl}
+                              alt=""
+                              className="w-full max-w-[172px] rounded-md border border-border"
+                            />
+                          )}
+                          {previewUrl && imageClass === "crop" && transform && (
+                            <div className="space-y-2">
+                              <div className="flex gap-2">
+                                {(["cover", "printer1", "printer2"] as const).map((key) => {
+                                  const t: ReleaseImageTransform =
+                                    key === "cover" ? { mode: "cover" } : { mode: "preset", preset: key as PresetKey };
+                                  const active =
+                                    key === "cover" ? transform.mode === "cover" : transform.mode === "preset" && transform.preset === key;
+                                  return (
+                                    <Button
+                                      key={key}
+                                      type="button"
+                                      size="sm"
+                                      variant={active ? "default" : "outline"}
+                                      onClick={() => setTransform(t)}
+                                    >
+                                      {key === "cover" ? "Cover" : key === "printer1" ? "Printer 1" : "Printer 2"}
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+                              <ImageFramePreview src={previewUrl} transform={transform} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <Input
+                        value={imgNote}
+                        onChange={(e) => setImgNote(e.target.value)}
+                        placeholder="Note (optional)"
+                      />
+
+                      {imgError && <p className="text-sm text-destructive">{imgError}</p>}
+                      {imgSuccess && <p className="text-sm text-foreground">{imgSuccess}</p>}
+
+                      <Button onClick={handleReplace} disabled={!selectedFile || replacing}>
+                        {replacing ? "Replacing..." : "Replace"}
+                      </Button>
                     </div>
                   </div>
                 </div>
