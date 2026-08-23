@@ -19,6 +19,9 @@ import {
   type ReleaseImageTransform,
 } from "@/app/forge/lib/catalogRow";
 import { auditReleaseImage } from "@/app/forge/lib/releaseImage";
+import {
+  groupRoster, defaultSelection, isCloseEligible, type RosterEntry,
+} from "@/app/forge/lib/releaseSelection";
 import { CARDS, findCard } from "@/lib/cards/lookup";
 import type { CardData } from "@/lib/cards/generated/cardData";
 
@@ -29,6 +32,14 @@ export type PromotePreviewRow = CardData & { cardId: string; versionId: string }
 export type PromoteReport = {
   setName: string;
   setStatus: string;
+  /** Every non-archived card in the set, grouped for the selection UI. */
+  roster: RosterEntry[];
+  /** The selection this report was built for (default: all approved cards). */
+  selectedCardIds: string[];
+  /** Non-archived, non-promoted cards remaining in the set. */
+  totalReleasable: number;
+  /** True when this selection covers every remaining releasable card. */
+  closeEligible: boolean;
   eligibleCount: number;
   excludedArchived: number;
   excludedPromoted: number;
@@ -72,6 +83,7 @@ type Ctx = NonNullable<Awaited<ReturnType<typeof requireForgeSuperadmin>>>;
 
 async function buildReport(
   ctx: Ctx, setId: string, setCode: string, officialSet: string,
+  selectedCardIds?: string[],
 ): Promise<PromoteReport | null> {
   const { data: set } = await ctx.supabase
     .from("forge_sets")
@@ -91,19 +103,41 @@ async function buildReport(
   const all = cards ?? [];
   const excludedArchived = all.filter((c: any) => c.status === "archived").length;
   const excludedPromoted = all.filter((c: any) => c.status === "promoted").length;
-  const releasable = all.filter((c: any) => c.status !== "archived" && c.status !== "promoted");
 
-  for (const c of releasable) {
-    if (c.status !== "approved" || !c.approved_version_id) {
+  const roster = groupRoster(
+    all.map((c: any) => ({
+      id: c.id as string,
+      title: (c.title as string | null) ?? null,
+      status: c.status as string,
+      approvedVersionId: (c.approved_version_id as string | null) ?? null,
+    })),
+  );
+  const selection = selectedCardIds ?? defaultSelection(roster);
+  const selectedSet = new Set(selection);
+  const totalReleasable = roster.filter((r) => r.group !== "promoted").length;
+
+  // Only SELECTED cards are validated and released; an unapproved card in the
+  // set is simply not part of this wave (never a blocker unless selected).
+  const byId = new Map(all.map((c: any) => [c.id as string, c]));
+  for (const id of selection) {
+    const c: any = byId.get(id);
+    if (!c || c.status === "archived" || c.status === "promoted") {
+      blockers.push({
+        code: "not_releasable", cardId: id,
+        message: "A selected card is no longer releasable — refresh and re-select.",
+      });
+    } else if (c.status !== "approved" || !c.approved_version_id) {
       blockers.push({
         code: "not_approved",
         cardId: c.id,
-        message: `"${c.title ?? "Untitled"}" is ${c.status} — every card must be marked final before promote.`,
+        message: `"${c.title ?? "Untitled"}" is ${c.status} — a card must be marked final to be released.`,
       });
     }
   }
 
-  const approved = releasable.filter((c: any) => c.status === "approved" && c.approved_version_id);
+  const approved = all.filter(
+    (c: any) => selectedSet.has(c.id) && c.status === "approved" && c.approved_version_id,
+  );
   const versionIds = approved.map((c: any) => c.approved_version_id as string);
   const versionsById = new Map<string, { data: DesignCard; finishedKey: string | null }>();
   if (versionIds.length > 0) {
@@ -140,6 +174,14 @@ async function buildReport(
   const inFlight = prior.find((r: any) => r.set_id === setId && r.status !== "decks_migrated");
   if (inFlight) {
     blockers.push({ code: "release_in_flight", message: "A release for this set is already in progress — finish or abort it first." });
+  }
+  // Waves must keep the identity of the set's earlier releases (§3.3).
+  const priorForSet = prior.find((r: any) => r.set_id === setId);
+  if (priorForSet && (priorForSet.set_code !== code || priorForSet.official_set !== official)) {
+    blockers.push({
+      code: "wave_identity_mismatch",
+      message: `This set already released as "${priorForSet.official_set}" (${priorForSet.set_code}) — follow-up waves must keep that identity.`,
+    });
   }
 
   const upstreamCodes = new Set<string>();
@@ -255,6 +297,10 @@ async function buildReport(
   return {
     setName: set.name,
     setStatus: set.status,
+    roster,
+    selectedCardIds: selection,
+    totalReleasable,
+    closeEligible: blockers.length === 0 && isCloseEligible(roster, selection),
     eligibleCount: rows.length,
     excludedArchived,
     excludedPromoted,
@@ -265,11 +311,11 @@ async function buildReport(
 }
 
 export async function getPromoteReport(
-  setId: string, setCode: string, officialSet: string,
+  setId: string, setCode: string, officialSet: string, selectedCardIds?: string[],
 ): Promise<PromoteReport | null> {
   const ctx = await requireForgeSuperadmin();
   if (!ctx) return null;
-  return buildReport(ctx, setId, setCode, officialSet);
+  return buildReport(ctx, setId, setCode, officialSet, selectedCardIds);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,14 +325,18 @@ export async function getPromoteReport(
 
 export async function promoteSet(
   setId: string, setCode: string, officialSet: string,
+  selectedCardIds: string[] | undefined, closeSet: boolean,
 ): Promise<{ ok: true; releaseId: string } | { ok: false; error: string }> {
   const ctx = await requireForgeSuperadmin();
   if (!ctx) return { ok: false, error: "Not authorized" };
 
-  const report = await buildReport(ctx, setId, setCode, officialSet);
+  const report = await buildReport(ctx, setId, setCode, officialSet, selectedCardIds);
   if (!report) return { ok: false, error: "Set not found" };
   if (report.blockers.length > 0) {
     return { ok: false, error: `Preflight has ${report.blockers.length} blocker(s) — refresh the report.` };
+  }
+  if (closeSet && !report.closeEligible) {
+    return { ok: false, error: "Cannot close the set — this release does not cover every remaining card." };
   }
 
   const rows = report.rows.map((r) => ({
@@ -312,6 +362,7 @@ export async function promoteSet(
     p_set_code: setCode.trim(),
     p_official_set: officialSet.trim(),
     p_rows: rows,
+    p_close_set: closeSet,
   });
   if (error || typeof data !== "string") {
     return { ok: false, error: error?.message ?? "Promote failed" };
