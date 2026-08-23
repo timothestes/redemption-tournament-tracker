@@ -18,6 +18,9 @@ const jsonPath = path.join(__dirname, '../lib/cards/generated/cardData.json');
 const abMapPath = path.join(__dirname, '../lib/cards/generated/abMap.json');
 const abOverridesPath = path.join(__dirname, 'data/ab-overrides.json');
 const forgeReleasedPath = path.join(__dirname, 'data/forge-released.json');
+const cardOverridesPath = path.join(__dirname, 'data/card-overrides.json');
+const imgVersionsPath = path.join(__dirname, '../lib/cards/generated/imgVersions.json');
+const { applyCardOverrides } = require('./lib/applyCardOverrides');
 
 const raw = fs.readFileSync(txtPath, 'utf-8');
 const lines = raw.split('\n');
@@ -128,6 +131,37 @@ if (fs.existsSync(forgeReleasedPath)) {
   if (appended > 0) console.log(`🔥 ${appended} forge-released cards appended from overlay`);
 }
 
+// ---- Card-override overlay (catalog admin editor) --------------------------
+// Superuser metadata edits ride scripts/data/card-overrides.json (synced by
+// `make pull-card-overrides`) and are applied LAST — they win over upstream AND
+// forge-released rows. Validation lives in scripts/lib/applyCardOverrides.js;
+// any error there (orphan, ambiguity, unknown/identity field, stranded image
+// version) is a hard exit so a bad pull can never silently corrupt the catalog.
+let overridesOverlay = { overrides: [], imageVersions: {} };
+if (fs.existsSync(cardOverridesPath)) {
+  try {
+    overridesOverlay = JSON.parse(fs.readFileSync(cardOverridesPath, 'utf-8'));
+  } catch (e) {
+    console.error(`❌ Failed to read ${cardOverridesPath}: ${e.message}`);
+    process.exit(1);
+  }
+}
+const overrideCount = (overridesOverlay.overrides || []).length;
+// Pristine copy for the AB-pairing guard below: pairing derives from editable
+// fields (reference + stats), so we must prove the patch didn't re-pair anything.
+const cardsPrePatch = overrideCount > 0 ? cards.map((c) => ({ ...c })) : null;
+{
+  const { errors, warnings } = applyCardOverrides(cards, overridesOverlay);
+  for (const w of warnings) console.log(`♻️  ${w}`);
+  if (errors.length > 0) {
+    console.error(
+      `❌ card-overrides.json failed validation:\n` + errors.map((e) => `   - ${e}`).join('\n')
+    );
+    process.exit(1);
+  }
+}
+if (overrideCount > 0) console.log(`✏️  ${overrideCount} card override(s) applied`);
+
 // Diff summary against previous generated data, if present
 function loadPreviousCards() {
   if (!fs.existsSync(jsonPath)) return null;
@@ -222,22 +256,47 @@ function pickCandidate(cands, deriveKey, target, ab) {
   return null;
 }
 
-const abCards = cards.filter(isAbCard);
-const candidatesByFamily = new Map();
-for (const c of cards) {
-  if (isAbCard(c)) continue;
-  const fam = familyOf(c.set);
-  if (!candidatesByFamily.has(fam)) candidatesByFamily.set(fam, []);
-  candidatesByFamily.get(fam).push(c);
+// Derives the AB→original map for a given card list. Extracted so the
+// override-patch guard below can compare a pre-patch and post-patch derivation
+// without duplicating the matching logic.
+function deriveAbMap(cardList) {
+  const abList = cardList.filter(isAbCard);
+  const candidatesByFamily = new Map();
+  for (const c of cardList) {
+    if (isAbCard(c)) continue;
+    const fam = familyOf(c.set);
+    if (!candidatesByFamily.has(fam)) candidatesByFamily.set(fam, []);
+    candidatesByFamily.get(fam).push(c);
+  }
+  const map = {}; // { "<ab name>|<ab set>": "<original name>|<original set>" }
+  for (const ab of abList) {
+    const cands = candidatesByFamily.get(familyOf(ab.set)) || [];
+    const match =
+      pickCandidate(cands, (c) => normName(c.name), normName(ab.name), ab) ||
+      pickCandidate(cands, (c) => normRef(c.reference), normRef(ab.reference), ab);
+    if (match) map[keyOf(ab)] = keyOf(match);
+  }
+  return map;
 }
 
-const abMap = {}; // { "<ab name>|<ab set>": "<original name>|<original set>" }
-for (const ab of abCards) {
-  const cands = candidatesByFamily.get(familyOf(ab.set)) || [];
-  const match =
-    pickCandidate(cands, (c) => normName(c.name), normName(ab.name), ab) ||
-    pickCandidate(cands, (c) => normRef(c.reference), normRef(ab.reference), ab);
-  if (match) abMap[keyOf(ab)] = keyOf(match);
+const abCards = cards.filter(isAbCard); // the assertions below still use this
+const abMap = deriveAbMap(cards);
+
+// Guard (spec F6): an override to reference/stat fields can silently re-pair an
+// AB card while the map stays complete and 1:1 — the existing assertions can't
+// see it. Intentional re-pairing goes through data/ab-overrides.json instead.
+if (cardsPrePatch) {
+  const abMapBefore = deriveAbMap(cardsPrePatch);
+  const allKeys = new Set([...Object.keys(abMapBefore), ...Object.keys(abMap)]);
+  const changed = [...allKeys].filter((k) => abMapBefore[k] !== abMap[k]);
+  if (changed.length > 0) {
+    console.error(
+      `❌ card override(s) changed AB→original pairing:\n` +
+        changed.map((k) => `   - ${k}: ${abMapBefore[k] ?? '(none)'} → ${abMap[k] ?? '(none)'}`).join('\n') +
+        `\nIf intentional, pin the pairing in ${path.relative(process.cwd(), abOverridesPath)}.`
+    );
+    process.exit(1);
+  }
 }
 
 // Manual overrides (safety valve for future data drift) applied last.
@@ -274,6 +333,16 @@ if (new Set(claimedOriginals).size !== claimedOriginals.length) {
 }
 fs.writeFileSync(abMapPath, JSON.stringify(abMap, null, 2));
 console.log(`🔗 ${path.relative(process.cwd(), abMapPath)} — ${abCards.length} AB→original pairs`);
+
+// Image cache-bust versions (catalog editor image replacements). Consumed by
+// app/shared/utils/cardImageUrl.ts, which appends ?v=<n>. Always written —
+// {} when no image has ever been replaced.
+const imgVersionsOut = {};
+for (const k of Object.keys(overridesOverlay.imageVersions || {}).sort()) {
+  imgVersionsOut[k] = overridesOverlay.imageVersions[k];
+}
+fs.writeFileSync(imgVersionsPath, JSON.stringify(imgVersionsOut, null, 2) + '\n');
+console.log(`🖼️  ${path.relative(process.cwd(), imgVersionsPath)} — ${Object.keys(imgVersionsOut).length} versioned image(s)`);
 
 // The card array lives in a .json file so TypeScript never has to type-check a
 // multi-megabyte inline literal (which OOMs the build). The lookup maps are
