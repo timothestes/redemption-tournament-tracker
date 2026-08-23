@@ -24,11 +24,11 @@ export const FIELD_LABELS: Record<string, string> = {
 
 // The real editing surface (StudioEditor name + rawText, CardDetailsFields for the
 // rest). Drives the Current vs Proposed diff. `rawText` is the primary body; the
-// old no-editor fields (specialAbility/legality/rarity/artistCredit/cardFrame) are
+// old no-editor fields (specialAbility/legality/artistCredit/cardFrame) are
 // intentionally excluded so a body edit no longer reads "No field changes".
 export const DIFF_FIELDS: (keyof DesignCard)[] = [
   "name", "rawText", "cardType", "alignment", "brigades", "strength", "toughness",
-  "class", "icons", "identifiers", "reference", "scripture",
+  "class", "icons", "identifiers", "reference", "scripture", "rarity",
 ];
 
 // Fields a comment may anchor a suggestion to. Must mirror the SQL allowlist
@@ -45,7 +45,7 @@ export const SUGGESTABLE_FIELDS: (keyof DesignCard)[] = [
 // actually does to open proposals, server-side — so drift here can misword the
 // dialog but can never change behavior.
 // Deliberately NOT `diffCards(a, b).length === 0`: DIFF_FIELDS omits
-// specialAbility/legality/rarity/artistCredit/cardFrame, so a diff-based
+// specialAbility/legality/artistCredit/cardFrame, so a diff-based
 // compare would call two genuinely different snapshots equal.
 export function sameSnapshot(a: DesignCard, b: DesignCard): boolean {
   return canonicalJson(a) === canonicalJson(b);

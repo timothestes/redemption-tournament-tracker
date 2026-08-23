@@ -31,6 +31,12 @@ describe("diffCards", () => {
     expect(allAdded.map((c) => c.field).sort()).toEqual(["brigades", "name"]);
     expect(diffCards({ name: "X" }, { name: "X" })).toEqual([]);
   });
+
+  it("detects a changed rarity", () => {
+    const d = diffCards({ rarity: "Rare" }, { rarity: "Common" });
+    expect(d).toHaveLength(1);
+    expect(d[0]).toMatchObject({ field: "rarity", label: "Rarity", kind: "changed", before: "Rare", after: "Common" });
+  });
 });
 
 describe("summarizeDiff", () => {
@@ -58,9 +64,9 @@ describe("sameSnapshot", () => {
     expect(sameSnapshot({ brigades: ["Blue", "Green"] }, { brigades: ["Green", "Blue"] })).toBe(false);
   });
 
-  it("catches changes diffCards is blind to (DIFF_FIELDS omits rarity et al.)", () => {
-    const a = { name: "David", rarity: "Rare" } as any;
-    const b = { name: "David", rarity: "Common" } as any;
+  it("catches changes diffCards is blind to (DIFF_FIELDS omits legality et al.)", () => {
+    const a = { name: "David", legality: "Rotation" } as any;
+    const b = { name: "David", legality: "Banned" } as any;
     expect(diffCards(a, b)).toHaveLength(0);
     expect(sameSnapshot(a, b)).toBe(false);
   });

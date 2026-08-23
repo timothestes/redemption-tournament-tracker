@@ -22,6 +22,7 @@ export type Brigade = (typeof BRIGADES)[number];
 export const CLASSES = ["Warrior", "Weapon"] as const;
 export const ICONS = ["Territory", "Star", "Cloud"] as const;
 export const LEGALITIES = ["Rotation", "Classic", "Scrolls", "Paragon", "Banned"] as const;
+export const RARITIES = ["Common", "Uncommon", "Rare", "Ultra Rare", "Promo"] as const;
 
 // NOTE: the property keys below are mirrored by the SQL allowlist
 // `_forge_is_card_field` (used to validate field-anchored suggestions); its
