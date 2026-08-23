@@ -21,6 +21,7 @@ export default async function PromotePage({ params }: { params: Promise<{ setId:
     <PromoteClient
       setId={setId}
       setName={set.name}
+      setStatus={set.status}
       initialRelease={release}
     />
   );
