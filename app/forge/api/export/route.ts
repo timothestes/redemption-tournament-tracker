@@ -39,10 +39,31 @@ export async function GET(req: Request): Promise<Response> {
     if (!set) continue;
     setNames.push(set.name);
 
+    // A released set exports its PUBLIC identity — set code, official name, and
+    // the released imgFile per card — so the upstream Lackey plugin handoff is
+    // byte-identical to the catalog and eventual absorption dedupes cleanly
+    // (promote design §8). Unreleased sets keep the slug-based identity.
+    const { data: releases } = await ctx.supabase
+      .from("forge_public_releases")
+      .select("id, set_code, official_set")
+      .eq("set_id", setId)
+      .order("created_at", { ascending: false });
+    const release = (releases ?? [])[0] ?? null;
+    const releasedImgByCard = new Map<string, string>();
+    if (releases && releases.length > 0) {
+      const { data: manifest } = await ctx.supabase
+        .from("forge_public_release_cards")
+        .select("card_id, img_file")
+        .in("release_id", releases.map((r: any) => r.id));
+      for (const m of manifest ?? []) {
+        releasedImgByCard.set(m.card_id as string, m.img_file as string);
+      }
+    }
+
     const cards = await listSetWorkingCards(setId);
     for (const card of cards) {
       // A unique image base name for the flat setimages/general dir (deduped across sets).
-      let base = imageFileSlug(card.title);
+      let base = releasedImgByCard.get(card.cardId) ?? imageFileSlug(card.title);
       if (usedImageNames.has(base.toLowerCase())) {
         let n = 2;
         while (usedImageNames.has(`${base}-${n}`.toLowerCase())) n++;
@@ -68,8 +89,8 @@ export async function GET(req: Request): Promise<Response> {
       rows.push(
         designCardToLackeyRow(card.snapshot, {
           name: card.title,
-          set: set.slug,
-          officialSet: set.name,
+          set: release ? release.set_code : set.slug,
+          officialSet: release ? release.official_set : set.name,
           imageFile,
         }),
       );

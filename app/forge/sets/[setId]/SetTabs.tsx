@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export default function SetTabs({ setId }: { setId: string }) {
+export default function SetTabs({ setId, showPromote = false }: { setId: string; showPromote?: boolean }) {
   const pathname = usePathname() ?? "";
   const tabs = [
     { href: `/forge/sets/${setId}/cards`, label: "Cards" },
     { href: `/forge/sets/${setId}/notes`, label: "Notes" },
     { href: `/forge/sets/${setId}/progress`, label: "Progress" },
     { href: `/forge/sets/${setId}/review`, label: "Review" },
+    ...(showPromote ? [{ href: `/forge/sets/${setId}/promote`, label: "Promote" }] : []),
   ];
   return (
     <nav className="mt-2 flex gap-1 text-sm">

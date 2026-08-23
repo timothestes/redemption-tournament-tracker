@@ -35,6 +35,7 @@ help:
 	@echo "Card Data:"
 	@echo "  make update-cards    - Download latest card data and regenerate TypeScript"
 	@echo "  make cards           - Alias for update-cards"
+	@echo "  make pull-forge-releases - Sync forge-released sets into the catalog overlay"
 	@echo ""
 
 # Install dependencies
@@ -104,4 +105,10 @@ update-cards:
 
 cards: update-cards
 
-.PHONY: all install run dev dev-windows build start stop setup clean fresh update-paragons paragons update-cards cards
+# Sync forge-released sets from Supabase into the overlay + regenerate the catalog.
+# Needs .env.local (service key) — run from the main checkout, not a bare worktree.
+pull-forge-releases:
+	@echo "📥 Syncing forge releases from Supabase..."
+	@node scripts/pull-forge-releases.js
+
+.PHONY: all install run dev dev-windows build start stop setup clean fresh update-paragons paragons update-cards cards pull-forge-releases

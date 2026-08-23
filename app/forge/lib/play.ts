@@ -11,6 +11,11 @@ export type RevealCard = { cardId: string; data: DesignCard; hasApprovedArt: boo
 // NOTE: still named listSetApprovedCards for caller stability, but it now reveals
 // playtesting cards too (see migration 057). The revealed version is the approved
 // snapshot when finalized, else the published (in-testing) snapshot.
+// 'promoted' (publicly released, migration 091) stays in this filter deliberately:
+// this reader feeds both the deck-builder pool and play-deck hydration, and
+// hydration fail-closes — dropping promoted cards here would break every deck
+// holding a forge ref the instant a set is promoted, before deck migration runs
+// (the Roots 2 outage mechanism). Keep it in sync with the 091 RLS policy.
 export async function listSetApprovedCards(setId: string): Promise<RevealCard[]> {
   const ctx = await requireForge();
   if (!ctx) return [];
@@ -19,7 +24,7 @@ export async function listSetApprovedCards(setId: string): Promise<RevealCard[]>
     .from("forge_cards")
     .select("id, approved_version_id, published_version_id")
     .eq("set_id", setId)
-    .in("status", ["playtesting", "approved"]);
+    .in("status", ["playtesting", "approved", "promoted"]);
 
   const byVersion = new Map<string, string>(); // version_id -> card_id
   for (const c of cards ?? []) {

@@ -17,6 +17,7 @@ const outputPath = path.join(__dirname, '../lib/cards/generated/cardData.ts');
 const jsonPath = path.join(__dirname, '../lib/cards/generated/cardData.json');
 const abMapPath = path.join(__dirname, '../lib/cards/generated/abMap.json');
 const abOverridesPath = path.join(__dirname, 'data/ab-overrides.json');
+const forgeReleasedPath = path.join(__dirname, 'data/forge-released.json');
 
 const raw = fs.readFileSync(txtPath, 'utf-8');
 const lines = raw.split('\n');
@@ -52,11 +53,79 @@ for (const line of dataLines) {
   });
 }
 
+// This guard covers UPSTREAM rows alone, before the forge overlay merges —
+// moving it after the merge would let a truncated upstream fetch hide behind
+// the overlay's row count.
 if (cards.length < 5000) {
   console.error(
     `❌ Only ${cards.length} cards parsed — expected >= 5000. Aborting to avoid writing a truncated artifact.`
   );
   process.exit(1);
+}
+
+// ---- Forge-released overlay ------------------------------------------------
+// Sets promoted from the Forge ride scripts/data/forge-released.json (synced by
+// `make pull-forge-releases`) so `make update-cards` can never wipe them. Rows
+// are CardData-shaped JSON tagged with releaseId/setCode — they bypass the
+// positional TSV fragility entirely. Upstream wins on name|set: once a released
+// set lands in upstream carddata.txt its overlay rows drop out (printed below).
+// PARTIAL absorption of one release is a hard failure — some rows matching
+// upstream while others linger is the rename/errata signature, and it must
+// never merge silently.
+const upstreamCount = cards.length;
+if (fs.existsSync(forgeReleasedPath)) {
+  let overlayRows;
+  try {
+    overlayRows = JSON.parse(fs.readFileSync(forgeReleasedPath, 'utf-8'));
+  } catch (e) {
+    console.error(`❌ Failed to read ${forgeReleasedPath}: ${e.message}`);
+    process.exit(1);
+  }
+  if (!Array.isArray(overlayRows)) {
+    console.error(`❌ ${forgeReleasedPath} must contain a JSON array`);
+    process.exit(1);
+  }
+  const upstreamKeys = new Set(cards.map((c) => `${c.name}|${c.set}`));
+  const byRelease = new Map();
+  for (const row of overlayRows) {
+    const releaseId = row.releaseId || 'untagged';
+    if (!byRelease.has(releaseId)) byRelease.set(releaseId, []);
+    byRelease.get(releaseId).push(row);
+  }
+  const CARD_FIELDS = [
+    'name', 'set', 'imgFile', 'officialSet', 'type', 'brigade', 'strength',
+    'toughness', 'class', 'identifier', 'specialAbility', 'rarity', 'reference',
+    'alignment', 'legality',
+  ];
+  for (const [releaseId, rows] of byRelease) {
+    if (rows.some((r) => /\(AB\)/.test(r.set || ''))) {
+      console.error(`❌ Overlay release ${releaseId} uses an (AB)-pattern set code — not allowed.`);
+      process.exit(1);
+    }
+    const absorbed = rows.filter((r) => upstreamKeys.has(`${r.name}|${r.set}`));
+    const lingering = rows.filter((r) => !upstreamKeys.has(`${r.name}|${r.set}`));
+    if (absorbed.length > 0 && lingering.length > 0) {
+      console.error(
+        `❌ Release ${releaseId} (${rows[0]?.set}) is PARTIALLY absorbed upstream — ` +
+          `${absorbed.length}/${rows.length} rows match carddata.txt but these do not ` +
+          `(rename/errata suspects; reconcile before regenerating):\n` +
+          lingering.map((r) => `   - ${r.name} | ${r.set}`).join('\n')
+      );
+      process.exit(1);
+    }
+    for (const r of absorbed) console.log(`⤵️  absorbed upstream: ${r.name} (${r.set})`);
+    for (const r of lingering) {
+      const clean = {};
+      for (const f of CARD_FIELDS) clean[f] = (r[f] ?? '').toString();
+      cards.push(clean);
+    }
+  }
+  if (cards.length < upstreamCount) {
+    console.error('❌ Merged card count fell below the upstream count — overlay merge bug.');
+    process.exit(1);
+  }
+  const appended = cards.length - upstreamCount;
+  if (appended > 0) console.log(`🔥 ${appended} forge-released cards appended from overlay`);
 }
 
 // Diff summary against previous generated data, if present
