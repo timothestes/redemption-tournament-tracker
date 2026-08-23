@@ -1,4 +1,4 @@
-import { put, copy } from "@vercel/blob";
+import { put, copy, BlobNotFoundError } from "@vercel/blob";
 import { requireSuperuser } from "@/app/admin/permissions/lib/auth";
 import { parseImageTransform } from "@/app/forge/lib/catalogRow";
 import { transformReleaseImage } from "@/app/forge/lib/releaseImage";
@@ -101,8 +101,16 @@ export async function POST(req: Request): Promise<Response> {
       token,
       addRandomSuffix: false,
     });
-  } catch {
+  } catch (e) {
     // Source blob missing (image never synced) — nothing to archive.
+    // But if it's a transient/auth/rate-limit error, fail the whole operation.
+    if (!(e instanceof BlobNotFoundError)) {
+      console.error(`Archive failed for ${imgFile}: ${e instanceof Error ? e.message : String(e)}`);
+      return Response.json(
+        { error: "Could not archive the current image — nothing was overwritten; retry" },
+        { status: 500 }
+      );
+    }
   }
 
   // 3) Transform to the uniform 345×495 q90 format (promote's pipeline).
