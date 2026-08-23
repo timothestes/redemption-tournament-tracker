@@ -44,4 +44,27 @@ describe.runIf(ENABLED)("Superuser portal anon-leak guardrail", () => {
       expect(error, `anon was able to execute ${fn} — a definer grant leaked`).not.toBeNull();
     });
   }
+
+  // Catalog editor tables (migration 092): superuser-only via RLS + anon revoke.
+  for (const table of ["card_overrides", "card_image_versions"] as const) {
+    it(`anon sees zero rows in ${table}`, async () => {
+      const { data, error } = await anonClient().from(table).select("*").limit(1000);
+      const rows = data ?? [];
+      expect(
+        rows.length,
+        `anon leaked ${rows.length} row(s) from ${table} (error: ${error?.message ?? "none"})`
+      ).toBe(0);
+    });
+
+    it(`anon cannot write to ${table}`, async () => {
+      const { error } = await anonClient()
+        .from(table)
+        .insert(
+          table === "card_overrides"
+            ? { card_name: "x", set_code: "x", fields: {}, note: "x", updated_by: "00000000-0000-0000-0000-000000000000" }
+            : { img_file: "x", version: 1, updated_by: "00000000-0000-0000-0000-000000000000" }
+        );
+      expect(error, `anon was able to insert into ${table}`).not.toBeNull();
+    });
+  }
 });
