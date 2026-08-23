@@ -7,9 +7,11 @@
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
-/** Strip trailing .jpg / .jpeg extension so we can append a canonical one. */
+/** Strip trailing .jpg / .jpeg and map path-breaking slashes, so we can append
+ *  a canonical extension. Slash→underscore matches how the legacy deck-preview
+ *  builders (and the blob store's actual filenames) always treated slashes. */
 export function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
+  return f.replace(/\//g, "_").replace(/\.jpe?g$/i, "");
 }
 
 /**

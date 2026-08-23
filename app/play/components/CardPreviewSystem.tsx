@@ -2,18 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { X } from 'lucide-react';
-
-const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
-
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
-}
-
-function getCardImageUrl(imgFile: string): string {
-  if (!imgFile) return '';
-  if (imgFile.startsWith('/')) return imgFile;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
-}
+import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
 // ---------------------------------------------------------------------------
 // Types
