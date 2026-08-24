@@ -6,7 +6,7 @@ import type { ParsedDeck, DeckEntry } from "./types";
  * Parity with Python's normalize_apostrophes.
  */
 export function normalizeApostrophes(text: string): string {
-  return text.replace("’", "'");
+  return text.replaceAll("’", "’");
 }
 
 /**
@@ -37,7 +37,14 @@ export function parseDecklistText(text: string): ParsedDeck {
     // Split on first tab only - skip if no tab
     const tabIndex = trimmed.indexOf("\t");
     if (tabIndex > -1) {
-      const quantity = parseInt(trimmed.substring(0, tabIndex).trim(), 10);
+      const quantityStr = trimmed.substring(0, tabIndex).trim();
+
+      // Validate quantity is a valid integer (matches Python's int() behavior)
+      if (!/^[+-]?\d+$/.test(quantityStr)) {
+        throw new Error(`invalid literal for int() with base 10: '${quantityStr}'`);
+      }
+
+      const quantity = parseInt(quantityStr, 10);
       const name = normalizeApostrophes(trimmed.substring(tabIndex + 1).trim());
 
       const entry: DeckEntry = { quantity, name };

@@ -46,4 +46,15 @@ describe("normalizeApostrophes", () => {
   it("replaces U+2019 only", () => {
     expect(normalizeApostrophes("a'b'c")).toBe("a'b'c");
   });
+
+  it("replaces all occurrences of U+2019 (regression for multiple apostrophes)", () => {
+    expect(normalizeApostrophes("Joseph's Brothers' Scheme")).toBe("Joseph's Brothers' Scheme");
+  });
+});
+
+describe("parseDecklistText error handling", () => {
+  it("throws a plain Error (not DeckCheckError) for non-numeric quantity", () => {
+    expect(() => parseDecklistText("abc\tSon of God\n")).toThrowError(Error);
+    expect(() => parseDecklistText("abc\tSon of God\n")).not.toThrowError(DeckCheckError);
+  });
 });
