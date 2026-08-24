@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { IconType } from "react-icons";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey, HiClipboardList, HiShoppingCart } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey, HiClipboardList, HiShoppingCart, HiPencilAlt } from "react-icons/hi";
 import { GiCrossedSwords, GiAnvil } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
@@ -289,6 +289,16 @@ const TopNav: React.FC = () => {
                         >
                           <HiShoppingCart className="w-4 h-4" />
                           YTG Store
+                        </Link>
+                      )}
+                      {isSuperuser && (
+                        <Link
+                          href="/admin/catalog"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiPencilAlt className="w-4 h-4" />
+                          Manage Catalog
                         </Link>
                       )}
                       {isSuperuser && (
@@ -709,6 +719,16 @@ const TopNav: React.FC = () => {
                       >
                         <HiShoppingCart className="w-4 h-4" />
                         YTG Store
+                      </Link>
+                    )}
+                    {isSuperuser && (
+                      <Link
+                        href="/admin/catalog"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiPencilAlt className="w-4 h-4" />
+                        Manage Catalog
                       </Link>
                     )}
                     {isSuperuser && (

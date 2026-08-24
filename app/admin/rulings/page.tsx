@@ -9,6 +9,7 @@ import { Input } from "../../../components/ui/input";
 import { Badge } from "../../../components/ui/badge";
 import ConfirmationDialog from "../../../components/ui/confirmation-dialog";
 import { CARDS } from "@/lib/cards/lookup";
+import { getCardImageUrl } from "@/app/shared/utils/cardImageUrl";
 import {
   getRulings,
   createRuling,
@@ -335,7 +336,7 @@ function CardPreview({ cardName }: { cardName: string }) {
     );
   }
 
-  const imageUrl = `${process.env.NEXT_PUBLIC_BLOB_BASE_URL}/card-images/${card.imgFile}.jpg`;
+  const imageUrl = getCardImageUrl(card.imgFile);
 
   return (
     <div className="space-y-2">

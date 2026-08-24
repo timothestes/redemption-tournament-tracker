@@ -30,6 +30,7 @@ import UsernameModal from "./UsernameModal";
 import QuickLookModal from "./QuickLookModal";
 import { buildSortInfo, compareDeckCards } from "./cardTypeSort";
 import type { SortableCard } from "@/lib/cards/defaultSort";
+import { getCardImageUrlOrNull } from "@/app/shared/utils/cardImageUrl";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import ShareDeckModal from "../card-search/components/ShareDeckModal";
@@ -1396,14 +1397,6 @@ function FolderItem({
 }
 
 // Deck Card Component (Grid View)
-function getCardImageUrl(cardName: string | null | undefined): string | null {
-  if (!cardName) return null;
-  const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
-  if (!blobBase) return null;
-  const sanitized = cardName.replace(/\//g, "_");
-  return `${blobBase}/card-images/${sanitized}.jpg`;
-}
-
 function DeckCard({
   deck,
   folders,
@@ -1481,10 +1474,10 @@ function DeckCard({
             className="w-full h-full object-cover object-top"
           />
         </div>
-      ) : (getCardImageUrl(deck.preview_card_1) || getCardImageUrl(deck.preview_card_2)) ? (
+      ) : (getCardImageUrlOrNull(deck.preview_card_1) || getCardImageUrlOrNull(deck.preview_card_2)) ? (
         <div className="relative h-32 overflow-hidden rounded-t-lg flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={openCard}>
-          {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" draggable={false} className="h-full object-contain rounded shadow-md" />}
-          {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" draggable={false} className="h-full object-contain rounded shadow-md" />}
+          {getCardImageUrlOrNull(deck.preview_card_1) && <img src={getCardImageUrlOrNull(deck.preview_card_1)!} alt="" draggable={false} className="h-full object-contain rounded shadow-md" />}
+          {getCardImageUrlOrNull(deck.preview_card_2) && <img src={getCardImageUrlOrNull(deck.preview_card_2)!} alt="" draggable={false} className="h-full object-contain rounded shadow-md" />}
           {!selectionMode && <button
             onClick={(e) => { e.stopPropagation(); onEditCover(deck.id!); }}
             className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/30 hover:bg-black/50 text-white/60 hover:text-white transition-colors"
@@ -2081,7 +2074,7 @@ function CoverPickerModal({
           <div className="flex gap-4 justify-center mb-2">
             {([1, 2] as const).map((slot) => {
               const imgFile = slot === 1 ? previewCard1 : previewCard2;
-              const imgUrl = imgFile ? getCardImageUrl(imgFile) : null;
+              const imgUrl = imgFile ? getCardImageUrlOrNull(imgFile) : null;
               const isActive = activeSlot === slot;
               return (
                 <button
@@ -2152,7 +2145,7 @@ function CoverPickerModal({
                   style={{ aspectRatio: "2.5/3.5" }}
                   title={card.card_name}
                 >
-                  <img src={getCardImageUrl(card.card_img_file || "") || ""} alt={card.card_name} className="w-full h-full object-cover" />
+                  <img src={getCardImageUrlOrNull(card.card_img_file || "") || ""} alt={card.card_name} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

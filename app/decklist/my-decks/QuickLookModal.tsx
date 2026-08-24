@@ -4,15 +4,7 @@ import { useEffect, useState } from "react";
 import { loadDeckByIdAction, DeckCardData } from "../actions";
 import { buildSortInfo, compareDeckCards } from "./cardTypeSort";
 import type { SortableCard } from "@/lib/cards/defaultSort";
-
-// Mirror of the helper in client.tsx (kept local to avoid cross-file coupling).
-function getCardImageUrl(cardName: string | null | undefined): string | null {
-  if (!cardName) return null;
-  const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
-  if (!blobBase) return null;
-  const sanitized = cardName.replace(/\//g, "_");
-  return `${blobBase}/card-images/${sanitized}.jpg`;
-}
+import { getCardImageUrlOrNull } from "@/app/shared/utils/cardImageUrl";
 
 // Read-only peek at a deck's contents without opening the full editor.
 export default function QuickLookModal({
@@ -77,7 +69,7 @@ export default function QuickLookModal({
         </h3>
         <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-2">
           {list.map((card) => {
-            const url = getCardImageUrl(card.card_img_file || card.card_name);
+            const url = getCardImageUrlOrNull(card.card_img_file || card.card_name);
             return (
               <div
                 key={`${card.card_name}|${card.card_set ?? ""}`}

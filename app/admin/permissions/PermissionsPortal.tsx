@@ -159,6 +159,14 @@ export default function PermissionsPortal({
         <p className="text-sm text-muted-foreground mt-1">
           Superuser portal — manage app admins and Forge member roles.
         </p>
+        <div className="mt-2">
+          <Link
+            href="/admin/catalog"
+            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            Catalog editor
+          </Link>
+        </div>
       </header>
 
       {error && (

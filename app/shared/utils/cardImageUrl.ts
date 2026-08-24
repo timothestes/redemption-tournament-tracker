@@ -5,11 +5,24 @@
  * getCardImageUrl() that were scattered across the codebase.
  */
 
+import imgVersions from "@/lib/cards/generated/imgVersions.json";
+
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
-/** Strip trailing .jpg / .jpeg extension so we can append a canonical one. */
+// imgFile → replacement version (catalog editor). Keyed on SANITIZED names;
+// non-empty entries append ?v= so a deploy busts every cached replaced image.
+const IMG_VERSIONS = imgVersions as Record<string, number>;
+
+function versionSuffix(sanitized: string): string {
+  const v = IMG_VERSIONS[sanitized];
+  return v ? `?v=${v}` : "";
+}
+
+/** Strip trailing .jpg / .jpeg and map path-breaking slashes, so we can append
+ *  a canonical extension. Slash→underscore matches how the legacy deck-preview
+ *  builders (and the blob store's actual filenames) always treated slashes. */
 export function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
+  return f.replace(/\//g, "_").replace(/\.jpe?g$/i, "");
 }
 
 /**
@@ -22,7 +35,8 @@ export function getCardImageUrl(imgFile: string): string {
   if (!imgFile) return '';
   if (imgFile.startsWith('forge:')) return ''; // opaque Forge ref — resolved via the forge resolver, never the public CDN
   if (imgFile.startsWith('/')) return imgFile;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
+  const sanitized = sanitizeImgFile(imgFile);
+  return `${BLOB_BASE_URL}/card-images/${sanitized}.jpg${versionSuffix(sanitized)}`;
 }
 
 /**
@@ -35,5 +49,6 @@ export function getCardImageUrlOrNull(imgFile: string | null | undefined): strin
   if (imgFile.startsWith('forge:')) return null;
   if (imgFile.startsWith('/')) return imgFile; // local assets & same-origin proxy URLs
   if (!BLOB_BASE_URL) return null;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
+  const sanitized = sanitizeImgFile(imgFile);
+  return `${BLOB_BASE_URL}/card-images/${sanitized}.jpg${versionSuffix(sanitized)}`;
 }
