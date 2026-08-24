@@ -9,6 +9,7 @@ import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import ConfirmationDialog from "../../../components/ui/confirmation-dialog";
 import { CARDS } from "@/lib/cards/lookup";
+import { getCardImageUrl } from "@/app/shared/utils/cardImageUrl";
 import {
   getDuplicateGroups,
   getDuplicateGroupStats,
@@ -91,7 +92,7 @@ const CardLookupContext = createContext<ReadonlyMap<string, CardInfo>>(new Map()
 /* ------------------------------------------------------------------ */
 
 function CardImagePreview({ imgFile, name }: { imgFile: string; name: string }) {
-  const imageUrl = `${process.env.NEXT_PUBLIC_BLOB_BASE_URL}/card-images/${imgFile}.jpg`;
+  const imageUrl = getCardImageUrl(imgFile);
   return (
     <img
       src={imageUrl}
@@ -117,7 +118,7 @@ function CardHoverPreview({
 
   if (!card) return null;
 
-  const imageUrl = `${process.env.NEXT_PUBLIC_BLOB_BASE_URL}/card-images/${card.imgFile}.jpg`;
+  const imageUrl = getCardImageUrl(card.imgFile);
 
   // Position: above the chip if there's room, otherwise below
   const previewWidth = 200;

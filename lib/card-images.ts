@@ -1,9 +1,3 @@
-export function getCardImageUrl(
-  cardName: string | null | undefined,
-): string | null {
-  if (!cardName) return null;
-  const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
-  if (!blobBase) return null;
-  const sanitized = cardName.replace(/\//g, "_");
-  return `${blobBase}/card-images/${sanitized}.jpg`;
-}
+// Thin delegate kept for existing import paths (play lobby / deck picker).
+// Canonical implementation: app/shared/utils/cardImageUrl.ts.
+export { getCardImageUrlOrNull as getCardImageUrl } from "@/app/shared/utils/cardImageUrl";

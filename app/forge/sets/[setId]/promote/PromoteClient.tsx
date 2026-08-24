@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import {
   getPromoteReport, promoteSet, applyRenameFix, getReleaseState,
   auditReleaseImages, setReleaseImageTransform, abortRelease,
-  verifyReleaseLive, migrateReleaseDecks,
+  verifyReleaseLive, migrateReleaseDecks, listReleaseOverrides,
   type PromoteReport, type ReleaseState, type ImageAuditRow, type PromoteIssue,
 } from "@/app/forge/lib/promote";
 import { PRINTER_PRESETS, type ReleaseImageTransform } from "@/app/forge/lib/catalogRow";
@@ -398,10 +398,17 @@ function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abort = async () => {
-    if (!window.confirm(
-      "Abort this release?\n\nUploaded public images are deleted, the manifest is removed, and every card returns to approved. Use this to fix a mistake before anything merges.",
-    )) return;
     setBusy(true);
+    const affected = await listReleaseOverrides(release.id);
+    let message =
+      "Abort this release?\n\nUploaded public images are deleted, the manifest is removed, and every card returns to approved. Use this to fix a mistake before anything merges.";
+    if (affected.length > 0) {
+      message += `\n\n⚠️ ${affected.length} card(s) in this release have catalog-editor overrides (${affected.slice(0, 5).join(", ")}${affected.length > 5 ? ", …" : ""}). If the overlay was already pulled, aborting strands them as codegen-blocking orphans — delete those overrides in /admin/catalog first.`;
+    }
+    if (!window.confirm(message)) {
+      setBusy(false);
+      return;
+    }
     const res = await abortRelease(release.id);
     setBusy(false);
     if (!res.ok) setError(res.error ?? "Abort failed");
