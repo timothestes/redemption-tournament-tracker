@@ -12,6 +12,7 @@
 import { revalidatePath } from "next/cache";
 import { del } from "@vercel/blob";
 import { requireForgeSuperadmin } from "@/app/forge/lib/auth";
+import { requireSuperuser } from "@/app/admin/permissions/lib/auth";
 import { readForgeArt } from "@/app/forge/lib/art";
 import { cardRawText, type DesignCard } from "@/app/forge/lib/designCard";
 import {
@@ -510,9 +511,16 @@ export async function setReleaseImageTransform(
  * Card names in this release that carry catalog-editor overrides. Aborting the
  * release after its overlay has been pulled turns these into codegen-blocking
  * orphans (catalog-editor spec F7) — the abort confirm must say so.
+ *
+ * Gated on requireSuperuser(), not requireForgeSuperadmin(): card_overrides RLS
+ * (migration 092) admits only public.is_superuser() — the single hardcoded app
+ * superuser — by design (spec §4). A forge superadmin who isn't that UID gets a
+ * silently empty read here and won't see this warning; for them the codegen
+ * orphan error (parse-carddata, spec §5.2) is the backstop that names the
+ * recovery path.
  */
 export async function listReleaseOverrides(releaseId: string): Promise<string[]> {
-  const ctx = await requireForgeSuperadmin();
+  const ctx = await requireSuperuser();
   if (!ctx) return [];
   const { data: release } = await ctx.supabase
     .from("forge_public_releases")
