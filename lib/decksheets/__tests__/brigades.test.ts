@@ -19,4 +19,10 @@ describe("normalizeBrigadesFrozen", () => {
       new DeckCheckError("Card Fake Card has an invalid brigade: Chartreuse.")
     );
   });
+
+  it("treats a null/undefined alignment as Python's None key on the Gold branch (frozen parity)", () => {
+    expect(() => normalizeBrigadesFrozen("Gold", undefined as any, "Fake Gold Card")).not.toThrow();
+    expect(normalizeBrigadesFrozen("Gold", undefined as any, "Fake Gold Card")).toEqual(["Good Gold"]);
+    expect(normalizeBrigadesFrozen("Gold", null, "Fake Gold Card")).toEqual(["Good Gold"]);
+  });
 });

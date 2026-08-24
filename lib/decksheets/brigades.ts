@@ -108,7 +108,11 @@ function replaceMultiBrigades(brigadesList: string[]): string[] {
   return result;
 }
 
-function handleGoldBrigade(cardName: string, alignment: string, brigadesList: string[]): string[] {
+function handleGoldBrigade(
+  cardName: string,
+  alignment: string | null | undefined,
+  brigadesList: string[]
+): string[] {
   const goldReplacement: Record<string, string> = {
     Good: "Good Gold",
     Evil: "Evil Gold",
@@ -118,17 +122,21 @@ function handleGoldBrigade(cardName: string, alignment: string, brigadesList: st
         ? "Good Gold"
         : "Evil Gold",
   };
-  // Python's dict also has a `None` key -> "Good Gold", for a Python-`None` alignment.
-  // The only real caller (decklist.py) always passes a string (`.get("alignment", "")`),
-  // never Python None, so that key is unreachable here and intentionally not ported.
-  // Python: `gold_replacement.get(alignment)` has no default, so any alignment string
-  // NOT in {"Good","Evil","Neutral"} yields None, which fails the final validation —
-  // mirrored here with `undefined` rather than silently defaulting to "Good Gold".
-  const replacement = goldReplacement[alignment];
+  // Python's dict also has a `None` key -> "Good Gold", for a Python-`None` alignment;
+  // `gold_replacement.get(alignment)` returns that when alignment IS None. Ported here as
+  // `alignment == null` (covers both `null` and `undefined`, since JS has both while Python
+  // has only `None`). Any other alignment string NOT in {"Good","Evil","Neutral"} still has
+  // no matching key, yielding `undefined`, which fails the final validation — same as Python's
+  // `None` result in that case.
+  const replacement = alignment == null ? "Good Gold" : goldReplacement[alignment];
   return replaceBrigades(brigadesList, "Gold", replacement as string);
 }
 
-export function normalizeBrigadesFrozen(brigade: string, alignment: string, cardName: string): string[] {
+export function normalizeBrigadesFrozen(
+  brigade: string,
+  alignment: string | null | undefined,
+  cardName: string
+): string[] {
   if (!brigade) {
     return [];
   }
@@ -140,10 +148,12 @@ export function normalizeBrigadesFrozen(brigade: string, alignment: string, card
       Evil: "Evil Multi",
       Neutral: "Good Multi",
     };
+    // multi_replacements has no `None` key in Python, so a None/absent alignment falls
+    // through to `undefined` here exactly as `.get(None)` falls through to `None` there.
     const replacement =
       cardName in multiReplacements
         ? multiReplacements[cardName]
-        : alignment in multiReplacements
+        : typeof alignment === "string" && alignment in multiReplacements
           ? multiReplacements[alignment]
           : undefined;
     brigadesList = replaceBrigades(brigadesList, "Multi", replacement as string);
