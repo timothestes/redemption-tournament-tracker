@@ -41,6 +41,17 @@ def gen_counts():
         json.dump(out, f, indent=1)
     return out
 
+def gen_sheet_sort(cards):
+    from src.utilities.sort import sort_cards
+    cards_dict = {}
+    for c in cards:
+        cards_dict[c["name"]] = {"type": c.get("type", ""), "alignment": c.get("alignment", ""),
+                                 "raw_brigade": c.get("brigade", "")}
+    ordered = sort_cards(cards_dict, sort_by=["type", "alignment", "brigade", "name"])
+    with open(os.path.join(OUT_DIR, "sheet_sort.json"), "w", encoding="utf-8") as f:
+        json.dump({"input": cards_dict, "expected_order": [name for name, _ in ordered]},
+                  f, ensure_ascii=False, indent=1)
+
 if __name__ == "__main__":
     cards = load_jsonl()
     gen_brigades(cards)
@@ -49,3 +60,5 @@ if __name__ == "__main__":
     print(f"counts.json: {len(counts)} decks")
     for fname, vals in counts.items():
         print(f"  {fname}: {vals}")
+    gen_sheet_sort(cards)
+    print(f"sheet_sort.json: {len(cards)} cards")
