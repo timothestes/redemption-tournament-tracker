@@ -31,7 +31,7 @@ describe("parseDecklistText", () => {
   });
 
   it("normalizes curly apostrophes in names", () => {
-    const deck = parseDecklistText("1\tKing's Pomp\n");
+    const deck = parseDecklistText("1\tKing’s Pomp\n");
     expect(deck.main[0].name).toBe("King's Pomp");
   });
 
@@ -44,11 +44,11 @@ describe("parseDecklistText", () => {
 
 describe("normalizeApostrophes", () => {
   it("replaces U+2019 only", () => {
-    expect(normalizeApostrophes("a'b'c")).toBe("a'b'c");
+    expect(normalizeApostrophes("a’b'c")).toBe("a'b'c");
   });
 
   it("replaces all occurrences of U+2019 (regression for multiple apostrophes)", () => {
-    expect(normalizeApostrophes("Joseph's Brothers' Scheme")).toBe("Joseph's Brothers' Scheme");
+    expect(normalizeApostrophes("Joseph’s Brothers’ Scheme")).toBe("Joseph's Brothers' Scheme");
   });
 });
 
