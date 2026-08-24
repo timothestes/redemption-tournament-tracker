@@ -6,7 +6,7 @@ import type { ParsedDeck, DeckEntry } from "./types";
  * Parity with Python's normalize_apostrophes.
  */
 export function normalizeApostrophes(text: string): string {
-  return text.replaceAll("’", "’");
+  return text.replaceAll("’", "'");
 }
 
 /**
