@@ -1,0 +1,52 @@
+3	Abednego (Azariah)
+3	Arioch
+3	Chaldeans (Pr)
+1	Abomination of Desolation
+3	King Darius, the Mede
+3	Ashpenaz
+3	Belshazzar
+3	Gabriel (Ki)
+1	Persian Presidents
+3	Abiathar (1st Print - K)
+3	Abraham (CoW)
+3	Aaron (Pi)
+3	Children [RR2]
+3	Adam
+3	Achaicus
+3	Adino (Ki)
+3	Ahimaaz (Pi)
+3	Eli, the Judge [RR2]
+3	Abigail (RoA)
+3	Abijah, son of Samuel
+3	Angel at Bethesda
+3	Abiram
+3	Adonijah
+3	Abihu ( C)
+3	Abaddon, the Destroyer (RoJ)
+3	Absalom (Ki)
+1	Babylonian Banquet Hall
+3	Lost Soul (Daniel 9:10) (Promo)
+3	Lost Soul (John 8:3-4) (GoC)
+3	Lost Soul (Mark 1:40) (GoC)
+3	Lost Soul (Proverbs 21:16) (LoC)
+3	Angel at Jerusalem (Pi)
+3	Ananias
+3	Achan (I)
+3	Ahiman, son of Anak
+1	Amasa
+Reserve:
+1	Abednego (Azariah)
+1	Arioch
+1	Chaldeans (Pr)
+1	King Darius, the Mede
+1	Ashpenaz
+1	Belshazzar
+1	Gabriel (Ki)
+1	Abiathar (1st Print - K)
+1	Abraham (CoW)
+1	Aaron (Pi)
+1	Children [RR2]
+1	Adam
+1	Achaicus
+1	Adino (Ki)
+1	Ahimaaz (Pi)

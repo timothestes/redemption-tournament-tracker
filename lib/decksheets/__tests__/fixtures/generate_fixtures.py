@@ -28,7 +28,24 @@ def gen_brigades(cards):
     with open(os.path.join(OUT_DIR, "brigades.json"), "w", encoding="utf-8") as f:
         json.dump(rows, f, ensure_ascii=False, indent=1)
 
+def gen_counts():
+    from src.utilities.decklist import Decklist
+    out = {}
+    deck_dir = os.path.join(OUT_DIR, "decks")
+    for fname in sorted(os.listdir(deck_dir)):
+        if not fname.endswith(".txt"):
+            continue
+        d = Decklist(os.path.join(deck_dir, fname), deck_type="type_2", bypass_assertions=True)
+        out[fname] = {"m_count": d.calculate_m_count(), **d.calculate_aod_breakdown()}
+    with open(os.path.join(OUT_DIR, "counts.json"), "w") as f:
+        json.dump(out, f, indent=1)
+    return out
+
 if __name__ == "__main__":
     cards = load_jsonl()
     gen_brigades(cards)
     print(f"brigades.json: {len(cards)} rows")
+    counts = gen_counts()
+    print(f"counts.json: {len(counts)} decks")
+    for fname, vals in counts.items():
+        print(f"  {fname}: {vals}")
