@@ -1,4 +1,13 @@
 {
-  "overrides": [],
+  "overrides": [
+    {
+      "name": "Captain of the Host (Roots)",
+      "set": "RR",
+      "fields": {
+        "identifier": "Angel"
+      },
+      "note": "Not a prophet"
+    }
+  ],
   "imageVersions": {}
 }
