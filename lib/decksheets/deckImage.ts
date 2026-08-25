@@ -20,6 +20,9 @@
  *   rows        = ceil(numCards / cardsPerRow)
  *   width       = cardWidth * cardsPerRow                // NO margin, ever
  *   height      = cardHeight*rows - cardOverlap*(rows-1)
+ * `cardsPerRow` also carries `_generate_deck_image`'s defensive
+ * `if cards_per_row == 0: cards_per_row = 10` fallback (a falsy
+ * `nCardColumns` on a non-type_2 deck resolves to 10, not a 0-width canvas).
  *
  * Combine math (transcribed from `_combine_deck_images`):
  *   - reserve exists:
@@ -103,11 +106,21 @@ function escapeXml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/**
+ * Parity with Python's f-string float formatting: `f"{0.0}"` -> "0.0",
+ * `f"{4.0}"` -> "4.0" (Python floats always keep a decimal point), while
+ * JS template interpolation on a whole number (`${0}`) drops it -> "0".
+ * Non-whole values format the same in both languages (e.g. "3.42").
+ */
+export function formatCountValue(v: number): string {
+  return Number.isInteger(v) ? v.toFixed(1) : String(v);
+}
+
 /** Parity with Python: `"  |  ".join(["M Count: X", "AoD Count: Y"])`, either part optional. */
 function buildCountText(mCountValue: number | null, aodCountValue: number | null): string | null {
   const parts: string[] = [];
-  if (mCountValue !== null) parts.push(`M Count: ${mCountValue}`);
-  if (aodCountValue !== null) parts.push(`AoD Count: ${aodCountValue}`);
+  if (mCountValue !== null) parts.push(`M Count: ${formatCountValue(mCountValue)}`);
+  if (aodCountValue !== null) parts.push(`AoD Count: ${formatCountValue(aodCountValue)}`);
   return parts.length > 0 ? parts.join("  |  ") : null;
 }
 
@@ -194,7 +207,8 @@ export async function generateDeckImage(opts: GenerateDeckImageOptions): Promise
     fetchImage = defaultFetchImage,
   } = opts;
 
-  const cardsPerRow = deckType === "type_2" ? 15 : nCardColumns;
+  // Parity with `_generate_deck_image`'s `if cards_per_row == 0: cards_per_row = 10` fallback.
+  const cardsPerRow = (deckType === "type_2" ? 15 : nCardColumns) || 10;
 
   // Dedupe imgFiles across both sections so a card appearing in main and
   // reserve (or repeated by quantity) is only fetched once.

@@ -2,12 +2,23 @@ import { describe, it, expect } from "vitest";
 import sharp from "sharp";
 import { parseDecklistText } from "../parse";
 import { resolveDeck } from "../resolve";
-import { generateDeckImage } from "../deckImage";
+import { generateDeckImage, formatCountValue } from "../deckImage";
 import fs from "fs";
 import path from "path";
 
 const fakeCard = () =>
   sharp({ create: { width: 344, height: 512, channels: 3, background: "#888" } }).jpeg().toBuffer();
+
+describe("formatCountValue", () => {
+  it.each([
+    [0, "0.0"],
+    [4, "4.0"],
+    [3.42, "3.42"],
+    [2.5, "2.5"],
+  ])("formats %p as Python's f-string float would: %p", (input, expected) => {
+    expect(formatCountValue(input)).toBe(expected);
+  });
+});
 
 describe("generateDeckImage", () => {
   it("renders a WebP grid; 10-col layout for type_1", async () => {
