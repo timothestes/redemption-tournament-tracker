@@ -143,7 +143,7 @@ export default function GenerateDeckList() {
     try {
       const isLegal = await checkLegality(decklist, deckType, loadedDeckId);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/generate-decklist`, {
+      const response = await fetch("/api/v1/generate-decklist", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -192,7 +192,7 @@ export default function GenerateDeckList() {
     try {
       const isLegal = await checkLegality(decklist, deckType, loadedDeckId);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/generate-decklist-image`, {
+      const response = await fetch("/api/v1/generate-decklist-image", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
