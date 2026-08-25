@@ -41,6 +41,24 @@ def gen_counts():
         json.dump(out, f, indent=1)
     return out
 
+def gen_clean_card_name(cards):
+    try:
+        from src.utilities.text_to_pdf import clean_card_name
+    except ImportError as e:
+        print(
+            f"text_to_pdf import failed ({e}); pip install reportlab==4.4.0 "
+            "PyPDF2==3.0.1 python-dotenv==1.0.1 into your venv first.",
+            file=sys.stderr,
+        )
+        raise
+    rows = []
+    for c in cards:
+        rows.append({"name": c["name"], "type": c.get("type", ""),
+                     "reference": c.get("reference", ""), "identifier": c.get("identifier", ""),
+                     "expected": clean_card_name(c["name"], c)})
+    with open(os.path.join(OUT_DIR, "clean_card_name.json"), "w", encoding="utf-8") as f:
+        json.dump(rows, f, ensure_ascii=False, indent=1)
+
 def gen_sheet_sort(cards):
     from src.utilities.sort import sort_cards
     cards_dict = {}
@@ -62,3 +80,5 @@ if __name__ == "__main__":
         print(f"  {fname}: {vals}")
     gen_sheet_sort(cards)
     print(f"sheet_sort.json: {len(cards)} cards")
+    gen_clean_card_name(cards)
+    print(f"clean_card_name.json: {len(cards)} rows")

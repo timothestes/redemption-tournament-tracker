@@ -46,6 +46,8 @@ const nextConfig = {
     '/threshingfloor/outline': ['./app/threshingfloor/outline.html'],
     '/threshingfloor/episodes/[episode]': ['./app/threshingfloor/outline.html'],
     '/api/decksheets-spike': ['./assets/decksheets/fonts/**'],
+    '/api/v1/generate-decklist': ['./assets/decksheets/**'],
+    '/api/v1/generate-decklist-image': ['./assets/decksheets/fonts/**'],
   },
 };
 
