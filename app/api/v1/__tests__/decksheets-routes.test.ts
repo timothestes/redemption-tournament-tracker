@@ -59,6 +59,14 @@ describe("contract parity", () => {
     });
   });
 
+  it("malformed quantity line → 500 {status:'error', message:'something unexpected happened'}", async () => {
+    // parseDecklistText throws a plain Error (not DeckCheckError) here, so
+    // this exercises the generic catch-all 500 path, not the 400 DeckCheckError path.
+    const res = await aodPost(req({ decklist: "abc\tShield of Faith", decklist_type: "type_1" }));
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ status: "error", message: "something unexpected happened" });
+  });
+
   it("aod success → 200 with aod_count + createdAt", async () => {
     const res = await aodPost(req({ decklist: DECK_40, decklist_type: "type_1" }));
     expect(res.status).toBe(200);

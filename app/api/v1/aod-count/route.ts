@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { rateLimitForUnauthIp, extractClientIp } from "@/lib/api/rateLimit";
+import { guard } from "@/lib/decksheets/routeGuard";
 import { DeckCheckError } from "@/lib/decksheets/errors";
 import { parseDecklistText } from "@/lib/decksheets/parse";
 import { resolveDeck } from "@/lib/decksheets/resolve";
@@ -7,15 +7,6 @@ import { enforceLimits } from "@/lib/decksheets/limits";
 import { calculateAodBreakdown } from "@/lib/decksheets/counts";
 
 export const runtime = "nodejs";
-
-async function guard(req: Request): Promise<NextResponse | null> {
-  try {
-    const rl = await rateLimitForUnauthIp(extractClientIp(req));
-    if (rl.success === false)
-      return NextResponse.json({ status: "error", message: "Too many requests. Please try again shortly." }, { status: 429 });
-  } catch { /* fail open: limiter must never 500 (join/actions.ts pattern) */ }
-  return null;
-}
 
 export async function POST(req: Request) {
   const limited = await guard(req);
