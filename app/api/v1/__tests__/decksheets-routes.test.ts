@@ -91,6 +91,12 @@ describe("contract parity", () => {
     expect(body.data.filename).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it("PDF unknown decklist_type + valid deck → 500 {status:'error', message:'something unexpected happened'} (Flask's unbound template_path crash)", async () => {
+    const res = await pdfPost(req({ decklist: DECK_40, decklist_type: "type_9" }));
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ status: "error", message: "something unexpected happened" });
+  });
+
   it("rate-limited → 429 {status:'error', message}", async () => {
     mockRateLimit.mockResolvedValue({ success: false, limit: 30, remaining: 0, reset: 0 });
     const res = await aodPost(req({ decklist: DECK_40, decklist_type: "type_1" }));

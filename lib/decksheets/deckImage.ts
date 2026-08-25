@@ -196,6 +196,30 @@ async function buildSeparatorStrip(
   return renderSvgToPng(svg);
 }
 
+/**
+ * Port of the reserve branch's oversized count-text overlay
+ * (text_to_webp.py `_combine_deck_images`, reserve branch, lines ~416-440):
+ * `font_size = int(line_height * 2.1)` (105 for the 50px bar) is bigger than
+ * the bar itself, so PIL draws the text directly on the FULL combined canvas
+ * -- not confined to the bar -- vertically centered on the bar's midline
+ * (`line_y_start = main_height + line_height // 2`) using the rendered
+ * text's own ink-bbox height:
+ *   text_y = line_y_start - text_height // 2
+ *   draw.text((20, text_y), text, fill="white", font=font)
+ * The oversized glyphs spill out above/below the bar into the card grid.
+ * A strip exactly `height` tall can't hold a `fontSize` this much larger
+ * than it without clipping, so this renders the text alone on a transparent
+ * canvas sized to the full glyph extent (fontSize*1.4, matching DejaVu Sans
+ * Bold's ascent+descent), and the caller composites it at the y that
+ * centers it on the bar's midline -- reproducing Python's overlap-the-grid
+ * behavior instead of clipping the text to the bar.
+ */
+async function buildSeparatorText(width: number, text: string, fontSize: number): Promise<Buffer> {
+  const stripHeight = Math.ceil(fontSize * 1.4);
+  const textEl = `<text x="20" y="${stripHeight / 2}" dominant-baseline="central" text-anchor="start" font-family="DejaVu Sans" font-weight="bold" font-size="${fontSize}" fill="#ffffff">${escapeXml(text)}</text>`;
+  return renderSvgToPng(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${stripHeight}">${textEl}</svg>`);
+}
+
 export async function generateDeckImage(opts: GenerateDeckImageOptions): Promise<Buffer> {
   const {
     deckType,
@@ -257,9 +281,17 @@ export async function generateDeckImage(opts: GenerateDeckImageOptions): Promise
   } else {
     combinedWidth = Math.max(mainImage.width, reserveImage.width);
     combinedHeight = mainImage.height + reserveImage.height + LINE_HEIGHT + PADDING;
-    const fontSize = Math.floor(LINE_HEIGHT * 2.1);
-    const strip = await buildSeparatorStrip(combinedWidth, LINE_HEIGHT, countText, fontSize);
-    overlays.push({ input: strip, left: 0, top: mainImage.height });
+    // Bar is plain (no text baked in) -- the oversized text is a separate
+    // canvas-anchored overlay below, per buildSeparatorText's doc comment.
+    const bar = await buildSeparatorStrip(combinedWidth, LINE_HEIGHT, null, 0);
+    overlays.push({ input: bar, left: 0, top: mainImage.height });
+    if (countText !== null) {
+      const fontSize = Math.floor(LINE_HEIGHT * 2.1);
+      const textStripHeight = Math.ceil(fontSize * 1.4);
+      const text = await buildSeparatorText(combinedWidth, countText, fontSize);
+      const lineYStart = mainImage.height + LINE_HEIGHT / 2;
+      overlays.push({ input: text, left: 0, top: Math.round(lineYStart - textStripHeight / 2) });
+    }
     overlays.push({ input: reserveImage.buffer, left: 0, top: mainImage.height + LINE_HEIGHT + PADDING });
   }
 

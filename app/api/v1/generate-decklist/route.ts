@@ -19,11 +19,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid request" }, { status: 400 });
   try {
     const deck = resolveDeck(parseDecklistText(String(data.decklist)));
-    enforceLimits(deck, String(data.decklist_type), false);
+    const decklistType = String(data.decklist_type);
+    enforceLimits(deck, decklistType, false);
+    if (decklistType !== "type_1" && decklistType !== "paragon" && decklistType !== "type_2") {
+      // Flask's make_pdf leaves `template_path` unbound for any other decklist_type
+      // (text_to_pdf.py:387-392) -> NameError -> its generic except -> 500 with this
+      // exact envelope. The deck-size assertions above already ran, so an invalid
+      // deck combined with an unknown type still 400s on the size error, matching
+      // Flask's execution order (assertions happen before make_pdf's template lookup).
+      throw new Error(`Unsupported decklist_type: ${decklistType}`);
+    }
     const mCountValue = data.m_count ? calculateMCount(deck.main) : null;
     const aodCountValue = data.aod_count ? calculateAodBreakdown(deck.main).aod_count : null;
     const bytes = await generateDeckCheckPdf({
-      deckType: String(data.decklist_type), deck, name: String(data.name ?? ""),
+      deckType: decklistType, deck, name: String(data.name ?? ""),
       event: String(data.event ?? ""), showAlignment: Boolean(data.show_alignment),
       mCountValue, aodCountValue, isLegal: data.is_legal ?? null,
     });
