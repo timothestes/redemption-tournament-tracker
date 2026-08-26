@@ -28,10 +28,12 @@ export default function PromoteClient({ setId, setName, setStatus, initialReleas
   const router = useRouter();
   const [release, setRelease] = useState<ReleaseState | null>(initialRelease);
   const [newWave, setNewWave] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const refresh = async () => {
+  const refresh = async (warning?: string) => {
     setRelease(await getReleaseState(setId));
     setNewWave(false);
+    setNotice(warning ?? null);
     router.refresh();
   };
 
@@ -41,6 +43,7 @@ export default function PromoteClient({ setId, setName, setStatus, initialReleas
   return (
     <div className="space-y-4">
       <StageHeader status={newWave ? null : (release?.status ?? null)} />
+      {notice && <p className="text-sm text-amber-600 dark:text-amber-400">{notice}</p>}
       {release === null || (done && newWave) ? (
         <PreflightSection
           setId={setId}
@@ -394,7 +397,7 @@ function ReleaseSection({ release, onChanged }: { release: ReleaseState; onChang
   );
 }
 
-function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged: () => Promise<void> }) {
+function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged: (warning?: string) => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abort = async () => {
@@ -412,7 +415,7 @@ function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged:
     const res = await abortRelease(release.id);
     setBusy(false);
     if (!res.ok) setError(res.error ?? "Abort failed");
-    else await onChanged();
+    else await onChanged(res.warning);
   };
   return (
     <div className="flex items-center gap-2">
