@@ -1,0 +1,20 @@
+{
+ "t1_multi_brigade.txt": {
+  "m_count": 6.13,
+  "aod_count": 2.5,
+  "soul_aod_count": 2.65,
+  "whiff_percentage": 25.7
+ },
+ "t2_with_reserve.txt": {
+  "m_count": 6.17,
+  "aod_count": 1.6,
+  "soul_aod_count": 1.8,
+  "whiff_percentage": 38.05
+ },
+ "tiny_8.txt": {
+  "m_count": 8.0,
+  "aod_count": 0.0,
+  "soul_aod_count": 0.0,
+  "whiff_percentage": 0.0
+ }
+}

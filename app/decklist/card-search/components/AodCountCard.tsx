@@ -86,7 +86,7 @@ export default function AodCountCard({ deck, deckType }: AodCountCardProps) {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/aod-count`,
+        "/api/v1/aod-count",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Generate parity fixtures from the Python API. Run from the API repo root:
+   cd /Users/timestes/projects/redemption-tournament-api && \
+   PYTHONPATH=. python3 <tracker>/lib/decksheets/__tests__/fixtures/generate_fixtures.py
+Reads only; never touches the Lackey-wired generators."""
+import json, os, sys
+
+OUT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+from src.utilities.brigades import normalize_brigade_field
+
+def load_jsonl():
+    cards = []
+    with open("assets/carddata/carddata.jsonl", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                cards.append(json.loads(line))
+    return cards
+
+def gen_brigades(cards):
+    rows = []
+    for c in cards:
+        rows.append({
+            "name": c["name"], "brigade": c.get("brigade", ""),
+            "alignment": c.get("alignment", ""),
+            "expected": normalize_brigade_field(c.get("brigade", ""), c.get("alignment", ""), c["name"]),
+        })
+    with open(os.path.join(OUT_DIR, "brigades.json"), "w", encoding="utf-8") as f:
+        json.dump(rows, f, ensure_ascii=False, indent=1)
+
+def gen_counts():
+    from src.utilities.decklist import Decklist
+    out = {}
+    deck_dir = os.path.join(OUT_DIR, "decks")
+    for fname in sorted(os.listdir(deck_dir)):
+        if not fname.endswith(".txt"):
+            continue
+        d = Decklist(os.path.join(deck_dir, fname), deck_type="type_2", bypass_assertions=True)
+        out[fname] = {"m_count": d.calculate_m_count(), **d.calculate_aod_breakdown()}
+    with open(os.path.join(OUT_DIR, "counts.json"), "w") as f:
+        json.dump(out, f, indent=1)
+    return out
+
+def gen_clean_card_name(cards):
+    try:
+        from src.utilities.text_to_pdf import clean_card_name
+    except ImportError as e:
+        print(
+            f"text_to_pdf import failed ({e}); pip install reportlab==4.4.0 "
+            "PyPDF2==3.0.1 python-dotenv==1.0.1 into your venv first.",
+            file=sys.stderr,
+        )
+        raise
+    rows = []
+    for c in cards:
+        rows.append({"name": c["name"], "type": c.get("type", ""),
+                     "reference": c.get("reference", ""), "identifier": c.get("identifier", ""),
+                     "expected": clean_card_name(c["name"], c)})
+    with open(os.path.join(OUT_DIR, "clean_card_name.json"), "w", encoding="utf-8") as f:
+        json.dump(rows, f, ensure_ascii=False, indent=1)
+
+def gen_sheet_sort(cards):
+    from src.utilities.sort import sort_cards
+    cards_dict = {}
+    for c in cards:
+        cards_dict[c["name"]] = {"type": c.get("type", ""), "alignment": c.get("alignment", ""),
+                                 "raw_brigade": c.get("brigade", "")}
+    ordered = sort_cards(cards_dict, sort_by=["type", "alignment", "brigade", "name"])
+    with open(os.path.join(OUT_DIR, "sheet_sort.json"), "w", encoding="utf-8") as f:
+        json.dump({"input": cards_dict, "expected_order": [name for name, _ in ordered]},
+                  f, ensure_ascii=False, indent=1)
+
+if __name__ == "__main__":
+    cards = load_jsonl()
+    gen_brigades(cards)
+    print(f"brigades.json: {len(cards)} rows")
+    counts = gen_counts()
+    print(f"counts.json: {len(counts)} decks")
+    for fname, vals in counts.items():
+        print(f"  {fname}: {vals}")
+    gen_sheet_sort(cards)
+    print(f"sheet_sort.json: {len(cards)} cards")
+    gen_clean_card_name(cards)
+    print(f"clean_card_name.json: {len(cards)} rows")
