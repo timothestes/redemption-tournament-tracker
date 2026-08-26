@@ -44,6 +44,16 @@ function missingReleasedKeys(committedRows, fetchedRows) {
 async function main() {
   const mode = decideMode(process.env);
 
+  if (
+    process.env.CATALOG_PREBUILD !== undefined &&
+    process.env.CATALOG_PREBUILD !== '0' &&
+    process.env.CATALOG_PREBUILD !== '1'
+  ) {
+    console.warn(
+      `⚠️  prebuild-catalog: CATALOG_PREBUILD=${JSON.stringify(process.env.CATALOG_PREBUILD)} is not "0" or "1" — ignoring it`
+    );
+  }
+
   if (mode === 'skip' || mode === 'noop') {
     console.log(`⏭️  prebuild-catalog: ${mode} — using committed scripts/data/forge-released.json`);
     process.exit(0);
@@ -73,6 +83,10 @@ async function main() {
     console.error(
       `❌ prebuild-catalog: monotonicity guard failed — fetched overlay is missing already-released ` +
         `card(s) present in the committed snapshot: ${missing.join(', ')}`
+    );
+    console.error(
+      'If a release was intentionally aborted, refresh the committed snapshot (make pull-forge-releases ' +
+        '+ commit) or set CATALOG_PREBUILD=0 to deploy the committed catalog.'
     );
     process.exit(1);
   }

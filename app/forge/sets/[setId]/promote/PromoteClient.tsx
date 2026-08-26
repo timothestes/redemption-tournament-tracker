@@ -377,7 +377,7 @@ function PreflightSection({ setId, setName, setStatus, identityLocked, defaultSe
 // Post-promote stages
 // ---------------------------------------------------------------------------
 
-function ReleaseSection({ release, onChanged }: { release: ReleaseState; onChanged: () => Promise<void> }) {
+function ReleaseSection({ release, onChanged }: { release: ReleaseState; onChanged: (warning?: string) => Promise<void> }) {
   return (
     <div className="space-y-4">
       <div className={panel}>
@@ -406,7 +406,7 @@ function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged:
     let message =
       "Abort this release?\n\nUploaded public images are deleted, the manifest is removed, and every card returns to approved. Use this to fix a mistake before anything merges.";
     if (affected.length > 0) {
-      message += `\n\n⚠️ ${affected.length} card(s) in this release have catalog-editor overrides (${affected.slice(0, 5).join(", ")}${affected.length > 5 ? ", …" : ""}). If the overlay was already pulled, aborting strands them as codegen-blocking orphans — delete those overrides in /admin/catalog first.`;
+      message += `\n\n⚠️ ${affected.length} card(s) in this release have catalog-editor overrides (${affected.slice(0, 5).join(", ")}${affected.length > 5 ? ", …" : ""}). If the overlay was already pulled, aborting strands them as codegen-blocking orphans — delete those overrides in /admin/catalog and land a \`make pull-card-overrides\` refresh first (or be ready to deploy with CATALOG_PREBUILD=0).`;
     }
     if (!window.confirm(message)) {
       setBusy(false);
@@ -458,7 +458,7 @@ function transformKey(t: ReleaseImageTransform | null): string {
   return "crop";
 }
 
-function ImageStep({ release, onChanged }: { release: ReleaseState; onChanged: () => Promise<void> }) {
+function ImageStep({ release, onChanged }: { release: ReleaseState; onChanged: (warning?: string) => Promise<void> }) {
   const [audit, setAudit] = useState<ImageAuditRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -615,7 +615,7 @@ function ImageStep({ release, onChanged }: { release: ReleaseState; onChanged: (
   );
 }
 
-function MergeStep({ release, onChanged }: { release: ReleaseState; onChanged: () => Promise<void> }) {
+function MergeStep({ release, onChanged }: { release: ReleaseState; onChanged: (warning?: string) => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -666,7 +666,16 @@ function MergeStep({ release, onChanged }: { release: ReleaseState; onChanged: (
         {deployError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{deployError}</p>}
         {deployed && (
           <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">
-            Build triggered — watch it in the Vercel dashboard, then Verify below once it’s live.
+            Build triggered — watch it in the{" "}
+            <a
+              href="https://vercel.com/land-of-redemptions-projects/redemption-tournament-tracker"
+              target="_blank"
+              rel="noreferrer"
+              className="underline hover:text-foreground"
+            >
+              Vercel dashboard
+            </a>
+            , then Verify below once it’s live.
           </p>
         )}
         <p className="mt-2 text-xs text-muted-foreground">Any ordinary merge to main also picks this release up.</p>
