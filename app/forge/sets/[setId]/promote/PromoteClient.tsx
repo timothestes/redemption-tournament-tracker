@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import {
   getPromoteReport, promoteSet, applyRenameFix, getReleaseState,
   auditReleaseImages, setReleaseImageTransform, abortRelease,
-  verifyReleaseLive, migrateReleaseDecks, listReleaseOverrides,
+  verifyReleaseLive, migrateReleaseDecks, listReleaseOverrides, deployCatalog,
   type PromoteReport, type ReleaseState, type ImageAuditRow, type PromoteIssue,
 } from "@/app/forge/lib/promote";
 import { PRINTER_PRESETS, type ReleaseImageTransform } from "@/app/forge/lib/catalogRow";
@@ -28,10 +28,12 @@ export default function PromoteClient({ setId, setName, setStatus, initialReleas
   const router = useRouter();
   const [release, setRelease] = useState<ReleaseState | null>(initialRelease);
   const [newWave, setNewWave] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const refresh = async () => {
+  const refresh = async (warning?: string) => {
     setRelease(await getReleaseState(setId));
     setNewWave(false);
+    setNotice(warning ?? null);
     router.refresh();
   };
 
@@ -41,6 +43,7 @@ export default function PromoteClient({ setId, setName, setStatus, initialReleas
   return (
     <div className="space-y-4">
       <StageHeader status={newWave ? null : (release?.status ?? null)} />
+      {notice && <p className="text-sm text-amber-600 dark:text-amber-400">{notice}</p>}
       {release === null || (done && newWave) ? (
         <PreflightSection
           setId={setId}
@@ -374,7 +377,7 @@ function PreflightSection({ setId, setName, setStatus, identityLocked, defaultSe
 // Post-promote stages
 // ---------------------------------------------------------------------------
 
-function ReleaseSection({ release, onChanged }: { release: ReleaseState; onChanged: () => Promise<void> }) {
+function ReleaseSection({ release, onChanged }: { release: ReleaseState; onChanged: (warning?: string) => Promise<void> }) {
   return (
     <div className="space-y-4">
       <div className={panel}>
@@ -394,7 +397,7 @@ function ReleaseSection({ release, onChanged }: { release: ReleaseState; onChang
   );
 }
 
-function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged: () => Promise<void> }) {
+function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged: (warning?: string) => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abort = async () => {
@@ -403,7 +406,7 @@ function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged:
     let message =
       "Abort this release?\n\nUploaded public images are deleted, the manifest is removed, and every card returns to approved. Use this to fix a mistake before anything merges.";
     if (affected.length > 0) {
-      message += `\n\n⚠️ ${affected.length} card(s) in this release have catalog-editor overrides (${affected.slice(0, 5).join(", ")}${affected.length > 5 ? ", …" : ""}). If the overlay was already pulled, aborting strands them as codegen-blocking orphans — delete those overrides in /admin/catalog first.`;
+      message += `\n\n⚠️ ${affected.length} card(s) in this release have catalog-editor overrides (${affected.slice(0, 5).join(", ")}${affected.length > 5 ? ", …" : ""}). If the overlay was already pulled, aborting strands them as codegen-blocking orphans — delete those overrides in /admin/catalog and land a \`make pull-card-overrides\` refresh first (or be ready to deploy with CATALOG_PREBUILD=0).`;
     }
     if (!window.confirm(message)) {
       setBusy(false);
@@ -412,7 +415,7 @@ function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged:
     const res = await abortRelease(release.id);
     setBusy(false);
     if (!res.ok) setError(res.error ?? "Abort failed");
-    else await onChanged();
+    else await onChanged(res.warning);
   };
   return (
     <div className="flex items-center gap-2">
@@ -455,7 +458,7 @@ function transformKey(t: ReleaseImageTransform | null): string {
   return "crop";
 }
 
-function ImageStep({ release, onChanged }: { release: ReleaseState; onChanged: () => Promise<void> }) {
+function ImageStep({ release, onChanged }: { release: ReleaseState; onChanged: (warning?: string) => Promise<void> }) {
   const [audit, setAudit] = useState<ImageAuditRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -612,10 +615,29 @@ function ImageStep({ release, onChanged }: { release: ReleaseState; onChanged: (
   );
 }
 
-function MergeStep({ release, onChanged }: { release: ReleaseState; onChanged: () => Promise<void> }) {
+function MergeStep({ release, onChanged }: { release: ReleaseState; onChanged: (warning?: string) => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const [deployBusy, setDeployBusy] = useState(false);
+  const [deployError, setDeployError] = useState<string | null>(null);
+  const [deployed, setDeployed] = useState(false);
+
+  const deploy = async () => {
+    setDeployBusy(true);
+    setDeployError(null);
+    setDeployed(false);
+    try {
+      const res = await deployCatalog();
+      if (res.ok) setDeployed(true);
+      else setDeployError(res.error ?? "Deploy failed");
+    } catch (e) {
+      setDeployError(e instanceof Error ? e.message : "Deploy failed");
+    } finally {
+      setDeployBusy(false);
+    }
+  };
 
   const verify = async () => {
     setBusy(true);
@@ -637,27 +659,32 @@ function MergeStep({ release, onChanged }: { release: ReleaseState; onChanged: (
   return (
     <div className="space-y-4">
       <div className={panel}>
-        <h3 className="text-sm font-semibold">Merge the catalog artifacts</h3>
-        <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm">
-          <li>
-            <span className="font-medium">Tracker:</span> from the main checkout run{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">make pull-forge-releases</code>, commit the
-            overlay + regenerated catalog, open a PR, merge, and let Vercel deploy.
-          </li>
-          <li>
-            <span className="font-medium">API repo:</span>{" "}
-            <a className="underline underline-offset-2 hover:text-foreground" href={`/forge/api/promote/bundle/${release.id}`}>
-              download the release bundle
-            </a>{" "}
-            and follow its README (append the jsonl, drop in the webps, commit, deploy).
-          </li>
-        </ol>
+        <h3 className="text-sm font-semibold">Deploy the catalog</h3>
+        <button type="button" className={`${btn} mt-2`} onClick={deploy} disabled={deployBusy}>
+          {deployBusy ? "Deploying…" : "Deploy catalog"}
+        </button>
+        {deployError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{deployError}</p>}
+        {deployed && (
+          <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">
+            Build triggered — watch it in the{" "}
+            <a
+              href="https://vercel.com/land-of-redemptions-projects/redemption-tournament-tracker"
+              target="_blank"
+              rel="noreferrer"
+              className="underline hover:text-foreground"
+            >
+              Vercel dashboard
+            </a>
+            , then Verify below once it’s live.
+          </p>
+        )}
+        <p className="mt-2 text-xs text-muted-foreground">Any ordinary merge to main also picks this release up.</p>
       </div>
       <div className={panel}>
         <h3 className="text-sm font-semibold">Verify live</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           Checks that <em>this deployment’s</em> own card catalog resolves every released card
-          exactly (name, set, and image file). Passes only after the tracker PR above is deployed.
+          exactly (name, set, and image file). Passes once a deployment built after this release went live.
         </p>
         <button type="button" className={`${btn} mt-3`} onClick={verify} disabled={busy}>
           {busy ? "Verifying…" : `Verify ${release.cardCount} cards`}
@@ -740,12 +767,6 @@ function DoneStep({ release }: { release: ReleaseState }) {
           re-key testament overrides, and delete the orphaned card-images blobs.
         </li>
       </ul>
-      <p className="mt-3 text-xs text-muted-foreground">
-        Bundle stays available:{" "}
-        <a className="underline underline-offset-2 hover:text-foreground" href={`/forge/api/promote/bundle/${release.id}`}>
-          API repo bundle
-        </a>
-      </p>
     </div>
   );
 }
