@@ -280,7 +280,7 @@ async function buildReport(
     if (!row.alignment) blockers.push({ code: "alignment_missing", cardId: c.id, message: `"${name}" has no alignment.` });
 
     if (!row.reference) {
-      warnings.push({ code: "no_reference", cardId: c.id, message: `"${name}" has no scripture reference — it will need a testament override in the overlay PR.` });
+      warnings.push({ code: "no_reference", cardId: c.id, message: `"${name}" has no scripture reference — it will need a testament override (TESTAMENT_OVERRIDES) in a follow-up code PR.` });
     }
     if (!row.rarity) warnings.push({ code: "no_rarity", cardId: c.id, message: `"${name}" has no rarity.` });
     if (!data.legality) {
@@ -668,6 +668,24 @@ export async function verifyReleaseLive(
   if (error) return { ok: false, verified: cards.length, failures: [], error: error.message };
   revalidatePath("/forge", "layout");
   return { ok: true, verified: cards.length, failures: [] };
+}
+
+// ---------------------------------------------------------------------------
+// Deploy catalog: fires the Vercel deploy hook so an ordinary main deploy
+// (Task 14's build-time overlay fetch) picks up this release. Replaces the
+// two-PR merge card.
+// ---------------------------------------------------------------------------
+
+export async function deployCatalog(): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireForgeSuperadmin();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+
+  const hookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
+  if (!hookUrl) return { ok: false, error: "VERCEL_DEPLOY_HOOK_URL is not configured" };
+
+  const res = await fetch(hookUrl, { method: "POST" });
+  if (!res.ok) return { ok: false, error: `deploy hook returned ${res.status}` };
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
