@@ -629,6 +629,8 @@ function MergeStep({ release, onChanged }: { release: ReleaseState; onChanged: (
       const res = await deployCatalog();
       if (res.ok) setDeployed(true);
       else setDeployError(res.error ?? "Deploy failed");
+    } catch (e) {
+      setDeployError(e instanceof Error ? e.message : "Deploy failed");
     } finally {
       setDeployBusy(false);
     }

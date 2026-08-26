@@ -683,9 +683,13 @@ export async function deployCatalog(): Promise<{ ok: boolean; error?: string }> 
   const hookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
   if (!hookUrl) return { ok: false, error: "VERCEL_DEPLOY_HOOK_URL is not configured" };
 
-  const res = await fetch(hookUrl, { method: "POST" });
-  if (!res.ok) return { ok: false, error: `deploy hook returned ${res.status}` };
-  return { ok: true };
+  try {
+    const res = await fetch(hookUrl, { method: "POST" });
+    if (!res.ok) return { ok: false, error: `deploy hook returned ${res.status}` };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "deploy hook request failed" };
+  }
 }
 
 // ---------------------------------------------------------------------------
