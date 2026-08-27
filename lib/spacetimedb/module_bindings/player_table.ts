@@ -27,4 +27,5 @@ export default __t.row({
   reserveRevealed: __t.bool().name("reserve_revealed"),
   handRevealSnapshot: __t.string().name("hand_reveal_snapshot"),
   shareHandWithSpectators: __t.bool().name("share_hand_with_spectators"),
+  topDeckRevealed: __t.bool().name("top_deck_revealed"),
 });

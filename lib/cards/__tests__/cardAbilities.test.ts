@@ -16,6 +16,7 @@ import {
   isNewTestamentLostSoul,
   isCharacterCard,
   isHeroCard,
+  isDanielCard,
   hasReferenceBook,
   getEffectiveAbilities,
   hasUsableAbilityInZone,
@@ -552,5 +553,35 @@ describe('star abilities are fireable from hand', () => {
     for (const a of abilities) {
       expect(a.sourceZones ?? DEFAULT_ABILITY_SOURCE_ZONES).not.toContain('hand');
     }
+  });
+});
+
+describe('toggle_top_deck_reveal — The Foretelling Angel (PC)', () => {
+  it('is registered on the PC printing only', () => {
+    expect(getAbilitiesForCard('The Foretelling Angel (PC)'))
+      .toEqual([{ type: 'toggle_top_deck_reveal' }]);
+    // The Paragon-era "Foretelling Angel" is a different card (look-at peeks).
+    expect(getAbilitiesForCard('Foretelling Angel').some(a => a.type === 'toggle_top_deck_reveal')).toBe(false);
+  });
+
+  it('labels the menu item with the printed wording', () => {
+    expect(abilityLabel({ type: 'toggle_top_deck_reveal' }))
+      .toBe('Play with top card of deck face up');
+  });
+});
+
+describe('isDanielCard', () => {
+  it('matches names containing Daniel, case-insensitively', () => {
+    expect(isDanielCard('Daniel (Pr)')).toBe(true);
+    expect(isDanielCard('Daniel, the Apocalyptist (PoC)')).toBe(true);
+    expect(isDanielCard("Daniel's Guardian")).toBe(true);
+    expect(isDanielCard('Faith of Daniel')).toBe(true);
+    expect(isDanielCard('Lost Soul "Stubborn" [Daniel 9:6]')).toBe(true);
+  });
+
+  it('rejects non-Daniel names and empty input', () => {
+    expect(isDanielCard('The Foretelling Angel (PC)')).toBe(false);
+    expect(isDanielCard('David (Roots)')).toBe(false);
+    expect(isDanielCard('')).toBe(false);
   });
 });

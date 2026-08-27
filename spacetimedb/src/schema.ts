@@ -86,6 +86,7 @@ export const Player = table(
     reserveRevealed: t.bool().default(false), // When true, reserve is visible to opponent
     handRevealSnapshot: t.string().default('[]'), // JSON array of card IDs visible during reveal — cards drawn after reveal stay hidden
     shareHandWithSpectators: t.bool().default(false),
+    topDeckRevealed: t.bool().default(false), // When true, this player's top deck card renders face up for everyone (The Foretelling Angel's toggle_top_deck_reveal)
   }
 );
 

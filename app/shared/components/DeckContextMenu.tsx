@@ -37,6 +37,13 @@ interface DeckContextMenuProps {
   onLookAtTop?: (count: number) => void;
   onLookAtBottom?: (count: number) => void;
   onLookAtRandom?: (count: number) => void;
+  /** Name of the face-up top deck card while it qualifies for a direct
+   *  add-to-hand — The Foretelling Angel's "If it's a Daniel card, you may
+   *  add it to hand", so callers pass it only while the top-deck reveal
+   *  toggle is on AND the top card is a Daniel card. Renders an extra
+   *  "Add <name> to hand" item above Search Deck that fires onDrawTop(1);
+   *  omitted = no item. */
+  revealedTopCardName?: string;
   /** When true, hides all draw-related actions (for opponent's deck) */
   hideDrawActions?: boolean;
   /** When true, hides the Discard row inside each Top/Bottom/Random submenu */
@@ -164,6 +171,7 @@ export function DeckContextMenu({
   onLookAtTop,
   onLookAtBottom,
   onLookAtRandom,
+  revealedTopCardName,
   hideDrawActions,
   hideDiscardActions,
   hideReserveActions,
@@ -223,6 +231,15 @@ export function DeckContextMenu({
         visibility: pos.ready ? 'visible' : 'hidden',
       }}
     >
+      {revealedTopCardName && !hideDrawActions && (
+        <>
+          <button style={ITEM_STYLE} onClick={() => onDrawTop(1)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
+            <Play size={14} />
+            Add {revealedTopCardName} to hand
+          </button>
+          <div style={SEPARATOR_STYLE} />
+        </>
+      )}
       <button style={ITEM_STYLE} onClick={onSearchDeck} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
         <Search size={14} />
         Search Deck
