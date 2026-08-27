@@ -18,6 +18,7 @@ import {
   isHeroCard,
   hasReferenceBook,
   simplifyLostSoulName,
+  lostSoulValue,
   type CardAbility,
 } from './cardAbilities';
 import {
@@ -287,7 +288,7 @@ function clearCountersIfLeavingPlay(ctx: any, cardId: bigint, fromZone: string, 
 // — this is the ONLY place those fields get cleared, so every move reducer's
 // completing write path picks it up via the shared spread.
 // ---------------------------------------------------------------------------
-function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string; isMeek: boolean; imitatingName: string; cardImgFile: string; originZone?: string; originPosX?: string; originPosY?: string } {
+function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string; isRotated: boolean; isMeek: boolean; imitatingName: string; cardImgFile: string; originZone?: string; originPosX?: string; originPosY?: string } {
   const leaving =
     fromZone !== toZone && (fromZone === 'territory' || fromZone === 'land-of-bondage' || fromZone === 'battle');
   // When an Imitate Lost Soul leaves play (rescued, shuffled, banished, etc.),
@@ -309,6 +310,10 @@ function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): {
     // territory).
     notes: isLeavingPlayField(fromZone, toZone) ? '' : card.notes,
     outlineColor: leaving ? '' : card.outlineColor,
+    // The Two/Three Liner sideways marker records "rescued once" while the
+    // soul sits in the Land of Bondage — any move off it (rescue, shuffle,
+    // discard) resets the marker.
+    isRotated: leaving ? false : card.isRotated,
     // isMeek is a lasting hero characteristic (the card's meek-side stats), not
     // battle-scoped state: a meek hero must stay meek across on-field
     // relocations — above all the battle round trip (territory -> battle ->
@@ -468,6 +473,7 @@ function insertCardsShuffleDraw(
       originPosX: '',
       originPosY: '',
       outlineColor: '',
+      isRotated: false,
       imitatingName: '',
     });
   }
@@ -573,6 +579,7 @@ function initializeSoulDeck(ctx: any, game: any) {
       originPosX: '',
       originPosY: '',
       outlineColor: '',
+      isRotated: false,
       imitatingName: '',
     });
   }
@@ -3436,7 +3443,7 @@ function checkAndApplyWin(ctx: any, gameId: bigint) {
   for (const player of ctx.db.Player.player_game_id.filter(gameId)) {
     let count = 0;
     for (const c of rows) {
-      if (c.ownerId === player.id && c.zone === 'land-of-redemption' && isLostSoulRow(c)) count++;
+      if (c.ownerId === player.id && c.zone === 'land-of-redemption' && isLostSoulRow(c)) count += lostSoulValue(c.cardName);
     }
     if (count >= goal) {
       ctx.db.Game.id.update({ ...game, status: 'finished' });
@@ -4625,6 +4632,42 @@ function setCardOutlineImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: setRotationImpl
+// Called by execute_card_ability when ability.type === 'set_rotation'. Turns a
+// "counts as two Lost Souls" card (Two/Three Liner) sideways in the Land of
+// Bondage to mark the first of its two required rescues, or back upright.
+// Zone gating (land-of-bondage only) is enforced by the entry's sourceZones
+// in execute_card_ability.
+// ---------------------------------------------------------------------------
+function setRotationImpl(
+  ctx: any,
+  source: any,
+  ability: Extract<CardAbility, { type: 'set_rotation' }>,
+  player: any,
+  gameId: bigint,
+) {
+  if (source.isRotated === ability.rotated) return; // already in that state
+  ctx.db.CardInstance.id.update({ ...source, isRotated: ability.rotated });
+
+  const game = ctx.db.Game.id.find(gameId);
+  if (game) {
+    logAction(
+      ctx,
+      gameId,
+      player.id,
+      'SET_ROTATION',
+      JSON.stringify({
+        cardName: source.cardName,
+        cardInstanceId: source.id.toString(),
+        rotated: ability.rotated,
+      }),
+      game.turnNumber,
+      game.currentPhase,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helper: spawnTokenImpl
 // Called by execute_card_ability when ability.type === 'spawn_token'.
 // Validates, computes target zone + zoneIndex, then inserts token CardInstance
@@ -4790,6 +4833,7 @@ function spawnTokenImpl(
       originPosX: '',
       originPosY: '',
       outlineColor: '',
+      isRotated: false,
       imitatingName: '',
     });
   }
@@ -5666,6 +5710,8 @@ export const execute_card_ability = spacetimedb.reducer(
         return discardCharactersFromReserveImpl(ctx, source, ability, player, gameId);
       case 'set_card_outline':
         return setCardOutlineImpl(ctx, source, ability, player, gameId);
+      case 'set_rotation':
+        return setRotationImpl(ctx, source, ability, player, gameId);
       case 'play_all_lost_souls':
         return playAllLostSoulsImpl(ctx, source, player, gameId);
       case 'band_heroes_from_deck':
@@ -8013,6 +8059,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       originPosX: '',
       originPosY: '',
       outlineColor: '',
+      isRotated: false,
       imitatingName: '',
     });
 

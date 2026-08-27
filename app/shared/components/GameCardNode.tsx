@@ -318,13 +318,15 @@ export const GameCardNode = memo(function GameCardNode({
         />
       )}
 
-      {/* Inner group handles meek rotation around card center without affecting drag */}
+      {/* Inner group handles meek (180°) and sideways (90°, Two/Three Liner
+          first-rescue marker) rotation around card center without affecting
+          drag. Meek wins if both are somehow set. */}
       <Group
-        rotation={card.isMeek ? 180 : 0}
-        offsetX={card.isMeek ? cardWidth / 2 : 0}
-        offsetY={card.isMeek ? cardHeight / 2 : 0}
-        x={card.isMeek ? cardWidth / 2 : 0}
-        y={card.isMeek ? cardHeight / 2 : 0}
+        rotation={card.isMeek ? 180 : card.isRotated ? 90 : 0}
+        offsetX={card.isMeek || card.isRotated ? cardWidth / 2 : 0}
+        offsetY={card.isMeek || card.isRotated ? cardHeight / 2 : 0}
+        x={card.isMeek || card.isRotated ? cardWidth / 2 : 0}
+        y={card.isMeek || card.isRotated ? cardHeight / 2 : 0}
       >
         {/* Token or regular card rendering */}
         {showFace ? (

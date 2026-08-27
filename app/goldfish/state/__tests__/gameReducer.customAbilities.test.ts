@@ -737,6 +737,52 @@ describe('band_heroes_from_deck — Creation of the World', () => {
   });
 });
 
+describe('EXECUTE_CARD_ABILITY — set_rotation (Two/Three Liner)', () => {
+  const makeLiner = (overrides: Partial<GameCard> = {}) => makeCard({
+    cardName: 'Lost Souls (Two Liner)',
+    type: 'Lost Soul',
+    alignment: 'Neutral',
+    identifier: '',
+    zone: 'land-of-bondage',
+    ...overrides,
+  });
+
+  it('Turn Sideways (index 0) sets isRotated in the Land of Bondage', () => {
+    const state = makeState([makeLiner()]);
+    const next = gameReducer(state, act('source-1', 0));
+    expect(next.zones['land-of-bondage'][0].isRotated).toBe(true);
+  });
+
+  it('Turn Upright (index 1) clears isRotated', () => {
+    const state = makeState([makeLiner({ isRotated: true })]);
+    const next = gameReducer(state, act('source-1', 1));
+    expect(next.zones['land-of-bondage'][0].isRotated).toBe(false);
+  });
+
+  it('re-firing the current state is a no-op (same state reference)', () => {
+    const state = makeState([makeLiner()]);
+    // Turn Upright while already upright.
+    expect(gameReducer(state, act('source-1', 1))).toBe(state);
+  });
+
+  it('does nothing outside the Land of Bondage', () => {
+    const state = makeState([makeLiner({ zone: 'territory' })]);
+    expect(gameReducer(state, act('source-1', 0))).toBe(state);
+  });
+
+  it('clears the marker when the soul leaves the Land of Bondage', () => {
+    const state = makeState([makeLiner({ isRotated: true })]);
+    const next = gameReducer(state, {
+      id: 'm',
+      type: 'MOVE_CARD',
+      playerId: 'player1',
+      timestamp: 0,
+      payload: { cardInstanceId: 'source-1', toZone: 'land-of-redemption' },
+    } as GameAction);
+    expect(next.zones['land-of-redemption'][0].isRotated).toBeUndefined();
+  });
+});
+
 describe('toggle_top_deck_reveal — The Foretelling Angel (PC)', () => {
   it('toggles the topDeckRevealed flag on and back off', () => {
     const source = makeCard({ zone: 'territory', cardName: 'The Foretelling Angel (PC)', type: 'Hero' });

@@ -342,6 +342,25 @@ function setCardOutlineInState(
   return { ...state, zones, history };
 }
 
+function setRotationInState(
+  state: GameState,
+  source: GameCard,
+  ability: Extract<CardAbility, { type: 'set_rotation' }>,
+  history: GameState[],
+): GameState {
+  // Sideways marker only exists in the Land of Bondage (first-of-two-rescues
+  // record on the Two/Three Liner souls); the menu already zone-gates via
+  // sourceZones, this is the reducer-side backstop.
+  if (source.zone !== 'land-of-bondage') return state;
+  if ((source.isRotated ?? false) === ability.rotated) return state;
+
+  const zones = cloneZones(state.zones);
+  const idx = zones['land-of-bondage'].findIndex(c => c.instanceId === source.instanceId);
+  if (idx === -1) return state;
+  zones['land-of-bondage'][idx] = { ...zones['land-of-bondage'][idx], isRotated: ability.rotated };
+  return { ...state, zones, history };
+}
+
 function shuffleAndDrawInState(
   state: GameState,
   _ownerId: string,
@@ -887,6 +906,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         result.card.counters = [];
         result.card.notes = '';
         result.card.outlineColor = undefined;
+        result.card.isRotated = undefined;
         // If the Imitate Lost Soul leaves LoB (rescued, shuffled, banished,
         // etc.), drop the imitation and restore its canonical art.
         if (result.card.imitatingName) {
@@ -1261,6 +1281,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           result.card.counters = [];
           result.card.notes = '';
           result.card.outlineColor = undefined;
+          result.card.isRotated = undefined;
         }
         const wasSharedSoulFromLob =
           result.fromZone === 'land-of-bondage' &&
@@ -1575,6 +1596,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return discardCharactersFromReserveInState(state, source, ability, history);
         case 'set_card_outline':
           return setCardOutlineInState(state, source, ability, history);
+        case 'set_rotation':
+          return setRotationInState(state, source, ability, history);
         case 'play_all_lost_souls':
           return playAllLostSoulsInState(state, source, history);
         case 'band_heroes_from_deck':

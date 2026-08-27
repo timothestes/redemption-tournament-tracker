@@ -556,6 +556,48 @@ describe('star abilities are fireable from hand', () => {
   });
 });
 
+describe('set_rotation (Two/Three Liner)', () => {
+  it('uses the explicit label', () => {
+    expect(abilityLabel({ type: 'set_rotation', rotated: true, label: 'Turn Sideways' }))
+      .toBe('Turn Sideways');
+    expect(abilityLabel({ type: 'set_rotation', rotated: false, label: 'Turn Upright' }))
+      .toBe('Turn Upright');
+  });
+
+  it.each(['Lost Souls (Two Liner)', 'Lost Souls (Three Liner)'])(
+    '%s is Land-of-Bondage only',
+    (name) => {
+      const abilities = CARD_ABILITIES[name];
+      expect(abilities, `${name} missing from registry`).toBeDefined();
+      for (const a of abilities) {
+        expect(a.sourceZones).toEqual(['land-of-bondage']);
+      }
+    },
+  );
+});
+
+describe('lostSoulValue', () => {
+  it('counts the Two/Three Liner souls as 2 and everything else as 1', async () => {
+    const { lostSoulValue, DOUBLE_VALUE_LOST_SOULS } = await import('../cardAbilities');
+    expect(lostSoulValue('Lost Souls (Two Liner)')).toBe(2);
+    expect(lostSoulValue('Lost Souls (Three Liner)')).toBe(2);
+    expect(lostSoulValue('Lost Soul "Harvest" [John 4:35]')).toBe(1);
+    // Every double-value entry must exist in the card data.
+    for (const name of DOUBLE_VALUE_LOST_SOULS) {
+      expect(findCard(name), `${name} not in CARDS`).toBeDefined();
+    }
+  });
+
+  it('SpacetimeDB duplicate stays in sync', async () => {
+    const lib = await import('../cardAbilities');
+    const server = await import('@/spacetimedb/src/cardAbilities');
+    expect(server.DOUBLE_VALUE_LOST_SOULS).toEqual(lib.DOUBLE_VALUE_LOST_SOULS);
+    for (const name of lib.DOUBLE_VALUE_LOST_SOULS) {
+      expect(server.lostSoulValue(name)).toBe(lib.lostSoulValue(name));
+    }
+  });
+});
+
 describe('toggle_top_deck_reveal — The Foretelling Angel (PC)', () => {
   it('is registered on the PC printing only', () => {
     expect(getAbilitiesForCard('The Foretelling Angel (PC)'))

@@ -101,6 +101,11 @@ export interface GameCard {
    *  (Three Woes "Choose Good"/"Choose Evil"). 'good' = green border,
    *  'evil' = red border. Cleared when the card leaves Territory. */
   outlineColor?: 'good' | 'evil';
+  /** Sideways (90°) marker driven by the `set_rotation` ability on "counts
+   *  as two Lost Souls" cards (Two/Three Liner) — records the first of two
+   *  required rescues while the soul is in the Land of Bondage. Cleared when
+   *  the card leaves the Land of Bondage. */
+  isRotated?: boolean;
   /** Name of the Lost Soul this card is currently imitating (set by the
    *  imitate_lost_soul reducer). Empty string or undefined when not
    *  imitating. The label overlay in GameCardNode renders this value

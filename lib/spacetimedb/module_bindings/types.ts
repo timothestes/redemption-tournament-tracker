@@ -51,6 +51,7 @@ export const CardInstance = __t.object("CardInstance", {
   originPosY: __t.string(),
   outlineColor: __t.string(),
   imitatingName: __t.string(),
+  isRotated: __t.bool(),
 });
 export type CardInstance = __Infer<typeof CardInstance>;
 

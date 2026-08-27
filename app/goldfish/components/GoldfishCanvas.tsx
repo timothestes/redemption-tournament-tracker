@@ -54,7 +54,7 @@ import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } 
 import { gameCardIsWarrior, gameCardIsWeapon } from '../utils/equipClass';
 import { findCard } from '@/lib/cards/lookup';
 import { compareCardsDefault } from '@/lib/cards/defaultSort';
-import { getEffectiveAbilities, isDanielCard, isLostSoulCard, isHeroCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isDanielCard, isLostSoulCard, isHeroCard, lostSoulValue, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
 import { KeepOneModal } from '@/app/shared/components/KeepOneModal';
 import { Link2Off } from 'lucide-react';
@@ -1731,7 +1731,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           {nonHandZones.map(zoneId => {
             const rect = zoneLayout[zoneId];
             if (!rect) return null;
-            const cardCount = state.zones[zoneId]?.length || 0;
+            // The LoR badge shows redeemed-soul VALUE, not card count — the
+            // Two/Three Liner souls count as two Lost Souls each.
+            const cardCount = zoneId === 'land-of-redemption'
+              ? (state.zones[zoneId] ?? []).reduce((n, c) => n + lostSoulValue(c.cardName), 0)
+              : state.zones[zoneId]?.length || 0;
 
             return (
               <Group

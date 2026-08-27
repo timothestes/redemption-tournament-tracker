@@ -159,6 +159,13 @@ export const CardInstance = table(
     // value as a label overlay (fallback-only). Cleared by
     // stop_imitating_lost_soul.
     imitatingName: t.string().default(''),
+    // Sideways (90°) marker set by the `set_rotation` ability on "counts as
+    // two Lost Souls" cards (Two/Three Liner) to record the first of their two
+    // required rescues while in the Land of Bondage. Cleared by
+    // leavePlayFieldOverrides when the card leaves the Land of Bondage.
+    // (New columns append at the END — inserting mid-list reads as a table
+    // reorder and aborts the publish.)
+    isRotated: t.bool().default(false),
   }
 );
 
