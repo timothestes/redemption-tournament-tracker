@@ -7818,7 +7818,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         const effectiveTop = topRevealed && topCard.isFlipped
                           ? { ...topCard, isFlipped: false }
                           : topCard;
-                        const gameCard = adaptCard(effectiveTop, 'player1');
+                        // adaptCard returns the reference-stable cached GameCard
+                        // for this row id, so the isFlipped override spread onto
+                        // effectiveTop is dropped in favor of the cached copy
+                        // (deck rows rest isFlipped=true) — re-apply it on the
+                        // adapted card or GameCardNode renders the card back.
+                        const adapted = adaptCard(effectiveTop, 'player1');
+                        const gameCard = topRevealed && adapted.isFlipped
+                          ? { ...adapted, isFlipped: false }
+                          : adapted;
                         return (
                           <GameCardNode
                             card={gameCard}
@@ -8003,7 +8011,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                           ? { ...topCard, isFlipped: false }
                           : topCard;
                         const img = getCardImage(effectiveTop);
-                        const gameCard = adaptCard(effectiveTop, 'player2');
+                        // adaptCard's reference-stable cache is keyed by row id,
+                        // so the isFlipped override on effectiveTop is dropped
+                        // for cards without an active per-card reveal (deck rows
+                        // rest isFlipped=true) — re-apply it on the adapted card
+                        // or GameCardNode renders the card back.
+                        const adapted = adaptCard(effectiveTop, 'player2');
+                        const gameCard = effectiveTop !== topCard && adapted.isFlipped
+                          ? { ...adapted, isFlipped: false }
+                          : adapted;
                         return img ? (
                           <GameCardNode
                             key={String(effectiveTop.id)}
