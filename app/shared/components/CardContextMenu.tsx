@@ -55,9 +55,13 @@ interface CardContextMenuProps {
    *  abilities that read the opponent's revealed hand (e.g. Matthew the
    *  Publican's "Draw cards equal to brigades"). Defaults to false. */
   opponentHandRevealed?: boolean;
+  /** When true, the local player's "play with top card of deck face up"
+   *  toggle is active — the toggle_top_deck_reveal menu item flips its label
+   *  to the turn-off wording. Defaults to false. */
+  topDeckRevealed?: boolean;
 }
 
-export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, onSurrender, onRescue, zones, isHandRevealed, opponentHandRevealed }: CardContextMenuProps) {
+export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, onSurrender, onRescue, zones, isHandRevealed, opponentHandRevealed, topDeckRevealed }: CardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
 
@@ -356,7 +360,9 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
                 onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'var(--gf-hover)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
-                {abilityLabel(ability)}
+                {ability.type === 'toggle_top_deck_reveal' && topDeckRevealed
+                  ? 'Turn top card of deck face down'
+                  : abilityLabel(ability)}
               </button>
             );
           })}

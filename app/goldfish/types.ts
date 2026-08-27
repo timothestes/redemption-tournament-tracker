@@ -58,6 +58,11 @@ export interface GameState {
   options: GoldfishOptions;
   isSpreadHand: boolean;
   drawnThisTurn: boolean;
+  /** True while "play with top card of deck face up" is active (The
+   *  Foretelling Angel's toggle_top_deck_reveal ability). The canvas renders
+   *  the top deck card face up and draggable while set. Optional so states
+   *  saved before the field existed load cleanly. */
+  topDeckRevealed?: boolean;
   /** Logged-in user's profile username (null when not signed in). Used only to
    *  gate the per-user cycling-token easter egg; everything else ignores it. */
   currentUsername?: string | null;

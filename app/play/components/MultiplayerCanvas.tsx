@@ -56,7 +56,7 @@ import { isHeroCard, hasReferenceBook } from '@/lib/cards/cardAbilities';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
-import { getEffectiveAbilities, isCharacterCard, isLostSoulCard, lostSoulValue, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isCharacterCard, isDanielCard, isLostSoulCard, lostSoulValue, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
@@ -7814,10 +7814,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         );
                       })
                     ) : zoneKey === 'deck' && topCard ? (
-                      // Deck top card is draggable (to draw) but its identity is
-                      // hidden information — suppress hover preview.
+                      // Deck top card is draggable (to draw). Its identity is
+                      // hidden information — face + hover preview stay
+                      // suppressed unless the owner's top-deck reveal toggle
+                      // (The Foretelling Angel) is active.
                       (() => {
-                        const gameCard = adaptCard(topCard, 'player1');
+                        const topRevealed = gameState.myPlayer?.topDeckRevealed ?? false;
+                        const effectiveTop = topRevealed && topCard.isFlipped
+                          ? { ...topCard, isFlipped: false }
+                          : topCard;
+                        const gameCard = adaptCard(effectiveTop, 'player1');
                         return (
                           <GameCardNode
                             card={gameCard}
@@ -7826,19 +7832,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             rotation={0}
                             cardWidth={pileCardWidth}
                             cardHeight={pileCardHeight}
-                            image={undefined}
+                            image={topRevealed ? getCardImage(effectiveTop) : undefined}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
                             isDraggable={!isSpectator}
                             nodeRef={registerCardNode}
-                            hoverProgress={0}
+                            hoverProgress={topRevealed && hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
                             onDragStart={handleCardDragStart}
                             onDragMove={handleCardDragMove}
                             onDragEnd={handleCardDragEnd}
                             onContextMenu={noopContextMenu}
                             onDblClick={noopDblClick}
-                            onMouseEnter={noopMouseEnter}
-                            onMouseLeave={noopMouseLeave}
+                            onMouseEnter={topRevealed ? handleMouseEnter : noopMouseEnter}
+                            onMouseLeave={topRevealed ? handleMouseLeave : noopMouseLeave}
                           />
                         );
                       })()
@@ -7877,10 +7883,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const revealedReserveCard = zoneKey === 'reserve'
               ? cards.find(c => c.revealExpiresAt !== undefined && c.revealExpiresAt.microsSinceUnixEpoch > nowMicrosForReveal)
               : undefined;
-            const topCard = revealedReserveCard ?? cards[cards.length - 1];
+            // Opponent's top-deck reveal toggle (The Foretelling Angel): their
+            // top deck card renders face up. Deck cards sort zoneIndex-
+            // ascending, so the top of the pile is the FIRST element — unlike
+            // the face-up piles where the last element renders on top.
+            const oppTopDeckRevealed = zoneKey === 'deck' && (gameState.opponentPlayer?.topDeckRevealed ?? false);
+            const topCard = zoneKey === 'deck'
+              ? cards[0]
+              : (revealedReserveCard ?? cards[cards.length - 1]);
             const topReserveCardRevealed = !!revealedReserveCard;
             const showFace = ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') && topCard && !topCard.isFlipped)
-              || (zoneKey === 'reserve' && topCard && (oppReserveRevealed || topReserveCardRevealed || (isSpectator && oppShareHand)));
+              || (zoneKey === 'reserve' && topCard && (oppReserveRevealed || topReserveCardRevealed || (isSpectator && oppShareHand)))
+              || (oppTopDeckRevealed && topCard);
 
             return (
               <Group
@@ -7995,7 +8009,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         // getCardImage() returns undefined for isFlipped cards,
                         // which would route this branch to CardBackShape and the
                         // opponent would never see the revealed face.
-                        const effectiveTop = zoneKey === 'reserve' && (oppReserveRevealed || topReserveCardRevealed) && topCard.isFlipped
+                        const effectiveTop = ((zoneKey === 'reserve' && (oppReserveRevealed || topReserveCardRevealed)) || oppTopDeckRevealed) && topCard.isFlipped
                           ? { ...topCard, isFlipped: false }
                           : topCard;
                         const img = getCardImage(effectiveTop);
@@ -8022,7 +8036,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
                             onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
                             onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
-                            onContextMenu={zoneKey === 'reserve' ? noopContextMenu : handleCardContextMenu}
+                            onContextMenu={zoneKey === 'reserve' || zoneKey === 'deck' ? noopContextMenu : handleCardContextMenu}
                             onDblClick={noopDblClick}
                             onMouseEnter={handleMouseEnter}
                             onMouseLeave={handleMouseLeave}
@@ -8754,6 +8768,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           actions={{ ...multiplayerActions, ...(sharedSoulActions ?? {}) }}
           isHandRevealed={gameState.myPlayer?.handRevealed ?? false}
           opponentHandRevealed={opponentHandRevealed}
+          topDeckRevealed={gameState.myPlayer?.topDeckRevealed ?? false}
           onClose={() => setContextMenu(null)}
           onExchange={(cardIds) => {
             setContextMenu(null);
@@ -8885,6 +8900,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           x={deckMenu.x}
           y={deckMenu.y}
           deckSize={(myCards['deck'] ?? []).length}
+          revealedTopCardName={(() => {
+            if (!(gameState.myPlayer?.topDeckRevealed ?? false)) return undefined;
+            const top = (myCards['deck'] ?? [])[0];
+            return top && isDanielCard(top.cardName ?? '', top.reference ?? '') ? top.cardName : undefined;
+          })()}
           onClose={() => setDeckMenu(null)}
           onSearchDeck={() => { logSearchDeck(); setDeckMenu(null); setShowDeckSearch(true); }}
           onLookAtTop={(n) => { logLookAtTop(n, undefined, 'top'); setDeckMenu(null); setLookState({ count: n, position: 'top' }); }}

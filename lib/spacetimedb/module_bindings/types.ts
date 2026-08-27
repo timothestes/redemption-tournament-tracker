@@ -184,6 +184,7 @@ export const Player = __t.object("Player", {
   reserveRevealed: __t.bool(),
   handRevealSnapshot: __t.string(),
   shareHandWithSpectators: __t.bool(),
+  topDeckRevealed: __t.bool(),
 });
 export type Player = __Infer<typeof Player>;
 

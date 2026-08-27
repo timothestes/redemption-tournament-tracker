@@ -759,6 +759,7 @@ function createGameCore(
     pendingDeckData: deckData,
     revealedCards: '',
     shareHandWithSpectators: false,
+    topDeckRevealed: false,
   });
 
   logAction(ctx, game.id, player.id, 'GAME_CREATED', JSON.stringify({ code }), 0n, 'draw');
@@ -830,6 +831,7 @@ function joinGameCore(
     pendingDeckData: deckData,
     revealedCards: '',
     shareHandWithSpectators: false,
+    topDeckRevealed: false,
   });
 
   // Log join
@@ -5718,6 +5720,27 @@ export const execute_card_ability = spacetimedb.reducer(
         return drawAndTopdeckSelfImpl(ctx, source, player, gameId);
       case 'draw_brigades':
         throw new SenderError('draw_brigades is dispatched via matthew_draw_brigades, not this reducer');
+      case 'toggle_top_deck_reveal': {
+        // Persistent flag on the ACTIVATOR's player row — both clients (and
+        // spectators) render that player's top deck card face up while set.
+        const revealed = !player.topDeckRevealed;
+        ctx.db.Player.id.update({ ...player, topDeckRevealed: revealed });
+        const game = ctx.db.Game.id.find(gameId);
+        logAction(
+          ctx,
+          gameId,
+          player.id,
+          'TOGGLE_TOP_DECK_REVEAL',
+          JSON.stringify({
+            revealed,
+            sourceCardName: source.cardName,
+            sourceCardImgFile: source.cardImgFile,
+          }),
+          game ? game.currentTurn : 0n,
+          game ? game.currentPhase : 'draw',
+        );
+        return;
+      }
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }

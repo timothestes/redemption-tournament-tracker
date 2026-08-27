@@ -782,3 +782,52 @@ describe('EXECUTE_CARD_ABILITY — set_rotation (Two/Three Liner)', () => {
     expect(next.zones['land-of-redemption'][0].isRotated).toBeUndefined();
   });
 });
+
+describe('toggle_top_deck_reveal — The Foretelling Angel (PC)', () => {
+  it('toggles the topDeckRevealed flag on and back off', () => {
+    const source = makeCard({ zone: 'territory', cardName: 'The Foretelling Angel (PC)', type: 'Hero' });
+    const state = makeState([source]);
+    expect(state.topDeckRevealed).toBeUndefined();
+
+    const on = gameReducer(state, act('source-1', 0));
+    expect(on.topDeckRevealed).toBe(true);
+
+    const off = gameReducer(on, act('source-1', 0));
+    expect(off.topDeckRevealed).toBe(false);
+  });
+
+  it('does not touch any zone contents', () => {
+    const source = makeCard({ zone: 'territory', cardName: 'The Foretelling Angel (PC)', type: 'Hero' });
+    const top = makeCard({ instanceId: 'deck-top', cardName: 'Daniel (Pr)', type: 'Hero', zone: 'deck' });
+    const state = makeState([source, top]);
+
+    const next = gameReducer(state, act('source-1', 0));
+
+    expect(next.zones.deck.map(c => c.instanceId)).toEqual(['deck-top']);
+    expect(next.zones.territory.map(c => c.instanceId)).toEqual(['source-1']);
+  });
+
+  it('is blocked outside the in-play zones (hand)', () => {
+    const source = makeCard({ zone: 'hand', cardName: 'The Foretelling Angel (PC)', type: 'Hero' });
+    const state = makeState([source]);
+
+    expect(gameReducer(state, act('source-1', 0))).toBe(state);
+  });
+
+  it('undo restores the previous flag', () => {
+    const source = makeCard({ zone: 'territory', cardName: 'The Foretelling Angel (PC)', type: 'Hero' });
+    const state = makeState([source]);
+
+    const on = gameReducer(state, act('source-1', 0));
+    expect(on.topDeckRevealed).toBe(true);
+
+    const undone = gameReducer(on, {
+      id: 'u',
+      type: 'MOVE_CARD',
+      playerId: 'player1',
+      timestamp: 0,
+      payload: { value: '__UNDO__' },
+    });
+    expect(undone.topDeckRevealed).toBeUndefined();
+  });
+});

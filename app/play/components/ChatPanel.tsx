@@ -144,6 +144,9 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   // parse-failure fallbacks.
   STOP_HOLD: 'requested action priority',
   STOP_RELEASE: 'resolved a priority request',
+  // The Foretelling Angel's toggle — payload rendered in formatActionType;
+  // this is the parse-failure fallback.
+  TOGGLE_TOP_DECK_REVEAL: 'toggled their top-deck reveal',
 };
 
 function HoverableCard({ name, img }: { name: string; img?: string }) {
@@ -525,6 +528,24 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
           {sourceName ? (
             <>
               {' '}from <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'TOGGLE_TOP_DECK_REVEAL' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const revealed = data.revealed === true;
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      return (
+        <>
+          {revealed ? 'is playing with top card of deck face up' : 'turned top card of deck face down'}
+          {sourceName ? (
+            <>
+              {' '}via <HoverableCard name={sourceName} img={sourceImg} />
             </>
           ) : null}
         </>
