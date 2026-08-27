@@ -71,6 +71,10 @@ export type CardAbility = AbilityBase & (
   | { type: 'underdeck_top_of_deck'; count: number }
   | { type: 'discard_characters_from_reserve'; target: 'self' | 'opponent' }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
+  // Two/Three Liner: turning the Lost Soul sideways (90°) in the Land of
+  // Bondage marks the first of its two required rescues; the opposite item
+  // turns it upright again.
+  | { type: 'set_rotation'; rotated: boolean; label: string }
   | { type: 'play_all_lost_souls' }
   // Creation of the World: "Take all Heroes having a Genesis reference out of
   // your draw pile and band them into the Field of Battle." `referenceBook` is
@@ -113,6 +117,11 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]':     [{ type: 'imitate_lost_soul' }],
   'Lost Soul "The First" [Luke 13:30]':                  [{ type: 'draw_and_topdeck_self' }],
   'Lost Soul "Lost Souls" [Proverbs 2:16-17]':           [{ type: 'spawn_token', tokenName: 'Lost Souls Token' }],
+  // "This card counts as two Lost Souls. It must be rescued twice." Turning
+  // the card sideways in the Land of Bondage marks the first rescue; once in
+  // the Land of Redemption it counts 2 (see lostSoulValue / checkAndApplyWin).
+  'Lost Souls (Two Liner)':                              [{ type: 'set_rotation', rotated: true, label: 'Turn Sideways', sourceZones: ['land-of-bondage'] }, { type: 'set_rotation', rotated: false, label: 'Turn Upright', sourceZones: ['land-of-bondage'] }],
+  'Lost Souls (Three Liner)':                            [{ type: 'set_rotation', rotated: true, label: 'Turn Sideways', sourceZones: ['land-of-bondage'] }, { type: 'set_rotation', rotated: false, label: 'Turn Upright', sourceZones: ['land-of-bondage'] }],
   'Mayhem':                                              [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
   'Mayhem (2020 Promo)':                                 [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
   'Mayhem [Fundraiser]':                                 [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
@@ -817,4 +826,20 @@ export const TOKEN_CARD_DATA: Record<string, TokenCardData> = {
 
 export function findTokenCard(name: string): TokenCardData | undefined {
   return TOKEN_CARD_DATA[name];
+}
+
+/**
+ * Redeemed-soul value of a Lost Soul by cardName. The Two/Three Liner souls
+ * print "This card counts as two Lost Souls" — each counts 2 toward the
+ * rescue goal and the Land of Redemption count once redeemed; everything else
+ * counts 1. Duplicate of lib/cards/cardAbilities.ts; parity test enforces
+ * equality.
+ */
+export const DOUBLE_VALUE_LOST_SOULS: ReadonlyArray<string> = [
+  'Lost Souls (Two Liner)',
+  'Lost Souls (Three Liner)',
+];
+
+export function lostSoulValue(cardName: string): number {
+  return DOUBLE_VALUE_LOST_SOULS.includes(cardName) ? 2 : 1;
 }

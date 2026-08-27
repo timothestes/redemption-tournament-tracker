@@ -151,6 +151,11 @@ export const CardInstance = table(
     // Woes "Choose Good"/"Choose Evil"). '' = no outline; 'good' renders
     // green, 'evil' renders red. Cleared when the card leaves Territory.
     outlineColor: t.string().default(''),
+    // Sideways (90°) marker set by the `set_rotation` ability on "counts as
+    // two Lost Souls" cards (Two/Three Liner) to record the first of their two
+    // required rescues while in the Land of Bondage. Cleared by
+    // leavePlayFieldOverrides when the card leaves the Land of Bondage.
+    isRotated: t.bool().default(false),
     // Set by imitate_lost_soul to the simplifyLostSoulName(target.cardName)
     // value when this card is currently imitating another Lost Soul. Empty
     // string when not imitating. The card's cardImgFile is also mutated when

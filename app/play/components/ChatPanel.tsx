@@ -499,6 +499,17 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       );
     } catch { /* fall through */ }
   }
+  if (actionType === 'SET_ROTATION' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const cardName: string = data.cardName ?? 'a card';
+      return (
+        <>
+          turned <HoverableCard name={cardName} img="" /> {data.rotated ? 'sideways' : 'upright'}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
   if (actionType === 'SPAWN_TOKEN' && payload) {
     try {
       const data = JSON.parse(payload);

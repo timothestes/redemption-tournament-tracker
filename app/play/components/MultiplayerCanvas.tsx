@@ -56,7 +56,7 @@ import { isHeroCard, hasReferenceBook } from '@/lib/cards/cardAbilities';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
-import { getEffectiveAbilities, isCharacterCard, isLostSoulCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isCharacterCard, isLostSoulCard, lostSoulValue, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
@@ -7613,6 +7613,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (!zone) return null;
             const cards = myCards[zoneKey] ?? [];
             const count = cards.length;
+            // The LoR badge shows redeemed-soul VALUE, not card count — the
+            // Two/Three Liner souls count as two Lost Souls each.
+            const badgeCount = zoneKey === 'land-of-redemption'
+              ? cards.reduce((n, c) => n + lostSoulValue(c.cardName), 0)
+              : count;
             const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
             // Center card vertically in remaining space after count badge (18px top)
             const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
@@ -7670,7 +7675,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
                   <Rect width={26} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text
-                    text={String(count)}
+                    text={String(badgeCount)}
                     fontSize={fs(12)}
                     fontStyle="bold"
                     fill="#e8d5a3"
@@ -7854,6 +7859,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (!zone) return null;
             const cards = opponentCards[zoneKey] ?? [];
             const count = cards.length;
+            // The LoR badge shows redeemed-soul VALUE, not card count — the
+            // Two/Three Liner souls count as two Lost Souls each.
+            const badgeCount = zoneKey === 'land-of-redemption'
+              ? cards.reduce((n, c) => n + lostSoulValue(c.cardName), 0)
+              : count;
             const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
             // Center card vertically in remaining space after count badge (18px top)
             const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
@@ -7899,7 +7909,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
                   <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text
-                    text={String(count)}
+                    text={String(badgeCount)}
                     fontSize={fs(12)}
                     fontStyle="bold"
                     fill="#a3c5e8"

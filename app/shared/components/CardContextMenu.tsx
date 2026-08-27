@@ -265,6 +265,13 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
       {hasAbilities && (
         <>
           {abilities.map((ability, index) => {
+            // set_rotation is a stateful toggle registered as two entries:
+            // show only the direction that changes the card (an upright card
+            // offers Turn Sideways, a sideways card offers Turn Upright).
+            // Returning null keeps `index` aligned with the dispatch path.
+            if (ability.type === 'set_rotation' && (card.isRotated ?? false) === ability.rotated) {
+              return null;
+            }
             const allowedZones = ability.sourceZones ?? DEFAULT_ABILITY_SOURCE_ZONES;
             const isInAbilityZone = allowedZones.includes(card.zone);
             // Brigade-draw abilities read the opponent's revealed hand —
