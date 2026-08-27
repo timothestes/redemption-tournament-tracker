@@ -7834,6 +7834,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                           : adapted;
                         return (
                           <GameCardNode
+                            // Keyed by row id so drawing the top card UNMOUNTS
+                            // this node instead of updating it in place. Drag
+                            // reparents the Konva node onto the game layer
+                            // (handleCardDragStart: node.moveTo(layer)); only an
+                            // unmount makes react-konva destroy it. Unkeyed,
+                            // React reused the displaced node for the NEXT top
+                            // card — leaving the pile showing just the shadow
+                            // CardBackShape until a full remount (hard refresh).
+                            // Invisible pre-toggle because every top rendered as
+                            // an identical back. Opponent branch already keys.
+                            key={String(topCard.id)}
                             card={gameCard}
                             x={0}
                             y={0}
