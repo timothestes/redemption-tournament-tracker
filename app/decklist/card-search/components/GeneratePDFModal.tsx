@@ -79,7 +79,7 @@ export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDF
         }
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/generate-decklist`, {
+      const response = await fetch("/api/v1/generate-decklist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

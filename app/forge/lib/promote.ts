@@ -280,7 +280,7 @@ async function buildReport(
     if (!row.alignment) blockers.push({ code: "alignment_missing", cardId: c.id, message: `"${name}" has no alignment.` });
 
     if (!row.reference) {
-      warnings.push({ code: "no_reference", cardId: c.id, message: `"${name}" has no scripture reference — it will need a testament override in the overlay PR.` });
+      warnings.push({ code: "no_reference", cardId: c.id, message: `"${name}" has no scripture reference — it will need a testament override (TESTAMENT_OVERRIDES) in a follow-up code PR.` });
     }
     if (!row.rarity) warnings.push({ code: "no_rarity", cardId: c.id, message: `"${name}" has no rarity.` });
     if (!data.legality) {
@@ -593,7 +593,9 @@ export async function listReleaseOverrides(releaseId: string): Promise<string[]>
   return ((overrides ?? []).map((o) => o.card_name as string)).filter((n) => names.has(n));
 }
 
-export async function abortRelease(releaseId: string): Promise<{ ok: boolean; error?: string }> {
+export async function abortRelease(
+  releaseId: string,
+): Promise<{ ok: boolean; error?: string; warning?: string }> {
   const ctx = await requireForgeSuperadmin();
   if (!ctx) return { ok: false, error: "Not authorized" };
 
@@ -627,6 +629,30 @@ export async function abortRelease(releaseId: string): Promise<{ ok: boolean; er
   const { error } = await ctx.supabase.rpc("forge_abort_release", { p_release_id: releaseId });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/forge", "layout");
+
+  // §5.5: a build whose overlay fetch landed during the images_done window
+  // shipped rows whose images we just deleted above. Fire the deploy hook so
+  // a rebuild reverts to the catalog without this aborted release's cards.
+  if (release.status === "images_done") {
+    const hookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
+    let hookOk = false;
+    if (hookUrl) {
+      try {
+        const res = await fetch(hookUrl, { method: "POST" });
+        hookOk = res.ok;
+      } catch {
+        hookOk = false;
+      }
+    }
+    if (!hookOk) {
+      return {
+        ok: true,
+        warning:
+          "Aborted, but the catalog redeploy could not be triggered — press Deploy catalog or merge to main to purge the aborted cards.",
+      };
+    }
+  }
+
   return { ok: true };
 }
 
@@ -668,6 +694,28 @@ export async function verifyReleaseLive(
   if (error) return { ok: false, verified: cards.length, failures: [], error: error.message };
   revalidatePath("/forge", "layout");
   return { ok: true, verified: cards.length, failures: [] };
+}
+
+// ---------------------------------------------------------------------------
+// Deploy catalog: fires the Vercel deploy hook so an ordinary main deploy
+// (Task 14's build-time overlay fetch) picks up this release. Replaces the
+// two-PR merge card.
+// ---------------------------------------------------------------------------
+
+export async function deployCatalog(): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireForgeSuperadmin();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+
+  const hookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
+  if (!hookUrl) return { ok: false, error: "VERCEL_DEPLOY_HOOK_URL is not configured" };
+
+  try {
+    const res = await fetch(hookUrl, { method: "POST" });
+    if (!res.ok) return { ok: false, error: `deploy hook returned ${res.status}` };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "deploy hook request failed" };
+  }
 }
 
 // ---------------------------------------------------------------------------

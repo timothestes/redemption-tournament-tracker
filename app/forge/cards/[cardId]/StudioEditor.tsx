@@ -201,7 +201,7 @@ export default function StudioEditor({
             placeholder="Name your card…" className="w-full rounded-md border bg-background px-3 py-2 text-lg" />
 
           <textarea value={snapshot.rawText ?? ""} onChange={(e) => update({ rawText: e.target.value })}
-            placeholder="Type the card — type, brigade, stats, ability, reference, flavor… Freeform; not rendered."
+            placeholder="Type the card's special ability."
             className="h-64 w-full rounded-md border bg-background px-3 py-2 text-sm" />
 
           <CardDetailsFields snapshot={snapshot} update={update} />

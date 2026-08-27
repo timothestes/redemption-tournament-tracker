@@ -31,6 +31,7 @@
     "lucide-react": "^0.456.0",
     "next": "^15.2.1",
     "next-themes": "^0.4.3",
+    "pdf-lib": "^1.17.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-colorful": "^5.6.1",
@@ -67,7 +68,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/prebuild-catalog.js && next build",
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
