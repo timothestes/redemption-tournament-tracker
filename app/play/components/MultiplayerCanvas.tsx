@@ -8893,7 +8893,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           revealedTopCardName={(() => {
             if (!(gameState.myPlayer?.topDeckRevealed ?? false)) return undefined;
             const top = (myCards['deck'] ?? [])[0];
-            return top && isDanielCard(top.cardName ?? '') ? top.cardName : undefined;
+            return top && isDanielCard(top.cardName ?? '', top.reference ?? '') ? top.cardName : undefined;
           })()}
           onClose={() => setDeckMenu(null)}
           onSearchDeck={() => { logSearchDeck(); setDeckMenu(null); setShowDeckSearch(true); }}

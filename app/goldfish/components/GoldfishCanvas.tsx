@@ -2007,7 +2007,12 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               // When not rotated, position top-left so card sits below the label
               const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - sidebarCardWidth / 2;
               const py = rotateSidebarPiles ? cy : zone.y + 24;
-              const revealedTop = state.topDeckRevealed ? cards[0] : undefined;
+              // Deck cards sit face-down (isFlipped) — force the revealed top
+              // card face up, same as the multiplayer pile's effectiveTop.
+              const rawTop = state.topDeckRevealed ? cards[0] : undefined;
+              const revealedTop = rawTop
+                ? (rawTop.isFlipped ? { ...rawTop, isFlipped: false } : rawTop)
+                : undefined;
               // GameCardNode has no offset props, so the rotated layout's
               // center pivot is rebased onto the node's top-left origin.
               const revealedX = rotateSidebarPiles ? cx - sidebarCardHeight / 2 : px;
@@ -2778,7 +2783,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           y={deckMenu.y}
           deckSize={state.zones.deck.length}
           revealedTopCardName={
-            state.topDeckRevealed && state.zones.deck[0] && isDanielCard(state.zones.deck[0].cardName)
+            state.topDeckRevealed && state.zones.deck[0] && isDanielCard(state.zones.deck[0].cardName, state.zones.deck[0].reference)
               ? state.zones.deck[0].cardName
               : undefined
           }

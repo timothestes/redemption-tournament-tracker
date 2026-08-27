@@ -579,9 +579,15 @@ describe('isDanielCard', () => {
     expect(isDanielCard('Lost Soul "Stubborn" [Daniel 9:6]')).toBe(true);
   });
 
-  it('rejects non-Daniel names and empty input', () => {
+  it('matches cards whose printed reference cites the book of Daniel', () => {
+    expect(isDanielCard('The Final Act', 'Daniel 12:10')).toBe(true);
+    expect(isDanielCard('Fiery Furnace', 'Daniel 3:20')).toBe(true);
+  });
+
+  it('rejects non-Daniel names/references and empty input', () => {
+    // TFA itself cites Daniel 10:6, so only the bare name misses.
     expect(isDanielCard('The Foretelling Angel (PC)')).toBe(false);
-    expect(isDanielCard('David (Roots)')).toBe(false);
+    expect(isDanielCard('David (Roots)', 'I Samuel 17:50')).toBe(false);
     expect(isDanielCard('')).toBe(false);
   });
 });

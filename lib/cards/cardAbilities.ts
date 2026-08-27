@@ -735,13 +735,15 @@ export function isHeroCard(card: { type?: string; cardType?: string }): boolean 
 
 /**
  * True when a card counts as a "Daniel card" for The Foretelling Angel's
- * "If it's a Daniel card, you may add it to hand" — matched on the printed
- * name containing "Daniel" (Daniel heroes, Daniel's Guardian/Prayer, Faith
- * of Daniel, and Daniel-verse Lost Souls). Client-only: the add-to-hand item
- * rides the deck context menu, so the server never needs this check.
+ * "If it's a Daniel card, you may add it to hand" — a card whose printed
+ * reference cites the book of Daniel (The Final Act, Fiery Furnace, the
+ * Daniel heroes, …) or whose name contains "Daniel" (covers reprints whose
+ * reference cites another book). Client-only: the add-to-hand item rides
+ * the deck context menu, so the server never needs this check.
  */
-export function isDanielCard(cardName: string): boolean {
-  return cardName.toLowerCase().includes('daniel');
+export function isDanielCard(cardName: string, reference?: string): boolean {
+  return cardName.toLowerCase().includes('daniel')
+    || hasReferenceBook(reference ?? '', 'Daniel');
 }
 
 /**
