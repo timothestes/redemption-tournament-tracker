@@ -1680,7 +1680,22 @@ export const respond_rematch = spacetimedb.reducer(
         const newDeckId = p.seat === 0n ? latestGame.rematchDeckId0 : latestGame.rematchDeckId1;
         const newDeckData = p.seat === 0n ? latestGame.rematchDeckData0 : latestGame.rematchDeckData1;
         const newParagon = p.seat === 0n ? latestGame.rematchParagon0 : latestGame.rematchParagon1;
-        ctx.db.Player.id.update({ ...p, deckId: newDeckId, paragon: newParagon, pendingDeckData: '' });
+        // Rematch reuses the same Player rows (in-place reset), so per-game
+        // reveal state must be cleared here or it leaks into the new game —
+        // e.g. The Foretelling Angel's top-deck toggle would flip the fresh
+        // deck's top card face up, and a revealed hand would expose the new
+        // opening hand.
+        ctx.db.Player.id.update({
+          ...p,
+          deckId: newDeckId,
+          paragon: newParagon,
+          pendingDeckData: '',
+          handRevealed: false,
+          handRevealSnapshot: '',
+          reserveRevealed: false,
+          revealedCards: '',
+          topDeckRevealed: false,
+        });
 
         // 3. Insert new cards, shuffle, draw opening hand
         const currentGame = ctx.db.Game.id.find(gameId);
