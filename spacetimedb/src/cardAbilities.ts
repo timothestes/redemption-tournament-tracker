@@ -92,6 +92,12 @@ export type CardAbility = AbilityBase & (
   // Count is computed client-side from the live reveal snapshot and drawn via
   // the alignment-agnostic matthew_draw_brigades reducer.
   | { type: 'draw_brigades'; alignment: 'good' | 'evil' | 'total'; limit?: number }
+  // The Foretelling Angel (PC): "Play with top card of deck face up." A
+  // persistent toggle, not a one-shot reveal — while on, the activator's top
+  // deck card renders face up (and draggable) on the deck pile for everyone.
+  // The card's "If it's a Daniel card, you may add it to hand" half lives in
+  // the deck context menu, gated on this toggle being active (isDanielCard).
+  | { type: 'toggle_top_deck_reveal' }
   | { type: 'custom'; reducerName: string; label: string }
 );
 
@@ -477,6 +483,17 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Angel of Revelation (RoJ AB)':                        [{ type: 'reveal_own_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }, { type: 'reveal_opponent_deck_choose', position: 'top', defaultCount: 3, maxCount: 7 }],
   'Outsiders (Gray/Pale Green) (RoJ)':                   [{ type: 'look_at_opponent_deck_choose', position: 'top', defaultCount: 5, maxCount: 16 }],
   'Outsiders (Gray/Pale Green) (RoJ AB)':                [{ type: 'look_at_opponent_deck_choose', position: 'top', defaultCount: 5, maxCount: 16 }],
+
+  // ---------------------------------------------------------------------------
+  // Persistent top-of-deck reveal
+  //
+  // "Protect deck from discard. Play with top card of deck face up: While it's
+  // a Daniel card, Daniel characters cannot be negated. If it's a Daniel card,
+  // you may add it to hand. Cannot be negated." The toggle keeps the
+  // activator's top deck card face up on the pile; the Daniel add-to-hand item
+  // appears in the deck context menu while the toggle is active.
+  // ---------------------------------------------------------------------------
+  'The Foretelling Angel (PC)':                          [{ type: 'toggle_top_deck_reveal' }],
 };
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {

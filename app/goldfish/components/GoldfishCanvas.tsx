@@ -54,7 +54,7 @@ import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } 
 import { gameCardIsWarrior, gameCardIsWeapon } from '../utils/equipClass';
 import { findCard } from '@/lib/cards/lookup';
 import { compareCardsDefault } from '@/lib/cards/defaultSort';
-import { getEffectiveAbilities, isLostSoulCard, isHeroCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, isDanielCard, isLostSoulCard, isHeroCard, simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { ResurrectHeroesModal } from '@/app/shared/components/ResurrectHeroesModal';
 import { KeepOneModal } from '@/app/shared/components/KeepOneModal';
 import { Link2Off } from 'lucide-react';
@@ -1993,7 +1993,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             const cards = state.zones[zoneId];
             if (!cards || cards.length === 0) return null;
 
-            // Deck: show top card face-down, right-click opens deck search
+            // Deck: show top card face-down, right-click opens deck search.
+            // While the top-deck reveal toggle is on (The Foretelling Angel's
+            // toggle_top_deck_reveal), the top card renders face up and
+            // draggable instead; right-click still opens the normal deck menu.
             if (zoneId === 'deck') {
               const zone = zoneLayout[zoneId];
               const cx = zone.x + zone.width / 2;
@@ -2004,6 +2007,16 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               // When not rotated, position top-left so card sits below the label
               const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - sidebarCardWidth / 2;
               const py = rotateSidebarPiles ? cy : zone.y + 24;
+              // Deck cards sit face-down (isFlipped) — force the revealed top
+              // card face up, same as the multiplayer pile's effectiveTop.
+              const rawTop = state.topDeckRevealed ? cards[0] : undefined;
+              const revealedTop = rawTop
+                ? (rawTop.isFlipped ? { ...rawTop, isFlipped: false } : rawTop)
+                : undefined;
+              // GameCardNode has no offset props, so the rotated layout's
+              // center pivot is rebased onto the node's top-left origin.
+              const revealedX = rotateSidebarPiles ? cx - sidebarCardHeight / 2 : px;
+              const revealedY = rotateSidebarPiles ? cy + sidebarCardWidth / 2 : py;
               return (
                 <Group key={zoneId}>
                   {cards.length > 1 && (
@@ -2011,16 +2024,47 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                       <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                     </Group>
                   )}
-                  <Group
-                    x={px}
-                    y={py}
-                    rotation={rot}
-                    offsetX={oX}
-                    offsetY={oY}
-                    onContextMenu={handleDeckContextMenu}
-                  >
-                    <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
-                  </Group>
+                  {revealedTop ? (
+                    <GameCardNode
+                      key={revealedTop.instanceId}
+                      card={revealedTop}
+                      x={revealedX}
+                      y={revealedY}
+                      rotation={rot}
+                      cardWidth={sidebarCardWidth}
+                      cardHeight={sidebarCardHeight}
+                      image={getImage(revealedTop.cardImgFile)}
+                      {...(getTargetingProps(revealedTop) ?? {})}
+                      isSelected={selectedIds.has(revealedTop.instanceId)}
+                      hoverProgress={hoveredInstanceId === revealedTop.instanceId ? hoverProgress : 0}
+                      nodeRef={registerCardNode}
+                      onDragStart={handleCardDragStart}
+                      onDragMove={handleCardDragMove}
+                      onDragEnd={(c, e) => {
+                        handleCardDragEnd(c, e);
+                        // Aborted drop (card stayed in deck): snap the node
+                        // back onto the pile. A successful move unmounts this
+                        // node on the next render, so the reset is harmless.
+                        e.target.position({ x: revealedX, y: revealedY });
+                        e.target.getLayer()?.batchDraw();
+                      }}
+                      onContextMenu={(_c, e) => handleDeckContextMenu(e)}
+                      onDblClick={() => {}}
+                      onMouseEnter={handleCardMouseEnter}
+                      onMouseLeave={handleCardMouseLeave}
+                    />
+                  ) : (
+                    <Group
+                      x={px}
+                      y={py}
+                      rotation={rot}
+                      offsetX={oX}
+                      offsetY={oY}
+                      onContextMenu={handleDeckContextMenu}
+                    >
+                      <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
+                    </Group>
+                  )}
                 </Group>
               );
             }
@@ -2690,6 +2734,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           actions={goldfishActions}
           zones={state.zones}
           isHandRevealed={false}
+          topDeckRevealed={!!state.topDeckRevealed}
           onClose={() => setContextMenu(null)}
           onExchange={(ids) => setExchangeCardIds(ids)}
           onDetach={(id) => {
@@ -2737,6 +2782,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           x={deckMenu.x}
           y={deckMenu.y}
           deckSize={state.zones.deck.length}
+          revealedTopCardName={
+            state.topDeckRevealed && state.zones.deck[0] && isDanielCard(state.zones.deck[0].cardName, state.zones.deck[0].reference)
+              ? state.zones.deck[0].cardName
+              : undefined
+          }
           onClose={() => setDeckMenu(null)}
           onSearchDeck={() => { setDeckMenu(null); setShowDeckSearch(true); }}
           onLookAtTop={(count) => {

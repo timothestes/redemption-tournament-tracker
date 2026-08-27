@@ -1583,6 +1583,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // Reads the opponent's revealed hand — meaningless in single-player
           // goldfish. Dispatched client-side in multiplayer. No-op here.
           return state;
+        case 'toggle_top_deck_reveal':
+          // Persistent flag — the canvas renders the top deck card face up
+          // (and draggable) while set. Nothing else in the state changes.
+          return { ...state, topDeckRevealed: !state.topDeckRevealed, history };
         case 'custom':
           // Custom abilities are dispatched client-side in multiplayer and
           // never reach the goldfish reducer in v1. No-op defensively.
