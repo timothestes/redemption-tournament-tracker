@@ -43,4 +43,5 @@ export default __t.row({
   originPosY: __t.string().name("origin_pos_y"),
   outlineColor: __t.string().name("outline_color"),
   imitatingName: __t.string().name("imitating_name"),
+  isRotated: __t.bool().name("is_rotated"),
 });
