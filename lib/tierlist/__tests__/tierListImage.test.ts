@@ -22,7 +22,7 @@ const CARD_HEIGHT = 215;
 const GAP = 8;
 const PAD = 12;
 const EMPTY_ROW_HEIGHT = 88;
-const FOOTER_HEIGHT = 40;
+const FOOTER_HEIGHT = 56;
 const TITLE_HEIGHT = 92;
 const MAX_ASPECT = 1.6;
 
@@ -216,7 +216,19 @@ describe("generateTierListImage", () => {
     expect((await sharp(png).metadata()).format).toBe("png");
   });
 
-  it("fetches each distinct card's art once", async () => {
+it("keeps the footer wordmark inside the canvas", async () => {
+    const png = await generateTierListImage({
+      rows: [{ label: "S", color: "#de7b72", cards: [CARD_A] }],
+      fetchImage: async () => fakeCard(),
+    });
+    const meta = await sharp(png).metadata();
+    // A wordmark wider than the canvas would make sharp's composite throw,
+    // so a successful render is the assertion that it fits.
+    expect(meta.format).toBe("png");
+    expect(meta.height).toBe(rowHeight(1, columnCount([{ cards: [CARD_A] }])) + FOOTER_HEIGHT);
+  });
+
+    it("fetches each distinct card's art once", async () => {
     let fetches = 0;
     await generateTierListImage({
       rows: [

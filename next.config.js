@@ -47,6 +47,12 @@ const nextConfig = {
     '/threshingfloor/episodes/[episode]': ['./app/threshingfloor/outline.html'],
     '/api/v1/generate-decklist': ['./assets/decksheets/**'],
     '/api/v1/generate-decklist-image': ['./assets/decksheets/fonts/**'],
+    // The tier list renderer needs the same SVG-text fonts, plus the wordmark
+    // it composites into the exported image's footer.
+    '/api/v1/generate-tierlist-image': [
+      './assets/decksheets/fonts/**',
+      './public/darkmode_redemptionccgapp.webp',
+    ],
   },
 };
 

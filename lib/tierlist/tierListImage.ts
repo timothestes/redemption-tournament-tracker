@@ -9,6 +9,8 @@
  * rasterizing Blob-hosted art client-side would run into.
  */
 
+import path from "path";
+
 import sharp, { type OverlayOptions } from "sharp";
 import { findCard } from "@/lib/cards/lookup";
 import { mapLimit, fetchCardImageBuffer } from "@/lib/decksheets/deckImage";
@@ -31,7 +33,9 @@ const MIN_COLUMNS = 3;
 /** height/width ceiling — past this the export reads as a skinny column. */
 const MAX_ASPECT = 1.6;
 const TITLE_HEIGHT = 92;
-const FOOTER_HEIGHT = 40;
+const FOOTER_HEIGHT = 56;
+/** Rendered height of the wordmark in the footer; width follows its aspect. */
+const LOGO_HEIGHT = 32;
 
 const MAX_LABEL_SIZE = 56;
 const MIN_LABEL_SIZE = 15;
@@ -185,9 +189,35 @@ async function buildTitleBar(width: number, title: string): Promise<Buffer> {
   return renderSvgToPng(svg);
 }
 
-async function buildFooter(width: number): Promise<Buffer> {
+async function buildFooterPlate(width: number): Promise<Buffer> {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${FOOTER_HEIGHT}">`
     + `<rect width="${width}" height="${FOOTER_HEIGHT}" fill="${BACKGROUND}" />`
+    + `</svg>`;
+  return renderSvgToPng(svg);
+}
+
+/**
+ * The app wordmark for the footer. The dark-mode asset is the right one — the
+ * footer plate is near-black — and it carries an alpha channel, so it composites
+ * straight onto the plate. Returns null if the file can't be read (a tracing
+ * miss in a future deploy), and the caller falls back to plain text so an
+ * export never loses its attribution.
+ */
+async function buildFooterLogo(): Promise<{ buffer: Buffer; width: number; height: number } | null> {
+  try {
+    const file = path.join(process.cwd(), "public", "darkmode_redemptionccgapp.webp");
+    const buffer = await sharp(file).resize({ height: LOGO_HEIGHT }).png().toBuffer();
+    const meta = await sharp(buffer).metadata();
+    if (!meta.width || !meta.height) return null;
+    return { buffer, width: meta.width, height: meta.height };
+  } catch {
+    console.warn("tier list: footer wordmark unavailable, falling back to text");
+    return null;
+  }
+}
+
+async function buildFooterText(width: number): Promise<Buffer> {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${FOOTER_HEIGHT}">`
     + `<text x="${width - PAD}" y="${FOOTER_HEIGHT / 2}" dominant-baseline="central" text-anchor="end"`
     + ` font-family="DejaVu Sans" font-size="20" fill="${FOOTER_TEXT}">RedemptionCCG.app</text>`
     + `</svg>`;
@@ -275,7 +305,17 @@ export async function generateTierListImage(
     y += rowH;
   }
 
-  composites.push({ input: await buildFooter(width), left: 0, top: y });
+  composites.push({ input: await buildFooterPlate(width), left: 0, top: y });
+  const logo = await buildFooterLogo();
+  if (logo) {
+    composites.push({
+      input: logo.buffer,
+      left: width - PAD - logo.width,
+      top: y + Math.round((FOOTER_HEIGHT - logo.height) / 2),
+    });
+  } else {
+    composites.push({ input: await buildFooterText(width), left: 0, top: y });
+  }
 
   return new Uint8Array(
     await sharp({ create: { width, height, channels: 3, background: BACKGROUND } })
