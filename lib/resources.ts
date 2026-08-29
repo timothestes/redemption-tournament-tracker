@@ -1,7 +1,7 @@
 import type { IconType } from "react-icons";
 import { FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
-import { TbCardsFilled } from "react-icons/tb";
+import { TbCardsFilled, TbFileTypePdf, TbListNumbers } from "react-icons/tb";
 
 // Single source of truth for the documents surfaced in the nav "Resources"
 // dropdown and on the /resources page. Update a link here and both change.
@@ -28,6 +28,29 @@ export type ResourceSection = {
 };
 
 export const RESOURCE_SECTIONS: ResourceSection[] = [
+  {
+    id: "tools",
+    title: "Deck Tools",
+    description: "Turn a deck or a pile of cards into something you can print or share.",
+    links: [
+      {
+        href: "/decklist/card-search/tier-list",
+        label: "Tier List Maker",
+        description:
+          "Rank any cards into tiers and export the board as a shareable image.",
+        internal: true,
+        icon: TbListNumbers,
+      },
+      {
+        href: "/decklist/generate",
+        label: "Deck Check PDF",
+        description:
+          "Turn a saved deck into a printable deck check sheet for a tournament.",
+        internal: true,
+        icon: TbFileTypePdf,
+      },
+    ],
+  },
   {
     id: "rules",
     title: "Tournament Resources",
@@ -176,16 +199,6 @@ export const RESOURCE_APP_TOOLS: { href: string; label: string; description: str
     href: "/decklist/community",
     label: "Community Decks",
     description: "Browse decks shared by other players.",
-  },
-  {
-    href: "/decklist/generate",
-    label: "Deck Check PDF",
-    description: "Turn a saved deck into a printable deck check sheet.",
-  },
-  {
-    href: "/decklist/card-search/tier-list",
-    label: "Tier List Maker",
-    description: "Rank cards into tiers and export the board as an image.",
   },
   {
     href: "/tournaments",
