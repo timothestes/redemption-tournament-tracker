@@ -63,7 +63,7 @@ export function HandContextMenu({
 
   return (
     <div
-      ref={menuRef}
+      ref={menuRef} data-context-menu
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',

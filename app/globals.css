@@ -300,3 +300,54 @@ button:focus, button:focus-visible,
 .gf-area-enter {
   animation: gf-area-fade-in 240ms ease-out 100ms both;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Touch presentation for the board's context menus.
+
+   The eight menu components (CardContextMenu, MultiCardContextMenu, Deck,
+   Reserve, Hand, Zone, OpponentZone, Lor — ~1,856 lines) each render a
+   cursor-anchored panel with inline positioning. On touch there is no cursor
+   to anchor to, and their 6px/13px rows are far under the 44px touch target.
+
+   Rather than refactor eight differently-shaped components, each root carries
+   `data-context-menu` and this block restyles them into a bottom sheet. The
+   !important flags are required to beat the components' own inline styles;
+   this is deliberately the whole extent of the override, so no menu ACTION
+   logic changes. `data-input-mode` is set on <html> by useInputMode.
+   ────────────────────────────────────────────────────────────────────────── */
+html[data-input-mode='touch'] [data-context-menu] {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: auto !important;
+  bottom: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  max-height: 70dvh !important;
+  overflow-y: auto !important;
+  border-radius: 16px 16px 0 0 !important;
+  padding-bottom: env(safe-area-inset-bottom) !important;
+  visibility: visible !important;
+  white-space: normal !important;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* 44x44 minimum (WCAG 2.5.5 AAA / Apple HIG), 15px text. */
+html[data-input-mode='touch'] [data-context-menu] button {
+  min-height: 44px !important;
+  font-size: 15px !important;
+  padding: 12px 16px !important;
+}
+
+/* Inline counter steppers sit at 22px/32px wide for a mouse. */
+html[data-input-mode='touch'] [data-context-menu] button[style*='width: 22px'],
+html[data-input-mode='touch'] [data-context-menu] button[style*='width: 32px'] {
+  min-width: 44px !important;
+}
+
+/* Section labels stay small but must clear the 11px legibility floor. */
+html[data-input-mode='touch'] [data-context-menu] [style*='font-size: 9px'],
+html[data-input-mode='touch'] [data-context-menu] [style*='font-size: 10px'] {
+  font-size: 11px !important;
+}

@@ -21,7 +21,13 @@ export function useInputMode(): InputMode {
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const override = parseInputOverride(window.location.search);
     const mq = window.matchMedia(COARSE_QUERY);
-    const update = () => setMode(resolveInputMode(mq.matches, override));
+    const update = () => {
+      const next = resolveInputMode(mq.matches, override);
+      setMode(next);
+      // Reflect onto <html> so global CSS can restyle the eight context-menu
+      // components into bottom sheets without touching their internals.
+      document.documentElement.setAttribute('data-input-mode', next);
+    };
     update();
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);

@@ -78,7 +78,7 @@ export function ZoneContextMenu({ x, y, spawnX, spawnY, onClose, onAddOpponentLo
   };
 
   return (
-    <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+    <div ref={menuRef} data-context-menu style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
       <div style={labelStyle}>Spawn Token</div>
       <button
         style={itemStyle}

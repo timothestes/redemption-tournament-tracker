@@ -211,7 +211,7 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   const isGoldfishMode = !onSurrender && !onRescue;
   if (card.isToken && isLostSoul(card) && isGoldfishMode) {
     return (
-      <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+      <div ref={menuRef} data-context-menu style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
         <div style={labelStyle}>{card.cardName}</div>
         <button
           style={itemStyle}
