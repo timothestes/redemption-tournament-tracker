@@ -177,6 +177,16 @@ what a player controls:
 
 Transitions are animated so the player does not lose spatial orientation.
 
+**Side jumps fit on the height axis, not both.** A side rect spans the full
+board width, so contain-fitting one can never zoom in — width is always the
+binding constraint at fit, which would make every side jump a silent no-op.
+`fitRectToViewport(..., { axis: 'height' })` instead fills the viewport
+vertically and lets the player pan horizontally along the side. Measured on an
+iPhone 14 Pro landscape this yields roughly 2x zoom, taking cards from ~57px to
+~112px. Only the whole-board **Fit** target uses `axis: 'both'`.
+
+(Caught by the camera unit tests during implementation, not by inspection.)
+
 ### 3.4 Tap-to-move
 
 State machine in `app/play/hooks/useTapToMove.ts`:
