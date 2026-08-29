@@ -6,6 +6,7 @@ import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { GameCard, COUNTER_COLORS } from '../../goldfish/types';
 import { findCard } from '@/lib/cards/lookup';
+import { LONG_PRESS_MS, LONG_PRESS_MOVE_TOLERANCE } from '@/app/play/lib/longPressCore';
 import { simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { useCardPreview } from '../../goldfish/state/CardPreviewContext';
 
@@ -88,6 +89,11 @@ export interface GameCardNodeProps {
     isEligible: boolean;
     onSelect: () => void;
   };
+  /** Touch equivalent of right-click. When supplied, a 500ms stationary press
+   *  opens the context menu; the pending Konva drag is cancelled first so no
+   *  ghost drag state lingers. Movement past the tolerance means "drag", and
+   *  the long-press is abandoned. */
+  onLongPress?: (card: GameCard, p: { x: number; y: number }) => void;
 }
 
 // Individual card component — memoized to avoid re-rendering cards that haven't changed
@@ -115,6 +121,7 @@ export const GameCardNode = memo(function GameCardNode({
   onMouseLeave,
   isDimmed,
   targetingMode,
+  onLongPress,
 }: GameCardNodeProps) {
   const isToken = card.isToken;
   const isActivelyRevealed =
@@ -123,6 +130,52 @@ export const GameCardNode = memo(function GameCardNode({
   // otherwise render face-down (opponent hand view).
   const showFace = (!card.isFlipped || isActivelyRevealed) && image;
   const [isDragging, setIsDragging] = useState(false);
+
+  // ---- Long-press -> context menu (touch equivalent of right-click) ----
+  const pressRef = useRef<{ x: number; y: number; fired: boolean } | null>(null);
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPress = useCallback(() => {
+    if (pressTimerRef.current !== null) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+    pressRef.current = null;
+  }, []);
+
+  useEffect(() => clearPress, [clearPress]);
+
+  const beginLongPress = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
+    if (!onLongPress) return;
+    const t = e.evt.touches?.[0];
+    if (!t) return;
+    // A second finger means the user is pinching, not pressing.
+    if (e.evt.touches.length > 1) { clearPress(); return; }
+    clearPress();
+    const origin = { x: t.clientX, y: t.clientY, fired: false };
+    pressRef.current = origin;
+    pressTimerRef.current = setTimeout(() => {
+      const s = pressRef.current;
+      if (!s || s.fired) return;
+      s.fired = true;
+      // Cancel the pending Konva drag so no ghost drag state lingers.
+      const node: any = e.target;
+      if (node && typeof node.stopDrag === 'function') node.stopDrag();
+      setIsDragging(false);
+      onLongPress(card, { x: s.x, y: s.y });
+    }, LONG_PRESS_MS);
+  }, [onLongPress, card, clearPress]);
+
+  const moveLongPress = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
+    const s = pressRef.current;
+    if (!s || s.fired) return;
+    const t = e.evt.touches?.[0];
+    if (!t) return;
+    // Radial tolerance, so a diagonal drag isn't accidentally tolerated.
+    if (Math.hypot(t.clientX - s.x, t.clientY - s.y) > LONG_PRESS_MOVE_TOLERANCE) {
+      clearPress();
+    }
+  }, [clearPress]);
 
   // Flip-preview eye: meek cards render upside-down on the table; hovering the
   // eye un-rotates them in the preview surfaces so the opponent can read them.
@@ -237,11 +290,15 @@ export const GameCardNode = memo(function GameCardNode({
       onDblTap={() => onDblClick(card)}
       onMouseEnter={(e) => onMouseEnter(card, e)}
       onMouseLeave={onMouseLeave}
-      onTouchStart={(e) => onMouseEnter(card, e as unknown as Konva.KonvaEventObject<MouseEvent>)}
+      onTouchStart={(e) => {
+        onMouseEnter(card, e as unknown as Konva.KonvaEventObject<MouseEvent>);
+        beginLongPress(e);
+      }}
+      onTouchMove={moveLongPress}
       // onTouchStart raises the hover/preview state; without these the touch
       // path had no way to lower it again and the loupe stuck open.
-      onTouchEnd={onMouseLeave}
-      onTouchCancel={onMouseLeave}
+      onTouchEnd={(e) => { clearPress(); onMouseLeave(); }}
+      onTouchCancel={(e) => { clearPress(); onMouseLeave(); }}
     >
       {/* LOB arrival glow — amber stroke pulse on arrival.
           opacity + strokeWidth are animated imperatively in the effect above.

@@ -5154,6 +5154,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     },
     [stopHoverAnimation, selectedIds, clearSelection],
   );
+  /** Touch equivalent of right-click. Reuses handleCardContextMenu unchanged;
+   *  it reads clientX/clientY off the event and positions from stageRef, so a
+   *  synthetic event carrying the press point is enough. */
+  const handleCardLongPress = useCallback((card: GameCard, p: { x: number; y: number }) => {
+    handleCardContextMenu(card, {
+      evt: { clientX: p.x, clientY: p.y, preventDefault() {} },
+      cancelBubble: false,
+    } as unknown as Konva.KonvaEventObject<PointerEvent>);
+  }, [handleCardContextMenu]);
+
   // Double-click toggles meek on any card (yours or an opponent's you control)
   const handleDblClick = useCallback((card: GameCard) => {
     if (leftClicksSinceContextMenuRef.current < 2) return;
@@ -7056,6 +7066,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragMove={handleCardDragMove}
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
+                  onLongPress={isTouch ? handleCardLongPress : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -7136,6 +7147,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragMove={handleCardDragMove}
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
+                  onLongPress={isTouch ? handleCardLongPress : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -7230,6 +7242,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     onDragMove={handleCardDragMove}
                     onDragEnd={handleCardDragEnd}
                     onContextMenu={handleCardContextMenu}
+                    onLongPress={isTouch ? handleCardLongPress : undefined}
                     onDblClick={handleDblClick}
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
@@ -7316,6 +7329,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragMove={handleCardDragMove}
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
+                  onLongPress={isTouch ? handleCardLongPress : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -7391,6 +7405,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragMove={handleCardDragMove}
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
+                  onLongPress={isTouch ? handleCardLongPress : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -7466,6 +7481,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragMove={handleCardDragMove}
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
+                  onLongPress={isTouch ? handleCardLongPress : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -7954,6 +7970,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleCardContextMenu}
+                        onLongPress={isTouch ? handleCardLongPress : undefined}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
@@ -8202,6 +8219,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleCardContextMenu}
+                        onLongPress={isTouch ? handleCardLongPress : undefined}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
@@ -8372,6 +8390,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleCardContextMenu}
+                        onLongPress={isTouch ? handleCardLongPress : undefined}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
@@ -8482,6 +8501,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
                       onContextMenu={handleCardContextMenu}
+                      onLongPress={isTouch ? handleCardLongPress : undefined}
                       onDblClick={handleDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
