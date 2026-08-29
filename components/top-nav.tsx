@@ -6,7 +6,7 @@ import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlo
 import { GiCrossedSwords, GiAnvil } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
-import { TbCardsFilled, TbSearch } from "react-icons/tb";
+import { TbCardsFilled, TbListNumbers, TbSearch } from "react-icons/tb";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -148,6 +148,7 @@ const TopNav: React.FC = () => {
     { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled, authRequired: true },
     { href: "/collection", label: "My Collection", icon: HiCollection, authRequired: true, isNew: true },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
+    { href: "/decklist/card-search/tier-list", label: "Tier List Maker", icon: TbListNumbers, isNew: true },
   ];
 
   // The document lists themselves live in lib/resources.ts so this dropdown and
