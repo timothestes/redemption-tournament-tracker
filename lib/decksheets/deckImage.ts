@@ -76,8 +76,8 @@ export interface GenerateDeckImageOptions {
   fetchImage?: (imgFile: string) => Promise<Buffer | null>;
 }
 
-/** Bounded-concurrency map, per the task-9 brief (no new deps). */
-async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+/** Bounded-concurrency map, per the task-9 brief (no new deps). Shared with the tier-list renderer. */
+export async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
   let i = 0;
   await Promise.all(
@@ -91,7 +91,8 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
   return out;
 }
 
-async function defaultFetchImage(imgFile: string): Promise<Buffer | null> {
+/** Blob fetch for one card's art; null on any miss. Shared with the tier-list renderer. */
+export async function fetchCardImageBuffer(imgFile: string): Promise<Buffer | null> {
   const url = getCardImageUrl(imgFile);
   if (!url) return null;
   const res = await fetch(url);
@@ -228,7 +229,7 @@ export async function generateDeckImage(opts: GenerateDeckImageOptions): Promise
     mCountValue,
     aodCountValue,
     isLegal,
-    fetchImage = defaultFetchImage,
+    fetchImage = fetchCardImageBuffer,
   } = opts;
 
   // Parity with `_generate_deck_image`'s `if cards_per_row == 0: cards_per_row = 10` fallback.

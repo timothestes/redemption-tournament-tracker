@@ -183,6 +183,11 @@ export const RESOURCE_APP_TOOLS: { href: string; label: string; description: str
     description: "Turn a saved deck into a printable deck check sheet.",
   },
   {
+    href: "/decklist/card-search/tier-list",
+    label: "Tier List Maker",
+    description: "Rank cards into tiers and export the board as an image.",
+  },
+  {
     href: "/tournaments",
     label: "Upcoming Events",
     description: "Find a sanctioned tournament near you.",
