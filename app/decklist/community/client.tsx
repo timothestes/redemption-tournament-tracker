@@ -64,6 +64,9 @@ function getDeckTypeBadgeClasses(format?: string): string {
   if (deckType === "Paragon") {
     return `${base} bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 [.jayden_&]:bg-[hsl(330,90%,55%)]/20 [.jayden_&]:text-[hsl(330,90%,88%)] [.jayden_&]:border-[hsl(330,90%,55%)]/45`;
   }
+  if (deckType === "Limited") {
+    return `${base} bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 [.jayden_&]:bg-[hsl(30,90%,55%)]/20 [.jayden_&]:text-[hsl(30,90%,88%)] [.jayden_&]:border-[hsl(30,90%,55%)]/45`;
+  }
   return `${base} bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 [.jayden_&]:bg-[hsl(230,90%,55%)]/20 [.jayden_&]:text-[hsl(220,90%,88%)] [.jayden_&]:border-[hsl(230,90%,55%)]/45`;
 }
 
