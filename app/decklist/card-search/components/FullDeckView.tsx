@@ -388,7 +388,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
             <CardThumb
               card={card}
               alt={card.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               loading="eager"
             />
           ) : (
@@ -843,7 +843,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                     <CardThumb
                       card={hoveredCard}
                       alt={hoveredCard.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                     />
                   </div>
                   <p className="mt-2 text-sm font-semibold text-foreground">{hoveredCard.name}</p>
