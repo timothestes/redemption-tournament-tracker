@@ -142,10 +142,36 @@ const STANDARD_PROFILE: LayoutProfile = {
 };
 // Sum check: 0.08 + 0.2775 + 0.09 + 0.005 + 0.09 + 0.2775 + 0.18 = 1.0 ✓
 
+/**
+ * Compact touch profile - phone landscape.
+ *
+ * Physical card width is containerWidth x (1 - sidebarWidthRatio) x
+ * mainCardWidthRatio; VIRTUAL_HEIGHT cancels out of that expression, so the
+ * only levers are the sidebar ratio and the card ratio. This profile shrinks
+ * the sidebar to an icon rail and enlarges cards, taking vertical budget from
+ * the opponent's hand (a strip of card backs, of little value) and giving it
+ * to the two territories.
+ */
+const TOUCH_PROFILE: LayoutProfile = {
+  sidebarWidthRatio: 0.10,   // icon rail; tapping a pile opens a sheet
+  oppHandRatio: 0.05,        // thin strip of backs
+  oppTerritoryRatio: 0.30,
+  oppLobRatio: 0.085,
+  dividerRatio: 0.005,
+  playerLobRatio: 0.085,
+  playerTerritoryRatio: 0.30,
+  playerHandRatio: 0.175,
+  mainCardWidthRatio: 0.078, // ~57px on an iPhone 14 Pro landscape
+  oppHandScale: 0.55,
+  pileLabelRatio: 0.14,
+};
+// Sum check: 0.05 + 0.30 + 0.085 + 0.005 + 0.085 + 0.30 + 0.175 = 1.0
+
 /** Virtual width breakpoint — below this use Narrow, above use Standard. */
 const BREAKPOINT_WIDTH = 1700;
 
-function getProfile(virtualWidth: number): LayoutProfile {
+function getProfile(virtualWidth: number, compact = false): LayoutProfile {
+  if (compact) return TOUCH_PROFILE;
   return virtualWidth <= BREAKPOINT_WIDTH ? NARROW_PROFILE : STANDARD_PROFILE;
 }
 
@@ -361,8 +387,9 @@ export function calculateMultiplayerLayout(
   format: 'T1' | 'T2' | 'Paragon' = 'T1',
   viewerKind: 'player' | 'spectator' = 'player',
   battleActive = false,
+  compact = false,
 ): MultiplayerLayout {
-  const baseProfile = getProfile(stageWidth);
+  const baseProfile = getProfile(stageWidth, compact);
   // Spectators have no toolbar and no personal hand — rebalance some height
   // from the bottom hand zone to the top so opponent-style hands aren't
   // clipped and seat-0/seat-1 hands feel more symmetric.
