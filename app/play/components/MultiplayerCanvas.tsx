@@ -71,7 +71,8 @@ import PregameRail from './PregameRail';
 import { STAR_OF_DAVID_IMG, STAR_OF_DAVID_INSET } from './StarOfDavidIcon';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
-import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
+import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen, screenToVirtual } from '@/app/shared/layout/virtualCanvas';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
 import { gameCardIsWarrior, gameCardIsWeapon } from '@/app/goldfish/utils/equipClass';
 import { findCard, isSite } from '@/lib/cards/lookup';
@@ -4934,7 +4935,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         toggleStarPick(BigInt(card.instanceId));
         return;
       }
-      if (e.evt.button === 0) leftClicksSinceContextMenuRef.current += 1;
+      // isPrimaryPointer, not `=== 0`: a TouchEvent has no `button`, so the
+      // strict comparison never incremented on touch and double-tap-to-meek
+      // (which needs this counter >= 2) was dead on touch devices.
+      if (isPrimaryPointer(e.evt)) leftClicksSinceContextMenuRef.current += 1;
       if (e.evt.shiftKey) {
         toggleSelect(card.instanceId);
         return;
@@ -6233,7 +6237,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ResizeObserver can measure it. Only the Stage content is gated.
   if (containerWidth === 0 || containerHeight === 0 || !mpLayout || !myHandRect || !opponentHandRect) {
     return (
-      <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} />
+      <div ref={containerRef} style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        overflow: 'hidden',
+        // The board owns every gesture inside it. Without this the browser
+        // steals pan/pinch and iOS shows the long-press callout.
+        touchAction: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+      }} />
     );
   }
 
@@ -6276,7 +6289,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }
 
   return (
-    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} onContextMenu={(e) => e.preventDefault()}>
+    <div
+      ref={containerRef}
+      style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        overflow: 'hidden',
+        // The board owns every gesture inside it. Without this the browser
+        // steals pan/pinch and iOS shows the long-press callout.
+        touchAction: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <Stage
         ref={stageRef}
         width={containerWidth}

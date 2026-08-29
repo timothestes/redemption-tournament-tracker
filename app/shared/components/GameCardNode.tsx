@@ -238,6 +238,10 @@ export const GameCardNode = memo(function GameCardNode({
       onMouseEnter={(e) => onMouseEnter(card, e)}
       onMouseLeave={onMouseLeave}
       onTouchStart={(e) => onMouseEnter(card, e as unknown as Konva.KonvaEventObject<MouseEvent>)}
+      // onTouchStart raises the hover/preview state; without these the touch
+      // path had no way to lower it again and the loupe stuck open.
+      onTouchEnd={onMouseLeave}
+      onTouchCancel={onMouseLeave}
     >
       {/* LOB arrival glow — amber stroke pulse on arrival.
           opacity + strokeWidth are animated imperatively in the effect above.
