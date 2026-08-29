@@ -53,6 +53,8 @@ function getDeckTypeBadgeClasses(format?: string): string {
     return "px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 rounded text-[11px] font-semibold leading-none";
   if (t === "Paragon")
     return "px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 rounded text-[11px] font-semibold leading-none";
+  if (t === "Limited")
+    return "px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/60 text-orange-700 dark:text-orange-300 rounded text-[11px] font-semibold leading-none";
   return "px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded text-[11px] font-semibold leading-none";
 }
 

@@ -173,6 +173,9 @@ function getDeckTypeBadgeClasses(format?: string): string {
   if (deckType === "Paragon") {
     return "px-3 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded-full text-sm font-semibold";
   }
+  if (deckType === "Limited") {
+    return "px-3 py-1 bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 rounded-full text-sm font-semibold";
+  }
   return "px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-semibold";
 }
 

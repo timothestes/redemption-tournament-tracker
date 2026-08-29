@@ -34,8 +34,9 @@ function getDeckTypeBadgeClasses(format?: string | null): string {
   if (id === "Paragon") {
     return `${base} bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200`;
   }
-  // Limited and Unlimited share the old T1 accent color (see
-  // DeckBuilderPanel.tsx for the same convention).
+  if (id === "Limited") {
+    return `${base} bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200`;
+  }
   return `${base} bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200`;
 }
 

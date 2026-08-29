@@ -269,7 +269,9 @@ function TournamentsPageInner() {
       return base + "bg-teal-500/15 text-teal-700 dark:text-teal-400";
     if (t.includes("paragon"))
       return base + "bg-rose-500/15 text-rose-700 dark:text-rose-400";
-    if (t.includes("type 1") || t.includes("type a") || t === "t1" || t === "limited" || t === "unlimited")
+    if (t === "limited")
+      return base + "bg-orange-500/15 text-orange-700 dark:text-orange-400";
+    if (t.includes("type 1") || t.includes("type a") || t === "t1" || t === "unlimited")
       return base + "bg-blue-500/15 text-blue-700 dark:text-blue-400";
     return base + "bg-muted text-muted-foreground";
   };
