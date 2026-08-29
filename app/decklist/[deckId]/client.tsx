@@ -1567,7 +1567,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                             <img
                               src={getImageUrl(card.card_img_file || "")}
                               alt={card.card_name}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                               loading="eager"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
@@ -1607,7 +1607,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                           <img
                             src={getImageUrl(card.card_img_file || "")}
                             alt={card.card_name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                             loading="eager"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
@@ -1652,7 +1652,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                           <img
                             src={getImageUrl(card.card_img_file || "")}
                             alt={card.card_name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                             loading="eager"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
@@ -1817,7 +1817,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   <img
                     src={getImageUrl(hoveredCard.imgFile)}
                     alt={hoveredCard.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 <p className="mt-2 text-sm font-semibold text-foreground">{hoveredCard.name}</p>
