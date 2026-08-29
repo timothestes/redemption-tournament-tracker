@@ -161,3 +161,23 @@ export function zoomAtPoint(
     centerY: anchorVY - (anchorVY - camera.centerY) * ratio,
   };
 }
+
+/**
+ * Fold an optional camera into a fit transform.
+ *
+ * A null camera returns the fit transform untouched — the path every
+ * non-multiplayer consumer takes (goldfish, waiting room, spectator) and the
+ * path pointer devices take, so their behaviour is bit-identical.
+ *
+ * Lives here rather than in virtualCanvas.ts to avoid a circular import:
+ * camera.ts already depends on virtualCanvas.ts for ScaleResult/VIRTUAL_HEIGHT.
+ */
+export function applyCameraToScale(
+  fit: ScaleResult,
+  camera: Camera | null | undefined,
+  containerWidth: number,
+  containerHeight: number,
+): ScaleResult {
+  if (!camera) return fit;
+  return composeCamera(fit, camera, containerWidth, containerHeight);
+}

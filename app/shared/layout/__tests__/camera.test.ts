@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { calculateScale, VIRTUAL_HEIGHT } from '../virtualCanvas';
 import {
   defaultCamera, composeCamera, clampCamera, fitRectToViewport,
-  unionRects, zoomAtPoint, MIN_ZOOM, MAX_ZOOM,
+  unionRects, zoomAtPoint, applyCameraToScale, MIN_ZOOM, MAX_ZOOM,
 } from '../camera';
 
 describe('composeCamera — identity property', () => {
@@ -139,4 +139,30 @@ describe('zoomAtPoint', () => {
 
 describe('VIRTUAL_HEIGHT sanity', () => {
   it('is 1080', () => expect(VIRTUAL_HEIGHT).toBe(1080));
+});
+
+describe('applyCameraToScale', () => {
+  it('is a no-op for a null camera', () => {
+    const fit = calculateScale(1920, 1080);
+    expect(applyCameraToScale(fit, null, 1920, 1080)).toEqual(fit);
+  });
+
+  it('is a no-op for undefined', () => {
+    const fit = calculateScale(852, 393);
+    expect(applyCameraToScale(fit, undefined, 852, 393)).toEqual(fit);
+  });
+
+  it('is a no-op for the default camera on a phone viewport', () => {
+    const fit = calculateScale(852, 393);
+    const out = applyCameraToScale(fit, defaultCamera(fit.virtualWidth), 852, 393);
+    expect(out.scale).toBeCloseTo(fit.scale, 10);
+    expect(out.offsetX).toBeCloseTo(fit.offsetX, 10);
+    expect(out.offsetY).toBeCloseTo(fit.offsetY, 10);
+  });
+
+  it('applies a non-default camera', () => {
+    const fit = calculateScale(1920, 1080);
+    const out = applyCameraToScale(fit, { zoom: 2, centerX: 960, centerY: 540 }, 1920, 1080);
+    expect(out.scale).toBeCloseTo(fit.scale * 2, 10);
+  });
 });
