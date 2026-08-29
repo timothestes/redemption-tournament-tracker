@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { IconType } from "react-icons";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey, HiClipboardList, HiShoppingCart, HiPencilAlt } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey, HiClipboardList, HiShoppingCart, HiPencilAlt } from "react-icons/hi";
 import { GiCrossedSwords, GiAnvil } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
@@ -16,7 +16,7 @@ import { createClient } from "../utils/supabase/client";
 import { getUserSafe } from "../utils/supabase/getUserSafe";
 import { signOutAction } from "../app/actions";
 import { useIsAdmin } from "../hooks/useIsAdmin";
-import { RESOURCE_SECTIONS } from "../lib/resources";
+import { ResourcesMenu } from "./resources-menu";
 // Hidden until Nationals 2026 registration reopens next year — see commented nav link below.
 // import { NATIONALS_CONFIG } from "../app/config/nationals";
 
@@ -502,67 +502,9 @@ const TopNav: React.FC = () => {
 
               {/* Resources Dropdown Menu */}
               {isResourcesOpen && (
-                <div className="absolute left-0 mt-2 w-72 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
+                <div className="absolute left-0 mt-2 w-72 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
                   <div className="py-2">
-                    {/* Shareable index of everything below */}
-                    <Link
-                      href="/resources"
-                      onClick={() => setIsResourcesOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
-                    >
-                      <HiDocumentText className="w-4 h-4" />
-                      All Resources
-                    </Link>
-
-                    {RESOURCE_SECTIONS.map((section) => (
-                      <div key={section.id}>
-                        <div className="px-4 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
-                          {section.title}
-                        </div>
-                        {section.links.map((resource) => {
-                          const Icon = resource.icon;
-                          const content = (
-                            <>
-                              {Icon && <Icon className="w-4 h-4 shrink-0" />}
-                              {resource.label}
-                            </>
-                          );
-                          const linkClass = "flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted";
-                          return resource.internal ? (
-                            <Link
-                              key={resource.href}
-                              href={resource.href}
-                              onClick={() => setIsResourcesOpen(false)}
-                              className={linkClass}
-                            >
-                              {content}
-                            </Link>
-                          ) : (
-                            <a
-                              key={resource.href}
-                              href={resource.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={linkClass}
-                            >
-                              {content}
-                            </a>
-                          );
-                        })}
-                      </div>
-                    ))}
-
-                    {/* Report a Bug */}
-                    <div className="border-t border-border mt-2 pt-2">
-                      <Link
-                        href="/tracker/bug"
-                        onClick={() => setIsResourcesOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                      >
-                        <HiArrowSmRight className="w-4 h-4" />
-                        Report a Bug
-                      </Link>
-                    </div>
+                    <ResourcesMenu variant="desktop" onNavigate={() => setIsResourcesOpen(false)} />
                   </div>
                 </div>
               )}
@@ -896,65 +838,7 @@ const TopNav: React.FC = () => {
 
               {isResourcesOpen && (
                 <div className="mt-2 ml-8 space-y-1">
-                  {/* Shareable index of everything below */}
-                  <Link
-                    href="/resources"
-                    onClick={closeMobileMenu}
-                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-muted"
-                  >
-                    <HiDocumentText className="w-4 h-4" />
-                    All Resources
-                  </Link>
-
-                  {RESOURCE_SECTIONS.map((section) => (
-                    <div key={section.id} className="space-y-1">
-                      <div className="px-3 py-1 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
-                        {section.title}
-                      </div>
-                      {section.links.map((resource) => {
-                        const Icon = resource.icon;
-                        const content = (
-                          <>
-                            {Icon && <Icon className="w-4 h-4 shrink-0" />}
-                            {resource.label}
-                          </>
-                        );
-                        const linkClass = "flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted";
-                        return resource.internal ? (
-                          <Link
-                            key={resource.href}
-                            href={resource.href}
-                            onClick={closeMobileMenu}
-                            className={linkClass}
-                          >
-                            {content}
-                          </Link>
-                        ) : (
-                          <a
-                            key={resource.href}
-                            href={resource.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={linkClass}
-                          >
-                            {content}
-                          </a>
-                        );
-                      })}
-                    </div>
-                  ))}
-
-                  {/* Report a Bug */}
-                  <div className="border-t border-border mt-2 pt-2">
-                    <Link
-                      href="/tracker/bug"
-                      onClick={closeMobileMenu}
-                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
-                    >
-                      <HiArrowSmRight className="w-4 h-4" />
-                      Report a Bug
-                    </Link>
-                  </div>
+                  <ResourcesMenu variant="mobile" onNavigate={closeMobileMenu} />
                 </div>
               )}
             </div>
