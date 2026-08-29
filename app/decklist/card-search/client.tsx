@@ -2724,7 +2724,7 @@ export default function CardSearchClient({
       {/* Right panel: Deck builder (hidden on mobile, toggleable on desktop) */}
       {showDeckBuilder && (
         <div
-          className="hidden md:flex flex-col overflow-visible flex-shrink-0"
+          className="hidden md:flex flex-col overflow-visible flex-shrink-0 min-h-0"
           style={{ width: showSearch ? `${deckPanelWidth}%` : '100%' }}
         >
           {isSpotlight ? (
