@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { syncShopifyProducts } from '@/lib/pricing/syncShopifyProducts';
 import { runMatchingPipeline, regenerateCardPrices, computeCheapestPrices } from '@/lib/pricing/matching';
 import { sendCronAlert } from '@/lib/cron/alerts';
@@ -30,6 +31,16 @@ export async function GET(request: NextRequest) {
     // 4. Compute cheapest equivalent prices
     console.log('[cron] Computing cheapest prices...');
     await computeCheapestPrices();
+
+    // 5. Bust the /api/prices cache so the new prices show up right away
+    // instead of waiting up to `revalidate` (86400s) for it to expire on its own.
+    // Isolated in its own try/catch: this is a nice-to-have on top of an already-
+    // successful sync, so it must not turn a good sync into a reported failure.
+    try {
+      revalidatePath('/api/prices');
+    } catch (err) {
+      console.error('[cron] revalidatePath(/api/prices) failed (sync itself succeeded):', err);
+    }
 
     console.log('[cron] Price sync complete');
     return NextResponse.json({ success: true, shopify_synced: upserted, matching: summary });
