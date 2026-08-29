@@ -163,7 +163,7 @@ export default function SpotlightPanel({
 }: SpotlightPanelProps) {
   const config = useBuilderConfig();
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
+    <div className="flex-1 flex flex-col items-center justify-center p-6 relative overflow-y-auto min-h-0">
       {/* Clear button — only when a card is spotlighted (absolute, no layout impact) */}
       {card && (
         <button
