@@ -73,6 +73,15 @@ import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/car
 import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen, screenToVirtual } from '@/app/shared/layout/virtualCanvas';
 import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
+import { applyCameraToScale } from '@/app/shared/layout/camera';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
+import { useBoardCamera } from '@/app/play/hooks/useBoardCamera';
+import { useTapToMove } from '@/app/play/hooks/useTapToMove';
+import { buildJumpTargets } from '@/app/play/lib/jumpTargets';
+import type { CommitMove } from '@/app/play/lib/tapToMoveCore';
+import type { PointerSample } from '@/app/play/lib/gestureCore';
+import { DestinationRail } from '@/app/play/components/DestinationRail';
+import { TouchControls } from '@/app/play/components/TouchControls';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
 import { gameCardIsWarrior, gameCardIsWeapon } from '@/app/goldfish/utils/equipClass';
 import { findCard, isSite } from '@/lib/cards/lookup';
@@ -405,7 +414,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   // ---- Container sizing (respects flex layout) ----
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef);
+  // ---- Input mode + board camera ----
+  // The camera folds into scale/offsetX/offsetY, which the Konva Layer and
+  // every HTML overlay already respect, so it needs no call-site changes. On
+  // pointer devices `camera` is null and the transform is bit-identical to
+  // the pre-camera behaviour (asserted in camera.test.ts).
+  const inputMode = useInputMode();
+  const isTouch = inputMode === 'touch';
+  const fit = useVirtualCanvas(containerRef);
+  const { containerWidth, containerHeight, virtualWidth } = fit;
+  const {
+    camera, jumpTo, reset: resetCamera, onPointersChange: onCameraPointers, isZoomed,
+  } = useBoardCamera({
+    fitScale: fit.scale,
+    virtualWidth,
+    containerWidth,
+    containerHeight,
+    enabled: isTouch,
+  });
+  const { scale, offsetX, offsetY } = applyCameraToScale(
+    fit, camera, containerWidth, containerHeight,
+  );
+  /** Phone-sized viewports get the compact layout profile; tablets keep the
+   *  standard one, which is already at laptop parity. */
+  const useCompactLayout = isTouch && containerHeight > 0 && containerHeight < 500;
 
   // ---- Canvas text legibility floor ----
   // Konva text is sized in virtual units and rendered through `scale`. On
@@ -648,8 +680,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }, [rawBattleActive]);
   const gameStatus = gameState.game?.status ?? '';
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', battleActive),
-    [virtualWidth, normalizedFormat, viewerKind, battleActive],
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', battleActive, useCompactLayout),
+    [virtualWidth, normalizedFormat, viewerKind, battleActive, useCompactLayout],
   );
   // Horizontal midline of the play mat (play area sans sidebar piles) in
   // screen px — dialogs that float over the board center on this rather than
@@ -663,8 +695,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // enter_battle lands.
   const battleBandRect = useMemo(() => {
     if (mpLayout?.zones.battle) return mpLayout.zones.battle;
-    return calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', true).zones.battle;
-  }, [mpLayout, virtualWidth, normalizedFormat, viewerKind]);
+    return calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat, viewerKind === 'spectator' ? 'spectator' : 'player', true, useCompactLayout).zones.battle;
+  }, [mpLayout, virtualWidth, normalizedFormat, viewerKind, useCompactLayout]);
 
   // Field of Battle band background lifecycle. OPEN is deliberately NOT
   // animated: the moment `battleActive` flips, the layout flip compresses the
@@ -4923,6 +4955,133 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const leftClicksSinceContextMenuRef = useRef<number>(99);
 
   // Universal card click handler — shift-click toggles selection
+  // ---- Camera jump targets + e2e hook ----
+  const jumpTargets = useMemo(
+    () => (mpLayout ? buildJumpTargets(mpLayout, virtualWidth, battleActive) : []),
+    [mpLayout, virtualWidth, battleActive],
+  );
+
+  const jumpToTarget = useCallback((t: (typeof jumpTargets)[number]) => {
+    if (t.rect) jumpTo(t.rect, { axis: t.axis });
+  }, [jumpTo]);
+
+  // Lets Playwright drive the camera without synthesising gestures, so camera
+  // behaviour and gesture recognition can be tested independently.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    (window as any).__mpCamera = {
+      get: () => camera,
+      jumpTo: (id: string) => {
+        const t = jumpTargets.find((x) => x.id === id);
+        if (t?.rect) jumpTo(t.rect, { axis: t.axis });
+      },
+      reset: resetCamera,
+    };
+    return () => { delete (window as any).__mpCamera; };
+  }, [camera, jumpTargets, jumpTo, resetCamera]);
+
+  // ---- Tap-to-move (touch) ----
+  // Mirrors handleCardDragEnd's ownership rules, but NOT its rotation-anchor
+  // adjustment: a tap has no drag anchor to preserve, so the tap point simply
+  // becomes the card's new centre (the same shape as the soul-deck pile drop).
+  const handleTapMoveCommit = useCallback((move: CommitMove) => {
+    const targetOwnerId =
+      move.toOwner === 'shared'
+        ? '0'
+        : move.toOwner === 'my' && gameState.myPlayer
+        ? String(gameState.myPlayer.id)
+        : move.toOwner === 'opponent' && gameState.opponentPlayer
+        ? String(gameState.opponentPlayer.id)
+        : '';
+
+    const id = BigInt(move.cardId);
+    const zoneRect =
+      move.toOwner === 'opponent' ? opponentZones[move.toZone] : myZones[move.toZone];
+
+    // Rail chips carry no point, and a zone we can't resolve a rect for falls
+    // back to the same path - the server places the card.
+    if (!move.atPoint || !zoneRect) {
+      moveCard(id, move.toZone, '', undefined, undefined, targetOwnerId);
+      return;
+    }
+
+    const targetOwner: 'my' | 'opponent' = move.toOwner === 'opponent' ? 'opponent' : 'my';
+    const clampOpts = isFreeFormZone(move.toZone) ? { cardWidth, cardHeight } : undefined;
+    const db = toDbPos(
+      move.atPoint.x - cardWidth / 2,
+      move.atPoint.y - cardHeight / 2,
+      zoneRect,
+      targetOwner,
+      clampOpts,
+    );
+    moveCard(id, move.toZone, '', String(db.x), String(db.y), targetOwnerId);
+  }, [gameState.myPlayer, gameState.opponentPlayer, moveCard, myZones, opponentZones, cardWidth, cardHeight]);
+
+  const {
+    state: tapMoveState, dispatch: tapMoveDispatch, reset: tapMoveReset,
+  } = useTapToMove(handleTapMoveCommit);
+  // Mirror for handleStageTap: reading state through a ref keeps that callback
+  // stable, so the Stage's onTap prop doesn't change on every arm/disarm.
+  const tapMoveStateRef = useRef(tapMoveState);
+  tapMoveStateRef.current = tapMoveState;
+
+  // ---- Stage-level touch handlers ----
+  const collectPointers = useCallback((evt: TouchEvent): PointerSample[] => {
+    const stage = stageRef.current;
+    if (!stage) return [];
+    const box = stage.container().getBoundingClientRect();
+    return Array.from(evt.touches).map((t, i) => ({
+      id: t.identifier ?? i,
+      x: t.clientX - box.left,
+      y: t.clientY - box.top,
+    }));
+  }, []);
+
+  const handleStageTouch = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
+    if (!isTouch) return;
+    const pointers = collectPointers(e.evt);
+    // Two or more fingers is a pinch and is allowed anywhere. A single finger
+    // only pans when it started on the background - on a card it is a drag.
+    if (pointers.length < 2 && e.target !== e.target.getStage()) return;
+    onCameraPointers(pointers);
+  }, [isTouch, onCameraPointers, collectPointers]);
+
+  const handleStageTouchEnd = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
+    if (!isTouch) return;
+    onCameraPointers(collectPointers(e.evt));
+  }, [isTouch, onCameraPointers, collectPointers]);
+
+  const handleStageTap = useCallback((e: Konva.KonvaEventObject<Event>) => {
+    if (!isTouch || tapMoveStateRef.current.kind !== 'armed') return;
+    // Taps that landed on a card are handled by handleCardClick.
+    if (e.target !== e.target.getStage()) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+    const pos = stage.getPointerPosition();
+    if (!pos) return;
+    const v = screenToVirtual(pos.x, pos.y, scale, offsetX, offsetY);
+    const hit = findZoneAtPosition(v.x, v.y);
+    if (!hit) {
+      tapMoveDispatch({ type: 'tapEmpty' });
+      return;
+    }
+    tapMoveDispatch({
+      type: 'tapZone',
+      zone: hit.zone as ZoneId,
+      owner: hit.owner,
+      point: { x: v.x, y: v.y },
+    });
+  }, [isTouch, scale, offsetX, offsetY, findZoneAtPosition, tapMoveDispatch]);
+
+  const handleStageDblTap = useCallback((e: Konva.KonvaEventObject<Event>) => {
+    if (!isTouch) return;
+    // Double-tap on a CARD toggles meek (existing behaviour); only a
+    // background double-tap touches the camera.
+    if (e.target !== e.target.getStage()) return;
+    if (isZoomed) resetCamera();
+  }, [isTouch, isZoomed, resetCamera]);
+
+
   const handleCardClick = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
       // REG pre-game star step: while my selection window is open, clicking a
@@ -4943,11 +5102,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         toggleSelect(card.instanceId);
         return;
       }
+      // Touch: a tap arms the card for tap-to-move rather than only adjusting
+      // selection. Spectators stay read-only. Runs after the click counter so
+      // double-tap-to-meek still works.
+      if (isTouch && !isSpectator) {
+        tapMoveDispatch({
+          type: 'tapCard',
+          cardId: card.instanceId,
+          zone: card.zone as ZoneId,
+          owner: String(card.ownerId) === String(gameState.myPlayer?.id) ? 'my' : 'opponent',
+        });
+        return;
+      }
       if (selectedIds.size > 0 && !selectedIds.has(card.instanceId)) {
         clearSelection();
       }
     },
-    [selectedIds, clearSelection, toggleSelect, starWindowOpen, toggleStarPick],
+    [selectedIds, clearSelection, toggleSelect, starWindowOpen, toggleStarPick, isTouch, isSpectator, tapMoveDispatch, gameState.myPlayer],
   );
 
   const handleCardContextMenu = useCallback(
@@ -6312,6 +6483,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         onMouseDown={handleStageMouseDown}
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
+        onTap={handleStageTap}
+        onDblTap={handleStageDblTap}
+        onTouchStart={handleStageTouch}
+        onTouchMove={handleStageTouch}
+        onTouchEnd={handleStageTouchEnd}
       >
         {/* Game layer — all content in 1920x1080 virtual coords */}
         <Layer
@@ -10137,6 +10313,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           />
         );
       })()}
+
+      {/* ---- Touch overlays ---- */}
+      {isTouch && (
+        <TouchControls
+          targets={jumpTargets}
+          onJump={jumpToTarget}
+          activeId={isZoomed ? null : 'fit'}
+        />
+      )}
+      {isTouch && !isSpectator && (
+        <DestinationRail
+          state={tapMoveState}
+          format={normalizedFormat}
+          cardName={
+            tapMoveState.kind === 'armed'
+              ? findAnyCardById(tapMoveState.cardId)?.cardName
+              : undefined
+          }
+          onPick={(zone, owner) => tapMoveDispatch({ type: 'tapDestinationChip', zone, owner })}
+          onCancel={tapMoveReset}
+        />
+      )}
     </div>
   );
 }
