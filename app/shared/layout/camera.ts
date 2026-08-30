@@ -142,8 +142,26 @@ export function fitRectToViewport(
     ? containerHeight / needH
     : Math.min(containerWidth / needW, containerHeight / needH);
   const zoom = scaleNeeded / fitScale;
+
+  // A height-axis fit can leave the viewport narrower than the rect (a
+  // "side" spans the full board width). Centering then frames the MIDDLE of
+  // the rect and flings its left-anchored content (e.g. auto-arranged LoB
+  // souls, which pack from the left) off-screen. When the zoomed viewport
+  // can't show the whole rect, align the viewport's left edge to the rect's
+  // left edge instead of centering, so the leftmost content is what lands
+  // on screen. Uses the CLAMPED zoom — clampCamera below caps at MAX_ZOOM,
+  // and the visible half-width must be computed at the zoom actually used.
+  let centerX = rect.x + rect.width / 2;
+  const effectiveScale = fitScale * clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+  if (Number.isFinite(effectiveScale) && effectiveScale > 0) {
+    const halfViewW = containerWidth / (2 * effectiveScale);
+    if (rect.width > 2 * halfViewW) {
+      centerX = rect.x + halfViewW;
+    }
+  }
+
   return clampCamera(
-    { zoom, centerX: rect.x + rect.width / 2, centerY: rect.y + rect.height / 2 },
+    { zoom, centerX, centerY: rect.y + rect.height / 2 },
     fitScale, virtualWidth, containerWidth, containerHeight,
   );
 }

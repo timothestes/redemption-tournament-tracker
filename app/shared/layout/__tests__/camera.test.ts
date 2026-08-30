@@ -120,6 +120,38 @@ describe('fitRectToViewport', () => {
     const cam = fitRectToViewport(side, fit.scale, fit.virtualWidth, cw, ch, { axis: 'height' });
     expect(cam.zoom).toBeGreaterThan(1.5);
   });
+
+  // Regression: a height-axis fit used to CENTER on a full-width side rect,
+  // which flung its left-anchored content (auto-arranged LoB souls pack from
+  // the left) hundreds of px off-screen left. When the zoomed viewport is
+  // narrower than the rect, the viewport's left edge must align to rect.x.
+  it('height-fit aligns the viewport left edge to the rect when it cannot show it all', () => {
+    const cw = 852, ch = 393;
+    const fit = calculateScale(cw, ch);
+    const side = { x: 0, y: 0, width: fit.virtualWidth, height: 540 };
+    const cam = fitRectToViewport(side, fit.scale, fit.virtualWidth, cw, ch, { axis: 'height' });
+
+    const composed = composeCamera(fit, cam, cw, ch);
+    const leftEdgeScreenX = side.x * composed.scale + composed.offsetX;
+    // Rect's left edge lands on-screen at (or just inside) the viewport edge…
+    expect(leftEdgeScreenX).toBeGreaterThanOrEqual(-1e-6);
+    expect(leftEdgeScreenX).toBeLessThanOrEqual(1);
+    // …so left-anchored content (a soul at virtual x ~6-250) is visible.
+    const soulScreenX = 6 * composed.scale + composed.offsetX;
+    expect(soulScreenX).toBeGreaterThanOrEqual(0);
+    expect(soulScreenX).toBeLessThan(cw);
+  });
+
+  it('height-fit still centres a rect the viewport can fully show', () => {
+    const cw = 852, ch = 393;
+    const fit = calculateScale(cw, ch);
+    // Narrow rect (fits horizontally even at the height-fit zoom).
+    const rect = { x: 900, y: 400, width: 300, height: 300 };
+    const cam = fitRectToViewport(rect, fit.scale, fit.virtualWidth, cw, ch, { axis: 'height' });
+    const composed = composeCamera(fit, cam, cw, ch);
+    const centerScreenX = (rect.x + rect.width / 2) * composed.scale + composed.offsetX;
+    expect(centerScreenX).toBeCloseTo(cw / 2, 4);
+  });
 });
 
 describe('zoomAtPoint', () => {
