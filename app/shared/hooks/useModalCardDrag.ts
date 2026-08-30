@@ -233,11 +233,25 @@ export function useModalCardDrag({
       setHoveredZone(null);
     };
 
+    // Touch scrolling fires pointercancel once the browser claims the gesture.
+    // Without this reset a scroll that started on a card left an armed (or
+    // committed) drag behind, and the NEXT tap anywhere ran onUp's drop logic —
+    // committing a phantom card move to wherever that tap landed.
+    const onCancel = () => {
+      pendingDrag.current = null;
+      if (dragRef.current.isDragging) {
+        setDragState(INITIAL_STATE);
+        setHoveredZone(null);
+      }
+    };
+
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
     return () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
     };
   }, [stageRef, findZoneAtPosition, moveCard, moveCardsBatch, onDeckDrop, onBatchDeckDrop, cardWidth, cardHeight, scale, offsetX, offsetY]);
 

@@ -381,7 +381,7 @@ html[data-input-mode='touch'] [data-context-menu] [style*='font-size: 10px'] {
    at any size that fits) in favour of larger icon-only buttons; `title` and
    the accessible name still carry the label.
    ────────────────────────────────────────────────────────────────────────── */
-html[data-input-mode='touch'] [data-game-toolbar] {
+html[data-input-mode='touch'] [data-game-toolbar]:not([data-toolbar-collapsed]) {
   bottom: calc(8px + env(safe-area-inset-bottom)) !important;
   padding: 4px 6px !important;
   max-width: calc(100vw - 16px) !important;
@@ -397,6 +397,45 @@ html[data-input-mode='touch'] [data-game-toolbar] button {
 html[data-input-mode='touch'] [data-game-toolbar] button svg {
   width: 22px !important;
   height: 22px !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Deck peek ("Look at / Reveal top N") on a short viewport.
+
+   The modal sizes its width off the card count — one card gives a 192px
+   column — and stacks a three-button footer under the grid. On a landscape
+   phone (393px tall) that footer wrapped to three rows and claimed the whole
+   box: the revealed CARD, the entire point of the modal, was scrolled out of
+   its own container and the hint truncated to "Only you can". Widen it into
+   the landscape space, keep the footer on one row, and size the cards off the
+   available height so the grid always has room.
+   ────────────────────────────────────────────────────────────────────────── */
+@media (max-height: 560px) {
+  html[data-input-mode='touch'] [data-peek-modal] {
+    width: min(92vw, 620px) !important;
+    max-height: 92dvh !important;
+  }
+  html[data-input-mode='touch'] [data-peek-grid] {
+    grid-template-columns: repeat(auto-fill, minmax(84px, 120px)) !important;
+  }
+  html[data-input-mode='touch'] [data-peek-footer] {
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+  }
+  /* The footer's button row — one line, no wrap. */
+  html[data-input-mode='touch'] [data-peek-footer] > div:last-child {
+    flex-wrap: nowrap !important;
+  }
+}
+
+/* Modal card grids (deck search/peek, zone/opponent browse): suppress the iOS
+   long-press image callout and text selection so the modals' long-press card
+   menus fire instead of the system sheet. */
+html[data-input-mode='touch'] [data-card-id],
+html[data-input-mode='touch'] [data-card-id] img {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Labels raised to the 11px legibility floor rather than hidden. Hiding them

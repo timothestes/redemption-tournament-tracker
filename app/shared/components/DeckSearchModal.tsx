@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
+import { beginCardPress, moveCardPress, cancelCardPress, cardPressFired, consumeCardPressFired, type CardPressTracker } from '@/app/shared/utils/modalCardPress';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId, ZONE_LABELS } from '@/app/shared/types/gameCard';
 import { X, Search } from 'lucide-react';
@@ -47,6 +49,7 @@ function CardContextPopup({
   onMoveToBottom: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const isTouch = useInputMode() === 'touch';
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -63,12 +66,12 @@ function CardContextPopup({
   const itemStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '5px 12px',
+    padding: isTouch ? '11px 16px' : '5px 12px',
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
     color: 'var(--gf-text)',
-    fontSize: 11,
+    fontSize: isTouch ? 13 : 11,
     textAlign: 'left',
     fontFamily: 'var(--font-cinzel), Georgia, serif',
   };
@@ -82,14 +85,14 @@ function CardContextPopup({
       onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
-        left: Math.min(x, window.innerWidth - 160),
-        top: Math.min(y, window.innerHeight - 300),
+        left: Math.max(8, Math.min(x, window.innerWidth - (isTouch ? 200 : 160))),
+        top: Math.max(8, Math.min(y, window.innerHeight - (isTouch ? 340 : 300))),
         background: 'var(--gf-bg)',
         border: '1px solid var(--gf-border)',
         borderRadius: 6,
         padding: '4px 0',
         zIndex: 900,
-        minWidth: 140,
+        minWidth: isTouch ? 180 : 140,
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
         pointerEvents: 'auto',
       }}
@@ -148,6 +151,8 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const isTouch = useInputMode() === 'touch';
+  const cardPressRef = useRef<CardPressTracker | null>(null);
 
   // Ref for the inner modal box — used for outside-click detection so the
   // backdrop can stay pointer-events: none (letting hover previews reach the
@@ -364,12 +369,16 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     };
   }, [handleClose, didDragRef]);
 
-  const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
-    e.preventDefault();
+  const openCardMenu = (card: GameCard, clientX: number, clientY: number) => {
     onCardMouseLeave();
-    setContextCard({ card, x: e.clientX, y: e.clientY });
+    setContextCard({ card, x: clientX, y: clientY });
     // Re-set the loupe preview so it keeps showing the right-clicked card
     setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek, notes: card.notes });
+  };
+
+  const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
+    e.preventDefault();
+    openCardMenu(card, e.clientX, e.clientY);
   };
 
   // Track pointer down card to distinguish click from drag on pointer up
@@ -380,6 +389,11 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     onCardMouseLeave();
     pointerDownCardRef.current = card.instanceId;
     if (didDragRef) didDragRef.current = false;
+
+    // Touch: never arm a drag from the grid — a touch drag fights the grid's
+    // native scrolling (the browser cancels it mid-gesture), so touch moves
+    // cards through the long-press menu instead. Tap still selects below.
+    if (e.pointerType === 'touch') return;
 
     const isSelected = selectedIds.has(card.instanceId);
     if (isSelected && selectedIds.size > 1 && onStartMultiDrag) {
@@ -396,6 +410,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
   const handlePointerUp = (card: GameCard) => {
     if (pointerDownCardRef.current !== card.instanceId) return;
     pointerDownCardRef.current = null;
+    if (consumeCardPressFired(cardPressRef)) return;
     if (didDragRef?.current) {
       didDragRef.current = false;
       return;
@@ -691,7 +706,9 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
         {/* Hint + auto-shuffle */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
-            Drag to a zone · Right-click for more · Hover to enlarge
+            {isTouch
+              ? 'Tap to select · Long-press a card for actions'
+              : 'Drag to a zone · Right-click for more · Hover to enlarge'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <label
@@ -802,6 +819,9 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                     onContextMenu={(e) => handleCardContextMenu(card, e)}
                     onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
                     onPointerUp={() => handlePointerUp(card)}
+                    onTouchStart={(e) => beginCardPress(cardPressRef, e, (x, y) => openCardMenu(card, x, y))}
+                    onTouchMove={(e) => moveCardPress(cardPressRef, e)}
+                    onTouchEnd={(e) => { if (cardPressFired(cardPressRef)) e.preventDefault(); cancelCardPress(cardPressRef); }}
                     onClick={(e) => e.stopPropagation()}
                     onMouseEnter={(e) => onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId)}
                     onMouseLeave={onCardMouseLeave}

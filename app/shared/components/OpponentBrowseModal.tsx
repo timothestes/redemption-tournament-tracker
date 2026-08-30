@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
+import { beginCardPress, moveCardPress, cancelCardPress, cardPressFired, consumeCardPressFired, type CardPressTracker } from '@/app/shared/utils/modalCardPress';
 import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { GameCard } from '@/app/shared/types/gameCard';
 import { X, Search } from 'lucide-react';
@@ -37,6 +38,7 @@ function OpponentCardPopup({
   onAction: (action: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const isTouch = useInputMode() === 'touch';
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -53,12 +55,12 @@ function OpponentCardPopup({
   const itemStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '5px 12px',
+    padding: isTouch ? '11px 16px' : '5px 12px',
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
     color: 'var(--gf-text)',
-    fontSize: 11,
+    fontSize: isTouch ? 13 : 11,
     textAlign: 'left',
     fontFamily: 'var(--font-cinzel), Georgia, serif',
   };
@@ -73,8 +75,8 @@ function OpponentCardPopup({
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
-        left: Math.min(x, window.innerWidth - 160),
-        top: Math.min(y, window.innerHeight - 200),
+        left: Math.max(8, Math.min(x, window.innerWidth - (isTouch ? 200 : 160))),
+        top: Math.max(8, Math.min(y, window.innerHeight - (isTouch ? 280 : 200))),
         background: 'var(--gf-bg)',
         border: '1px solid var(--gf-border)',
         borderRadius: 6,
@@ -163,7 +165,7 @@ export function OpponentBrowseModal({
   const { dragHandleProps, modalStyle } = useDraggableModal();
   // Touch has no clicks, hovers or right-clicks — say what actually works.
   const hintText = useInputMode() === 'touch'
-    ? 'Tap to select · drag to a zone'
+    ? 'Tap to select · Long-press a card for actions'
     : 'Right-click for actions · Drag to a zone · Click to select · Hover to enlarge';
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<string>('all');
@@ -307,20 +309,29 @@ export function OpponentBrowseModal({
     };
   }, [handleClose, didDragRef]);
 
-  const handleCardContextMenu = useCallback((card: GameCard, e: React.MouseEvent) => {
-    e.preventDefault();
+  const openCardMenu = useCallback((card: GameCard, clientX: number, clientY: number) => {
     onCardMouseLeave();
-    setContextCard({ card, x: e.clientX, y: e.clientY });
+    setContextCard({ card, x: clientX, y: clientY });
     setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek, notes: card.notes });
   }, [onCardMouseLeave, setPreviewCard]);
 
+  const handleCardContextMenu = useCallback((card: GameCard, e: React.MouseEvent) => {
+    e.preventDefault();
+    openCardMenu(card, e.clientX, e.clientY);
+  }, [openCardMenu]);
+
   const pointerDownCardRef = useRef<string | null>(null);
+  const cardPressRef = useRef<CardPressTracker | null>(null);
 
   const handlePointerDown = useCallback((card: GameCard, imageUrl: string, e: React.PointerEvent) => {
     if (e.button !== 0) return;
     onCardMouseLeave();
     pointerDownCardRef.current = card.instanceId;
     if (didDragRef) didDragRef.current = false;
+
+    // Touch: no drag from the modal — it fights native scrolling. Tap still
+    // selects; the long-press menu moves cards.
+    if (e.pointerType === 'touch') return;
 
     const isSelected = selectedIds.has(card.instanceId);
     if (isSelected && selectedIds.size > 1 && onStartMultiDrag) {
@@ -337,6 +348,7 @@ export function OpponentBrowseModal({
   const handlePointerUp = useCallback((card: GameCard) => {
     if (pointerDownCardRef.current !== card.instanceId) return;
     pointerDownCardRef.current = null;
+    if (consumeCardPressFired(cardPressRef)) return;
     if (didDragRef?.current) {
       didDragRef.current = false;
       return;
@@ -714,6 +726,9 @@ export function OpponentBrowseModal({
                     data-card-id={card.instanceId}
                     style={{ position: 'relative', cursor: 'grab' }}
                     onContextMenu={(e) => handleCardContextMenu(card, e)}
+                    onTouchStart={(e) => beginCardPress(cardPressRef, e, (px, py) => openCardMenu(card, px, py))}
+                    onTouchMove={(e) => moveCardPress(cardPressRef, e)}
+                    onTouchEnd={(e) => { if (cardPressFired(cardPressRef)) e.preventDefault(); cancelCardPress(cardPressRef); }}
                     onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
                     onPointerUp={() => handlePointerUp(card)}
                     onClick={(e) => e.stopPropagation()}

@@ -2,6 +2,7 @@
 
 import { useContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Search, Shuffle, Eye, Sparkles, Trash2, Archive, ChevronRight, Play } from 'lucide-react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import {
   SubMenuActionRow,
   SubmenuLockContext,
@@ -91,6 +92,11 @@ function SubmenuTrigger({
     const MARGIN = 8;
     let left = tRect.left - sRect.width - 2;
     if (left < MARGIN) left = tRect.right + 2;
+    // Clamp on-screen: in the touch bottom sheet the trigger row is
+    // full-width, so "beside the trigger" is past the viewport edge — the
+    // submenu floats over the sheet's right side instead.
+    left = Math.min(left, window.innerWidth - sRect.width - MARGIN);
+    if (left < MARGIN) left = MARGIN;
     let top = tRect.top - 4;
     const maxTop = window.innerHeight - sRect.height - MARGIN;
     if (top > maxTop) top = maxTop;
@@ -107,9 +113,19 @@ function SubmenuTrigger({
     };
   }, []);
 
+  // Touch: hover never means anything real — after a tap Chrome clears its
+  // synthetic hover state, firing a mouseleave that closed the submenu the tap
+  // had just opened. On touch only the tap toggle (and closing the whole menu)
+  // dismisses a submenu.
+  const isTouch = useInputMode() === 'touch';
+
   const showSub = () => {
     if (ctx?.closeTimerRef.current) { clearTimeout(ctx.closeTimerRef.current); ctx.closeTimerRef.current = null; }
     if (isOpen) return;
+    // Touch: the browser's synthesized mouseenter would start this timer and
+    // race the tap toggle below — whichever lost, the submenu ended up shut.
+    // Hover is meaningless here, so the tap is the only opener.
+    if (isTouch) return;
     if (!openTimerRef.current) {
       openTimerRef.current = setTimeout(() => {
         openTimerRef.current = null;
@@ -120,7 +136,7 @@ function SubmenuTrigger({
 
   const hideSub = () => {
     if (openTimerRef.current) { clearTimeout(openTimerRef.current); openTimerRef.current = null; }
-    if (lockedRef.current) return;
+    if (lockedRef.current || isTouch) return;
     if (ctx) {
       ctx.closeTimerRef.current = setTimeout(() => ctx.setActive(null), 400);
     }
