@@ -493,11 +493,15 @@ export default function TurnIndicator({
         // and right cluster (Concede) are now both small enough to fit in
         // their 1fr share — TURN N / NAME's-turn moved to a canvas overlay
         // over the opponent's hand zone, freeing ~140px from the left.
-        // Touch: `minmax(0, auto)` lets the phase row SHRINK below its
-        // content (it scrolls, see the center cluster) instead of
-        // overprinting Concede on sub-700px portrait widths.
-        display: 'grid',
-        gridTemplateColumns: isTouchBar ? '1fr minmax(0, auto) 1fr' : '1fr auto 1fr',
+        // Touch uses FLEX instead: on sub-700px portrait widths the grid's
+        // intrinsic middle track maximizes BEFORE the fr side tracks get
+        // leftover space, collapsing them to 0px (measured live: cols
+        // "0px 353px 0px") — the side clusters then overflow their empty
+        // tracks underneath the phase buttons. Flex sides are shrink-0 and
+        // the center is flex:1 with its own horizontal scroll, so the row
+        // shrinks and scrolls instead of overprinting Concede.
+        display: isTouchBar ? 'flex' : 'grid',
+        gridTemplateColumns: isTouchBar ? undefined : '1fr auto 1fr',
         alignItems: 'center',
         gap: 8,
         paddingLeft: 12,
@@ -515,6 +519,7 @@ export default function TurnIndicator({
           alignItems: 'center',
           gap: 12,
           minWidth: 0,
+          flexShrink: isTouchBar ? 0 : undefined,
         }}
       >
       {/* Exit to lobby */}
@@ -780,8 +785,10 @@ export default function TurnIndicator({
           justifyContent: isTouchBar ? 'safe center' : 'center',
           gap: 2,
           minWidth: 0,
-          // Touch: on narrow (portrait) widths the row scrolls horizontally
-          // inside its grid track instead of overprinting the right cluster.
+          // Touch: the center takes exactly the space between the fixed side
+          // clusters and scrolls its own content on narrow (portrait) widths
+          // instead of overprinting the right cluster.
+          flex: isTouchBar ? '1 1 0' : undefined,
           overflowX: isTouchBar ? 'auto' : undefined,
         }}
       >
@@ -1095,6 +1102,7 @@ export default function TurnIndicator({
           gap: 6,
           flexShrink: 0,
           minWidth: 0,
+          marginLeft: isTouchBar ? 'auto' : undefined,
         }}
       >
         {/* While a rematch request is pending, the button retracts it; otherwise
