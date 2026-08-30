@@ -439,10 +439,18 @@ export default function TurnIndicator({
   // shrinks when the right-side panel opens.
   const barRef = useRef<HTMLDivElement | null>(null);
   const [isBarNarrow, setIsBarNarrow] = useState(false);
+  // Portrait-phone widths: even the trimmed touch bar overflows ~30px at
+  // 393px, clipping the exit button and Concede at the edges — drop the
+  // score cluster there (the least load-bearing block; LoR counts live on
+  // the board) so every control stays on-screen.
+  const [isBarUltraNarrow, setIsBarUltraNarrow] = useState(false);
   useEffect(() => {
     const el = barRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const update = () => setIsBarNarrow(el.clientWidth < 1100);
+    const update = () => {
+      setIsBarNarrow(el.clientWidth < 1100);
+      setIsBarUltraNarrow(el.clientWidth < 520);
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -660,10 +668,11 @@ export default function TurnIndicator({
           flexShrink: 0,
         }}
       >
-      {/* Score */}
+      {/* Score — dropped on ultra-narrow (portrait-phone) touch bars so the
+          exit button and Concede stop clipping at the screen edges. */}
       <div
         style={{
-          display: 'flex',
+          display: isTouchBar && isBarUltraNarrow ? 'none' : 'flex',
           alignItems: 'center',
           gap: 10,
           fontFamily: 'var(--font-cinzel), Georgia, serif',
