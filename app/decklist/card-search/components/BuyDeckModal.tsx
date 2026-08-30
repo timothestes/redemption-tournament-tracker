@@ -264,7 +264,7 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
       {/* Modal — bottom sheet on mobile, centered on desktop */}
       <div
         ref={sheetRef}
-        className="fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] flex flex-col bg-card rounded-t-xl shadow-2xl border border-border md:inset-x-auto md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:mx-auto md:max-w-md md:rounded-xl md:max-h-[80vh] md:inset-x-4 lg:inset-x-0"
+        className="fixed inset-x-0 bottom-0 z-[61] max-h-[85dvh] flex flex-col bg-card rounded-t-xl shadow-2xl border border-border md:inset-x-auto md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:mx-auto md:max-w-md md:rounded-xl md:max-h-[80dvh] md:inset-x-4 lg:inset-x-0"
         style={dragY > 0 ? { transform: `translateY(${dragY}px)`, transition: dragStartY.current !== null ? 'none' : 'transform 0.2s ease-out' } : undefined}
       >
         {/* Mobile drag handle — swipe down to dismiss */}
