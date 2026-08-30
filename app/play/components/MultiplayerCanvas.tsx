@@ -5125,6 +5125,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
    *  the camera. */
   const touchTravelRef = useRef(0);
   const touchStartPtRef = useRef<{ x: number; y: number } | null>(null);
+  /** True from the moment a gesture grows to two fingers until the next
+   *  single-finger touchstart. Konva counts a pinch's finger-lifts as taps and
+   *  fires stage tap AND dbltap when it ends, but the travel tracker above only
+   *  accrues in the one-pointer branch — so without this flag every pinch ended
+   *  by resetting the camera (dbltap) and, with a card armed, could commit a
+   *  tapZone move at the release point. */
+  const sawMultiTouchRef = useRef(false);
 
   const handleStageTouch = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     if (!isTouch) return;
@@ -5135,6 +5142,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (e.type === 'touchstart' || !touchStartPtRef.current) {
         touchStartPtRef.current = { x: p.x, y: p.y };
         touchTravelRef.current = 0;
+        sawMultiTouchRef.current = false;
       } else {
         const s = touchStartPtRef.current;
         touchTravelRef.current = Math.max(touchTravelRef.current, Math.hypot(p.x - s.x, p.y - s.y));
@@ -5145,6 +5153,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // drag in flight first, otherwise the card stays glued to finger 1 while
     // the layer transform changes under it and commits wherever it lands.
     if (pointers.length >= 2) {
+      sawMultiTouchRef.current = true;
       if (isDraggingRef.current) {
         dragCancelledRef.current = true;
         const node = draggedCardIdRef.current
@@ -5170,10 +5179,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const handleStageTap = useCallback((e: Konva.KonvaEventObject<Event>) => {
     const wasCardTap = cardTapHandledRef.current;
     cardTapHandledRef.current = false;
+    // Do NOT zero touchTravelRef here: dbltap fires right after tap on the
+    // same touchend, so clearing it made dbltap's travel guard read 0 and a
+    // pan-pan or pinch ending looked like a clean double-tap. The next
+    // single-finger touchstart resets it anyway.
     const travelled = touchTravelRef.current;
-    touchTravelRef.current = 0;
 
     if (!isTouch || tapMoveStateRef.current.kind !== 'armed') return;
+    // The gesture was a pinch, not a tap — its finger-lifts still emit taps.
+    if (sawMultiTouchRef.current) return;
     // The card's own tap already armed/disarmed; don't also resolve a zone.
     if (wasCardTap) return;
     // The gesture was a pan, not a tap.
@@ -5207,6 +5221,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // Double-tap on a CARD toggles meek (existing behaviour); only a
     // background double-tap touches the camera.
     if (e.target !== e.target.getStage()) return;
+    // A pinch ending is not a double-tap, even though Konva emits one.
+    if (sawMultiTouchRef.current) return;
     // Two quick pans are not a double-tap.
     if (touchTravelRef.current > LONG_PRESS_MOVE_TOLERANCE) return;
     if (isZoomed) resetCamera();
@@ -5242,7 +5258,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           type: 'tapCard',
           cardId: card.instanceId,
           zone: card.zone as ZoneId,
-          owner: String(card.ownerId) === String(gameState.myPlayer?.id) ? 'my' : 'opponent',
+          // GameCard.ownerId is the viewer-relative seat label ('player1' =
+          // mine), NOT a player id — cardInstanceToGameCard sets it from the
+          // render seat. Comparing it to myPlayer.id is always false, which
+          // armed every card as 'opponent' and made the liveness effect below
+          // (which reads the raw row's numeric ownerId) disarm on the next
+          // render — tap-to-move never survived a live game's render churn.
+          owner: card.ownerId === 'player1' ? 'my' : 'opponent',
         });
         return;
       }
@@ -5250,7 +5272,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         clearSelection();
       }
     },
-    [selectedIds, clearSelection, toggleSelect, starWindowOpen, toggleStarPick, isTouch, isSpectator, tapMoveDispatch, gameState.myPlayer],
+    [selectedIds, clearSelection, toggleSelect, starWindowOpen, toggleStarPick, isTouch, isSpectator, tapMoveDispatch],
   );
 
   const handleCardContextMenu = useCallback(
