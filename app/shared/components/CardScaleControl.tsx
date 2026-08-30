@@ -81,7 +81,14 @@ export function CardScaleControl({
     <div data-card-scale-control
       ref={popoverRef}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ position: 'absolute', bottom: 8, left: isTouch ? 60 : 12, zIndex: 200 }}
+      style={{
+        position: 'absolute',
+        // Mirror the collapsed toolbar button's safe-area anchoring exactly —
+        // raw 8/60 drifts out of line with it on notched phones in landscape.
+        bottom: isTouch ? 'calc(8px + env(safe-area-inset-bottom))' : 8,
+        left: isTouch ? 'calc(60px + env(safe-area-inset-left))' : 12,
+        zIndex: 200,
+      }}
     >
       {/* Gear button */}
       <button

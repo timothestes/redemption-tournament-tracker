@@ -916,8 +916,10 @@ export default function TurnIndicator({
               position: 'absolute',
               // The pre-game chips sit lower to clear the PRE-GAME PHASE
               // caption; the pill drops with them so its top edge doesn't cut
-              // through that caption. No effect during normal play.
-              top: pregameStep ? PREGAME_CAPTION_GAP : 0,
+              // through that caption. The 48px touch bar has no headroom for
+              // the caption (it clipped above the screen edge), so there the
+              // caption is dropped and the chips center like normal phases.
+              top: pregameStep && !isTouchBar ? PREGAME_CAPTION_GAP : 0,
               bottom: 0,
               left: 0,
               width: activeBounds.width,
@@ -926,7 +928,7 @@ export default function TurnIndicator({
               border: '1px solid rgba(196, 149, 90, 0.45)',
               borderRadius: 20,
               boxSizing: 'border-box',
-              opacity: hasMeasuredRef.current && activeBounds.width > 0 ? 1 : 0,
+              opacity: hasMeasuredRef.current && activeBounds.width > 12 ? 1 : 0,
               transition: 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s',
               pointerEvents: 'none',
               willChange: 'transform, width',
@@ -946,7 +948,7 @@ export default function TurnIndicator({
               background: '#c4955a',
               borderRadius: 1,
               boxShadow: '0 0 6px rgba(196, 149, 90, 0.5)',
-              opacity: hasMeasuredRef.current && activeBounds.width > 0 ? 1 : 0,
+              opacity: hasMeasuredRef.current && activeBounds.width > 12 ? 1 : 0,
               transition: 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s',
               pointerEvents: 'none',
               willChange: 'transform, width',
@@ -960,7 +962,7 @@ export default function TurnIndicator({
               server drives the step. */}
           {pregameStep && (
             <>
-              <span
+              {!isTouchBar && <span
                 style={{
                   position: 'absolute',
                   // lineHeight 1 pins the caption's box to its font size, so the
@@ -980,7 +982,7 @@ export default function TurnIndicator({
                 }}
               >
                 Pre-Game Phase
-              </span>
+              </span>}
               {PREGAME_STEPS.map((step) => {
                 const isActive = step === pregameStep;
                 return (
@@ -990,7 +992,7 @@ export default function TurnIndicator({
                     style={{
                       position: 'relative',
                       padding: '4px 10px',
-                      marginTop: PREGAME_CAPTION_GAP,
+                      marginTop: isTouchBar ? 0 : PREGAME_CAPTION_GAP,
                       fontFamily: 'var(--font-cinzel), Georgia, serif',
                       fontSize: FZ.ui,
                       letterSpacing: '0.07em',

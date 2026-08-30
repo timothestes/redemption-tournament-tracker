@@ -303,7 +303,7 @@ export function GameToolbar({
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'absolute',
-        bottom: 8,
+        bottom: isTouch ? 'calc(8px + env(safe-area-inset-bottom))' : 8,
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
