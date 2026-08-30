@@ -230,7 +230,26 @@ const STANDARD_BATTLE_PROFILE: BattleProfile = {
 // Sum check: 0.08 + 0.09 + 0.185 + 0.19 + 0.21 + 0.09 + 0.155 = 1.0 ✓
 // Midline check: 0.08 + 0.09 + 0.185 + 0.19 / 2 = 0.45 — matches idle ✓
 
-function getBattleProfile(virtualWidth: number): BattleProfile {
+/** Compact touch: battle-mode row ratios. The idle profile's top gutter
+ * (0.125) is carried by the Y anchors, so these seven rows sum to 1 − 0.125.
+ * The band gets enough height for a full main card BELOW its 18px header —
+ * at phone virtual widths mainCard.cardHeight ≈ 0.213 × stageHeight, and the
+ * standard band (0.19) left in-band cards taller than the band itself. */
+const TOUCH_BATTLE_PROFILE: BattleProfile = {
+  oppHandRatio: 0.05,
+  oppLobRatio: 0.085,
+  oppTerritoryRatio: 0.1225,
+  bandRatio: 0.24,
+  playerTerritoryRatio: 0.1425,
+  playerLobRatio: 0.085,
+  playerHandRatio: 0.15,
+};
+// Sum check: 0.05 + 0.085 + 0.1225 + 0.24 + 0.1425 + 0.085 + 0.15 = 0.875 = 1 − 0.125 gutter ✓
+// Midline check: 0.125 + 0.05 + 0.085 + 0.1225 + 0.24 / 2 = 0.5025 — matches
+// idle (0.125 + 0.05 + 0.085 + 0.24 + 0.005 / 2 = 0.5025) ✓
+
+function getBattleProfile(virtualWidth: number, compact = false): BattleProfile {
+  if (compact) return TOUCH_BATTLE_PROFILE;
   return virtualWidth <= BREAKPOINT_WIDTH ? NARROW_BATTLE_PROFILE : STANDARD_BATTLE_PROFILE;
 }
 
@@ -507,7 +526,7 @@ export function calculateMultiplayerLayout(
   // — hand, LOB — reuses the idle Y anchors verbatim; only the territories
   // and the band itself get new anchors. `battleProfile`/`bandHeight` are
   // also read by the Paragon branch below, so this always runs (cheap).
-  const battleProfile = getBattleProfile(stageWidth);
+  const battleProfile = getBattleProfile(stageWidth, compact);
   const battleOppTerritoryHeight = Math.round(stageHeight * battleProfile.oppTerritoryRatio);
   const bandHeight = Math.round(stageHeight * battleProfile.bandRatio);
   const battlePlayerTerritoryHeight = Math.round(stageHeight * battleProfile.playerTerritoryRatio);

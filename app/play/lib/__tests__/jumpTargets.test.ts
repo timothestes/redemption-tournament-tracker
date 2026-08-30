@@ -42,10 +42,17 @@ describe('buildJumpTargets', () => {
     expect(buildJumpTargets(layout, VW, false).some((t) => t.id === 'battle')).toBe(false);
   });
 
-  it('includes battle when a band is active', () => {
+  it('includes battle when a band is active, framed with half a card of context', () => {
     const battleLayout = calculateMultiplayerLayout(VW, VIRTUAL_HEIGHT, 'T1', 'player', true);
-    const t = buildJumpTargets(battleLayout, VW, true);
-    expect(t.find((x) => x.id === 'battle')?.rect).toEqual(battleLayout.zones.battle);
+    const band = battleLayout.zones.battle!;
+    const rect = buildJumpTargets(battleLayout, VW, true).find((x) => x.id === 'battle')!.rect!;
+    // A height-fit of the bare band clipped the flanking cards at the frame
+    // edges — the jump rect extends ~half a card above and below the band.
+    const pad = battleLayout.mainCard.cardHeight / 2;
+    expect(rect.x).toBe(band.x);
+    expect(rect.width).toBe(band.width);
+    expect(rect.y).toBeCloseTo(Math.max(0, band.y - pad), 6);
+    expect(rect.y + rect.height).toBeCloseTo(Math.min(VIRTUAL_HEIGHT, band.y + band.height + pad), 6);
   });
 
   it('side targets actually zoom in on a phone viewport', () => {

@@ -425,3 +425,14 @@ html[data-input-mode='touch'] [data-card-scale-control] button {
   min-width: 44px !important;
   min-height: 44px !important;
 }
+
+/* Battle resolution row (Win Battle / Battle Lost / End Battle) — the
+   pointer build's 6px/12px buttons are ~27px tall. The row is anchored
+   inside the band's bottom-left corner with translateY(-100%), so taller
+   buttons grow UP into the band, which the compact battle profile has
+   already enlarged. */
+html[data-input-mode='touch'] [data-battle-resolution] button {
+  min-height: 44px !important;
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+}

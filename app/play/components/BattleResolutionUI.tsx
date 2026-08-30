@@ -217,6 +217,7 @@ function AwaitingSoulUI({
     return (
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
         <div
+          data-battle-resolution
           style={{
             position: 'absolute',
             left: topLeft.x,
@@ -552,6 +553,7 @@ export default function BattleResolutionUI({
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
       <div
+        data-battle-resolution
         style={{
           position: 'absolute',
           left: topLeft.x,

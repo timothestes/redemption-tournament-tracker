@@ -57,7 +57,19 @@ export function buildJumpTargets(
   ];
 
   if (battleActive && z.battle) {
-    targets.push({ id: 'battle', label: 'Battle', rect: z.battle, axis: 'height' });
+    // Frame the band PLUS half a card of context above and below — a
+    // height-fit of the bare band put its edges at the frame edges, clipping
+    // the cards that flank it (band cards overhang, and the adjacent
+    // territory rows are what a player references mid-battle).
+    const contextPad = layout.mainCard.cardHeight / 2;
+    const top = Math.max(0, z.battle.y - contextPad);
+    const bottom = Math.min(VIRTUAL_HEIGHT, z.battle.y + z.battle.height + contextPad);
+    targets.push({
+      id: 'battle',
+      label: 'Battle',
+      rect: { x: z.battle.x, y: top, width: z.battle.width, height: bottom - top },
+      axis: 'height',
+    });
   }
 
   return targets;

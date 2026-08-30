@@ -6208,15 +6208,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     const sideHasCharacters = (seat: string) =>
       battleLikes.some((c) => battleSideOf(c) === seat && isCharacterCard({ cardType: c.cardType }));
 
-    if (sideHasCharacters(mySeatStr)) return null; // my side already has a character — cue's job is done
+    // ANY card on my side retires the cue — gating on characters alone left
+    // it rendering underneath a placed enhancement/weapon (mobile QA).
+    if (battleLikes.some((c) => battleSideOf(c) === mySeatStr)) return null;
 
-    if (mySeatStr === attackerSeat) return 'Drag attackers here';
+    if (mySeatStr === attackerSeat) {
+      return isTouch ? 'Drag or tap a card here' : 'Drag attackers here';
+    }
     // Defending: only cue once there's actually something to block.
-    return sideHasCharacters(attackerSeat) ? 'Drag a blocker here' : null;
+    if (!sideHasCharacters(attackerSeat)) return null;
+    return isTouch ? 'Drag or tap a blocker here' : 'Drag a blocker here';
   }, [
     battleActive,
     gameStatus,
     isSpectator,
+    isTouch,
     gameState.battleState,
     gameState.battleAttackerSeat,
     gameState.myPlayer,
