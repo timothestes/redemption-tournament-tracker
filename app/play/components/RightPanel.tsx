@@ -82,6 +82,11 @@ export default function RightPanel({
   const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all' | 'spectators'>('all');
   const isTouch = useInputMode() === 'touch';
   const collapsedWidth = isTouch ? PANEL_COLLAPSED_WIDTH_TOUCH : PANEL_COLLAPSED_WIDTH;
+  // Collapsed on touch, only the top 48px of the 44px-wide rail did anything —
+  // the rest was an empty scrim running the height of the screen, reading as
+  // dead space beside the sidebar. The whole strip is the control instead,
+  // labelled so it says what it opens.
+  const isRail = isTouch && !isLoupeVisible;
 
   return (
     <div style={{
@@ -101,20 +106,23 @@ export default function RightPanel({
       <button
         onClick={toggleLoupe}
         title={isLoupeVisible ? 'Hide panel (Tab)' : 'Show panel (Tab)'}
+        aria-label={isLoupeVisible ? 'Hide chat and game log' : 'Show chat and game log'}
         style={{
           width: '100%',
-          height: 48,
+          height: isRail ? 'auto' : 48,
           minHeight: 48,
-          background: 'rgba(10, 8, 5, 0.96)',
+          flex: isRail ? 1 : undefined,
+          background: isRail ? 'transparent' : 'rgba(10, 8, 5, 0.96)',
           borderTop: 'none',
           borderLeft: 'none',
           borderRight: 'none',
-          borderBottom: '1px solid rgba(107, 78, 39, 0.5)',
+          borderBottom: isRail ? 'none' : '1px solid rgba(107, 78, 39, 0.5)',
           cursor: 'pointer',
           display: 'flex',
+          flexDirection: isRail ? 'column' : 'row',
           alignItems: 'center',
           justifyContent: isLoupeVisible ? 'flex-start' : 'center',
-          gap: 6,
+          gap: isRail ? 14 : 6,
           padding: isLoupeVisible ? '0 12px' : '0',
           color: 'rgba(232, 213, 163, 0.5)',
           flexShrink: 0,
@@ -134,24 +142,41 @@ export default function RightPanel({
             </span>
           </>
         ) : (
-          <span style={{ fontSize: 14, position: 'relative' }}>
-            ‹
-            {unreadChatCount > 0 && (
+          <>
+            <span style={{ fontSize: 14, position: 'relative' }}>
+              ‹
+              {unreadChatCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -6,
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: '#c4955a',
+                    boxShadow: '0 0 4px rgba(196, 149, 90, 0.6)',
+                    animation: 'unread-pulse 2s ease-in-out infinite',
+                  }}
+                />
+              )}
+            </span>
+            {isRail && (
               <span
                 style={{
-                  position: 'absolute',
-                  top: -2,
-                  right: -6,
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  background: '#c4955a',
-                  boxShadow: '0 0 4px rgba(196, 149, 90, 0.6)',
-                  animation: 'unread-pulse 2s ease-in-out infinite',
+                  writingMode: 'vertical-rl',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 10,
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                  opacity: 0.8,
                 }}
-              />
+              >
+                Chat &amp; Log
+              </span>
             )}
-          </span>
+          </>
         )}
       </button>
       {/* Keyframe for unread dot pulse */}

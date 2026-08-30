@@ -62,9 +62,6 @@ export function CardScaleControl({
     };
   }, [open]);
 
-  // Touch docks the GameToolbar's collapsed button at left:8 bottom:8 with a
-  // higher stacking order — the gear at left:12 rendered underneath it and
-  // card size / timer / chat scale were unreachable. Sit beside it instead.
   const isTouch = useInputMode() === 'touch';
 
   const pct = Math.round(cardScale * 100);
@@ -83,10 +80,10 @@ export function CardScaleControl({
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'absolute',
-        // Mirror the collapsed toolbar button's safe-area anchoring exactly —
-        // raw 8/60 drifts out of line with it on notched phones in landscape.
+        // The collapsed toolbar button sits beside this one; both anchor to the
+        // safe area so they stay on the same line on a notched phone.
         bottom: isTouch ? 'calc(8px + env(safe-area-inset-bottom))' : 8,
-        left: isTouch ? 'calc(60px + env(safe-area-inset-left))' : 12,
+        left: isTouch ? 'calc(8px + env(safe-area-inset-left))' : 12,
         zIndex: 200,
       }}
     >

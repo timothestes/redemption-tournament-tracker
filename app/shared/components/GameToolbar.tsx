@@ -270,7 +270,9 @@ export function GameToolbar({
         style={{
           position: 'absolute',
           bottom: 'calc(8px + env(safe-area-inset-bottom))',
-          left: 'calc(8px + env(safe-area-inset-left))',
+          // The settings gear keeps the far-left corner it has on pointer;
+          // this docks beside it.
+          left: 'calc(60px + env(safe-area-inset-left))',
           zIndex: 200,
         }}
       >

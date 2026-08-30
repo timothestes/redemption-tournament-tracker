@@ -447,10 +447,12 @@ html[data-input-mode='touch'] [data-game-toolbar] button span {
   white-space: nowrap !important;
 }
 
-/* The toolbar is z-index 200 and centred at bottom: 8, which lands it squarely
-   on top of the player's hand — the surface touched every single turn. On
-   touch it docks bottom-left, clear of the hand fan, and scrolls if needed. */
-html[data-input-mode='touch'] [data-game-toolbar] {
+/* The expanded bar is z-index 200 and centred at bottom: 8, which lands it
+   squarely on top of the player's hand — the surface touched every single
+   turn. On touch it docks bottom-left, clear of the hand fan, and scrolls if
+   needed. The collapsed button positions itself (it sits beside the settings
+   gear), so this must not reach it. */
+html[data-input-mode='touch'] [data-game-toolbar]:not([data-toolbar-collapsed]) {
   left: 8px !important;
   transform: none !important;
 }
