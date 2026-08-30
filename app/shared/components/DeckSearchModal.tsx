@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId, ZONE_LABELS } from '@/app/shared/types/gameCard';
 import { X, Search } from 'lucide-react';
@@ -341,7 +342,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
 
     const handleMouseDown = (e: MouseEvent) => {
       if (isInside(e.target)) return;
-      if (e.button === 0 && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+      if (isPrimaryPointer(e) && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
         setContextCard(null);
         handleClose();
       }

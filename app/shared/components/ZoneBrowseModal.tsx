@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '@/app/shared/types/gameCard';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
@@ -242,7 +243,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
 
     const handleMouseDown = (e: MouseEvent) => {
       if (isInside(e.target)) return;
-      if (e.button === 0 && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+      if (isPrimaryPointer(e) && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
         setContextCard(null);
         onClose();
       }

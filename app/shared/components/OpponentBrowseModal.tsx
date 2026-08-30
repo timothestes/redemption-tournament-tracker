@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
 import { GameCard } from '@/app/shared/types/gameCard';
 import { X, Search } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
@@ -280,7 +281,7 @@ export function OpponentBrowseModal({
     const handleMouseDown = (e: MouseEvent) => {
       if (isInside(e.target)) return;
       setContextCard(null);
-      if (e.button === 0 && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+      if (isPrimaryPointer(e) && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
         handleClose();
       }
     };

@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId } from '@/app/shared/types/gameCard';
 import { ArrowUp, ArrowDown, Shuffle } from 'lucide-react';
@@ -306,7 +307,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
     const handleMouseDown = (e: MouseEvent) => {
       if (isInside(e.target)) return;
-      if (e.button === 0 && readyForClose && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+      if (isPrimaryPointer(e) && readyForClose && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
         handleDismiss();
       }
     };
