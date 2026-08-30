@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS, CounterColorId } from '../../goldfish/types';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { GameActions } from '@/app/shared/types/gameActions';
 import { getEffectiveAbilities, abilityLabel, DEFAULT_ABILITY_SOURCE_ZONES, isNewTestamentLostSoul } from '@/lib/cards/cardAbilities';
 
@@ -64,6 +65,11 @@ interface CardContextMenuProps {
 export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, onSurrender, onRescue, zones, isHandRevealed, opponentHandRevealed, topDeckRevealed }: CardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
+  // Touch renders this menu as a bottom sheet (globals.css [data-context-menu]).
+  // A sheet needs its own header — which card this is, and an explicit close
+  // target — and the click/context-click counter dots need real +/− steppers
+  // (there is no right-click on touch).
+  const isTouchMenu = useInputMode() === 'touch';
 
   // Read live card data so counters update while menu is open
   const card = useMemo(() => {
@@ -264,6 +270,59 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   return (
     <div ref={menuRef} data-context-menu style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
 
+      {/* Touch sheet header — the card's name plus an explicit close target.
+          Pointer menus stay cursor-anchored and dismiss on outside click, so
+          they skip this. */}
+      {isTouchMenu && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            padding: '2px 4px 2px 16px',
+            borderBottom: '1px solid var(--gf-border)',
+            marginBottom: 4,
+          }}
+        >
+          <span
+            style={{
+              color: 'var(--gf-text)',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 15,
+              fontWeight: 700,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+            }}
+          >
+            {card.cardName}
+          </span>
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={onClose}
+            style={{
+              minWidth: 44,
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--gf-text-dim)',
+              fontSize: 22,
+              lineHeight: 1,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Card abilities from CARD_ABILITIES registry. Either player may fire an
           ability on any card (effects route to the activator). Rendered disabled
           only when the card isn't in a valid source zone, or when a brigade-draw
@@ -405,6 +464,103 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
       {(card.zone === 'territory' || card.zone === 'land-of-bondage' || card.zone === 'battle' || (card.zone === 'land-of-redemption' && card.counters.some(c => c.count > 0))) && (
         <>
           <div style={labelStyle}>Counters</div>
+          {/* Touch: explicit +/− steppers per color — the pointer row's
+              left-click/right-click semantics don't exist on touch. The
+              existing add/remove handlers are reused verbatim. */}
+          {isTouchMenu && (
+            <div style={{ display: 'flex', gap: 12, padding: '4px 16px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {COUNTER_COLORS.filter(c => c.id === 'red' || c.id === 'green' || c.id === 'blue').map((color) => {
+                const count = getCount(color.id);
+                const stepStyle: React.CSSProperties = {
+                  minWidth: 40,
+                  minHeight: 40,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'transparent',
+                  border: '1px solid var(--gf-border)',
+                  borderRadius: 8,
+                  color: 'var(--gf-text)',
+                  fontSize: 18,
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                };
+                return (
+                  <div key={color.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${color.label} counter`}
+                      disabled={count === 0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (count > 0) actions.removeCounter(card.instanceId, color.id);
+                      }}
+                      style={{ ...stepStyle, opacity: count === 0 ? 0.35 : 1, cursor: count === 0 ? 'default' : 'pointer' }}
+                    >
+                      −
+                    </button>
+                    <span
+                      aria-label={`${color.label} counters: ${count}`}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: '50%',
+                        background: color.hex,
+                        border: count > 0 ? '2px solid rgba(255,255,255,0.8)' : '2px solid rgba(255,255,255,0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontSize: 13,
+                        fontWeight: 'bold',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {count > 0 ? count : ''}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Add ${color.label} counter`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        actions.addCounter(card.instanceId, color.id);
+                      }}
+                      style={stepStyle}
+                    >
+                      +
+                    </button>
+                  </div>
+                );
+              })}
+              {card.counters.some(c => c.count > 0) && (
+                <button
+                  type="button"
+                  aria-label="Clear all counters"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    card.counters.forEach(c => {
+                      for (let i = 0; i < c.count; i++) {
+                        actions.removeCounter(card.instanceId, c.color);
+                      }
+                    });
+                  }}
+                  style={{
+                    minHeight: 40,
+                    padding: '0 12px',
+                    background: 'transparent',
+                    border: '1px solid var(--gf-border)',
+                    borderRadius: 8,
+                    color: 'var(--gf-text-dim)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+          {!isTouchMenu && (
           <div style={{ display: 'flex', gap: 6, padding: '4px 16px 2px', alignItems: 'center' }}>
             {COUNTER_COLORS.filter(c => c.id === 'red' || c.id === 'green' || c.id === 'blue').map((color) => {
               const count = getCount(color.id);
@@ -488,9 +644,12 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
               </button>
             )}
           </div>
+          )}
+          {!isTouchMenu && (
           <div style={{ padding: '0 16px 4px', fontSize: 9, color: 'var(--gf-border)', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
             Left-click +1 · Right-click -1
           </div>
+          )}
         </>
       )}
 
