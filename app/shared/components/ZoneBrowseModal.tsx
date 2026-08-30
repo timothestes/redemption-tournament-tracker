@@ -49,7 +49,11 @@ function CardContextPopup({
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
+    };
   }, [onClose]);
 
   const itemStyle: React.CSSProperties = {
@@ -250,9 +254,12 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     };
 
     document.addEventListener('mousedown', handleMouseDown);
+
+    document.addEventListener('touchstart', handleMouseDown);
     document.addEventListener('contextmenu', handleContextMenu);
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('touchstart', handleMouseDown);
       document.removeEventListener('contextmenu', handleContextMenu);
     };
   }, [onClose, didDragRef]);

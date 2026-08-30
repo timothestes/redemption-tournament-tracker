@@ -80,6 +80,7 @@ import { useTapToMove } from '@/app/play/hooks/useTapToMove';
 import { buildJumpTargets } from '@/app/play/lib/jumpTargets';
 import type { CommitMove } from '@/app/play/lib/tapToMoveCore';
 import type { PointerSample } from '@/app/play/lib/gestureCore';
+import { LONG_PRESS_MOVE_TOLERANCE } from '@/app/play/lib/longPressCore';
 import { DestinationRail } from '@/app/play/components/DestinationRail';
 import { TouchControls } from '@/app/play/components/TouchControls';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
@@ -4985,8 +4986,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // adjustment: a tap has no drag anchor to preserve, so the tap point simply
   // becomes the card's new centre (the same shape as the soul-deck pile drop).
   const handleTapMoveCommit = useCallback((move: CommitMove) => {
+    const id = BigInt(move.cardId);
+    const card = findAnyCardById(move.cardId);
+
+    // Battle drops NEVER transfer ownership (battle spec section 4) and the
+    // band is shared table space, so an owner id here would hand the
+    // opponent's card to whoever tapped. findZoneAtPosition reports the band
+    // as owner 'my' purely as a formality.
     const targetOwnerId =
-      move.toOwner === 'shared'
+      move.toZone === 'battle'
+        ? ''
+        : move.toOwner === 'shared'
         ? '0'
         : move.toOwner === 'my' && gameState.myPlayer
         ? String(gameState.myPlayer.id)
@@ -4994,9 +5004,32 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         ? String(gameState.opponentPlayer.id)
         : '';
 
-    const id = BigInt(move.cardId);
+    // Battle positions mirror by CARD owner, not by hit owner, so each
+    // player's cards land on their own half of the band on both screens.
+    if (move.toZone === 'battle') {
+      if (!battleBandRect || !move.atPoint) {
+        moveCard(id, 'battle', '', undefined, undefined, '');
+        return;
+      }
+      const cardIsOpponents =
+        !!card && String(card.ownerId) !== String(gameState.myPlayer?.id);
+      const bOwner: 'my' | 'opponent' = cardIsOpponents ? 'opponent' : 'my';
+      const bAdj = adjustAnchorForRotationChange(
+        move.atPoint.x - cardWidth / 2,
+        move.atPoint.y - cardHeight / 2,
+        cardWidth, cardHeight, false, cardIsOpponents,
+      );
+      const bdb = toDbPos(bAdj.x, bAdj.y, battleBandRect, bOwner, { cardWidth, cardHeight });
+      moveCard(id, 'battle', '', String(bdb.x), String(bdb.y), '');
+      return;
+    }
+
     const zoneRect =
-      move.toOwner === 'opponent' ? opponentZones[move.toZone] : myZones[move.toZone];
+      move.toOwner === 'shared'
+        ? mpLayout?.zones.sharedLob
+        : move.toOwner === 'opponent'
+        ? opponentZones[move.toZone]
+        : myZones[move.toZone];
 
     // Rail chips carry no point, and a zone we can't resolve a rect for falls
     // back to the same path - the server places the card.
@@ -5007,15 +5040,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
     const targetOwner: 'my' | 'opponent' = move.toOwner === 'opponent' ? 'opponent' : 'my';
     const clampOpts = isFreeFormZone(move.toZone) ? { cardWidth, cardHeight } : undefined;
-    const db = toDbPos(
+
+    // Opponent free-form zones render rotated 180, so toDbPos expects the
+    // BOTTOM-RIGHT anchor there while our own zones expect the top-left. The
+    // drag path corrects this via adjustAnchorForRotationChange; without the
+    // same correction a tap into opponent territory landed a full card
+    // up-and-left of where the player touched.
+    const targetIsRotated = targetOwner === 'opponent' && isFreeFormZone(move.toZone);
+    const { x: adjX, y: adjY } = adjustAnchorForRotationChange(
       move.atPoint.x - cardWidth / 2,
       move.atPoint.y - cardHeight / 2,
-      zoneRect,
-      targetOwner,
-      clampOpts,
+      cardWidth,
+      cardHeight,
+      false,          // a tap has no source-drag anchor
+      targetIsRotated,
     );
+    const db = toDbPos(adjX, adjY, zoneRect, targetOwner, clampOpts);
     moveCard(id, move.toZone, '', String(db.x), String(db.y), targetOwnerId);
-  }, [gameState.myPlayer, gameState.opponentPlayer, moveCard, myZones, opponentZones, cardWidth, cardHeight]);
+  }, [gameState.myPlayer, gameState.opponentPlayer, moveCard, myZones, opponentZones, cardWidth, cardHeight, battleBandRect, mpLayout, findAnyCardById]);
 
   const {
     state: tapMoveState, dispatch: tapMoveDispatch, reset: tapMoveReset,
@@ -5024,6 +5066,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // stable, so the Stage's onTap prop doesn't change on every arm/disarm.
   const tapMoveStateRef = useRef(tapMoveState);
   tapMoveStateRef.current = tapMoveState;
+
+  // The opponent acts concurrently, so an armed card can change zone, be
+  // discarded, or disappear while the rail is open. Committing then would
+  // yank the card out of wherever it actually ended up.
+  useEffect(() => {
+    if (tapMoveState.kind !== 'armed') return;
+    if (gameStatus !== 'playing') { tapMoveReset(); return; }
+    const live = findAnyCardById(tapMoveState.cardId);
+    if (!live) { tapMoveReset(); return; }
+    const liveOwner = String(live.ownerId) === String(gameState.myPlayer?.id) ? 'my' : 'opponent';
+    if (live.zone !== tapMoveState.sourceZone || liveOwner !== tapMoveState.sourceOwner) {
+      tapMoveReset();
+    }
+  }, [tapMoveState, gameStatus, findAnyCardById, gameState.myPlayer, tapMoveReset]);
+
+  // Lets global CSS lift the floating toolbar out of the rail's way.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const open = isTouch && tapMoveState.kind === 'armed';
+    document.documentElement.setAttribute('data-rail-open', open ? 'true' : 'false');
+    return () => document.documentElement.removeAttribute('data-rail-open');
+  }, [isTouch, tapMoveState.kind]);
 
   // ---- Stage-level touch handlers ----
   const collectPointers = useCallback((evt: TouchEvent): PointerSample[] => {
@@ -5037,28 +5101,78 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }));
   }, []);
 
+  /** Set by handleCardClick when a tap lands on a card, so the Stage-level tap
+   *  that bubbles up afterwards doesn't also try to resolve a destination. */
+  const cardTapHandledRef = useRef(false);
+  /** Screen-space distance the current one-finger gesture has travelled. A pan
+   *  is not a Konva drag, so Konva still emits tap/dbltap when it ends —
+   *  without this a pan would commit a move, and two quick pans would reset
+   *  the camera. */
+  const touchTravelRef = useRef(0);
+  const touchStartPtRef = useRef<{ x: number; y: number } | null>(null);
+
   const handleStageTouch = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     if (!isTouch) return;
     const pointers = collectPointers(e.evt);
-    // Two or more fingers is a pinch and is allowed anywhere. A single finger
-    // only pans when it started on the background - on a card it is a drag.
-    if (pointers.length < 2 && e.target !== e.target.getStage()) return;
+
+    if (pointers.length === 1) {
+      const p = pointers[0];
+      if (e.type === 'touchstart' || !touchStartPtRef.current) {
+        touchStartPtRef.current = { x: p.x, y: p.y };
+        touchTravelRef.current = 0;
+      } else {
+        const s = touchStartPtRef.current;
+        touchTravelRef.current = Math.max(touchTravelRef.current, Math.hypot(p.x - s.x, p.y - s.y));
+      }
+    }
+
+    // A second finger promotes the interaction to a pinch. Cancel any card
+    // drag in flight first, otherwise the card stays glued to finger 1 while
+    // the layer transform changes under it and commits wherever it lands.
+    if (pointers.length >= 2) {
+      if (isDraggingRef.current) {
+        dragCancelledRef.current = true;
+        const node = draggedCardIdRef.current
+          ? cardNodeRefs.current.get(draggedCardIdRef.current)
+          : null;
+        if (node && typeof (node as any).stopDrag === 'function') (node as any).stopDrag();
+      }
+      onCameraPointers(pointers);
+      return;
+    }
+
+    // One finger only pans from the background; on a card it is a card drag.
+    if (e.target !== e.target.getStage()) return;
     onCameraPointers(pointers);
   }, [isTouch, onCameraPointers, collectPointers]);
 
   const handleStageTouchEnd = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     if (!isTouch) return;
     onCameraPointers(collectPointers(e.evt));
+    touchStartPtRef.current = null;
   }, [isTouch, onCameraPointers, collectPointers]);
 
   const handleStageTap = useCallback((e: Konva.KonvaEventObject<Event>) => {
+    const wasCardTap = cardTapHandledRef.current;
+    cardTapHandledRef.current = false;
+    const travelled = touchTravelRef.current;
+    touchTravelRef.current = 0;
+
     if (!isTouch || tapMoveStateRef.current.kind !== 'armed') return;
-    // Taps that landed on a card are handled by handleCardClick.
-    if (e.target !== e.target.getStage()) return;
+    // The card's own tap already armed/disarmed; don't also resolve a zone.
+    if (wasCardTap) return;
+    // The gesture was a pan, not a tap.
+    if (travelled > LONG_PRESS_MOVE_TOLERANCE) return;
+
     const stage = stageRef.current;
     if (!stage) return;
     const pos = stage.getPointerPosition();
     if (!pos) return;
+    // Hit-test the release point regardless of which shape Konva reports as
+    // the target. Konva only names the Stage when the tap misses every
+    // listening shape, and the LoB rects, all six sidebar piles, the shared
+    // Paragon rects and the hand background all listen — so gating on
+    // `e.target === stage` made tap-to-move work over territory alone.
     const v = screenToVirtual(pos.x, pos.y, scale, offsetX, offsetY);
     const hit = findZoneAtPosition(v.x, v.y);
     if (!hit) {
@@ -5078,6 +5192,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // Double-tap on a CARD toggles meek (existing behaviour); only a
     // background double-tap touches the camera.
     if (e.target !== e.target.getStage()) return;
+    // Two quick pans are not a double-tap.
+    if (touchTravelRef.current > LONG_PRESS_MOVE_TOLERANCE) return;
     if (isZoomed) resetCamera();
   }, [isTouch, isZoomed, resetCamera]);
 
@@ -5106,6 +5222,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // selection. Spectators stay read-only. Runs after the click counter so
       // double-tap-to-meek still works.
       if (isTouch && !isSpectator) {
+        cardTapHandledRef.current = true;
         tapMoveDispatch({
           type: 'tapCard',
           cardId: card.instanceId,
@@ -5158,6 +5275,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
    *  it reads clientX/clientY off the event and positions from stageRef, so a
    *  synthetic event carrying the press point is enough. */
   const handleCardLongPress = useCallback((card: GameCard, p: { x: number; y: number }) => {
+    // GameCardNode calls this immediately before stopDrag(). Marking the drag
+    // cancelled here makes the resulting dragend a no-op instead of a move.
+    if (isDraggingRef.current) dragCancelledRef.current = true;
     handleCardContextMenu(card, {
       evt: { clientX: p.x, clientY: p.y, preventDefault() {} },
       cancelBubble: false,

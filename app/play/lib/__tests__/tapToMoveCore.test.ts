@@ -94,3 +94,36 @@ describe('legalDestinations', () => {
     expect(legalDestinations('hand', 'my', 'T1').some((x) => x.zone === 'battle')).toBe(false);
   });
 });
+
+describe('legalDestinations - adversarial review regressions', () => {
+  it('omits the per-seat Land of Bondage in Paragon', () => {
+    // Paragon collapses each seat's LoB to a zero-height placeholder and
+    // renders one shared LoB instead. Offering the per-seat zone sent the card
+    // somewhere that does not render - recoverable only via Undo.
+    const d = legalDestinations('hand', 'my', 'Paragon');
+    expect(d.some((x) => x.zone === 'land-of-bondage' && x.owner === 'my')).toBe(false);
+    expect(d.some((x) => x.zone === 'land-of-bondage' && x.owner === 'opponent')).toBe(false);
+    // ...but the SHARED one is still offered.
+    expect(d).toContainEqual({ zone: 'land-of-bondage', owner: 'shared' });
+  });
+
+  it('keeps the per-seat Land of Bondage outside Paragon', () => {
+    const d = legalDestinations('hand', 'my', 'T1');
+    expect(d).toContainEqual({ zone: 'land-of-bondage', owner: 'my' });
+    expect(d).toContainEqual({ zone: 'land-of-bondage', owner: 'opponent' });
+  });
+
+  it('offers the opponent deck and reserve, which the drop path accepts', () => {
+    const d = legalDestinations('hand', 'my', 'T1');
+    expect(d).toContainEqual({ zone: 'deck', owner: 'opponent' });
+    expect(d).toContainEqual({ zone: 'reserve', owner: 'opponent' });
+  });
+
+  it('never offers a destination twice', () => {
+    for (const fmt of ['T1', 'T2', 'Paragon'] as const) {
+      const d = legalDestinations('hand', 'my', fmt);
+      const keys = d.map((x) => `${x.owner}:${x.zone}`);
+      expect(new Set(keys).size, `${fmt} has duplicates`).toBe(keys.length);
+    }
+  });
+});

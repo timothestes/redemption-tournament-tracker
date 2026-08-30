@@ -227,6 +227,7 @@ export function GameToolbar({
 
   return (
     <div
+      data-game-toolbar
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'absolute',

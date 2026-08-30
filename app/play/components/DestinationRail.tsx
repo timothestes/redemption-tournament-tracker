@@ -55,7 +55,7 @@ export function DestinationRail({
     <AnimatePresence>
       {state.kind === 'armed' && (
         <motion.div
-          className="pointer-events-auto absolute inset-x-0 bottom-0 z-40
+          className="pointer-events-auto absolute inset-x-0 bottom-0 z-[300]
                      border-t border-neutral-700 bg-neutral-900/95 backdrop-blur
                      pb-[env(safe-area-inset-bottom)]"
           initial={{ y: '100%' }}

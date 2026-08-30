@@ -108,9 +108,11 @@ const MY_DESTINATIONS: ZoneId[] = [
 ];
 
 /** Zones a player can send a card to on the opponent's side. Sandbox rules
- *  already permit all of these - see findZoneAtPosition in MultiplayerCanvas. */
+ *  already permit all of these - see findZoneAtPosition in MultiplayerCanvas,
+ *  whose opponent sidebar loop also accepts deck and reserve. */
 const OPPONENT_DESTINATIONS: ZoneId[] = [
-  'territory', 'land-of-bondage', 'land-of-redemption', 'discard', 'banish', 'hand',
+  'territory', 'land-of-bondage', 'land-of-redemption', 'discard', 'banish',
+  'hand', 'deck', 'reserve',
 ];
 
 /** Paragon-only shared zones. */
@@ -128,8 +130,14 @@ export function legalDestinations(
 ): Array<{ zone: ZoneId; owner: ZoneOwner }> {
   const out: Array<{ zone: ZoneId; owner: ZoneOwner }> = [];
 
-  for (const zone of MY_DESTINATIONS) out.push({ zone, owner: 'my' });
-  for (const zone of OPPONENT_DESTINATIONS) out.push({ zone, owner: 'opponent' });
+  // Paragon collapses each seat's Land of Bondage to a zero-height placeholder
+  // and renders a single shared LoB instead. Offering the per-seat zone would
+  // send the card somewhere that does not render - recoverable only by Undo.
+  const perSeatLobHidden = format === 'Paragon';
+  const keep = (zone: ZoneId) => !(perSeatLobHidden && zone === 'land-of-bondage');
+
+  for (const zone of MY_DESTINATIONS) if (keep(zone)) out.push({ zone, owner: 'my' });
+  for (const zone of OPPONENT_DESTINATIONS) if (keep(zone)) out.push({ zone, owner: 'opponent' });
   if (format === 'Paragon') {
     for (const zone of SHARED_DESTINATIONS) out.push({ zone, owner: 'shared' });
   }

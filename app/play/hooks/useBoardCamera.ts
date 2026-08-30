@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   defaultCamera, clampCamera, fitRectToViewport, zoomAtPoint,
-  MIN_ZOOM, type Camera, type Rect, type FitOptions,
+  MIN_ZOOM, MAX_ZOOM, type Camera, type Rect, type FitOptions,
 } from '@/app/shared/layout/camera';
 import {
   classifyGesture, pinchMetrics, pinchZoomDelta, type PointerSample,
@@ -24,14 +24,22 @@ export function useBoardCamera({
 }: UseBoardCameraArgs) {
   const [camera, setCameraRaw] = useState<Camera>(() => defaultCamera(virtualWidth));
 
-  // Re-centre when the virtual width changes (rotation, resize) but only while
-  // at rest, so a resize mid-zoom doesn't yank the player's view.
+  // Re-clamp whenever the viewport changes (rotation, sheet open/close). Only
+  // re-centring at zoom 1 left a zoomed-and-panned camera pointing outside the
+  // board after a resize, showing a dead band until the next pan.
   useEffect(() => {
-    setCameraRaw((c) => (c.zoom === MIN_ZOOM ? defaultCamera(virtualWidth) : c));
-  }, [virtualWidth]);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) return;
+    setCameraRaw((c) => (
+      c.zoom === MIN_ZOOM
+        ? defaultCamera(virtualWidth)
+        : clampCamera(c, fitScale, virtualWidth, containerWidth, containerHeight)
+    ));
+  }, [virtualWidth, fitScale, containerWidth, containerHeight]);
 
   const setCamera = useCallback((next: Camera) => {
-    if (fitScale <= 0) return;
+    // Number.isFinite, not `> 0`: a NaN fitScale would slip past a comparison
+    // guard and clampCamera would return NaN centres.
+    if (!Number.isFinite(fitScale) || fitScale <= 0) return;
     setCameraRaw(clampCamera(next, fitScale, virtualWidth, containerWidth, containerHeight));
   }, [fitScale, virtualWidth, containerWidth, containerHeight]);
 
@@ -78,7 +86,12 @@ export function useBoardCamera({
       const dy = (p.y - g.lastY) / scale;
       g.lastX = p.x;
       g.lastY = p.y;
-      setCamera({ ...camera, centerX: camera.centerX - dx, centerY: camera.centerY - dy });
+      // Functional update: two touchmoves batched into one render would
+      // otherwise both read the same stale closure camera and lose a delta.
+      setCameraRaw((prev) => clampCamera(
+        { ...prev, centerX: prev.centerX - dx, centerY: prev.centerY - dy },
+        fitScale, virtualWidth, containerWidth, containerHeight,
+      ));
       return;
     }
 
@@ -92,7 +105,11 @@ export function useBoardCamera({
       return;
     }
     const factor = pinchZoomDelta(g.startDistance, m.distance);
-    const nextZoom = g.startCamera.zoom * factor;
+    // Clamp BEFORE anchoring. zoomAtPoint solves the centre for the zoom it is
+    // given; handing it an out-of-range zoom and clamping afterwards keeps a
+    // centre computed for a zoom that was never applied, so an over-pinch
+    // walks the camera into the corner.
+    const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, g.startCamera.zoom * factor));
     // Anchor on the pinch midpoint, converted to virtual space.
     const anchorVX = camera.centerX + (m.midX - containerWidth / 2) / scale;
     const anchorVY = camera.centerY + (m.midY - containerHeight / 2) / scale;

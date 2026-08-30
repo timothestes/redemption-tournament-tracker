@@ -351,3 +351,77 @@ html[data-input-mode='touch'] [data-context-menu] [style*='font-size: 9px'],
 html[data-input-mode='touch'] [data-context-menu] [style*='font-size: 10px'] {
   font-size: 11px !important;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Touch sizing for the floating game toolbar.
+
+   The pointer build packs ten buttons at minWidth 50 with 8px Cinzel labels —
+   fine for a mouse, but under half the 44px touch target and well below the
+   11px legibility floor. On touch the labels are dropped (they are unreadable
+   at any size that fits) in favour of larger icon-only buttons; `title` and
+   the accessible name still carry the label.
+   ────────────────────────────────────────────────────────────────────────── */
+html[data-input-mode='touch'] [data-game-toolbar] {
+  bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+  padding: 4px 6px !important;
+  max-width: calc(100vw - 16px) !important;
+  overflow-x: auto !important;
+}
+
+html[data-input-mode='touch'] [data-game-toolbar] button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  padding: 6px 8px !important;
+}
+
+html[data-input-mode='touch'] [data-game-toolbar] button svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+/* Labels raised to the 11px legibility floor rather than hidden. Hiding them
+   left five unlabelled glyphs, including a destructive "New Game" sitting next
+   to "Undo" — and `title` never appears on touch, so there was no fallback
+   affordance at all. */
+html[data-input-mode='touch'] [data-game-toolbar] button span {
+  font-size: 11px !important;
+  white-space: nowrap !important;
+}
+
+/* The toolbar is z-index 200 and centred at bottom: 8, which lands it squarely
+   on top of the player's hand — the surface touched every single turn. On
+   touch it docks bottom-left, clear of the hand fan, and scrolls if needed. */
+html[data-input-mode='touch'] [data-game-toolbar] {
+  left: 8px !important;
+  transform: none !important;
+}
+
+/* While a card is armed, the destination rail owns the bottom edge. */
+html[data-rail-open='true'] [data-game-toolbar] {
+  display: none !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Touch sizing for the phase bar and the card-scale stepper.
+
+   Both are shared between goldfish and multiplayer. The phase buttons render
+   ~30px tall and the scale steppers 21x22 — the latter is below even the
+   WCAG 2.5.8 AA floor of 24px, so it is an accessibility failure, not just a
+   comfort issue. Sizing is raised on touch only; the pointer build is
+   untouched.
+   ────────────────────────────────────────────────────────────────────────── */
+html[data-input-mode='touch'] [data-phase-bar] button {
+  /* Height only. Raising min-WIDTH too widened the bar past what a 667px
+     viewport fits and clipped "End Turn" over the turn counter — the phase
+     bar is already crowded at that width before any of this (the goldfish
+     bar overlaps its own logo on a stock build). Growing the narrow
+     phase-scroll arrows needs a layout change in the bar itself, which is
+     out of scope here; see the mobile QA checklist. */
+  min-height: 44px !important;
+  white-space: nowrap !important;
+}
+
+html[data-input-mode='touch'] [data-card-scale-control] button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}

@@ -456,6 +456,7 @@ export default function TurnIndicator({
 
   return (
     <div
+      data-phase-bar
       ref={barRef}
       style={{
         position: 'relative',

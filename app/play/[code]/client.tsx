@@ -387,7 +387,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       window.removeEventListener('orientationchange', update);
     };
   }, []);
-  const gateForPortrait = shouldGateForPortrait(shellViewport.w, shellViewport.h, shellInputMode);
+  const [portraitGateDismissed, setPortraitGateDismissed] = useState(false);
+  const gateForPortrait =
+    !portraitGateDismissed &&
+    shouldGateForPortrait(shellViewport.w, shellViewport.h, shellInputMode);
 
   // Where "Back to lobby" / exit / stale-game redirects land. Forge games
   // return to the Forge play lobby; everyone else to the public play lobby.
@@ -1816,7 +1819,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Phone portrait is structurally broken (RightPanel's 280px floor leaves
   // ~113px of canvas), so gate it rather than render a 6x8px board. Placed
   // after every hook so hook order stays stable across renders.
-  if (gateForPortrait) return <RotateDevicePrompt />;
+  if (gateForPortrait) {
+    return (
+      <RotateDevicePrompt
+        onContinueAnyway={() => setPortraitGateDismissed(true)}
+        lobbyHref={lobbyPath}
+      />
+    );
+  }
 
   // lifecycle === 'playing' — two-column layout: canvas + right panel (preview + chat)
   return (

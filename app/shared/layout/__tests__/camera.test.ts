@@ -166,3 +166,44 @@ describe('applyCameraToScale', () => {
     expect(out.scale).toBeCloseTo(fit.scale * 2, 10);
   });
 });
+
+describe('clampCamera - adversarial review regressions', () => {
+  it('does not produce NaN centres at zero container size', () => {
+    const c = clampCamera({ zoom: 1, centerX: 100, centerY: 100 }, 0, 1920, 0, 0);
+    expect(Number.isFinite(c.centerX)).toBe(true);
+    expect(Number.isFinite(c.centerY)).toBe(true);
+  });
+
+  it('re-clamping after a viewport shrink keeps the board covering the view', () => {
+    // Pan hard right at 2.5x on a wide viewport, then narrow the container.
+    const wide = clampCamera({ zoom: 2.5, centerX: 9999, centerY: 540 }, 1, 1920, 1133, 744);
+    const narrowed = clampCamera(wide, 1, 1920, 744, 1133);
+    const scale = 2.5;
+    const halfViewW = 744 / (2 * scale);
+    expect(narrowed.centerX).toBeLessThanOrEqual(1920 - halfViewW + 1e-6);
+    expect(narrowed.centerX).toBeGreaterThanOrEqual(halfViewW - 1e-6);
+  });
+});
+
+describe('zoomAtPoint - clamp before anchoring', () => {
+  it('anchors exactly when the requested zoom is already in range', () => {
+    const before = { zoom: 1, centerX: 960, centerY: 540 };
+    const after = zoomAtPoint(before, MAX_ZOOM, 700, 250);
+    const fit = calculateScale(852, 393);
+    const c1 = composeCamera(fit, before, 852, 393);
+    const c2 = composeCamera(fit, after, 852, 393);
+    expect(700 * c1.scale + c1.offsetX).toBeCloseTo(700 * c2.scale + c2.offsetX, 6);
+  });
+
+  it('a caller that clamps first gets a centre consistent with the applied zoom', () => {
+    // The bug: solving the centre for zoom 5, then clamping zoom to 3, keeps a
+    // centre computed for a zoom never applied - the camera walks to a corner.
+    const before = { zoom: 1, centerX: 960, centerY: 540 };
+    const clampedFirst = zoomAtPoint(before, Math.min(MAX_ZOOM, 5), 700, 250);
+    expect(clampedFirst.zoom).toBe(MAX_ZOOM);
+    const fit = calculateScale(852, 393);
+    const c1 = composeCamera(fit, before, 852, 393);
+    const c2 = composeCamera(fit, clampedFirst, 852, 393);
+    expect(700 * c1.scale + c1.offsetX).toBeCloseTo(700 * c2.scale + c2.offsetX, 6);
+  });
+});

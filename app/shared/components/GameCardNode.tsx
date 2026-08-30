@@ -158,11 +158,15 @@ export const GameCardNode = memo(function GameCardNode({
       const s = pressRef.current;
       if (!s || s.fired) return;
       s.fired = true;
-      // Cancel the pending Konva drag so no ghost drag state lingers.
+      // onLongPress FIRST: Konva's dragDistance is 3px but our movement
+      // tolerance is 10px, so in the 3-10px band a real Konva drag is already
+      // running and stopDrag() emits a genuine dragend. The canvas marks the
+      // drag cancelled inside this callback, so the dragend is ignored rather
+      // than committing the move (which could equip a weapon by accident).
+      onLongPress(card, { x: s.x, y: s.y });
       const node: any = e.target;
       if (node && typeof node.stopDrag === 'function') node.stopDrag();
       setIsDragging(false);
-      onLongPress(card, { x: s.x, y: s.y });
     }, LONG_PRESS_MS);
   }, [onLongPress, card, clearPress]);
 

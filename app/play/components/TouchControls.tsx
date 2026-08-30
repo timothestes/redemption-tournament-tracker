@@ -16,9 +16,15 @@ interface TouchControlsProps {
 export function TouchControls({ targets, onJump, activeId }: TouchControlsProps) {
   return (
     <div
-      className="pointer-events-auto absolute right-2 top-2 z-30 flex flex-col gap-1
+      // Docked to the LEFT edge below the turn bar. Right-aligned it covered
+      // Concede (the turn bar's right-hand control) and the sidebar piles;
+      // vertically it is a single row so it cannot eat half a 393px viewport.
+      className="pointer-events-auto absolute left-2 z-30 flex flex-row gap-1
                  rounded-lg border border-neutral-700 bg-neutral-900/90 p-1 backdrop-blur"
-      style={{ marginRight: 'env(safe-area-inset-right)' }}
+      style={{
+        top: 'calc(48px + env(safe-area-inset-top))',
+        marginLeft: 'env(safe-area-inset-left)',
+      }}
       data-testid="touch-controls"
     >
       {targets.map((t) => (

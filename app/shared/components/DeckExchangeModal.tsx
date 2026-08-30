@@ -138,7 +138,12 @@ export function DeckExchangeModal({
     };
 
     document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
+
+    document.addEventListener('touchstart', handleMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('touchstart', handleMouseDown);
+    };
   }, [onCancel, didDragRef]);
 
   const selectCard = useCallback((cardId: string) => {

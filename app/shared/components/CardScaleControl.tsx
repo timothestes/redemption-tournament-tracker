@@ -54,7 +54,11 @@ export function CardScaleControl({
       }
     };
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
+    };
   }, [open]);
 
   const pct = Math.round(cardScale * 100);
@@ -68,7 +72,7 @@ export function CardScaleControl({
     chatStep !== undefined;
 
   return (
-    <div
+    <div data-card-scale-control
       ref={popoverRef}
       onContextMenu={(e) => e.preventDefault()}
       style={{ position: 'absolute', bottom: 8, left: 12, zIndex: 200 }}

@@ -76,6 +76,13 @@ export function clampCamera(
   const zoom = clamp(camera.zoom, MIN_ZOOM, MAX_ZOOM);
   const scale = fitScale * zoom;
 
+  // Before the container has been measured, scale is 0 and the half-view
+  // divisions are 0/0 = NaN. NaN fails every comparison, so it would slip past
+  // the visibility checks below and clamp() would hand back NaN centres.
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return { zoom, centerX: virtualWidth / 2, centerY: VIRTUAL_HEIGHT / 2 };
+  }
+
   const halfViewW = containerWidth / (2 * scale);
   const halfViewH = containerHeight / (2 * scale);
 
