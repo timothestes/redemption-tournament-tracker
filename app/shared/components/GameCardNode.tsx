@@ -94,6 +94,10 @@ export interface GameCardNodeProps {
    *  ghost drag state lingers. Movement past the tolerance means "drag", and
    *  the long-press is abandoned. */
   onLongPress?: (card: GameCard, p: { x: number; y: number }) => void;
+  /** Touch tap-to-move: true while THIS card is the armed card. Renders a
+   *  steady amber ring so the player can see which card the destination rail
+   *  is about to move. */
+  isArmed?: boolean;
 }
 
 // Individual card component — memoized to avoid re-rendering cards that haven't changed
@@ -122,6 +126,7 @@ export const GameCardNode = memo(function GameCardNode({
   isDimmed,
   targetingMode,
   onLongPress,
+  isArmed,
 }: GameCardNodeProps) {
   const isToken = card.isToken;
   const isActivelyRevealed =
@@ -377,6 +382,28 @@ export const GameCardNode = memo(function GameCardNode({
           shadowColor="#c4955a"
           shadowBlur={8}
           shadowOpacity={0.6}
+          listening={false}
+          perfectDrawEnabled={false}
+        />
+      )}
+
+      {/* Tap-to-move armed ring — steady amber marker for the card the
+          destination rail is about to move (touch only; the canvas passes
+          isArmed solely on touch). Thicker than the selection ring so it
+          reads at phone card sizes. */}
+      {isArmed && (
+        <Rect
+          x={-2}
+          y={-2}
+          width={cardWidth + 4}
+          height={cardHeight + 4}
+          fill="transparent"
+          stroke="#c4955a"
+          strokeWidth={3}
+          cornerRadius={5}
+          shadowColor="#c4955a"
+          shadowBlur={8}
+          shadowOpacity={0.7}
           listening={false}
           perfectDrawEnabled={false}
         />

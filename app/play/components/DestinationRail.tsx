@@ -68,6 +68,19 @@ export function DestinationRail({
           transition={{ type: 'spring', damping: 30, stiffness: 320 }}
           data-testid="destination-rail"
         >
+          {/* Armed-card name — a small tab riding the rail's top edge, so the
+              player can see WHICH card the chips will move (pairs with the
+              amber ring on the card itself). Absolute: costs no rail width. */}
+          {cardName && (
+            <span
+              data-testid="destination-rail-card-name"
+              className="pointer-events-none absolute -top-[22px] left-2 max-w-[60%] truncate
+                         rounded-t-md border border-b-0 border-neutral-700 bg-neutral-900/95
+                         px-2 py-0.5 text-[11px] font-medium text-amber-200/90"
+            >
+              {cardName}
+            </span>
+          )}
           {/* One compact row. Three stacked rows were ~130px tall, which on a
               393px-high phone buried the entire hand band. */}
           <div className="flex shrink-0 gap-1">

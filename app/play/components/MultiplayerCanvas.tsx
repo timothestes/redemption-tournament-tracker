@@ -5135,6 +5135,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return () => document.documentElement.removeAttribute('data-rail-open');
   }, [isTouch, tapMoveState.kind]);
 
+  // Armed-card cue: the instanceId the destination rail is about to move.
+  // Every GameCardNode compares against this to draw its amber ring.
+  const armedCardId = isTouch && tapMoveState.kind === 'armed' ? tapMoveState.cardId : null;
 
   // ---- Stage-level touch handlers ----
   const collectPointers = useCallback((evt: TouchEvent): PointerSample[] => {
@@ -7248,6 +7251,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 <GameCardNode
                   key={String(card.id)}
                   card={gameCard}
+                  isArmed={armedCardId === gameCard.instanceId}
                   x={x}
                   y={y}
                   rotation={0}
@@ -7329,6 +7333,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 <GameCardNode
                   key={String(card.id)}
                   card={gameCard}
+                  isArmed={armedCardId === gameCard.instanceId}
                   x={x}
                   y={y}
                   rotation={180}
@@ -7424,6 +7429,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   <GameCardNode
                     key={String(card.id)}
                     card={gameCard}
+                    isArmed={armedCardId === gameCard.instanceId}
                     x={x}
                     y={y}
                     rotation={owner === 'my' ? 0 : 180}
@@ -7510,6 +7516,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 <GameCardNode
                   key={cardIdStr}
                   card={gameCard}
+                  isArmed={armedCardId === gameCard.instanceId}
                   x={overridePos.x}
                   y={overridePos.y}
                   rotation={0}
@@ -7586,6 +7593,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 <GameCardNode
                   key={cardIdStr}
                   card={gameCard}
+                  isArmed={armedCardId === gameCard.instanceId}
                   x={anchor.x}
                   y={anchor.y}
                   rotation={180}
@@ -7663,6 +7671,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 <GameCardNode
                   key={cardIdStr}
                   card={gameCard}
+                  isArmed={armedCardId === gameCard.instanceId}
                   x={overridePos.x}
                   y={overridePos.y}
                   rotation={0}
@@ -8152,6 +8161,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       <GameCardNode
                         key={String(c.id)}
                         card={gameCard}
+                        isArmed={armedCardId === gameCard.instanceId}
                         x={cardX}
                         y={cardY}
                         rotation={0}
@@ -8205,6 +8215,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                           <GameCardNode
                             key={String(c.id)}
                             card={gameCard}
+                            isArmed={armedCardId === gameCard.instanceId}
                             x={0}
                             y={0}
                             rotation={0}
@@ -8263,6 +8274,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             // an identical back. Opponent branch already keys.
                             key={String(topCard.id)}
                             card={gameCard}
+                            isArmed={armedCardId === gameCard.instanceId}
                             x={0}
                             y={0}
                             rotation={0}
@@ -8401,6 +8413,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       <GameCardNode
                         key={String(c.id)}
                         card={gameCard}
+                        isArmed={armedCardId === gameCard.instanceId}
                         x={cardX}
                         y={cardY}
                         rotation={180}
@@ -8463,6 +8476,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                           <GameCardNode
                             key={String(effectiveTop.id)}
                             card={gameCard}
+                            isArmed={armedCardId === gameCard.instanceId}
                             x={pileCardWidth}
                             y={pileCardHeight}
                             rotation={180}
@@ -8574,6 +8588,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       <GameCardNode
                         key={String(card.id)}
                         card={gameCard}
+                        isArmed={armedCardId === gameCard.instanceId}
                         x={pos.x}
                         y={pos.y}
                         rotation={pos.rotation}
@@ -8678,6 +8693,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     <GameCardNode
                       key={idStr}
                       card={gameCard}
+                      isArmed={armedCardId === gameCard.instanceId}
                       x={pos.x}
                       y={pos.y}
                       rotation={pos.rotation}
