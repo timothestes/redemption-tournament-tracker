@@ -40,6 +40,23 @@ describe('TOUCH_PROFILE', () => {
     expect(after).toEqual(before);
   });
 
+  it('keeps every interactive zone below the 48px overlay bar at fit', () => {
+    // The touch shell overlays the turn bar (~48px) on the canvas. The top
+    // gutter must push the opponent hand strip, opponent LoB, and opponent
+    // sidebar piles fully below it, or souls in the opp LoB are untappable
+    // at fit (elementFromPoint returns the bar) and rescues are impossible.
+    const virtualWidth = 2341; // 852x393 phone -> fitScale = 393/1080
+    const l = calculateMultiplayerLayout(virtualWidth, VH, 'T1', 'player', false, true);
+    const fitScale = 393 / VH;
+    expect(l.zones.opponentHand.y * fitScale).toBeGreaterThanOrEqual(48);
+    expect(l.zones.opponentLob.y * fitScale).toBeGreaterThanOrEqual(48);
+    for (const [key, r] of Object.entries(l.sidebar.opponent)) {
+      expect(r!.y * fitScale, `opp sidebar ${key}`).toBeGreaterThanOrEqual(48);
+    }
+    // The gutter is reserved space, not lost space — rows still fill the stage.
+    expect(l.zones.playerHand.y + l.zones.playerHand.height).toBe(VH);
+  });
+
   it('reaches roughly 57px cards on an iPhone 14 Pro landscape', () => {
     // 852x393 viewport -> virtualWidth ~2341, fitScale ~0.364.
     // Physical width = containerWidth x (1 - sidebarRatio) x mainCardWidthRatio.

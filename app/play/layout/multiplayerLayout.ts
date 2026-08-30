@@ -98,6 +98,13 @@ const CARD_ASPECT_RATIO = 1.4;
 
 interface LayoutProfile {
   sidebarWidthRatio: number;
+  /** Empty strip at the very top holding NO zones. The touch shell overlays
+   *  the turn bar on the canvas (~48px of a 393px viewport), so without this
+   *  the opponent's hand strip and most of their Land of Bondage sit under
+   *  the bar — `elementFromPoint` returns the bar and the souls there are
+   *  untappable at fit, making rescues impossible. Non-touch profiles omit
+   *  it (0): their bar is a separate flex row above the canvas. */
+  topGutterRatio?: number;
   oppHandRatio: number;
   oppTerritoryRatio: number;
   oppLobRatio: number;
@@ -154,18 +161,19 @@ const STANDARD_PROFILE: LayoutProfile = {
  */
 const TOUCH_PROFILE: LayoutProfile = {
   sidebarWidthRatio: 0.10,   // icon rail; tapping a pile opens a sheet
+  topGutterRatio: 0.125,     // ≈49px at fit on a 393px viewport — clears the 48px overlay bar
   oppHandRatio: 0.05,        // thin strip of backs
-  oppTerritoryRatio: 0.30,
+  oppTerritoryRatio: 0.24,
   oppLobRatio: 0.085,
   dividerRatio: 0.005,
   playerLobRatio: 0.085,
-  playerTerritoryRatio: 0.30,
+  playerTerritoryRatio: 0.235,
   playerHandRatio: 0.175,
   mainCardWidthRatio: 0.078, // ~57px on an iPhone 14 Pro landscape
   oppHandScale: 0.55,
   pileLabelRatio: 0.14,
 };
-// Sum check: 0.05 + 0.30 + 0.085 + 0.005 + 0.085 + 0.30 + 0.175 = 1.0
+// Sum check: 0.125 + 0.05 + 0.24 + 0.085 + 0.005 + 0.085 + 0.235 + 0.175 = 1.0
 
 /** Virtual width breakpoint — below this use Narrow, above use Standard. */
 const BREAKPOINT_WIDTH = 1700;
@@ -418,9 +426,13 @@ export function calculateMultiplayerLayout(
   const playerHandHeight = Math.round(stageHeight * profile.playerHandRatio);
 
   // ── Y anchors ────────────────────────────────────────────────────────
-  // Order: Opp Hand → Opp LOB → Opp Territory → Divider → Player Territory → Player LOB → Player Hand
-  const oppHandY = 0;
-  const oppLobY = oppHandHeight;
+  // Order: [Top gutter] → Opp Hand → Opp LOB → Opp Territory → Divider → Player Territory → Player LOB → Player Hand
+  // The gutter is 0 everywhere except the compact touch profile (see
+  // LayoutProfile.topGutterRatio) — there it keeps every interactive zone
+  // below the overlaid turn bar.
+  const topGutterHeight = Math.round(stageHeight * (profile.topGutterRatio ?? 0));
+  const oppHandY = topGutterHeight;
+  const oppLobY = oppHandY + oppHandHeight;
   const oppTerritoryY = oppLobY + oppLobHeight;
   const dividerY = oppTerritoryY + oppTerritoryHeight;
   const playerTerritoryY = dividerY + dividerHeight;
@@ -581,8 +593,9 @@ export function calculateMultiplayerLayout(
   if (format === 'Paragon') {
     const SOUL_DECK_GUTTER = 4;
 
-    // 1. Drop the unused opp LoB slot at the top — shift opp territory up.
-    const paragonOppTerritoryY = oppHandHeight;
+    // 1. Drop the unused opp LoB slot at the top — shift opp territory up
+    //    (directly below the opp hand, which itself sits below any gutter).
+    const paragonOppTerritoryY = oppLobY;
 
     // 2. Shrink the shared band to roughly one per-seat LoB's visual weight.
     const paragonSharedBandHeight = oppLobHeight + gap * 2;
@@ -681,7 +694,10 @@ export function calculateMultiplayerLayout(
     ? sharedLob.y + sharedLob.height / 2
     : null;
 
-  const oppSidebarY = format === 'Paragon' ? oppHandHeight : oppLobY;
+  // Both formats: sidebar starts right below the opp hand (Paragon's LoB
+  // slot is collapsed, so its territory starts there too) — oppLobY either
+  // way. Includes the touch gutter, keeping piles clear of the overlay bar.
+  const oppSidebarY = oppLobY;
   const oppSidebarHeight =
     format === 'Paragon' && sharedBandMidY !== null
       ? sharedBandMidY - oppSidebarY
