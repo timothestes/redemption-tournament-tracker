@@ -256,17 +256,25 @@ Stage container gains `touch-action: none`, `-webkit-touch-callout: none` and
 
 ### 3.7 Context menus as bottom sheets
 
-The 1,856 lines of menu logic are **not** refactored. Each of the 8 components gains
-`variant?: 'pointer' | 'touch'`:
+The 1,856 lines of menu logic are **not** refactored.
 
-- `pointer` — today's fixed-position menu, unchanged.
-- `touch` — the same rows rendered in a bottom-sheet shell built on `MobileDrawer`,
-  with rows at `padding: 12px 16px` / `fontSize: 15` (≥44px tall) instead of
-  `6px 14px` / `13`, and inline counter buttons widened from 22/32px to ≥44px.
+*Implementation note:* the original plan added a `variant?: 'pointer' | 'touch'`
+prop to each of the eight components. In practice they have eight different
+internal shapes, so a prop meant eight bespoke edits. The shipped approach is
+smaller: each root carries a `data-context-menu` attribute (one line per file),
+`useInputMode` reflects `data-input-mode` onto `<html>`, and one scoped CSS
+block in `globals.css` restyles them into bottom sheets with ≥44px rows. The
+`!important` flags are needed to beat the components' own inline positioning,
+and that override is the entire extent of the change — no action logic moves.
 
-Presentation-only. No action logic moves. Affected: `CardContextMenu`,
-`MultiCardContextMenu`, `DeckContextMenu`, `ReserveContextMenu`, `HandContextMenu`,
-`ZoneContextMenu`, `OpponentZoneContextMenu`, `LorContextMenu`.
+Affected: `CardContextMenu`, `MultiCardContextMenu`, `DeckContextMenu`,
+`ReserveContextMenu`, `HandContextMenu`, `ZoneContextMenu`,
+`OpponentZoneContextMenu`, `LorContextMenu`.
+
+Konva calls `preventDefault()` on any touchstart hitting a listening shape,
+which suppresses the synthesized `mousedown` these menus used for
+outside-click dismissal — so on touch a menu could not be closed at all. All
+17 menus and modals now carry a paired `touchstart` listener.
 
 ### 3.8 Touch layout profile
 

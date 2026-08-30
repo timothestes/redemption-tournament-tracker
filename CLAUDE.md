@@ -53,6 +53,7 @@ make update-cards        # Download latest carddata.txt and regenerate TypeScrip
 | Forge set promotion ("big red button") | `docs/superpowers/specs/2026-08-22-forge-public-set-release-design.md` + `app/forge/lib/promote.ts`; overlay `scripts/data/forge-released.json` via `make pull-forge-releases` |
 | Catalog admin editor | `docs/superpowers/specs/2026-08-23-catalog-admin-editor-design.md` + `app/admin/catalog/`; overlay `scripts/data/card-overrides.json` via `make pull-card-overrides` |
 | Goldfish mode | `prompt_context/goldfish_practice_mode.md` |
+| Mobile touch support | `docs/superpowers/specs/2026-08-29-mobile-multiplayer-touch-design.md` + `app/shared/layout/camera.ts`; `npm run shots:mobile` for the screenshot matrix. Konva fires `tap` not `click` on touch — see the implementation notes. |
 | Goldfish design system | `prompt_context/goldfish_design_system.md` |
 | Multiplayer design spec | `docs/superpowers/specs/2026-03-23-multiplayer-spacetimedb-design.md` |
 | Battle zone design | `docs/superpowers/specs/2026-07-12-battle-zone-design.md` |

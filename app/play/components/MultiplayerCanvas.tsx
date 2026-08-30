@@ -6456,7 +6456,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Skip Ctrl/⌘+Click: macOS fires a native contextmenu right after. Starting
       // a marquee here would flip layer.listening(false) before Konva can hit-test
       // the contextmenu, so the hand Rect's onContextMenu never fires.
-      if (e.evt.button !== 0 || e.evt.ctrlKey || e.evt.metaKey) return;
+      if (!isPrimaryPointer(e.evt) || e.evt.ctrlKey || e.evt.metaKey) return;
 
       // Only start selection on empty canvas (not on cards or clickable zones).
       // Walks target + ancestors; treats anything draggable, named "zone-click",
@@ -6683,7 +6683,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               else if (key === 'discard' || key === 'banish') setBrowseMyZone(key);
             };
             const myPileClickHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
-              if (e.evt.button !== 0) return;
+              if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
               if (key === 'discard' || key === 'banish') setBrowseMyZone(key);
               else if (key === 'reserve' && canViewMyReserve) setBrowseMyZone('reserve');
             };
@@ -6704,6 +6704,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   // LoB and sidebar piles must stay listening for their handlers.
                   listening={isFreeForm ? false : undefined}
                   onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? myPileClickHandler : undefined}
+                  onTap={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? (myPileClickHandler as unknown as (e: Konva.KonvaEventObject<TouchEvent>) => void) : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
                     if (isSpectator) return;
@@ -6761,7 +6762,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               else if (key === 'discard' || key === 'banish') setBrowseOpponentZone(key);
             };
             const oppPileClickHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
-              if (e.evt.button !== 0) return;
+              if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
               if (key === 'discard' || key === 'banish') setBrowseOpponentZone(key);
               else if (key === 'reserve' && canViewOppReserve) setBrowseOpponentZone('reserve');
             };
@@ -6779,6 +6780,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   opacity={0.45}
                   listening={isFreeForm ? false : undefined}
                   onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? oppPileClickHandler : undefined}
+                  onTap={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? (oppPileClickHandler as unknown as (e: Konva.KonvaEventObject<TouchEvent>) => void) : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
                     if (isSpectator) return;
@@ -7989,7 +7991,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               <Group
                 key={`my-pile-${zoneKey}`}
                 onClick={zoneKey !== 'deck' && !(zoneKey === 'reserve' && !canViewMyReserve) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
-                  if (e.evt.button !== 0) return;
+                  if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
                   setBrowseMyZone(zoneKey);
                 } : undefined}
                 onDblClick={undefined}
@@ -8034,7 +8036,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     onClick={(e: Konva.KonvaEventObject<PointerEvent>) => {
                       e.cancelBubble = true;
                       e.evt.stopPropagation();
-                      if (e.evt.button !== 0) return;
+                      if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
                       gameState.revealReserve(false);
                     }}
                     onMouseEnter={() => { const c = stageRef.current?.container(); if (c) c.style.cursor = 'pointer'; }}
@@ -8259,7 +8261,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 key={`opp-pile-${zoneKey}`}
                 name="zone-click"
                 onClick={zoneKey !== 'deck' && !(zoneKey === 'reserve' && !canViewOppReserve) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
-                  if (e.evt.button !== 0) return;
+                  if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
                   setBrowseOpponentZone(zoneKey);
                 } : undefined}
                 onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
