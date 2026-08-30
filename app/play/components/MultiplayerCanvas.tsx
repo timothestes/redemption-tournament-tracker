@@ -6818,9 +6818,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       fontSize={fs(11)}
                       fontFamily="Cinzel, Georgia, serif"
                       fill="#e8d5a3"
-                      letterSpacing={useCompactLayout ? 0.5 : 1}
-                      width={zone.width - (useCompactLayout ? 40 : 12)}
-                      ellipsis
+                      letterSpacing={useCompactLayout ? 0 : 1}
+                      width={useCompactLayout ? undefined : zone.width - 12}
+                      wrap={useCompactLayout ? 'none' : undefined}
+                      ellipsis={!useCompactLayout}
                       listening={false}
                       perfectDrawEnabled={false}
                     />
@@ -6894,9 +6895,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       fontSize={fs(11)}
                       fontFamily="Cinzel, Georgia, serif"
                       fill="#a3c5e8"
-                      letterSpacing={useCompactLayout ? 0.5 : 1}
-                      width={zone.width - (useCompactLayout ? 40 : 12)}
-                      ellipsis
+                      letterSpacing={useCompactLayout ? 0 : 1}
+                      width={useCompactLayout ? undefined : zone.width - 12}
+                      wrap={useCompactLayout ? 'none' : undefined}
+                      ellipsis={!useCompactLayout}
                       listening={false}
                       perfectDrawEnabled={false}
                     />
@@ -8122,8 +8124,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   ctx.fillStrokeShape(shape);
                 }}
               >
-                {/* Count badge */}
-                <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
+                {/* Count badge — compact drops it below the label line so the
+                    count never overprints the pile-name glyphs. */}
+                <Group x={zone.x + zone.width - 32} y={useCompactLayout ? zone.y + 34 : zone.y + 2} listening={false}>
                   <Rect width={26} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text
                     text={String(badgeCount)}
@@ -8393,8 +8396,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   ctx.fillStrokeShape(shape);
                 }}
               >
-                {/* Count badge */}
-                <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
+                {/* Count badge — compact drops it below the label line so the
+                    count never overprints the pile-name glyphs. */}
+                <Group x={zone.x + zone.width - 32} y={useCompactLayout ? zone.y + 34 : zone.y + 2} listening={false}>
                   <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text
                     text={String(badgeCount)}
