@@ -14,7 +14,9 @@
 import { chromium, devices } from '@playwright/test';
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
-import { MOBILE_VIEWPORTS, checkTargetSize, checkFontSize } from '../e2e/mobile/layoutRules';
+import {
+  MOBILE_VIEWPORTS, checkTargetSize, checkFontSize, checkHandBandOcclusion,
+} from '../e2e/mobile/layoutRules';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3100';
 const OUT_DIR = path.resolve(process.cwd(), '.artifacts/mobile-shots');
@@ -72,6 +74,50 @@ async function auditPage(page: import('@playwright/test').Page): Promise<Finding
   });
 
   const findings: Finding[] = [];
+
+  // ---- Occlusion of the hand band ----
+  // Falls back to the bottom 18% of the viewport when the board has not
+  // published a band (playerHandRatio is 0.165-0.175 across every profile), so
+  // the rule still bites on any board-like screen.
+  const occ = await page.evaluate(() => {
+    const band = (window as any).__mpHandBand ?? {
+      top: window.innerHeight * 0.82,
+      left: 0,
+      width: window.innerWidth,
+      height: window.innerHeight * 0.18,
+    };
+    const overlays: Array<{ selector: string; top: number; left: number; width: number; height: number }> = [];
+    document.querySelectorAll('body *').forEach((el) => {
+      const cs = window.getComputedStyle(el);
+      if (cs.position !== 'fixed' && cs.position !== 'absolute') return;
+      if (cs.visibility === 'hidden' || cs.display === 'none') return;
+      if (parseFloat(cs.opacity || '1') < 0.05) return;
+      // Only chrome that actually paints and blocks taps.
+      const bg = cs.backgroundColor;
+      const selfPaints = !!bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+      // A positioned wrapper is often transparent with a painted child (the
+      // collapsed toolbar is exactly this) - checking only the element's own
+      // background made that invisible to the rule.
+      const paints = selfPaints || !!el.querySelector('button, [role="button"]');
+      if (!paints || cs.pointerEvents === 'none') return;
+      const r = el.getBoundingClientRect();
+      if (r.width < 40 || r.height < 20) return;
+      // Ignore full-screen shells; we want floating chrome.
+      if (r.height > window.innerHeight * 0.8) return;
+      const id = el.getAttribute('data-testid') ?? el.getAttribute('data-game-toolbar') !== null
+        ? (el.getAttribute('data-testid') ?? 'game-toolbar') : (el.id || el.tagName.toLowerCase());
+      overlays.push({ selector: id, top: r.top, left: r.left, width: r.width, height: r.height });
+    });
+    return { band, overlays };
+  });
+
+  for (const o of occ.overlays) {
+    const r = checkHandBandOcclusion(o, occ.band);
+    if (!r.ok && r.severity) {
+      findings.push({ rule: 'hand-occlusion', severity: r.severity, message: r.message, selector: o.selector });
+    }
+  }
+
   for (const el of raw) {
     if (!el.visible) continue;
     const t = checkTargetSize({ width: el.w, height: el.h });

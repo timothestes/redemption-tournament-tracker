@@ -4970,6 +4970,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // behaviour and gesture recognition can be tested independently.
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return;
+    // Published so the screenshot harness can assert that no floating chrome
+    // occludes the hand band - the check that would have caught the toolbar
+    // covering 93% of the player's cards.
+    if (mpLayout) {
+      const box = stageRef.current?.container().getBoundingClientRect();
+      (window as any).__mpHandBand = {
+        top: (box?.top ?? 0) + mpLayout.zones.playerHand.y * scale + offsetY,
+        left: (box?.left ?? 0) + mpLayout.zones.playerHand.x * scale + offsetX,
+        width: mpLayout.zones.playerHand.width * scale,
+        height: mpLayout.zones.playerHand.height * scale,
+      };
+    }
     (window as any).__mpCamera = {
       get: () => camera,
       jumpTo: (id: string) => {
@@ -4978,8 +4990,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       },
       reset: resetCamera,
     };
-    return () => { delete (window as any).__mpCamera; };
-  }, [camera, jumpTargets, jumpTo, resetCamera]);
+    return () => {
+      delete (window as any).__mpCamera;
+      delete (window as any).__mpHandBand;
+    };
+  }, [camera, jumpTargets, jumpTo, resetCamera, mpLayout, scale, offsetX, offsetY]);
 
   // ---- Tap-to-move (touch) ----
   // Mirrors handleCardDragEnd's ownership rules, but NOT its rotation-anchor
@@ -10468,6 +10483,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         <DestinationRail
           state={tapMoveState}
           format={normalizedFormat}
+          handBandHeight={
+            mpLayout ? Math.round(mpLayout.zones.playerHand.height * scale) : 0
+          }
           cardName={
             tapMoveState.kind === 'armed'
               ? findAnyCardById(tapMoveState.cardId)?.cardName

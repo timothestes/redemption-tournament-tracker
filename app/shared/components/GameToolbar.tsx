@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import {
   Play,
   Undo2,
@@ -12,6 +13,8 @@ import {
   BookOpen,
   Skull,
   ThumbsUp,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import type { GameActions } from '../types/gameActions';
 
@@ -225,9 +228,55 @@ export function GameToolbar({
 
   const visibleButtons = buttons.filter(b => !b.hidden);
 
+  // ---- Touch: collapse to a single button ----
+  // The bar is anchored in the hand band, where it covered 89-97% of the
+  // player's cards on a phone. The hand is tapped every turn and its cards
+  // cannot be moved out from under an overlay, so on touch the bar collapses
+  // to one 44px control and expands upward into the (free-form, movable)
+  // territory only while the player is actually using it.
+  const inputMode = useInputMode();
+  const isTouch = inputMode === 'touch';
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = isTouch && !expanded;
+
+  if (collapsed) {
+    return (
+      <div
+        data-game-toolbar
+        data-toolbar-collapsed
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          position: 'absolute',
+          bottom: 'calc(8px + env(safe-area-inset-bottom))',
+          left: 'calc(8px + env(safe-area-inset-left))',
+          zIndex: 200,
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Game actions"
+          data-testid="toolbar-expand"
+          onClick={() => setExpanded(true)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 44, height: 44,
+            background: 'rgba(30,22,16,0.92)',
+            border: '1px solid var(--gf-border)',
+            borderRadius: 8,
+            color: 'var(--gf-text)',
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronUp size={22} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       data-game-toolbar
+      data-toolbar-expanded={isTouch ? 'true' : undefined}
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'absolute',
@@ -244,6 +293,22 @@ export function GameToolbar({
         zIndex: 200,
       }}
     >
+      {isTouch && (
+        <button
+          type="button"
+          aria-label="Hide game actions"
+          data-testid="toolbar-collapse"
+          onClick={() => setExpanded(false)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minWidth: 44, minHeight: 44,
+            background: 'transparent', border: 'none',
+            color: 'var(--gf-text)', cursor: 'pointer',
+          }}
+        >
+          <ChevronDown size={22} />
+        </button>
+      )}
       {visibleButtons.map(({ icon: Icon, key, label, onClick, shortcut, disabled: btnDisabled, pushRight }) => (
         <button
           key={key}

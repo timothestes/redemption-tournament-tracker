@@ -9,6 +9,10 @@ interface DestinationRailProps {
   state: TapMoveState;
   format: 'T1' | 'T2' | 'Paragon';
   cardName?: string;
+  /** Height of the player's hand band in screen px. The rail floats ABOVE it
+   *  rather than over it: a card is usually armed FROM the hand, so covering
+   *  the hand would hide the card just picked and block re-arming another. */
+  handBandHeight?: number;
   onPick: (zone: ZoneId, owner: ZoneOwner) => void;
   onCancel: () => void;
 }
@@ -33,7 +37,7 @@ function label(zone: ZoneId): string {
  * the camera happens to be showing.
  */
 export function DestinationRail({
-  state, format, cardName, onPick, onCancel,
+  state, format, cardName, handBandHeight = 0, onPick, onCancel,
 }: DestinationRailProps) {
   const [side, setSide] = useState<ZoneOwner>('my');
 
@@ -55,30 +59,18 @@ export function DestinationRail({
     <AnimatePresence>
       {state.kind === 'armed' && (
         <motion.div
-          className="pointer-events-auto absolute inset-x-0 bottom-0 z-[300]
-                     border-t border-neutral-700 bg-neutral-900/95 backdrop-blur
-                     pb-[env(safe-area-inset-bottom)]"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
+          className="pointer-events-auto absolute inset-x-0 z-[300] flex items-center gap-2
+                     border-y border-neutral-700 bg-neutral-900/95 px-2 py-1 backdrop-blur"
+          style={{ bottom: handBandHeight }}
+          initial={{ y: '100%', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 30, stiffness: 320 }}
           data-testid="destination-rail"
         >
-          <div className="flex items-center justify-between px-3 pt-2">
-            <span className="truncate text-[13px] font-medium text-neutral-200">
-              Move {cardName ?? 'card'} to&hellip;
-            </span>
-            <button
-              type="button"
-              onClick={onCancel}
-              data-testid="destination-rail-cancel"
-              className="min-h-[44px] min-w-[44px] px-3 text-[13px] text-neutral-400 active:text-neutral-100"
-            >
-              Cancel
-            </button>
-          </div>
-
-          <div className="flex gap-2 px-3 pt-1">
+          {/* One compact row. Three stacked rows were ~130px tall, which on a
+              393px-high phone buried the entire hand band. */}
+          <div className="flex shrink-0 gap-1">
             {sides.map((s) => (
               <button
                 key={s}
@@ -86,7 +78,7 @@ export function DestinationRail({
                 onClick={() => setSide(s)}
                 data-testid={`destination-side-${s}`}
                 className={
-                  'min-h-[44px] rounded-md px-3 text-[13px] font-medium ' +
+                  'min-h-[44px] rounded-md px-2 text-[12px] font-semibold ' +
                   (side === s
                     ? 'bg-neutral-700 text-neutral-50'
                     : 'text-neutral-400 active:bg-neutral-800')
@@ -97,7 +89,7 @@ export function DestinationRail({
             ))}
           </div>
 
-          <div className="flex gap-2 overflow-x-auto px-3 py-2">
+          <div className="flex flex-1 gap-2 overflow-x-auto">
             {visible.map((d) => (
               <button
                 key={`${d.owner}:${d.zone}`}
@@ -112,6 +104,16 @@ export function DestinationRail({
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={onCancel}
+            data-testid="destination-rail-cancel"
+            aria-label={`Cancel moving ${cardName ?? 'card'}`}
+            className="min-h-[44px] min-w-[44px] shrink-0 px-2 text-[12px] text-neutral-400 active:text-neutral-100"
+          >
+            Cancel
+          </button>
         </motion.div>
       )}
     </AnimatePresence>
