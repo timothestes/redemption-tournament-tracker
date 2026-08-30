@@ -7062,6 +7062,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 </Group>
                 {myHandBrigadeCounts.total > 0 && (
                   <>
+                    {/* Scrim behind the totals — the NEUTRAL/EVIL lines were
+                        unreadable over bright background art. */}
+                    <Rect
+                      x={brigadeX - 6}
+                      y={brigadeTop - 4}
+                      width={brigadeW + 12}
+                      height={rowH * 4 + 8}
+                      fill="rgba(10, 8, 5, 0.72)"
+                      cornerRadius={4}
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
                     <Text
                       x={brigadeX}
                       y={brigadeTop}
