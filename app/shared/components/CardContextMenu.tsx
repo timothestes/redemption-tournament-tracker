@@ -262,7 +262,7 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     (card.ownerId === 'player2' || isParagonSharedSoul);
 
   return (
-    <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+    <div ref={menuRef} data-context-menu style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
 
       {/* Card abilities from CARD_ABILITIES registry. Either player may fire an
           ability on any card (effects route to the activator). Rendered disabled
