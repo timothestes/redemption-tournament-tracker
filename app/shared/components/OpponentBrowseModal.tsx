@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { GameCard } from '@/app/shared/types/gameCard';
 import { X, Search } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
@@ -160,6 +161,10 @@ export function OpponentBrowseModal({
   isDragActive,
 }: OpponentBrowseModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
+  // Touch has no clicks, hovers or right-clicks — say what actually works.
+  const hintText = useInputMode() === 'touch'
+    ? 'Tap to select · drag to a zone'
+    : 'Right-click for actions · Drag to a zone · Click to select · Hover to enlarge';
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<string>('all');
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -598,7 +603,7 @@ export function OpponentBrowseModal({
         {/* Hint + options */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
-            Right-click for actions · Drag to a zone · Click to select · Hover to enlarge
+            {hintText}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <label

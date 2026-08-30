@@ -426,6 +426,14 @@ html[data-input-mode='touch'] [data-card-scale-control] button {
   min-height: 44px !important;
 }
 
+/* Browse/search modal close: the shared DraggableTitleBar's × is 28x24 for a
+   mouse — far under the 44px touch target. Scoped to the close button so the
+   optional title-bar extras (e.g. Deselect) keep their compact size. */
+html[data-input-mode='touch'] [data-modal-title-bar] button[aria-label='Close'] {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
 /* Battle resolution row (Win Battle / Battle Lost / End Battle) — the
    pointer build's 6px/12px buttons are ~27px tall. The row is anchored
    inside the band's bottom-left corner with translateY(-100%), so taller

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '@/app/shared/types/gameCard';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
@@ -161,6 +162,10 @@ interface ZoneBrowseModalProps {
 
 export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly, onRequestCardMenu }: ZoneBrowseModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
+  // Touch has no clicks, lassos or right-clicks — say what actually works.
+  const hintText = useInputMode() === 'touch'
+    ? 'Tap to select · drag to a zone'
+    : 'Drag to a zone · Click or lasso to select · Right-click for more';
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck } = actions;
   const rawCards = zones[zoneId] ?? [];
@@ -514,7 +519,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         {!readOnly && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
-              Drag to a zone · Click or lasso to select · Right-click for more
+              {hintText}
             </span>
             <label
               style={{
