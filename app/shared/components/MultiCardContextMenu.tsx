@@ -205,7 +205,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
   }
 
   return (
-    <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+    <div ref={menuRef} data-context-menu style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
       {/* Header */}
       <div style={{ ...labelStyle, color: 'var(--gf-text-bright)', fontSize: 11 }}>
         {selectedIds.length} cards selected

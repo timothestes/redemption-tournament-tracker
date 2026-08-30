@@ -324,13 +324,33 @@ html[data-input-mode='touch'] [data-context-menu] {
   width: auto !important;
   max-width: none !important;
   min-width: 0 !important;
+  /* vh line first: iOS < 16.4 drops dvh, and without the fallback the
+     component's inline maxHeight: 80vh won — 80% of the LAYOUT viewport can
+     poke below the visual one. */
+  max-height: 70vh !important;
   max-height: 70dvh !important;
   overflow-y: auto !important;
   border-radius: 16px 16px 0 0 !important;
   padding-bottom: env(safe-area-inset-bottom) !important;
+  /* The sheet ignores the page's side padding (position: fixed) — keep rows
+     clear of the landscape notch. */
+  padding-left: env(safe-area-inset-left) !important;
+  padding-right: env(safe-area-inset-right) !important;
   visibility: visible !important;
   white-space: normal !important;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6) !important;
+  /* A wide soft shadow doubles as a scrim: without it the full-brightness
+     board directly above the sheet read as equally tappable. */
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6), 0 -100vh 0 100vh rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Touch has no real hover, but the browser's compatibility mouseenter still
+   fires under the finger and the menus' inline handlers paint their hover
+   background — the row under the release point rendered pre-highlighted, as
+   if pre-selected. The handlers all inject the literal `var(--gf-hover)`
+   into the style attribute, so this matches exactly the hover-injected
+   background and nothing else. */
+html[data-input-mode='touch'] [data-context-menu] [style*='var(--gf-hover)'] {
+  background: transparent !important;
 }
 
 /* 44x44 minimum (WCAG 2.5.5 AAA / Apple HIG), 15px text. */

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import ChatPanel from '@/app/play/components/ChatPanel';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
@@ -54,6 +55,11 @@ interface RightPanelProps {
 
 const PANEL_EXPANDED_WIDTH = 'clamp(280px, 20vw, 380px)';
 const PANEL_COLLAPSED_WIDTH = 36;
+// Touch: the collapsed rail IS the expand button, and 36px is under the 44px
+// minimum touch target. The panel clips overflow (needed for the width
+// transition), so a hit-area overhang would be unclickable — widen the whole
+// rail instead. Pointer keeps the original 36px.
+const PANEL_COLLAPSED_WIDTH_TOUCH = 44;
 
 export default function RightPanel({
   chatMessages,
@@ -74,15 +80,20 @@ export default function RightPanel({
 }: RightPanelProps) {
   const { isLoupeVisible, toggleLoupe, previewCard, isPreviewFlipped } = useCardPreview();
   const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all' | 'spectators'>('all');
+  const isTouch = useInputMode() === 'touch';
+  const collapsedWidth = isTouch ? PANEL_COLLAPSED_WIDTH_TOUCH : PANEL_COLLAPSED_WIDTH;
 
   return (
     <div style={{
-      width: isLoupeVisible ? PANEL_EXPANDED_WIDTH : PANEL_COLLAPSED_WIDTH,
-      minWidth: isLoupeVisible ? undefined : PANEL_COLLAPSED_WIDTH,
+      width: isLoupeVisible ? PANEL_EXPANDED_WIDTH : collapsedWidth,
+      minWidth: isLoupeVisible ? undefined : collapsedWidth,
       flexShrink: 0,
       display: 'flex',
       flexDirection: 'column',
-      background: isLoupeVisible ? 'rgba(10, 8, 5, 0.97)' : 'transparent',
+      // Collapsed rail gets a scrim too — transparent, it showed a bright
+      // strip of raw background art down the whole right screen edge while
+      // every neighboring surface is darkened.
+      background: isLoupeVisible ? 'rgba(10, 8, 5, 0.97)' : 'rgba(10, 8, 5, 0.55)',
       borderLeft: '1px solid rgba(107, 78, 39, 0.3)',
       overflow: 'hidden',
       transition: 'width 0.2s ease',

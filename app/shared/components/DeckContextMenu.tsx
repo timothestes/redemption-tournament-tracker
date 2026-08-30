@@ -136,6 +136,12 @@ function SubmenuTrigger({
         style={ITEM_STYLE}
         onMouseEnter={(e) => { hoverEnter(e); showSub(); }}
         onMouseLeave={(e) => { hoverLeave(e); }}
+        // Tap toggle: hover never fires on touch, so without this the
+        // submenus were unreachable even once the deck sheet opened.
+        onClick={() => {
+          if (openTimerRef.current) { clearTimeout(openTimerRef.current); openTimerRef.current = null; }
+          ctx?.setActive(isOpen ? null : label);
+        }}
       >
         <ChevronRight size={12} style={{ opacity: 0.6, transform: 'rotate(180deg)' }} />
         <span>{label}</span>

@@ -302,7 +302,7 @@ export default function PregameRail({
           <button style={ACTION} onClick={() => submitStars([])}>No stars</button>
         </div>
         {secondsLeft !== null && (
-          <div style={{ ...BODY, fontSize: 11, color: 'rgba(232, 213, 163, 0.5)' }}>
+          <div style={{ ...BODY, fontSize: 11, color: 'rgba(232, 213, 163, 0.75)' }}>
             Continuing automatically in {secondsLeft}s
           </div>
         )}

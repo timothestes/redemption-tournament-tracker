@@ -391,6 +391,12 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const gateForPortrait =
     !portraitGateDismissed &&
     shouldGateForPortrait(shellViewport.w, shellViewport.h, shellInputMode);
+  // The bar overlays the canvas only where the compact layout profile's top
+  // gutter (containerHeight < 500) pushes the board content clear of it. On
+  // taller touch viewports (iPad, portrait continue-anyway) there is no
+  // gutter, so an overlaid bar sat on the opponent's hand and LoB — give the
+  // bar its own row there like desktop; those viewports have height to spare.
+  const overlayTurnBar = isTouchShell && shellViewport.h > 0 && shellViewport.h < 500;
 
   // Where "Back to lobby" / exit / stale-game redirects land. Forge games
   // return to the Forge play lobby; everyone else to the public play lobby.
@@ -1839,10 +1845,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }}>
       {/* Turn bar + Canvas + Toolbar */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* On touch the turn bar overlays the board instead of consuming a
-            fixed 48px row. Scale is derived from container height, so giving
-            those 48px back to the canvas is a ~14% board gain on a phone. */}
-        <div style={isTouchShell
+        {/* On compact touch the turn bar overlays the board instead of
+            consuming a fixed 48px row (the compact layout profile's top
+            gutter keeps board content clear of it). Scale is derived from
+            container height, so giving those 48px back to the canvas is a
+            ~14% board gain on a phone. Non-compact touch keeps the bar in
+            its own row — no gutter exists to duck under it there. */}
+        <div style={overlayTurnBar
           ? { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, paddingTop: 'env(safe-area-inset-top)' }
           : { flexShrink: 0, height: 48 }}>
           <TurnIndicator

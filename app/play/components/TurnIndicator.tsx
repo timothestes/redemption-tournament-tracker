@@ -162,6 +162,15 @@ function PhaseGate({
 }) {
   const [hovered, setHovered] = useState(false);
   const label = PHASE_LABELS[phase] ?? phase;
+  // Touch: the 16px-wide gate is under half the 44px target (height is
+  // already 44+ via the global [data-phase-bar] button rule + stretch).
+  // Widen the tappable box to 32px with -8px margins so the row's layout
+  // metrics are unchanged (net contribution stays 16px and the 852x393 fit
+  // is undisturbed) — the extra 8px per side overlaps the neighbouring
+  // phase buttons' padding. Interactive gates float above those (then
+  // disabled) buttons; non-interactive gates go hit-transparent so they
+  // never swallow taps meant for the phase buttons on your own turn.
+  const isTouch = useInputMode() === 'touch';
 
   // Precedence: an engaged hold outranks an armed stop, which outranks the
   // faint "you could toggle here" affordance. Nothing renders otherwise —
@@ -196,6 +205,11 @@ function PhaseGate({
           ? (hasStop ? `Remove stop before ${label}` : `Stop before ${label} on ${opponentName}'s turn`)
           : undefined
       }
+      aria-label={
+        isInteractive
+          ? (hasStop ? `Remove stop before ${label}` : `Stop before ${label} on ${opponentName}'s turn`)
+          : undefined
+      }
       onMouseEnter={isInteractive ? () => setHovered(true) : undefined}
       onMouseLeave={isInteractive ? () => setHovered(false) : undefined}
       style={{
@@ -203,16 +217,17 @@ function PhaseGate({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: 16,
-        minWidth: 16,
+        width: isTouch ? 32 : 16,
+        minWidth: isTouch ? 32 : 16,
         alignSelf: 'stretch',
         flexShrink: 0,
         padding: 0,
-        margin: 0,
+        margin: isTouch ? '0 -8px' : 0,
         background: 'transparent',
         border: 'none',
         cursor: isInteractive ? 'pointer' : 'default',
-        zIndex: 1,
+        pointerEvents: isTouch && !isInteractive ? 'none' : undefined,
+        zIndex: isTouch && isInteractive ? 2 : 1,
       }}
     >
       {isVisible && (
@@ -410,6 +425,14 @@ export default function TurnIndicator({
   const [activeBounds, setActiveBounds] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const hasMeasuredRef = useRef(false);
 
+  // Portrait touch: the phase strip scrolls inside a narrow sliver — keep the
+  // CURRENT phase in view instead of wherever the strip was last scrolled.
+  useEffect(() => {
+    if (!isTouchBar) return;
+    const btn = buttonRefs.current[activeKey];
+    btn?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+  }, [isTouchBar, activeKey]);
+
   // Measure the bar's own width so we can hide non-essential bits (the timer)
   // when the playfield container is narrow — e.g. on a 14" laptop or when the
   // loupe sidebar is open. Width-based, not viewport-based, since the bar
@@ -474,6 +497,48 @@ export default function TurnIndicator({
     }
   };
 
+  // Touch renders End Turn in the FIXED right cluster next to Concede — in
+  // the scrollable center it scrolled out of view on portrait widths,
+  // leaving no visible way to end the turn.
+  const endTurnButton = !readOnly && !pregameStep ? (
+    <button
+      onClick={onEndTurn}
+      disabled={!isMyTurn || heldAgainstMe}
+      title={
+        heldAgainstMe
+          ? 'Answer the priority request first'
+          : isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"
+      }
+      style={{
+        marginLeft: isTouchBar ? 0 : 10,
+        padding: isTouchBar ? '5px 8px' : '5px 12px',
+        background: isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.15)' : 'transparent',
+        border: `1px solid ${isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.45)' : 'rgba(107, 78, 39, 0.25)'}`,
+        borderRadius: 4,
+        cursor: isMyTurn && !heldAgainstMe ? 'pointer' : 'default',
+        fontFamily: 'var(--font-cinzel), Georgia, serif',
+        fontSize: FZ.ui,
+        letterSpacing: '0.07em',
+        textTransform: 'uppercase',
+        color: isMyTurn && !heldAgainstMe ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)',
+        transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+        whiteSpace: 'nowrap',
+      }}
+      onMouseEnter={(e) => {
+        if (!isMyTurn || heldAgainstMe) return;
+        e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
+        e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
+      }}
+      onMouseLeave={(e) => {
+        if (!isMyTurn || heldAgainstMe) return;
+        e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
+        e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
+      }}
+    >
+      End Turn
+    </button>
+  ) : null;
+
   return (
     <div
       data-phase-bar
@@ -481,7 +546,13 @@ export default function TurnIndicator({
       style={{
         position: 'relative',
         width: '100%',
-        height: '100%',
+        // Touch: fixed 48px with symmetric breathing room — sized by content,
+        // the 44px buttons sat flush against the screen's top edge (clipped
+        // pill/borders) with all the slack pooled at the bottom.
+        height: isTouchBar ? 48 : '100%',
+        boxSizing: 'border-box',
+        paddingTop: isTouchBar ? 2 : 0,
+        paddingBottom: isTouchBar ? 1 : 0,
         // Touch overlays the bar on the canvas — fully opaque so canvas
         // labels can't ghost through. Pointer keeps the original alpha.
         background: isTouchBar ? '#0a0805' : 'rgba(10, 8, 5, 0.96)',
@@ -784,7 +855,10 @@ export default function TurnIndicator({
           // ends unreachably.
           justifyContent: isTouchBar ? 'safe center' : 'center',
           gap: 2,
-          minWidth: 0,
+          // Touch keeps a sliver of the phase strip alive on portrait widths
+          // — flex-basis 0 let the side clusters squeeze it to nothing, and
+          // the current phase vanished from the bar entirely.
+          minWidth: isTouchBar ? 64 : 0,
           // Touch: the center takes exactly the space between the fixed side
           // clusters and scrolls its own content on narrow (portrait) widths
           // instead of overprinting the right cluster.
@@ -965,13 +1039,15 @@ export default function TurnIndicator({
                     fontSize: FZ.ui,
                     letterSpacing: '0.07em',
                     textTransform: 'uppercase',
+                    // Touch floors: 0.45/0.35 alphas were near-invisible at
+                    // arm's length on a phone under glare.
                     color: isHeldPhase
                       ? '#fbbf24'
                       : isActive
                       ? '#e8d5a3'
                       : isMyTurn
-                      ? 'rgba(232, 213, 163, 0.45)'
-                      : 'rgba(150, 150, 160, 0.35)',
+                      ? (isTouchBar ? 'rgba(232, 213, 163, 0.62)' : 'rgba(232, 213, 163, 0.45)')
+                      : (isTouchBar ? 'rgba(196, 186, 168, 0.55)' : 'rgba(150, 150, 160, 0.35)'),
                     transition: 'color 0.24s ease-out',
                     whiteSpace: 'nowrap',
                     zIndex: 1,
@@ -1028,45 +1104,9 @@ export default function TurnIndicator({
 
         {/* End Turn. While the turn is held the center-board priority prompt
             is the surface — this button just disables (the server refuses
-            movement until the prompt is answered). */}
-        {!readOnly && !pregameStep && (
-          <button
-            onClick={onEndTurn}
-            disabled={!isMyTurn || heldAgainstMe}
-            title={
-              heldAgainstMe
-                ? 'Answer the priority request first'
-                : isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"
-            }
-            style={{
-              marginLeft: 10,
-              padding: '5px 12px',
-              background: isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.15)' : 'transparent',
-              border: `1px solid ${isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.45)' : 'rgba(107, 78, 39, 0.25)'}`,
-              borderRadius: 4,
-              cursor: isMyTurn && !heldAgainstMe ? 'pointer' : 'default',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: FZ.ui,
-              letterSpacing: '0.07em',
-              textTransform: 'uppercase',
-              color: isMyTurn && !heldAgainstMe ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)',
-              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-              whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={(e) => {
-              if (!isMyTurn || heldAgainstMe) return;
-              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
-              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
-            }}
-            onMouseLeave={(e) => {
-              if (!isMyTurn || heldAgainstMe) return;
-              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
-              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
-            }}
-          >
-            End Turn
-          </button>
-        )}
+            movement until the prompt is answered). On touch it renders in the
+            fixed right cluster instead (see endTurnButton above). */}
+        {!isTouchBar && endTurnButton}
 
         {/* Spectators can never act, so this is a non-interactive status span —
             not a button — but still surfaces the hold + countdown (spec §8.4). */}
@@ -1105,6 +1145,7 @@ export default function TurnIndicator({
           marginLeft: isTouchBar ? 'auto' : undefined,
         }}
       >
+        {isTouchBar && endTurnButton}
         {/* While a rematch request is pending, the button retracts it; otherwise
             it starts a one-tap rematch. The "Waiting for opponent…" copy lives on
             the GameOverOverlay toast, so this slot just offers the action. */}
@@ -1231,7 +1272,9 @@ export default function TurnIndicator({
           <button
             onClick={() => setShowConcedeConfirm(true)}
             style={{
-              padding: '5px 12px',
+              // Touch: End Turn shares the right cluster, and at portrait
+              // widths the pair overflowed — Concede's box ran off-screen.
+              padding: isTouchBar ? '5px 8px' : '5px 12px',
               background: 'transparent',
               border: '1px solid rgba(180, 60, 60, 0.5)',
               borderRadius: 4,

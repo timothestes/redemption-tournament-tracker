@@ -7,28 +7,32 @@ interface TouchControlsProps {
   targets: JumpTarget[];
   onJump: (target: JumpTarget) => void;
   activeId: JumpTargetId | null;
+  /** Screen-px distance from the container's right edge to the sidebar's left
+   *  edge, so the cluster clears the pile rail on every layout profile — the
+   *  old hardcoded 10% only matched the compact profile's sidebar ratio. */
+  rightOffsetPx?: number;
 }
 
 /**
  * Camera jump cluster. Every button clears 44x44 (WCAG 2.5.5 / Apple HIG) --
  * unlike GameToolbar, which is sized for a mouse.
  */
-export function TouchControls({ targets, onJump, activeId }: TouchControlsProps) {
+export function TouchControls({ targets, onJump, activeId, rightOffsetPx }: TouchControlsProps) {
   return (
     <div
       // Docked below the turn bar at the RIGHT end of the play area, clear of
-      // the 10% sidebar rail. It sits over the right end of the opponent's
+      // the sidebar rail. It sits over the right end of the opponent's
       // LoB band — souls auto-arrange from the LEFT, so that end is the last
       // to fill. Left-docked it sat exactly on the first souls and made them
       // untappable at fit (rescue acceptance run); the bar overlays the top
       // 48px on touch, so a right-side dock no longer collides with Concede.
       // Vertically it stays a single row so it cannot eat half a 393px
-      // viewport.
+      // viewport. Rendered only while zoomed (see MultiplayerCanvas).
       className="pointer-events-auto absolute z-30 flex flex-row gap-1
                  rounded-lg border border-neutral-700 bg-neutral-900/90 p-1 backdrop-blur"
       style={{
         top: 'calc(48px + env(safe-area-inset-top))',
-        right: 'calc(10% + 8px)',
+        right: rightOffsetPx != null ? Math.max(8, Math.round(rightOffsetPx)) : 'calc(10% + 8px)',
       }}
       data-testid="touch-controls"
     >

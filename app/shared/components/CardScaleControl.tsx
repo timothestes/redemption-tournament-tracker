@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Settings, RotateCcw, RefreshCw, Clock, EyeOff } from 'lucide-react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 
 interface CardScaleControlProps {
   cardScale: number;
@@ -61,6 +62,11 @@ export function CardScaleControl({
     };
   }, [open]);
 
+  // Touch docks the GameToolbar's collapsed button at left:8 bottom:8 with a
+  // higher stacking order — the gear at left:12 rendered underneath it and
+  // card size / timer / chat scale were unreachable. Sit beside it instead.
+  const isTouch = useInputMode() === 'touch';
+
   const pct = Math.round(cardScale * 100);
   const chatPct = chatScale !== undefined ? Math.round(chatScale * 100) : null;
   const hasChatControl =
@@ -75,18 +81,19 @@ export function CardScaleControl({
     <div data-card-scale-control
       ref={popoverRef}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ position: 'absolute', bottom: 8, left: 12, zIndex: 200 }}
+      style={{ position: 'absolute', bottom: 8, left: isTouch ? 60 : 12, zIndex: 200 }}
     >
       {/* Gear button */}
       <button
         onClick={() => setOpen(prev => !prev)}
         title="Card size settings (+/- keys)"
+        aria-label="Card size settings"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: 36,
-          height: 36,
+          width: isTouch ? 44 : 36,
+          height: isTouch ? 44 : 36,
           background: 'rgba(30,22,16,0.92)',
           border: '1px solid var(--gf-border, #3d2e1f)',
           borderRadius: 8,
