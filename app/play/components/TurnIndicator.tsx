@@ -493,8 +493,11 @@ export default function TurnIndicator({
         // and right cluster (Concede) are now both small enough to fit in
         // their 1fr share — TURN N / NAME's-turn moved to a canvas overlay
         // over the opponent's hand zone, freeing ~140px from the left.
+        // Touch: `minmax(0, auto)` lets the phase row SHRINK below its
+        // content (it scrolls, see the center cluster) instead of
+        // overprinting Concede on sub-700px portrait widths.
         display: 'grid',
-        gridTemplateColumns: '1fr auto 1fr',
+        gridTemplateColumns: isTouchBar ? '1fr minmax(0, auto) 1fr' : '1fr auto 1fr',
         alignItems: 'center',
         gap: 8,
         paddingLeft: 12,
@@ -770,9 +773,16 @@ export default function TurnIndicator({
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          // 'safe center' keeps the row centered when it fits but start-aligns
+          // it when it overflows, so the scrollable strip's left end is
+          // reachable. Touch only — with plain 'center', overflow clips both
+          // ends unreachably.
+          justifyContent: isTouchBar ? 'safe center' : 'center',
           gap: 2,
           minWidth: 0,
+          // Touch: on narrow (portrait) widths the row scrolls horizontally
+          // inside its grid track instead of overprinting the right cluster.
+          overflowX: isTouchBar ? 'auto' : undefined,
         }}
       >
         {/* Previous phase arrow — hidden during the pre-game alongside the next
