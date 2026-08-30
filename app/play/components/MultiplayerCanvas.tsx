@@ -80,7 +80,7 @@ import { useTapToMove } from '@/app/play/hooks/useTapToMove';
 import { buildJumpTargets } from '@/app/play/lib/jumpTargets';
 import type { CommitMove } from '@/app/play/lib/tapToMoveCore';
 import type { PointerSample } from '@/app/play/lib/gestureCore';
-import { LONG_PRESS_MOVE_TOLERANCE } from '@/app/play/lib/longPressCore';
+import { LONG_PRESS_MS, LONG_PRESS_MOVE_TOLERANCE } from '@/app/play/lib/longPressCore';
 import { DestinationRail } from '@/app/play/components/DestinationRail';
 import { TouchControls } from '@/app/play/components/TouchControls';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
@@ -131,6 +131,21 @@ const COMPACT_PILE_LABELS: Record<string, string> = {
   'land-of-redemption': 'LOR',
   'land-of-bondage': 'LOB',
 };
+
+// The territory label band used to size itself from a per-char estimate
+// (length * 8.5), which visibly mismatches Cinzel's real glyph widths — the
+// band is right-anchored, so all the error showed up as a left overhang plus
+// a gap before the count badge. Measure with the same canvas API Konva uses.
+// No cache: Cinzel loads async, and an uncached measure self-corrects on the
+// next render once the webfont is in.
+let labelMeasureCtx: CanvasRenderingContext2D | null = null;
+function measureLabelWidth(text: string, fontSize: number, letterSpacing: number): number {
+  if (typeof document === 'undefined') return text.length * fontSize * 0.77;
+  if (!labelMeasureCtx) labelMeasureCtx = document.createElement('canvas').getContext('2d');
+  if (!labelMeasureCtx) return text.length * fontSize * 0.77;
+  labelMeasureCtx.font = `${fontSize}px Cinzel, Georgia, serif`;
+  return labelMeasureCtx.measureText(text).width + letterSpacing * Math.max(0, text.length - 1);
+}
 
 /** Zones where cards are positioned freely (territory only). */
 const FREE_FORM_ZONES = ['territory'] as const;
@@ -5006,8 +5021,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   );
 
   const jumpToTarget = useCallback((t: (typeof jumpTargets)[number]) => {
-    if (t.rect) jumpTo(t.rect, { axis: t.axis });
-  }, [jumpTo]);
+    // In the compact profile the turn bar OVERLAYS the canvas top — without
+    // the inset, "Theirs" framed the opponent's hand row underneath it.
+    if (t.rect) jumpTo(t.rect, { axis: t.axis, insetTop: useCompactLayout ? 48 : 0 });
+  }, [jumpTo, useCompactLayout]);
 
   // Lets Playwright drive the camera without synthesising gestures, so camera
   // behaviour and gesture recognition can be tested independently.
@@ -5038,6 +5055,57 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       delete (window as any).__mpHandBand;
     };
   }, [camera, jumpTargets, jumpTo, resetCamera, mpLayout, scale, offsetX, offsetY]);
+
+  // ---- Sidebar pile / LoB long-press (touch) ----
+  // Pile menus (deck actions, LoR, token spawn on LoB) opened only via
+  // onContextMenu, which iOS never fires for canvas long-presses — so touch
+  // users had no path to them at all. Long-press on a zone Rect now opens the
+  // same menu. One shared timer suffices: a second finger is a pinch.
+  const zonePressRef = useRef<{ x: number; y: number; fired: boolean } | null>(null);
+  const zonePressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The touchend that ends a long-press still emits a Konva tap on the same
+  // Rect (Konva taps have no duration ceiling); this one-shot ref keeps that
+  // tap from also firing the pile's tap action over the fresh menu.
+  const zoneLongPressFiredRef = useRef(false);
+  const clearZonePress = useCallback(() => {
+    if (zonePressTimerRef.current) clearTimeout(zonePressTimerRef.current);
+    zonePressTimerRef.current = null;
+    zonePressRef.current = null;
+  }, []);
+  useEffect(() => clearZonePress, [clearZonePress]);
+  const beginZonePress = useCallback((e: Konva.KonvaEventObject<TouchEvent>, fire: (pt: { x: number; y: number }) => void) => {
+    const t = e.evt.touches?.[0];
+    if (!t) return;
+    if (e.evt.touches.length > 1) { clearZonePress(); return; }
+    clearZonePress();
+    zoneLongPressFiredRef.current = false;
+    const origin = { x: t.clientX, y: t.clientY, fired: false };
+    zonePressRef.current = origin;
+    zonePressTimerRef.current = setTimeout(() => {
+      const s = zonePressRef.current;
+      if (!s || s.fired) return;
+      // Fire-time movement re-check, same reasoning as GameCardNode: Konva
+      // suppresses stage pointer events while one of its drags is live, so
+      // onTouchMove alone can go blind mid-press.
+      const pressStage = (e.target as Konva.Node).getStage?.();
+      const livePos = pressStage?.getPointerPosition?.();
+      if (pressStage && livePos) {
+        const box = pressStage.container().getBoundingClientRect();
+        const moved = Math.hypot(box.left + livePos.x - s.x, box.top + livePos.y - s.y);
+        if (moved > LONG_PRESS_MOVE_TOLERANCE) { clearZonePress(); return; }
+      }
+      s.fired = true;
+      zoneLongPressFiredRef.current = true;
+      fire({ x: s.x, y: s.y });
+    }, LONG_PRESS_MS);
+  }, [clearZonePress]);
+  const moveZonePress = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
+    const s = zonePressRef.current;
+    if (!s || s.fired) return;
+    const t = e.evt.touches?.[0];
+    if (!t) return;
+    if (Math.hypot(t.clientX - s.x, t.clientY - s.y) > LONG_PRESS_MOVE_TOLERANCE) clearZonePress();
+  }, [clearZonePress]);
 
   // ---- Tap-to-move (touch) ----
   // Mirrors handleCardDragEnd's ownership rules, but NOT its rotation-anchor
@@ -5089,9 +5157,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         ? opponentZones[move.toZone]
         : myZones[move.toZone];
 
-    // Rail chips carry no point, and a zone we can't resolve a rect for falls
-    // back to the same path - the server places the card.
-    if (!move.atPoint || !zoneRect) {
+    // Rail chips carry no point. For free-form territory the server default
+    // parked every card flush against the zone's top-left corner — synthesize
+    // a centered drop, staggered by how many cards are already there so
+    // successive rail moves don't pile onto one spot.
+    let atPoint = move.atPoint;
+    if (!atPoint && zoneRect && isFreeFormZone(move.toZone)) {
+      const existing =
+        (move.toOwner === 'opponent' ? opponentCards[move.toZone] : myCards[move.toZone])?.length ?? 0;
+      atPoint = {
+        x: zoneRect.x + Math.min(
+          zoneRect.width * 0.22 + (existing % 6) * cardWidth * 0.45,
+          zoneRect.width - cardWidth / 2 - 8,
+        ),
+        y: zoneRect.y + zoneRect.height / 2,
+      };
+    }
+    // A zone we can't resolve a rect for falls back to the server placing it.
+    if (!atPoint || !zoneRect) {
       moveCard(id, move.toZone, '', undefined, undefined, targetOwnerId);
       return;
     }
@@ -5106,8 +5189,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // up-and-left of where the player touched.
     const targetIsRotated = targetOwner === 'opponent' && isFreeFormZone(move.toZone);
     const { x: adjX, y: adjY } = adjustAnchorForRotationChange(
-      move.atPoint.x - cardWidth / 2,
-      move.atPoint.y - cardHeight / 2,
+      atPoint.x - cardWidth / 2,
+      atPoint.y - cardHeight / 2,
       cardWidth,
       cardHeight,
       false,          // a tap has no source-drag anchor
@@ -5115,7 +5198,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     );
     const db = toDbPos(adjX, adjY, zoneRect, targetOwner, clampOpts);
     moveCard(id, move.toZone, '', String(db.x), String(db.y), targetOwnerId);
-  }, [gameState.myPlayer, gameState.opponentPlayer, moveCard, myZones, opponentZones, cardWidth, cardHeight, battleBandRect, mpLayout, findAnyCardById]);
+  }, [gameState.myPlayer, gameState.opponentPlayer, moveCard, myZones, opponentZones, myCards, opponentCards, cardWidth, cardHeight, battleBandRect, mpLayout, findAnyCardById]);
 
   const {
     state: tapMoveState, dispatch: tapMoveDispatch, reset: tapMoveReset,
@@ -5186,10 +5269,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
     if (pointers.length === 1) {
       const p = pointers[0];
-      if (e.type === 'touchstart' || !touchStartPtRef.current) {
+      if (e.type === 'touchstart') {
         touchStartPtRef.current = { x: p.x, y: p.y };
         touchTravelRef.current = 0;
         sawMultiTouchRef.current = false;
+      } else if (!touchStartPtRef.current) {
+        // Tail of a pinch: the first finger's lift nulled the baseline, and
+        // the surviving finger keeps moving. Re-baseline for travel, but KEEP
+        // sawMultiTouch and the accrued travel — clearing them here made the
+        // pinch's final finger-lift read as a clean tap, and with a card
+        // armed that committed a stray tapZone move at the release point.
+        touchStartPtRef.current = { x: p.x, y: p.y };
       } else {
         const s = touchStartPtRef.current;
         touchTravelRef.current = Math.max(touchTravelRef.current, Math.hypot(p.x - s.x, p.y - s.y));
@@ -5212,8 +5302,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       return;
     }
 
-    // One finger only pans from the background; on a card it is a card drag.
-    if (e.target !== e.target.getStage()) return;
+    // One finger pans from the background or any non-draggable zone surface —
+    // the LoB bands, hand background and pile rects all listen (for menus)
+    // and used to eat the pan, leaving big dead patches while zoomed. Only a
+    // draggable ancestor chain (a card) claims the finger for a drag instead.
+    const stage = e.target.getStage();
+    if (e.target !== stage) {
+      let cur: Konva.Node | null = e.target as Konva.Node;
+      let onDraggable = false;
+      while (cur && cur !== (stage as unknown as Konva.Node)) {
+        if (typeof (cur as any).draggable === 'function' && (cur as any).draggable()) { onDraggable = true; break; }
+        cur = cur.getParent();
+      }
+      if (onDraggable) return;
+    }
     onCameraPointers(pointers);
   }, [isTouch, onCameraPointers, collectPointers]);
 
@@ -6733,6 +6835,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               cornerRadius={3}
               opacity={0.45}
               onContextMenu={handleSharedLobContextMenu}
+              // Touch path to the shared-LoB spawn menu (Paragon).
+              onTouchStart={isTouch && !isSpectator ? (e: Konva.KonvaEventObject<TouchEvent>) => beginZonePress(e, (pt) => {
+                closeAllMenus();
+                const sharedRect = mpLayout?.zones.sharedLob;
+                if (!sharedRect) return;
+                const layer = gameLayerRef.current;
+                const pointer = layer?.getRelativePointerPosition();
+                const spawnX = pointer ? (pointer.x - sharedRect.x) / sharedRect.width : 0.5;
+                const spawnY = pointer ? (pointer.y - sharedRect.y) / sharedRect.height : 0.5;
+                setZoneMenu({ x: pt.x, y: pt.y, spawnX, spawnY, targetPlayerId: '0' });
+              }) : undefined}
+              onTouchMove={isTouch ? moveZonePress : undefined}
+              onTouchEnd={isTouch ? clearZonePress : undefined}
               perfectDrawEnabled={false}
             />
           )}
@@ -6763,18 +6878,32 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const cardsInZone = myCards[key] ?? [];
             // Approximate label width: ~7px per uppercase char at fontSize 11 + letterSpacing 1
             const labelTextWidth = zone.label.toUpperCase().length * 7;
-            const myPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
-              e.evt.preventDefault();
+            const isSidebarPile = SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]);
+            const openMyPileMenu = (pt: { x: number; y: number }) => {
               if (isSpectator) return;
               closeAllMenus();
-              const pt = { x: e.evt.clientX, y: e.evt.clientY };
               if (key === 'deck') setDeckMenu(pt);
               else if (key === 'reserve') setReserveMenu(pt);
               else if (key === 'land-of-redemption') setLorMenu(pt);
               else if (key === 'discard' || key === 'banish') setBrowseMyZone(key);
             };
+            const openMyLobMenu = (pt: { x: number; y: number }) => {
+              if (isSpectator) return;
+              // Compute spawn position as normalized 0-1 within the LOB zone
+              const layer = gameLayerRef.current;
+              const pointer = layer?.getRelativePointerPosition();
+              const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
+              const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
+              setZoneMenu({ x: pt.x, y: pt.y, spawnX, spawnY });
+            };
+            const myPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
+              e.evt.preventDefault();
+              openMyPileMenu({ x: e.evt.clientX, y: e.evt.clientY });
+            };
             const myPileClickHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
               if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
+              // The touchend of a zone long-press also emits a tap — swallow it.
+              if (zoneLongPressFiredRef.current) { zoneLongPressFiredRef.current = false; return; }
               if (key === 'discard' || key === 'banish') setBrowseMyZone(key);
               else if (key === 'reserve' && canViewMyReserve) setBrowseMyZone('reserve');
             };
@@ -6786,26 +6915,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   width={zone.width}
                   height={zone.height}
                   fill="#1e1610"
-                  stroke="#6b4e27"
-                  strokeWidth={1}
+                  // Free-form territory is borderless: its stroke ran parallel
+                  // to the divider/band strokes a few px away, doubling every
+                  // horizontal boundary line across the board.
+                  stroke={isFreeForm ? undefined : '#6b4e27'}
+                  strokeWidth={isFreeForm ? 0 : 1}
                   cornerRadius={3}
                   opacity={0.45}
                   // Territory has no click/context handlers — drop it from the
                   // hit graph entirely so per-pointermove traversal is cheaper.
                   // LoB and sidebar piles must stay listening for their handlers.
                   listening={isFreeForm ? false : undefined}
-                  onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? myPileClickHandler : undefined}
-                  onTap={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? (myPileClickHandler as unknown as (e: Konva.KonvaEventObject<TouchEvent>) => void) : undefined}
+                  onClick={isSidebarPile ? myPileClickHandler : undefined}
+                  onTap={isSidebarPile ? (myPileClickHandler as unknown as (e: Konva.KonvaEventObject<TouchEvent>) => void) : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
-                    if (isSpectator) return;
-                    // Compute spawn position as normalized 0-1 within the LOB zone
-                    const layer = gameLayerRef.current;
-                    const pointer = layer?.getRelativePointerPosition();
-                    const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
-                    const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
-                    setZoneMenu({ x: e.evt.clientX, y: e.evt.clientY, spawnX, spawnY });
-                  } : SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? myPileContextHandler : undefined}
+                    openMyLobMenu({ x: e.evt.clientX, y: e.evt.clientY });
+                  } : isSidebarPile ? myPileContextHandler : undefined}
+                  onTouchStart={isTouch && (isLob || isSidebarPile) ? (e: Konva.KonvaEventObject<TouchEvent>) => beginZonePress(e, isLob ? openMyLobMenu : openMyPileMenu) : undefined}
+                  onTouchMove={isTouch && (isLob || isSidebarPile) ? moveZonePress : undefined}
+                  onTouchEnd={isTouch && (isLob || isSidebarPile) ? clearZonePress : undefined}
                   perfectDrawEnabled={false}
                 />
                 {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
@@ -6820,7 +6949,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       fill="#e8d5a3"
                       letterSpacing={useCompactLayout ? 0 : 1}
                       width={useCompactLayout ? undefined : zone.width - 12}
-                      wrap={useCompactLayout ? 'none' : undefined}
+                      // wrap must be 'none' for ellipsis to apply — the default
+                      // 'word' wrap char-breaks long words instead ("REDEMPTIO/N")
+                      wrap="none"
                       ellipsis={!useCompactLayout}
                       listening={false}
                       perfectDrawEnabled={false}
@@ -6844,17 +6975,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const skipLabel = isLob || isFreeForm;
             const cardsInZone = opponentCards[key] ?? [];
             const labelTextWidth = zone.label.toUpperCase().length * 7;
-            const oppPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
-              e.evt.preventDefault();
+            const isOppSidebarPile = SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]);
+            const openOppPileMenu = (pt: { x: number; y: number }) => {
               if (isSpectator) return;
               closeAllMenus();
-              const pt = { x: e.evt.clientX, y: e.evt.clientY };
               if (key === 'deck') setOpponentDeckMenu(pt);
               else if (key === 'reserve') setOpponentReserveMenu(pt);
               else if (key === 'discard' || key === 'banish') setBrowseOpponentZone(key);
             };
+            const openOppLobMenu = (pt: { x: number; y: number }) => {
+              if (isSpectator) return;
+              const layer = gameLayerRef.current;
+              const pointer = layer?.getRelativePointerPosition();
+              const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
+              const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
+              const oppId = gameState.opponentPlayer?.id;
+              setZoneMenu({ x: pt.x, y: pt.y, spawnX, spawnY, targetPlayerId: oppId != null ? String(oppId) : undefined });
+            };
+            const oppPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
+              e.evt.preventDefault();
+              openOppPileMenu({ x: e.evt.clientX, y: e.evt.clientY });
+            };
             const oppPileClickHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
               if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
+              // The touchend of a zone long-press also emits a tap — swallow it.
+              if (zoneLongPressFiredRef.current) { zoneLongPressFiredRef.current = false; return; }
               if (key === 'discard' || key === 'banish') setBrowseOpponentZone(key);
               else if (key === 'reserve' && canViewOppReserve) setBrowseOpponentZone('reserve');
             };
@@ -6866,23 +7011,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   width={zone.width}
                   height={zone.height}
                   fill="#10141e"
-                  stroke="#27456b"
-                  strokeWidth={1}
+                  // Borderless like the my-side territory (see comment there).
+                  stroke={isFreeForm ? undefined : '#27456b'}
+                  strokeWidth={isFreeForm ? 0 : 1}
                   cornerRadius={3}
                   opacity={0.45}
                   listening={isFreeForm ? false : undefined}
-                  onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? oppPileClickHandler : undefined}
-                  onTap={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? (oppPileClickHandler as unknown as (e: Konva.KonvaEventObject<TouchEvent>) => void) : undefined}
+                  onClick={isOppSidebarPile ? oppPileClickHandler : undefined}
+                  onTap={isOppSidebarPile ? (oppPileClickHandler as unknown as (e: Konva.KonvaEventObject<TouchEvent>) => void) : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
-                    if (isSpectator) return;
-                    const layer = gameLayerRef.current;
-                    const pointer = layer?.getRelativePointerPosition();
-                    const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
-                    const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
-                    const oppId = gameState.opponentPlayer?.id;
-                    setZoneMenu({ x: e.evt.clientX, y: e.evt.clientY, spawnX, spawnY, targetPlayerId: oppId != null ? String(oppId) : undefined });
-                  } : SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? oppPileContextHandler : undefined}
+                    openOppLobMenu({ x: e.evt.clientX, y: e.evt.clientY });
+                  } : isOppSidebarPile ? oppPileContextHandler : undefined}
+                  onTouchStart={isTouch && (isLob || isOppSidebarPile) ? (e: Konva.KonvaEventObject<TouchEvent>) => beginZonePress(e, isLob ? openOppLobMenu : openOppPileMenu) : undefined}
+                  onTouchMove={isTouch && (isLob || isOppSidebarPile) ? moveZonePress : undefined}
+                  onTouchEnd={isTouch && (isLob || isOppSidebarPile) ? clearZonePress : undefined}
                   perfectDrawEnabled={false}
                 />
                 {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
@@ -6897,7 +7040,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       fill="#a3c5e8"
                       letterSpacing={useCompactLayout ? 0 : 1}
                       width={useCompactLayout ? undefined : zone.width - 12}
-                      wrap={useCompactLayout ? 'none' : undefined}
+                      // wrap must be 'none' for ellipsis to apply — the default
+                      // 'word' wrap char-breaks long words instead ("REDEMPTIO/N")
+                      wrap="none"
                       ellipsis={!useCompactLayout}
                       listening={false}
                       perfectDrawEnabled={false}
@@ -7034,15 +7179,27 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
               if (isSpectator) return;
-              const stage = stageRef.current;
-              if (!stage) return;
-              const container = stage.container().getBoundingClientRect();
               closeAllMenus();
               setHandMenu({
                 x: e.evt.clientX,
                 y: e.evt.clientY,
               });
             }}
+            // Touch path to Reveal/Hide Hand — contextmenu never fires for a
+            // canvas long-press on iOS. Presses that land on hand CARDS are
+            // claimed by the card's own long-press (draggable ancestor check).
+            onTouchStart={isTouch && !isSpectator ? (e: Konva.KonvaEventObject<TouchEvent>) => {
+              if (e.target !== e.currentTarget) {
+                let cur: Konva.Node | null = e.target as Konva.Node;
+                while (cur) {
+                  if (typeof (cur as any).draggable === 'function' && (cur as any).draggable()) return;
+                  cur = cur.getParent();
+                }
+              }
+              beginZonePress(e, (pt) => { closeAllMenus(); setHandMenu(pt); });
+            } : undefined}
+            onTouchMove={isTouch ? moveZonePress : undefined}
+            onTouchEnd={isTouch ? clearZonePress : undefined}
             perfectDrawEnabled={false}
           />
           {(() => {
@@ -7053,7 +7210,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const sx = areaRight - lw - 8 - bw - 6;
             const brigadeW = 200 * fsGrowth(12);
             const brigadeX = areaRight - brigadeW - 6;
-            const brigadeTop = myHandRect.y + 24;
+            // Below the HAND label's real (floored-font) bottom edge — a fixed
+            // +24 let the scrim swallow the label once fs(12) grew past 14.
+            const brigadeTop = myHandRect.y + 4 + fs(12) + 8;
             const rowH = 16 * fsGrowth(12);
             return (
               <>
@@ -7155,6 +7314,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 y: e.evt.clientY,
               });
             }}
+            // Touch path to Request Reveal Hand (see my-hand rect above).
+            onTouchStart={isTouch && !isSpectator ? (e: Konva.KonvaEventObject<TouchEvent>) => {
+              if (e.target !== e.currentTarget) {
+                let cur: Konva.Node | null = e.target as Konva.Node;
+                while (cur) {
+                  if (typeof (cur as any).draggable === 'function' && (cur as any).draggable()) return;
+                  cur = cur.getParent();
+                }
+              }
+              beginZonePress(e, (pt) => { closeAllMenus(); setOpponentHandMenu(pt); });
+            } : undefined}
+            onTouchMove={isTouch ? moveZonePress : undefined}
+            onTouchEnd={isTouch ? clearZonePress : undefined}
             perfectDrawEnabled={false}
           />
           {(() => {
@@ -7171,15 +7343,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const gridW = colW * 2 + colGap;
             const col1X = areaRight - gridW - 6;
             const col2X = col1X + colW + colGap;
-            const brigadeTop = opponentHandRect.y + 24;
+            // Below the label's floored-font bottom (same fix as my side).
+            const brigadeTop = opponentHandRect.y + 4 + fs(12) + 8;
             const rowH = 16 * fsGrowth(12);
             return (
               <>
+                {/* Count pill lives AFTER the strip (see the opp-hand cards
+                    section) so the card backs can never bury it. */}
                 <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} listening={false} perfectDrawEnabled={false} />
-                <Group x={sx + lw + 8} y={opponentHandRect.y + 2} listening={false}>
-                  <Rect width={bw} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} perfectDrawEnabled={false} />
-                  <Text text={String(opponentCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#a3c5e8" width={bw} height={18} align="center" verticalAlign="middle" perfectDrawEnabled={false} />
-                </Group>
                 {opponentHandRevealed && opponentHandBrigadeCounts.total > 0 && (
                   <>
                     <Text
@@ -7762,6 +7933,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 key="soul-deck-pile"
                 draggable={true}
                 onContextMenu={handleSharedSoulDeckContextMenu}
+                // Touch path to the soul-deck menu; the fire-time movement
+                // re-check in beginZonePress keeps drag-to-draw intact.
+                onTouchStart={isTouch && !isSpectator ? (e: Konva.KonvaEventObject<TouchEvent>) => beginZonePress(e, (pt) => { closeAllMenus(); setSoulDeckMenu(pt); }) : undefined}
+                onTouchMove={isTouch ? moveZonePress : undefined}
+                onTouchEnd={isTouch ? clearZonePress : undefined}
                 onDragStart={handleSoulDeckPileDragStart}
                 onDragEnd={handleSoulDeckPileDragEnd}
                 hitFunc={(ctx: any, shape: any) => {
@@ -7862,45 +8038,51 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             return lobEntries.map(({ zone, isOpponent }) => {
               const cards = isOpponent ? (opponentCards['land-of-bondage'] ?? []) : (myCards['land-of-bondage'] ?? []);
               const lobLabel = useCompactLayout ? COMPACT_PILE_LABELS['land-of-bondage'] : zone.label.toUpperCase();
-              const labelTextWidth = lobLabel.length * 8.5 * fsGrowth(11);
+              const lobFs = fs(11);
               const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
               const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
               const bgFill = isOpponent ? 'rgba(16, 20, 30, 0.85)' : 'rgba(30, 22, 16, 0.85)';
-              const badgeW = 24;
-              const labelW = labelTextWidth + 8 + badgeW + 8;
-              const bgW = Math.min(labelW + 6, zone.width);
+              const badgeW = Math.max(24, Math.round(lobFs * 2.2));
+              const badgeH = lobFs + 3;
+              const bandH = Math.max(20, lobFs + 9);
+              const fullLabelWidth = measureLabelWidth(lobLabel, lobFs, 1);
+              const maxLabelWidth = Math.max(10, zone.width - badgeW - 22);
+              const labelTextWidth = Math.min(fullLabelWidth, maxLabelWidth);
+              const bgW = Math.min(6 + labelTextWidth + 8 + badgeW + 8, zone.width);
               const bgX = zone.x + zone.width - bgW;
               const labelX = bgX + 6;
               const badgeX = labelX + labelTextWidth + 8;
+              const textY = zone.y + Math.round((bandH - lobFs) / 2);
               return (
                 <Group key={`lob-overlay-${isOpponent ? 'opp' : 'my'}`} listening={false}>
                   <Rect
                     x={bgX}
                     y={zone.y}
                     width={bgW}
-                    height={20}
+                    height={bandH}
                     fill={bgFill}
                     cornerRadius={[0, 3, 0, 4]}
                     perfectDrawEnabled={false}
                   />
                   <Text
                     x={labelX}
-                    y={zone.y + 4}
+                    y={textY}
                     text={lobLabel}
-                    fontSize={fs(11)}
+                    fontSize={lobFs}
                     fontFamily="Cinzel, Georgia, serif"
                     fill={fillColor}
                     letterSpacing={1}
-                    width={zone.width - 44}
+                    width={labelTextWidth + 2}
+                    wrap="none"
                     ellipsis={true}
                     perfectDrawEnabled={false}
                   />
                   <Rect
                     x={badgeX}
-                    y={zone.y + 3}
+                    y={zone.y + Math.round((bandH - badgeH) / 2)}
                     width={badgeW}
-                    height={14}
+                    height={badgeH}
                     fill={badgeFill}
                     cornerRadius={3}
                     stroke={badgeStroke}
@@ -7909,10 +8091,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   />
                   <Text
                     x={badgeX}
-                    y={zone.y + 4}
+                    y={textY}
                     width={badgeW}
                     text={String(cards.length)}
-                    fontSize={fs(11)}
+                    fontSize={lobFs}
                     fill={fillColor}
                     align="center"
                     perfectDrawEnabled={false}
@@ -7929,45 +8111,51 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const zone = mpLayout.zones.sharedLob!;
             const cards = sharedCards['land-of-bondage'] ?? [];
             const sharedLobLabel = useCompactLayout ? COMPACT_PILE_LABELS['land-of-bondage'] : zone.label.toUpperCase();
-            const labelTextWidth = sharedLobLabel.length * 8.5 * fsGrowth(11);
+            const sharedFs = fs(11);
             const fillColor = '#e8d5a3';
             const badgeFill = 'rgba(196, 149, 90, 0.25)';
             const badgeStroke = 'rgba(196, 149, 90, 0.5)';
             const bgFill = 'rgba(30, 22, 16, 0.85)';
-            const badgeW = 24;
-            const labelW = labelTextWidth + 8 + badgeW + 8;
-            const bgW = Math.min(labelW + 6, zone.width);
+            const badgeW = Math.max(24, Math.round(sharedFs * 2.2));
+            const badgeH = sharedFs + 3;
+            const bandH = Math.max(20, sharedFs + 9);
+            const fullLabelWidth = measureLabelWidth(sharedLobLabel, sharedFs, 1);
+            const maxLabelWidth = Math.max(10, zone.width - badgeW - 22);
+            const labelTextWidth = Math.min(fullLabelWidth, maxLabelWidth);
+            const bgW = Math.min(6 + labelTextWidth + 8 + badgeW + 8, zone.width);
             const bgX = zone.x + zone.width - bgW;
             const labelX = bgX + 6;
             const badgeX = labelX + labelTextWidth + 8;
+            const textY = zone.y + Math.round((bandH - sharedFs) / 2);
             return (
               <Group key="lob-overlay-shared" listening={false}>
                 <Rect
                   x={bgX}
                   y={zone.y}
                   width={bgW}
-                  height={20}
+                  height={bandH}
                   fill={bgFill}
                   cornerRadius={[0, 3, 0, 4]}
                   perfectDrawEnabled={false}
                 />
                 <Text
                   x={labelX}
-                  y={zone.y + 4}
+                  y={textY}
                   text={sharedLobLabel}
-                  fontSize={fs(11)}
+                  fontSize={sharedFs}
                   fontFamily="Cinzel, Georgia, serif"
                   fill={fillColor}
                   letterSpacing={1}
-                  width={zone.width - 44}
+                  width={labelTextWidth + 2}
+                  wrap="none"
                   ellipsis={true}
                   perfectDrawEnabled={false}
                 />
                 <Rect
                   x={badgeX}
-                  y={zone.y + 3}
+                  y={zone.y + Math.round((bandH - badgeH) / 2)}
                   width={badgeW}
-                  height={14}
+                  height={badgeH}
                   fill={badgeFill}
                   cornerRadius={3}
                   stroke={badgeStroke}
@@ -7976,10 +8164,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 />
                 <Text
                   x={badgeX}
-                  y={zone.y + 4}
+                  y={textY}
                   width={badgeW}
                   text={String(cards.length)}
-                  fontSize={fs(11)}
+                  fontSize={sharedFs}
                   fill={fillColor}
                   align="center"
                   perfectDrawEnabled={false}
@@ -7998,45 +8186,52 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (myTerr) territoryEntries.push({ zone: myTerr, isOpponent: false, cards: myCards['territory'] ?? [] });
             if (oppTerr) territoryEntries.push({ zone: oppTerr, isOpponent: true, cards: opponentCards['territory'] ?? [] });
             return territoryEntries.map(({ zone, isOpponent, cards }) => {
-              const labelTextWidth = zone.label.toUpperCase().length * 8.5 * fsGrowth(11);
+              const labelFs = fs(11);
               const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
               const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
               const bgFill = isOpponent ? 'rgba(16, 20, 30, 0.85)' : 'rgba(30, 22, 16, 0.85)';
-              const badgeW = 24;
-              const labelW = labelTextWidth + 8 + badgeW + 8;
-              const bgW = Math.min(labelW + 6, zone.width);
+              const badgeW = Math.max(24, Math.round(labelFs * 2.2));
+              const badgeH = labelFs + 3;
+              const bandH = Math.max(20, labelFs + 9);
+              const fullLabelWidth = measureLabelWidth(zone.label.toUpperCase(), labelFs, 1);
+              // Band clamps to the zone; the label truncates before the badge does.
+              const maxLabelWidth = Math.max(10, zone.width - badgeW - 22);
+              const labelTextWidth = Math.min(fullLabelWidth, maxLabelWidth);
+              const bgW = Math.min(6 + labelTextWidth + 8 + badgeW + 8, zone.width);
               const bgX = zone.x + zone.width - bgW;
               const labelX = bgX + 6;
               const badgeX = labelX + labelTextWidth + 8;
+              const textY = zone.y + Math.round((bandH - labelFs) / 2);
               return (
                 <Group key={`territory-overlay-${isOpponent ? 'opp' : 'my'}`} listening={false}>
                   <Rect
                     x={bgX}
                     y={zone.y}
                     width={bgW}
-                    height={20}
+                    height={bandH}
                     fill={bgFill}
                     cornerRadius={[0, 3, 0, 4]}
                     perfectDrawEnabled={false}
                   />
                   <Text
                     x={labelX}
-                    y={zone.y + 4}
+                    y={textY}
                     text={zone.label.toUpperCase()}
-                    fontSize={fs(11)}
+                    fontSize={labelFs}
                     fontFamily="Cinzel, Georgia, serif"
                     fill={fillColor}
                     letterSpacing={1}
-                    width={zone.width - 44}
+                    width={labelTextWidth + 2}
+                    wrap="none"
                     ellipsis={true}
                     perfectDrawEnabled={false}
                   />
                   <Rect
                     x={badgeX}
-                    y={zone.y + 3}
+                    y={zone.y + Math.round((bandH - badgeH) / 2)}
                     width={badgeW}
-                    height={14}
+                    height={badgeH}
                     fill={badgeFill}
                     cornerRadius={3}
                     stroke={badgeStroke}
@@ -8045,10 +8240,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   />
                   <Text
                     x={badgeX}
-                    y={zone.y + 4}
+                    y={textY}
                     width={badgeW}
                     text={String(cards.length)}
-                    fontSize={fs(11)}
+                    fontSize={labelFs}
                     fill={fillColor}
                     align="center"
                     perfectDrawEnabled={false}
@@ -8071,9 +8266,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const badgeCount = zoneKey === 'land-of-redemption'
               ? cards.reduce((n, c) => n + lostSoulValue(c.cardName), 0)
               : count;
-            const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
-            // Center card vertically in remaining space after count badge (18px top)
-            const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
+            // Cell header metrics. The badge grows with the floored font —
+            // fixed at 26x18 it clipped "53" to "5" whenever fs() grew (Konva
+            // char-wraps the overflowing digit onto a clipped second line).
+            // Compact drops the grown badge under the label row (side by side
+            // they no longer fit a phone cell); the art starts below whichever
+            // header is in play and shrinks rather than overflow the cell.
+            const pileBadgeGrow = fsGrowth(12);
+            const bw = Math.round(26 * pileBadgeGrow);
+            const bh = Math.round(18 * pileBadgeGrow);
+            const badgeX = zone.x + zone.width - bw - 6;
+            const badgeY = useCompactLayout ? Math.round(zone.y + 4 + fs(11) + 3) : zone.y + 2;
+            const headerH = useCompactLayout ? Math.round(4 + fs(11) + 3 + bh + 3) : Math.max(18, bh + 4);
+            const cellCardH = Math.max(12, Math.min(pileCardHeight, zone.height - headerH - 2));
+            const cellCardW = Math.round(cellCardH / 1.4);
+            const cx = zone.x + zone.width / 2 - cellCardW / 2;
+            const cy = zone.y + headerH + Math.max(0, (zone.height - headerH - cellCardH) / 2);
 
             // Discard, LOR, and Reserve show top card face-up; everything else shows card back
             // Reserve always shows face-up to the owner regardless of isFlipped
@@ -8100,6 +8308,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const topCard = zoneKey === 'deck' ? sortedCards[0] : sortedCards[sortedCards.length - 1];
             const showFace = topCard && ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') ? !topCard.isFlipped : (zoneKey === 'reserve' && canViewMyReserve));
 
+            const openMyPileGroupMenu = (pt: { x: number; y: number }) => {
+              closeAllMenus();
+              if (zoneKey === 'deck') setDeckMenu(pt);
+              else if (zoneKey === 'land-of-redemption') setLorMenu(pt);
+              else if (zoneKey === 'reserve') setReserveMenu(pt);
+              else if (zoneKey === 'discard' || zoneKey === 'banish') setBrowseMyZone(zoneKey);
+            };
             return (
               <Group
                 key={`my-pile-${zoneKey}`}
@@ -8107,16 +8322,38 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
                   setBrowseMyZone(zoneKey);
                 } : undefined}
+                // Tap parity: the browse fallback used to live only on the zone
+                // Rect UNDERNEATH this Group, so the art surface swallowed
+                // taps. Deck and a hidden reserve tap into their menus (their
+                // desktop click is a no-op; the menu holds the touch path to
+                // draw X / search / reveal).
+                onTap={(e: Konva.KonvaEventObject<TouchEvent>) => {
+                  if (zoneLongPressFiredRef.current) { zoneLongPressFiredRef.current = false; return; }
+                  const t = (e.evt as TouchEvent).changedTouches?.[0];
+                  const pt = t ? { x: t.clientX, y: t.clientY } : { x: 0, y: 0 };
+                  if (zoneKey === 'deck' || (zoneKey === 'reserve' && !canViewMyReserve)) openMyPileGroupMenu(pt);
+                  else setBrowseMyZone(zoneKey);
+                }}
                 onDblClick={undefined}
                 onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
-                  closeAllMenus();
-                  const pt = { x: e.evt.clientX, y: e.evt.clientY };
-                  if (zoneKey === 'deck') setDeckMenu(pt);
-                  else if (zoneKey === 'land-of-redemption') setLorMenu(pt);
-                  else if (zoneKey === 'reserve') setReserveMenu(pt);
-                  else if (zoneKey === 'discard' || zoneKey === 'banish') setBrowseMyZone(zoneKey);
+                  openMyPileGroupMenu({ x: e.evt.clientX, y: e.evt.clientY });
                 }}
+                // Long-press opens the same menu the desktop right-click does.
+                // LoR is excluded when the press lands on a spread card — the
+                // card's own long-press (card menu) owns that gesture.
+                onTouchStart={isTouch ? (e: Konva.KonvaEventObject<TouchEvent>) => {
+                  if (zoneKey === 'land-of-redemption' && e.target !== e.currentTarget) {
+                    let cur: Konva.Node | null = e.target as Konva.Node;
+                    while (cur) {
+                      if (typeof (cur as any).draggable === 'function' && (cur as any).draggable()) return;
+                      cur = cur.getParent();
+                    }
+                  }
+                  beginZonePress(e, openMyPileGroupMenu);
+                } : undefined}
+                onTouchMove={isTouch ? moveZonePress : undefined}
+                onTouchEnd={isTouch ? clearZonePress : undefined}
                 hitFunc={(ctx: any, shape: any) => {
                   ctx.beginPath();
                   ctx.rect(zone.x, zone.y, zone.width, zone.height);
@@ -8124,17 +8361,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   ctx.fillStrokeShape(shape);
                 }}
               >
-                {/* Count badge — compact drops it below the label line so the
-                    count never overprints the pile-name glyphs. */}
-                <Group x={zone.x + zone.width - 32} y={useCompactLayout ? zone.y + 34 : zone.y + 2} listening={false}>
-                  <Rect width={26} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} perfectDrawEnabled={false} />
+                {/* Count badge — see the header metrics above for sizing. */}
+                <Group x={badgeX} y={badgeY} listening={false}>
+                  <Rect width={bw} height={bh} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text
                     text={String(badgeCount)}
                     fontSize={fs(12)}
                     fontStyle="bold"
                     fill="#e8d5a3"
-                    width={26}
-                    height={18}
+                    width={bw}
+                    height={bh}
                     align="center"
                     verticalAlign="middle"
                     perfectDrawEnabled={false}
@@ -8144,13 +8380,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 {/* Revealed indicator for own reserve — clickable to hide. Sits left of the count badge. */}
                 {zoneKey === 'reserve' && (gameState.myPlayer?.reserveRevealed ?? false) && (
                   <Group
-                    x={zone.x + zone.width - 56}
-                    y={zone.y + 2}
+                    x={badgeX - 26}
+                    y={badgeY}
                     onMouseDown={(e: Konva.KonvaEventObject<PointerEvent>) => { e.cancelBubble = true; }}
                     onClick={(e: Konva.KonvaEventObject<PointerEvent>) => {
                       e.cancelBubble = true;
                       e.evt.stopPropagation();
                       if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
+                      gameState.revealReserve(false);
+                    }}
+                    // onClick never fires from a touch tap — without this
+                    // mirror, un-revealing the reserve was unreachable on touch.
+                    onTap={(e: Konva.KonvaEventObject<TouchEvent>) => {
+                      e.cancelBubble = true;
                       gameState.revealReserve(false);
                     }}
                     onMouseEnter={() => { const c = stageRef.current?.container(); if (c) c.style.cursor = 'pointer'; }}
@@ -8180,12 +8422,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 {zoneKey === 'land-of-redemption' && count > 0 && (() => {
                   const pad = 4;
                   const availW = zone.width - pad * 2;
-                  const overlap = count <= 1 ? 0 : Math.min(pileCardWidth * 0.3, (availW - pileCardWidth) / (count - 1));
+                  const overlap = count <= 1 ? 0 : Math.min(cellCardW * 0.3, (availW - cellCardW) / (count - 1));
                   return cards.map((c, i) => {
                     const img = getCardImage(c);
                     const gameCard = adaptCard(c, 'player1');
                     const cardX = zone.x + pad + i * overlap;
-                    const cardY = zone.y + (zone.height - pileCardHeight) / 2;
+                    // Below the 18px label/badge header, like the other piles —
+                    // full-height centering ran the cards up into the label row.
+                    const cardY = zone.y + headerH + Math.max(0, (zone.height - headerH - cellCardH) / 2);
                     return img ? (
                       <GameCardNode
                         key={String(c.id)}
@@ -8194,8 +8438,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         x={cardX}
                         y={cardY}
                         rotation={0}
-                        cardWidth={pileCardWidth}
-                        cardHeight={pileCardHeight}
+                        cardWidth={cellCardW}
+                        cardHeight={cellCardH}
                         image={img}
                         {...(getTargetingProps(gameCard) ?? {})}
                         isSelected={isSelected(String(c.id))}
@@ -8214,7 +8458,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       />
                     ) : (
                       <Group key={String(c.id)} x={cardX} y={cardY}>
-                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                        <CardBackShape width={cellCardW} height={cellCardH} />
                       </Group>
                     );
                   });
@@ -8226,7 +8470,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     {/* Shadow card for depth if multiple — hide when showing face-up */}
                     {count > 1 && !showFace && (
                       <Group x={-2} y={-2}>
-                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                        <CardBackShape width={cellCardW} height={cellCardH} />
                       </Group>
                     )}
                     {showFace ? (
@@ -8248,8 +8492,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             x={0}
                             y={0}
                             rotation={0}
-                            cardWidth={pileCardWidth}
-                            cardHeight={pileCardHeight}
+                            cardWidth={cellCardW}
+                            cardHeight={cellCardH}
                             image={img}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
@@ -8266,7 +8510,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                           />
                         ) : (
                           <Group key={String(c.id)}>
-                            <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                            <CardBackShape width={cellCardW} height={cellCardH} />
                           </Group>
                         );
                       })
@@ -8307,8 +8551,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             x={0}
                             y={0}
                             rotation={0}
-                            cardWidth={pileCardWidth}
-                            cardHeight={pileCardHeight}
+                            cardWidth={cellCardW}
+                            cardHeight={cellCardH}
                             image={topRevealed ? getCardImage(effectiveTop) : undefined}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
@@ -8326,7 +8570,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         );
                       })()
                     ) : (
-                      <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                      <CardBackShape width={cellCardW} height={cellCardH} />
                     )}
                   </Group>
                 )}
@@ -8347,9 +8591,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const badgeCount = zoneKey === 'land-of-redemption'
               ? cards.reduce((n, c) => n + lostSoulValue(c.cardName), 0)
               : count;
-            const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
-            // Center card vertically in remaining space after count badge (18px top)
-            const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
+            // Cell header metrics. The badge grows with the floored font —
+            // fixed at 26x18 it clipped "53" to "5" whenever fs() grew (Konva
+            // char-wraps the overflowing digit onto a clipped second line).
+            // Compact drops the grown badge under the label row (side by side
+            // they no longer fit a phone cell); the art starts below whichever
+            // header is in play and shrinks rather than overflow the cell.
+            const pileBadgeGrow = fsGrowth(12);
+            const bw = Math.round(26 * pileBadgeGrow);
+            const bh = Math.round(18 * pileBadgeGrow);
+            const badgeX = zone.x + zone.width - bw - 6;
+            const badgeY = useCompactLayout ? Math.round(zone.y + 4 + fs(11) + 3) : zone.y + 2;
+            const headerH = useCompactLayout ? Math.round(4 + fs(11) + 3 + bh + 3) : Math.max(18, bh + 4);
+            const cellCardH = Math.max(12, Math.min(pileCardHeight, zone.height - headerH - 2));
+            const cellCardW = Math.round(cellCardH / 1.4);
+            const cx = zone.x + zone.width / 2 - cellCardW / 2;
+            const cy = zone.y + headerH + Math.max(0, (zone.height - headerH - cellCardH) / 2);
 
             const oppReserveRevealed = gameState.opponentPlayer?.reserveRevealed ?? false;
             const nowMicrosForReveal = BigInt(Date.now()) * 1000n;
@@ -8373,6 +8630,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               || (zoneKey === 'reserve' && topCard && (oppReserveRevealed || topReserveCardRevealed || (isSpectator && oppShareHand)))
               || (oppTopDeckRevealed && topCard);
 
+            const openOppPileGroupMenu = (pt: { x: number; y: number }) => {
+              closeAllMenus();
+              if (zoneKey === 'deck') setOpponentDeckMenu(pt);
+              else if (zoneKey === 'reserve') setOpponentReserveMenu(pt);
+              else if (zoneKey === 'discard' || zoneKey === 'banish') setBrowseOpponentZone(zoneKey);
+            };
             return (
               <Group
                 key={`opp-pile-${zoneKey}`}
@@ -8381,14 +8644,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
                   setBrowseOpponentZone(zoneKey);
                 } : undefined}
+                // Tap parity with onClick, plus menus for the zones whose
+                // desktop click is a no-op (see the my-side loop).
+                onTap={(e: Konva.KonvaEventObject<TouchEvent>) => {
+                  if (zoneLongPressFiredRef.current) { zoneLongPressFiredRef.current = false; return; }
+                  const t = (e.evt as TouchEvent).changedTouches?.[0];
+                  const pt = t ? { x: t.clientX, y: t.clientY } : { x: 0, y: 0 };
+                  if (zoneKey === 'deck' || (zoneKey === 'reserve' && !canViewOppReserve)) openOppPileGroupMenu(pt);
+                  else setBrowseOpponentZone(zoneKey);
+                }}
                 onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
-                  closeAllMenus();
-                  const pt = { x: e.evt.clientX, y: e.evt.clientY };
-                  if (zoneKey === 'deck') setOpponentDeckMenu(pt);
-                  else if (zoneKey === 'reserve') setOpponentReserveMenu(pt);
-                  else if (zoneKey === 'discard' || zoneKey === 'banish') setBrowseOpponentZone(zoneKey);
+                  openOppPileGroupMenu({ x: e.evt.clientX, y: e.evt.clientY });
                 }}
+                onTouchStart={isTouch ? (e: Konva.KonvaEventObject<TouchEvent>) => {
+                  if (zoneKey === 'land-of-redemption' && e.target !== e.currentTarget) {
+                    let cur: Konva.Node | null = e.target as Konva.Node;
+                    while (cur) {
+                      if (typeof (cur as any).draggable === 'function' && (cur as any).draggable()) return;
+                      cur = cur.getParent();
+                    }
+                  }
+                  beginZonePress(e, openOppPileGroupMenu);
+                } : undefined}
+                onTouchMove={isTouch ? moveZonePress : undefined}
+                onTouchEnd={isTouch ? clearZonePress : undefined}
                 hitFunc={(ctx: any, shape: any) => {
                   ctx.beginPath();
                   ctx.rect(zone.x, zone.y, zone.width, zone.height);
@@ -8396,17 +8676,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   ctx.fillStrokeShape(shape);
                 }}
               >
-                {/* Count badge — compact drops it below the label line so the
-                    count never overprints the pile-name glyphs. */}
-                <Group x={zone.x + zone.width - 32} y={useCompactLayout ? zone.y + 34 : zone.y + 2} listening={false}>
-                  <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} perfectDrawEnabled={false} />
+                {/* Count badge — see the my-side header metrics for sizing. */}
+                <Group x={badgeX} y={badgeY} listening={false}>
+                  <Rect width={bw} height={bh} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text
                     text={String(badgeCount)}
                     fontSize={fs(12)}
                     fontStyle="bold"
                     fill="#a3c5e8"
-                    width={26}
-                    height={18}
+                    width={bw}
+                    height={bh}
                     align="center"
                     verticalAlign="middle"
                     perfectDrawEnabled={false}
@@ -8415,7 +8694,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
                 {/* Revealed indicator for opponent reserve — sits left of the count badge. Not clickable (only owner can toggle). */}
                 {zoneKey === 'reserve' && oppReserveRevealed && (
-                  <Group x={zone.x + zone.width - 56} y={zone.y + 2} listening={false}>
+                  <Group x={badgeX - 26} y={badgeY} listening={false}>
                     <Rect width={20} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} perfectDrawEnabled={false} />
                     <Text
                       text="👁"
@@ -8433,12 +8712,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 {zoneKey === 'land-of-redemption' && count > 0 && (() => {
                   const pad = 4;
                   const availW = zone.width - pad * 2;
-                  const overlap = count <= 1 ? 0 : Math.min(pileCardWidth * 0.3, (availW - pileCardWidth) / (count - 1));
+                  const overlap = count <= 1 ? 0 : Math.min(cellCardW * 0.3, (availW - cellCardW) / (count - 1));
                   return cards.map((c, i) => {
                     const img = getCardImage(c);
                     const gameCard = adaptCard(c, 'player2');
-                    const cardX = zone.x + pad + i * overlap + pileCardWidth;
-                    const cardY = zone.y + (zone.height - pileCardHeight) / 2 + pileCardHeight;
+                    const cardX = zone.x + pad + i * overlap + cellCardW;
+                    // Header-aware like the my-side spread (rot-180 anchor adds
+                    // +cellCardH to reach the card's visual top-left).
+                    const cardY = zone.y + headerH + Math.max(0, (zone.height - headerH - cellCardH) / 2) + cellCardH;
                     return img ? (
                       <GameCardNode
                         key={String(c.id)}
@@ -8447,8 +8728,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         x={cardX}
                         y={cardY}
                         rotation={180}
-                        cardWidth={pileCardWidth}
-                        cardHeight={pileCardHeight}
+                        cardWidth={cellCardW}
+                        cardHeight={cellCardH}
                         image={img}
                         {...(getTargetingProps(gameCard) ?? {})}
                         isSelected={isSelected(String(c.id))}
@@ -8467,7 +8748,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       />
                     ) : (
                       <Group key={String(c.id)} x={cardX} y={cardY}>
-                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                        <CardBackShape width={cellCardW} height={cellCardH} />
                       </Group>
                     );
                   });
@@ -8477,8 +8758,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 {zoneKey !== 'land-of-redemption' && count > 0 && (
                   <Group x={cx} y={cy}>
                     {count > 1 && !showFace && (
-                      <Group x={pileCardWidth - 2} y={pileCardHeight - 2} rotation={180}>
-                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                      <Group x={cellCardW - 2} y={cellCardH - 2} rotation={180}>
+                        <CardBackShape width={cellCardW} height={cellCardH} />
                       </Group>
                     )}
                     {showFace && topCard ? (
@@ -8507,11 +8788,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             key={String(effectiveTop.id)}
                             card={gameCard}
                             isArmed={armedCardId === gameCard.instanceId}
-                            x={pileCardWidth}
-                            y={pileCardHeight}
+                            x={cellCardW}
+                            y={cellCardH}
                             rotation={180}
-                            cardWidth={pileCardWidth}
-                            cardHeight={pileCardHeight}
+                            cardWidth={cellCardW}
+                            cardHeight={cellCardH}
                             image={img}
                             {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
@@ -8531,14 +8812,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             onMouseLeave={handleMouseLeave}
                           />
                         ) : (
-                          <Group x={pileCardWidth} y={pileCardHeight} rotation={180}>
-                            <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                          <Group x={cellCardW} y={cellCardH} rotation={180}>
+                            <CardBackShape width={cellCardW} height={cellCardH} />
                           </Group>
                         );
                       })()
                     ) : (
-                      <Group x={pileCardWidth} y={pileCardHeight} rotation={180}>
-                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                      <Group x={cellCardW} y={cellCardH} rotation={180}>
+                        <CardBackShape width={cellCardW} height={cellCardH} />
                       </Group>
                     )}
                   </Group>
@@ -8647,6 +8928,34 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   );
                 })}
               </Group>
+              {/* Count pill re-drawn OVER the strip: the pre-strip label block
+                  renders first, so on narrow (portrait) widths the centered
+                  card backs buried the count entirely. */}
+              {(() => {
+                const grow = fsGrowth(12);
+                const pbw = Math.round(26 * grow);
+                const pbh = Math.round(18 * grow);
+                return (
+                  <Group
+                    x={opponentHandRect!.x + opponentHandRect!.width - pbw - 6}
+                    y={opponentHandRect!.y + 2}
+                    listening={false}
+                  >
+                    <Rect width={pbw} height={pbh} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} perfectDrawEnabled={false} />
+                    <Text
+                      text={String(opponentCards['hand']?.length ?? 0)}
+                      fontSize={fs(12)}
+                      fontStyle="bold"
+                      fill="#a3c5e8"
+                      width={pbw}
+                      height={pbh}
+                      align="center"
+                      verticalAlign="middle"
+                      perfectDrawEnabled={false}
+                    />
+                  </Group>
+                );
+              })()}
               <DealLayer sprites={oppDealSprites} onLanded={completeOppDeal} />
               </>
             );
@@ -8719,13 +9028,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     }
                   }
                   const gameCard = adaptCard(card, 'player1');
+                  const isArmedCard = armedCardId === gameCard.instanceId;
+                  // The DestinationRail (a ~54px DOM overlay just above the
+                  // hand band) covers the fan's arc — lift the armed card far
+                  // enough that its top third (and amber ring) clears the
+                  // rail. The rail is screen-sized, so convert to virtual.
+                  const armedLift = isArmedCard ? Math.round(54 / safeScale + handCardHeight * 0.6) : 0;
                   return (
                     <GameCardNode
                       key={idStr}
                       card={gameCard}
-                      isArmed={armedCardId === gameCard.instanceId}
+                      isArmed={isArmedCard}
                       x={pos.x}
-                      y={pos.y}
+                      y={pos.y - armedLift}
                       rotation={pos.rotation}
                       cardWidth={handCardWidth}
                       cardHeight={handCardHeight}
@@ -10391,7 +10706,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ================================================================
           Card hover preview — floating tooltip near cursor
           ================================================================ */}
-      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && !opponentHandMenu && !reserveMenu && !opponentReserveMenu && (() => {
+      {/* Touch gets no cursor-anchored hover preview: Konva synthesizes
+          mouseenter from touches (setting hoveredCard) but never a mousemove
+          with client coords, so mousePos is stale/NaN — the preview rendered
+          at 0,0 or threw "NaN is an invalid value for left". The loupe panel
+          is the touch preview surface. */}
+      {!isTouch && hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && !opponentHandMenu && !reserveMenu && !opponentReserveMenu && (() => {
         const MARGIN = 8;
         const CURSOR_OFFSET = 16;
         const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
@@ -10426,6 +10746,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
         left = Math.max(MARGIN, Math.min(left, viewportW - previewWidth - MARGIN));
         top = Math.max(MARGIN, Math.min(top, viewportH - previewHeight - MARGIN));
+        if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
 
         return (
           <div
@@ -10583,11 +10904,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       })()}
 
       {/* ---- Touch overlays ---- */}
-      {isTouch && (
+      {/* Jump cluster only while zoomed: at fit the whole board is already
+          visible and the floating chrome sat on the opponent-hand count and
+          territory band. Pinching in summons it, Fit dismisses it. */}
+      {isTouch && isZoomed && (
         <TouchControls
           targets={jumpTargets}
           onJump={jumpToTarget}
-          activeId={isZoomed ? null : 'fit'}
+          activeId={null}
+          rightOffsetPx={
+            mpLayout
+              ? containerWidth - (fit.offsetX + mpLayout.playAreaWidth * fit.scale) + 8
+              : undefined
+          }
         />
       )}
       {isTouch && !isSpectator && (

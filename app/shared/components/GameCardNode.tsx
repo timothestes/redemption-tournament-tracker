@@ -150,6 +150,12 @@ export const GameCardNode = memo(function GameCardNode({
 
   useEffect(() => clearPress, [clearPress]);
 
+  // The touchend that ends a long-press still emits a Konva tap on this node
+  // (taps have no duration ceiling), and by then clearPress() has wiped the
+  // press state — so the tap re-fired onClick and, on touch, ARMED the card
+  // right under the freshly opened menu. One-shot swallow.
+  const longPressTapSwallowRef = useRef(false);
+
   const beginLongPress = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     if (!onLongPress) return;
     const t = e.evt.touches?.[0];
@@ -157,6 +163,7 @@ export const GameCardNode = memo(function GameCardNode({
     // A second finger means the user is pinching, not pressing.
     if (e.evt.touches.length > 1) { clearPress(); return; }
     clearPress();
+    longPressTapSwallowRef.current = false;
     const origin = { x: t.clientX, y: t.clientY, fired: false };
     pressRef.current = origin;
     pressTimerRef.current = setTimeout(() => {
@@ -181,6 +188,7 @@ export const GameCardNode = memo(function GameCardNode({
         }
       }
       s.fired = true;
+      longPressTapSwallowRef.current = true;
       // onLongPress FIRST: Konva's dragDistance is 3px but our movement
       // tolerance is 10px, so in the 3-10px band a real Konva drag is already
       // running and stopDrag() emits a genuine dragend. The canvas marks the
@@ -306,6 +314,12 @@ export const GameCardNode = memo(function GameCardNode({
         if (onClick) onClick(card, e);
       }}
       onTap={(e) => {
+        // The tail of a long-press is not a tap (see longPressTapSwallowRef).
+        if (longPressTapSwallowRef.current) {
+          longPressTapSwallowRef.current = false;
+          e.cancelBubble = true;
+          return;
+        }
         if (targetingMode) {
           e.cancelBubble = true;
           if (targetingMode.isEligible) targetingMode.onSelect();

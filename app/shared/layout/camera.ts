@@ -124,6 +124,10 @@ export interface FitOptions {
    */
   axis?: 'both' | 'height';
   padding?: number;
+  /** Screen px at the top of the viewport covered by overlay chrome (the
+   *  touch turn bar). The rect is fitted and centered within the area BELOW
+   *  it, so a side jump doesn't hide its top row under the bar. */
+  insetTop?: number;
 }
 
 /** Camera that frames `rect` in the viewport. */
@@ -135,12 +139,13 @@ export function fitRectToViewport(
   containerHeight: number,
   opts: FitOptions = {},
 ): Camera {
-  const { axis = 'both', padding = 1.06 } = opts;
+  const { axis = 'both', padding = 1.06, insetTop = 0 } = opts;
   const needW = rect.width * padding;
   const needH = rect.height * padding;
+  const availH = Math.max(1, containerHeight - insetTop);
   const scaleNeeded = axis === 'height'
-    ? containerHeight / needH
-    : Math.min(containerWidth / needW, containerHeight / needH);
+    ? availH / needH
+    : Math.min(containerWidth / needW, availH / needH);
   const zoom = scaleNeeded / fitScale;
 
   // A height-axis fit can leave the viewport narrower than the rect (a
@@ -160,8 +165,16 @@ export function fitRectToViewport(
     }
   }
 
+  // Center the rect within the area below the top chrome: pushing content
+  // down by insetTop/2 screen px means moving the camera centre UP by the
+  // same distance in virtual units.
+  let centerY = rect.y + rect.height / 2;
+  if (insetTop > 0 && Number.isFinite(effectiveScale) && effectiveScale > 0) {
+    centerY -= insetTop / (2 * effectiveScale);
+  }
+
   return clampCamera(
-    { zoom, centerX, centerY: rect.y + rect.height / 2 },
+    { zoom, centerX, centerY },
     fitScale, virtualWidth, containerWidth, containerHeight,
   );
 }

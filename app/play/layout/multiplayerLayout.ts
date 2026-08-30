@@ -296,7 +296,10 @@ function getPileCardDimensions(slotHeight: number, sidebarWidth: number, zonePad
   const hFromW = maxCardW * CARD_ASPECT_RATIO;
   const h = Math.round(Math.min(Math.max(Math.min(usableH, hFromW), 30), usableH));
   const w = Math.round(h / CARD_ASPECT_RATIO);
-  return { cardWidth: Math.max(w, Math.round(30 / CARD_ASPECT_RATIO)), cardHeight: Math.round(Math.max(h, 30)) };
+  // No re-floor past usableH here: `h` is already 30 when the cell allows it,
+  // and re-applying Math.max(h, 30) made tiny cells overflow into the next
+  // row (the deck art overdrawing the LOR label below it).
+  return { cardWidth: Math.max(w, 8), cardHeight: Math.max(h, 12) };
 }
 
 // ── Sidebar builder ─────────────────────────────────────────────────────
