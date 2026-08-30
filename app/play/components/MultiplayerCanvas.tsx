@@ -120,6 +120,18 @@ import {
 /** Sidebar zones that display as a pile with a count badge (not individual cards). */
 const SIDEBAR_PILE_ZONES = ['deck', 'discard', 'reserve', 'banish', 'land-of-redemption'] as const;
 
+// Compact touch: the icon-rail sidebar is too narrow for the full pile names —
+// the count badges overprinted the glyphs ("DECR4", "RESER0/VE", "LAND OF/
+// REDEMPTIO/N"). Short labels keep the count clear at phone sizes.
+const COMPACT_PILE_LABELS: Record<string, string> = {
+  deck: 'DECK',
+  reserve: 'RES',
+  discard: 'DISC',
+  banish: 'BAN',
+  'land-of-redemption': 'LOR',
+  'land-of-bondage': 'LOB',
+};
+
 /** Zones where cards are positioned freely (territory only). */
 const FREE_FORM_ZONES = ['territory'] as const;
 type FreeFormZone = (typeof FREE_FORM_ZONES)[number];
@@ -6802,12 +6814,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     <Text
                       x={zone.x + 6}
                       y={zone.y + 4}
-                      text={zone.label.toUpperCase()}
+                      text={useCompactLayout ? (COMPACT_PILE_LABELS[key] ?? zone.label.toUpperCase()) : zone.label.toUpperCase()}
                       fontSize={fs(11)}
                       fontFamily="Cinzel, Georgia, serif"
                       fill="#e8d5a3"
-                      letterSpacing={1}
-                      width={zone.width - 12}
+                      letterSpacing={useCompactLayout ? 0.5 : 1}
+                      width={zone.width - (useCompactLayout ? 40 : 12)}
                       ellipsis
                       listening={false}
                       perfectDrawEnabled={false}
@@ -6878,12 +6890,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     <Text
                       x={zone.x + 6}
                       y={zone.y + 4}
-                      text={zone.label.toUpperCase()}
+                      text={useCompactLayout ? (COMPACT_PILE_LABELS[key] ?? zone.label.toUpperCase()) : zone.label.toUpperCase()}
                       fontSize={fs(11)}
                       fontFamily="Cinzel, Georgia, serif"
                       fill="#a3c5e8"
-                      letterSpacing={1}
-                      width={zone.width - 12}
+                      letterSpacing={useCompactLayout ? 0.5 : 1}
+                      width={zone.width - (useCompactLayout ? 40 : 12)}
                       ellipsis
                       listening={false}
                       perfectDrawEnabled={false}
@@ -7835,7 +7847,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (oppLob) lobEntries.push({ zone: oppLob, isOpponent: true });
             return lobEntries.map(({ zone, isOpponent }) => {
               const cards = isOpponent ? (opponentCards['land-of-bondage'] ?? []) : (myCards['land-of-bondage'] ?? []);
-              const labelTextWidth = zone.label.toUpperCase().length * 8.5 * fsGrowth(11);
+              const lobLabel = useCompactLayout ? COMPACT_PILE_LABELS['land-of-bondage'] : zone.label.toUpperCase();
+              const labelTextWidth = lobLabel.length * 8.5 * fsGrowth(11);
               const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
               const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
@@ -7860,7 +7873,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   <Text
                     x={labelX}
                     y={zone.y + 4}
-                    text={zone.label.toUpperCase()}
+                    text={lobLabel}
                     fontSize={fs(11)}
                     fontFamily="Cinzel, Georgia, serif"
                     fill={fillColor}
@@ -7901,7 +7914,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           {normalizedFormat === 'Paragon' && mpLayout?.zones.sharedLob && (() => {
             const zone = mpLayout.zones.sharedLob!;
             const cards = sharedCards['land-of-bondage'] ?? [];
-            const labelTextWidth = zone.label.toUpperCase().length * 8.5 * fsGrowth(11);
+            const sharedLobLabel = useCompactLayout ? COMPACT_PILE_LABELS['land-of-bondage'] : zone.label.toUpperCase();
+            const labelTextWidth = sharedLobLabel.length * 8.5 * fsGrowth(11);
             const fillColor = '#e8d5a3';
             const badgeFill = 'rgba(196, 149, 90, 0.25)';
             const badgeStroke = 'rgba(196, 149, 90, 0.5)';
@@ -7926,7 +7940,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 <Text
                   x={labelX}
                   y={zone.y + 4}
-                  text={zone.label.toUpperCase()}
+                  text={sharedLobLabel}
                   fontSize={fs(11)}
                   fontFamily="Cinzel, Georgia, serif"
                   fill={fillColor}
