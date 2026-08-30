@@ -8882,8 +8882,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           in the TurnIndicator bar — moving it here freed enough room in
           the bar to keep the centered phase row from overlapping the
           score on narrow viewports.
+          Touch: not rendered — the overlaid turn bar sits on top of this
+          exact corner and buried it (plus the score orbs / phase pill
+          behind it). The bar's own compact T{n} chip carries the turn
+          number there instead (TurnIndicator, touch only).
           ================================================================ */}
-      {gameState.game && gameState.myPlayer && (
+      {gameState.game && gameState.myPlayer && !isTouch && (
         <div
           className="pointer-events-none absolute z-20"
           style={{

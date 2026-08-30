@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { PHASE_ORDER } from '@/app/goldfish/types';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import type { GamePhase } from '@/app/shared/types/gameCard';
 import { showGameToast } from '@/app/shared/components/GameToast';
@@ -93,6 +94,18 @@ const PHASE_LABELS: Record<string, string> = {
   battle: 'Battle',
   discard: 'Discard',
   end: 'End of Turn', // the 'end' gate — the boundary after discard, before the flip
+};
+
+// Touch: the overlaid bar shares one row with END TURN / CONCEDE on a phone
+// viewport, so the longer phase names abbreviate. Full names stay in the
+// button titles and in every toast (which read from PHASE_LABELS).
+const TOUCH_PHASE_LABELS: Record<string, string> = {
+  draw: 'Draw',
+  upkeep: 'Upk',
+  preparation: 'Prep',
+  battle: 'Battle',
+  discard: 'Disc',
+  end: 'End of Turn',
 };
 
 // REG Pre-Game Phase sub-steps. Kept separate from PHASE_ORDER/PHASE_LABELS so
@@ -325,6 +338,13 @@ export default function TurnIndicator({
   const [handRevealCooldownUntil, setHandRevealCooldownUntil] = useState(0);
   const handRevealOnCooldown = Date.now() < handRevealCooldownUntil;
   const { isLoupeVisible } = useCardPreview();
+  // Touch: the bar overlays the canvas (client.tsx), so it goes fully opaque
+  // (canvas labels ghosted through the 0.96 alpha), abbreviates the longer
+  // phase names, and carries a compact T{n} turn chip — the canvas's own
+  // turn badge is suppressed there. Pointer rendering is bit-identical.
+  const isTouchBar = useInputMode() === 'touch';
+  const phaseLabelFor = (phase: string): string =>
+    (isTouchBar ? TOUCH_PHASE_LABELS[phase] : PHASE_LABELS[phase]) ?? phase;
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
   const currentIdx = PHASE_ORDER.indexOf(currentPhase as GamePhase);
@@ -462,7 +482,9 @@ export default function TurnIndicator({
         position: 'relative',
         width: '100%',
         height: '100%',
-        background: 'rgba(10, 8, 5, 0.96)',
+        // Touch overlays the bar on the canvas — fully opaque so canvas
+        // labels can't ghost through. Pointer keeps the original alpha.
+        background: isTouchBar ? '#0a0805' : 'rgba(10, 8, 5, 0.96)',
         borderBottom: '1px solid rgba(107, 78, 39, 0.5)',
         // Three columns: left cluster | center cluster | right cluster.
         // `1fr auto 1fr` keeps the center anchored to the bar's geometric
@@ -526,6 +548,28 @@ export default function TurnIndicator({
         </svg>
       </button>
 
+      {/* Touch-only compact turn chip. On pointer the TURN N / NAME's-turn
+          block is a canvas overlay, but on touch that overlay sits under
+          this very bar — so the turn number lives here instead. Color says
+          whose turn it is (amber = mine, blue = theirs). */}
+      {isTouchBar && (
+        <span
+          data-testid="turn-chip"
+          title={isMyTurn ? `Turn ${turnNumber} — your turn` : `Turn ${turnNumber} — ${opponentName}'s turn`}
+          style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            lineHeight: 1,
+            color: isMyTurn ? '#c4955a' : '#4a7ab5',
+            flexShrink: 0,
+          }}
+        >
+          T{turnNumber}
+        </span>
+      )}
+
       {/* Score + timer wrapper. The TURN N / NAME's turn block lives over
           the opponent's hand zone in the canvas instead — keeps the bar
           narrow enough that the centered phase row never collides. */}
@@ -562,21 +606,21 @@ export default function TurnIndicator({
           return (
             <>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ color: '#c4955a', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{myScore}</span>
+                <span style={{ color: isTouchBar ? '#e0b070' : '#c4955a', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{myScore}</span>
                 <NameHint
                   label={leftLabel}
                   full={leftFull}
-                  color="rgba(196, 149, 90, 0.45)"
+                  color={isTouchBar ? 'rgba(196, 149, 90, 0.8)' : 'rgba(196, 149, 90, 0.45)'}
                   accent="#c4955a"
                 />
               </div>
               <span style={{ color: 'rgba(232, 213, 163, 0.2)', fontSize: FZ.ui, fontWeight: 400 }}>vs</span>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ color: '#4a7ab5', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
+                <span style={{ color: isTouchBar ? '#7aa5d8' : '#4a7ab5', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
                 <NameHint
                   label={rightLabel}
                   full={rightFull}
-                  color="rgba(74, 122, 181, 0.45)"
+                  color={isTouchBar ? 'rgba(122, 165, 216, 0.85)' : 'rgba(74, 122, 181, 0.45)'}
                   accent="#4a7ab5"
                   trailing={
                     <span
@@ -922,7 +966,7 @@ export default function TurnIndicator({
                     if (canClick) e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)';
                   }}
                 >
-                  {PHASE_LABELS[phase]}
+                  {phaseLabelFor(phase)}
                 </button>
               </Fragment>
             );
