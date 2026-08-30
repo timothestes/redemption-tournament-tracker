@@ -157,6 +157,24 @@ export const GameCardNode = memo(function GameCardNode({
     pressTimerRef.current = setTimeout(() => {
       const s = pressRef.current;
       if (!s || s.fired) return;
+      // Movement re-check at fire time. moveLongPress alone is not enough:
+      // Konva suppresses stage pointer events while one of its drags is
+      // live (Stage.js eventsEnabled), so once a drag starts inside the
+      // 3-10px band this node's onTouchMove stops firing and a fast 50px
+      // drag would still "long-press" at 500ms — cancelling the drag
+      // mid-flight, opening the menu, and stranding the card. The stage
+      // still calls setPointersPositions() on every touchmove even during
+      // drags, so the live pointer is readable here.
+      const pressStage = (e.target as Konva.Node).getStage?.();
+      const livePos = pressStage?.getPointerPosition?.();
+      if (pressStage && livePos) {
+        const box = pressStage.container().getBoundingClientRect();
+        const moved = Math.hypot(box.left + livePos.x - s.x, box.top + livePos.y - s.y);
+        if (moved > LONG_PRESS_MOVE_TOLERANCE) {
+          clearPress();
+          return;
+        }
+      }
       s.fired = true;
       // onLongPress FIRST: Konva's dragDistance is 3px but our movement
       // tolerance is 10px, so in the 3-10px band a real Konva drag is already

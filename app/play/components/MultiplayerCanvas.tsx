@@ -4040,15 +4040,69 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         }
       };
 
+      // Restore a node to its pre-drag position/parent/z-index. Shared by the
+      // gesture-cancel branch below and the drop paths' `snapBack` (which
+      // binds it to the drop node).
+      const snapBackNode = (node: Konva.Node) => {
+        if (originalParent && node.parent !== originalParent) {
+          node.moveTo(originalParent);
+          // Restore the node's position in its original parent's coord space.
+          // Using the pre-reparent local coords avoids the offset accumulation
+          // that would occur if we applied layer-local coords inside a parent
+          // that itself has a non-zero transform (e.g. sidebar pile Groups).
+          if (originalLocalPos) {
+            node.x(originalLocalPos.x);
+            node.y(originalLocalPos.y);
+          } else if (originalPos) {
+            node.x(originalPos.x);
+            node.y(originalPos.y);
+          }
+          // Restore original z-index so stacking order is preserved after snap-back
+          if (originalZIndex != null) {
+            const maxIdx = originalParent.getChildren().length - 1;
+            node.zIndex(Math.min(originalZIndex, maxIdx));
+          }
+        } else if (originalPos) {
+          node.x(originalPos.x);
+          node.y(originalPos.y);
+        }
+        node.getLayer()?.batchDraw();
+      };
+
       if (dragCancelledRef.current) {
-        // The mid-drag zone-change guard (below) already called
-        // node.stopDrag() because the row's zone changed server-side while
-        // this client was still dragging it (e.g. the opponent's End Battle
-        // auto-returned a battle card). There's no drop to resolve — the
-        // row's new zone/position is already authoritative from the server,
-        // and resolving one here would race a stale drop target against it.
+        // Something called node.stopDrag() with this flag set — there is no
+        // drop to resolve. TWO distinct causes land here, with different
+        // node cleanup:
+        // - Server-driven (mid-drag zone-change guard / synchronous remount):
+        //   the row left its drag-start zone, react-konva owns the node's
+        //   remount in the new zone — don't touch it beyond orphan cleanup.
+        // - User-gesture (a pinch's second finger, a long-press): the row
+        //   never moved, so nothing will remount — without an explicit
+        //   snap-back the node strands visually at the drag point while the
+        //   row still says it's in the source zone. Tell them apart by the
+        //   row's LIVE zone (read through the ref — see the stale-closure
+        //   note below).
         dragCancelledRef.current = false;
-        destroyOrphanedDragNode();
+        const cancelledLiveRow = findAnyCardByIdRef.current(card.instanceId);
+        if (
+          cancelledLiveRow &&
+          cancelledLiveRow.zone === sourceZone &&
+          e.target.getStage() != null &&
+          cardNodeRefs.current.get(card.instanceId) === e.target
+        ) {
+          if (followerOffsets && originalPos) {
+            for (const [id, offset] of followerOffsets) {
+              const fNode = cardNodeRefs.current.get(id);
+              if (fNode) {
+                fNode.x(originalPos.x + offset.dx);
+                fNode.y(originalPos.y + offset.dy);
+              }
+            }
+          }
+          snapBackNode(e.target);
+        } else {
+          destroyOrphanedDragNode();
+        }
         return;
       }
 
@@ -4123,32 +4177,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // During dragStart the node was reparented from its clipped Group to the
       // layer so it renders above everything. On snap-back we need to reverse
       // that — move it back to the original parent and convert position from
-      // layer coords back to the parent's local coords.
-      const snapBack = () => {
-        if (originalParent && node.parent !== originalParent) {
-          node.moveTo(originalParent);
-          // Restore the node's position in its original parent's coord space.
-          // Using the pre-reparent local coords avoids the offset accumulation
-          // that would occur if we applied layer-local coords inside a parent
-          // that itself has a non-zero transform (e.g. sidebar pile Groups).
-          if (originalLocalPos) {
-            node.x(originalLocalPos.x);
-            node.y(originalLocalPos.y);
-          } else if (originalPos) {
-            node.x(originalPos.x);
-            node.y(originalPos.y);
-          }
-          // Restore original z-index so stacking order is preserved after snap-back
-          if (originalZIndex != null) {
-            const maxIdx = originalParent.getChildren().length - 1;
-            node.zIndex(Math.min(originalZIndex, maxIdx));
-          }
-        } else if (originalPos) {
-          node.x(originalPos.x);
-          node.y(originalPos.y);
-        }
-        node.getLayer()?.batchDraw();
-      };
+      // layer coords back to the parent's local coords. (Shared logic lives in
+      // snapBackNode above so the gesture-cancel branch can reuse it.)
+      const snapBack = () => snapBackNode(node);
 
       if (!hit) {
         // No valid drop zone — snap primary and followers back to original positions
@@ -5104,6 +5135,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return () => document.documentElement.removeAttribute('data-rail-open');
   }, [isTouch, tapMoveState.kind]);
 
+
   // ---- Stage-level touch handlers ----
   const collectPointers = useCallback((evt: TouchEvent): PointerSample[] => {
     const stage = stageRef.current;
@@ -5175,6 +5207,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     onCameraPointers(collectPointers(e.evt));
     touchStartPtRef.current = null;
   }, [isTouch, onCameraPointers, collectPointers]);
+
 
   const handleStageTap = useCallback((e: Konva.KonvaEventObject<Event>) => {
     const wasCardTap = cardTapHandledRef.current;
