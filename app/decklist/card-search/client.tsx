@@ -210,7 +210,7 @@ export default function CardSearchClient({
   // Card legality filter mode: Limited (rotation pool), Unlimited (all), Banned, Scrolls (not Rotation or Banned), Paragon
   const [legalityMode, setLegalityMode] = useState<'Limited'|'Unlimited'|'Banned'|'Scrolls'|'Paragon'>('Limited');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
-  const [sortBy, setSortBy] = useState<'default' | 'name' | 'set' | 'strength' | 'toughness' | 'type' | 'brigade'>('default');
+  const [sortBy, setSortBy] = useState<'default' | 'name' | 'set' | 'strength' | 'toughness' | 'type' | 'brigade' | 'price-asc' | 'price-desc'>('default');
 
   const [modalCard, setModalCardRaw] = useState<Card | null>(null);
   const modalOpenedFromDeckRef = useRef(false);
@@ -531,7 +531,7 @@ export default function CardSearchClient({
     !ignoreLegalityChecks && config.features?.serverDeckCheck !== false
   );
 
-  const { getPrice } = useCardPrices();
+  const { getPrice, prices } = useCardPrices();
 
   // User's card collection — loaded only when signed in. Drives the owned
   // badges on search tiles and the collection actions in the card modal.
@@ -1284,12 +1284,28 @@ export default function CardSearchClient({
           return a.brigade.localeCompare(b.brigade) || a.name.localeCompare(b.name);
         case 'name':
           return a.name.localeCompare(b.name);
+        case 'price-asc': {
+          const aP = getPrice(`${a.name}|${a.set}|${a.imgFile}`)?.price;
+          const bP = getPrice(`${b.name}|${b.set}|${b.imgFile}`)?.price;
+          if (aP == null && bP == null) return a.name.localeCompare(b.name);
+          if (aP == null) return 1;
+          if (bP == null) return -1;
+          return aP - bP || a.name.localeCompare(b.name);
+        }
+        case 'price-desc': {
+          const aP = getPrice(`${a.name}|${a.set}|${a.imgFile}`)?.price;
+          const bP = getPrice(`${b.name}|${b.set}|${b.imgFile}`)?.price;
+          if (aP == null && bP == null) return a.name.localeCompare(b.name);
+          if (aP == null) return 1;
+          if (bP == null) return -1;
+          return bP - aP || a.name.localeCompare(b.name);
+        }
         case 'default':
         default:
           return compareCardsDefault(a, b);
       }
     });
-  }, [filtered, sortBy]);
+  }, [filtered, sortBy, prices]);
 
   const visibleCards = useMemo(
     () => sortedFiltered.slice(0, visibleCount),
@@ -1940,6 +1956,8 @@ export default function CardSearchClient({
                 <option value="toughness">Toughness</option>
                 <option value="type">Type</option>
                 <option value="brigade">Brigade</option>
+                <option value="price-asc">Price (Low to High)</option>
+                <option value="price-desc">Price (High to Low)</option>
               </select>
             </div>
             <button
@@ -2223,6 +2241,8 @@ export default function CardSearchClient({
             <option value="toughness">Toughness</option>
             <option value="type">Type</option>
             <option value="brigade">Brigade</option>
+            <option value="price-asc">Price (Low to High)</option>
+            <option value="price-desc">Price (High to Low)</option>
           </select>
         </div>
         <div className="flex items-center gap-1.5">
