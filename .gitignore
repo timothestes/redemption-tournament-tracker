@@ -112,3 +112,6 @@ public/forge/frames/Curses/
 public/forge/frames/Elements/**/*.png
 nationals-history-source.html
 .superpowers/
+
+# Mobile screenshot artifacts
+.artifacts/
