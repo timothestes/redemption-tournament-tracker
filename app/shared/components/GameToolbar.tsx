@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useInputMode } from '@/app/shared/hooks/useInputMode';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
 import {
   Play,
   Undo2,
@@ -239,6 +240,27 @@ export function GameToolbar({
   const [expanded, setExpanded] = useState(false);
   const collapsed = isTouch && !expanded;
 
+  // Touch: a tap anywhere OFF the expanded bar collapses it — the same
+  // outside-tap dismissal the context menus use. Raw document listeners so
+  // canvas touches count; isPrimaryPointer keeps parity with the menus'
+  // pointer handling (TouchEvent has no `button`).
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!isTouch || !expanded) return;
+    const handle = (evt: MouseEvent | TouchEvent) => {
+      if (!isPrimaryPointer(evt as { button?: number })) return;
+      if (barRef.current && !barRef.current.contains(evt.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener('touchstart', handle);
+    document.addEventListener('mousedown', handle);
+    return () => {
+      document.removeEventListener('touchstart', handle);
+      document.removeEventListener('mousedown', handle);
+    };
+  }, [isTouch, expanded]);
+
   if (collapsed) {
     return (
       <div
@@ -275,6 +297,7 @@ export function GameToolbar({
 
   return (
     <div
+      ref={barRef}
       data-game-toolbar
       data-toolbar-expanded={isTouch ? 'true' : undefined}
       onContextMenu={(e) => e.preventDefault()}
