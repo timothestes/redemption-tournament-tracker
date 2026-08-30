@@ -22,6 +22,7 @@ const SHORT_LABELS: Partial<Record<ZoneId, string>> = {
   'land-of-redemption': 'LoR',
   'land-of-bondage': 'LoB',
   'soul-deck': 'Soul Deck',
+  banish: 'Banish',
 };
 
 function label(zone: ZoneId): string {
@@ -83,18 +84,28 @@ export function DestinationRail({
           )}
           {/* One compact row. Three stacked rows were ~130px tall, which on a
               393px-high phone buried the entire hand band. */}
-          <div className="flex shrink-0 gap-1">
-            {sides.map((s) => (
+          {/* Side selector — a segmented control, visually distinct from the
+              destination chips so "which side" doesn't read as a destination.
+              Unselected segments stay clearly legible (they looked disabled
+              at neutral-400). */}
+          <div
+            role="group"
+            aria-label="Whose side"
+            className="flex shrink-0 overflow-hidden rounded-lg border border-neutral-500"
+          >
+            {sides.map((s, i) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setSide(s)}
                 data-testid={`destination-side-${s}`}
+                aria-pressed={side === s}
                 className={
-                  'min-h-[44px] rounded-md px-2 text-[12px] font-semibold ' +
+                  'min-h-[44px] px-3 text-[12px] font-semibold ' +
+                  (i > 0 ? 'border-l border-neutral-500 ' : '') +
                   (side === s
-                    ? 'bg-neutral-700 text-neutral-50'
-                    : 'text-neutral-400 active:bg-neutral-800')
+                    ? 'bg-neutral-200 text-neutral-900'
+                    : 'bg-neutral-900 text-neutral-200 active:bg-neutral-700')
                 }
               >
                 {s === 'my' ? 'Mine' : s === 'opponent' ? 'Theirs' : 'Shared'}
@@ -123,7 +134,8 @@ export function DestinationRail({
             onClick={onCancel}
             data-testid="destination-rail-cancel"
             aria-label={`Cancel moving ${cardName ?? 'card'}`}
-            className="min-h-[44px] min-w-[44px] shrink-0 px-2 text-[12px] text-neutral-400 active:text-neutral-100"
+            className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg border border-neutral-600
+                       px-3 text-[12px] text-neutral-300 active:bg-neutral-800 active:text-neutral-100"
           >
             Cancel
           </button>
