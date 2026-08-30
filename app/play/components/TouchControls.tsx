@@ -16,14 +16,19 @@ interface TouchControlsProps {
 export function TouchControls({ targets, onJump, activeId }: TouchControlsProps) {
   return (
     <div
-      // Docked to the LEFT edge below the turn bar. Right-aligned it covered
-      // Concede (the turn bar's right-hand control) and the sidebar piles;
-      // vertically it is a single row so it cannot eat half a 393px viewport.
-      className="pointer-events-auto absolute left-2 z-30 flex flex-row gap-1
+      // Docked below the turn bar at the RIGHT end of the play area, clear of
+      // the 10% sidebar rail. It sits over the right end of the opponent's
+      // LoB band — souls auto-arrange from the LEFT, so that end is the last
+      // to fill. Left-docked it sat exactly on the first souls and made them
+      // untappable at fit (rescue acceptance run); the bar overlays the top
+      // 48px on touch, so a right-side dock no longer collides with Concede.
+      // Vertically it stays a single row so it cannot eat half a 393px
+      // viewport.
+      className="pointer-events-auto absolute z-30 flex flex-row gap-1
                  rounded-lg border border-neutral-700 bg-neutral-900/90 p-1 backdrop-blur"
       style={{
         top: 'calc(48px + env(safe-area-inset-top))',
-        marginLeft: 'env(safe-area-inset-left)',
+        right: 'calc(10% + 8px)',
       }}
       data-testid="touch-controls"
     >
