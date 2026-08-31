@@ -9,6 +9,11 @@
  * characters/enhancements, Good brigades (characters then enhancements,
  * strength descending), Evil brigades (same), then everything else.
  *
+ * Alphabetical tie-breaks ignore a leading "The " (confirmed against real
+ * print-number order in Times to Come, Revelation of John, and Israel's
+ * Rebellion — e.g. "The Book of Knowledge" prints between "Abomination..."
+ * and "Darius' Decree", i.e. alphabetized as "Book of Knowledge").
+ *
  * The comparator degrades gracefully: given only `name` + `type` it still
  * yields section order then alphabetical.
  */
@@ -69,6 +74,13 @@ const SECTION_MISC = 10;
 // and Forge forms ("EvilCharacter", "LostSoul", "PaleGreen").
 function norm(s: string): string {
   return s.toLowerCase().replace(/[\s-]+/g, "");
+}
+
+// Lowercased alphabetization key for a card name, ignoring a leading "The "
+// the way the designers do (see module docstring). "Theodore..." is left
+// alone — only a standalone leading "The" article is stripped.
+function alphaKey(name: string | undefined): string {
+  return (name ?? "").toLowerCase().replace(/^the\s+/, "");
 }
 
 const GOOD_CHAR_TYPES = new Set(["hero", "heroes", "herocharacter", "hc", "goodcharacter", "gc"]);
@@ -210,7 +222,7 @@ function dominantAlignmentRank(alignment: string | undefined): number {
 type SortKey = (string | number)[];
 
 function buildKey(card: SortableCard): SortKey {
-  const name = (card.name ?? "").toLowerCase();
+  const name = alphaKey(card.name);
   const type = card.type ?? "";
   const parts = typeParts(type);
   const first = parts.length > 0 ? parts[0] : "";
@@ -352,5 +364,5 @@ export function compareCardsByType(a: SortableCard, b: SortableCard): number {
   if (alignDiff !== 0) return alignDiff;
   const brigadeDiff = (a.brigade ?? "").localeCompare(b.brigade ?? "");
   if (brigadeDiff !== 0) return brigadeDiff;
-  return (a.name ?? "").toLowerCase().localeCompare((b.name ?? "").toLowerCase());
+  return alphaKey(a.name).localeCompare(alphaKey(b.name));
 }
