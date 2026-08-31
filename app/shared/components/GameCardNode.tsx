@@ -175,6 +175,16 @@ export const GameCardNode = memo(function GameCardNode({
     pressTimerRef.current = setTimeout(() => {
       const s = pressRef.current;
       if (!s || s.fired) return;
+      // A live Konva drag means the finger already committed to moving the
+      // card; opening a menu on top of it cancels the drag mid-flight and
+      // strands it. `dragDistance` on the Group below is set above
+      // LONG_PRESS_MOVE_TOLERANCE so this should now be unreachable, but
+      // Konva's default is 3px and a stale global would re-open the hole.
+      const dragNode: any = e.target;
+      if (dragNode && typeof dragNode.isDragging === 'function' && dragNode.isDragging()) {
+        clearPress();
+        return;
+      }
       // Movement re-check at fire time. moveLongPress alone is not enough:
       // Konva suppresses stage pointer events while one of its drags is
       // live (Stage.js eventsEnabled), so once a drag starts inside the
@@ -183,16 +193,6 @@ export const GameCardNode = memo(function GameCardNode({
       // mid-flight, opening the menu, and stranding the card. The stage
       // still calls setPointersPositions() on every touchmove even during
       // drags, so the live pointer is readable here.
-      // A live Konva drag means the finger already committed to moving the
-      // card; opening a menu on top of it cancels the drag mid-flight and
-      // strands the card. `dragDistance` below is set above
-      // LONG_PRESS_MOVE_TOLERANCE so this should be unreachable, but Konva's
-      // default is 3px and a stale global would re-open the hole.
-      const dragNode: any = e.target;
-      if (dragNode && typeof dragNode.isDragging === 'function' && dragNode.isDragging()) {
-        clearPress();
-        return;
-      }
       const pressStage = (e.target as Konva.Node).getStage?.();
       const livePos = pressStage?.getPointerPosition?.();
       if (pressStage && livePos) {
