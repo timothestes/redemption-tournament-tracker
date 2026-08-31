@@ -115,6 +115,16 @@ interface LayoutProfile {
   mainCardWidthRatio: number;
   oppHandScale: number;
   pileLabelRatio: number;
+  /** Fraction of the Land of Bondage band height a soul may occupy. Above 1
+   *  the card deliberately overhangs the band.
+   *
+   *  On a landscape phone the band is only ~34 screen px tall, so the default
+   *  0.85 produced 20x28 px souls - far under the 44px touch floor, in the one
+   *  zone that hosts the most-repeated touch action in the game (rescuing).
+   *  The band's neighbours (the opponent hand strip above, the territory
+   *  below) are sparse at their edges, so letting a soul spill a few px past
+   *  the band buys real size for almost no visual cost. */
+  lobBandFillRatio?: number;
 }
 
 /** Narrow displays: 4:3 to ~3:2 (virtual width ≤ 1700). */
@@ -162,18 +172,21 @@ const STANDARD_PROFILE: LayoutProfile = {
 const TOUCH_PROFILE: LayoutProfile = {
   sidebarWidthRatio: 0.10,   // icon rail; tapping a pile opens a sheet
   topGutterRatio: 0.125,     // ≈49px at fit on a 393px viewport — clears the 48px overlay bar
-  oppHandRatio: 0.05,        // thin strip of backs
-  oppTerritoryRatio: 0.24,
-  oppLobRatio: 0.085,
+  oppHandRatio: 0.045,       // thin strip of backs (clipped to the band)
+  oppTerritoryRatio: 0.22,
+  // Souls are the smallest cards on the board and the most tapped - buy band
+  // height back from the two territories and the opponent's hand strip.
+  oppLobRatio: 0.105,
   dividerRatio: 0.005,
-  playerLobRatio: 0.085,
-  playerTerritoryRatio: 0.235,
+  playerLobRatio: 0.105,
+  playerTerritoryRatio: 0.22,
   playerHandRatio: 0.175,
   mainCardWidthRatio: 0.078, // ~57px on an iPhone 14 Pro landscape
   oppHandScale: 0.55,
   pileLabelRatio: 0.14,
+  lobBandFillRatio: 1.35,    // souls overhang the band ~7px a side at fit
 };
-// Sum check: 0.125 + 0.05 + 0.24 + 0.085 + 0.005 + 0.085 + 0.235 + 0.175 = 1.0
+// Sum check: 0.125 + 0.045 + 0.22 + 0.105 + 0.005 + 0.105 + 0.22 + 0.175 = 1.0
 
 /** Virtual width breakpoint — below this use Narrow, above use Standard. */
 const BREAKPOINT_WIDTH = 1700;
@@ -236,17 +249,17 @@ const STANDARD_BATTLE_PROFILE: BattleProfile = {
  * at phone virtual widths mainCard.cardHeight ≈ 0.213 × stageHeight, and the
  * standard band (0.19) left in-band cards taller than the band itself. */
 const TOUCH_BATTLE_PROFILE: BattleProfile = {
-  oppHandRatio: 0.05,
-  oppLobRatio: 0.085,
-  oppTerritoryRatio: 0.1225,
+  oppHandRatio: 0.045,
+  oppLobRatio: 0.105,
+  oppTerritoryRatio: 0.1025,
   bandRatio: 0.24,
-  playerTerritoryRatio: 0.1425,
-  playerLobRatio: 0.085,
+  playerTerritoryRatio: 0.1275,
+  playerLobRatio: 0.105,
   playerHandRatio: 0.15,
 };
-// Sum check: 0.05 + 0.085 + 0.1225 + 0.24 + 0.1425 + 0.085 + 0.15 = 0.875 = 1 − 0.125 gutter ✓
-// Midline check: 0.125 + 0.05 + 0.085 + 0.1225 + 0.24 / 2 = 0.5025 — matches
-// idle (0.125 + 0.05 + 0.085 + 0.24 + 0.005 / 2 = 0.5025) ✓
+// Sum check: 0.045 + 0.105 + 0.1025 + 0.24 + 0.1275 + 0.105 + 0.15 = 0.875 = 1 − 0.125 gutter ✓
+// Midline check: 0.125 + 0.045 + 0.105 + 0.1025 + 0.24 / 2 = 0.4975 — matches
+// idle (0.125 + 0.045 + 0.105 + 0.22 + 0.005 / 2 = 0.4975) ✓
 
 function getBattleProfile(virtualWidth: number, compact = false): BattleProfile {
   if (compact) return TOUCH_BATTLE_PROFILE;
@@ -268,8 +281,9 @@ function computeCardDimensions(
   const mainH = Math.round(mainW * CARD_ASPECT_RATIO);
   const mainCard = { cardWidth: mainW, cardHeight: mainH };
 
-  // LOB cards: scale down to fit within the LOB zone height
-  const lobUsable = lobZoneHeight * 0.85;
+  // LOB cards: scale down to fit within the LOB zone height. A
+  // `lobBandFillRatio` above 1 lets a soul overhang the band (touch only).
+  const lobUsable = lobZoneHeight * (profile.lobBandFillRatio ?? 0.85);
   const lobH = Math.round(Math.min(mainH, lobUsable));
   const lobW = Math.round(lobH / CARD_ASPECT_RATIO);
   const lobCard = { cardWidth: lobW, cardHeight: lobH };

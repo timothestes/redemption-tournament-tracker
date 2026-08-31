@@ -160,9 +160,14 @@ interface ZoneBrowseModalProps {
    *  ability — instead of this modal's move-only popup. Receives viewport
    *  coordinates. */
   onRequestCardMenu?: (card: GameCard, clientX: number, clientY: number) => void;
+  /** Route EVERY card to `onRequestCardMenu`, not just ones with a usable
+   *  right-click ability. Set when browsing an in-play zone (territory, Land
+   *  of Bondage, hand): those cards need rotate/attach/counters/notes/rescue,
+   *  none of which the move-only popup below offers. */
+  alwaysUseCardMenu?: boolean;
 }
 
-export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly, onRequestCardMenu }: ZoneBrowseModalProps) {
+export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly, onRequestCardMenu, alwaysUseCardMenu }: ZoneBrowseModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
   // Touch has no clicks, lassos or right-clicks — say what actually works.
   const hintText = useInputMode() === 'touch'
@@ -280,7 +285,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     // menu so the ability is reachable. Multi-selections keep the batch-move
     // popup below.
     const isMultiSelected = selectedIds.has(card.instanceId) && selectedIds.size > 1;
-    if (onRequestCardMenu && !isMultiSelected && hasUsableAbilityInZone(card)) {
+    if (onRequestCardMenu && !isMultiSelected && (alwaysUseCardMenu || hasUsableAbilityInZone(card))) {
       onRequestCardMenu(card, clientX, clientY);
       return;
     }

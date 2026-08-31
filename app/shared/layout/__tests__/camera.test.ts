@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { calculateScale, VIRTUAL_HEIGHT } from '../virtualCanvas';
 import {
   defaultCamera, composeCamera, clampCamera, fitRectToViewport,
-  unionRects, zoomAtPoint, applyCameraToScale, MIN_ZOOM, MAX_ZOOM,
+  unionRects, zoomAtPoint, applyCameraToScale, pinchCamera, MIN_ZOOM, MAX_ZOOM,
 } from '../camera';
 
 describe('composeCamera — identity property', () => {
@@ -237,5 +237,59 @@ describe('zoomAtPoint - clamp before anchoring', () => {
     const c1 = composeCamera(fit, before, 852, 393);
     const c2 = composeCamera(fit, clampedFirst, 852, 393);
     expect(700 * c1.scale + c1.offsetX).toBeCloseTo(700 * c2.scale + c2.offsetX, 6);
+  });
+});
+
+describe('pinchCamera - two-finger pan', () => {
+  const fitScale = 0.3638;
+  const virtualWidth = 2221;
+  const cw = 808;
+  const ch = 393;
+
+  it('translates the camera when the midpoint moves at constant separation', () => {
+    const zoomed = clampCamera(
+      { zoom: 2.2, centerX: 500, centerY: 540 }, fitScale, virtualWidth, cw, ch,
+    );
+    // Two fingers drag left by 100px without changing separation: the board
+    // follows the fingers, so the camera centre moves RIGHT.
+    const next = pinchCamera(
+      zoomed, zoomed.zoom,
+      { x: 300, y: 200, dx: -100, dy: 0 },
+      fitScale, virtualWidth, cw, ch,
+    );
+    expect(next.zoom).toBeCloseTo(zoomed.zoom, 6);
+    expect(next.centerX).toBeGreaterThan(zoomed.centerX);
+    expect(next.centerX - zoomed.centerX).toBeCloseTo(100 / (fitScale * zoomed.zoom), 4);
+  });
+
+  it('reaches the right-hand edge of the board by repeated panning', () => {
+    let cam = clampCamera({ zoom: 2.2, centerX: 0, centerY: 540 }, fitScale, virtualWidth, cw, ch);
+    for (let i = 0; i < 40; i++) {
+      cam = pinchCamera(cam, cam.zoom, { x: 400, y: 200, dx: -100, dy: 0 }, fitScale, virtualWidth, cw, ch);
+    }
+    const halfViewW = cw / (2 * fitScale * cam.zoom);
+    expect(cam.centerX + halfViewW).toBeGreaterThanOrEqual(virtualWidth - 1);
+  });
+
+  it('still zooms about the midpoint when the midpoint is stationary', () => {
+    const start = clampCamera({ zoom: 1.5, centerX: 1100, centerY: 540 }, fitScale, virtualWidth, cw, ch);
+    const next = pinchCamera(
+      start, 2.5, { x: cw / 2, y: ch / 2, dx: 0, dy: 0 },
+      fitScale, virtualWidth, cw, ch,
+    );
+    expect(next.zoom).toBeCloseTo(2.5, 6);
+    // Anchored on the viewport centre, so the centre itself does not move.
+    expect(next.centerX).toBeCloseTo(start.centerX, 4);
+    expect(next.centerY).toBeCloseTo(start.centerY, 4);
+  });
+
+  it('never returns a camera outside the board', () => {
+    const start = clampCamera({ zoom: 2, centerX: 1100, centerY: 540 }, fitScale, virtualWidth, cw, ch);
+    const next = pinchCamera(
+      start, 2, { x: 10, y: 10, dx: 100000, dy: 100000 },
+      fitScale, virtualWidth, cw, ch,
+    );
+    const halfViewW = cw / (2 * fitScale * next.zoom);
+    expect(next.centerX).toBeGreaterThanOrEqual(halfViewW - 1e-6);
   });
 });

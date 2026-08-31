@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
-  defaultCamera, clampCamera, fitRectToViewport, zoomAtPoint,
+  defaultCamera, clampCamera, fitRectToViewport, pinchCamera,
   MIN_ZOOM, MAX_ZOOM, type Camera, type Rect, type FitOptions,
 } from '@/app/shared/layout/camera';
 import {
@@ -95,13 +95,22 @@ export function useBoardCamera({
       return;
     }
 
-    // pinch
+    // pinch - two fingers zoom AND pan together, the way every map does.
+    //
+    // Pan used to be one-finger-only, and a one-finger press only reaches the
+    // camera when it lands on a non-draggable surface. Once a territory holds
+    // a dozen cards there is almost no bare board left to grab, so a zoomed-in
+    // player could not travel to the far side of the board at all - the whole
+    // right-hand half of the opponent's board was effectively unreachable.
+    // Two fingers always reach the camera, whatever is underneath them.
     const [a, b] = pointers;
     const m = pinchMetrics(a, b);
     if (g.kind !== 'pinch') {
       g.kind = 'pinch';
       g.startCamera = camera;
       g.startDistance = m.distance;
+      g.lastX = m.midX;
+      g.lastY = m.midY;
       return;
     }
     const factor = pinchZoomDelta(g.startDistance, m.distance);
@@ -110,11 +119,19 @@ export function useBoardCamera({
     // centre computed for a zoom that was never applied, so an over-pinch
     // walks the camera into the corner.
     const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, g.startCamera.zoom * factor));
-    // Anchor on the pinch midpoint, converted to virtual space.
-    const anchorVX = camera.centerX + (m.midX - containerWidth / 2) / scale;
-    const anchorVY = camera.centerY + (m.midY - containerHeight / 2) / scale;
-    setCamera(zoomAtPoint(camera, nextZoom, anchorVX, anchorVY));
-  }, [enabled, fitScale, camera, containerWidth, containerHeight, setCamera]);
+    const midDX = m.midX - g.lastX;
+    const midDY = m.midY - g.lastY;
+    g.lastX = m.midX;
+    g.lastY = m.midY;
+    // Functional update for the same reason the pan branch uses one: two
+    // touchmoves batched into one render would both read the same stale
+    // closure camera and silently drop a translation delta.
+    setCameraRaw((prev) => pinchCamera(
+      prev, nextZoom,
+      { x: m.midX, y: m.midY, dx: midDX, dy: midDY },
+      fitScale, virtualWidth, containerWidth, containerHeight,
+    ));
+  }, [enabled, fitScale, camera, virtualWidth, containerWidth, containerHeight]);
 
   const isZoomed = useMemo(() => camera.zoom > MIN_ZOOM + 1e-6, [camera.zoom]);
 

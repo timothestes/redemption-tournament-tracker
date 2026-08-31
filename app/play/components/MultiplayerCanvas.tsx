@@ -77,12 +77,14 @@ import { applyCameraToScale } from '@/app/shared/layout/camera';
 import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { useBoardCamera } from '@/app/play/hooks/useBoardCamera';
 import { useTapToMove } from '@/app/play/hooks/useTapToMove';
-import { buildJumpTargets } from '@/app/play/lib/jumpTargets';
+import { buildJumpTargets, type JumpTargetId } from '@/app/play/lib/jumpTargets';
 import type { CommitMove } from '@/app/play/lib/tapToMoveCore';
 import type { PointerSample } from '@/app/play/lib/gestureCore';
 import { LONG_PRESS_MS, LONG_PRESS_MOVE_TOLERANCE } from '@/app/play/lib/longPressCore';
 import { DestinationRail } from '@/app/play/components/DestinationRail';
 import { TouchControls } from '@/app/play/components/TouchControls';
+import { BoardBrowseSheet, type BoardBrowseEntry } from './BoardBrowseSheet';
+import { CardReaderOverlay } from './CardReaderOverlay';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
 import { gameCardIsWarrior, gameCardIsWeapon } from '@/app/goldfish/utils/equipClass';
 import { findCard, isSite } from '@/lib/cards/lookup';
@@ -434,6 +436,10 @@ interface MultiplayerCanvasProps {
 // Component
 // ---------------------------------------------------------------------------
 
+/** Zones whose browse grid must offer the full card menu rather than the
+ *  move-only popup - cards in play need rotate/attach/counters/notes/rescue. */
+const IN_PLAY_BROWSE_ZONES = new Set(['territory', 'land-of-bondage', 'hand']);
+
 export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep, viewerKind = 'player', forgeResolver }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible, isPreviewFlipped } = useCardPreview();
   // Spectators may NEVER drag cards — even visually. Every `isDraggable` site
@@ -452,7 +458,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const fit = useVirtualCanvas(containerRef);
   const { containerWidth, containerHeight, virtualWidth } = fit;
   const {
-    camera, jumpTo, reset: resetCamera, onPointersChange: onCameraPointers, isZoomed,
+    camera, setCamera, jumpTo, reset: resetCamera,
+    onPointersChange: onCameraPointers, isZoomed,
   } = useBoardCamera({
     fitScale: fit.scale,
     virtualWidth,
@@ -912,15 +919,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // above the floating toolbar reserve. On narrow viewports the mainCard
   // height can exceed the hand zone's usable height, which would push card
   // bottoms (e.g. Judas's alignment line) under the toolbar.
+  // The reserve keeps card bottoms clear of the floating toolbar. On touch the
+  // toolbar collapses to a small button pinned bottom-LEFT while the hand fans
+  // from the band's centre, so nothing needs reserving - and paying the 48
+  // virtual px anyway squeezed hand cards to ~37 screen px wide, under the
+  // touch target floor, on the surface a player uses every single turn.
+  const handToolbarReserve = useCompactLayout ? 0 : HAND_TOOLBAR_RESERVE;
+
   const { handCardWidth, handCardHeight } = useMemo(() => {
     if (!myHandRect) return { handCardWidth: cardWidth, handCardHeight: cardHeight };
-    const usableHeight = Math.max(0, myHandRect.height - HAND_TOOLBAR_RESERVE);
+    const usableHeight = Math.max(0, myHandRect.height - handToolbarReserve);
     if (cardHeight <= usableHeight) return { handCardWidth: cardWidth, handCardHeight: cardHeight };
     const aspect = cardHeight / Math.max(cardWidth, 1);
     const cappedH = Math.max(0, Math.round(usableHeight));
     const cappedW = Math.max(0, Math.round(cappedH / aspect));
     return { handCardWidth: cappedW, handCardHeight: cappedH };
-  }, [myHandRect, cardWidth, cardHeight]);
+  }, [myHandRect, cardWidth, cardHeight, handToolbarReserve]);
 
   // ---- LOB arrival glow + Lost Soul "deal" animation ----
   const myLobIds = useMemo(
@@ -1428,6 +1442,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ---- Zone browse overlay state ----
   const [browseMyZone, setBrowseMyZone] = useState<string | null>(null);
   const [browseOpponentZone, setBrowseOpponentZone] = useState<string | null>(null);
+  /** Touch: the "cards in play" sheet, and the full-screen card reader. */
+  const [boardBrowseOpen, setBoardBrowseOpen] = useState(false);
+  const [readerCard, setReaderCard] = useState<GameCard | null>(null);
+  const [browseSharedLob, setBrowseSharedLob] = useState(false);
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number; targetPlayerId?: string } | null>(null);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
   // Paragon-only: right-click context menu for the shared Soul Deck pile. Shared by
@@ -2545,6 +2563,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     setExchangeState(null);
     setBrowseMyZone(null);
     setBrowseOpponentZone(null);
+    setBoardBrowseOpen(false);
+    setReaderCard(null);
+    setBrowseSharedLob(false);
     setOpponentZoneMenu(null);
     setOpponentDeckMenu(null);
     setOpponentPeekState(null);
@@ -2819,13 +2840,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       handCardWidth,
       handCardHeight,
       viewerKind === 'spectator' ? true : isSpreadHand,
+      handToolbarReserve,
     );
     cards.forEach((c, i) => {
       const p = pos[i];
       if (p) m.set(String(c.id), p);
     });
     return m;
-  }, [myCards, myHandRect, handCardWidth, handCardHeight, viewerKind, isSpreadHand]);
+  }, [myCards, myHandRect, handCardWidth, handCardHeight, viewerKind, isSpreadHand, handToolbarReserve]);
   useHandLayoutTween(myHandSlots, cardNodeRefs);
 
   // Multi-card drag: offsets of follower cards relative to the dragged card
@@ -4573,6 +4595,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               handCardWidth,
               handCardHeight,
               viewerKind === 'spectator' ? true : isSpreadHand,
+              handToolbarReserve,
             );
             let targetIdx = 0;
             let minDist = Infinity;
@@ -5020,11 +5043,60 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     [mpLayout, virtualWidth, battleActive],
   );
 
+  /** The in-play zones offered by the "cards in play" sheet, with live counts.
+   *  Piles already open a grid when tapped in the sidebar rail; these four are
+   *  the free-form zones that had no list view at all. */
+  const boardBrowseEntries = useMemo<BoardBrowseEntry[]>(() => {
+    const sharedLob = normalizedFormat === 'Paragon';
+    const entries: BoardBrowseEntry[] = [
+      { owner: 'my', zone: 'territory', label: 'Territory', count: (myCards['territory'] ?? []).length },
+      { owner: 'opponent', zone: 'territory', label: 'Territory', count: (opponentCards['territory'] ?? []).length },
+    ];
+    if (sharedLob) {
+      entries.push({
+        owner: 'shared', zone: 'land-of-bondage', label: 'Land of Bondage (shared)',
+        count: (sharedCards['land-of-bondage'] ?? []).length,
+      });
+    } else {
+      entries.push(
+        { owner: 'my', zone: 'land-of-bondage', label: 'Land of Bondage', count: (myCards['land-of-bondage'] ?? []).length },
+        { owner: 'opponent', zone: 'land-of-bondage', label: 'Land of Bondage', count: (opponentCards['land-of-bondage'] ?? []).length },
+      );
+    }
+    entries.push({ owner: 'my', zone: 'hand', label: 'Hand', count: (myCards['hand'] ?? []).length });
+    return entries;
+  }, [myCards, opponentCards, sharedCards, normalizedFormat]);
+
+  /** Which jump the camera is currently sitting in, so the cluster can show
+   *  it. Cleared by any manual pan/pinch — the framing is no longer that
+   *  target's. Without this every button rendered unselected and "Fit" vs
+   *  "Theirs" read as "nothing happened". */
+  const [activeJumpId, setActiveJumpId] = useState<JumpTargetId | null>('fit');
+
   const jumpToTarget = useCallback((t: (typeof jumpTargets)[number]) => {
     // In the compact profile the turn bar OVERLAYS the canvas top — without
     // the inset, "Theirs" framed the opponent's hand row underneath it.
-    if (t.rect) jumpTo(t.rect, { axis: t.axis, insetTop: useCompactLayout ? 48 : 0 });
+    if (!t.rect) return;
+    jumpTo(t.rect, { axis: t.axis, insetTop: useCompactLayout ? 48 : 0 });
+    setActiveJumpId(t.id);
   }, [jumpTo, useCompactLayout]);
+
+  /** The board is wider than the viewport at the current zoom — there is
+   *  somewhere to pan to. */
+  const canPanHorizontally = containerWidth > 0 && virtualWidth * scale > containerWidth + 1;
+
+  /** Pan by most of a screen. Two-finger drag pans too, but a side jump leaves
+   *  half the board off-screen and a crowded territory leaves no bare board to
+   *  grab with one finger — so the pan needs a control that is always hittable. */
+  const panHorizontal = useCallback((direction: -1 | 1) => {
+    if (!Number.isFinite(scale) || scale <= 0) return;
+    if (!camera) return;
+    setActiveJumpId(null);
+    setCamera({
+      ...camera,
+      centerX: camera.centerX + (direction * containerWidth * 0.8) / scale,
+    });
+  }, [camera, containerWidth, scale, setCamera]);
 
   // Lets Playwright drive the camera without synthesising gestures, so camera
   // behaviour and gesture recognition can be tested independently.
@@ -5298,6 +5370,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           : null;
         if (node && typeof (node as any).stopDrag === 'function') (node as any).stopDrag();
       }
+      if (e.type === 'touchmove') setActiveJumpId(null);
       onCameraPointers(pointers);
       return;
     }
@@ -5316,6 +5389,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
       if (onDraggable) return;
     }
+    if (e.type === 'touchmove') setActiveJumpId(null);
     onCameraPointers(pointers);
   }, [isTouch, onCameraPointers, collectPointers]);
 
@@ -5375,7 +5449,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (sawMultiTouchRef.current) return;
     // Two quick pans are not a double-tap.
     if (touchTravelRef.current > LONG_PRESS_MOVE_TOLERANCE) return;
-    if (isZoomed) resetCamera();
+    if (isZoomed) { resetCamera(); setActiveJumpId('fit'); }
   }, [isTouch, isZoomed, resetCamera]);
 
 
@@ -5470,6 +5544,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       cancelBubble: false,
     } as unknown as Konva.KonvaEventObject<PointerEvent>);
   }, [handleCardContextMenu]);
+
+  /** The player kept dragging after the long-press menu appeared: they were
+   *  aiming, not asking for a menu. Take it back rather than making them
+   *  dismiss something they never wanted. */
+  const handleCardLongPressCancel = useCallback(() => {
+    setContextMenu(null);
+  }, []);
 
   // Double-click toggles meek on any card (yours or an opponent's you control)
   const handleDblClick = useCallback((card: GameCard) => {
@@ -6623,6 +6704,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         handCardWidth,
         handCardHeight,
         viewerKind === 'spectator' ? true : isSpreadHand,
+        handToolbarReserve,
       );
       handCards.forEach((card, i) => {
         const pos = positions[i];
@@ -6641,7 +6723,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
 
     return bounds;
-  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, handCardWidth, handCardHeight, lobCard, isSpreadHand, viewerKind, myDerivedWeaponPositions, opponentDerivedWeaponPositions, normalizedFormat, sharedCards, sharedLobLayout]);
+  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, handCardWidth, handCardHeight, lobCard, isSpreadHand, viewerKind, myDerivedWeaponPositions, opponentDerivedWeaponPositions, normalizedFormat, sharedCards, sharedLobLayout, handToolbarReserve]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -7466,6 +7548,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
                   onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -7548,6 +7631,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
                   onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -7644,6 +7728,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     onDragEnd={handleCardDragEnd}
                     onContextMenu={handleCardContextMenu}
                     onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                     onDblClick={handleDblClick}
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
@@ -7732,6 +7817,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
                   onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -7809,6 +7895,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
                   onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -7886,6 +7973,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   onDragEnd={handleCardDragEnd}
                   onContextMenu={handleCardContextMenu}
                   onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                   onDblClick={handleDblClick}
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -8452,6 +8540,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleCardContextMenu}
                         onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
@@ -8742,6 +8831,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleCardContextMenu}
                         onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
@@ -8915,6 +9005,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleCardContextMenu}
                         onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
@@ -8974,6 +9065,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               handCardWidth,
               handCardHeight,
               viewerKind === 'spectator' ? true : isSpreadHand,
+              handToolbarReserve,
             );
 
             // In spectator mode, seat-0's hand is subject to the same
@@ -9061,6 +9153,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       onDragEnd={handleCardDragEnd}
                       onContextMenu={handleCardContextMenu}
                       onLongPress={isTouch ? handleCardLongPress : undefined}
+                  onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                       onDblClick={handleDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
@@ -9581,6 +9674,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           isHandRevealed={gameState.myPlayer?.handRevealed ?? false}
           opponentHandRevealed={opponentHandRevealed}
           topDeckRevealed={gameState.myPlayer?.topDeckRevealed ?? false}
+          // Touch only: hover previews and the loupe are both hover-fed, so the
+          // sheet header is a phone player's only route to a card's text.
+          onViewCard={isTouch ? (c) => { setContextMenu(null); setReaderCard(c); } : undefined}
+          cardImageUrl={isTouch ? resolveCardImageUrl(contextMenu.card.cardImgFile, forgeResolver) : undefined}
           onClose={() => setContextMenu(null)}
           onExchange={(cardIds) => {
             setContextMenu(null);
@@ -10276,6 +10373,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
             readOnly={isSpectator}
+            alwaysUseCardMenu={IN_PLAY_BROWSE_ZONES.has(browseOpponentZone)}
+            onRequestCardMenu={(card, clientX, clientY) => {
+              setBrowseOpponentZone(null);
+              setContextMenu({ card, x: clientX, y: clientY });
+            }}
           />
         </ModalGameProvider>
       )}
@@ -10293,6 +10395,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
             readOnly={isSpectator}
+            alwaysUseCardMenu={IN_PLAY_BROWSE_ZONES.has(browseMyZone)}
             onRequestCardMenu={(card, clientX, clientY) => {
               setBrowseMyZone(null);
               setContextMenu({ card, x: clientX, y: clientY });
@@ -10383,6 +10486,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           Paragon-only: shared Soul Deck modals (Search + private Look).
           ================================================================ */}
       <ModalGameProvider value={soulDeckModalGameValue}>
+        {browseSharedLob && (
+          <ZoneBrowseModal
+            zoneId="land-of-bondage"
+            onClose={() => setBrowseSharedLob(false)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+            readOnly={isSpectator}
+            alwaysUseCardMenu
+            onRequestCardMenu={(card, clientX, clientY) => {
+              setBrowseSharedLob(false);
+              setContextMenu({ card, x: clientX, y: clientY });
+            }}
+          />
+        )}
         {browseSoulDeck && (
           <ZoneBrowseModal
             zoneId="soul-deck"
@@ -10904,14 +11023,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       })()}
 
       {/* ---- Touch overlays ---- */}
-      {/* Jump cluster only while zoomed: at fit the whole board is already
-          visible and the floating chrome sat on the opponent-hand count and
-          territory band. Pinching in summons it, Fit dismisses it. */}
-      {isTouch && isZoomed && (
+      {/* Shown at every zoom level. Gating it on isZoomed made Fit a one-way
+          trip — pressing it took the jump buttons away with it, and the only
+          way back was a pinch. */}
+      {isTouch && (
         <TouchControls
           targets={jumpTargets}
           onJump={jumpToTarget}
-          activeId={null}
+          activeId={activeJumpId}
+          canPanHorizontally={canPanHorizontally}
+          onPanHorizontal={panHorizontal}
+          onBrowseBoard={isSpectator ? undefined : () => { closeAllMenus(); setBoardBrowseOpen(true); }}
           rightOffsetPx={
             mpLayout
               ? containerWidth - (fit.offsetX + mpLayout.playAreaWidth * fit.scale) + 8
@@ -10919,12 +11041,45 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           }
         />
       )}
+      {isTouch && boardBrowseOpen && (
+        <BoardBrowseSheet
+          entries={boardBrowseEntries}
+          onClose={() => setBoardBrowseOpen(false)}
+          onPick={(entry) => {
+            setBoardBrowseOpen(false);
+            if (entry.owner === 'my') setBrowseMyZone(entry.zone);
+            else if (entry.owner === 'shared') setBrowseSharedLob(true);
+            else setBrowseOpponentZone(entry.zone);
+          }}
+        />
+      )}
+      {readerCard && (
+        <CardReaderOverlay
+          card={readerCard}
+          imageUrl={resolveCardImageUrl(readerCard.cardImgFile, forgeResolver)}
+          onClose={() => setReaderCard(null)}
+        />
+      )}
       {isTouch && !isSpectator && (
         <DestinationRail
           state={tapMoveState}
           format={normalizedFormat}
+          isLostSoul={
+            tapMoveState.kind === 'armed'
+              ? isLostSoulCard(findAnyCardById(tapMoveState.cardId) ?? {})
+              : false
+          }
+          // Distance from the container's BOTTOM to the top of the hand band on
+          // screen. Deriving it from the band's height times the CAMERA scale
+          // parked the rail mid-viewport while zoomed, with the hand nowhere in
+          // sight. Capped so it can never eat more than a third of the screen.
           handBandHeight={
-            mpLayout ? Math.round(mpLayout.zones.playerHand.height * scale) : 0
+            mpLayout && containerHeight > 0
+              ? Math.max(0, Math.min(
+                  Math.round(containerHeight - (mpLayout.zones.playerHand.y * scale + offsetY)),
+                  Math.round(containerHeight * 0.35),
+                ))
+              : 0
           }
           cardName={
             tapMoveState.kind === 'armed'

@@ -127,3 +127,40 @@ describe('legalDestinations - adversarial review regressions', () => {
     }
   });
 });
+
+describe('legalDestinations - Lost Soul ordering', () => {
+  it('puts Land of Bondage and Land of Redemption first for a Lost Soul', () => {
+    const d = legalDestinations('hand', 'my', 'T1', { isLostSoul: true });
+    const mine = d.filter((x) => x.owner === 'my').map((x) => x.zone);
+    expect(mine.slice(0, 2)).toEqual(['land-of-bondage', 'land-of-redemption']);
+  });
+
+  it('hoists the rescue destination on the opponent side too', () => {
+    const d = legalDestinations('land-of-bondage', 'opponent', 'T1', { isLostSoul: true });
+    const mine = d.filter((x) => x.owner === 'my').map((x) => x.zone);
+    expect(mine[0]).toBe('land-of-bondage');
+    expect(mine[1]).toBe('land-of-redemption');
+    // The source zone is still filtered out of its own side.
+    const theirs = d.filter((x) => x.owner === 'opponent').map((x) => x.zone);
+    expect(theirs).not.toContain('land-of-bondage');
+    expect(theirs[0]).toBe('land-of-redemption');
+  });
+
+  it('leaves the order alone for anything that is not a Lost Soul', () => {
+    expect(legalDestinations('hand', 'my', 'T1', { isLostSoul: false }))
+      .toEqual(legalDestinations('hand', 'my', 'T1'));
+  });
+
+  it('offers the same set of destinations either way', () => {
+    const plain = legalDestinations('hand', 'my', 'T1');
+    const soul = legalDestinations('hand', 'my', 'T1', { isLostSoul: true });
+    const key = (d: { zone: string; owner: string }) => `${d.owner}:${d.zone}`;
+    expect(new Set(soul.map(key))).toEqual(new Set(plain.map(key)));
+  });
+
+  it('never offers the hidden per-seat LoB in Paragon, even hoisted', () => {
+    const d = legalDestinations('hand', 'my', 'Paragon', { isLostSoul: true });
+    expect(d.some((x) => x.owner !== 'shared' && x.zone === 'land-of-bondage')).toBe(false);
+    expect(d.filter((x) => x.owner === 'my')[0].zone).toBe('land-of-redemption');
+  });
+});

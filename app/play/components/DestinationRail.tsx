@@ -9,6 +9,9 @@ interface DestinationRailProps {
   state: TapMoveState;
   format: 'T1' | 'T2' | 'Paragon';
   cardName?: string;
+  /** The armed card is a Lost Soul - pulls Land of Bondage and Land of
+   *  Redemption to the front of the chip row (see legalDestinations). */
+  isLostSoul?: boolean;
   /** Height of the player's hand band in screen px. The rail floats ABOVE it
    *  rather than over it: a card is usually armed FROM the hand, so covering
    *  the hand would hide the card just picked and block re-arming another. */
@@ -44,7 +47,7 @@ function label(zone: ZoneId): string {
  * the camera happens to be showing.
  */
 export function DestinationRail({
-  state, format, cardName, handBandHeight = 0, onPick, onCancel,
+  state, format, cardName, isLostSoul = false, handBandHeight = 0, onPick, onCancel,
 }: DestinationRailProps) {
   const [side, setSide] = useState<ZoneOwner>('my');
 
@@ -55,8 +58,8 @@ export function DestinationRail({
 
   const destinations = useMemo(() => {
     if (state.kind !== 'armed') return [];
-    return legalDestinations(state.sourceZone, state.sourceOwner, format);
-  }, [state, format]);
+    return legalDestinations(state.sourceZone, state.sourceOwner, format, { isLostSoul });
+  }, [state, format, isLostSoul]);
 
   const visible = destinations.filter((d) => d.owner === side);
   const hasShared = destinations.some((d) => d.owner === 'shared');

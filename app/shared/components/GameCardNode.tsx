@@ -6,7 +6,9 @@ import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { GameCard, COUNTER_COLORS } from '../../goldfish/types';
 import { findCard } from '@/lib/cards/lookup';
-import { LONG_PRESS_MS, LONG_PRESS_MOVE_TOLERANCE } from '@/app/play/lib/longPressCore';
+import {
+  LONG_PRESS_MS, LONG_PRESS_MOVE_TOLERANCE, LONG_PRESS_DISMISS_TRAVEL, TOUCH_DRAG_DISTANCE,
+} from '@/app/play/lib/longPressCore';
 import { simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { useCardPreview } from '../../goldfish/state/CardPreviewContext';
 
@@ -94,6 +96,9 @@ export interface GameCardNodeProps {
    *  ghost drag state lingers. Movement past the tolerance means "drag", and
    *  the long-press is abandoned. */
   onLongPress?: (card: GameCard, p: { x: number; y: number }) => void;
+  /** Called when the player keeps moving after a long-press menu opened -
+   *  they meant to drag, not to open a menu. Lets the caller dismiss it. */
+  onLongPressCancel?: () => void;
   /** Touch tap-to-move: true while THIS card is the armed card. Renders a
    *  steady amber ring so the player can see which card the destination rail
    *  is about to move. */
@@ -126,6 +131,7 @@ export const GameCardNode = memo(function GameCardNode({
   isDimmed,
   targetingMode,
   onLongPress,
+  onLongPressCancel,
   isArmed,
 }: GameCardNodeProps) {
   const isToken = card.isToken;
@@ -177,6 +183,16 @@ export const GameCardNode = memo(function GameCardNode({
       // mid-flight, opening the menu, and stranding the card. The stage
       // still calls setPointersPositions() on every touchmove even during
       // drags, so the live pointer is readable here.
+      // A live Konva drag means the finger already committed to moving the
+      // card; opening a menu on top of it cancels the drag mid-flight and
+      // strands the card. `dragDistance` below is set above
+      // LONG_PRESS_MOVE_TOLERANCE so this should be unreachable, but Konva's
+      // default is 3px and a stale global would re-open the hole.
+      const dragNode: any = e.target;
+      if (dragNode && typeof dragNode.isDragging === 'function' && dragNode.isDragging()) {
+        clearPress();
+        return;
+      }
       const pressStage = (e.target as Konva.Node).getStage?.();
       const livePos = pressStage?.getPointerPosition?.();
       if (pressStage && livePos) {
@@ -203,14 +219,29 @@ export const GameCardNode = memo(function GameCardNode({
 
   const moveLongPress = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     const s = pressRef.current;
-    if (!s || s.fired) return;
+    if (!s) return;
+    // A second finger means a pinch, not a press. The stage cancels the card
+    // drag when that happens but has no way to reach this node's timer, so a
+    // stationary first finger would still open a menu 500ms into the pinch.
+    if ((e.evt.touches?.length ?? 0) > 1) { clearPress(); return; }
     const t = e.evt.touches?.[0];
     if (!t) return;
+    const moved = Math.hypot(t.clientX - s.x, t.clientY - s.y);
+    if (s.fired) {
+      // The menu is already up and the finger is still travelling: the player
+      // was aiming a drag, not asking for a menu. Take it away rather than
+      // leaving them to dismiss a menu they never wanted.
+      if (moved > LONG_PRESS_DISMISS_TRAVEL) {
+        clearPress();
+        onLongPressCancel?.();
+      }
+      return;
+    }
     // Radial tolerance, so a diagonal drag isn't accidentally tolerated.
-    if (Math.hypot(t.clientX - s.x, t.clientY - s.y) > LONG_PRESS_MOVE_TOLERANCE) {
+    if (moved > LONG_PRESS_MOVE_TOLERANCE) {
       clearPress();
     }
-  }, [clearPress]);
+  }, [clearPress, onLongPressCancel]);
 
   // Flip-preview eye: meek cards render upside-down on the table; hovering the
   // eye un-rotates them in the preview surfaces so the opponent can read them.
@@ -286,6 +317,14 @@ export const GameCardNode = memo(function GameCardNode({
       y={y}
       rotation={rotation}
       draggable={isDraggable}
+      // Touch only (onLongPress is passed on touch devices only). Konva's 3px
+      // default lets a drag begin INSIDE the long-press movement tolerance,
+      // and Konva suppresses shape-level touchmove once a drag is live
+      // (Stage._pointermove returns early when Konva.isDragging()), so the
+      // press stopped being cancellable exactly when it needed to be.
+      // Requiring more travel than the tolerance makes the two mutually
+      // exclusive by construction.
+      dragDistance={onLongPress ? TOUCH_DRAG_DISTANCE : undefined}
       opacity={isDimmed ? 0.3 : 1}
       hitFunc={cardHitFunc as any}
       onMouseDown={(e) => {
@@ -301,7 +340,7 @@ export const GameCardNode = memo(function GameCardNode({
           e.cancelBubble = true;
         }
       }}
-      onDragStart={() => { setIsDragging(true); onDragStart(card); }}
+      onDragStart={() => { clearPress(); setIsDragging(true); onDragStart(card); }}
       onDragMove={onDragMove}
       onDragEnd={(e) => { setIsDragging(false); onDragEnd(card, e); }}
       onContextMenu={(e) => onContextMenu(card, e)}
