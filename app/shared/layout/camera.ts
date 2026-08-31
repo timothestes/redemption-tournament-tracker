@@ -201,6 +201,41 @@ export function zoomAtPoint(
 }
 
 /**
+ * One frame of a two-finger gesture: translate by how far the pinch midpoint
+ * travelled, then re-anchor the zoom on the virtual point under the midpoint.
+ *
+ * The translation is the whole point. Anchoring alone holds a point fixed on
+ * screen, so two fingers moving together at constant separation changed
+ * nothing — the board could only be panned with ONE finger, and a one-finger
+ * press only reaches the camera when it lands on bare board. Once a territory
+ * fills up there is no bare board left, and the half of the board that a side
+ * jump leaves off-screen becomes unreachable.
+ */
+export function pinchCamera(
+  prev: Camera,
+  nextZoom: number,
+  mid: { x: number; y: number; dx: number; dy: number },
+  fitScale: number,
+  virtualWidth: number,
+  containerWidth: number,
+  containerHeight: number,
+): Camera {
+  const prevScale = fitScale * prev.zoom;
+  if (!Number.isFinite(prevScale) || prevScale <= 0) return prev;
+  const panned: Camera = {
+    ...prev,
+    centerX: prev.centerX - mid.dx / prevScale,
+    centerY: prev.centerY - mid.dy / prevScale,
+  };
+  const anchorVX = panned.centerX + (mid.x - containerWidth / 2) / prevScale;
+  const anchorVY = panned.centerY + (mid.y - containerHeight / 2) / prevScale;
+  return clampCamera(
+    zoomAtPoint(panned, nextZoom, anchorVX, anchorVY),
+    fitScale, virtualWidth, containerWidth, containerHeight,
+  );
+}
+
+/**
  * Fold an optional camera into a fit transform.
  *
  * A null camera returns the fit transform untouched — the path every

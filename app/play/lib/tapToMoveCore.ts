@@ -119,6 +119,45 @@ const OPPONENT_DESTINATIONS: ZoneId[] = [
 const SHARED_DESTINATIONS: ZoneId[] = ['land-of-bondage', 'soul-deck'];
 
 /**
+ * Zones pulled to the front of the rail for a Lost Soul.
+ *
+ * The rail is one horizontally scrolling row that fits about five chips, and a
+ * Lost Soul only ever goes two places in real play — into a Land of Bondage,
+ * or out of one into a Land of Redemption on a rescue. Both sat at positions 6
+ * and 8 of the default order, off the right edge.
+ *
+ * Which of the two leads depends on where the soul is now: a soul sitting in a
+ * Land of Bondage is nearly always about to be rescued, and anywhere else it
+ * is nearly always on its way into bondage.
+ */
+function lostSoulPriority(sourceZone: ZoneId): ZoneId[] {
+  return sourceZone === 'land-of-bondage'
+    ? ['land-of-redemption', 'land-of-bondage']
+    : ['land-of-bondage', 'land-of-redemption'];
+}
+
+/** Stable partial sort: `priority` zones first, in the order given; everything
+ *  else keeps its original relative order. */
+function prioritize(
+  dests: Array<{ zone: ZoneId; owner: ZoneOwner }>,
+  priority: ZoneId[],
+): Array<{ zone: ZoneId; owner: ZoneOwner }> {
+  const rank = (z: ZoneId) => {
+    const i = priority.indexOf(z);
+    return i === -1 ? priority.length : i;
+  };
+  return dests
+    .map((d, i) => ({ d, i }))
+    .sort((a, b) => rank(a.d.zone) - rank(b.d.zone) || a.i - b.i)
+    .map(({ d }) => d);
+}
+
+export interface DestinationOptions {
+  /** The armed card is a Lost Soul — reorder the rail around bondage/rescue. */
+  isLostSoul?: boolean;
+}
+
+/**
  * Destinations offered in the rail. 'battle' is deliberately excluded - the
  * Field of Battle is phase-driven and only reachable while a battle is open,
  * so it stays on the existing drop path rather than the rail.
@@ -127,6 +166,7 @@ export function legalDestinations(
   sourceZone: ZoneId,
   sourceOwner: ZoneOwner,
   format: 'T1' | 'T2' | 'Paragon',
+  opts: DestinationOptions = {},
 ): Array<{ zone: ZoneId; owner: ZoneOwner }> {
   const out: Array<{ zone: ZoneId; owner: ZoneOwner }> = [];
 
@@ -142,5 +182,6 @@ export function legalDestinations(
     for (const zone of SHARED_DESTINATIONS) out.push({ zone, owner: 'shared' });
   }
 
-  return out.filter((d) => !(d.zone === sourceZone && d.owner === sourceOwner));
+  const legal = out.filter((d) => !(d.zone === sourceZone && d.owner === sourceOwner));
+  return opts.isLostSoul ? prioritize(legal, lostSoulPriority(sourceZone)) : legal;
 }

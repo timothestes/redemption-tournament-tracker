@@ -60,9 +60,16 @@ interface CardContextMenuProps {
    *  toggle is active — the toggle_top_deck_reveal menu item flips its label
    *  to the turn-off wording. Defaults to false. */
   topDeckRevealed?: boolean;
+  /** Opens the full-screen card reader. On touch the sheet's header becomes the
+   *  button for it: hover previews and the right panel's loupe are both
+   *  hover-fed and disabled on touch, so this is the only route a phone player
+   *  has to a card's type and special ability. */
+  onViewCard?: (card: GameCard) => void;
+  /** Resolved (forge-aware) art for the header thumbnail. */
+  cardImageUrl?: string;
 }
 
-export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, onSurrender, onRescue, zones, isHandRevealed, opponentHandRevealed, topDeckRevealed }: CardContextMenuProps) {
+export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, onSurrender, onRescue, zones, isHandRevealed, opponentHandRevealed, topDeckRevealed, onViewCard, cardImageUrl }: CardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
   // Touch renders this menu as a bottom sheet (globals.css [data-context-menu]).
@@ -285,20 +292,74 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
             marginBottom: 4,
           }}
         >
-          <span
-            style={{
-              color: 'var(--gf-text)',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 15,
-              fontWeight: 700,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              minWidth: 0,
-            }}
-          >
-            {card.cardName}
-          </span>
+          {onViewCard ? (
+            <button
+              type="button"
+              onClick={() => onViewCard(card)}
+              data-testid="context-menu-view-card"
+              aria-label={`View ${card.cardName}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                flex: 1,
+                minWidth: 0,
+                minHeight: 44,
+                padding: 0,
+                background: 'transparent',
+                border: 'none',
+                textAlign: 'left',
+                cursor: 'pointer',
+              }}
+            >
+              {cardImageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={cardImageUrl}
+                  alt=""
+                  style={{
+                    width: 28, height: 39, objectFit: 'cover',
+                    borderRadius: 3, flexShrink: 0,
+                    border: '1px solid var(--gf-border)',
+                  }}
+                />
+              )}
+              <span style={{ minWidth: 0 }}>
+                <span
+                  style={{
+                    display: 'block',
+                    color: 'var(--gf-text)',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                    fontSize: 15,
+                    fontWeight: 700,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {card.cardName}
+                </span>
+                <span style={{ display: 'block', color: 'var(--gf-text-dim)', fontSize: 10 }}>
+                  {card.type ? `${card.type} · ` : ''}Tap to read
+                </span>
+              </span>
+            </button>
+          ) : (
+            <span
+              style={{
+                color: 'var(--gf-text)',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 15,
+                fontWeight: 700,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0,
+              }}
+            >
+              {card.cardName}
+            </span>
+          )}
           <button
             type="button"
             aria-label="Close menu"

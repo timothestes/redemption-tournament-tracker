@@ -11,6 +11,22 @@
 export const LONG_PRESS_MS = 500;
 export const LONG_PRESS_MOVE_TOLERANCE = 10;
 
+/**
+ * Travel (px) a Konva drag needs before it starts, on touch.
+ *
+ * Konva's global default is 3px, which is INSIDE
+ * LONG_PRESS_MOVE_TOLERANCE - and Konva stops delivering shape-level
+ * touchmove once one of its drags is live, so between 3px and 10px the press
+ * was uncancellable and the 500ms timer still fired: the menu opened in the
+ * middle of a drag and the card snapped back. Requiring more travel than the
+ * tolerance makes drag and long-press mutually exclusive by construction.
+ */
+export const TOUCH_DRAG_DISTANCE = LONG_PRESS_MOVE_TOLERANCE + 2;
+
+/** Travel (px) after the menu has opened that means "I actually wanted to
+ *  move this card" - the caller dismisses the menu it just opened. */
+export const LONG_PRESS_DISMISS_TRAVEL = 24;
+
 export interface PressState {
   startX: number;
   startY: number;
