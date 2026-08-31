@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ZONE_LABELS, type ZoneId } from '@/app/shared/types/gameCard';
 import { legalDestinations, type TapMoveState, type ZoneOwner } from '@/app/play/lib/tapToMoveCore';
@@ -18,6 +18,11 @@ interface DestinationRailProps {
   handBandHeight?: number;
   onPick: (zone: ZoneId, owner: ZoneOwner) => void;
   onCancel: () => void;
+  /** The segmented Mine/Theirs/Shared control drives the armed state's `side`
+   *  (which gates board-tap commits) — the reducer owns it, the rail is a
+   *  view. A cross-side board tap flips it too, so the visible segment change
+   *  is the feedback that the tap re-targeted rather than committed. */
+  onSideChange: (side: ZoneOwner) => void;
 }
 
 /** Short labels - the full ZONE_LABELS strings overflow a chip. Casing
@@ -47,14 +52,11 @@ function label(zone: ZoneId): string {
  * the camera happens to be showing.
  */
 export function DestinationRail({
-  state, format, cardName, isLostSoul = false, handBandHeight = 0, onPick, onCancel,
+  state, format, cardName, isLostSoul = false, handBandHeight = 0, onPick, onCancel, onSideChange,
 }: DestinationRailProps) {
-  const [side, setSide] = useState<ZoneOwner>('my');
-
-  // Reset to my own side whenever a new card is armed, so the rail never
-  // opens on a stale tab from the previous move.
-  const armedId = state.kind === 'armed' ? state.cardId : null;
-  useEffect(() => { setSide('my'); }, [armedId]);
+  // The side lives in the tap-to-move reducer (tapCard resets it to 'my', so
+  // the rail never opens on a stale tab from the previous move).
+  const side: ZoneOwner = state.kind === 'armed' ? state.side : 'my';
 
   const destinations = useMemo(() => {
     if (state.kind !== 'armed') return [];
@@ -106,7 +108,7 @@ export function DestinationRail({
               <button
                 key={s}
                 type="button"
-                onClick={() => setSide(s)}
+                onClick={() => onSideChange(s)}
                 data-testid={`destination-side-${s}`}
                 aria-pressed={side === s}
                 className={

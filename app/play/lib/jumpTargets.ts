@@ -32,6 +32,7 @@ export function buildJumpTargets(
   layout: MultiplayerLayout,
   virtualWidth: number,
   battleActive: boolean,
+  portrait = false,
 ): JumpTarget[] {
   const z = layout.zones;
 
@@ -45,12 +46,25 @@ export function buildJumpTargets(
     ...Object.values(layout.sidebar.opponent),
   ]));
 
+  // Portrait (phone "Continue anyway"): a whole-board contain-fit inside a
+  // 2.05:1 virtual aspect is a ~25%-height letterboxed strip with unreadable
+  // cards. "Fit" becomes a card-wide, centred, full-height column instead —
+  // height-fitted, so cards render at usable size and the jump cluster + pan
+  // buttons make the rest reachable. fitRectToViewport's narrow-rect
+  // centring keeps the hand fan on screen.
   const targets: JumpTarget[] = [
     {
       id: 'fit',
       label: 'Fit',
-      rect: { x: 0, y: 0, width: virtualWidth, height: VIRTUAL_HEIGHT },
-      axis: 'both',
+      rect: portrait
+        ? {
+            x: layout.playAreaWidth / 2 - layout.mainCard.cardWidth / 2,
+            y: 0,
+            width: layout.mainCard.cardWidth,
+            height: VIRTUAL_HEIGHT,
+          }
+        : { x: 0, y: 0, width: virtualWidth, height: VIRTUAL_HEIGHT },
+      axis: portrait ? 'height' : 'both',
     },
     { id: 'opponent-side', label: 'Theirs', rect: theirs, axis: 'height' },
     { id: 'my-side', label: 'Mine', rect: mine, axis: 'height' },

@@ -78,6 +78,7 @@ import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { useBoardCamera } from '@/app/play/hooks/useBoardCamera';
 import { useTapToMove } from '@/app/play/hooks/useTapToMove';
 import { buildJumpTargets, type JumpTargetId } from '@/app/play/lib/jumpTargets';
+import { PORTRAIT_GATE_MAX_WIDTH } from '@/app/play/lib/orientationGate';
 import type { CommitMove } from '@/app/play/lib/tapToMoveCore';
 import type { PointerSample } from '@/app/play/lib/gestureCore';
 import { LONG_PRESS_MS, LONG_PRESS_MOVE_TOLERANCE } from '@/app/play/lib/longPressCore';
@@ -430,6 +431,13 @@ interface MultiplayerCanvasProps {
   viewerKind?: 'player' | 'spectator';
   /** Forge card resolver (granted name/text/art) for private Forge playtest games. */
   forgeResolver?: ForgeResolverMap | null;
+  /** Compact touch layout, decided by the shell from the WINDOW viewport
+   *  (isCompactTouchViewport) — covers phone portrait behind "Continue
+   *  anyway" too, and kills the 500-548px drift between the shell's window
+   *  height and this component's container height. Optional so callers that
+   *  pass nothing (the spectator shell) keep the container-height fallback
+   *  bit-identical. */
+  compactLayout?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +448,18 @@ interface MultiplayerCanvasProps {
  *  move-only popup - cards in play need rotate/attach/counters/notes/rescue. */
 const IN_PLAY_BROWSE_ZONES = new Set(['territory', 'land-of-bondage', 'hand']);
 
-export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep, viewerKind = 'player', forgeResolver }: MultiplayerCanvasProps) {
+/** Mirror of BattleResolutionUI's chooser derivation (spec §7 / server
+ *  surrender_soul): T1 → the defender picks the soul, T2/Paragon → the
+ *  attacker. Used to hide TouchControls only for the viewer whose chooser
+ *  modal is actually occluded by the cluster. */
+function isSoulChooserSeat(mySeat: string, opponentSeat: string, attackerSeat: string, format: string): boolean {
+  if (!mySeat) return false;
+  const defenderSeat = attackerSeat === mySeat ? opponentSeat : attackerSeat === opponentSeat ? mySeat : '';
+  const chooserSeat = format === 'T1' ? defenderSeat : attackerSeat;
+  return mySeat === chooserSeat;
+}
+
+export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep, viewerKind = 'player', forgeResolver, compactLayout }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible, isPreviewFlipped } = useCardPreview();
   // Spectators may NEVER drag cards — even visually. Every `isDraggable` site
   // ANDs against this flag.
@@ -471,8 +490,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     fit, camera, containerWidth, containerHeight,
   );
   /** Phone-sized viewports get the compact layout profile; tablets keep the
-   *  standard one, which is already at laptop parity. */
-  const useCompactLayout = isTouch && containerHeight > 0 && containerHeight < 500;
+   *  standard one, which is already at laptop parity. The shell's viewport
+   *  verdict wins when provided (it also covers phone portrait); the
+   *  container-height fallback keeps prop-less callers (spectator shell)
+   *  bit-identical. */
+  const useCompactLayout = compactLayout ?? (isTouch && containerHeight > 0 && containerHeight < 500);
+  /** Phone portrait behind "Continue anyway": the whole-board fit is a
+   *  microfilm strip, so the default framing becomes a card-wide full-height
+   *  column instead (see buildJumpTargets). Width-bounded like the rotate
+   *  gate itself — iPad portrait is deliberately un-gated and its whole-board
+   *  fit is usable, so it must NOT inherit the phone column framing. */
+  const portraitBoard =
+    isTouch && containerWidth > 0 && containerWidth < containerHeight && containerWidth < PORTRAIT_GATE_MAX_WIDTH;
 
   // ---- Canvas text legibility floor ----
   // Konva text is sized in virtual units and rendered through `scale`. On
@@ -1446,6 +1475,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [boardBrowseOpen, setBoardBrowseOpen] = useState(false);
   const [readerCard, setReaderCard] = useState<GameCard | null>(null);
   const [browseSharedLob, setBrowseSharedLob] = useState(false);
+  /** Touch: the browse sheet's Field of Battle grid (both players' band cards
+   *  merged) — the only way to inspect an attacker buried under a blocker. */
+  const [browseBattle, setBrowseBattle] = useState(false);
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number; targetPlayerId?: string } | null>(null);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
   // Paragon-only: right-click context menu for the shared Soul Deck pile. Shared by
@@ -2548,6 +2580,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return combined;
   }, [modalGameValue.zones, opponentModalGameValue.zones]);
 
+  // ---- ModalGameProvider value for the browse sheet's Field of Battle grid.
+  //      The band is shared table space, so the grid shows BOTH players' band
+  //      cards (allZonesForContextMenu already merges them); move_card accepts
+  //      either player's card in sandbox mode (see the opponent deck modals
+  //      comment below), so modalGameValue's actions serve both. ----
+  const battleBrowseModalGameValue = useMemo<ModalGameContextValue>(() => ({
+    ...modalGameValue,
+    zones: { ...modalGameValue.zones, battle: allZonesForContextMenu['battle'] ?? [] },
+  }), [modalGameValue, allZonesForContextMenu]);
+
   // ---- Close all menus helper ----
   const closeAllMenus = useCallback(() => {
     setContextMenu(null);
@@ -2566,6 +2608,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     setBoardBrowseOpen(false);
     setReaderCard(null);
     setBrowseSharedLob(false);
+    setBrowseBattle(false);
     setOpponentZoneMenu(null);
     setOpponentDeckMenu(null);
     setOpponentPeekState(null);
@@ -5039,8 +5082,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Universal card click handler — shift-click toggles selection
   // ---- Camera jump targets + e2e hook ----
   const jumpTargets = useMemo(
-    () => (mpLayout ? buildJumpTargets(mpLayout, virtualWidth, battleActive) : []),
-    [mpLayout, virtualWidth, battleActive],
+    () => (mpLayout ? buildJumpTargets(mpLayout, virtualWidth, battleActive, portraitBoard) : []),
+    [mpLayout, virtualWidth, battleActive, portraitBoard],
   );
 
   /** The in-play zones offered by the "cards in play" sheet, with live counts.
@@ -5052,6 +5095,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       { owner: 'my', zone: 'territory', label: 'Territory', count: (myCards['territory'] ?? []).length },
       { owner: 'opponent', zone: 'territory', label: 'Territory', count: (opponentCards['territory'] ?? []).length },
     ];
+    if (battleActive) {
+      // A contested battle stacks the attacker ~10px under the blocker, and
+      // Konva hit-testing only returns the topmost card — on touch the buried
+      // card is unreachable on the board. The band is shared table space, so
+      // the row carries no Mine/Theirs prefix and the grid merges both sides.
+      entries.unshift({
+        owner: 'shared', zone: 'battle', label: 'Field of Battle',
+        count: (myCards['battle'] ?? []).length + (opponentCards['battle'] ?? []).length,
+      });
+    }
     if (sharedLob) {
       entries.push({
         owner: 'shared', zone: 'land-of-bondage', label: 'Land of Bondage (shared)',
@@ -5065,18 +5118,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     entries.push({ owner: 'my', zone: 'hand', label: 'Hand', count: (myCards['hand'] ?? []).length });
     return entries;
-  }, [myCards, opponentCards, sharedCards, normalizedFormat]);
+  }, [myCards, opponentCards, sharedCards, normalizedFormat, battleActive]);
 
   /** Which jump the camera is currently sitting in, so the cluster can show
    *  it. Cleared by any manual pan/pinch — the framing is no longer that
    *  target's. Without this every button rendered unselected and "Fit" vs
    *  "Theirs" read as "nothing happened". */
   const [activeJumpId, setActiveJumpId] = useState<JumpTargetId | null>('fit');
+  // Mirror so jumpToTarget (and the edge-triggered effects below) can read the
+  // current framing without re-creating on every jump — same idiom as
+  // tapMoveStateRef.
+  const activeJumpIdRef = useRef<JumpTargetId | null>(activeJumpId);
+  activeJumpIdRef.current = activeJumpId;
+  /** What the camera was framing before a Battle jump, so it can return there
+   *  when the battle band closes instead of staying parked on an empty strip. */
+  const preBattleJumpRef = useRef<JumpTargetId | null>(null);
 
   const jumpToTarget = useCallback((t: (typeof jumpTargets)[number]) => {
     // In the compact profile the turn bar OVERLAYS the canvas top — without
     // the inset, "Theirs" framed the opponent's hand row underneath it.
     if (!t.rect) return;
+    if (t.id === 'battle' && activeJumpIdRef.current !== 'battle') {
+      preBattleJumpRef.current = activeJumpIdRef.current;
+    }
     jumpTo(t.rect, { axis: t.axis, insetTop: useCompactLayout ? 48 : 0 });
     setActiveJumpId(t.id);
   }, [jumpTo, useCompactLayout]);
@@ -5097,6 +5161,46 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       centerX: camera.centerX + (direction * containerWidth * 0.8) / scale,
     });
   }, [camera, containerWidth, scale, setCamera]);
+
+  // ---- Default framing (touch) ----
+  // Frame 'fit' once the board is measured, and re-frame when portrait flips
+  // (a rotation): in landscape this reproduces the default camera exactly
+  // (whole-board fit clamps to zoom 1, centred), but in portrait 'fit' is the
+  // card-wide column — and useBoardCamera preserves zoom != MIN_ZOOM across
+  // resizes, so rotating to landscape would otherwise strand the user at the
+  // column's ~2.9x zoom.
+  const framedOnMeasureRef = useRef(false);
+  const prevPortraitBoardRef = useRef(portraitBoard);
+  useEffect(() => {
+    if (isTouch === false) return;
+    if (containerWidth <= 0 || containerHeight <= 0) return;
+    const fitTarget = jumpTargets.find((t) => t.id === 'fit');
+    if (!fitTarget || !fitTarget.rect) return;
+    const portraitFlipped = prevPortraitBoardRef.current !== portraitBoard;
+    if (framedOnMeasureRef.current === true && portraitFlipped === false) return;
+    framedOnMeasureRef.current = true;
+    prevPortraitBoardRef.current = portraitBoard;
+    jumpToTarget(fitTarget);
+  }, [isTouch, containerWidth, containerHeight, portraitBoard, jumpTargets, jumpToTarget]);
+
+  // ---- Camera return after a battle closes (touch) ----
+  // When the band closes, its jump target vanishes but the camera stayed
+  // parked on the now-empty strip with a dangling activeJumpId. Edge-triggered
+  // on battleActive true→false, and only while the camera is still framing
+  // 'battle' — any manual pan nulls activeJumpId and suppresses the restore,
+  // so this can never fight the player.
+  const prevBattleActiveRef = useRef(battleActive);
+  useEffect(() => {
+    const wasActive = prevBattleActiveRef.current;
+    prevBattleActiveRef.current = battleActive;
+    if (wasActive === false || battleActive === true) return;
+    if (isTouch === false) return;
+    if (activeJumpIdRef.current !== 'battle') return;
+    const restore =
+      jumpTargets.find((t) => t.id === preBattleJumpRef.current) ??
+      jumpTargets.find((t) => t.id === 'fit');
+    if (restore && restore.rect) jumpToTarget(restore);
+  }, [battleActive, isTouch, jumpTargets, jumpToTarget]);
 
   // Lets Playwright drive the camera without synthesising gestures, so camera
   // behaviour and gesture recognition can be tested independently.
@@ -5487,8 +5591,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (sawMultiTouchRef.current) return;
     // Two quick pans are not a double-tap.
     if (touchTravelRef.current > LONG_PRESS_MOVE_TOLERANCE) return;
-    if (isZoomed) { resetCamera(); setActiveJumpId('fit'); }
-  }, [isTouch, isZoomed, resetCamera]);
+    if (isZoomed) {
+      // Through the fit TARGET, not resetCamera: identical in landscape (the
+      // whole-board fit clamps to the default camera) but correct in portrait,
+      // where 'fit' is the card-wide column framing.
+      const fitTarget = jumpTargets.find((t) => t.id === 'fit');
+      if (fitTarget && fitTarget.rect) {
+        jumpToTarget(fitTarget);
+      } else {
+        resetCamera();
+        setActiveJumpId('fit');
+      }
+    }
+  }, [isTouch, isZoomed, resetCamera, jumpTargets, jumpToTarget]);
 
 
   const handleCardClick = useCallback(
@@ -9652,6 +9767,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onEndBattle={gameState.endBattle}
           onSurrenderSoul={gameState.surrenderSoul}
           holdPhase={gameState.holdPhase}
+          compact={useCompactLayout}
         />
       )}
 
@@ -10401,6 +10517,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ================================================================
           Zone browse overlay — card grid for browsing pile contents
           ================================================================ */}
+      {/* Field of Battle grid (touch browse sheet): both players' band cards.
+          No drag props — the sheet only opens on touch, where modal drags are
+          disabled anyway; taps route to the full card menu / card reader. */}
+      {browseBattle && (
+        <ModalGameProvider value={battleBrowseModalGameValue}>
+          <ZoneBrowseModal
+            zoneId="battle"
+            onClose={() => setBrowseBattle(false)}
+            readOnly={isSpectator}
+            alwaysUseCardMenu
+            onRequestCardMenu={(card, clientX, clientY) => {
+              setBrowseBattle(false);
+              setContextMenu({ card, x: clientX, y: clientY });
+            }}
+          />
+        </ModalGameProvider>
+      )}
       {browseOpponentZone && (
         <ModalGameProvider value={opponentModalGameValue}>
           <ZoneBrowseModal
@@ -11063,8 +11196,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ---- Touch overlays ---- */}
       {/* Shown at every zoom level. Gating it on isZoomed made Fit a one-way
           trip — pressing it took the jump buttons away with it, and the only
-          way back was a pinch. */}
-      {isTouch && (
+          way back was a pinch. Hidden while THIS viewer's soul chooser is up:
+          the z-30 cluster painted over the chooser's top-right corner, and the
+          chooser's wait is momentary. The non-chooser (and spectators) keep
+          the cluster — they have no modal and still need the camera. */}
+      {isTouch &&
+        !(
+          gameState.battleState === 'awaiting-soul' &&
+          !isSpectator &&
+          isSoulChooserSeat(
+            gameState.myPlayer ? String(gameState.myPlayer.seat) : '',
+            gameState.opponentPlayer ? String(gameState.opponentPlayer.seat) : '',
+            gameState.battleAttackerSeat,
+            normalizedFormat,
+          )
+        ) && (
         <TouchControls
           targets={jumpTargets}
           onJump={jumpToTarget}
@@ -11085,7 +11231,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onClose={() => setBoardBrowseOpen(false)}
           onPick={(entry) => {
             setBoardBrowseOpen(false);
-            if (entry.owner === 'my') setBrowseMyZone(entry.zone);
+            if (entry.zone === 'battle') setBrowseBattle(true);
+            else if (entry.owner === 'my') setBrowseMyZone(entry.zone);
             else if (entry.owner === 'shared') setBrowseSharedLob(true);
             else setBrowseOpponentZone(entry.zone);
           }}
@@ -11126,6 +11273,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           }
           onPick={(zone, owner) => tapMoveDispatch({ type: 'tapDestinationChip', zone, owner })}
           onCancel={tapMoveReset}
+          onSideChange={(s) => tapMoveDispatch({ type: 'setSide', side: s })}
         />
       )}
     </div>

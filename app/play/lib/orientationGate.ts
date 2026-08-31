@@ -17,3 +17,20 @@ export function shouldGateForPortrait(
   if (width === 0 || height === 0) return false;
   return width < height && width < PORTRAIT_GATE_MAX_WIDTH;
 }
+
+/**
+ * Touch viewports that get the compact layout profile (TOUCH_PROFILE) and the
+ * overlaid turn bar: short landscape phones (h < 500) AND phone portrait
+ * behind "Continue anyway" — which previously fell through to the desktop
+ * profile and rendered the board as a ~25%-height microfilm strip. iPad
+ * portrait (834x1112) stays on the standard profile, same as the gate.
+ */
+export function isCompactTouchViewport(
+  width: number,
+  height: number,
+  inputMode: InputMode,
+): boolean {
+  if (inputMode !== 'touch') return false;
+  if (width <= 0 || height <= 0) return false;
+  return height < 500 || (width < height && width < PORTRAIT_GATE_MAX_WIDTH);
+}

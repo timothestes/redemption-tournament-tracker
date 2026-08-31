@@ -3,7 +3,7 @@ import { tapMoveReducer, legalDestinations, type TapMoveState } from '../tapToMo
 
 const idle: TapMoveState = { kind: 'idle' };
 const armed: TapMoveState = {
-  kind: 'armed', cardId: 'c1', sourceZone: 'hand', sourceOwner: 'my',
+  kind: 'armed', cardId: 'c1', sourceZone: 'hand', sourceOwner: 'my', side: 'my',
 };
 
 describe('tapMoveReducer', () => {
@@ -22,7 +22,7 @@ describe('tapMoveReducer', () => {
   it('re-arms onto a different card', () => {
     const r = tapMoveReducer(armed, { type: 'tapCard', cardId: 'c2', zone: 'territory', owner: 'my' });
     expect(r.state).toEqual({
-      kind: 'armed', cardId: 'c2', sourceZone: 'territory', sourceOwner: 'my',
+      kind: 'armed', cardId: 'c2', sourceZone: 'territory', sourceOwner: 'my', side: 'my',
     });
     expect(r.commit).toBeNull();
   });
@@ -65,6 +65,95 @@ describe('tapMoveReducer', () => {
   it('cancels on empty-space tap and on explicit cancel', () => {
     expect(tapMoveReducer(armed, { type: 'tapEmpty' }).state.kind).toBe('idle');
     expect(tapMoveReducer(armed, { type: 'cancel' }).state.kind).toBe('idle');
+  });
+});
+
+describe('tapMoveReducer - side gate (stray-tap guardrail)', () => {
+  it('re-targets instead of committing on a cross-side zone tap', () => {
+    // The live-QA failure: armed hand card + one stray tap on opponent
+    // territory = combat card revealed in the wrong territory. Now the tap
+    // flips the rail's side and moves nothing.
+    const r = tapMoveReducer(armed, {
+      type: 'tapZone', zone: 'territory', owner: 'opponent', point: { x: 9, y: 9 },
+    });
+    expect(r.commit).toBeNull();
+    expect(r.state).toEqual({ ...armed, side: 'opponent' });
+  });
+
+  it('commits on the second tap into the re-targeted zone', () => {
+    const first = tapMoveReducer(armed, {
+      type: 'tapZone', zone: 'territory', owner: 'opponent', point: { x: 9, y: 9 },
+    });
+    const second = tapMoveReducer(first.state, {
+      type: 'tapZone', zone: 'territory', owner: 'opponent', point: { x: 10, y: 10 },
+    });
+    expect(second.state.kind).toBe('idle');
+    expect(second.commit).toEqual({
+      cardId: 'c1', toZone: 'territory', toOwner: 'opponent', atPoint: { x: 10, y: 10 },
+    });
+  });
+
+  it('commits shared-owner zones regardless of side', () => {
+    // A shared zone (Paragon LoB / soul deck) can't be "the wrong side".
+    const r = tapMoveReducer(armed, {
+      type: 'tapZone', zone: 'land-of-bondage', owner: 'shared', point: { x: 1, y: 2 },
+    });
+    expect(r.commit).toEqual({
+      cardId: 'c1', toZone: 'land-of-bondage', toOwner: 'shared', atPoint: { x: 1, y: 2 },
+    });
+    expect(r.state.kind).toBe('idle');
+  });
+
+  it('commits the battle band in one tap even with the rail flipped to Theirs', () => {
+    // The band is effectively shared space (findZoneAtPosition reports it as
+    // 'my'); "arm, tap band" must stay a one-tap attack regardless of side.
+    const flipped = tapMoveReducer(armed, { type: 'setSide', side: 'opponent' }).state;
+    const r = tapMoveReducer(flipped, {
+      type: 'tapZone', zone: 'battle', owner: 'my', point: { x: 3, y: 4 },
+    });
+    expect(r.commit).toEqual({
+      cardId: 'c1', toZone: 'battle', toOwner: 'my', atPoint: { x: 3, y: 4 },
+    });
+    expect(r.state.kind).toBe('idle');
+  });
+
+  it('setSide updates the armed side without committing', () => {
+    const r = tapMoveReducer(armed, { type: 'setSide', side: 'opponent' });
+    expect(r.state).toEqual({ ...armed, side: 'opponent' });
+    expect(r.commit).toBeNull();
+
+    // ...and a same-side tap then commits directly.
+    const commit = tapMoveReducer(r.state, {
+      type: 'tapZone', zone: 'territory', owner: 'opponent', point: { x: 3, y: 4 },
+    });
+    expect(commit.commit).not.toBeNull();
+  });
+
+  it('setSide is a no-op while idle', () => {
+    const r = tapMoveReducer(idle, { type: 'setSide', side: 'opponent' });
+    expect(r.state).toEqual(idle);
+    expect(r.commit).toBeNull();
+  });
+
+  it('arming resets the side to my own', () => {
+    const flipped = tapMoveReducer(armed, { type: 'setSide', side: 'opponent' }).state;
+    const rearmed = tapMoveReducer(flipped, { type: 'tapCard', cardId: 'c2', zone: 'hand', owner: 'my' });
+    expect(rearmed.state).toEqual({
+      kind: 'armed', cardId: 'c2', sourceZone: 'hand', sourceOwner: 'my', side: 'my',
+    });
+  });
+
+  it('same-zone no-op still wins over the side gate', () => {
+    // Tapping the source zone disarms without committing even when the source
+    // is on the other side (e.g. a card armed FROM opponent territory).
+    const oppArmed: TapMoveState = {
+      kind: 'armed', cardId: 'c1', sourceZone: 'territory', sourceOwner: 'opponent', side: 'my',
+    };
+    const r = tapMoveReducer(oppArmed, {
+      type: 'tapZone', zone: 'territory', owner: 'opponent', point: { x: 1, y: 2 },
+    });
+    expect(r.state.kind).toBe('idle');
+    expect(r.commit).toBeNull();
   });
 });
 

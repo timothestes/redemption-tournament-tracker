@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildJumpTargets } from '../jumpTargets';
 import { calculateMultiplayerLayout } from '@/app/play/layout/multiplayerLayout';
-import { fitRectToViewport, MIN_ZOOM } from '@/app/shared/layout/camera';
+import { fitRectToViewport, MIN_ZOOM, MAX_ZOOM } from '@/app/shared/layout/camera';
 import { calculateScale, VIRTUAL_HEIGHT } from '@/app/shared/layout/virtualCanvas';
 
 // Real geometry, not a hand-built fixture, so the test tracks the real layout.
@@ -53,6 +53,42 @@ describe('buildJumpTargets', () => {
     expect(rect.width).toBe(band.width);
     expect(rect.y).toBeCloseTo(Math.max(0, band.y - pad), 6);
     expect(rect.y + rect.height).toBeCloseTo(Math.min(VIRTUAL_HEIGHT, band.y + band.height + pad), 6);
+  });
+
+  it('portrait fit is a card-wide, full-height centred column that magnifies', () => {
+    // Phone portrait behind "Continue anyway": the whole-board fit was a
+    // ~25%-height microfilm strip, so portrait 'fit' becomes a card-wide
+    // column height-fitted to the viewport.
+    const cw = 393, ch = 852;
+    const fit = calculateScale(cw, ch);
+    const l = calculateMultiplayerLayout(fit.virtualWidth, VIRTUAL_HEIGHT, 'T1', 'player', false, true);
+    const t = buildJumpTargets(l, fit.virtualWidth, false, true).find((x) => x.id === 'fit')!;
+    expect(t.axis).toBe('height');
+    expect(t.rect).toEqual({
+      x: l.playAreaWidth / 2 - l.mainCard.cardWidth / 2,
+      y: 0,
+      width: l.mainCard.cardWidth,
+      height: VIRTUAL_HEIGHT,
+    });
+
+    // It genuinely magnifies, within the zoom range (no MAX_ZOOM clipping)...
+    const cam = fitRectToViewport(t.rect!, fit.scale, fit.virtualWidth, cw, ch, { axis: t.axis, insetTop: 48 });
+    expect(cam.zoom).toBeGreaterThan(MIN_ZOOM);
+    expect(cam.zoom).toBeLessThanOrEqual(MAX_ZOOM);
+
+    // ...and the first interactive content (the opponent hand row — the
+    // compact profile's top gutter sits above it) lands below the 48px
+    // overlaid turn bar. The bare board EDGE may tuck ~1px under the bar via
+    // the letterbox; the gutter is what keeps tappable content clear.
+    const scale = fit.scale * cam.zoom;
+    const handScreenY = ch / 2 + (l.zones.opponentHand.y - cam.centerY) * scale;
+    expect(handScreenY).toBeGreaterThanOrEqual(48);
+  });
+
+  it('a 3-arg call (no portrait flag) keeps the whole-board landscape fit', () => {
+    const fit = buildJumpTargets(layout, VW, false).find((t) => t.id === 'fit')!;
+    expect(fit.axis).toBe('both');
+    expect(fit.rect!.width).toBe(VW);
   });
 
   it('side targets actually zoom in on a phone viewport', () => {

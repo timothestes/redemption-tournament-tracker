@@ -72,3 +72,11 @@ export function cardPressFired(ref: TrackerRef): boolean {
 }
 
 export const consumeCardPressFired = cardPressFired;
+
+// True while a press begun by beginCardPress is still live and its long-press
+// has NOT fired — i.e. a touchend arriving now is a clean tap. A scrolled
+// press reads false (moveCardPress cancels past MOVE_TOLERANCE), and so does
+// a fired long-press (its menu is already open). Does not consume the state.
+export function isCardPressLive(ref: TrackerRef): boolean {
+  return !!ref.current && !ref.current.fired;
+}

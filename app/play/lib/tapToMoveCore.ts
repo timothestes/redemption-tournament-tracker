@@ -20,12 +20,24 @@ export type ZoneOwner = 'my' | 'opponent' | 'shared';
 
 export type TapMoveState =
   | { kind: 'idle' }
-  | { kind: 'armed'; cardId: string; sourceZone: ZoneId; sourceOwner: ZoneOwner };
+  | {
+      kind: 'armed';
+      cardId: string;
+      sourceZone: ZoneId;
+      sourceOwner: ZoneOwner;
+      /** Which side a board tap may commit into. Zones tile the whole board,
+       *  so without this ANY stray tap while armed was a commit — including
+       *  into opponent territory, revealing a hand card. Defaults to 'my' on
+       *  arm; a tap on the other side's zone re-targets this instead of
+       *  committing (the rail's segmented control mirrors and drives it). */
+      side: ZoneOwner;
+    };
 
 export type TapMoveEvent =
   | { type: 'tapCard'; cardId: string; zone: ZoneId; owner: ZoneOwner }
   | { type: 'tapZone'; zone: ZoneId; owner: ZoneOwner; point: { x: number; y: number } }
   | { type: 'tapDestinationChip'; zone: ZoneId; owner: ZoneOwner }
+  | { type: 'setSide'; side: ZoneOwner }
   | { type: 'tapEmpty' }
   | { type: 'cancel' };
 
@@ -61,9 +73,15 @@ export function tapMoveReducer(state: TapMoveState, event: TapMoveEvent): TapMov
           cardId: event.cardId,
           sourceZone: event.zone,
           sourceOwner: event.owner,
+          side: 'my',
         },
         commit: null,
       };
+    }
+
+    case 'setSide': {
+      if (state.kind !== 'armed') return { state, commit: null };
+      return { state: { ...state, side: event.side }, commit: null };
     }
 
     case 'tapZone': {
@@ -71,6 +89,16 @@ export function tapMoveReducer(state: TapMoveState, event: TapMoveEvent): TapMov
       // Dropping a card back where it came from is a no-op, not a move.
       if (state.sourceZone === event.zone && state.sourceOwner === event.owner) {
         return { state: IDLE, commit: null };
+      }
+      // A tap on the OTHER side's zone re-targets the rail instead of
+      // committing — stays armed, moves nothing; a second tap in that zone
+      // commits normally. Shared zones (Paragon LoB / soul deck) always
+      // commit: a shared zone can't be "the wrong side". The battle band is
+      // effectively shared space too (findZoneAtPosition reports it as 'my'),
+      // so it bypasses the gate — "arm, tap band" must stay a one-tap attack
+      // regardless of which side the rail is pointed at.
+      if (event.zone !== 'battle' && event.owner !== 'shared' && event.owner !== state.side) {
+        return { state: { ...state, side: event.owner }, commit: null };
       }
       return {
         state: IDLE,

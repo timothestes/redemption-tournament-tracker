@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
-import { beginCardPress, moveCardPress, cancelCardPress, cardPressFired, consumeCardPressFired, type CardPressTracker } from '@/app/shared/utils/modalCardPress';
+import { beginCardPress, moveCardPress, cancelCardPress, cardPressFired, consumeCardPressFired, isCardPressLive, type CardPressTracker } from '@/app/shared/utils/modalCardPress';
 import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '@/app/shared/types/gameCard';
@@ -346,8 +346,11 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     // for. There is no batch-move use for a territory, and requiring a second
     // long-press to reach any action is the friction this sheet is meant to
     // remove. Pile grids keep tap-to-select for their multi-card moves.
+    // The menu itself opens from onTouchEnd, NOT here: pointerup fires before
+    // touchend, and opening on pointerup flushed the unmount/mount before the
+    // tap's synthesized click was suppressible — the click then landed on the
+    // just-mounted menu sheet (e.g. its counter "+" row) under the finger.
     if (alwaysUseCardMenu && e?.pointerType === 'touch' && !readOnly) {
-      openCardMenu(card, e.clientX, e.clientY);
       return;
     }
     setContextCard(null);
@@ -619,7 +622,22 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                   onPointerUp={(e) => handlePointerUp(card, e)}
                   onTouchStart={(e) => beginCardPress(cardPressRef, e, (px, py) => openCardMenu(card, px, py))}
                   onTouchMove={(e) => moveCardPress(cardPressRef, e)}
-                  onTouchEnd={(e) => { if (cardPressFired(cardPressRef)) e.preventDefault(); cancelCardPress(cardPressRef); }}
+                  onTouchEnd={(e) => {
+                    if (cardPressFired(cardPressRef)) {
+                      e.preventDefault();
+                    } else if (alwaysUseCardMenu && !readOnly && isCardPressLive(cardPressRef)) {
+                      // A clean tap on an in-play grid card opens the full card
+                      // menu. preventDefault FIRST, while this node is still
+                      // mounted — that suppresses the tap's synthesized mouse
+                      // events so no ghost click reaches whatever mounts next.
+                      // A scrolled press reads not-live (moveCardPress), so a
+                      // grid scroll can no longer open a menu on release.
+                      e.preventDefault();
+                      const t = e.changedTouches[0];
+                      if (t) openCardMenu(card, t.clientX, t.clientY);
+                    }
+                    cancelCardPress(cardPressRef);
+                  }}
                   onClick={(e) => e.stopPropagation()}
                   onContextMenu={(e) => handleCardContextMenu(card, e)}
                   onMouseEnter={(e) => { if (!contextCard) onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId); }}
