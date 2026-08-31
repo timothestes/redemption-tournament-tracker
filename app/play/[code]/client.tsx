@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
 import { SpacetimeConnectionResetWrapper } from '@/app/play/components/SpacetimeConnectionResetWrapper';
 import { useInputMode } from '@/app/shared/hooks/useInputMode';
-import { shouldGateForPortrait } from '@/app/play/lib/orientationGate';
+import { shouldGateForPortrait, isCompactTouchViewport } from '@/app/play/lib/orientationGate';
 import { RotateDevicePrompt } from '@/app/play/components/RotateDevicePrompt';
 import ReconnectOnResume from '@/app/play/components/ReconnectOnResume';
 import { useGameState } from '@/app/play/hooks/useGameState';
@@ -375,7 +375,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // ---- Touch shell ----
   const shellInputMode = useInputMode();
-  const isTouchShell = shellInputMode === 'touch';
   const [shellViewport, setShellViewport] = useState({ w: 0, h: 0 });
   useEffect(() => {
     const update = () => setShellViewport({ w: window.innerWidth, h: window.innerHeight });
@@ -391,12 +390,19 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const gateForPortrait =
     !portraitGateDismissed &&
     shouldGateForPortrait(shellViewport.w, shellViewport.h, shellInputMode);
+  // Compact touch shell = short landscape phones AND phone portrait behind
+  // "Continue anyway". Drives both the overlaid turn bar and (via the
+  // compactLayout prop) the canvas's TOUCH_PROFILE, from the SAME viewport
+  // measurement — the canvas previously re-derived it from containerHeight,
+  // leaving a 500-548px drift band, and portrait fell through to the desktop
+  // profile entirely. iPad keeps the standard profile and its own bar row.
+  const compactTouchShell = isCompactTouchViewport(shellViewport.w, shellViewport.h, shellInputMode);
   // The bar overlays the canvas only where the compact layout profile's top
-  // gutter (containerHeight < 500) pushes the board content clear of it. On
-  // taller touch viewports (iPad, portrait continue-anyway) there is no
+  // gutter pushes the board content clear of it (in portrait the camera's
+  // insetTop does the same job). On taller touch viewports (iPad) there is no
   // gutter, so an overlaid bar sat on the opponent's hand and LoB — give the
   // bar its own row there like desktop; those viewports have height to spare.
-  const overlayTurnBar = isTouchShell && shellViewport.h > 0 && shellViewport.h < 500;
+  const overlayTurnBar = compactTouchShell;
 
   // Where "Back to lobby" / exit / stale-game redirects land. Forge games
   // return to the Forge play lobby; everyone else to the public play lobby.
@@ -1499,7 +1505,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} compactLayout={compactTouchShell} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
             {justJoinedToast && <OpponentJoinedToast name={justJoinedToast} />}
@@ -1556,7 +1562,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} compactLayout={compactTouchShell} />
             )}
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
@@ -1620,7 +1626,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} compactLayout={compactTouchShell} />
               {/* Bottom toolbar — stays active for draw/shuffle, end turn disabled */}
               <GameToolbar
                 actions={{
@@ -1887,7 +1893,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} />
+            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} forgeResolver={forgeResolver} compactLayout={compactTouchShell} />
           )}
           <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
           {/* Quick action toolbar — floating above hand area */}

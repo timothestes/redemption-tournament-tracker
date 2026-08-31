@@ -57,6 +57,19 @@ describe('TOUCH_PROFILE', () => {
     expect(l.zones.playerHand.y + l.zones.playerHand.height).toBe(VH);
   });
 
+  it('clears the 48px overlay bar at fit in portrait continue-anyway', () => {
+    // 393x852 portrait clamps virtualWidth to the 1440 floor; the compact
+    // profile (and the overlaid bar) now apply there too. The board is
+    // width-bound at fit, so the vertical letterbox alone parks the top row
+    // far below the bar. (The zoomed portrait column framing's clearance is
+    // asserted in jumpTargets.test.ts via the camera's insetTop.)
+    const fitScale = 393 / 1440;
+    const offsetY = (852 - VH * fitScale) / 2;
+    const l = calculateMultiplayerLayout(1440, VH, 'T1', 'player', false, true);
+    expect(offsetY + l.zones.opponentHand.y * fitScale).toBeGreaterThanOrEqual(48);
+    expect(offsetY + l.zones.opponentLob.y * fitScale).toBeGreaterThanOrEqual(48);
+  });
+
   it('gives Land of Bondage souls a real touch target on a landscape phone', () => {
     // Rescuing is the most-repeated touch action in the game and it happens in
     // this band. At oppLobRatio 0.085 with the default 0.85 band fill a soul

@@ -78,6 +78,14 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   // (there is no right-click on touch).
   const isTouchMenu = useInputMode() === 'touch';
 
+  // Press-gate (touch): the sheet often mounts UNDER the finger (a browse-grid
+  // tap opens it), and the tap's synthesized mouse click fires AFTER touchend —
+  // on whatever now occupies that point, e.g. a counter "+" row, dispatching a
+  // real reducer call from pure browsing. A compat click never re-fires
+  // pointerdown, so a click with no preceding press inside the menu is provably
+  // synthetic — swallow it. Pointer mode is bit-identical (gate is touch-only).
+  const sawRealPressRef = useRef(false);
+
   // Read live card data so counters update while menu is open
   const card = useMemo(() => {
     if (!zones) return initialCard;
@@ -275,7 +283,20 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     (card.ownerId === 'player2' || isParagonSharedSoul);
 
   return (
-    <div ref={menuRef} data-context-menu style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+    <div
+      ref={menuRef}
+      data-context-menu
+      style={menuStyle}
+      onContextMenu={(e) => e.preventDefault()}
+      onPointerDownCapture={() => { sawRealPressRef.current = true; }}
+      onTouchStartCapture={() => { sawRealPressRef.current = true; }}
+      onClickCapture={(e) => {
+        if (isTouchMenu && !sawRealPressRef.current) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+    >
 
       {/* Touch sheet header — the card's name plus an explicit close target.
           Pointer menus stay cursor-anchored and dismiss on outside click, so

@@ -22,6 +22,7 @@
 // battle actually closes, not a pre-dispatch confirmation here.
 
 import { useEffect, useState } from 'react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import type { ZoneRect } from '../layout/multiplayerLayout';
 import type { CardInstance } from '@/lib/spacetimedb/module_bindings/types';
@@ -80,6 +81,12 @@ interface BattleResolutionUIProps {
    *  players (spec §5.4) — the conclude buttons below are disabled to match
    *  rather than dispatch a doomed reducer call. */
   holdPhase: string;
+  /** Compact (phone) layout — the caller's useCompactLayout. The awaiting-soul
+   *  chooser anchors to the viewport centre (the band midline can be panned
+   *  off-screen on a phone) and scrims the live board behind it so a missed
+   *  tap can't fall through to an armed Konva stage. Pointer mode is
+   *  byte-identical when this is false/omitted. */
+  compact?: boolean;
 }
 
 const BUTTON_COPY: Record<ResolutionAction, { label: string }> = {
@@ -171,6 +178,7 @@ function AwaitingSoulUI({
   setPendingSoulId,
   onSurrenderSoul,
   onEndBattle,
+  compact,
 }: {
   topLeft: { x: number; y: number };
   right: { x: number; y: number };
@@ -192,6 +200,7 @@ function AwaitingSoulUI({
   /** Bare dispatch (no confirm) — used by both the chooser's own "no souls
    *  left" button above and the non-chooser's escape-hatch button below. */
   onEndBattle: () => void;
+  compact?: boolean;
 }) {
   // Chooser derivation (spec §7 / server surrender_soul guard): T1 → the
   // defender picks which of their own souls to give up; T2 & Paragon → the
@@ -202,6 +211,10 @@ function AwaitingSoulUI({
   const defenderSeat = attackerSeat === mySeat ? opponentSeat : attackerSeat === opponentSeat ? mySeat : '';
   const chooserSeat = format === 'T1' ? defenderSeat : attackerSeat;
   const isChooser = !isSpectator && mySeat !== '' && mySeat === chooserSeat;
+  // Tap-safety is an input-mode property, not a viewport-size one: on ANY
+  // touch device (tablet included) a missed tap must not fall through to the
+  // live Konva stage. The visible scrim stays compact-only.
+  const isTouchInput = useInputMode() === 'touch';
 
   if (!isChooser) {
     // The "Waiting for <chooser> to choose a soul…" status lives in the
@@ -262,13 +275,22 @@ function AwaitingSoulUI({
         position: 'absolute',
         inset: 0,
         zIndex: 900,
-        pointerEvents: 'none',
+        // Touch: a missed tap must not fall through to the live (possibly
+        // armed) Konva stage underneath — the wrapper becomes a tap shield
+        // (visible scrim on compact only). Desktop pointer mode keeps
+        // pointerEvents:none per the spec §8 no-backdrop direction.
+        pointerEvents: compact === true || isTouchInput ? 'auto' : 'none',
+        background: compact === true ? 'rgba(0, 0, 0, 0.45)' : undefined,
       }}
     >
       <div
+        data-soul-chooser
         style={{
           position: 'absolute',
-          left: centerX,
+          // Compact anchors to the container centre — the band midline is a
+          // desktop nicety that pans off-viewport on a phone (the right rail
+          // is only 36px, so container centre ≈ board centre).
+          left: compact === true ? '50%' : centerX,
           top: '50%',
           transform: 'translate(-50%, -50%)',
           pointerEvents: 'auto',
@@ -344,13 +366,17 @@ function AwaitingSoulUI({
           </>
         ) : (
           <>
+            {/* Scroll container OUTSIDE the grid (the ZoneBrowseModal pattern):
+                a flex-crushed grid with overflow on itself clipped every
+                portrait to an identical ~25px sliver instead of scrolling. */}
+            <div style={{ marginTop: 16, flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
             <div
+              data-soul-grid
               style={{
-                marginTop: 16,
-                overflowY: 'auto',
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))',
                 gap: 10,
+                alignContent: 'start',
               }}
             >
               {eligibleSouls.map((soul) => {
@@ -426,6 +452,7 @@ function AwaitingSoulUI({
                 );
               })}
             </div>
+            </div>
             {/* Decline (owner direction): the chooser can refuse the pick —
                 dispatches end_battle, so the battle auto-returns with NO
                 soul awarded and the modal closes when battleState clears.
@@ -433,11 +460,13 @@ function AwaitingSoulUI({
                 with the app's no-hard-enforcement philosophy (the log shows
                 the battle ended without a soul — table talk handles it). */}
             <button
+              data-soul-decline
               onClick={onEndBattle}
               disabled={pendingSoulId !== null}
               style={{
                 marginTop: 14,
                 alignSelf: 'center',
+                flexShrink: 0,
                 padding: '6px 14px',
                 borderRadius: 4,
                 border: '1px solid rgba(107, 78, 39, 0.4)',
@@ -482,6 +511,7 @@ export default function BattleResolutionUI({
   onEndBattle,
   onSurrenderSoul,
   holdPhase,
+  compact,
 }: BattleResolutionUIProps) {
   // Guards against a double-fire from a fast repeat click while the pick is
   // in flight (self-review requirement, Task 14). Resets whenever the
@@ -528,6 +558,7 @@ export default function BattleResolutionUI({
         setPendingSoulId={setPendingSoulId}
         onSurrenderSoul={onSurrenderSoul}
         onEndBattle={onEndBattle}
+        compact={compact}
       />
     );
   }

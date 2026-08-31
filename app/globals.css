@@ -436,6 +436,51 @@ html[data-input-mode='touch'] [data-game-toolbar] button svg {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+   Awaiting-soul chooser ("Choose a Lost Soul to surrender") on a short
+   viewport. The desktop panel is 420px wide with a 60vh cap; on a landscape
+   phone the flex-crushed grid clipped every portrait to an identical ~25px
+   sliver with sub-44px effective targets — the defender was silently cheated
+   of a won soul. Widen into the landscape space and pin explicit row/card
+   heights so the grid can never collapse; the panel scrolls instead.
+   Deliberately NOT [data-battle-resolution] — its blanket 44px button rule
+   would wreck the card grid.
+   ────────────────────────────────────────────────────────────────────────── */
+@media (max-height: 560px) {
+  html[data-input-mode='touch'] [data-soul-chooser] {
+    width: min(96vw, 720px) !important;
+    max-width: none !important;
+    /* vh line first: iOS < 16.4 drops dvh, and without the fallback the
+       whole declaration is discarded (falls back to the inline 60vh cap). */
+    max-height: 92vh !important;
+    max-height: 92dvh !important;
+    padding: 12px 14px !important;
+  }
+  html[data-input-mode='touch'] [data-soul-grid] {
+    grid-template-columns: repeat(auto-fill, minmax(84px, 110px)) !important;
+    grid-auto-rows: 118px !important;
+    justify-content: center !important;
+  }
+  html[data-input-mode='touch'] [data-soul-grid] > button {
+    height: 118px !important;
+  }
+  html[data-input-mode='touch'] [data-soul-grid] > button img {
+    height: 100% !important;
+    width: auto !important;
+    margin: 0 auto !important;
+  }
+  /* The no-art fallback tile is an aspect-ratio div; unpinned it computes
+     taller than the 118px row and the card NAME — the only identifier when
+     art is missing — gets clipped. Pin it to the row like the img. */
+  html[data-input-mode='touch'] [data-soul-grid] > button > div {
+    height: 100% !important;
+    aspect-ratio: auto !important;
+  }
+  html[data-input-mode='touch'] [data-soul-decline] {
+    min-height: 44px !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
    The chat / game-log panel on a phone.
 
    Expanded, the panel is a `clamp(280px, 20vw, 380px)` column beside the

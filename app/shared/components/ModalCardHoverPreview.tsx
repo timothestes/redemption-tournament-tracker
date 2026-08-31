@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 
 interface HoverState {
   imageUrl: string;
@@ -25,6 +26,12 @@ interface ModalCardHoverOptions {
 }
 
 export function useModalCardHover(delay = 400, options?: ModalCardHoverOptions) {
+  // Touch never hovers: a tap synthesizes mouseover AFTER touchend, and no
+  // mouseleave ever follows — so a grid mounting under the finger opened a
+  // 280px preview that stuck over the modal. Gate the whole enter path off
+  // touch; CardReaderOverlay is the touch read path, and the loupe panel is
+  // display:none on touch (mirrors the board's own !isTouch hover gate).
+  const isTouchInput = useInputMode() === 'touch';
   const [hover, setHover] = useState<HoverState | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hoverProgress, setHoverProgress] = useState(0);
@@ -60,6 +67,7 @@ export function useModalCardHover(delay = 400, options?: ModalCardHoverOptions) 
   }, [stopAnimation]);
 
   const onCardMouseEnter = useCallback((imgFile: string, cardName: string, e: React.MouseEvent, instanceId?: string) => {
+    if (isTouchInput) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     const x = e.clientX;
     const y = e.clientY;
@@ -84,7 +92,7 @@ export function useModalCardHover(delay = 400, options?: ModalCardHoverOptions) 
         setHover({ imageUrl, cardName, x, y });
       }
     }, delay);
-  }, [delay, startAnimation, stopAnimation]);
+  }, [delay, startAnimation, stopAnimation, isTouchInput]);
 
   const onCardMouseLeave = useCallback(() => {
     if (timerRef.current) {

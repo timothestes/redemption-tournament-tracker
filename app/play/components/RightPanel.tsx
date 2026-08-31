@@ -114,7 +114,11 @@ export default function RightPanel({
           width: '100%',
           height: isRail ? 'auto' : 48,
           minHeight: 48,
-          flex: isRail ? 1 : undefined,
+          // Longhands, not the `flex` shorthand: mixing `flex` with the
+          // `flexShrink` below trips React's conflicting-style warning every
+          // time isRail flips (dev error overlay on every game).
+          flexGrow: isRail ? 1 : 0,
+          flexBasis: isRail ? '0%' : 'auto',
           background: isRail ? 'transparent' : 'rgba(10, 8, 5, 0.96)',
           borderTop: 'none',
           borderLeft: 'none',
