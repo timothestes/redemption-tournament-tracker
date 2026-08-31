@@ -245,6 +245,62 @@ describe("good and evil brigade sections", () => {
   });
 });
 
+describe("alphabetization ignores a leading \"The \"", () => {
+  it("sorts a leading article as if absent (Times to Come artifact order)", () => {
+    // Real print order: Abomination of Desolation, The Book of Knowledge,
+    // Darius' Decree, Idol of Nebuchadnezzar — only possible if "The Book
+    // of Knowledge" alphabetizes as "Book of Knowledge".
+    const cards = [
+      card({ name: "Idol of Nebuchadnezzar", type: "Artifact" }),
+      card({ name: "Darius' Decree", type: "Artifact" }),
+      card({ name: "The Book of Knowledge", type: "Artifact" }),
+      card({ name: "Abomination of Desolation", type: "Artifact" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "Abomination of Desolation", "The Book of Knowledge", "Darius' Decree", "Idol of Nebuchadnezzar",
+    ]);
+  });
+
+  it("sorts two \"The\"-prefixed names by their word after the article (Times to Come fortresses)", () => {
+    // Real print order: Babylon, Kingdom of the Divine, The Realm of
+    // Greece, The Restored Land — "Realm" < "Restored" once "The" drops.
+    const cards = [
+      card({ name: "The Restored Land", type: "Fortress" }),
+      card({ name: "The Realm of Greece", type: "Fortress" }),
+      card({ name: "Kingdom of the Divine", type: "Fortress" }),
+      card({ name: "Babylon", type: "Fortress" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "Babylon", "Kingdom of the Divine", "The Realm of Greece", "The Restored Land",
+    ]);
+  });
+
+  it("is case-insensitive and only strips the article, not names that merely start with those letters", () => {
+    const cards = [
+      card({ name: "Theodore's Ledger", type: "Artifact" }),
+      card({ name: "the gods of Egypt", type: "Artifact" }),
+      card({ name: "Israel's Rebellion", type: "Artifact" }),
+    ];
+    // "the gods of Egypt" -> alphabetizes as "gods of Egypt" (g), before
+    // "Israel's Rebellion" (i); "Theodore's Ledger" keeps its leading "The"
+    // since it isn't followed by a word boundary + space forming the article,
+    // so it alphabetizes under "t", after both.
+    expect(sortNames(cards)).toEqual(["the gods of Egypt", "Israel's Rebellion", "Theodore's Ledger"]);
+  });
+
+  it("matches the real Israel's Rebellion dominant order (Neutral, Good, then Evil alpha with the article dropped)", () => {
+    const cards = [
+      card({ name: "Israel's Rebellion", type: "Dominant", alignment: "Evil" }),
+      card({ name: "the gods of Egypt", type: "Dominant", alignment: "Evil" }),
+      card({ name: "Out of Their Hands", type: "Dominant", alignment: "Good" }),
+      card({ name: "Forty Years", type: "Dominant", alignment: "Neutral" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "Forty Years", "Out of Their Hands", "the gods of Egypt", "Israel's Rebellion",
+    ]);
+  });
+});
+
 describe("degraded input (name + type only)", () => {
   it("still yields section order then alphabetical", () => {
     const cards = [
