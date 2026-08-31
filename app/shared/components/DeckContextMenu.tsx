@@ -62,6 +62,10 @@ const SUBMENU_STYLE: React.CSSProperties = {
   boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
   whiteSpace: 'nowrap',
   zIndex: 910,
+  // Backstop for the case the clamp cannot solve: a submenu taller than the
+  // screen (five rows with a stepper open, on a short phone) scrolls.
+  maxHeight: 'calc(100dvh - 16px)',
+  overflowY: 'auto',
 };
 
 function SubmenuTrigger({
@@ -79,11 +83,7 @@ function SubmenuTrigger({
   const submenuRef = useRef<HTMLDivElement | null>(null);
   const [fixedPos, setFixedPos] = useState<{ top: number; left: number } | null>(null);
 
-  useLayoutEffect(() => {
-    if (!isOpen) {
-      setFixedPos(null);
-      return;
-    }
+  const position = useCallback(() => {
     const trigger = triggerRef.current;
     const sub = submenuRef.current;
     if (!trigger || !sub) return;
@@ -102,7 +102,23 @@ function SubmenuTrigger({
     if (top > maxTop) top = maxTop;
     if (top < MARGIN) top = MARGIN;
     setFixedPos({ top, left });
-  }, [isOpen]);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setFixedPos(null);
+      return;
+    }
+    position();
+    // The submenu grows when a row's X expander opens its stepper. Positioning
+    // only on open left the new rows hanging below the screen edge with no
+    // scroll container to reach them, so re-clamp whenever it resizes.
+    const sub = submenuRef.current;
+    if (!sub || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => position());
+    ro.observe(sub);
+    return () => ro.disconnect();
+  }, [isOpen, position]);
 
   const lock = useCallback(() => { lockedRef.current = true; }, []);
   const unlock = useCallback(() => { lockedRef.current = false; }, []);

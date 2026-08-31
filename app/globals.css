@@ -360,10 +360,17 @@ html[data-input-mode='touch'] [data-context-menu] button {
   padding: 12px 16px !important;
 }
 
-/* Inline counter steppers sit at 22px/32px wide for a mouse. */
+/* Inline square controls sized for a mouse: the counter steppers (22/32px) and
+   the submenus' −/+ steppers and 1/6/X quick-counts (36px). The generic rule
+   above already gives them 44px of height; without this they stayed 36px wide,
+   which is the control you actually aim at when picking "draw X". Horizontal
+   padding is dropped so the glyph keeps its own box at that width. */
 html[data-input-mode='touch'] [data-context-menu] button[style*='width: 22px'],
-html[data-input-mode='touch'] [data-context-menu] button[style*='width: 32px'] {
+html[data-input-mode='touch'] [data-context-menu] button[style*='width: 32px'],
+html[data-input-mode='touch'] [data-context-menu] button[style*='width: 36px'] {
   min-width: 44px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
 /* Section labels stay small but must clear the 11px legibility floor. */
@@ -455,9 +462,53 @@ html[data-input-mode='touch'] [data-game-toolbar] button svg {
     padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);
   }
-  html[data-input-mode='touch'] [data-right-panel][data-panel-open] [data-panel-preview] {
-    display: none !important;
-  }
+}
+
+/* The panel leads with a card loupe fed by hover. Touch has no hover, so it
+   only ever shows the empty card-back placeholder — dead weight on a phone
+   and on a tablet alike. Tapping a card opens the real preview. */
+html[data-input-mode='touch'] [data-right-panel] [data-panel-preview] {
+  display: none !important;
+}
+
+/* Inside the chat / log panel nothing was ever sized for touch: the tab strip
+   sat at 28px, the search toggle at 24px, the message field and Send at 36px.
+   That was survivable while the panel was a desktop side-column; it is the
+   whole screen on a phone. 16px on the input also stops iOS zooming the page
+   when it takes focus. */
+html[data-input-mode='touch'] [data-right-panel] button,
+html[data-input-mode='touch'] [data-right-panel] [role='button'] {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
+html[data-input-mode='touch'] [data-right-panel] input,
+html[data-input-mode='touch'] [data-right-panel] textarea {
+  min-height: 44px !important;
+  font-size: 16px !important;
+}
+
+/* The card choice prompt (Three Woes' Choose Good / Choose Evil, and any other
+   card that offers a choice on entering play). Its choices render ~40px tall
+   and the dismiss × at 32px. This prompt decides a card's alignment for the
+   rest of the game, so a mis-tap is not a small cost. */
+html[data-input-mode='touch'] [data-card-choice-prompt] button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
+/* The turn bar's exit-to-lobby button is 28px wide. */
+html[data-input-mode='touch'] [data-phase-bar] button[title='Back to lobby'] {
+  min-width: 44px !important;
+}
+
+/* The pre-game rail's own controls — "No stars", "Done", the star chips —
+   render at 11px in a 5px-tall box. Every player passes through this screen
+   at the start of every game. */
+html[data-input-mode='touch'] [data-pregame-rail] button {
+  min-height: 44px !important;
+  padding: 10px 16px !important;
+  font-size: 13px !important;
 }
 
 /* Modal card grids (deck search/peek, zone/opponent browse): suppress the iOS
@@ -507,11 +558,19 @@ html[data-input-mode='touch'] [data-phase-bar] button {
   /* Height only. Raising min-WIDTH too widened the bar past what a 667px
      viewport fits and clipped "End Turn" over the turn counter — the phase
      bar is already crowded at that width before any of this (the goldfish
-     bar overlaps its own logo on a stock build). Growing the narrow
-     phase-scroll arrows needs a layout change in the bar itself, which is
-     out of scope here; see the mobile QA checklist. */
+     bar overlaps its own logo on a stock build). */
   min-height: 44px !important;
   white-space: nowrap !important;
+}
+
+/* The phase-step arrows were the exception left at ~28px wide, because
+   widening them used to push End Turn off the bar. On the touch bar End Turn
+   now lives in a fixed right cluster and the phase strip scrolls, so they can
+   have a real target. */
+html[data-input-mode='touch'] [data-phase-bar] button[title='Previous phase'],
+html[data-input-mode='touch'] [data-phase-bar] button[title='Next phase'],
+html[data-input-mode='touch'] [data-phase-bar] button[title='End turn'] {
+  min-width: 44px !important;
 }
 
 html[data-input-mode='touch'] [data-card-scale-control] button {

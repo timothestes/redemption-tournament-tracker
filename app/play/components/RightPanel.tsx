@@ -59,7 +59,7 @@ const PANEL_COLLAPSED_WIDTH = 36;
 // minimum touch target. The panel clips overflow (needed for the width
 // transition), so a hit-area overhang would be unclickable — widen the whole
 // rail instead. Pointer keeps the original 36px.
-const PANEL_COLLAPSED_WIDTH_TOUCH = 44;
+const PANEL_COLLAPSED_WIDTH_TOUCH = 45; // 44 of button + the 1px left border
 
 export default function RightPanel({
   chatMessages,

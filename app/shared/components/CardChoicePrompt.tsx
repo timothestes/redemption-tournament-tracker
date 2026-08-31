@@ -159,6 +159,7 @@ function PromptCard({
   return (
     <motion.div
       ref={registerEl}
+      data-card-choice-prompt
       drag
       dragMomentum={false}
       dragElastic={0}
