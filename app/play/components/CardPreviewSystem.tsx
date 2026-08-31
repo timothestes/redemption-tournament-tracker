@@ -136,6 +136,9 @@ function HoverPreview({ card, getImage }: HoverPreviewProps) {
   if (top + PREVIEW_HEIGHT > vh - 8) {
     top = vh - PREVIEW_HEIGHT - 8;
   }
+  // Touch paths can hand over a card with no client coords (Konva synthesizes
+  // mouseenter from touches) — never feed NaN into a CSS position.
+  if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
 
   const hasStats = card.strength || card.toughness;
 

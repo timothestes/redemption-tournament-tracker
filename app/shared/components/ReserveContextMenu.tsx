@@ -36,9 +36,11 @@ export function ReserveContextMenu({
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
     document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
   }, [onClose]);
@@ -51,7 +53,7 @@ export function ReserveContextMenu({
 
   return (
     <div
-      ref={menuRef}
+      ref={menuRef} data-context-menu
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',

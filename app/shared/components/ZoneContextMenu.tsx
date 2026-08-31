@@ -24,9 +24,11 @@ export function ZoneContextMenu({ x, y, spawnX, spawnY, onClose, onAddOpponentLo
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
     document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
   }, [onClose]);
@@ -78,7 +80,7 @@ export function ZoneContextMenu({ x, y, spawnX, spawnY, onClose, onAddOpponentLo
   };
 
   return (
-    <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+    <div ref={menuRef} data-context-menu style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
       <div style={labelStyle}>Spawn Token</div>
       <button
         style={itemStyle}

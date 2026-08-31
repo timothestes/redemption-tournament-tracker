@@ -76,7 +76,11 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
       }
     };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
   }, [open]);
 
   const cycleParagon = (step: 1 | -1) => {

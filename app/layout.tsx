@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes";
 import Background from "../components/ui/background"; // Using the improved background
 import { AdminProvider } from "../components/providers/AdminProvider";
 import ChunkErrorReloader from "../components/ChunkErrorReloader";
+import { InputModeReflector } from '@/app/shared/components/InputModeReflector';
 import "./globals.css";
 
 const cinzel = Cinzel({ subsets: ["latin"], variable: "--font-cinzel" });
@@ -32,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.className} ${cinzel.variable}`} suppressHydrationWarning>
       <body className="bg-background text-foreground">
+        <InputModeReflector />
         <ChunkErrorReloader />
         <ThemeProvider
           attribute="class"

@@ -8,6 +8,7 @@ import { loadDeckForGame } from '../actions';
 import { loadForgeDeckForGame } from '@/app/forge/lib/playDecks';
 import type { GameState } from '../hooks/useGameState';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -79,6 +80,10 @@ export default function GameOverOverlay({
   myDeckId,
 }: GameOverOverlayProps) {
   const { isLoupeVisible } = useCardPreview();
+  // Touch: interactive buttons get the 44px minimum target (min-height grows
+  // the padding via the button's own vertical centering; fonts stay put).
+  // Pointer rendering is untouched.
+  const isTouch = useInputMode() === 'touch';
   const { label, outcome } = deriveEndReason(gameActions, myPlayer);
   const oppName: string = opponentPlayer?.displayName ?? 'Opponent';
   const mySeat = myPlayer?.seat?.toString() ?? '0';
@@ -321,6 +326,7 @@ export default function GameOverOverlay({
               onClick={() => gameState.cancelRematch()}
               style={{
                 padding: '5px 12px',
+                minHeight: isTouch ? 44 : undefined,
                 borderRadius: 4,
                 border: '1px solid rgba(107, 78, 39, 0.4)',
                 background: 'transparent',
@@ -408,6 +414,7 @@ function GameOverModal({
   onChangeDeck?: () => void;
   onDismiss: () => void;
 }) {
+  const isTouch = useInputMode() === 'touch';
   const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
     count: 2,
     defaultIndex: 1, // Dismiss
@@ -490,6 +497,7 @@ function GameOverModal({
             style={{
               flex: 1,
               padding: '10px 16px',
+              minHeight: isTouch ? 44 : undefined,
               borderRadius: 4,
               border: '1px solid rgba(196, 149, 90, 0.45)',
               background: playAgainFocused ? 'rgba(196, 149, 90, 0.30)' : 'rgba(196, 149, 90, 0.15)',
@@ -512,6 +520,7 @@ function GameOverModal({
             style={{
               flex: 1,
               padding: '10px 16px',
+              minHeight: isTouch ? 44 : undefined,
               borderRadius: 4,
               border: '1px solid rgba(196, 149, 90, 0.45)',
               background: dismissFocused ? 'rgba(196, 149, 90, 0.30)' : 'rgba(196, 149, 90, 0.15)',
@@ -539,6 +548,7 @@ function GameOverModal({
               background: 'none',
               border: 'none',
               padding: 0,
+              minHeight: isTouch ? 44 : undefined,
               color: 'rgba(196, 149, 90, 0.5)',
               fontFamily: 'Georgia, serif',
               fontSize: 12,
@@ -577,6 +587,7 @@ function RematchRequestBanner({
   onChangeDeck?: () => void;
   onDecline: () => void;
 }) {
+  const isTouch = useInputMode() === 'touch';
   const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
     count: 2,
     defaultIndex: 0, // Accept
@@ -617,6 +628,7 @@ function RematchRequestBanner({
         disabled={isLoading}
         style={{
           padding: '8px 16px',
+          minHeight: isTouch ? 44 : undefined,
           borderRadius: 4,
           border: '1px solid rgba(196, 149, 90, 0.45)',
           background: acceptFocused ? 'rgba(196, 149, 90, 0.30)' : 'rgba(196, 149, 90, 0.15)',
@@ -639,6 +651,7 @@ function RematchRequestBanner({
         onMouseEnter={() => setFocusedIndex(1)}
         style={{
           padding: '8px 16px',
+          minHeight: isTouch ? 44 : undefined,
           borderRadius: 4,
           border: `1px solid ${declineFocused ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
           background: declineFocused ? 'rgba(196, 149, 90, 0.12)' : 'transparent',
@@ -665,6 +678,7 @@ function RematchRequestBanner({
             background: 'none',
             border: 'none',
             padding: 0,
+            minHeight: isTouch ? 44 : undefined,
             color: 'rgba(196, 149, 90, 0.5)',
             fontFamily: 'Georgia, serif',
             fontSize: 12,

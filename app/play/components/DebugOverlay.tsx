@@ -10,6 +10,10 @@ interface DebugOverlayProps {
 export function DebugOverlay({ text, tone = 'amber' }: DebugOverlayProps) {
   const [copied, setCopied] = useState(false);
 
+  // Diagnostic ribbon (code · gameId · phase · conn …) — development only.
+  // It rendered for everyone in production waiting rooms/games.
+  if (process.env.NODE_ENV !== 'development') return null;
+
   const handleCopy = () => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);

@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { PHASE_ORDER } from '@/app/goldfish/types';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import type { GamePhase } from '@/app/shared/types/gameCard';
 import { showGameToast } from '@/app/shared/components/GameToast';
@@ -95,6 +96,18 @@ const PHASE_LABELS: Record<string, string> = {
   end: 'End of Turn', // the 'end' gate — the boundary after discard, before the flip
 };
 
+// Touch: the overlaid bar shares one row with END TURN / CONCEDE on a phone
+// viewport, so the longer phase names abbreviate. Full names stay in the
+// button titles and in every toast (which read from PHASE_LABELS).
+const TOUCH_PHASE_LABELS: Record<string, string> = {
+  draw: 'Draw',
+  upkeep: 'Upk',
+  preparation: 'Prep',
+  battle: 'Battle',
+  discard: 'Disc',
+  end: 'End of Turn',
+};
+
 // REG Pre-Game Phase sub-steps. Kept separate from PHASE_ORDER/PHASE_LABELS so
 // the normal turn phases are untouched.
 const PREGAME_STEPS = ['stars', 'souls'] as const;
@@ -149,6 +162,15 @@ function PhaseGate({
 }) {
   const [hovered, setHovered] = useState(false);
   const label = PHASE_LABELS[phase] ?? phase;
+  // Touch: the 16px-wide gate is under half the 44px target (height is
+  // already 44+ via the global [data-phase-bar] button rule + stretch).
+  // Widen the tappable box to 32px with -8px margins so the row's layout
+  // metrics are unchanged (net contribution stays 16px and the 852x393 fit
+  // is undisturbed) — the extra 8px per side overlaps the neighbouring
+  // phase buttons' padding. Interactive gates float above those (then
+  // disabled) buttons; non-interactive gates go hit-transparent so they
+  // never swallow taps meant for the phase buttons on your own turn.
+  const isTouch = useInputMode() === 'touch';
 
   // Precedence: an engaged hold outranks an armed stop, which outranks the
   // faint "you could toggle here" affordance. Nothing renders otherwise —
@@ -183,6 +205,11 @@ function PhaseGate({
           ? (hasStop ? `Remove stop before ${label}` : `Stop before ${label} on ${opponentName}'s turn`)
           : undefined
       }
+      aria-label={
+        isInteractive
+          ? (hasStop ? `Remove stop before ${label}` : `Stop before ${label} on ${opponentName}'s turn`)
+          : undefined
+      }
       onMouseEnter={isInteractive ? () => setHovered(true) : undefined}
       onMouseLeave={isInteractive ? () => setHovered(false) : undefined}
       style={{
@@ -190,16 +217,17 @@ function PhaseGate({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: 16,
-        minWidth: 16,
+        width: isTouch ? 32 : 16,
+        minWidth: isTouch ? 32 : 16,
         alignSelf: 'stretch',
         flexShrink: 0,
         padding: 0,
-        margin: 0,
+        margin: isTouch ? '0 -8px' : 0,
         background: 'transparent',
         border: 'none',
         cursor: isInteractive ? 'pointer' : 'default',
-        zIndex: 1,
+        pointerEvents: isTouch && !isInteractive ? 'none' : undefined,
+        zIndex: isTouch && isInteractive ? 2 : 1,
       }}
     >
       {isVisible && (
@@ -325,6 +353,13 @@ export default function TurnIndicator({
   const [handRevealCooldownUntil, setHandRevealCooldownUntil] = useState(0);
   const handRevealOnCooldown = Date.now() < handRevealCooldownUntil;
   const { isLoupeVisible } = useCardPreview();
+  // Touch: the bar overlays the canvas (client.tsx), so it goes fully opaque
+  // (canvas labels ghosted through the 0.96 alpha), abbreviates the longer
+  // phase names, and carries a compact T{n} turn chip — the canvas's own
+  // turn badge is suppressed there. Pointer rendering is bit-identical.
+  const isTouchBar = useInputMode() === 'touch';
+  const phaseLabelFor = (phase: string): string =>
+    (isTouchBar ? TOUCH_PHASE_LABELS[phase] : PHASE_LABELS[phase]) ?? phase;
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
   const currentIdx = PHASE_ORDER.indexOf(currentPhase as GamePhase);
@@ -390,16 +425,32 @@ export default function TurnIndicator({
   const [activeBounds, setActiveBounds] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const hasMeasuredRef = useRef(false);
 
+  // Portrait touch: the phase strip scrolls inside a narrow sliver — keep the
+  // CURRENT phase in view instead of wherever the strip was last scrolled.
+  useEffect(() => {
+    if (!isTouchBar) return;
+    const btn = buttonRefs.current[activeKey];
+    btn?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+  }, [isTouchBar, activeKey]);
+
   // Measure the bar's own width so we can hide non-essential bits (the timer)
   // when the playfield container is narrow — e.g. on a 14" laptop or when the
   // loupe sidebar is open. Width-based, not viewport-based, since the bar
   // shrinks when the right-side panel opens.
   const barRef = useRef<HTMLDivElement | null>(null);
   const [isBarNarrow, setIsBarNarrow] = useState(false);
+  // Portrait-phone widths: even the trimmed touch bar overflows ~30px at
+  // 393px, clipping the exit button and Concede at the edges — drop the
+  // score cluster there (the least load-bearing block; LoR counts live on
+  // the board) so every control stays on-screen.
+  const [isBarUltraNarrow, setIsBarUltraNarrow] = useState(false);
   useEffect(() => {
     const el = barRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const update = () => setIsBarNarrow(el.clientWidth < 1100);
+    const update = () => {
+      setIsBarNarrow(el.clientWidth < 1100);
+      setIsBarUltraNarrow(el.clientWidth < 520);
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -454,14 +505,65 @@ export default function TurnIndicator({
     }
   };
 
+  // Touch renders End Turn in the FIXED right cluster next to Concede — in
+  // the scrollable center it scrolled out of view on portrait widths,
+  // leaving no visible way to end the turn.
+  const endTurnButton = !readOnly && !pregameStep ? (
+    <button
+      onClick={onEndTurn}
+      disabled={!isMyTurn || heldAgainstMe}
+      title={
+        heldAgainstMe
+          ? 'Answer the priority request first'
+          : isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"
+      }
+      style={{
+        marginLeft: isTouchBar ? 0 : 10,
+        padding: isTouchBar ? '5px 8px' : '5px 12px',
+        background: isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.15)' : 'transparent',
+        border: `1px solid ${isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.45)' : 'rgba(107, 78, 39, 0.25)'}`,
+        borderRadius: 4,
+        cursor: isMyTurn && !heldAgainstMe ? 'pointer' : 'default',
+        fontFamily: 'var(--font-cinzel), Georgia, serif',
+        fontSize: FZ.ui,
+        letterSpacing: '0.07em',
+        textTransform: 'uppercase',
+        color: isMyTurn && !heldAgainstMe ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)',
+        transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+        whiteSpace: 'nowrap',
+      }}
+      onMouseEnter={(e) => {
+        if (!isMyTurn || heldAgainstMe) return;
+        e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
+        e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
+      }}
+      onMouseLeave={(e) => {
+        if (!isMyTurn || heldAgainstMe) return;
+        e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
+        e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
+      }}
+    >
+      End Turn
+    </button>
+  ) : null;
+
   return (
     <div
+      data-phase-bar
       ref={barRef}
       style={{
         position: 'relative',
         width: '100%',
-        height: '100%',
-        background: 'rgba(10, 8, 5, 0.96)',
+        // Touch: fixed 48px with symmetric breathing room — sized by content,
+        // the 44px buttons sat flush against the screen's top edge (clipped
+        // pill/borders) with all the slack pooled at the bottom.
+        height: isTouchBar ? 48 : '100%',
+        boxSizing: 'border-box',
+        paddingTop: isTouchBar ? 2 : 0,
+        paddingBottom: isTouchBar ? 1 : 0,
+        // Touch overlays the bar on the canvas — fully opaque so canvas
+        // labels can't ghost through. Pointer keeps the original alpha.
+        background: isTouchBar ? '#0a0805' : 'rgba(10, 8, 5, 0.96)',
         borderBottom: '1px solid rgba(107, 78, 39, 0.5)',
         // Three columns: left cluster | center cluster | right cluster.
         // `1fr auto 1fr` keeps the center anchored to the bar's geometric
@@ -470,8 +572,15 @@ export default function TurnIndicator({
         // and right cluster (Concede) are now both small enough to fit in
         // their 1fr share — TURN N / NAME's-turn moved to a canvas overlay
         // over the opponent's hand zone, freeing ~140px from the left.
-        display: 'grid',
-        gridTemplateColumns: '1fr auto 1fr',
+        // Touch uses FLEX instead: on sub-700px portrait widths the grid's
+        // intrinsic middle track maximizes BEFORE the fr side tracks get
+        // leftover space, collapsing them to 0px (measured live: cols
+        // "0px 353px 0px") — the side clusters then overflow their empty
+        // tracks underneath the phase buttons. Flex sides are shrink-0 and
+        // the center is flex:1 with its own horizontal scroll, so the row
+        // shrinks and scrolls instead of overprinting Concede.
+        display: isTouchBar ? 'flex' : 'grid',
+        gridTemplateColumns: isTouchBar ? undefined : '1fr auto 1fr',
         alignItems: 'center',
         gap: 8,
         paddingLeft: 12,
@@ -489,6 +598,7 @@ export default function TurnIndicator({
           alignItems: 'center',
           gap: 12,
           minWidth: 0,
+          flexShrink: isTouchBar ? 0 : undefined,
         }}
       >
       {/* Exit to lobby */}
@@ -525,6 +635,28 @@ export default function TurnIndicator({
         </svg>
       </button>
 
+      {/* Touch-only compact turn chip. On pointer the TURN N / NAME's-turn
+          block is a canvas overlay, but on touch that overlay sits under
+          this very bar — so the turn number lives here instead. Color says
+          whose turn it is (amber = mine, blue = theirs). */}
+      {isTouchBar && (
+        <span
+          data-testid="turn-chip"
+          title={isMyTurn ? `Turn ${turnNumber} — your turn` : `Turn ${turnNumber} — ${opponentName}'s turn`}
+          style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            lineHeight: 1,
+            color: isMyTurn ? '#c4955a' : '#4a7ab5',
+            flexShrink: 0,
+          }}
+        >
+          T{turnNumber}
+        </span>
+      )}
+
       {/* Score + timer wrapper. The TURN N / NAME's turn block lives over
           the opponent's hand zone in the canvas instead — keeps the bar
           narrow enough that the centered phase row never collides. */}
@@ -536,10 +668,11 @@ export default function TurnIndicator({
           flexShrink: 0,
         }}
       >
-      {/* Score */}
+      {/* Score — dropped on ultra-narrow (portrait-phone) touch bars so the
+          exit button and Concede stop clipping at the screen edges. */}
       <div
         style={{
-          display: 'flex',
+          display: isTouchBar && isBarUltraNarrow ? 'none' : 'flex',
           alignItems: 'center',
           gap: 10,
           fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -561,21 +694,21 @@ export default function TurnIndicator({
           return (
             <>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ color: '#c4955a', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{myScore}</span>
+                <span style={{ color: isTouchBar ? '#e0b070' : '#c4955a', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{myScore}</span>
                 <NameHint
                   label={leftLabel}
                   full={leftFull}
-                  color="rgba(196, 149, 90, 0.45)"
+                  color={isTouchBar ? 'rgba(196, 149, 90, 0.8)' : 'rgba(196, 149, 90, 0.45)'}
                   accent="#c4955a"
                 />
               </div>
               <span style={{ color: 'rgba(232, 213, 163, 0.2)', fontSize: FZ.ui, fontWeight: 400 }}>vs</span>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ color: '#4a7ab5', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
+                <span style={{ color: isTouchBar ? '#7aa5d8' : '#4a7ab5', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
                 <NameHint
                   label={rightLabel}
                   full={rightFull}
-                  color="rgba(74, 122, 181, 0.45)"
+                  color={isTouchBar ? 'rgba(122, 165, 216, 0.85)' : 'rgba(74, 122, 181, 0.45)'}
                   accent="#4a7ab5"
                   trailing={
                     <span
@@ -725,9 +858,21 @@ export default function TurnIndicator({
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          // 'safe center' keeps the row centered when it fits but start-aligns
+          // it when it overflows, so the scrollable strip's left end is
+          // reachable. Touch only — with plain 'center', overflow clips both
+          // ends unreachably.
+          justifyContent: isTouchBar ? 'safe center' : 'center',
           gap: 2,
-          minWidth: 0,
+          // Touch keeps a sliver of the phase strip alive on portrait widths
+          // — flex-basis 0 let the side clusters squeeze it to nothing, and
+          // the current phase vanished from the bar entirely.
+          minWidth: isTouchBar ? 64 : 0,
+          // Touch: the center takes exactly the space between the fixed side
+          // clusters and scrolls its own content on narrow (portrait) widths
+          // instead of overprinting the right cluster.
+          flex: isTouchBar ? '1 1 0' : undefined,
+          overflowX: isTouchBar ? 'auto' : undefined,
         }}
       >
         {/* Previous phase arrow — hidden during the pre-game alongside the next
@@ -771,8 +916,10 @@ export default function TurnIndicator({
               position: 'absolute',
               // The pre-game chips sit lower to clear the PRE-GAME PHASE
               // caption; the pill drops with them so its top edge doesn't cut
-              // through that caption. No effect during normal play.
-              top: pregameStep ? PREGAME_CAPTION_GAP : 0,
+              // through that caption. The 48px touch bar has no headroom for
+              // the caption (it clipped above the screen edge), so there the
+              // caption is dropped and the chips center like normal phases.
+              top: pregameStep && !isTouchBar ? PREGAME_CAPTION_GAP : 0,
               bottom: 0,
               left: 0,
               width: activeBounds.width,
@@ -781,7 +928,7 @@ export default function TurnIndicator({
               border: '1px solid rgba(196, 149, 90, 0.45)',
               borderRadius: 20,
               boxSizing: 'border-box',
-              opacity: hasMeasuredRef.current && activeBounds.width > 0 ? 1 : 0,
+              opacity: hasMeasuredRef.current && activeBounds.width > 12 ? 1 : 0,
               transition: 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s',
               pointerEvents: 'none',
               willChange: 'transform, width',
@@ -801,7 +948,7 @@ export default function TurnIndicator({
               background: '#c4955a',
               borderRadius: 1,
               boxShadow: '0 0 6px rgba(196, 149, 90, 0.5)',
-              opacity: hasMeasuredRef.current && activeBounds.width > 0 ? 1 : 0,
+              opacity: hasMeasuredRef.current && activeBounds.width > 12 ? 1 : 0,
               transition: 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s',
               pointerEvents: 'none',
               willChange: 'transform, width',
@@ -815,7 +962,7 @@ export default function TurnIndicator({
               server drives the step. */}
           {pregameStep && (
             <>
-              <span
+              {!isTouchBar && <span
                 style={{
                   position: 'absolute',
                   // lineHeight 1 pins the caption's box to its font size, so the
@@ -835,7 +982,7 @@ export default function TurnIndicator({
                 }}
               >
                 Pre-Game Phase
-              </span>
+              </span>}
               {PREGAME_STEPS.map((step) => {
                 const isActive = step === pregameStep;
                 return (
@@ -845,7 +992,7 @@ export default function TurnIndicator({
                     style={{
                       position: 'relative',
                       padding: '4px 10px',
-                      marginTop: PREGAME_CAPTION_GAP,
+                      marginTop: isTouchBar ? 0 : PREGAME_CAPTION_GAP,
                       fontFamily: 'var(--font-cinzel), Georgia, serif',
                       fontSize: FZ.ui,
                       letterSpacing: '0.07em',
@@ -903,13 +1050,15 @@ export default function TurnIndicator({
                     fontSize: FZ.ui,
                     letterSpacing: '0.07em',
                     textTransform: 'uppercase',
+                    // Touch floors: 0.45/0.35 alphas were near-invisible at
+                    // arm's length on a phone under glare.
                     color: isHeldPhase
                       ? '#fbbf24'
                       : isActive
                       ? '#e8d5a3'
                       : isMyTurn
-                      ? 'rgba(232, 213, 163, 0.45)'
-                      : 'rgba(150, 150, 160, 0.35)',
+                      ? (isTouchBar ? 'rgba(232, 213, 163, 0.62)' : 'rgba(232, 213, 163, 0.45)')
+                      : (isTouchBar ? 'rgba(196, 186, 168, 0.55)' : 'rgba(150, 150, 160, 0.35)'),
                     transition: 'color 0.24s ease-out',
                     whiteSpace: 'nowrap',
                     zIndex: 1,
@@ -921,7 +1070,7 @@ export default function TurnIndicator({
                     if (canClick) e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)';
                   }}
                 >
-                  {PHASE_LABELS[phase]}
+                  {phaseLabelFor(phase)}
                 </button>
               </Fragment>
             );
@@ -966,45 +1115,9 @@ export default function TurnIndicator({
 
         {/* End Turn. While the turn is held the center-board priority prompt
             is the surface — this button just disables (the server refuses
-            movement until the prompt is answered). */}
-        {!readOnly && !pregameStep && (
-          <button
-            onClick={onEndTurn}
-            disabled={!isMyTurn || heldAgainstMe}
-            title={
-              heldAgainstMe
-                ? 'Answer the priority request first'
-                : isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"
-            }
-            style={{
-              marginLeft: 10,
-              padding: '5px 12px',
-              background: isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.15)' : 'transparent',
-              border: `1px solid ${isMyTurn && !heldAgainstMe ? 'rgba(196, 149, 90, 0.45)' : 'rgba(107, 78, 39, 0.25)'}`,
-              borderRadius: 4,
-              cursor: isMyTurn && !heldAgainstMe ? 'pointer' : 'default',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: FZ.ui,
-              letterSpacing: '0.07em',
-              textTransform: 'uppercase',
-              color: isMyTurn && !heldAgainstMe ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)',
-              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-              whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={(e) => {
-              if (!isMyTurn || heldAgainstMe) return;
-              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
-              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
-            }}
-            onMouseLeave={(e) => {
-              if (!isMyTurn || heldAgainstMe) return;
-              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
-              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
-            }}
-          >
-            End Turn
-          </button>
-        )}
+            movement until the prompt is answered). On touch it renders in the
+            fixed right cluster instead (see endTurnButton above). */}
+        {!isTouchBar && endTurnButton}
 
         {/* Spectators can never act, so this is a non-interactive status span —
             not a button — but still surfaces the hold + countdown (spec §8.4). */}
@@ -1040,8 +1153,10 @@ export default function TurnIndicator({
           gap: 6,
           flexShrink: 0,
           minWidth: 0,
+          marginLeft: isTouchBar ? 'auto' : undefined,
         }}
       >
+        {isTouchBar && endTurnButton}
         {/* While a rematch request is pending, the button retracts it; otherwise
             it starts a one-tap rematch. The "Waiting for opponent…" copy lives on
             the GameOverOverlay toast, so this slot just offers the action. */}
@@ -1168,7 +1283,9 @@ export default function TurnIndicator({
           <button
             onClick={() => setShowConcedeConfirm(true)}
             style={{
-              padding: '5px 12px',
+              // Touch: End Turn shares the right cluster, and at portrait
+              // widths the pair overflowed — Concede's box ran off-screen.
+              padding: isTouchBar ? '5px 8px' : '5px 12px',
               background: 'transparent',
               border: '1px solid rgba(180, 60, 60, 0.5)',
               borderRadius: 4,

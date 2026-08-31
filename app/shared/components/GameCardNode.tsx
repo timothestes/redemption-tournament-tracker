@@ -6,6 +6,7 @@ import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { GameCard, COUNTER_COLORS } from '../../goldfish/types';
 import { findCard } from '@/lib/cards/lookup';
+import { LONG_PRESS_MS, LONG_PRESS_MOVE_TOLERANCE } from '@/app/play/lib/longPressCore';
 import { simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 import { useCardPreview } from '../../goldfish/state/CardPreviewContext';
 
@@ -88,6 +89,15 @@ export interface GameCardNodeProps {
     isEligible: boolean;
     onSelect: () => void;
   };
+  /** Touch equivalent of right-click. When supplied, a 500ms stationary press
+   *  opens the context menu; the pending Konva drag is cancelled first so no
+   *  ghost drag state lingers. Movement past the tolerance means "drag", and
+   *  the long-press is abandoned. */
+  onLongPress?: (card: GameCard, p: { x: number; y: number }) => void;
+  /** Touch tap-to-move: true while THIS card is the armed card. Renders a
+   *  steady amber ring so the player can see which card the destination rail
+   *  is about to move. */
+  isArmed?: boolean;
 }
 
 // Individual card component — memoized to avoid re-rendering cards that haven't changed
@@ -115,6 +125,8 @@ export const GameCardNode = memo(function GameCardNode({
   onMouseLeave,
   isDimmed,
   targetingMode,
+  onLongPress,
+  isArmed,
 }: GameCardNodeProps) {
   const isToken = card.isToken;
   const isActivelyRevealed =
@@ -123,6 +135,82 @@ export const GameCardNode = memo(function GameCardNode({
   // otherwise render face-down (opponent hand view).
   const showFace = (!card.isFlipped || isActivelyRevealed) && image;
   const [isDragging, setIsDragging] = useState(false);
+
+  // ---- Long-press -> context menu (touch equivalent of right-click) ----
+  const pressRef = useRef<{ x: number; y: number; fired: boolean } | null>(null);
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPress = useCallback(() => {
+    if (pressTimerRef.current !== null) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+    pressRef.current = null;
+  }, []);
+
+  useEffect(() => clearPress, [clearPress]);
+
+  // The touchend that ends a long-press still emits a Konva tap on this node
+  // (taps have no duration ceiling), and by then clearPress() has wiped the
+  // press state — so the tap re-fired onClick and, on touch, ARMED the card
+  // right under the freshly opened menu. One-shot swallow.
+  const longPressTapSwallowRef = useRef(false);
+
+  const beginLongPress = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
+    if (!onLongPress) return;
+    const t = e.evt.touches?.[0];
+    if (!t) return;
+    // A second finger means the user is pinching, not pressing.
+    if (e.evt.touches.length > 1) { clearPress(); return; }
+    clearPress();
+    longPressTapSwallowRef.current = false;
+    const origin = { x: t.clientX, y: t.clientY, fired: false };
+    pressRef.current = origin;
+    pressTimerRef.current = setTimeout(() => {
+      const s = pressRef.current;
+      if (!s || s.fired) return;
+      // Movement re-check at fire time. moveLongPress alone is not enough:
+      // Konva suppresses stage pointer events while one of its drags is
+      // live (Stage.js eventsEnabled), so once a drag starts inside the
+      // 3-10px band this node's onTouchMove stops firing and a fast 50px
+      // drag would still "long-press" at 500ms — cancelling the drag
+      // mid-flight, opening the menu, and stranding the card. The stage
+      // still calls setPointersPositions() on every touchmove even during
+      // drags, so the live pointer is readable here.
+      const pressStage = (e.target as Konva.Node).getStage?.();
+      const livePos = pressStage?.getPointerPosition?.();
+      if (pressStage && livePos) {
+        const box = pressStage.container().getBoundingClientRect();
+        const moved = Math.hypot(box.left + livePos.x - s.x, box.top + livePos.y - s.y);
+        if (moved > LONG_PRESS_MOVE_TOLERANCE) {
+          clearPress();
+          return;
+        }
+      }
+      s.fired = true;
+      longPressTapSwallowRef.current = true;
+      // onLongPress FIRST: Konva's dragDistance is 3px but our movement
+      // tolerance is 10px, so in the 3-10px band a real Konva drag is already
+      // running and stopDrag() emits a genuine dragend. The canvas marks the
+      // drag cancelled inside this callback, so the dragend is ignored rather
+      // than committing the move (which could equip a weapon by accident).
+      onLongPress(card, { x: s.x, y: s.y });
+      const node: any = e.target;
+      if (node && typeof node.stopDrag === 'function') node.stopDrag();
+      setIsDragging(false);
+    }, LONG_PRESS_MS);
+  }, [onLongPress, card, clearPress]);
+
+  const moveLongPress = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
+    const s = pressRef.current;
+    if (!s || s.fired) return;
+    const t = e.evt.touches?.[0];
+    if (!t) return;
+    // Radial tolerance, so a diagonal drag isn't accidentally tolerated.
+    if (Math.hypot(t.clientX - s.x, t.clientY - s.y) > LONG_PRESS_MOVE_TOLERANCE) {
+      clearPress();
+    }
+  }, [clearPress]);
 
   // Flip-preview eye: meek cards render upside-down on the table; hovering the
   // eye un-rotates them in the preview surfaces so the opponent can read them.
@@ -226,6 +314,12 @@ export const GameCardNode = memo(function GameCardNode({
         if (onClick) onClick(card, e);
       }}
       onTap={(e) => {
+        // The tail of a long-press is not a tap (see longPressTapSwallowRef).
+        if (longPressTapSwallowRef.current) {
+          longPressTapSwallowRef.current = false;
+          e.cancelBubble = true;
+          return;
+        }
         if (targetingMode) {
           e.cancelBubble = true;
           if (targetingMode.isEligible) targetingMode.onSelect();
@@ -237,7 +331,15 @@ export const GameCardNode = memo(function GameCardNode({
       onDblTap={() => onDblClick(card)}
       onMouseEnter={(e) => onMouseEnter(card, e)}
       onMouseLeave={onMouseLeave}
-      onTouchStart={(e) => onMouseEnter(card, e as unknown as Konva.KonvaEventObject<MouseEvent>)}
+      onTouchStart={(e) => {
+        onMouseEnter(card, e as unknown as Konva.KonvaEventObject<MouseEvent>);
+        beginLongPress(e);
+      }}
+      onTouchMove={moveLongPress}
+      // onTouchStart raises the hover/preview state; without these the touch
+      // path had no way to lower it again and the loupe stuck open.
+      onTouchEnd={(e) => { clearPress(); onMouseLeave(); }}
+      onTouchCancel={(e) => { clearPress(); onMouseLeave(); }}
     >
       {/* LOB arrival glow — amber stroke pulse on arrival.
           opacity + strokeWidth are animated imperatively in the effect above.
@@ -294,6 +396,28 @@ export const GameCardNode = memo(function GameCardNode({
           shadowColor="#c4955a"
           shadowBlur={8}
           shadowOpacity={0.6}
+          listening={false}
+          perfectDrawEnabled={false}
+        />
+      )}
+
+      {/* Tap-to-move armed ring — steady amber marker for the card the
+          destination rail is about to move (touch only; the canvas passes
+          isArmed solely on touch). Thicker than the selection ring so it
+          reads at phone card sizes. */}
+      {isArmed && (
+        <Rect
+          x={-2}
+          y={-2}
+          width={cardWidth + 4}
+          height={cardHeight + 4}
+          fill="transparent"
+          stroke="#c4955a"
+          strokeWidth={3}
+          cornerRadius={5}
+          shadowColor="#c4955a"
+          shadowBlur={8}
+          shadowOpacity={0.7}
           listening={false}
           perfectDrawEnabled={false}
         />

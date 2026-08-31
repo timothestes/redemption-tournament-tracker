@@ -82,9 +82,11 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
     document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
   }, [onClose]);
@@ -174,7 +176,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
 
   if (allTokens) {
     return (
-      <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+      <div ref={menuRef} data-context-menu style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
         <div style={{ ...labelStyle, color: 'var(--gf-text-bright)', fontSize: 11 }}>
           {selectedIds.length} tokens selected
         </div>
@@ -203,7 +205,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
   }
 
   return (
-    <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+    <div ref={menuRef} data-context-menu style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
       {/* Header */}
       <div style={{ ...labelStyle, color: 'var(--gf-text-bright)', fontSize: 11 }}>
         {selectedIds.length} cards selected

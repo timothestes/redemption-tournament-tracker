@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
 import {
   Play,
   Undo2,
@@ -12,6 +14,8 @@ import {
   BookOpen,
   Skull,
   ThumbsUp,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import type { GameActions } from '../types/gameActions';
 
@@ -225,12 +229,83 @@ export function GameToolbar({
 
   const visibleButtons = buttons.filter(b => !b.hidden);
 
+  // ---- Touch: collapse to a single button ----
+  // The bar is anchored in the hand band, where it covered 89-97% of the
+  // player's cards on a phone. The hand is tapped every turn and its cards
+  // cannot be moved out from under an overlay, so on touch the bar collapses
+  // to one 44px control and expands upward into the (free-form, movable)
+  // territory only while the player is actually using it.
+  const inputMode = useInputMode();
+  const isTouch = inputMode === 'touch';
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = isTouch && !expanded;
+
+  // Touch: a tap anywhere OFF the expanded bar collapses it — the same
+  // outside-tap dismissal the context menus use. Raw document listeners so
+  // canvas touches count; isPrimaryPointer keeps parity with the menus'
+  // pointer handling (TouchEvent has no `button`).
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!isTouch || !expanded) return;
+    const handle = (evt: MouseEvent | TouchEvent) => {
+      if (!isPrimaryPointer(evt as { button?: number })) return;
+      if (barRef.current && !barRef.current.contains(evt.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener('touchstart', handle);
+    document.addEventListener('mousedown', handle);
+    return () => {
+      document.removeEventListener('touchstart', handle);
+      document.removeEventListener('mousedown', handle);
+    };
+  }, [isTouch, expanded]);
+
+  if (collapsed) {
+    return (
+      <div
+        data-game-toolbar
+        data-toolbar-collapsed
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          position: 'absolute',
+          bottom: 'calc(8px + env(safe-area-inset-bottom))',
+          // The settings gear keeps the far-left corner it has on pointer;
+          // this docks beside it.
+          left: 'calc(60px + env(safe-area-inset-left))',
+          zIndex: 200,
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Game actions"
+          data-testid="toolbar-expand"
+          onClick={() => setExpanded(true)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 44, height: 44,
+            background: 'rgba(30,22,16,0.92)',
+            border: '1px solid var(--gf-border)',
+            borderRadius: 8,
+            color: 'var(--gf-text)',
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronUp size={22} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
+      ref={barRef}
+      data-game-toolbar
+      data-toolbar-expanded={isTouch ? 'true' : undefined}
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'absolute',
-        bottom: 8,
+        bottom: isTouch ? 'calc(8px + env(safe-area-inset-bottom))' : 8,
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
@@ -243,6 +318,22 @@ export function GameToolbar({
         zIndex: 200,
       }}
     >
+      {isTouch && (
+        <button
+          type="button"
+          aria-label="Hide game actions"
+          data-testid="toolbar-collapse"
+          onClick={() => setExpanded(false)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minWidth: 44, minHeight: 44,
+            background: 'transparent', border: 'none',
+            color: 'var(--gf-text)', cursor: 'pointer',
+          }}
+        >
+          <ChevronDown size={22} />
+        </button>
+      )}
       {visibleButtons.map(({ icon: Icon, key, label, onClick, shortcut, disabled: btnDisabled, pushRight }) => (
         <button
           key={key}

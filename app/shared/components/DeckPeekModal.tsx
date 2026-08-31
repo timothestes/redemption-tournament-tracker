@@ -1,6 +1,9 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
+import { beginCardPress, moveCardPress, cancelCardPress, cardPressFired, consumeCardPressFired, type CardPressTracker } from '@/app/shared/utils/modalCardPress';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId } from '@/app/shared/types/gameCard';
 import { ArrowUp, ArrowDown, Shuffle } from 'lucide-react';
@@ -40,25 +43,30 @@ function PeekCardContextPopup({
   sourceZone?: ZoneId;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const isTouch = useInputMode() === 'touch';
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
+    };
   }, [onClose]);
 
   const itemStyle: React.CSSProperties = {
-    display: 'block', width: '100%', padding: '5px 12px', background: 'transparent',
-    border: 'none', cursor: 'pointer', color: 'var(--gf-text)', fontSize: 11,
+    display: 'block', width: '100%', padding: isTouch ? '11px 16px' : '5px 12px', background: 'transparent',
+    border: 'none', cursor: 'pointer', color: 'var(--gf-text)', fontSize: isTouch ? 13 : 11,
     textAlign: 'left', fontFamily: 'var(--font-cinzel), Georgia, serif',
   };
   const label = count && count > 1 ? `Move ${count} cards to...` : 'Move to...';
 
   return (
     <div ref={ref} data-modal-keep-open="true" onClick={(e) => e.stopPropagation()} style={{
-      position: 'fixed', left: Math.min(x, window.innerWidth - 160),
-      top: Math.min(y, window.innerHeight - 300), background: 'var(--gf-bg)',
+      position: 'fixed', left: Math.max(8, Math.min(x, window.innerWidth - (isTouch ? 200 : 160))),
+      top: Math.max(8, Math.min(y, window.innerHeight - (isTouch ? 340 : 300))), background: 'var(--gf-bg)',
       border: '1px solid var(--gf-border)', borderRadius: 6, padding: '4px 0',
       zIndex: 1000, minWidth: 140, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', pointerEvents: 'auto',
     }}>
@@ -99,6 +107,7 @@ function PeekActionButton({ icon, label, onClick, style }: {
   onClick: () => void;
   style?: React.CSSProperties;
 }) {
+  const isTouch = useInputMode() === 'touch';
   return (
     <button
       onClick={onClick}
@@ -106,7 +115,8 @@ function PeekActionButton({ icon, label, onClick, style }: {
         display: 'flex',
         alignItems: 'center',
         gap: 5,
-        padding: '5px 12px',
+        minHeight: isTouch ? 40 : undefined,
+        padding: isTouch ? '8px 14px' : '5px 12px',
         background: 'var(--gf-bg)',
         border: '1px solid var(--gf-border)',
         borderRadius: 5,
@@ -189,12 +199,19 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Context menu state
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
+  const isTouch = useInputMode() === 'touch';
+  const cardPressRef = useRef<CardPressTracker | null>(null);
+
+  const openCardMenu = (card: GameCard, clientX: number, clientY: number) => {
+    if (!onClose) return; // Read-only mode (opponent viewing reveal)
+    setContextCard({ card, x: clientX, y: clientY });
+  };
 
   const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
     if (!onClose) return; // Read-only mode (opponent viewing reveal)
     e.preventDefault();
     e.stopPropagation();
-    setContextCard({ card, x: e.clientX, y: e.clientY });
+    openCardMenu(card, e.clientX, e.clientY);
   };
 
   // Ref for the inner modal box — used for outside-click detection so the
@@ -302,7 +319,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
     const handleMouseDown = (e: MouseEvent) => {
       if (isInside(e.target)) return;
-      if (e.button === 0 && readyForClose && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+      if (isPrimaryPointer(e) && readyForClose && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
         handleDismiss();
       }
     };
@@ -312,9 +329,12 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     };
 
     document.addEventListener('mousedown', handleMouseDown);
+
+    document.addEventListener('touchstart', handleMouseDown);
     document.addEventListener('contextmenu', handleContextMenu);
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('touchstart', handleMouseDown);
       document.removeEventListener('contextmenu', handleContextMenu);
     };
   }, [onClose, readyForClose, didDragRef]);
@@ -329,6 +349,10 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
     // Reset didDragRef so we can detect if a drag fires before pointerUp
     if (didDragRef) didDragRef.current = false;
+
+    // Touch: no drag from the modal — it fights native scrolling. Tap still
+    // selects; the long-press menu moves cards.
+    if (e.pointerType === 'touch') return;
 
     const isSelected = selectedIds.has(card.instanceId);
     if (isSelected && selectedIds.size > 1 && onStartMultiDrag) {
@@ -347,6 +371,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     // Only toggle selection if this was a click (no drag occurred) on the same card
     if (pointerDownCardRef.current !== card.instanceId) return;
     pointerDownCardRef.current = null;
+    if (consumeCardPressFired(cardPressRef)) return;
     if (didDragRef?.current) {
       didDragRef.current = false;
       return;
@@ -449,6 +474,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     >
       <div ref={modalBoxRef} style={modalStyle}>
       <motion.div
+        data-peek-modal
         initial={false}
         animate={{ opacity: isDragActive ? 0.15 : 1, scale: 1 }}
         transition={{ opacity: { duration: 0.2 } }}
@@ -500,7 +526,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           )}
         </DraggableTitleBar>
 
-        <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+        <div data-peek-scroll style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <p style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -509,8 +535,10 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             margin: 0,
           }}>
             {isPrivateLook
-              ? 'Only you can see this \u00b7 Drag to a zone \u00b7 Click to select'
-              : onClose ? 'Drag to a zone \u00b7 Click to select \u00b7 Lasso to multi-select' : 'Your opponent is revealing cards'}
+              ? (isTouch ? 'Only you can see this \u00b7 Tap to select \u00b7 Long-press for actions' : 'Only you can see this \u00b7 Drag to a zone \u00b7 Click to select')
+              : onClose
+                ? (isTouch ? 'Tap to select \u00b7 Long-press a card for actions' : 'Drag to a zone \u00b7 Click to select \u00b7 Lasso to multi-select')
+                : 'Your opponent is revealing cards'}
           </p>
           {onClose && (
             <label
@@ -568,6 +596,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
         ) : (
           <div
             ref={gridRef}
+            data-peek-grid
             style={{
               display: 'grid',
               gridTemplateColumns: `repeat(${Math.min(peekedIds.length, 4)}, minmax(140px, 1fr))`,
@@ -587,6 +616,9 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                   style={{ position: 'relative', cursor: onClose ? 'grab' : 'default' }}
                   onPointerDown={onClose ? (e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); } : undefined}
                   onPointerUp={onClose ? () => handlePointerUp(card) : undefined}
+                  onTouchStart={onClose ? (e) => beginCardPress(cardPressRef, e, (x, y) => openCardMenu(card, x, y)) : undefined}
+                  onTouchMove={onClose ? (e) => moveCardPress(cardPressRef, e) : undefined}
+                  onTouchEnd={onClose ? (e) => { if (cardPressFired(cardPressRef)) e.preventDefault(); cancelCardPress(cardPressRef); } : undefined}
                   onClick={(e) => e.stopPropagation()}
                   onContextMenu={(e) => handleCardContextMenu(card, e)}
                   onMouseEnter={(e) => onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId)}
@@ -657,7 +689,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
         </div>
 
         {/* Action footer — choose where remaining revealed cards go */}
-        <div style={{
+        <div data-peek-footer style={{
           marginTop: 16,
           paddingTop: 12,
           borderTop: '1px solid #3d2e1a',

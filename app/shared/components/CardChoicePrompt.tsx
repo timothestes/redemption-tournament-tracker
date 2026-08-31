@@ -90,7 +90,11 @@ export function CardChoicePromptContainer() {
       setPrompts(prev => prev.slice(0, -1));
     };
     document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
+    document.addEventListener('touchstart', onMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('touchstart', onMouseDown);
+    };
   }, [prompts.length]);
 
   return (
@@ -155,6 +159,7 @@ function PromptCard({
   return (
     <motion.div
       ref={registerEl}
+      data-card-choice-prompt
       drag
       dragMomentum={false}
       dragElastic={0}

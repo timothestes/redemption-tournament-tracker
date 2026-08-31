@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
+import { beginCardPress, moveCardPress, cancelCardPress, cardPressFired, consumeCardPressFired, type CardPressTracker } from '@/app/shared/utils/modalCardPress';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '@/app/shared/types/gameCard';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
@@ -43,24 +46,29 @@ function CardContextPopup({
   onShuffleIntoDeck: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const isTouch = useInputMode() === 'touch';
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
+    };
   }, [onClose]);
 
   const itemStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '5px 12px',
+    padding: isTouch ? '11px 16px' : '5px 12px',
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
     color: 'var(--gf-text)',
-    fontSize: 11,
+    fontSize: isTouch ? 13 : 11,
     textAlign: 'left',
     fontFamily: 'var(--font-cinzel), Georgia, serif',
   };
@@ -75,8 +83,8 @@ function CardContextPopup({
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
-        left: Math.min(x, window.innerWidth - 160),
-        top: Math.min(y, window.innerHeight - 300),
+        left: Math.max(8, Math.min(x, window.innerWidth - (isTouch ? 200 : 160))),
+        top: Math.max(8, Math.min(y, window.innerHeight - (isTouch ? 340 : 300))),
         background: 'var(--gf-bg)',
         border: '1px solid var(--gf-border)',
         borderRadius: 6,
@@ -156,6 +164,10 @@ interface ZoneBrowseModalProps {
 
 export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly, onRequestCardMenu }: ZoneBrowseModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
+  // Touch has no clicks, lassos or right-clicks — say what actually works.
+  const hintText = useInputMode() === 'touch'
+    ? 'Tap to select · Long-press a card for actions'
+    : 'Drag to a zone · Click or lasso to select · Right-click for more';
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck } = actions;
   const rawCards = zones[zoneId] ?? [];
@@ -238,7 +250,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
 
     const handleMouseDown = (e: MouseEvent) => {
       if (isInside(e.target)) return;
-      if (e.button === 0 && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+      if (isPrimaryPointer(e) && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
         setContextCard(null);
         onClose();
       }
@@ -250,15 +262,17 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     };
 
     document.addEventListener('mousedown', handleMouseDown);
+
+    document.addEventListener('touchstart', handleMouseDown);
     document.addEventListener('contextmenu', handleContextMenu);
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('touchstart', handleMouseDown);
       document.removeEventListener('contextmenu', handleContextMenu);
     };
   }, [onClose, didDragRef]);
 
-  const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
-    e.preventDefault();
+  const openCardMenu = (card: GameCard, clientX: number, clientY: number) => {
     if (readOnly) return;
     onCardMouseLeave();
     // A card with a right-click ability usable from this zone (e.g. a Lost Soul
@@ -267,16 +281,22 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     // popup below.
     const isMultiSelected = selectedIds.has(card.instanceId) && selectedIds.size > 1;
     if (onRequestCardMenu && !isMultiSelected && hasUsableAbilityInZone(card)) {
-      onRequestCardMenu(card, e.clientX, e.clientY);
+      onRequestCardMenu(card, clientX, clientY);
       return;
     }
-    setContextCard({ card, x: e.clientX, y: e.clientY });
+    setContextCard({ card, x: clientX, y: clientY });
     // Re-set the loupe preview so it keeps showing the right-clicked card
     setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek });
   };
 
+  const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
+    e.preventDefault();
+    openCardMenu(card, e.clientX, e.clientY);
+  };
+
   // Track pointer down card to distinguish click from drag on pointer up
   const pointerDownCardRef = useRef<string | null>(null);
+  const cardPressRef = useRef<CardPressTracker | null>(null);
 
   const handlePointerDown = (card: GameCard, imageUrl: string, e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -286,6 +306,10 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
 
     // Reset didDragRef so we can detect if a drag fires before pointerUp
     if (didDragRef) didDragRef.current = false;
+
+    // Touch: no drag from the modal — it fights native scrolling. Tap still
+    // selects; the long-press menu moves cards.
+    if (e.pointerType === 'touch') return;
 
     const isSelected = selectedIds.has(card.instanceId);
     if (isSelected && selectedIds.size > 1 && onStartMultiDrag) {
@@ -304,6 +328,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     // Only toggle selection if this was a click (no drag occurred) on the same card
     if (pointerDownCardRef.current !== card.instanceId) return;
     pointerDownCardRef.current = null;
+    if (consumeCardPressFired(cardPressRef)) return;
     if (didDragRef?.current) {
       didDragRef.current = false;
       return;
@@ -506,7 +531,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         {!readOnly && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
-              Drag to a zone · Click or lasso to select · Right-click for more
+              {hintText}
             </span>
             <label
               style={{
@@ -575,6 +600,9 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                   style={{ position: 'relative', cursor: 'grab' }}
                   onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
                   onPointerUp={() => handlePointerUp(card)}
+                  onTouchStart={(e) => beginCardPress(cardPressRef, e, (px, py) => openCardMenu(card, px, py))}
+                  onTouchMove={(e) => moveCardPress(cardPressRef, e)}
+                  onTouchEnd={(e) => { if (cardPressFired(cardPressRef)) e.preventDefault(); cancelCardPress(cardPressRef); }}
                   onClick={(e) => e.stopPropagation()}
                   onContextMenu={(e) => handleCardContextMenu(card, e)}
                   onMouseEnter={(e) => { if (!contextCard) onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId); }}

@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
 import { SpacetimeConnectionResetWrapper } from '@/app/play/components/SpacetimeConnectionResetWrapper';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
+import { shouldGateForPortrait } from '@/app/play/lib/orientationGate';
+import { RotateDevicePrompt } from '@/app/play/components/RotateDevicePrompt';
 import ReconnectOnResume from '@/app/play/components/ReconnectOnResume';
 import { useGameState } from '@/app/play/hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
@@ -369,6 +372,31 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // Board backdrop — Forge playtest games get a distinct background.
   const gameBackground = `url(/gameplay/${isForge ? 'forge_background' : 'cave_background'}.png)`;
+
+  // ---- Touch shell ----
+  const shellInputMode = useInputMode();
+  const isTouchShell = shellInputMode === 'touch';
+  const [shellViewport, setShellViewport] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const update = () => setShellViewport({ w: window.innerWidth, h: window.innerHeight });
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+  const [portraitGateDismissed, setPortraitGateDismissed] = useState(false);
+  const gateForPortrait =
+    !portraitGateDismissed &&
+    shouldGateForPortrait(shellViewport.w, shellViewport.h, shellInputMode);
+  // The bar overlays the canvas only where the compact layout profile's top
+  // gutter (containerHeight < 500) pushes the board content clear of it. On
+  // taller touch viewports (iPad, portrait continue-anyway) there is no
+  // gutter, so an overlaid bar sat on the opponent's hand and LoB — give the
+  // bar its own row there like desktop; those viewports have height to spare.
+  const overlayTurnBar = isTouchShell && shellViewport.h > 0 && shellViewport.h < 500;
 
   // Where "Back to lobby" / exit / stale-game redirects land. Forge games
   // return to the Forge play lobby; everyone else to the public play lobby.
@@ -1794,12 +1822,38 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     );
   }
 
+  // Phone portrait is structurally broken (RightPanel's 280px floor leaves
+  // ~113px of canvas), so gate it rather than render a 6x8px board. Placed
+  // after every hook so hook order stays stable across renders.
+  if (gateForPortrait) {
+    return (
+      <RotateDevicePrompt
+        onContinueAnyway={() => setPortraitGateDismissed(true)}
+        lobbyHref={lobbyPath}
+      />
+    );
+  }
+
   // lifecycle === 'playing' — two-column layout: canvas + right panel (preview + chat)
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: gameBackground, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+    <div style={{
+      display: 'flex', width: '100vw', height: '100dvh',
+      backgroundImage: gameBackground, backgroundSize: 'cover', backgroundPosition: 'center',
+      // Keep the board clear of the landscape notch on a phone.
+      paddingLeft: 'env(safe-area-inset-left)',
+      paddingRight: 'env(safe-area-inset-right)',
+    }}>
       {/* Turn bar + Canvas + Toolbar */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ flexShrink: 0, height: 48 }}>
+        {/* On compact touch the turn bar overlays the board instead of
+            consuming a fixed 48px row (the compact layout profile's top
+            gutter keeps board content clear of it). Scale is derived from
+            container height, so giving those 48px back to the canvas is a
+            ~14% board gain on a phone. Non-compact touch keeps the bar in
+            its own row — no gutter exists to duck under it there. */}
+        <div style={overlayTurnBar
+          ? { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, paddingTop: 'env(safe-area-inset-top)' }
+          : { flexShrink: 0, height: 48 }}>
           <TurnIndicator
             lobbyPath={lobbyPath}
             game={gameState.game}

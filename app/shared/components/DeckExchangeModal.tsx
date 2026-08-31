@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { isPrimaryPointer } from '@/app/play/lib/pointerButton';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId } from '@/app/shared/types/gameCard';
 import { X, Search, ArrowLeftRight } from 'lucide-react';
@@ -132,13 +133,18 @@ export function DeckExchangeModal({
 
     const handleMouseDown = (e: MouseEvent) => {
       if (isInside(e.target)) return;
-      if (e.button === 0 && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+      if (isPrimaryPointer(e) && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
         onCancel();
       }
     };
 
     document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
+
+    document.addEventListener('touchstart', handleMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('touchstart', handleMouseDown);
+    };
   }, [onCancel, didDragRef]);
 
   const selectCard = useCallback((cardId: string) => {

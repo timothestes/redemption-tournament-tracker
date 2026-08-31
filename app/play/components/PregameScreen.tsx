@@ -62,7 +62,10 @@ export function OpponentJoinedToast({ name }: { name: string }) {
       initial={{ opacity: 0, y: -8, x: '-50%' }}
       animate={{ opacity: 1, y: 0, x: '-50%' }}
       transition={{ duration: 0.25 }}
-      className="absolute top-16 left-1/2 z-50 rounded-lg border border-amber-200/20 bg-black/85 backdrop-blur-sm px-4 py-2.5 pointer-events-none"
+      // On short landscape-phone viewports top-16 lands squarely on the
+      // ceremony card's player names — drop to the bottom edge there instead
+      // (the hand isn't dealt yet while this toast shows, so it's clear).
+      className="absolute top-16 [@media(max-height:500px)]:top-auto [@media(max-height:500px)]:bottom-3 left-1/2 z-50 rounded-lg border border-amber-200/20 bg-black/85 backdrop-blur-sm px-4 py-2.5 pointer-events-none"
     >
       <p className="font-cinzel text-sm text-amber-200/90 tracking-wide whitespace-nowrap">
         ⚔️ {name} joined — rolling for first player…
@@ -647,7 +650,7 @@ export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) 
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
-      <div className="pointer-events-auto rounded-xl border border-amber-200/10 bg-black/80 backdrop-blur-md p-6 sm:p-8 text-center max-w-md w-full mx-4">
+      <div className="pointer-events-auto rounded-xl border border-amber-200/10 bg-black/80 backdrop-blur-md p-6 sm:p-8 [@media(max-height:500px)]:!p-4 text-center max-w-md w-full mx-4 max-h-full overflow-y-auto">
         {/* Player cards with dice */}
         <PlayerCards
           isWaiting={false}
@@ -868,12 +871,28 @@ function RollAndChooseArea({
 
   if (!game || !myPlayer || mySeat === undefined) return null;
 
+  // Until the dice land, the result block used to render at opacity 0 — still
+  // occupying its full height. On a landscape phone that reserved a ~175px
+  // void under the dice for the two seconds of the tumble. Show the status
+  // line instead and let the block mount when there is something to read.
+  if (!showResults) {
+    return (
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4 }}
+        className="font-cinzel text-[11px] uppercase tracking-[0.18em] text-amber-200/45"
+      >
+        Rolling for first player&hellip;
+      </motion.p>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
-      animate={showResults ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-      transition={{ duration: 0.5, delay: showResults ? 0.2 : 0 }}
-      style={{ pointerEvents: showResults ? 'auto' : 'none' }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.2 }}
     >
       <p className="font-cinzel text-sm font-bold text-amber-200/90 tracking-wide">
         {winnerName} the roll!
@@ -883,13 +902,13 @@ function RollAndChooseArea({
         <div className="mt-3 flex flex-col gap-2">
           <button
             onClick={() => handleChoose(mySeat)}
-            className="w-full py-2.5 rounded border border-[#c4955a]/45 bg-[#c4955a]/15 font-cinzel text-xs font-bold uppercase tracking-wider text-amber-200/90 hover:bg-[#c4955a]/25 transition-colors"
+            className="w-full min-h-[44px] py-2.5 rounded border border-[#c4955a]/45 bg-[#c4955a]/15 font-cinzel text-xs font-bold uppercase tracking-wider text-amber-200/90 hover:bg-[#c4955a]/25 transition-colors"
           >
             I&apos;ll go first
           </button>
           <button
             onClick={() => handleChoose(isSeat0 ? BigInt(1) : BigInt(0))}
-            className="w-full py-2.5 rounded border border-amber-200/15 bg-transparent font-cinzel text-xs font-bold uppercase tracking-wider text-amber-200/50 hover:text-amber-200/70 transition-colors"
+            className="w-full min-h-[44px] py-2.5 rounded border border-amber-200/15 bg-transparent font-cinzel text-xs font-bold uppercase tracking-wider text-amber-200/50 hover:text-amber-200/70 transition-colors"
           >
             {opponentName} goes first
           </button>
@@ -901,8 +920,7 @@ function RollAndChooseArea({
       )}
 
       {/* Timer bar */}
-      {showResults && (
-        <div className="mt-4">
+      <div className="mt-4">
           <div className="w-full h-[3px] rounded-sm bg-amber-200/[0.08] overflow-hidden">
             <motion.div
               initial={{ width: `${(secondsLeft / CHOOSE_TIME_LIMIT_S) * 100}%` }}
@@ -913,10 +931,9 @@ function RollAndChooseArea({
                 backgroundColor: secondsLeft <= 10 ? 'rgba(220, 120, 80, 0.6)' : 'rgba(196, 149, 90, 0.4)',
                 transition: 'background-color 0.5s ease',
               }}
-            />
-          </div>
+          />
         </div>
-      )}
+      </div>
     </motion.div>
   );
 }

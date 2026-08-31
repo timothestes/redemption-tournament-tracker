@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTable, useSpacetimeDB } from 'spacetimedb/react';
 import { tables } from '@/lib/spacetimedb/module_bindings';
 import { useToastKeyboardNav, toastFocusShadow } from '@/app/shared/components/toastKeyboardNav';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 
 interface SpectatorHandRequestBannerProps {
   gameId: bigint | null;
@@ -107,6 +108,9 @@ function SpectatorRequestBanner({
   onShare: () => void;
   onDismiss: () => void;
 }) {
+  // Touch: 44px minimum target on the buttons (min-height only — the button's
+  // own vertical centering grows the padding). Pointer rendering is untouched.
+  const isTouch = useInputMode() === 'touch';
   const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
     count: 2,
     defaultIndex: 1, // Share hand
@@ -193,6 +197,7 @@ function SpectatorRequestBanner({
           onMouseEnter={() => setFocusedIndex(0)}
           style={{
             padding: '8px 16px',
+            minHeight: isTouch ? 44 : undefined,
             borderRadius: 4,
             border: `1px solid ${dismissFocused ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
             background: dismissFocused ? 'rgba(196, 149, 90, 0.12)' : 'transparent',
@@ -215,6 +220,7 @@ function SpectatorRequestBanner({
           onMouseEnter={() => setFocusedIndex(1)}
           style={{
             padding: '8px 16px',
+            minHeight: isTouch ? 44 : undefined,
             borderRadius: 4,
             border: '1px solid rgba(196, 149, 90, 0.45)',
             background: shareFocused ? 'rgba(196, 149, 90, 0.30)' : 'rgba(196, 149, 90, 0.15)',

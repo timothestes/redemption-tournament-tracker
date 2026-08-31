@@ -34,6 +34,7 @@ export function DraggableTitleBar({
   return (
     <div
       {...dragHandleProps}
+      data-modal-title-bar
       style={{
         display: 'flex',
         justifyContent: 'space-between',

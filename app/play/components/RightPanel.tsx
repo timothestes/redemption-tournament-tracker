@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import ChatPanel from '@/app/play/components/ChatPanel';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
@@ -54,6 +55,11 @@ interface RightPanelProps {
 
 const PANEL_EXPANDED_WIDTH = 'clamp(280px, 20vw, 380px)';
 const PANEL_COLLAPSED_WIDTH = 36;
+// Touch: the collapsed rail IS the expand button, and 36px is under the 44px
+// minimum touch target. The panel clips overflow (needed for the width
+// transition), so a hit-area overhang would be unclickable — widen the whole
+// rail instead. Pointer keeps the original 36px.
+const PANEL_COLLAPSED_WIDTH_TOUCH = 45; // 44 of button + the 1px left border
 
 export default function RightPanel({
   chatMessages,
@@ -74,15 +80,28 @@ export default function RightPanel({
 }: RightPanelProps) {
   const { isLoupeVisible, toggleLoupe, previewCard, isPreviewFlipped } = useCardPreview();
   const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all' | 'spectators'>('all');
+  const isTouch = useInputMode() === 'touch';
+  const collapsedWidth = isTouch ? PANEL_COLLAPSED_WIDTH_TOUCH : PANEL_COLLAPSED_WIDTH;
+  // Collapsed on touch, only the top 48px of the 44px-wide rail did anything —
+  // the rest was an empty scrim running the height of the screen, reading as
+  // dead space beside the sidebar. The whole strip is the control instead,
+  // labelled so it says what it opens.
+  const isRail = isTouch && !isLoupeVisible;
 
   return (
-    <div style={{
-      width: isLoupeVisible ? PANEL_EXPANDED_WIDTH : PANEL_COLLAPSED_WIDTH,
-      minWidth: isLoupeVisible ? undefined : PANEL_COLLAPSED_WIDTH,
+    <div
+      data-right-panel
+      data-panel-open={isLoupeVisible ? 'true' : undefined}
+      style={{
+      width: isLoupeVisible ? PANEL_EXPANDED_WIDTH : collapsedWidth,
+      minWidth: isLoupeVisible ? undefined : collapsedWidth,
       flexShrink: 0,
       display: 'flex',
       flexDirection: 'column',
-      background: isLoupeVisible ? 'rgba(10, 8, 5, 0.97)' : 'transparent',
+      // Collapsed rail gets a scrim too — transparent, it showed a bright
+      // strip of raw background art down the whole right screen edge while
+      // every neighboring surface is darkened.
+      background: isLoupeVisible ? 'rgba(10, 8, 5, 0.97)' : 'rgba(10, 8, 5, 0.55)',
       borderLeft: '1px solid rgba(107, 78, 39, 0.3)',
       overflow: 'hidden',
       transition: 'width 0.2s ease',
@@ -90,20 +109,23 @@ export default function RightPanel({
       <button
         onClick={toggleLoupe}
         title={isLoupeVisible ? 'Hide panel (Tab)' : 'Show panel (Tab)'}
+        aria-label={isLoupeVisible ? 'Hide chat and game log' : 'Show chat and game log'}
         style={{
           width: '100%',
-          height: 48,
+          height: isRail ? 'auto' : 48,
           minHeight: 48,
-          background: 'rgba(10, 8, 5, 0.96)',
+          flex: isRail ? 1 : undefined,
+          background: isRail ? 'transparent' : 'rgba(10, 8, 5, 0.96)',
           borderTop: 'none',
           borderLeft: 'none',
           borderRight: 'none',
-          borderBottom: '1px solid rgba(107, 78, 39, 0.5)',
+          borderBottom: isRail ? 'none' : '1px solid rgba(107, 78, 39, 0.5)',
           cursor: 'pointer',
           display: 'flex',
+          flexDirection: isRail ? 'column' : 'row',
           alignItems: 'center',
           justifyContent: isLoupeVisible ? 'flex-start' : 'center',
-          gap: 6,
+          gap: isRail ? 14 : 6,
           padding: isLoupeVisible ? '0 12px' : '0',
           color: 'rgba(232, 213, 163, 0.5)',
           flexShrink: 0,
@@ -119,28 +141,45 @@ export default function RightPanel({
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
             }}>
-              Preview
+              {isTouch ? 'Chat & Log' : 'Preview'}
             </span>
           </>
         ) : (
-          <span style={{ fontSize: 14, position: 'relative' }}>
-            ‹
-            {unreadChatCount > 0 && (
+          <>
+            <span style={{ fontSize: 14, position: 'relative' }}>
+              ‹
+              {unreadChatCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -6,
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: '#c4955a',
+                    boxShadow: '0 0 4px rgba(196, 149, 90, 0.6)',
+                    animation: 'unread-pulse 2s ease-in-out infinite',
+                  }}
+                />
+              )}
+            </span>
+            {isRail && (
               <span
                 style={{
-                  position: 'absolute',
-                  top: -2,
-                  right: -6,
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  background: '#c4955a',
-                  boxShadow: '0 0 4px rgba(196, 149, 90, 0.6)',
-                  animation: 'unread-pulse 2s ease-in-out infinite',
+                  writingMode: 'vertical-rl',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 10,
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                  opacity: 0.8,
                 }}
-              />
+              >
+                Chat &amp; Log
+              </span>
             )}
-          </span>
+          </>
         )}
       </button>
       {/* Keyframe for unread dot pulse */}
@@ -154,7 +193,7 @@ export default function RightPanel({
       )}
       {isLoupeVisible && (
         <>
-          <div style={{
+          <div data-panel-preview style={{
             flexShrink: 0,
             padding: 12,
             display: 'flex',

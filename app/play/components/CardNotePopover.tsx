@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 
 const MAX_LEN = 40;
 const WIDTH = 260;
@@ -17,6 +18,9 @@ interface CardNotePopoverProps {
 
 export function CardNotePopover({ x, y, initialValue, onSave, onCancel }: CardNotePopoverProps) {
   const [value, setValue] = useState(initialValue);
+  // Touch: iOS Safari auto-zooms the page when focusing an input whose font
+  // is under 16px — keep the pointer build at 13px, raise touch to 16px.
+  const isTouch = useInputMode() === 'touch';
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const valueRef = useRef(value);
@@ -91,7 +95,7 @@ export function CardNotePopover({ x, y, initialValue, onSave, onCancel }: CardNo
           border: '1px solid var(--gf-border)',
           borderRadius: 4,
           color: 'var(--gf-text)',
-          fontSize: 13,
+          fontSize: isTouch ? 16 : 13,
           fontFamily: 'var(--font-cinzel), Georgia, serif',
           outline: 'none',
         }}

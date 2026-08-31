@@ -1,6 +1,7 @@
 'use client';
 
 import { useToastKeyboardNav, toastFocusShadow } from '@/app/shared/components/toastKeyboardNav';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 
 interface PauseConsentToastProps {
   /** Game row from SpacetimeDB. */
@@ -63,6 +64,9 @@ function PauseConsentBody({
   onAccept: () => void;
   onDecline: () => void;
 }) {
+  // Touch: 44px minimum target on the buttons (min-height only — the button's
+  // own vertical centering grows the padding). Pointer rendering is untouched.
+  const isTouch = useInputMode() === 'touch';
   const { focusedIndex, setFocusedIndex } = useToastKeyboardNav({
     count: 2,
     defaultIndex: 0, // Accept
@@ -107,6 +111,7 @@ function PauseConsentBody({
         onMouseEnter={() => setFocusedIndex(0)}
         style={{
           padding: '8px 16px',
+          minHeight: isTouch ? 44 : undefined,
           borderRadius: 4,
           border: '1px solid rgba(196, 149, 90, 0.45)',
           background: acceptFocused ? 'rgba(196, 149, 90, 0.30)' : 'rgba(196, 149, 90, 0.15)',
@@ -129,6 +134,7 @@ function PauseConsentBody({
         onMouseEnter={() => setFocusedIndex(1)}
         style={{
           padding: '8px 16px',
+          minHeight: isTouch ? 44 : undefined,
           borderRadius: 4,
           border: `1px solid ${declineFocused ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
           background: declineFocused ? 'rgba(196, 149, 90, 0.12)' : 'transparent',

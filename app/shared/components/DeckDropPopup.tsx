@@ -24,9 +24,11 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onEx
       if (e.key === 'Escape') onCancel();
     };
     document.addEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
     document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
   }, [onCancel]);

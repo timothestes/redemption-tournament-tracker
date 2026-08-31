@@ -98,6 +98,13 @@ const CARD_ASPECT_RATIO = 1.4;
 
 interface LayoutProfile {
   sidebarWidthRatio: number;
+  /** Empty strip at the very top holding NO zones. The touch shell overlays
+   *  the turn bar on the canvas (~48px of a 393px viewport), so without this
+   *  the opponent's hand strip and most of their Land of Bondage sit under
+   *  the bar — `elementFromPoint` returns the bar and the souls there are
+   *  untappable at fit, making rescues impossible. Non-touch profiles omit
+   *  it (0): their bar is a separate flex row above the canvas. */
+  topGutterRatio?: number;
   oppHandRatio: number;
   oppTerritoryRatio: number;
   oppLobRatio: number;
@@ -142,10 +149,37 @@ const STANDARD_PROFILE: LayoutProfile = {
 };
 // Sum check: 0.08 + 0.2775 + 0.09 + 0.005 + 0.09 + 0.2775 + 0.18 = 1.0 ✓
 
+/**
+ * Compact touch profile - phone landscape.
+ *
+ * Physical card width is containerWidth x (1 - sidebarWidthRatio) x
+ * mainCardWidthRatio; VIRTUAL_HEIGHT cancels out of that expression, so the
+ * only levers are the sidebar ratio and the card ratio. This profile shrinks
+ * the sidebar to an icon rail and enlarges cards, taking vertical budget from
+ * the opponent's hand (a strip of card backs, of little value) and giving it
+ * to the two territories.
+ */
+const TOUCH_PROFILE: LayoutProfile = {
+  sidebarWidthRatio: 0.10,   // icon rail; tapping a pile opens a sheet
+  topGutterRatio: 0.125,     // ≈49px at fit on a 393px viewport — clears the 48px overlay bar
+  oppHandRatio: 0.05,        // thin strip of backs
+  oppTerritoryRatio: 0.24,
+  oppLobRatio: 0.085,
+  dividerRatio: 0.005,
+  playerLobRatio: 0.085,
+  playerTerritoryRatio: 0.235,
+  playerHandRatio: 0.175,
+  mainCardWidthRatio: 0.078, // ~57px on an iPhone 14 Pro landscape
+  oppHandScale: 0.55,
+  pileLabelRatio: 0.14,
+};
+// Sum check: 0.125 + 0.05 + 0.24 + 0.085 + 0.005 + 0.085 + 0.235 + 0.175 = 1.0
+
 /** Virtual width breakpoint — below this use Narrow, above use Standard. */
 const BREAKPOINT_WIDTH = 1700;
 
-function getProfile(virtualWidth: number): LayoutProfile {
+function getProfile(virtualWidth: number, compact = false): LayoutProfile {
+  if (compact) return TOUCH_PROFILE;
   return virtualWidth <= BREAKPOINT_WIDTH ? NARROW_PROFILE : STANDARD_PROFILE;
 }
 
@@ -196,7 +230,26 @@ const STANDARD_BATTLE_PROFILE: BattleProfile = {
 // Sum check: 0.08 + 0.09 + 0.185 + 0.19 + 0.21 + 0.09 + 0.155 = 1.0 ✓
 // Midline check: 0.08 + 0.09 + 0.185 + 0.19 / 2 = 0.45 — matches idle ✓
 
-function getBattleProfile(virtualWidth: number): BattleProfile {
+/** Compact touch: battle-mode row ratios. The idle profile's top gutter
+ * (0.125) is carried by the Y anchors, so these seven rows sum to 1 − 0.125.
+ * The band gets enough height for a full main card BELOW its 18px header —
+ * at phone virtual widths mainCard.cardHeight ≈ 0.213 × stageHeight, and the
+ * standard band (0.19) left in-band cards taller than the band itself. */
+const TOUCH_BATTLE_PROFILE: BattleProfile = {
+  oppHandRatio: 0.05,
+  oppLobRatio: 0.085,
+  oppTerritoryRatio: 0.1225,
+  bandRatio: 0.24,
+  playerTerritoryRatio: 0.1425,
+  playerLobRatio: 0.085,
+  playerHandRatio: 0.15,
+};
+// Sum check: 0.05 + 0.085 + 0.1225 + 0.24 + 0.1425 + 0.085 + 0.15 = 0.875 = 1 − 0.125 gutter ✓
+// Midline check: 0.125 + 0.05 + 0.085 + 0.1225 + 0.24 / 2 = 0.5025 — matches
+// idle (0.125 + 0.05 + 0.085 + 0.24 + 0.005 / 2 = 0.5025) ✓
+
+function getBattleProfile(virtualWidth: number, compact = false): BattleProfile {
+  if (compact) return TOUCH_BATTLE_PROFILE;
   return virtualWidth <= BREAKPOINT_WIDTH ? NARROW_BATTLE_PROFILE : STANDARD_BATTLE_PROFILE;
 }
 
@@ -243,7 +296,10 @@ function getPileCardDimensions(slotHeight: number, sidebarWidth: number, zonePad
   const hFromW = maxCardW * CARD_ASPECT_RATIO;
   const h = Math.round(Math.min(Math.max(Math.min(usableH, hFromW), 30), usableH));
   const w = Math.round(h / CARD_ASPECT_RATIO);
-  return { cardWidth: Math.max(w, Math.round(30 / CARD_ASPECT_RATIO)), cardHeight: Math.round(Math.max(h, 30)) };
+  // No re-floor past usableH here: `h` is already 30 when the cell allows it,
+  // and re-applying Math.max(h, 30) made tiny cells overflow into the next
+  // row (the deck art overdrawing the LOR label below it).
+  return { cardWidth: Math.max(w, 8), cardHeight: Math.max(h, 12) };
 }
 
 // ── Sidebar builder ─────────────────────────────────────────────────────
@@ -361,8 +417,9 @@ export function calculateMultiplayerLayout(
   format: 'T1' | 'T2' | 'Paragon' = 'T1',
   viewerKind: 'player' | 'spectator' = 'player',
   battleActive = false,
+  compact = false,
 ): MultiplayerLayout {
-  const baseProfile = getProfile(stageWidth);
+  const baseProfile = getProfile(stageWidth, compact);
   // Spectators have no toolbar and no personal hand — rebalance some height
   // from the bottom hand zone to the top so opponent-style hands aren't
   // clipped and seat-0/seat-1 hands feel more symmetric.
@@ -391,9 +448,13 @@ export function calculateMultiplayerLayout(
   const playerHandHeight = Math.round(stageHeight * profile.playerHandRatio);
 
   // ── Y anchors ────────────────────────────────────────────────────────
-  // Order: Opp Hand → Opp LOB → Opp Territory → Divider → Player Territory → Player LOB → Player Hand
-  const oppHandY = 0;
-  const oppLobY = oppHandHeight;
+  // Order: [Top gutter] → Opp Hand → Opp LOB → Opp Territory → Divider → Player Territory → Player LOB → Player Hand
+  // The gutter is 0 everywhere except the compact touch profile (see
+  // LayoutProfile.topGutterRatio) — there it keeps every interactive zone
+  // below the overlaid turn bar.
+  const topGutterHeight = Math.round(stageHeight * (profile.topGutterRatio ?? 0));
+  const oppHandY = topGutterHeight;
+  const oppLobY = oppHandY + oppHandHeight;
   const oppTerritoryY = oppLobY + oppLobHeight;
   const dividerY = oppTerritoryY + oppTerritoryHeight;
   const playerTerritoryY = dividerY + dividerHeight;
@@ -468,7 +529,7 @@ export function calculateMultiplayerLayout(
   // — hand, LOB — reuses the idle Y anchors verbatim; only the territories
   // and the band itself get new anchors. `battleProfile`/`bandHeight` are
   // also read by the Paragon branch below, so this always runs (cheap).
-  const battleProfile = getBattleProfile(stageWidth);
+  const battleProfile = getBattleProfile(stageWidth, compact);
   const battleOppTerritoryHeight = Math.round(stageHeight * battleProfile.oppTerritoryRatio);
   const bandHeight = Math.round(stageHeight * battleProfile.bandRatio);
   const battlePlayerTerritoryHeight = Math.round(stageHeight * battleProfile.playerTerritoryRatio);
@@ -554,8 +615,9 @@ export function calculateMultiplayerLayout(
   if (format === 'Paragon') {
     const SOUL_DECK_GUTTER = 4;
 
-    // 1. Drop the unused opp LoB slot at the top — shift opp territory up.
-    const paragonOppTerritoryY = oppHandHeight;
+    // 1. Drop the unused opp LoB slot at the top — shift opp territory up
+    //    (directly below the opp hand, which itself sits below any gutter).
+    const paragonOppTerritoryY = oppLobY;
 
     // 2. Shrink the shared band to roughly one per-seat LoB's visual weight.
     const paragonSharedBandHeight = oppLobHeight + gap * 2;
@@ -654,7 +716,10 @@ export function calculateMultiplayerLayout(
     ? sharedLob.y + sharedLob.height / 2
     : null;
 
-  const oppSidebarY = format === 'Paragon' ? oppHandHeight : oppLobY;
+  // Both formats: sidebar starts right below the opp hand (Paragon's LoB
+  // slot is collapsed, so its territory starts there too) — oppLobY either
+  // way. Includes the touch gutter, keeping piles clear of the overlay bar.
+  const oppSidebarY = oppLobY;
   const oppSidebarHeight =
     format === 'Paragon' && sharedBandMidY !== null
       ? sharedBandMidY - oppSidebarY

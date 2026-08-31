@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Settings, RotateCcw, RefreshCw, Clock, EyeOff } from 'lucide-react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 
 interface CardScaleControlProps {
   cardScale: number;
@@ -54,8 +55,14 @@ export function CardScaleControl({
       }
     };
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
+    };
   }, [open]);
+
+  const isTouch = useInputMode() === 'touch';
 
   const pct = Math.round(cardScale * 100);
   const chatPct = chatScale !== undefined ? Math.round(chatScale * 100) : null;
@@ -68,21 +75,29 @@ export function CardScaleControl({
     chatStep !== undefined;
 
   return (
-    <div
+    <div data-card-scale-control
       ref={popoverRef}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ position: 'absolute', bottom: 8, left: 12, zIndex: 200 }}
+      style={{
+        position: 'absolute',
+        // The collapsed toolbar button sits beside this one; both anchor to the
+        // safe area so they stay on the same line on a notched phone.
+        bottom: isTouch ? 'calc(8px + env(safe-area-inset-bottom))' : 8,
+        left: isTouch ? 'calc(8px + env(safe-area-inset-left))' : 12,
+        zIndex: 200,
+      }}
     >
       {/* Gear button */}
       <button
         onClick={() => setOpen(prev => !prev)}
         title="Card size settings (+/- keys)"
+        aria-label="Card size settings"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: 36,
-          height: 36,
+          width: isTouch ? 44 : 36,
+          height: isTouch ? 44 : 36,
           background: 'rgba(30,22,16,0.92)',
           border: '1px solid var(--gf-border, #3d2e1f)',
           borderRadius: 8,

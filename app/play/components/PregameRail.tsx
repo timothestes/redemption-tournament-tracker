@@ -205,7 +205,7 @@ export default function PregameRail({
   // The whole wrapper is click-through; only chips and buttons opt back in.
   // Konva hit-tests on its own canvas, so this never blocks board interaction.
   const wrapper = (children: React.ReactNode) => (
-    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: RAIL_Z }}>
+    <div data-pregame-rail style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: RAIL_Z }}>
       <div style={{ position: 'absolute', left: '50%', top: '50%',
                     transform: 'translate(-50%, -50%)', ...PANEL }}>
         {children}
@@ -302,7 +302,7 @@ export default function PregameRail({
           <button style={ACTION} onClick={() => submitStars([])}>No stars</button>
         </div>
         {secondsLeft !== null && (
-          <div style={{ ...BODY, fontSize: 11, color: 'rgba(232, 213, 163, 0.5)' }}>
+          <div style={{ ...BODY, fontSize: 11, color: 'rgba(232, 213, 163, 0.75)' }}>
             Continuing automatically in {secondsLeft}s
           </div>
         )}

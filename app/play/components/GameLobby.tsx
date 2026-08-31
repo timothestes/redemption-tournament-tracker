@@ -515,7 +515,11 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                       setGameCode(cleaned.slice(-4));
                     }
                   }}
-                  placeholder="Game Code"
+                  // "Game Code" truncated to "GAME COD" in the phone-width
+                  // input; the aria-label keeps the accessible name (and the
+                  // e2e getByRole lookups) intact.
+                  placeholder="CODE"
+                  aria-label="Game Code"
                   maxLength={4}
                   className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"
                 />

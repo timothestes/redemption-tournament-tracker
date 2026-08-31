@@ -2,6 +2,7 @@
 
 import { useContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Search, Shuffle, Eye, Sparkles, Trash2, Archive, ChevronRight, Play } from 'lucide-react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import {
   SubMenuActionRow,
   SubmenuLockContext,
@@ -61,6 +62,10 @@ const SUBMENU_STYLE: React.CSSProperties = {
   boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
   whiteSpace: 'nowrap',
   zIndex: 910,
+  // Backstop for the case the clamp cannot solve: a submenu taller than the
+  // screen (five rows with a stepper open, on a short phone) scrolls.
+  maxHeight: 'calc(100dvh - 16px)',
+  overflowY: 'auto',
 };
 
 function SubmenuTrigger({
@@ -78,11 +83,7 @@ function SubmenuTrigger({
   const submenuRef = useRef<HTMLDivElement | null>(null);
   const [fixedPos, setFixedPos] = useState<{ top: number; left: number } | null>(null);
 
-  useLayoutEffect(() => {
-    if (!isOpen) {
-      setFixedPos(null);
-      return;
-    }
+  const position = useCallback(() => {
     const trigger = triggerRef.current;
     const sub = submenuRef.current;
     if (!trigger || !sub) return;
@@ -91,12 +92,33 @@ function SubmenuTrigger({
     const MARGIN = 8;
     let left = tRect.left - sRect.width - 2;
     if (left < MARGIN) left = tRect.right + 2;
+    // Clamp on-screen: in the touch bottom sheet the trigger row is
+    // full-width, so "beside the trigger" is past the viewport edge — the
+    // submenu floats over the sheet's right side instead.
+    left = Math.min(left, window.innerWidth - sRect.width - MARGIN);
+    if (left < MARGIN) left = MARGIN;
     let top = tRect.top - 4;
     const maxTop = window.innerHeight - sRect.height - MARGIN;
     if (top > maxTop) top = maxTop;
     if (top < MARGIN) top = MARGIN;
     setFixedPos({ top, left });
-  }, [isOpen]);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setFixedPos(null);
+      return;
+    }
+    position();
+    // The submenu grows when a row's X expander opens its stepper. Positioning
+    // only on open left the new rows hanging below the screen edge with no
+    // scroll container to reach them, so re-clamp whenever it resizes.
+    const sub = submenuRef.current;
+    if (!sub || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => position());
+    ro.observe(sub);
+    return () => ro.disconnect();
+  }, [isOpen, position]);
 
   const lock = useCallback(() => { lockedRef.current = true; }, []);
   const unlock = useCallback(() => { lockedRef.current = false; }, []);
@@ -107,9 +129,19 @@ function SubmenuTrigger({
     };
   }, []);
 
+  // Touch: hover never means anything real — after a tap Chrome clears its
+  // synthetic hover state, firing a mouseleave that closed the submenu the tap
+  // had just opened. On touch only the tap toggle (and closing the whole menu)
+  // dismisses a submenu.
+  const isTouch = useInputMode() === 'touch';
+
   const showSub = () => {
     if (ctx?.closeTimerRef.current) { clearTimeout(ctx.closeTimerRef.current); ctx.closeTimerRef.current = null; }
     if (isOpen) return;
+    // Touch: the browser's synthesized mouseenter would start this timer and
+    // race the tap toggle below — whichever lost, the submenu ended up shut.
+    // Hover is meaningless here, so the tap is the only opener.
+    if (isTouch) return;
     if (!openTimerRef.current) {
       openTimerRef.current = setTimeout(() => {
         openTimerRef.current = null;
@@ -120,7 +152,7 @@ function SubmenuTrigger({
 
   const hideSub = () => {
     if (openTimerRef.current) { clearTimeout(openTimerRef.current); openTimerRef.current = null; }
-    if (lockedRef.current) return;
+    if (lockedRef.current || isTouch) return;
     if (ctx) {
       ctx.closeTimerRef.current = setTimeout(() => ctx.setActive(null), 400);
     }
@@ -136,6 +168,12 @@ function SubmenuTrigger({
         style={ITEM_STYLE}
         onMouseEnter={(e) => { hoverEnter(e); showSub(); }}
         onMouseLeave={(e) => { hoverLeave(e); }}
+        // Tap toggle: hover never fires on touch, so without this the
+        // submenus were unreachable even once the deck sheet opened.
+        onClick={() => {
+          if (openTimerRef.current) { clearTimeout(openTimerRef.current); openTimerRef.current = null; }
+          ctx?.setActive(isOpen ? null : label);
+        }}
       >
         <ChevronRight size={12} style={{ opacity: 0.6, transform: 'rotate(180deg)' }} />
         <span>{label}</span>
@@ -206,16 +244,18 @@ export function DeckContextMenu({
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
     document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
   }, [onClose]);
 
   return (
     <div
-      ref={menuRef}
+      ref={menuRef} data-context-menu
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
