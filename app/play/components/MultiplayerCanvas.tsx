@@ -919,11 +919,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // above the floating toolbar reserve. On narrow viewports the mainCard
   // height can exceed the hand zone's usable height, which would push card
   // bottoms (e.g. Judas's alignment line) under the toolbar.
-  // The reserve keeps card bottoms clear of the floating toolbar. On touch the
-  // toolbar collapses to a small button pinned bottom-LEFT while the hand fans
-  // from the band's centre, so nothing needs reserving - and paying the 48
-  // virtual px anyway squeezed hand cards to ~37 screen px wide, under the
-  // touch target floor, on the surface a player uses every single turn.
+  //
+  // Touch has nothing to reserve for: the toolbar collapses to a small button
+  // pinned bottom-LEFT while the hand fans from the band's centre. Paying the
+  // 48 virtual px anyway squeezed hand cards to ~37 screen px wide -- under
+  // the touch target floor, on the surface used every single turn.
   const handToolbarReserve = useCompactLayout ? 0 : HAND_TOOLBAR_RESERVE;
 
   const { handCardWidth, handCardHeight } = useMemo(() => {
@@ -5044,8 +5044,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   );
 
   /** The in-play zones offered by the "cards in play" sheet, with live counts.
-   *  Piles already open a grid when tapped in the sidebar rail; these four are
-   *  the free-form zones that had no list view at all. */
+   *  Sidebar piles already open a grid when tapped; these are the zones on the
+   *  board itself, which had no list view at all. */
   const boardBrowseEntries = useMemo<BoardBrowseEntry[]>(() => {
     const sharedLob = normalizedFormat === 'Paragon';
     const entries: BoardBrowseEntry[] = [
@@ -5370,7 +5370,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           : null;
         if (node && typeof (node as any).stopDrag === 'function') (node as any).stopDrag();
       }
-      if (e.type === 'touchmove') setActiveJumpId(null);
+      if (e.type === 'touchmove' && isZoomed) setActiveJumpId(null);
       onCameraPointers(pointers);
       return;
     }
@@ -5389,9 +5389,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
       if (onDraggable) return;
     }
-    if (e.type === 'touchmove') setActiveJumpId(null);
+    // Only while zoomed: at fit a pan is clamped to a no-op, so the framing is
+    // still "Fit" and the button should stay lit.
+    if (e.type === 'touchmove' && isZoomed) setActiveJumpId(null);
     onCameraPointers(pointers);
-  }, [isTouch, onCameraPointers, collectPointers]);
+  }, [isTouch, isZoomed, onCameraPointers, collectPointers]);
 
   const handleStageTouchEnd = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     if (!isTouch) return;
