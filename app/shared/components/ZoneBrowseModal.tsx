@@ -170,8 +170,11 @@ interface ZoneBrowseModalProps {
 export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly, onRequestCardMenu, alwaysUseCardMenu }: ZoneBrowseModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
   // Touch has no clicks, lassos or right-clicks — say what actually works.
-  const hintText = useInputMode() === 'touch'
-    ? 'Tap to select · Long-press a card for actions'
+  const isTouchInput = useInputMode() === 'touch';
+  const hintText = isTouchInput
+    ? (alwaysUseCardMenu
+        ? 'Tap a card for its actions'
+        : 'Tap to select · Long-press a card for actions')
     : 'Drag to a zone · Click or lasso to select · Right-click for more';
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck } = actions;
@@ -329,13 +332,22 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     }
   };
 
-  const handlePointerUp = (card: GameCard) => {
+  const handlePointerUp = (card: GameCard, e?: React.PointerEvent) => {
     // Only toggle selection if this was a click (no drag occurred) on the same card
     if (pointerDownCardRef.current !== card.instanceId) return;
     pointerDownCardRef.current = null;
     if (consumeCardPressFired(cardPressRef)) return;
     if (didDragRef?.current) {
       didDragRef.current = false;
+      return;
+    }
+    // Browsing an in-play zone on touch: the grid exists BECAUSE the card is
+    // hard to hit on the board, so a tap should do the thing the player came
+    // for. There is no batch-move use for a territory, and requiring a second
+    // long-press to reach any action is the friction this sheet is meant to
+    // remove. Pile grids keep tap-to-select for their multi-card moves.
+    if (alwaysUseCardMenu && e?.pointerType === 'touch' && !readOnly) {
+      openCardMenu(card, e.clientX, e.clientY);
       return;
     }
     setContextCard(null);
@@ -604,7 +616,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                   data-card-id={card.instanceId}
                   style={{ position: 'relative', cursor: 'grab' }}
                   onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
-                  onPointerUp={() => handlePointerUp(card)}
+                  onPointerUp={(e) => handlePointerUp(card, e)}
                   onTouchStart={(e) => beginCardPress(cardPressRef, e, (px, py) => openCardMenu(card, px, py))}
                   onTouchMove={(e) => moveCardPress(cardPressRef, e)}
                   onTouchEnd={(e) => { if (cardPressFired(cardPressRef)) e.preventDefault(); cancelCardPress(cardPressRef); }}

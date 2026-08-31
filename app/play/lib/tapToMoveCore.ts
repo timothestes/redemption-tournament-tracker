@@ -121,12 +121,20 @@ const SHARED_DESTINATIONS: ZoneId[] = ['land-of-bondage', 'soul-deck'];
 /**
  * Zones pulled to the front of the rail for a Lost Soul.
  *
- * The rail is one horizontally scrolling row, so anything past the third chip
- * needs a sideways scroll to reach. A Lost Soul only ever goes two places in
- * real play — into a Land of Bondage, or out of one into a Land of Redemption
- * on a rescue — and both sat at positions 6 and 8 of the default order.
+ * The rail is one horizontally scrolling row that fits about five chips, and a
+ * Lost Soul only ever goes two places in real play — into a Land of Bondage,
+ * or out of one into a Land of Redemption on a rescue. Both sat at positions 6
+ * and 8 of the default order, off the right edge.
+ *
+ * Which of the two leads depends on where the soul is now: a soul sitting in a
+ * Land of Bondage is nearly always about to be rescued, and anywhere else it
+ * is nearly always on its way into bondage.
  */
-const LOST_SOUL_PRIORITY: ZoneId[] = ['land-of-bondage', 'land-of-redemption'];
+function lostSoulPriority(sourceZone: ZoneId): ZoneId[] {
+  return sourceZone === 'land-of-bondage'
+    ? ['land-of-redemption', 'land-of-bondage']
+    : ['land-of-bondage', 'land-of-redemption'];
+}
 
 /** Stable partial sort: `priority` zones first, in the order given; everything
  *  else keeps its original relative order. */
@@ -175,5 +183,5 @@ export function legalDestinations(
   }
 
   const legal = out.filter((d) => !(d.zone === sourceZone && d.owner === sourceOwner));
-  return opts.isLostSoul ? prioritize(legal, LOST_SOUL_PRIORITY) : legal;
+  return opts.isLostSoul ? prioritize(legal, lostSoulPriority(sourceZone)) : legal;
 }

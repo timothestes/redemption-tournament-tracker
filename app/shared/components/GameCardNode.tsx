@@ -146,10 +146,20 @@ export const GameCardNode = memo(function GameCardNode({
   const pressRef = useRef<{ x: number; y: number; fired: boolean } | null>(null);
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Once the menu opens it covers the board as a bottom sheet, so the finger
+  // that opened it is usually OVER THE SHEET, not over this node - the node's
+  // own touchmove stops arriving exactly when the "they meant to drag"
+  // dismissal needs it. A document listener sees the whole press either way.
+  const docMoveRef = useRef<((ev: TouchEvent) => void) | null>(null);
+
   const clearPress = useCallback(() => {
     if (pressTimerRef.current !== null) {
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
+    }
+    if (docMoveRef.current) {
+      document.removeEventListener('touchmove', docMoveRef.current);
+      docMoveRef.current = null;
     }
     pressRef.current = null;
   }, []);
@@ -172,6 +182,21 @@ export const GameCardNode = memo(function GameCardNode({
     longPressTapSwallowRef.current = false;
     const origin = { x: t.clientX, y: t.clientY, fired: false };
     pressRef.current = origin;
+    const onDocMove = (ev: TouchEvent) => {
+      const st = pressRef.current;
+      if (!st) return;
+      if ((ev.touches?.length ?? 0) > 1) { clearPress(); return; }
+      const touch = ev.touches?.[0];
+      if (!touch) return;
+      const travelled = Math.hypot(touch.clientX - st.x, touch.clientY - st.y);
+      if (st.fired) {
+        if (travelled > LONG_PRESS_DISMISS_TRAVEL) { clearPress(); onLongPressCancel?.(); }
+        return;
+      }
+      if (travelled > LONG_PRESS_MOVE_TOLERANCE) clearPress();
+    };
+    docMoveRef.current = onDocMove;
+    document.addEventListener('touchmove', onDocMove, { passive: true });
     pressTimerRef.current = setTimeout(() => {
       const s = pressRef.current;
       if (!s || s.fired) return;
@@ -205,17 +230,16 @@ export const GameCardNode = memo(function GameCardNode({
       }
       s.fired = true;
       longPressTapSwallowRef.current = true;
-      // onLongPress FIRST: Konva's dragDistance is 3px but our movement
-      // tolerance is 10px, so in the 3-10px band a real Konva drag is already
-      // running and stopDrag() emits a genuine dragend. The canvas marks the
-      // drag cancelled inside this callback, so the dragend is ignored rather
-      // than committing the move (which could equip a weapon by accident).
       onLongPress(card, { x: s.x, y: s.y });
-      const node: any = e.target;
-      if (node && typeof node.stopDrag === 'function') node.stopDrag();
-      setIsDragging(false);
+      // Deliberately NOT stopDrag(). With dragDistance above the movement
+      // tolerance no drag can be running here (the guard above bails if one
+      // somehow is), and Konva's armed drag element is what lets the gesture
+      // still become a drag: a player who held to aim, got a menu they did
+      // not want, and kept moving gets the card under their finger and the
+      // menu dismissed (see the document listener above) instead of a dead
+      // gesture they have to start over.
     }, LONG_PRESS_MS);
-  }, [onLongPress, card, clearPress]);
+  }, [onLongPress, onLongPressCancel, card, clearPress]);
 
   const moveLongPress = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     const s = pressRef.current;

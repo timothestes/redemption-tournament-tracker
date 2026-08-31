@@ -135,11 +135,11 @@ describe('legalDestinations - Lost Soul ordering', () => {
     expect(mine.slice(0, 2)).toEqual(['land-of-bondage', 'land-of-redemption']);
   });
 
-  it('hoists the rescue destination on the opponent side too', () => {
+  it('leads with the rescue when the soul is already in a Land of Bondage', () => {
     const d = legalDestinations('land-of-bondage', 'opponent', 'T1', { isLostSoul: true });
     const mine = d.filter((x) => x.owner === 'my').map((x) => x.zone);
-    expect(mine[0]).toBe('land-of-bondage');
-    expect(mine[1]).toBe('land-of-redemption');
+    // A soul in a Land of Bondage is nearly always about to be rescued.
+    expect(mine.slice(0, 2)).toEqual(['land-of-redemption', 'land-of-bondage']);
     // The source zone is still filtered out of its own side.
     const theirs = d.filter((x) => x.owner === 'opponent').map((x) => x.zone);
     expect(theirs).not.toContain('land-of-bondage');

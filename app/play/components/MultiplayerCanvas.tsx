@@ -5334,10 +5334,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
    *  by resetting the camera (dbltap) and, with a card armed, could commit a
    *  tapZone move at the release point. */
   const sawMultiTouchRef = useRef(false);
+  /** Draggable nodes this gesture's fingers landed on. Konva ARMS a drag on
+   *  touchstart and starts it once the finger travels past dragDistance, so a
+   *  node is dangerous long before `isDraggingRef` knows about it. */
+  const pendingDragNodesRef = useRef<Set<Konva.Node>>(new Set());
 
   const handleStageTouch = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     if (!isTouch) return;
     const pointers = collectPointers(e.evt);
+
+    // Remember every draggable node a finger came down on, whichever finger it
+    // was — the branch below only ever inspects one target, and a two-finger
+    // gesture routinely lands on two different cards.
+    if (e.type === 'touchstart') {
+      const hitStage = e.target.getStage();
+      let cur: Konva.Node | null = e.target as Konva.Node;
+      while (cur && cur !== (hitStage as unknown as Konva.Node)) {
+        if (typeof (cur as any).draggable === 'function' && (cur as any).draggable()) {
+          pendingDragNodesRef.current.add(cur);
+          break;
+        }
+        cur = cur.getParent();
+      }
+    }
 
     if (pointers.length === 1) {
       const p = pointers[0];
@@ -5370,6 +5389,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           : null;
         if (node && typeof (node as any).stopDrag === 'function') (node as any).stopDrag();
       }
+      // Disarm drags Konva has readied but not yet started. Left armed, one
+      // starts a frame or two into the pinch — and the moment ANY Konva drag
+      // is live, Stage._pointermove returns before firing shape events, so the
+      // stage stops delivering touchmove and the camera freezes after a single
+      // frame. That is what made two-finger panning look like it moved the
+      // board once and then gave up.
+      if (pendingDragNodesRef.current.size > 0) {
+        for (const node of pendingDragNodesRef.current) {
+          // stopDrag fires a synchronous dragend, which this flag turns into a
+          // no-op; a node that was only ARMED emits none, so clear it after.
+          dragCancelledRef.current = true;
+          if (typeof (node as any).stopDrag === 'function') (node as any).stopDrag();
+        }
+        pendingDragNodesRef.current.clear();
+        dragCancelledRef.current = false;
+      }
       if (e.type === 'touchmove' && isZoomed) setActiveJumpId(null);
       onCameraPointers(pointers);
       return;
@@ -5399,6 +5434,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (!isTouch) return;
     onCameraPointers(collectPointers(e.evt));
     touchStartPtRef.current = null;
+    if ((e.evt.touches?.length ?? 0) === 0) pendingDragNodesRef.current.clear();
   }, [isTouch, onCameraPointers, collectPointers]);
 
 
