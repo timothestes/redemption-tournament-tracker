@@ -428,6 +428,38 @@ html[data-input-mode='touch'] [data-game-toolbar] button svg {
   }
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   The chat / game-log panel on a phone.
+
+   Expanded, the panel is a `clamp(280px, 20vw, 380px)` column beside the
+   board, led by a full-width card loupe. On a landscape phone that column is
+   a third of the screen, the loupe alone is ~358px of a 393px viewport (so no
+   chat is visible at all), and the panel's own close button sits under the
+   overlaid turn bar. Small screens get it as a full overlay instead, without
+   the loupe — there is no hover on touch to put a card in it, and tapping a
+   card opens the real preview anyway.
+
+   z-index clears the turn bar (20) and the floating toolbar/gear (200), and
+   stays under the browse modals (500) and context menus (900).
+   ────────────────────────────────────────────────────────────────────────── */
+@media (max-height: 560px), (max-width: 560px) {
+  html[data-input-mode='touch'] [data-right-panel][data-panel-open] {
+    position: fixed !important;
+    inset: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    z-index: 300 !important;
+    border-left: none !important;
+    background: rgba(10, 8, 5, 0.97) !important;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  html[data-input-mode='touch'] [data-right-panel][data-panel-open] [data-panel-preview] {
+    display: none !important;
+  }
+}
+
 /* Modal card grids (deck search/peek, zone/opponent browse): suppress the iOS
    long-press image callout and text selection so the modals' long-press card
    menus fire instead of the system sheet. */

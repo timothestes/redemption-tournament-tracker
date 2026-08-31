@@ -89,7 +89,10 @@ export default function RightPanel({
   const isRail = isTouch && !isLoupeVisible;
 
   return (
-    <div style={{
+    <div
+      data-right-panel
+      data-panel-open={isLoupeVisible ? 'true' : undefined}
+      style={{
       width: isLoupeVisible ? PANEL_EXPANDED_WIDTH : collapsedWidth,
       minWidth: isLoupeVisible ? undefined : collapsedWidth,
       flexShrink: 0,
@@ -138,7 +141,7 @@ export default function RightPanel({
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
             }}>
-              Preview
+              {isTouch ? 'Chat & Log' : 'Preview'}
             </span>
           </>
         ) : (
@@ -190,7 +193,7 @@ export default function RightPanel({
       )}
       {isLoupeVisible && (
         <>
-          <div style={{
+          <div data-panel-preview style={{
             flexShrink: 0,
             padding: 12,
             display: 'flex',
