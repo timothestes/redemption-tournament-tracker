@@ -364,7 +364,17 @@ export const GameCardNode = memo(function GameCardNode({
           e.cancelBubble = true;
         }
       }}
-      onDragStart={() => { clearPress(); setIsDragging(true); onDragStart(card); }}
+      onDragStart={() => {
+        // A real drag has begun. If the long-press menu opened while the
+        // player was still aiming, this is the proof they wanted to move the
+        // card -- take the menu away now rather than waiting for the
+        // document listener's larger travel threshold, which clearPress()
+        // below would disarm anyway.
+        if (pressRef.current?.fired) onLongPressCancel?.();
+        clearPress();
+        setIsDragging(true);
+        onDragStart(card);
+      }}
       onDragMove={onDragMove}
       onDragEnd={(e) => { setIsDragging(false); onDragEnd(card, e); }}
       onContextMenu={(e) => onContextMenu(card, e)}
