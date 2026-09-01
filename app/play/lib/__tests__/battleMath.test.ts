@@ -6,8 +6,10 @@ import {
   summarizeAutoReturn,
   siteAttachedSoulIds,
   parseMeekStats,
+  parseAlignmentStats,
   type BattleCardLike,
 } from '../battleMath';
+import { CARDS } from '@/lib/cards/lookup';
 
 // Card factory. Defaults land the card on its OWNER's own half
 // (dbX=0.6, cardRelW=0.1 -> centerX=0.65 >= 0.5) so most totals/initiative
@@ -174,6 +176,114 @@ describe('parseMeekStats', () => {
     expect(parseMeekStats('7', '7')).toBeNull();
     expect(parseMeekStats('7', '3(7)')).toBeNull();
     expect(parseMeekStats('', '')).toBeNull();
+  });
+});
+
+describe('parseAlignmentStats — dual-icon cards', () => {
+  it('Nebuchadnezzar (PoC): an Evil-aligned instance reads his 11/10 Evil Character side, not the 4/3 Hero side', () => {
+    expect(parseAlignmentStats('4/11', '3/10', 'Evil')).toEqual({ strength: '11', toughness: '10' });
+  });
+
+  it('Abram/Abraham: a Good-aligned instance reads the first segment (Abram, 5/6)', () => {
+    expect(parseAlignmentStats('5/10', '6/11', 'Good')).toEqual({ strength: '5', toughness: '6' });
+  });
+
+  it('Neutral GE/EE cards keep the GE side (Delivered 3/2), matching the pre-fix parseInt value', () => {
+    expect(parseAlignmentStats('3/2', '2/3', 'Neutral')).toEqual({ strength: '3', toughness: '2' });
+  });
+
+  it('passes a stat-less good segment through verbatim so it still reads as unknown (Scapegoat (PoC))', () => {
+    expect(parseAlignmentStats('-/0', '-/6', 'Neutral')).toEqual({ strength: '-', toughness: '-' });
+  });
+
+  it('returns null when there is no second side to choose (plain stats, blanked Forge fields)', () => {
+    expect(parseAlignmentStats('5', '4', 'Evil')).toBeNull();
+    expect(parseAlignmentStats('', '', 'Evil')).toBeNull();
+  });
+
+  it('returns null when the two fields disagree on how many sides they have', () => {
+    expect(parseAlignmentStats('4/11', '3', 'Evil')).toBeNull();
+    expect(parseAlignmentStats('4', '3/10', 'Evil')).toBeNull();
+  });
+
+  it('tolerates surrounding whitespace in both the stats and the alignment', () => {
+    expect(parseAlignmentStats('4 / 11', '3 / 10', ' evil ')).toEqual({ strength: '11', toughness: '10' });
+  });
+});
+
+describe('dual-icon cards in the battle band', () => {
+  it('Nebuchadnezzar (PoC) fights as an 11/10, the numbers his crimson icon prints', () => {
+    const nebbie = mkCard({
+      ownerSeat: '0',
+      cardName: 'Nebuchadnezzar (PoC)',
+      cardType: 'Evil Character',
+      strength: '11',
+      toughness: '10',
+    });
+    expect(sideTotals([nebbie], '0')).toEqual({ str: 11, tgh: 10, hasUnknown: false });
+  });
+
+  it('and beats a blocker he used to lose to at his mistaken 4/3', () => {
+    const cards = [
+      mkCard({ ownerSeat: '0', cardType: 'Evil Character', strength: '11', toughness: '10' }),
+      mkCard({ ownerSeat: '1', cardType: 'Hero', strength: '4', toughness: '5' }),
+    ];
+    // attacker 11 >= defender toughness 5, defender 4 < attacker toughness 10:
+    // the defender is losing outright and takes initiative.
+    expect(computeInitiative(cards, '0', '')).toEqual({
+      kind: 'initiative',
+      seat: '1',
+      reason: 'losing',
+    });
+  });
+});
+
+// Drift guard. The rule above is only safe while the generated card data
+// keeps listing dual stat lines good-side-first, and while the set of cards
+// that print two of them stays the one we checked against real scans. A new
+// slashed-stat card from `make update-cards` lands here first instead of
+// silently taking a wrong segment into somebody's battle band.
+describe('card data: every card that prints two stat lines', () => {
+  const dualStatCards = CARDS.filter(
+    (c) => c.strength.includes('/') || c.toughness.includes('/'),
+  );
+
+  it('is one of the six known printings', () => {
+    expect(dualStatCards.map((c) => c.name).sort()).toEqual([
+      'Abram/Abraham',
+      'Delivered',
+      'Nebuchadnezzar (PoC)',
+      'Persian Horsemen / Persian Horses',
+      'Philosophy',
+      'Scapegoat (PoC)',
+    ]);
+  });
+
+  it('resolves to the side its alignment icon prints', () => {
+    const resolved = Object.fromEntries(
+      dualStatCards.map((c) => [
+        c.name,
+        parseAlignmentStats(c.strength, c.toughness, c.alignment),
+      ]),
+    );
+    expect(resolved).toEqual({
+      // The bug this guards: his Evil Character side, not the Hero side.
+      'Nebuchadnezzar (PoC)': { strength: '11', toughness: '10' },
+      'Abram/Abraham': { strength: '5', toughness: '6' },
+      'Persian Horsemen / Persian Horses': { strength: '2', toughness: '2' },
+      'Delivered': { strength: '3', toughness: '2' },
+      'Philosophy': { strength: '3', toughness: '2' },
+      'Scapegoat (PoC)': { strength: '-', toughness: '-' },
+    });
+  });
+
+  it('leaves five of the six on the number the old parseInt already produced', () => {
+    for (const c of dualStatCards) {
+      if (c.name === 'Nebuchadnezzar (PoC)') continue;
+      const sided = parseAlignmentStats(c.strength, c.toughness, c.alignment)!;
+      expect(parseInt(sided.strength, 10)).toEqual(parseInt(c.strength, 10));
+      expect(parseInt(sided.toughness, 10)).toEqual(parseInt(c.toughness, 10));
+    }
   });
 });
 

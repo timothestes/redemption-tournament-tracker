@@ -110,6 +110,7 @@ import {
   battleSideOf,
   sideTotals,
   computeInitiative,
+  parseAlignmentStats,
   siteAttachedSoulIds,
   parseMeekStats,
   type BattleCardLike,
@@ -6240,13 +6241,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         // summary must predict the server, which only sees the blanked row
         // (see resolveBattleRowFields).
         const resolved = resolveBattleRowFields(row, forgeResolver);
+        // Dual-icon cards (Nebuchadnezzar (PoC) and friends) carry BOTH
+        // printed stat lines in one slash-joined field; resolve down to the
+        // side matching the row's alignment before anything parses a number
+        // out of it, or parseInt silently takes the left (good) segment and
+        // counts an 11/10 Evil Character as a 4/3 Hero. See
+        // parseAlignmentStats. Runs BEFORE the meek read so a meek value is
+        // looked for inside the already-chosen side.
+        const sideStats = parseAlignmentStats(resolved.strength, resolved.toughness, row.alignment);
+        const sidedStr = sideStats ? sideStats.strength : resolved.strength;
+        const sidedTgh = sideStats ? sideStats.toughness : resolved.toughness;
         // Meek hero/character in battle must count its meek-side power/
         // toughness, not its normal-side stats (spec: Matthias converted to
         // meek is 7/7). The meek value lives in the row's own strength/
         // toughness string ("<normal>(<meek>)") — see parseMeekStats. Falls
         // through to the normal-side string unchanged when unresolvable
         // (non-meek card, blanked Forge field), matching existing ? handling.
-        const meekStats = row.isMeek ? parseMeekStats(resolved.strength, resolved.toughness) : null;
+        const meekStats = row.isMeek ? parseMeekStats(sidedStr, sidedTgh) : null;
         entries.push({
           row,
           owner,
@@ -6254,8 +6265,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             ownerSeat: seat,
             dbX: parseFloat(row.posX || '0'),
             cardRelW,
-            strength: meekStats ? String(meekStats.strength) : resolved.strength,
-            toughness: meekStats ? String(meekStats.toughness) : resolved.toughness,
+            strength: meekStats ? String(meekStats.strength) : sidedStr,
+            toughness: meekStats ? String(meekStats.toughness) : sidedTgh,
             brigade: resolved.brigade,
             cardType: row.cardType,
             specialAbility: row.specialAbility,
