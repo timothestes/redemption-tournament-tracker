@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregateOwnedByName, computeMissingCards } from "../collectionCheck";
+import { aggregateOwnedByName, computeMissingCards, ownedCardNames } from "../collectionCheck";
 import type { BuyDeckCard } from "../../components/BuyDeckModal";
 
 function bdc(
@@ -23,6 +23,37 @@ describe("aggregateOwnedByName", () => {
 
   it("returns an empty record for an empty map", () => {
     expect(aggregateOwnedByName(new Map())).toEqual({});
+  });
+});
+
+describe("ownedCardNames", () => {
+  it("collapses every printing of a name to one entry", () => {
+    const q = new Map<string, number>([
+      ["Mayhem|Rot|a.jpg", 1],
+      ["Mayhem|Pi|b.jpg", 2],
+      ["Angel|Rot|c.jpg", 3],
+    ]);
+    expect(ownedCardNames(q)).toEqual(new Set(["Mayhem", "Angel"]));
+  });
+
+  it("ignores zero and negative quantities", () => {
+    const q = new Map<string, number>([
+      ["Mayhem|Rot|a.jpg", 0],
+      ["Angel|Rot|c.jpg", 1],
+    ]);
+    expect(ownedCardNames(q)).toEqual(new Set(["Angel"]));
+  });
+
+  it("keeps a name owned when only one of its printings is stocked", () => {
+    const q = new Map<string, number>([
+      ["Mayhem|Rot|a.jpg", 0],
+      ["Mayhem|Pi|b.jpg", 1],
+    ]);
+    expect(ownedCardNames(q)).toEqual(new Set(["Mayhem"]));
+  });
+
+  it("returns an empty set for an empty map", () => {
+    expect(ownedCardNames(new Map())).toEqual(new Set());
   });
 });
 

@@ -319,6 +319,13 @@ export default function CollectionClient() {
           ) : null}
         </span>
         <div className="flex items-center gap-2 ml-auto">
+          {/* Opens the deck builder with its "Cards I own" filter already on. */}
+          <a
+            href="/decklist/card-search?owned=true"
+            className="px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+          >
+            Build a deck
+          </a>
           <button
             onClick={() => setShowSetStats((v) => !v)}
             className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted"

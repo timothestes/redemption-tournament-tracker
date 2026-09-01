@@ -11,6 +11,10 @@ interface FilterGridProps {
   toggleAlignmentFilter: (value: string) => void;
   selectedRarityFilters: string[];
   toggleRarityFilter: (value: string) => void;
+  /** Whether to offer the "Cards I own" filter (signed in, non-Forge host). */
+  showOwnedFilter: boolean;
+  ownedOnly: boolean;
+  setOwnedOnly: (value: boolean | ((prev: boolean) => boolean)) => void;
   
   // Advanced filters
   advancedOpen: boolean;
@@ -80,6 +84,9 @@ export default function FilterGrid({
   toggleAlignmentFilter,
   selectedRarityFilters,
   toggleRarityFilter,
+  showOwnedFilter,
+  ownedOnly,
+  setOwnedOnly,
   advancedOpen,
   setAdvancedOpen,
   selectedTestaments,
@@ -244,6 +251,24 @@ export default function FilterGrid({
             ))}
           </div>
         </div>
+        {showOwnedFilter && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
+            <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Collection</span>
+            <button
+              aria-pressed={ownedOnly}
+              className={clsx(
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
+                ownedOnly
+                  ? 'bg-primary/20 text-primary border-primary/30'
+                  : 'bg-muted text-foreground hover:bg-muted/80 border-border'
+              )}
+              onClick={() => setOwnedOnly((v) => !v)}
+              title="Show only cards in your collection (any printing counts)"
+            >
+              Cards I own
+            </button>
+          </div>
+        )}
         {/* Utility controls — inline with text filter rows */}
         <div className="flex items-center gap-2">
           <span

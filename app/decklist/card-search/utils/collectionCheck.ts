@@ -16,6 +16,20 @@ export function aggregateOwnedByName(
   return owned;
 }
 
+/**
+ * The set of card NAMES the user owns at least one copy of, in any printing.
+ * Same name-level rule as `aggregateOwnedByName` — the "Cards I own"
+ * search filter treats owning any printing as owning the card, so one copy in
+ * your binder surfaces every reprint of it in the builder.
+ */
+export function ownedCardNames(quantities: Map<string, number>): Set<string> {
+  const names = new Set<string>();
+  for (const [fullKey, qty] of quantities) {
+    if (qty > 0) names.add(fullKey.split("|")[0]);
+  }
+  return names;
+}
+
 export interface MissingResult {
   /** Deck entries (main+reserve) the user is short on, with original card_key/zone preserved. */
   missing: BuyDeckCard[];
