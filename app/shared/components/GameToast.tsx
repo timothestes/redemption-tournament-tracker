@@ -7,14 +7,19 @@ interface Toast {
   id: number;
   message: string;
   durationMs: number;
+  /** Verbatim player-authored text (a chat message) rather than game chrome.
+   *  Cinzel is an all-caps display serif — fine for "Deck is empty", but it
+   *  renders someone's sentence as SHOUTING, and `nowrap` runs a long one off
+   *  both edges of a phone. */
+  verbatim?: boolean;
 }
 
 let toastId = 0;
 const listeners: ((toast: Toast) => void)[] = [];
 const clearListeners: (() => void)[] = [];
 
-export function showGameToast(message: string, durationMs = 2500) {
-  const toast: Toast = { id: ++toastId, message, durationMs };
+export function showGameToast(message: string, durationMs = 2500, opts?: { verbatim?: boolean }) {
+  const toast: Toast = { id: ++toastId, message, durationMs, verbatim: opts?.verbatim };
   listeners.forEach(fn => fn(toast));
 }
 
@@ -73,9 +78,14 @@ export function GameToastContainer() {
               padding: '10px 18px',
               color: 'var(--gf-text-bright)',
               fontSize: 14,
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontFamily: toast.verbatim
+                ? 'var(--font-geist-sans, system-ui, sans-serif)'
+                : 'var(--font-cinzel), Georgia, serif',
               boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-              whiteSpace: 'nowrap',
+              whiteSpace: toast.verbatim ? 'pre-wrap' : 'nowrap',
+              maxWidth: toast.verbatim ? 'min(78vw, 460px)' : undefined,
+              wordBreak: toast.verbatim ? 'break-word' : undefined,
+              textAlign: toast.verbatim ? 'left' : undefined,
             }}
           >
             {toast.message}

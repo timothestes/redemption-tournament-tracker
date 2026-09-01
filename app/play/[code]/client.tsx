@@ -582,17 +582,45 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Track unread chat messages at this level so the count survives ChatPanel
   // unmounting when the right panel collapses.
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  // The counter used to start at 0, so the entire existing history counted as
+  // unread the moment the subscription landed — and this component remounts on
+  // every reconnect, so a flaky phone connection re-flagged every message in
+  // the game, every time. `isChatReady` alone isn't enough to fix it: the flag
+  // flips true one render BEFORE the backlog rows arrive (measured), so it
+  // would still baseline at 0 and then count the whole history. Instead, keep
+  // re-baselining until the sync has visibly settled.
   const prevChatCountRef = useRef(0);
+  const [chatSyncSettled, setChatSyncSettled] = useState(false);
   useEffect(() => {
-    const current = gameState.chatMessages.length;
-    if (current > prevChatCountRef.current) {
-      const newCount = current - prevChatCountRef.current;
-      if (!isLoupeVisible) {
-        setUnreadChatCount((n) => n + newCount);
-      }
-    }
+    if (!gameState.isChatReady) return;
+    const t = setTimeout(() => setChatSyncSettled(true), 1500);
+    return () => clearTimeout(t);
+  }, [gameState.isChatReady]);
+  useEffect(() => {
+    // Only player-to-player messages. senderId 0n is the system sentinel
+    // ("X started spectating", privacy toggles); those render in the Log tab,
+    // so counting them lit the "new chat" badge for things that were not chat.
+    const messages = gameState.chatMessages;
+    const current = messages.reduce((n, m) => (m.senderId !== 0n ? n + 1 : n), 0);
+    const prev = prevChatCountRef.current;
     prevChatCountRef.current = current;
-  }, [gameState.chatMessages.length, isLoupeVisible]);
+    if (!chatSyncSettled || current <= prev) return;
+    if (isLoupeVisible) return;
+    setUnreadChatCount((n) => n + (current - prev));
+    // A badge on the collapsed rail is a 17px target at the screen edge; a
+    // player looking at the board will not see it. Chat is how an opponent
+    // says "wait, can we back that up?" — surface the newest one where every
+    // other important event already surfaces.
+    const newest = [...messages].reverse().find((m) => m.senderId !== 0n);
+    const mine = gameState.myPlayer?.id;
+    if (newest && (mine === undefined || newest.senderId !== mine)) {
+      const who = newest.senderId === gameState.opponentPlayer?.id
+        ? gameState.opponentPlayer.displayName
+        : 'Spectator';
+      const body = newest.text.length > 80 ? `${newest.text.slice(0, 80)}…` : newest.text;
+      showGameToast(`💬 ${who}: ${body}`, 4000, { verbatim: true });
+    }
+  }, [gameState.chatMessages, chatSyncSettled, gameState.myPlayer, gameState.opponentPlayer, isLoupeVisible]);
 
   // Clear unread when panel opens
   useEffect(() => {

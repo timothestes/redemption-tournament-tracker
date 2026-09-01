@@ -48,7 +48,15 @@ export function BoardRequestBanner({
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: 300,
+        // 800, not 300: on a phone the chat panel is a full-screen `inset: 0`
+        // overlay at z-index 300 (globals.css), and it is rendered AFTER the
+        // canvas column, so at an equal z-index it won. A player with chat
+        // open saw only the log line ("… requested action priority") — the
+        // Grant/Deny buttons were painted over and untappable, and for a
+        // phase-stop hold that means their own turn stays frozen until the
+        // 60s server backstop. 800 matches the other must-answer surfaces
+        // (PauseConsentToast, SpectatorHandRequestBanner).
+        zIndex: 800,
         pointerEvents: 'auto',
       }}
     >

@@ -278,8 +278,12 @@ export function SpacetimeConnectionResetWrapper({ createBuilder, children }: Pro
 }
 
 // Small always-on-top readout while the auto-reconnect machinery works.
-// Purely informational: pointer-events none so it can never eat a tap, and
-// z-[60] keeps it under FatalConnectionScreen (z-[70]) and blocking prompts.
+// Purely informational: pointer-events none so it can never eat a tap.
+// z-[820] because "always on top" was not true on a phone: the chat panel is a
+// full-screen overlay at z-index 300, so at z-[60] this banner — the whole
+// point of which is to explain why nothing is responding — was itself hidden
+// by the surface a player is most likely to be sitting in when they notice.
+// It stays under FatalConnectionScreen (z-[830]).
 function ReconnectBanner({ offline, health }: { offline: boolean; health: ConnectionHealthKind }) {
   const label = offline
     ? "You're offline — waiting for network…"
@@ -288,7 +292,7 @@ function ReconnectBanner({ offline, health }: { offline: boolean; health: Connec
       : 'Reconnecting…';
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center"
+      className="pointer-events-none fixed inset-x-0 z-[820] flex justify-center"
       style={{ top: 'calc(56px + env(safe-area-inset-top, 0px))' }}
     >
       <div className="flex items-center gap-2 rounded-full border border-amber-500/40 bg-black/80 px-4 py-2 text-[13px] font-medium text-amber-200 shadow-lg backdrop-blur-sm">
@@ -303,7 +307,7 @@ function ReconnectBanner({ offline, health }: { offline: boolean; health: Connec
 // fatal screen from app/play/[code]/client.tsx so the look is preserved.
 function FatalConnectionScreen({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="fixed inset-0 z-[70] flex min-h-screen items-center justify-center bg-background/95 backdrop-blur-sm px-4">
+    <div className="fixed inset-0 z-[830] flex min-h-screen items-center justify-center bg-background/95 backdrop-blur-sm px-4">
       <div className="rounded-lg border border-border bg-card/95 p-8 text-center max-w-sm">
         <div className="mb-4 flex justify-center">
           <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
