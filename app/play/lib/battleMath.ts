@@ -135,6 +135,58 @@ export function parseMeekStats(strength: string, toughness: string): { strength:
   return { strength: s, toughness: t };
 }
 
+/**
+ * Picks the stat pair matching a dual-icon card's CURRENT alignment.
+ *
+ * Six official cards print two stat lines and the generated card data joins
+ * them with a slash into one field — Nebuchadnezzar (PoC) ships
+ * strength "4/11", toughness "3/10". `parseInt` stops at the slash, so
+ * before this helper every one of them silently contributed its LEFT value
+ * to the band totals.
+ *
+ * The segments are ordered GOOD SIDE FIRST. That holds for the dual-type
+ * printings by construction (Delivered / Philosophy are "GE/EE"; Scapegoat
+ * (PoC) is "GE/Evil Character" with stats "-/0" and "-/6" — the GE side has
+ * no printed numbers), and the Nebuchadnezzar (PoC) scan confirms it for the
+ * single-type case: his card prints the crimson 11/10 on the LEFT and the
+ * purple/white 4/3 on the right, i.e. the data order is the reverse of the
+ * card's visual order.
+ *
+ * So an Evil-aligned instance reads the last segment and everything else
+ * reads the first. Applied to the six real cards that means:
+ *
+ *   Nebuchadnezzar (PoC)  Evil     -> 11/10  (his Evil Character side; he
+ *                                    "Begins as an Evil Character" and only
+ *                                    converts to the 4/3 Hero AFTER battle,
+ *                                    so 11/10 is the only value a card in
+ *                                    the band can have)
+ *   Persian Horsemen      Evil     -> 2/2    (both segments are 2/2)
+ *   Abram/Abraham         Good     -> 5/6    (Abram, the printed base state)
+ *   Delivered, Philosophy Neutral  -> 3/2    (the GE side)
+ *   Scapegoat (PoC)       Neutral  -> "-"    (unparseable -> band shows "?",
+ *                                    exactly as before)
+ *
+ * Only Nebuchadnezzar changes value; the other five keep the number the old
+ * `parseInt` produced. Returns null when there is nothing to disambiguate
+ * (a single-segment stat, or a segment count that doesn't line up), so
+ * callers fall through to the raw string and every existing "unknown"
+ * path is untouched. Deliberately returns STRINGS, not numbers: a segment
+ * can be "-", "X" or "" and parseBattleStat already knows what each means.
+ */
+export function parseAlignmentStats(
+  strength: string,
+  toughness: string,
+  alignment: string,
+): { strength: string; toughness: string } | null {
+  const s = strength.split('/');
+  const t = toughness.split('/');
+  // Both fields must offer the same two sides, or we can't say which stat
+  // belongs to which icon — bail rather than pair mismatched segments.
+  if (s.length !== 2 || t.length !== 2) return null;
+  const i = alignment.trim().toLowerCase() === 'evil' ? 1 : 0;
+  return { strength: s[i].trim(), toughness: t[i].trim() };
+}
+
 export type InitiativeState =
   | { kind: 'empty' }
   | { kind: 'waiting-blocker' }
