@@ -58,12 +58,18 @@ export function CardPreviewProvider({
     });
   }, [storageKey]);
 
-  // Auto-hide on narrow viewports
+  // Auto-hide when the viewport *becomes* narrow. This used to close on every
+  // resize where innerWidth < 1200, which on a phone is every resize there is:
+  // rotating the device, the Android soft keyboard opening, the mobile URL bar
+  // collapsing. Since this panel is the only chat/log surface on touch, opening
+  // the log and rotating — or just tapping the chat input — closed it again.
+  // Only act on a real wide -> narrow crossing.
   useEffect(() => {
+    let wasWide = window.innerWidth >= 1200;
     const onResize = () => {
-      if (window.innerWidth < 1200) {
-        setIsLoupeVisible(false);
-      }
+      const isWide = window.innerWidth >= 1200;
+      if (wasWide && !isWide) setIsLoupeVisible(false);
+      wasWide = isWide;
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);

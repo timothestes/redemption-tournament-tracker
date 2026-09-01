@@ -78,7 +78,12 @@ export function useMultiplayerImagePreloader(
     if (pendingBumpRef.current !== null) return;
     pendingBumpRef.current = requestAnimationFrame(() => {
       pendingBumpRef.current = null;
-      scheduleBump();
+      // Bump the counter — do NOT re-enter scheduleBump(). Recursing here made
+      // this a self-perpetuating rAF that ran at display refresh rate for the
+      // whole game (a phone's "why is this app hot?") while `version` stayed
+      // pinned at 0, so a finished image never re-rendered its consumers and
+      // `isReady` could never flip.
+      setVersion((v) => v + 1);
     });
   }, []);
 

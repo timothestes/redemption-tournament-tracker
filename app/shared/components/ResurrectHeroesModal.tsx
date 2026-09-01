@@ -131,6 +131,7 @@ export function ResurrectHeroesModal({ pages, onConfirm, onCancel, isDragActive 
       // Full-area backdrop. Catches outside clicks directly (robust against
       // canvas event handling). Goes pointer-through while dragging so the drop
       // reaches the board below.
+      data-blocking-prompt
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
       style={{
         position: 'absolute',

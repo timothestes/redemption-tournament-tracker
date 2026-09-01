@@ -26,6 +26,7 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
 
   return (
     <div
+      data-blocking-prompt
       style={{
         position: 'absolute',
         top: '50%',
