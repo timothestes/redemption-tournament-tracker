@@ -24,6 +24,7 @@ import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
 import { useCollectionState } from "../../collection/hooks/useCollectionState";
 import { ownedCardNames } from "./utils/collectionCheck";
+import { cycleOwnedMode, parseOwnedMode, ownedModeParam, OWNED_MODE_LABELS, type OwnedFilterMode } from "./ownedFilter";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, downloadDeckAsFileBySet, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
@@ -53,6 +54,7 @@ const PILL_STYLES = {
   misc: 'bg-fuchsia-500/15 text-fuchsia-300 hover:bg-fuchsia-500/25',
   stat: 'bg-orange-500/15 text-orange-300 hover:bg-orange-500/25',
   collection: 'bg-zinc-500/25 text-zinc-200 hover:bg-zinc-500/35',
+  collectionMissing: 'bg-amber-600/20 text-amber-200 hover:bg-amber-600/30',
 } as const;
 // Brigade pills get tinted with their own brigade color so "Green AND White" reads as the
 // brigades themselves, not generic blue chips.
@@ -544,19 +546,20 @@ export default function CardSearchClient({
     adjustQuantity: adjustCollectionQuantity,
   } = useCollectionState({ enabled: !!user });
 
-  // "Cards I own" — narrows the search to the user's collection so a deck can be
-  // built from what's actually in their binder. Ownership is name-level (any
-  // printing counts), the same rule "Check my collection" uses.
-  const [ownedOnly, setOwnedOnly] = useState(false);
+  // Collection filter, cycling all → cards I own → cards I don't own. "Owned"
+  // builds a deck from what's in your binder; "don't own" is the want-list view
+  // (what to pick up next). Ownership is name-level (any printing counts), the
+  // same rule "Check my collection" uses.
+  const [ownedMode, setOwnedMode] = useState<OwnedFilterMode>("off");
   const ownedNames = useMemo(() => ownedCardNames(collectionQuantities), [collectionQuantities]);
   // Only offered where a collection exists: signed in, and not in the Forge —
   // forge cards are unknown to the shop/collection, the same reason
   // enableShopping gates the other collection features.
   const collectionFilterAvailable = !!user && config.features?.enableShopping !== false;
-  // The toggle can outlive its availability (a shared ?owned=true link opened
+  // The filter can outlive its availability (a shared ?owned= link opened
   // signed-out). Gate at the point of use rather than resetting state, so the
   // async auth load doesn't race the URL-restored value back off.
-  const ownedFilterActive = ownedOnly && collectionFilterAvailable;
+  const activeOwnedMode: OwnedFilterMode = collectionFilterAvailable ? ownedMode : "off";
 
   // Refs for input fields to enable auto-focus
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -643,7 +646,8 @@ export default function CardSearchClient({
       params.set('toughness', filters.toughnessFilter.toString());
       params.set('toughnessOp', filters.toughnessOp);
     }
-    if (filters.ownedOnly) params.set('owned', 'true');
+    const ownedParam = ownedModeParam(filters.ownedMode);
+    if (ownedParam) params.set('owned', ownedParam);
     if (filters.altArtMode !== 'hide') params.set('showAltArt', filters.altArtMode);
     if (!filters.noFirstPrint) params.set('showFirstPrint', 'true');
     if (filters.nativityOnly) {
@@ -768,7 +772,7 @@ export default function CardSearchClient({
       }
       // Entry point from /collection ("Build a deck"). Personal to whoever
       // opens the link — it means "cards I own", not "cards they own".
-      setOwnedOnly(searchParams.get('owned') === 'true');
+      setOwnedMode(parseOwnedMode(searchParams.get('owned')));
       setNativityOnly(searchParams.get('nativity') === 'true');
       setNativityNot(searchParams.get('nativityNot') === 'true');
       setHasStarOnly(searchParams.get('hasStar') === 'true');
@@ -819,7 +823,7 @@ export default function CardSearchClient({
       strengthOp,
       toughnessFilter,
       toughnessOp,
-      ownedOnly,
+      ownedMode,
       altArtMode,
       noFirstPrint,
       nativityOnly,
@@ -843,7 +847,7 @@ export default function CardSearchClient({
     queries, legalityMode, iconFilterMode, selectedIconFilters,
     selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, testamentNots,
     isGospel, gospelNot, strengthFilter,
-    strengthOp, toughnessFilter, toughnessOp, ownedOnly, altArtMode, noFirstPrint,
+    strengthOp, toughnessFilter, toughnessOp, ownedMode, altArtMode, noFirstPrint,
     nativityOnly, nativityNot, hasStarOnly, hasStarNot, cloudOnly, cloudNot,
     angelOnly, angelNot, demonOnly, demonNot, danielOnly, danielNot,
     postexilicOnly, postexilicNot, updateURL, mode
@@ -975,7 +979,11 @@ export default function CardSearchClient({
       cards
         // Collection filter runs first: a Set lookup, and it shrinks the pool
         // the much heavier text matching below has to walk.
-        .filter((c) => !ownedFilterActive || ownedNames.has(c.name))
+        .filter((c) => {
+          if (activeOwnedMode === 'off') return true;
+          const owned = ownedNames.has(c.name);
+          return activeOwnedMode === 'owned' ? owned : !owned;
+        })
         .filter((c) => {
           // Handle multiple queries with operators - similar to icon filter logic
           const activeQueries = queries.filter(q => q.text.trim());
@@ -1253,7 +1261,7 @@ export default function CardSearchClient({
           const matches = postexilicCards.includes(c.name);
           return postexilicNot ? !matches : matches;
         }),
-    [cards, ownedFilterActive, ownedNames, queries, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode, nativityNot, hasStarNot, cloudNot, angelNot, demonNot, danielNot, postexilicNot, testamentNots, gospelNot]
+    [cards, activeOwnedMode, ownedNames, queries, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode, nativityNot, hasStarNot, cloudNot, angelNot, demonNot, danielNot, postexilicNot, testamentNots, gospelNot]
   );
 
   // Effect to show all cards when any filter is applied
@@ -1262,7 +1270,7 @@ export default function CardSearchClient({
     // Note: searchField change alone shouldn't trigger showing cards without a query
     const hasActiveQueries = queries.some(q => q.text.trim());
     const hasActiveFilters = hasActiveQueries || 
-      ownedFilterActive ||
+      activeOwnedMode !== 'off' ||
       selectedIconFilters.length > 0 || 
       selectedAlignmentFilters.length > 0 || 
       selectedRarityFilters.length > 0 || 
@@ -1286,7 +1294,7 @@ export default function CardSearchClient({
     } else {
       setVisibleCount(0);
     }
-  }, [filtered.length, ownedFilterActive, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, testamentNots, gospelNot]);
+  }, [filtered.length, activeOwnedMode, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, testamentNots, gospelNot]);
 
   const sortedFiltered = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -1339,7 +1347,7 @@ export default function CardSearchClient({
 
   // Whether any filter pills should be shown in the summary bar
   const hasActiveFilters = queries.some(q => q.text.trim()) ||
-    ownedFilterActive ||
+    activeOwnedMode !== 'off' ||
     legalityMode !== 'Limited' ||
     selectedAlignmentFilters.length > 0 ||
     selectedRarityFilters.length > 0 ||
@@ -1444,7 +1452,7 @@ export default function CardSearchClient({
     setSelectedRarityFilters([]);
     setSelectedTestaments([]);
     setIsGospel(false);
-    setOwnedOnly(false);
+    setOwnedMode('off');
     // Keep the sticky print/art preferences on reset (don't force "hide" back
     // on) — they mirror the persisted per-device default, like legalityMode above.
     setNativityOnly(false);
@@ -2085,9 +2093,15 @@ export default function CardSearchClient({
           </span>
         )}
         {/* Collection */}
-        {ownedFilterActive && (
-          <span className={`${PILL_BASE} ${PILL_STYLES.collection}`} onClick={() => setOwnedOnly(false)} tabIndex={0} role="button" aria-label="Remove Cards I own filter">
-            Cards I own
+        {activeOwnedMode !== 'off' && (
+          <span
+            className={`${PILL_BASE} ${activeOwnedMode === 'owned' ? PILL_STYLES.collection : PILL_STYLES.collectionMissing}`}
+            onClick={() => setOwnedMode('off')}
+            tabIndex={0}
+            role="button"
+            aria-label={`Remove ${OWNED_MODE_LABELS[activeOwnedMode]} filter`}
+          >
+            {OWNED_MODE_LABELS[activeOwnedMode]}
             <span className="ml-1">×</span>
           </span>
         )}
@@ -2335,8 +2349,8 @@ export default function CardSearchClient({
             selectedRarityFilters={selectedRarityFilters}
             toggleRarityFilter={toggleRarityFilter}
             showOwnedFilter={collectionFilterAvailable}
-            ownedOnly={ownedOnly}
-            setOwnedOnly={setOwnedOnly}
+            ownedMode={ownedMode}
+            onCycleOwnedMode={() => setOwnedMode(cycleOwnedMode)}
             advancedOpen={advancedOpen}
             setAdvancedOpen={setAdvancedOpen}
             selectedTestaments={selectedTestaments}
@@ -2695,12 +2709,12 @@ export default function CardSearchClient({
             </div>
           )}
           </>
-        ) : ownedFilterActive ? (
+        ) : activeOwnedMode !== 'off' ? (
           <div className="flex items-center justify-center mt-16 mb-16">
             <div className="text-center">
               {!collectionAvailable ? (
                 <p className="text-xl text-muted-foreground">Loading your collection…</p>
-              ) : ownedNames.size === 0 ? (
+              ) : activeOwnedMode === 'owned' && ownedNames.size === 0 ? (
                 <>
                   <p className="text-xl text-muted-foreground mb-2">Your collection is empty</p>
                   <p className="text-sm text-muted-foreground">
@@ -2708,10 +2722,15 @@ export default function CardSearchClient({
                     to build a deck from it.
                   </p>
                 </>
-              ) : (
+              ) : activeOwnedMode === 'owned' ? (
                 <>
                   <p className="text-xl text-muted-foreground mb-2">No cards you own match these filters</p>
                   <p className="text-sm text-muted-foreground">Widen the filters, or turn off &ldquo;Cards I own&rdquo;.</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xl text-muted-foreground mb-2">You own every card matching these filters</p>
+                  <p className="text-sm text-muted-foreground">Nothing left to hunt down here — widen the filters to find more.</p>
                 </>
               )}
             </div>
