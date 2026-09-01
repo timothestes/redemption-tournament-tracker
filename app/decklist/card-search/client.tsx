@@ -23,6 +23,7 @@ import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
 import { useCollectionState } from "../../collection/hooks/useCollectionState";
+import { ownedCardNames } from "./utils/collectionCheck";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, downloadDeckAsFileBySet, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
@@ -51,6 +52,7 @@ const PILL_STYLES = {
   gospel: 'bg-yellow-500/15 text-yellow-200 hover:bg-yellow-500/25',
   misc: 'bg-fuchsia-500/15 text-fuchsia-300 hover:bg-fuchsia-500/25',
   stat: 'bg-orange-500/15 text-orange-300 hover:bg-orange-500/25',
+  collection: 'bg-zinc-500/25 text-zinc-200 hover:bg-zinc-500/35',
 } as const;
 // Brigade pills get tinted with their own brigade color so "Green AND White" reads as the
 // brigades themselves, not generic blue chips.
@@ -542,6 +544,20 @@ export default function CardSearchClient({
     adjustQuantity: adjustCollectionQuantity,
   } = useCollectionState({ enabled: !!user });
 
+  // "Cards I own" — narrows the search to the user's collection so a deck can be
+  // built from what's actually in their binder. Ownership is name-level (any
+  // printing counts), the same rule "Check my collection" uses.
+  const [ownedOnly, setOwnedOnly] = useState(false);
+  const ownedNames = useMemo(() => ownedCardNames(collectionQuantities), [collectionQuantities]);
+  // Only offered where a collection exists: signed in, and not in the Forge —
+  // forge cards are unknown to the shop/collection, the same reason
+  // enableShopping gates the other collection features.
+  const collectionFilterAvailable = !!user && config.features?.enableShopping !== false;
+  // The toggle can outlive its availability (a shared ?owned=true link opened
+  // signed-out). Gate at the point of use rather than resetting state, so the
+  // async auth load doesn't race the URL-restored value back off.
+  const ownedFilterActive = ownedOnly && collectionFilterAvailable;
+
   // Refs for input fields to enable auto-focus
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -627,6 +643,7 @@ export default function CardSearchClient({
       params.set('toughness', filters.toughnessFilter.toString());
       params.set('toughnessOp', filters.toughnessOp);
     }
+    if (filters.ownedOnly) params.set('owned', 'true');
     if (filters.altArtMode !== 'hide') params.set('showAltArt', filters.altArtMode);
     if (!filters.noFirstPrint) params.set('showFirstPrint', 'true');
     if (filters.nativityOnly) {
@@ -749,6 +766,9 @@ export default function CardSearchClient({
       if (searchParams.get('showFirstPrint') === 'true') {
         setnoFirstPrint(false);
       }
+      // Entry point from /collection ("Build a deck"). Personal to whoever
+      // opens the link — it means "cards I own", not "cards they own".
+      setOwnedOnly(searchParams.get('owned') === 'true');
       setNativityOnly(searchParams.get('nativity') === 'true');
       setNativityNot(searchParams.get('nativityNot') === 'true');
       setHasStarOnly(searchParams.get('hasStar') === 'true');
@@ -799,6 +819,7 @@ export default function CardSearchClient({
       strengthOp,
       toughnessFilter,
       toughnessOp,
+      ownedOnly,
       altArtMode,
       noFirstPrint,
       nativityOnly,
@@ -822,7 +843,7 @@ export default function CardSearchClient({
     queries, legalityMode, iconFilterMode, selectedIconFilters,
     selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, testamentNots,
     isGospel, gospelNot, strengthFilter,
-    strengthOp, toughnessFilter, toughnessOp, altArtMode, noFirstPrint,
+    strengthOp, toughnessFilter, toughnessOp, ownedOnly, altArtMode, noFirstPrint,
     nativityOnly, nativityNot, hasStarOnly, hasStarNot, cloudOnly, cloudNot,
     angelOnly, angelNot, demonOnly, demonNot, danielOnly, danielNot,
     postexilicOnly, postexilicNot, updateURL, mode
@@ -952,6 +973,9 @@ export default function CardSearchClient({
   const filtered = useMemo(
     () =>
       cards
+        // Collection filter runs first: a Set lookup, and it shrinks the pool
+        // the much heavier text matching below has to walk.
+        .filter((c) => !ownedFilterActive || ownedNames.has(c.name))
         .filter((c) => {
           // Handle multiple queries with operators - similar to icon filter logic
           const activeQueries = queries.filter(q => q.text.trim());
@@ -1229,7 +1253,7 @@ export default function CardSearchClient({
           const matches = postexilicCards.includes(c.name);
           return postexilicNot ? !matches : matches;
         }),
-    [cards, queries, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode, nativityNot, hasStarNot, cloudNot, angelNot, demonNot, danielNot, postexilicNot, testamentNots, gospelNot]
+    [cards, ownedFilterActive, ownedNames, queries, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode, nativityNot, hasStarNot, cloudNot, angelNot, demonNot, danielNot, postexilicNot, testamentNots, gospelNot]
   );
 
   // Effect to show all cards when any filter is applied
@@ -1238,6 +1262,7 @@ export default function CardSearchClient({
     // Note: searchField change alone shouldn't trigger showing cards without a query
     const hasActiveQueries = queries.some(q => q.text.trim());
     const hasActiveFilters = hasActiveQueries || 
+      ownedFilterActive ||
       selectedIconFilters.length > 0 || 
       selectedAlignmentFilters.length > 0 || 
       selectedRarityFilters.length > 0 || 
@@ -1261,7 +1286,7 @@ export default function CardSearchClient({
     } else {
       setVisibleCount(0);
     }
-  }, [filtered.length, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, testamentNots, gospelNot]);
+  }, [filtered.length, ownedFilterActive, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, altArtMode, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, testamentNots, gospelNot]);
 
   const sortedFiltered = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -1314,6 +1339,7 @@ export default function CardSearchClient({
 
   // Whether any filter pills should be shown in the summary bar
   const hasActiveFilters = queries.some(q => q.text.trim()) ||
+    ownedFilterActive ||
     legalityMode !== 'Limited' ||
     selectedAlignmentFilters.length > 0 ||
     selectedRarityFilters.length > 0 ||
@@ -1418,6 +1444,7 @@ export default function CardSearchClient({
     setSelectedRarityFilters([]);
     setSelectedTestaments([]);
     setIsGospel(false);
+    setOwnedOnly(false);
     // Keep the sticky print/art preferences on reset (don't force "hide" back
     // on) — they mirror the persisted per-device default, like legalityMode above.
     setNativityOnly(false);
@@ -2057,6 +2084,13 @@ export default function CardSearchClient({
             <span className="ml-1">×</span>
           </span>
         )}
+        {/* Collection */}
+        {ownedFilterActive && (
+          <span className={`${PILL_BASE} ${PILL_STYLES.collection}`} onClick={() => setOwnedOnly(false)} tabIndex={0} role="button" aria-label="Remove Cards I own filter">
+            Cards I own
+            <span className="ml-1">×</span>
+          </span>
+        )}
         {/* Alignment — Good/Evil/Neutral tinted to match the alignment they represent. */}
         {selectedAlignmentFilters.map(mode => (
           <span
@@ -2300,6 +2334,9 @@ export default function CardSearchClient({
             toggleAlignmentFilter={toggleAlignmentFilter}
             selectedRarityFilters={selectedRarityFilters}
             toggleRarityFilter={toggleRarityFilter}
+            showOwnedFilter={collectionFilterAvailable}
+            ownedOnly={ownedOnly}
+            setOwnedOnly={setOwnedOnly}
             advancedOpen={advancedOpen}
             setAdvancedOpen={setAdvancedOpen}
             selectedTestaments={selectedTestaments}
@@ -2658,6 +2695,27 @@ export default function CardSearchClient({
             </div>
           )}
           </>
+        ) : ownedFilterActive ? (
+          <div className="flex items-center justify-center mt-16 mb-16">
+            <div className="text-center">
+              {!collectionAvailable ? (
+                <p className="text-xl text-muted-foreground">Loading your collection…</p>
+              ) : ownedNames.size === 0 ? (
+                <>
+                  <p className="text-xl text-muted-foreground mb-2">Your collection is empty</p>
+                  <p className="text-sm text-muted-foreground">
+                    <a href="/collection" className="underline hover:text-foreground">Add cards to your collection</a>{" "}
+                    to build a deck from it.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xl text-muted-foreground mb-2">No cards you own match these filters</p>
+                  <p className="text-sm text-muted-foreground">Widen the filters, or turn off &ldquo;Cards I own&rdquo;.</p>
+                </>
+              )}
+            </div>
+          </div>
         ) : (
           <div className="flex items-center justify-center mt-16 mb-16">
             <div className="text-center">
