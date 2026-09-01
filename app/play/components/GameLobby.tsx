@@ -521,7 +521,26 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                   placeholder="CODE"
                   aria-label="Game Code"
                   maxLength={4}
-                  className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"
+                  // Keyboard hints for a 4-char code (mirrors app/join):
+                  // caps to match the CSS-uppercased field, no autocorrect /
+                  // QuickType over it, Go key submits instead of doing nothing.
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="go"
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === 'Enter' &&
+                      gameCode.length === 4 &&
+                      !isJoining &&
+                      !isCreating &&
+                      (isSpectate || selectedDeck)
+                    ) {
+                      handleJoinGame();
+                    }
+                  }}
+                  className="flex-1 uppercase tracking-widest font-mono text-center h-12 text-base focus-visible:ring-0 focus-visible:border-primary"
                 />
                 <Button
                   size="lg"

@@ -1871,6 +1871,7 @@ export default function ChatPanel({
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder={chatDisabled ? "Spectators can't chat" : "Message..."}
+                  enterKeyHint="send"
                   maxLength={500}
                   disabled={chatDisabled}
                   style={{
@@ -2207,6 +2208,7 @@ export default function ChatPanel({
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder={chatDisabled ? "Spectators can't chat" : "Message..."}
+                  enterKeyHint="send"
                   maxLength={500}
                   disabled={chatDisabled}
                   style={{

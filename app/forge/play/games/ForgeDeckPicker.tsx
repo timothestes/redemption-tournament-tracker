@@ -27,7 +27,7 @@ function summaryLine(d: PickerDeck): string {
 
 export function ForgeDeckPicker({ decks, sharedDecks, selectedDeckId, onSelect }: Props) {
   const [open, setOpen] = useState(false);
-  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const isDesktop = useMediaQuery("(min-width: 768px) and (min-height: 600px)");
 
   const selected: PickerDeck | null =
     decks.find((d) => d.id === selectedDeckId) ??
@@ -98,7 +98,7 @@ export function ForgeDeckPickerModal({
   onSelect: (deckId: string) => void;
   selectedDeckId?: string | null;
 }) {
-  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const isDesktop = useMediaQuery("(min-width: 768px) and (min-height: 600px)");
   const [decks, setDecks] = useState<ForgeDeckSummary[] | null>(null);
   const [sharedDecks, setSharedDecks] = useState<SharedForgeDeckSummary[]>([]);
   const [loadError, setLoadError] = useState(false);

@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
-import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
+import { SpacetimeConnectionResetWrapper } from '@/app/play/components/SpacetimeConnectionResetWrapper';
+import ReconnectOnResume from '@/app/play/components/ReconnectOnResume';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
+import { isCompactTouchViewport } from '@/app/play/lib/orientationGate';
 import { useSpectatorGameState } from '@/app/play/hooks/useGameState';
 import { SpectatorPregameView, SpectatorPregameCeremonyOverlay, GameCodeHeader } from '@/app/play/components/PregameScreen';
 import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
@@ -45,31 +48,19 @@ interface SpectatorClientProps {
 // Outer component — owns the connection builder and wraps the provider
 // ---------------------------------------------------------------------------
 export function SpectatorClient({ code, displayName }: SpectatorClientProps) {
-  const { connectionBuilder, isConnected, error } = useSpacetimeConnection();
+  const { createBuilder, isConnected } = useSpacetimeConnection();
 
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-center">
-          <p className="text-lg font-semibold text-destructive">Connection error</p>
-          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-          <a
-            href="/play"
-            className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Back to lobby
-          </a>
-        </div>
-      </div>
-    );
-  }
-
+  // Mirror the player shell: the reset wrapper + ReconnectOnResume give the
+  // spectator the same backgrounded-tab survival (visibility resume → ping →
+  // reconnect with backoff). Without them a phone that locks its screen came
+  // back to a silently frozen board.
   return (
-    <SpacetimeProvider connectionBuilder={connectionBuilder}>
+    <SpacetimeConnectionResetWrapper createBuilder={createBuilder}>
+      <ReconnectOnResume />
       <CardPreviewProvider storageKey="multiplayer-loupe-visible" defaultVisible>
         <SpectatorInner code={code} isConnected={isConnected} displayName={displayName} />
       </CardPreviewProvider>
-    </SpacetimeProvider>
+    </SpacetimeConnectionResetWrapper>
   );
 }
 
@@ -92,6 +83,24 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   const router = useRouter();
 
   const [lifecycle, setLifecycle] = useState<LifecycleState>('joining');
+
+  // Same viewport measurement the player shell uses. Without an explicit
+  // compactLayout prop the canvas falls back to container-height sniffing,
+  // which left portrait phone spectators on the desktop profile (microfilm
+  // strip) — the exact drift the player side fixed in wave 4.
+  const shellInputMode = useInputMode();
+  const [shellViewport, setShellViewport] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const update = () => setShellViewport({ w: window.innerWidth, h: window.innerHeight });
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+  const compactTouchShell = isCompactTouchViewport(shellViewport.w, shellViewport.h, shellInputMode);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [gameId, setGameId] = useState<bigint | null>(null);
   const [phase1Applied, setPhase1Applied] = useState(false);
@@ -243,7 +252,9 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     }
     if (wasWatching.current) {
       showGameToast('You were removed from this game');
-      router.push('/play');
+      // replace, not push — a push leaves the dead spectate URL in history, and
+      // the Android back button ping-pongs: back → remount → re-detect → push.
+      router.replace('/play');
     }
   }, [gameState.spectators, lifecycle, gameId, myIdentityHex, router]);
 
@@ -260,7 +271,8 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     if (!game || game.status !== 'finished') return;
     if ((game.playingStartedAtMicros ?? 0n) > 0n) return;
     showGameToast('Host left the lobby');
-    router.push('/play');
+    // replace, not push — see the kicked-spectator redirect above.
+    router.replace('/play');
   }, [gameState.game, lifecycle, router]);
 
   // Image preloader — mirrors player client but without the myDeckImageUrls
@@ -557,6 +569,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                   viewerKind="spectator"
                   getImage={getImage}
                   forgeResolver={forgeResolver}
+                  compactLayout={compactTouchShell}
                 />
                 {status === 'pregame' && (
                   <SpectatorPregameCeremonyOverlay

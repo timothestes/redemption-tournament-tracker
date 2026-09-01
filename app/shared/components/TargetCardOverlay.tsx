@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 
 export interface TargetCardOverlayProps {
   prompt: string;
@@ -13,6 +14,7 @@ export interface TargetCardOverlayProps {
  * primitives); this component is pure DOM chrome for the prompt + cancel UX.
  */
 export function TargetCardOverlay({ prompt, onCancel }: TargetCardOverlayProps) {
+  const isTouch = useInputMode() === 'touch';
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -26,6 +28,9 @@ export function TargetCardOverlay({ prompt, onCancel }: TargetCardOverlayProps) 
 
   return (
     <div
+      // Targeting mode intercepts every card tap, so this Cancel is the only
+      // exit — the blocking-prompt rule gives it a 44px target on touch.
+      data-blocking-prompt
       style={{
         position: 'fixed',
         // PhaseBar sits at top:0 with height ~40px + safe-area inset and
@@ -48,7 +53,7 @@ export function TargetCardOverlay({ prompt, onCancel }: TargetCardOverlayProps) 
       }}
     >
       <span>{prompt}</span>
-      <span style={{ opacity: 0.6, fontSize: 12 }}>Esc to cancel</span>
+      {!isTouch && <span style={{ opacity: 0.6, fontSize: 12 }}>Esc to cancel</span>}
       <button
         onClick={onCancel}
         style={{

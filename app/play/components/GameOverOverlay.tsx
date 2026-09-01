@@ -296,12 +296,15 @@ export default function GameOverOverlay({
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 800,
+          maxWidth: 'calc(100vw - 24px)',
           background: 'rgba(14, 10, 6, 0.95)',
           border: `1px solid ${rematchResponse === 'declined' ? 'rgba(180, 60, 60, 0.3)' : 'rgba(107, 78, 39, 0.4)'}`,
           borderRadius: 8,
           padding: '10px 20px',
           display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: 16,
           boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
         }}>
@@ -313,7 +316,6 @@ export default function GameOverOverlay({
               : rematchResponse === 'accepted'
                 ? 'rgba(196, 149, 90, 0.7)'
                 : 'rgba(196, 149, 90, 0.5)',
-            whiteSpace: 'nowrap',
           }}>
             {rematchResponse === 'declined'
               ? (iRequested ? 'Opponent declined.' : 'You declined.')
@@ -449,7 +451,10 @@ function GameOverModal({
       style={{
         position: 'fixed',
         inset: 0,
-        right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
+        // The right inset dodges the DESKTOP loupe column. On touch the
+        // panel is a full-screen overlay (or a 45px rail), so the inset just
+        // squeezed the dialog into a ~113px gutter on portrait phones.
+        right: isTouch ? 0 : isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
         zIndex: 900,
         display: 'flex',
         alignItems: 'center',
@@ -605,20 +610,26 @@ function RematchRequestBanner({
       left: '50%',
       transform: 'translateX(-50%)',
       zIndex: 800,
+      // The single nowrap row is ~540px intrinsic — on a portrait phone it
+      // clipped the name off the left edge and "Change deck" entirely off the
+      // right (the parent is overflow:hidden). Cap and wrap instead.
+      maxWidth: 'calc(100vw - 24px)',
       background: 'rgba(14, 10, 6, 0.95)',
       border: '1px solid rgba(196, 149, 90, 0.4)',
       borderRadius: 8,
       padding: '12px 20px',
       display: 'flex',
+      flexWrap: 'wrap',
       alignItems: 'center',
-      gap: 16,
+      justifyContent: 'center',
+      gap: 12,
       boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
     }}>
       <p style={{
         fontFamily: 'Georgia, serif',
         fontSize: 14,
         color: '#e8d5a3',
-        whiteSpace: 'nowrap',
+        textAlign: 'center',
       }}>
         {oppName} wants to play again
       </p>

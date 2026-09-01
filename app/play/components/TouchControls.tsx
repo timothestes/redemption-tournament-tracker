@@ -18,6 +18,10 @@ interface TouchControlsProps {
   onPanHorizontal?: (direction: -1 | 1) => void;
   /** Opens the board browse sheet (every card in a zone, as a readable list). */
   onBrowseBoard?: () => void;
+  /** Vertical clearance for the turn bar. The player shell overlays the bar on
+   *  the canvas (default 48); the spectator shell gives the bar its own row,
+   *  so the canvas starts below it already — pass 0 there. */
+  topOffsetPx?: number;
 }
 
 const BTN =
@@ -40,7 +44,7 @@ const BTN =
  */
 export function TouchControls({
   targets, onJump, activeId, rightOffsetPx,
-  canPanHorizontally, onPanHorizontal, onBrowseBoard,
+  canPanHorizontally, onPanHorizontal, onBrowseBoard, topOffsetPx,
 }: TouchControlsProps) {
   return (
     <div
@@ -52,7 +56,7 @@ export function TouchControls({
       // 48px on touch, so a right-side dock no longer collides with Concede.
       className="pointer-events-auto absolute z-30 flex flex-col items-end gap-1"
       style={{
-        top: 'calc(48px + env(safe-area-inset-top))',
+        top: `calc(${topOffsetPx ?? 48}px + env(safe-area-inset-top))`,
         right: rightOffsetPx != null ? Math.max(8, Math.round(rightOffsetPx)) : 'calc(10% + 8px)',
       }}
       data-testid="touch-controls"
