@@ -53,6 +53,11 @@ interface ChatPanelProps {
   onSetShareHand?: (share: boolean) => void;
   onKickSpectator?: (spectatorId: bigint) => void;
   onSetGamePrivate?: (isPublic: boolean) => void;
+  /** When set, "close chat" collapses the WHOLE right panel instead of just
+   *  this section. On phones the panel is full-width and chat is its only
+   *  content, so collapsing the section alone left a full-screen empty panel
+   *  swallowing every tap until the tiny header rail was found. */
+  onCollapsePanel?: () => void;
 }
 
 // Discriminated union for interleaved timeline entries
@@ -1227,6 +1232,7 @@ export default function ChatPanel({
   onSetShareHand,
   onKickSpectator,
   onSetGamePrivate,
+  onCollapsePanel,
 }: ChatPanelProps) {
   const showSpectatorsTab = spectators !== undefined;
   const [isOpen, setIsOpen] = useState(true);
@@ -1459,6 +1465,10 @@ export default function ChatPanel({
   };
 
   const togglePanel = () => {
+    if (isOpen && onCollapsePanel) {
+      onCollapsePanel();
+      return;
+    }
     setIsOpen((prev) => !prev);
   };
 

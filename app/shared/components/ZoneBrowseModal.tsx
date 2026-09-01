@@ -165,17 +165,27 @@ interface ZoneBrowseModalProps {
    *  of Bondage, hand): those cards need rotate/attach/counters/notes/rescue,
    *  none of which the move-only popup below offers. */
   alwaysUseCardMenu?: boolean;
+  /** Cards whose FACE the viewer may not see (face-down in-play cards, a hand
+   *  not shared with this spectator) render as a card back and never open the
+   *  reader or the hover preview. The grid gets raw zone data, so hidden-info
+   *  rules have to be answered by the caller. */
+  isCardFaceHidden?: (card: GameCard) => boolean;
+  /** Read-only viewers (spectators) can't act on a card, but they still need
+   *  to READ it — tap / long-press / click opens the caller's card reader. */
+  onReadCard?: (card: GameCard) => void;
 }
 
-export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly, onRequestCardMenu, alwaysUseCardMenu }: ZoneBrowseModalProps) {
+export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly, onRequestCardMenu, alwaysUseCardMenu, isCardFaceHidden, onReadCard }: ZoneBrowseModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
   // Touch has no clicks, lassos or right-clicks — say what actually works.
   const isTouchInput = useInputMode() === 'touch';
-  const hintText = isTouchInput
-    ? (alwaysUseCardMenu
-        ? 'Tap a card for its actions'
-        : 'Tap to select · Long-press a card for actions')
-    : 'Drag to a zone · Click or lasso to select · Right-click for more';
+  const hintText = readOnly
+    ? (onReadCard ? (isTouchInput ? 'Tap a card to read it' : 'Click a card to read it') : null)
+    : isTouchInput
+      ? (alwaysUseCardMenu
+          ? 'Tap a card for its actions'
+          : 'Tap to select · Long-press a card for actions')
+      : 'Drag to a zone · Click or lasso to select · Right-click for more';
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck } = actions;
   const rawCards = zones[zoneId] ?? [];
@@ -312,7 +322,12 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
 
   const handlePointerDown = (card: GameCard, imageUrl: string, e: React.PointerEvent) => {
     if (e.button !== 0) return;
-    if (readOnly) return;
+    if (readOnly) {
+      // Track the press so handlePointerUp can turn a clean click into
+      // "read this card" — the only interaction a read-only viewer has.
+      pointerDownCardRef.current = card.instanceId;
+      return;
+    }
     onCardMouseLeave();
     pointerDownCardRef.current = card.instanceId;
 
@@ -341,6 +356,14 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     if (pointerDownCardRef.current !== card.instanceId) return;
     pointerDownCardRef.current = null;
     if (consumeCardPressFired(cardPressRef)) return;
+    if (readOnly) {
+      // Touch opens the reader from onTouchEnd (see below) so the tap's
+      // synthesized click can be suppressed; pointer clicks open it here.
+      if (e?.pointerType !== 'touch' && onReadCard && !(isCardFaceHidden?.(card) ?? false)) {
+        onReadCard(card);
+      }
+      return;
+    }
     if (didDragRef?.current) {
       didDragRef.current = false;
       return;
@@ -551,6 +574,13 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
           )}
         </DraggableTitleBar>
 
+        {/* Read-only hint — spectators still get told the one thing a tap does. */}
+        {readOnly && hintText && (
+          <div style={{ marginBottom: 12 }}>
+            <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>{hintText}</span>
+          </div>
+        )}
+
         {/* Hint + leave open toggle */}
         {!readOnly && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -614,7 +644,10 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
             }}
           >
             {cards.map((card) => {
-              const imageUrl = getCardImageUrl(card.cardImgFile);
+              // Hidden-info gate: render a card back and keep every read path
+              // (reader, hover preview) inert for faces this viewer may not see.
+              const faceHidden = isCardFaceHidden?.(card) ?? false;
+              const imageUrl = faceHidden ? '/gameplay/cardback.webp' : getCardImageUrl(card.cardImgFile);
               const isSelected = selectedIds.has(card.instanceId);
               // Field of Battle merges both sides into one grid, and a
               // contested pair renders stacked on the board — this grid is
@@ -634,11 +667,23 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                   style={{ position: 'relative', cursor: 'grab' }}
                   onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
                   onPointerUp={(e) => handlePointerUp(card, e)}
-                  onTouchStart={(e) => beginCardPress(cardPressRef, e, (px, py) => openCardMenu(card, px, py))}
+                  onTouchStart={(e) => beginCardPress(cardPressRef, e, (px, py) => {
+                    if (readOnly) {
+                      // Long-press for a read-only viewer opens the reader.
+                      if (onReadCard && !faceHidden) onReadCard(card);
+                      return;
+                    }
+                    openCardMenu(card, px, py);
+                  })}
                   onTouchMove={(e) => moveCardPress(cardPressRef, e)}
                   onTouchEnd={(e) => {
                     if (cardPressFired(cardPressRef)) {
                       e.preventDefault();
+                    } else if (readOnly && onReadCard && !faceHidden && isCardPressLive(cardPressRef)) {
+                      // Clean tap in a read-only grid = read the card. Same
+                      // preventDefault-first ordering as the action path below.
+                      e.preventDefault();
+                      onReadCard(card);
                     } else if (alwaysUseCardMenu && !readOnly && isCardPressLive(cardPressRef)) {
                       // A clean tap on an in-play grid card opens the full card
                       // menu. preventDefault FIRST, while this node is still
@@ -654,7 +699,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                   }}
                   onClick={(e) => e.stopPropagation()}
                   onContextMenu={(e) => handleCardContextMenu(card, e)}
-                  onMouseEnter={(e) => { if (!contextCard) onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId); }}
+                  onMouseEnter={(e) => { if (!contextCard && !faceHidden) onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId); }}
                   onMouseLeave={onCardMouseLeave}
                 >
                   {(() => {
@@ -664,7 +709,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                     return imageUrl ? (
                       <img
                         src={imageUrl}
-                        alt={card.cardName}
+                        alt={faceHidden ? 'Face-down card' : card.cardName}
                         draggable={false}
                         style={{
                           width: '100%',
@@ -692,7 +737,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                           transition: 'border 0.1s ease',
                         }}
                       >
-                        {card.cardName}
+                        {faceHidden ? 'Face-down card' : card.cardName}
                       </div>
                     );
                   })()}
