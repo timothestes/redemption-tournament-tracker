@@ -2,6 +2,7 @@
 import React from "react";
 import clsx from "clsx";
 import type { AltArtMode } from "../stickyFilters";
+import { OWNED_MODE_LABELS, type OwnedFilterMode } from "../ownedFilter";
 
 interface FilterGridProps {
   // Legality & Alignment
@@ -11,10 +12,11 @@ interface FilterGridProps {
   toggleAlignmentFilter: (value: string) => void;
   selectedRarityFilters: string[];
   toggleRarityFilter: (value: string) => void;
-  /** Whether to offer the "Cards I own" filter (signed in, non-Forge host). */
+  /** Whether to offer the collection filter (signed in, non-Forge host). */
   showOwnedFilter: boolean;
-  ownedOnly: boolean;
-  setOwnedOnly: (value: boolean | ((prev: boolean) => boolean)) => void;
+  ownedMode: OwnedFilterMode;
+  /** Advance the filter: all → cards I own → cards I don't own → all. */
+  onCycleOwnedMode: () => void;
   
   // Advanced filters
   advancedOpen: boolean;
@@ -85,8 +87,8 @@ export default function FilterGrid({
   selectedRarityFilters,
   toggleRarityFilter,
   showOwnedFilter,
-  ownedOnly,
-  setOwnedOnly,
+  ownedMode,
+  onCycleOwnedMode,
   advancedOpen,
   setAdvancedOpen,
   selectedTestaments,
@@ -255,17 +257,19 @@ export default function FilterGrid({
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
             <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Collection</span>
             <button
-              aria-pressed={ownedOnly}
+              aria-pressed={ownedMode !== 'off'}
+              data-owned-mode={ownedMode}
+              // Fixed width so cycling between the two labels doesn't reflow the filter band.
               className={clsx(
-                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
-                ownedOnly
-                  ? 'bg-primary/20 text-primary border-primary/30'
-                  : 'bg-muted text-foreground hover:bg-muted/80 border-border'
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150 min-w-[8.25rem] text-center',
+                ownedMode === 'owned' && 'bg-primary/20 text-primary border-primary/30',
+                ownedMode === 'missing' && 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40',
+                ownedMode === 'off' && 'bg-muted text-foreground hover:bg-muted/80 border-border'
               )}
-              onClick={() => setOwnedOnly((v) => !v)}
-              title="Show only cards in your collection (any printing counts)"
+              onClick={onCycleOwnedMode}
+              title="Click to cycle: all cards → cards I own → cards I don't own (any printing counts)"
             >
-              Cards I own
+              {OWNED_MODE_LABELS[ownedMode]}
             </button>
           </div>
         )}
