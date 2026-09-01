@@ -17,6 +17,9 @@ interface BoardBrowseSheetProps {
   entries: BoardBrowseEntry[];
   onPick: (entry: BoardBrowseEntry) => void;
   onClose: () => void;
+  /** Replaces the default "Mine"/"Theirs" owner prefixes — a spectator is
+   *  neither player, so their sheet shows the seat names instead. */
+  ownerLabels?: { my: string; opponent: string };
 }
 
 /**
@@ -31,7 +34,7 @@ interface BoardBrowseSheetProps {
  * finding and acting on a specific card stops depending on hitting a sliver of
  * it.
  */
-export function BoardBrowseSheet({ entries, onPick, onClose }: BoardBrowseSheetProps) {
+export function BoardBrowseSheet({ entries, onPick, onClose, ownerLabels }: BoardBrowseSheetProps) {
   return (
     <div
       data-board-browse
@@ -127,8 +130,19 @@ export function BoardBrowseSheet({ entries, onPick, onClose }: BoardBrowseSheetP
             <span>
               {e.owner !== 'shared' && (
                 <>
-                  <span style={{ color: e.owner === 'my' ? '#c4955a' : 'rgba(232,213,163,0.55)' }}>
-                    {e.owner === 'my' ? 'Mine' : 'Theirs'}
+                  <span
+                    style={{
+                      color: e.owner === 'my' ? '#c4955a' : 'rgba(232,213,163,0.55)',
+                      // Seat names can be long — keep the zone label readable.
+                      display: 'inline-block',
+                      maxWidth: 110,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      verticalAlign: 'bottom',
+                    }}
+                  >
+                    {e.owner === 'my' ? (ownerLabels?.my ?? 'Mine') : (ownerLabels?.opponent ?? 'Theirs')}
                   </span>
                   {' · '}
                 </>

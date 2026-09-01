@@ -17,7 +17,7 @@ import { tables } from '@/lib/spacetimedb/module_bindings';
 import type { ForgeGame } from '@/lib/spacetimedb/module_bindings/types';
 import { authorizeForgeSeat, getForgePlayResolver } from '@/app/forge/lib/playDecks';
 import type { ForgeResolverMap } from '@/app/play/utils/forgeResolver';
-import { showGameToast } from '@/app/shared/components/GameToast';
+import { showGameToast, GameToastContainer } from '@/app/shared/components/GameToast';
 import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerImagePreloader';
 import { buildPrioritizedImageUrls } from '@/app/play/lib/multiplayerImageUrls';
 import TurnIndicator from '@/app/play/components/TurnIndicator';
@@ -106,9 +106,14 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   const [phase1Applied, setPhase1Applied] = useState(false);
   const [joined, setJoined] = useState(false);
   const [forgeResolver, setForgeResolver] = useState<ForgeResolverMap | null>(null);
+  // Game-over banner dismissal — spectators may keep reviewing the final board.
+  const [resultDismissed, setResultDismissed] = useState(false);
   const didSubscribe = useRef(false);
   const didCallReducer = useRef(false);
   const wasWatching = useRef(false);
+  // One-shot guard for the toast-then-redirect exits below: the effects re-run
+  // on live data while the redirect timer is pending.
+  const leavingRef = useRef(false);
 
   // Phase 1: Seed subscriptions for tables that don't auto-subscribe via
   // typed .where() queries (Game and CardCounter). Mirrors the player
@@ -250,11 +255,16 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
       wasWatching.current = true;
       return;
     }
-    if (wasWatching.current) {
+    if (wasWatching.current && !leavingRef.current) {
+      leavingRef.current = true;
+      // Toast BEFORE navigating, and give it time to be read — the lobby page
+      // mounts its own tree after replace(), so a toast fired here never
+      // survives the navigation and the spectator was ejected with no
+      // explanation at all.
       showGameToast('You were removed from this game');
       // replace, not push — a push leaves the dead spectate URL in history, and
       // the Android back button ping-pongs: back → remount → re-detect → push.
-      router.replace('/play');
+      window.setTimeout(() => router.replace('/play'), 1600);
     }
   }, [gameState.spectators, lifecycle, gameId, myIdentityHex, router]);
 
@@ -270,9 +280,12 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     const game = gameState.game;
     if (!game || game.status !== 'finished') return;
     if ((game.playingStartedAtMicros ?? 0n) > 0n) return;
+    if (leavingRef.current) return;
+    leavingRef.current = true;
     showGameToast('Host left the lobby');
-    // replace, not push — see the kicked-spectator redirect above.
-    router.replace('/play');
+    // replace, not push — see the kicked-spectator redirect above. Delayed so
+    // the toast is actually readable before the page goes away.
+    window.setTimeout(() => router.replace('/play'), 1600);
   }, [gameState.game, lifecycle, router]);
 
   // Image preloader — mirrors player client but without the myDeckImageUrls
@@ -432,6 +445,12 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   const myScore = gameState.myCards['land-of-redemption']?.length ?? 0;
   const opponentScore = gameState.opponentCards['land-of-redemption']?.length ?? 0;
 
+  // Game ended after real play (host-abandoned lobbies redirect above instead).
+  // Players each get their own Victory/Defeat overlay; without this the
+  // watcher's board just silently stopped moving.
+  const gameFinishedAfterPlay =
+    gameState.game?.status === 'finished' && (gameState.game?.playingStartedAtMicros ?? 0n) > 0n;
+
   if (gameId !== null && game && status === 'waiting') {
     return (
       <>
@@ -485,6 +504,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
               Spectating
             </p>
           </div>
+          <GameToastContainer />
         </div>
         <DebugOverlay
           tone="amber"
@@ -542,6 +562,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
               <div style={{ flexShrink: 0, height: 48 }}>
                 <TurnIndicator
                   readOnly
+                  isFinished={gameState.game?.status === 'finished'}
                   game={gameState.game}
                   myPlayer={gameState.myPlayer}
                   opponentPlayer={gameState.opponentPlayer}
@@ -578,6 +599,22 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                     seat1Player={(gameState as any).seat1Player}
                   />
                 )}
+                {/* Emotes render for spectators too — they were only wired
+                    into the pre-board loading branch before. */}
+                <EmoteOverlay emotes={gameState.emotes} myPlayerId={null} />
+                {/* showGameToast needs a mounted container on THIS page —
+                    kick/host-left toasts fired into the void without one. */}
+                <GameToastContainer />
+                {gameFinishedAfterPlay && !resultDismissed && (
+                  <SpectatorGameOverBanner
+                    gameActions={gameState.gameActions}
+                    seat0={gameState.myPlayer}
+                    seat1={gameState.opponentPlayer}
+                    seat0Score={myScore}
+                    seat1Score={opponentScore}
+                    onDismiss={() => setResultDismissed(true)}
+                  />
+                )}
               </div>
             </div>
             <RightPanel
@@ -595,6 +632,92 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
             <ParagonDrawer paragons={paragonEntries} />
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Game-over banner — players each get a Victory/Defeat overlay from
+// GameOverOverlay, but the watcher's board just silently stopped moving.
+// Outcome comes from the action log the same way GameOverOverlay derives it,
+// phrased for a third party.
+// ---------------------------------------------------------------------------
+function deriveSpectatorResult(
+  gameActions: any[],
+  seat0: any,
+  seat1: any,
+): { headline: string; detail: string } {
+  const nameOf = (id: unknown) =>
+    seat0 && id === seat0.id ? seat0.displayName
+    : seat1 && id === seat1.id ? seat1.displayName
+    : 'A player';
+  const winnerOver = (loserId: unknown) =>
+    seat0 && loserId === seat0.id ? (seat1?.displayName ?? 'Their opponent')
+    : seat1 && loserId === seat1.id ? (seat0?.displayName ?? 'Their opponent')
+    : 'Their opponent';
+  for (let i = gameActions.length - 1; i >= 0; i--) {
+    const action = gameActions[i];
+    const actionType: string = (action.actionType ?? '').toUpperCase();
+    const actorId = action.playerId ?? action.actorId;
+    if (actionType === 'WIN') {
+      return { headline: `${nameOf(actorId)} wins`, detail: '' };
+    }
+    if (actionType === 'RESIGN') {
+      return { headline: `${winnerOver(actorId)} wins`, detail: `${nameOf(actorId)} resigned` };
+    }
+    if (actionType === 'TIMEOUT') {
+      return { headline: 'Game over', detail: 'A player disconnected' };
+    }
+  }
+  return { headline: 'Game over', detail: '' };
+}
+
+function SpectatorGameOverBanner({
+  gameActions,
+  seat0,
+  seat1,
+  seat0Score,
+  seat1Score,
+  onDismiss,
+}: {
+  gameActions: any[];
+  seat0: any;
+  seat1: any;
+  seat0Score: number;
+  seat1Score: number;
+  onDismiss: () => void;
+}) {
+  const { headline, detail } = deriveSpectatorResult(gameActions, seat0, seat1);
+  return (
+    <div
+      className="absolute inset-0 z-40 flex items-center justify-center px-4"
+      style={{ background: 'rgba(0, 0, 0, 0.55)' }}
+    >
+      <div className="w-full max-w-sm rounded-xl border border-amber-200/15 bg-black/85 px-6 py-7 text-center backdrop-blur-sm">
+        <p className="font-cinzel text-[11px] uppercase tracking-[0.25em] text-amber-200/50">
+          Game over
+        </p>
+        <p className="mt-3 font-cinzel text-xl text-amber-200/95">{headline}</p>
+        {detail && <p className="mt-1 text-sm text-amber-200/55">{detail}</p>}
+        <p className="mt-2 text-xs text-amber-200/40">
+          Souls rescued · {seat0?.displayName ?? 'Player 1'} {seat0Score} — {seat1Score}{' '}
+          {seat1?.displayName ?? 'Player 2'}
+        </p>
+        <div className="mt-5 flex items-center justify-center gap-3">
+          <a
+            href="/play"
+            className="inline-flex min-h-[44px] items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Back to lobby
+          </a>
+          <button
+            onClick={onDismiss}
+            className="inline-flex min-h-[44px] items-center rounded-md border border-amber-200/25 px-4 py-2 text-sm text-amber-200/80 hover:bg-amber-200/10"
+          >
+            Review the board
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -289,6 +289,10 @@ export default function RightPanel({
               onSetShareHand={onSetShareHand}
               onKickSpectator={onKickSpectator}
               onSetGamePrivate={onSetGamePrivate}
+              // Touch: chat is the panel's whole reason to be open, so its
+              // close control collapses the panel back to the rail instead of
+              // leaving a full-width shell over the board.
+              onCollapsePanel={isTouch ? toggleLoupe : undefined}
             />
           </div>
         </>

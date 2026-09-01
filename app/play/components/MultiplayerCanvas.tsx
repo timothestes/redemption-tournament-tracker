@@ -1218,6 +1218,34 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     ? (oppShareHand || (gameState.opponentPlayer?.reserveRevealed ?? false))
     : (gameState.opponentPlayer?.reserveRevealed ?? false);
 
+  /** Face visibility for the DOM browse surfaces (zone grids, card reader).
+   *  The Konva board gates faces per-node at render time, but the grids render
+   *  straight from zone data — for a spectator, "my" zones are seat-0's
+   *  PRIVATE data, so the same consent rules have to be answered here too.
+   *  True = render a card back and never open a reader for it. */
+  const isCardFaceHiddenFromViewer = useCallback((card: GameCard): boolean => {
+    const revealedNow = typeof card.revealUntil === 'number' && card.revealUntil > Date.now();
+    if (revealedNow) return false;
+    if (card.zone === 'hand') {
+      if (!isSpectator) return card.ownerId !== 'player1';
+      const owner = card.ownerId === 'player1' ? gameState.myPlayer : gameState.opponentPlayer;
+      if (!owner) return true;
+      if (owner.shareHandWithSpectators === true) return false;
+      try {
+        const snapshot = (JSON.parse(owner.handRevealSnapshot || '[]') as unknown[]).map(String);
+        return !snapshot.includes(card.instanceId);
+      } catch {
+        return true;
+      }
+    }
+    if (!card.isFlipped) return false;
+    return !isFaceDownInPlayCardVisible(
+      isSpectator ? 'spectator' : 'player',
+      card.ownerId,
+      { myShareHand, oppShareHand },
+    );
+  }, [isSpectator, gameState.myPlayer, gameState.opponentPlayer, myShareHand, oppShareHand]);
+
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
@@ -5082,10 +5110,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   // Universal card click handler — shift-click toggles selection
   // ---- Camera jump targets + e2e hook ----
-  const jumpTargets = useMemo(
-    () => (mpLayout ? buildJumpTargets(mpLayout, virtualWidth, battleActive, portraitBoard) : []),
-    [mpLayout, virtualWidth, battleActive, portraitBoard],
-  );
+  const jumpTargets = useMemo(() => {
+    if (!mpLayout) return [];
+    // Portrait's card-column "Fit" is a PLAYER framing (your hand, your
+    // column). A spectator wants the overview, so they keep the whole-board
+    // fit even in portrait — small, but complete, with the side jumps and
+    // pinch for detail. Without this a portrait spectator's default view was
+    // a column of empty ground with every pile off-screen.
+    const targets = buildJumpTargets(mpLayout, virtualWidth, battleActive, portraitBoard && !isSpectator);
+    if (!isSpectator) return targets;
+    // A spectator has no "Mine"/"Theirs" — relabel the side jumps with the
+    // seat names (seat-0 renders at the bottom, seat-1 at the top).
+    const seatLabel = (name: string | undefined, fallback: string) => {
+      const n = (name ?? '').trim();
+      if (!n) return fallback;
+      return n.length > 8 ? `${n.slice(0, 7)}…` : n;
+    };
+    return targets.map((t) =>
+      t.id === 'my-side'
+        ? { ...t, label: seatLabel(gameState.myPlayer?.displayName, 'P1') }
+        : t.id === 'opponent-side'
+          ? { ...t, label: seatLabel(gameState.opponentPlayer?.displayName, 'P2') }
+          : t,
+    );
+  }, [mpLayout, virtualWidth, battleActive, portraitBoard, isSpectator, gameState.myPlayer?.displayName, gameState.opponentPlayer?.displayName]);
 
   /** The in-play zones offered by the "cards in play" sheet, with live counts.
    *  Sidebar piles already open a grid when tapped; these are the zones on the
@@ -5117,7 +5165,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         { owner: 'opponent', zone: 'land-of-bondage', label: 'Land of Bondage', count: (opponentCards['land-of-bondage'] ?? []).length },
       );
     }
-    entries.push({ owner: 'my', zone: 'hand', label: 'Hand', count: (myCards['hand'] ?? []).length });
+    // A spectator's "my" side is seat-0's PRIVATE hand, not the viewer's own —
+    // this row (and the grid it opens) leaked the host's full hand to any
+    // spectator. Offer it only when that player shares with spectators.
+    if (!isSpectator || myShareHand) {
+      entries.push({ owner: 'my', zone: 'hand', label: 'Hand', count: (myCards['hand'] ?? []).length });
+    }
 
     // The pile zones. Their only other tap target is the right rail's count
     // badge, which is ~24x17 CSS px on a landscape phone with ~15px between
@@ -5132,13 +5185,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       { zone: 'banish', label: 'Banish' },
     ];
     for (const { zone, label } of pileZones) {
-      entries.push({ owner: 'my', zone, label, count: (myCards[zone] ?? []).length });
+      // Seat-0's reserve is hidden info for a spectator too — same gate the
+      // rail uses (canViewMyReserve is always true for the seated player).
+      if (!(zone === 'reserve' && !canViewMyReserve)) {
+        entries.push({ owner: 'my', zone, label, count: (myCards[zone] ?? []).length });
+      }
       // Their reserve is face-down unless revealed — same gate the rail uses.
       if (zone === 'reserve' && !canViewOppReserve) continue;
       entries.push({ owner: 'opponent', zone, label, count: (opponentCards[zone] ?? []).length });
     }
     return entries;
-  }, [myCards, opponentCards, sharedCards, normalizedFormat, battleActive, canViewOppReserve]);
+  }, [myCards, opponentCards, sharedCards, normalizedFormat, battleActive, canViewOppReserve, canViewMyReserve, isSpectator, myShareHand]);
 
   /** Which jump the camera is currently sitting in, so the cluster can show
    *  it. Cleared by any manual pan/pinch — the framing is no longer that
@@ -5646,6 +5703,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         toggleSelect(card.instanceId);
         return;
       }
+      // Touch spectator: a tap can't act, so it becomes "read this card" —
+      // there is no hover loupe on a phone, and this was the one thing a
+      // watching phone couldn't do at all. Hidden faces stay inert.
+      if (isTouch && isSpectator) {
+        if (!isCardFaceHiddenFromViewer(card)) setReaderCard(card);
+        return;
+      }
       // Touch: a tap arms the card for tap-to-move rather than only adjusting
       // selection. Spectators stay read-only. Runs after the click counter so
       // double-tap-to-meek still works.
@@ -5669,14 +5733,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         clearSelection();
       }
     },
-    [selectedIds, clearSelection, toggleSelect, starWindowOpen, toggleStarPick, isTouch, isSpectator, tapMoveDispatch],
+    [selectedIds, clearSelection, toggleSelect, starWindowOpen, toggleStarPick, isTouch, isSpectator, tapMoveDispatch, isCardFaceHiddenFromViewer],
   );
 
   const handleCardContextMenu = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
       e.cancelBubble = true;
-      if (isSpectator) return;
+      if (isSpectator) {
+        // Right-click / long-press for a spectator opens the read-only card
+        // reader, never the action menu. Hidden faces stay inert.
+        if (!isCardFaceHiddenFromViewer(card)) setReaderCard(card);
+        return;
+      }
       leftClicksSinceContextMenuRef.current = 0;
       const stage = stageRef.current;
       if (!stage) return;
@@ -5703,7 +5772,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         setContextMenu({ card, x: menuX, y: menuY });
       }
     },
-    [stopHoverAnimation, selectedIds, clearSelection],
+    [stopHoverAnimation, selectedIds, clearSelection, isSpectator, isCardFaceHiddenFromViewer],
   );
   /** Touch equivalent of right-click. Reuses handleCardContextMenu unchanged;
    *  it reads clientX/clientY off the event and positions from stageRef, so a
@@ -10561,6 +10630,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             zoneId="battle"
             onClose={() => setBrowseBattle(false)}
             readOnly={isSpectator}
+            isCardFaceHidden={isCardFaceHiddenFromViewer}
+            onReadCard={isSpectator ? setReaderCard : undefined}
             alwaysUseCardMenu
             onRequestCardMenu={(card, clientX, clientY) => {
               setBrowseBattle(false);
@@ -10579,6 +10650,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
             readOnly={isSpectator}
+            isCardFaceHidden={isCardFaceHiddenFromViewer}
+            onReadCard={isSpectator ? setReaderCard : undefined}
             alwaysUseCardMenu={IN_PLAY_BROWSE_ZONES.has(browseOpponentZone)}
             onRequestCardMenu={(card, clientX, clientY) => {
               setBrowseOpponentZone(null);
@@ -10601,6 +10674,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
             readOnly={isSpectator}
+            isCardFaceHidden={isCardFaceHiddenFromViewer}
+            onReadCard={isSpectator ? setReaderCard : undefined}
             alwaysUseCardMenu={IN_PLAY_BROWSE_ZONES.has(browseMyZone)}
             onRequestCardMenu={(card, clientX, clientY) => {
               setBrowseMyZone(null);
@@ -11267,6 +11342,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {isTouch && boardBrowseOpen && (
         <BoardBrowseSheet
           entries={boardBrowseEntries}
+          // Spectators have no "Mine"/"Theirs" — show the seat names instead.
+          ownerLabels={isSpectator ? {
+            my: gameState.myPlayer?.displayName || 'Player 1',
+            opponent: gameState.opponentPlayer?.displayName || 'Player 2',
+          } : undefined}
           onClose={() => setBoardBrowseOpen(false)}
           onPick={(entry) => {
             setBoardBrowseOpen(false);

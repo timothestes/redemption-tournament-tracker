@@ -422,6 +422,26 @@ export default function TurnIndicator({
   // the SpacetimeDB subscription drives the re-render, CSS transitions do the slide.
   const phaseRowRef = useRef<HTMLDivElement | null>(null);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const centerScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Touch: the phase strip scrolls (portrait can't fit all five chips) but it
+  // never followed the game on its own — the active chip could sit outside
+  // the visible window for a whole turn, so a phone watcher lost the one
+  // "what's happening" signal the bar carries. Keep the current chip in view.
+  useEffect(() => {
+    if (!isTouchBar) return;
+    const scroller = centerScrollRef.current;
+    const el = buttonRefs.current[pregameStep ?? currentPhase];
+    if (!scroller || !el) return;
+    if (scroller.scrollWidth <= scroller.clientWidth + 1) return;
+    const eb = el.getBoundingClientRect();
+    const sb = scroller.getBoundingClientRect();
+    if (eb.left < sb.left + 8) {
+      scroller.scrollBy({ left: eb.left - sb.left - 24, behavior: 'smooth' });
+    } else if (eb.right > sb.right - 8) {
+      scroller.scrollBy({ left: eb.right - sb.right + 24, behavior: 'smooth' });
+    }
+  }, [isTouchBar, currentPhase, pregameStep]);
   const [activeBounds, setActiveBounds] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const hasMeasuredRef = useRef(false);
 
@@ -874,6 +894,7 @@ export default function TurnIndicator({
           rather than overlapping when one side outgrows its track.
           ================================================================ */}
       <div
+        ref={centerScrollRef}
         style={{
           display: 'flex',
           alignItems: 'center',
