@@ -527,6 +527,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     gameState.game?.playingStartedAtMicros ?? null,
     gameState.game?.pauseStartedAtMicros ?? 0n,
     gameState.game?.totalPausedMicros ?? 0n,
+    // The compact touch shell hides the readout by layout, but the 1 Hz tick
+    // still re-rendered GameInner — and with it the whole Konva canvas — every
+    // second for the life of the game. Skip the interval where it can't show.
+    { tickEnabled: !compactTouchShell },
   );
 
   // ---- Mutually-agreed pause callbacks (passed to TurnIndicator + ConsentToast) ----
@@ -1476,6 +1480,22 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     />
   );
 
+  // Phone portrait is structurally broken (RightPanel's 280px floor leaves
+  // ~113px of canvas), so gate it rather than render a 6x8px board. Placed
+  // after every hook so hook order stays stable across renders — and BEFORE
+  // every board-rendering branch (ceremony / awaiting-start / finished /
+  // playing). It used to sit just above the 'playing' return, so a portrait
+  // player watched the ceremony render fine and then had the rotate wall
+  // slam in the moment status flipped to 'playing' — reading as a crash.
+  if (gateForPortrait) {
+    return (
+      <RotateDevicePrompt
+        onContinueAnyway={() => setPortraitGateDismissed(true)}
+        lobbyHref={lobbyPath}
+      />
+    );
+  }
+
   // lifecycle === 'pregame' ceremony phases (rolling/choosing/revealing) —
   // show the game board with the roll/choose overlay on top so players
   // can see their dealt hand while deciding who goes first.
@@ -1825,18 +1845,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         {/* Paragon drawer — self-hides when paragons list is empty. */}
         <ParagonDrawer paragons={paragonEntries} />
       </div>
-    );
-  }
-
-  // Phone portrait is structurally broken (RightPanel's 280px floor leaves
-  // ~113px of canvas), so gate it rather than render a 6x8px board. Placed
-  // after every hook so hook order stays stable across renders.
-  if (gateForPortrait) {
-    return (
-      <RotateDevicePrompt
-        onContinueAnyway={() => setPortraitGateDismissed(true)}
-        lobbyHref={lobbyPath}
-      />
     );
   }
 

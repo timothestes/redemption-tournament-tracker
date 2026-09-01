@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { MobileDrawer } from "@/components/ui/mobile-drawer";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useInputMode } from "@/app/shared/hooks/useInputMode";
 import { loadPublicDecksAction, type LoadPublicDecksParams } from "@/app/decklist/actions";
 import { loadUserDecksPaged, type LoadUserDecksPagedParams } from "../actions";
 import { DeckPickerCard } from "./DeckPickerCard";
@@ -85,11 +86,14 @@ function DeckPickerContent({
   const [hasSearched, setHasSearched] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-focus search on mount
+  // Auto-focus search on mount — not on touch, where the keyboard covers the
+  // deck grid the player came to browse.
+  const isTouchPicker = useInputMode() === 'touch';
   useEffect(() => {
+    if (isTouchPicker) return;
     const timer = setTimeout(() => searchInputRef.current?.focus(), 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isTouchPicker]);
 
   // Reset pagination when filters change
   useEffect(() => { setMyPage(1); }, [mySearch, mySort, myFormat]);
@@ -258,7 +262,7 @@ function DeckPickerContent({
             placeholder={activeTab === "my" ? "Search your decks..." : "Search decks, players..."}
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            className="pl-9 h-9 text-sm focus-visible:ring-0 focus-visible:border-primary"
+            className="pl-9 h-9 text-base md:text-sm focus-visible:ring-0 focus-visible:border-primary"
           />
         </div>
 
@@ -434,7 +438,10 @@ export function DeckPickerModal({
   onSelect,
   selectedDeckId,
 }: DeckPickerModalProps) {
-  const isDesktop = useMediaQuery("(min-width: 768px)");
+  // Height-aware: a landscape phone (852x393) satisfies min-width alone and
+  // got the desktop Dialog — which has no close button, leaving backdrop-tap
+  // as the only undiscoverable exit. Short viewports get the drawer instead.
+  const isDesktop = useMediaQuery("(min-width: 768px) and (min-height: 600px)");
 
   const handleSelect = useCallback(
     (deck: DeckOption) => {

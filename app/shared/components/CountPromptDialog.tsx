@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import type { CountPromptRequest } from '../types/gameActions';
 
 interface CountPromptDialogProps {
@@ -14,11 +15,16 @@ interface CountPromptDialogProps {
 export function CountPromptDialog({ req, centerX }: CountPromptDialogProps) {
   const [count, setCount] = useState(req.defaultCount);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isTouch = useInputMode() === 'touch';
 
   useEffect(() => {
+    // Touch: don't autofocus — it summons the iOS numeric keypad (which has
+    // no return key) over the confirm row, and the 44px steppers cover every
+    // count anyway. The field still focuses on tap for direct entry.
+    if (isTouch) return;
     inputRef.current?.focus();
     inputRef.current?.select();
-  }, []);
+  }, [isTouch]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -41,7 +47,10 @@ export function CountPromptDialog({ req, centerX }: CountPromptDialogProps) {
       data-blocking-prompt
       style={{
         position: 'absolute',
-        top: '50%',
+        // Clamp vertically too — with the on-screen keyboard up the visual
+        // viewport is ~45% height and a bare 50% put the confirm row inside
+        // the keyboard region.
+        top: 'clamp(120px, 50%, calc(100% - 140px))',
         // `centerX` is the play area's midpoint in SCREEN space, so it moves
         // with the camera and is unbounded — pinch in on the right of your
         // territory (exactly what you do before tapping a card there) and this

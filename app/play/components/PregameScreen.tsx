@@ -10,6 +10,7 @@ import type { DeckOption } from './DeckPickerCard';
 import { loadDeckForGame } from '../actions';
 import { loadForgeDeckForGame } from '@/app/forge/lib/playDecks';
 import type { GameState } from '../hooks/useGameState';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { DebugOverlay } from './DebugOverlay';
 
 // ---------------------------------------------------------------------------
@@ -148,7 +149,12 @@ export default function PregameScreen({
   return (
     <>
       <TopNav />
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
+      {/* overflow-y-auto + the card's my-auto (not justify-center — that
+          clips the top of overflowing content in a scroll container) keep
+          the whole card reachable on short landscape phones, where the stack
+          is taller than the screen. pt clears the sticky z-50 TopNav, which
+          otherwise covers the "Back to lobby" row of this z-auto container. */}
+      <div className="fixed inset-0 flex flex-col items-center overflow-y-auto bg-black pt-[68px] pb-4">
         {/* Board backdrop — Forge playtest games get a distinct background. */}
         <div
           className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
@@ -159,7 +165,7 @@ export default function PregameScreen({
           style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
         />
 
-        <div className="relative z-10 rounded-xl border border-amber-200/10 bg-black/60 backdrop-blur-sm p-6 sm:p-8 text-center max-w-md w-full mx-4">
+        <div className="relative z-10 my-auto shrink-0 rounded-xl border border-amber-200/10 bg-black/60 backdrop-blur-sm p-6 sm:p-8 [@media(max-height:500px)]:!p-4 text-center max-w-md w-full mx-4">
           {/* Back to lobby */}
           <div className="text-left mb-4">
             <button
@@ -537,6 +543,7 @@ function WaitingActions({
   const [messageSaved, setMessageSaved] = useState(false);
   const [messageExpanded, setMessageExpanded] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
+  const isTouch = useInputMode() === 'touch';
 
   function handleSaveMessage() {
     if (!onUpdateMessage) return;
@@ -564,6 +571,9 @@ function WaitingActions({
                   if (e.key === 'Enter') handleSaveMessage();
                   if (e.key === 'Escape') setMessageExpanded(false);
                 }}
+                // 16px on touch — a 14px focused input makes iOS zoom the
+                // whole (unscrollable) page and it doesn't zoom back.
+                style={{ fontSize: isTouch ? 16 : undefined }}
                 className="flex-1 rounded-md border border-amber-200/15 bg-black/40 px-3 py-2 text-sm text-amber-200/80 placeholder:text-amber-200/25 focus-visible:outline-none focus-visible:border-amber-200/30"
               />
               <button

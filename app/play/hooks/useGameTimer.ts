@@ -24,7 +24,17 @@ export function useGameTimer(
   anchorMicros: bigint | null,
   pauseStartedAtMicros: bigint = 0n,
   totalPausedMicros: bigint = 0n,
+  options?: {
+    /**
+     * When false the 1 Hz interval is skipped entirely (the readout is hidden
+     * by layout, e.g. the compact touch shell). Elapsed recomputes from the
+     * server anchor whenever this flips back on, so no drift accumulates.
+     * pause/resume/isTimerVisible stay live regardless.
+     */
+    tickEnabled?: boolean;
+  },
 ) {
+  const tickEnabled = options?.tickEnabled ?? true;
   const [elapsed, setElapsed] = useState(0);
 
   // Local pause bookkeeping (session-only)
@@ -65,16 +75,19 @@ export function useGameTimer(
     // Reset session pause state when anchor changes (new game / rematch)
     pauseStartRef.current = null;
     totalPausedMsRef.current = 0;
+  }, [anchorMicros]);
 
+  useEffect(() => {
     if (anchorMicros === null || anchorMicros === 0n) {
       setElapsed(0);
       return;
     }
 
     setElapsed(computeElapsed());
+    if (!tickEnabled) return;
     const interval = setInterval(() => setElapsed(computeElapsed()), 1000);
     return () => clearInterval(interval);
-  }, [anchorMicros, computeElapsed]);
+  }, [anchorMicros, computeElapsed, tickEnabled]);
 
   const pause = useCallback(() => {
     if (pauseStartRef.current !== null) return;

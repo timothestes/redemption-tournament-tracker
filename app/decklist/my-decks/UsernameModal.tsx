@@ -102,6 +102,11 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
               autoFocus
               name="deck-display-alias"
               autoComplete="one-time-code"
+              // iOS sentence-cases the first letter and the sanitizer keeps
+              // it — phone players silently got Capitalized usernames.
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               maxLength={24}
               className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
             />

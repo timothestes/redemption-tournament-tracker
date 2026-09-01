@@ -8746,10 +8746,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       </Group>
                     )}
                     {showFace ? (
-                      // Render all cards stacked — each is independently draggable.
-                      // Only the topmost is visible, but when dragged away the next
-                      // card is already rendered underneath with its own node ref.
-                      sortedCards.map((c) => {
+                      // Render the top few cards stacked — each independently
+                      // draggable. Only the topmost is visible; when dragged away
+                      // the next card is already rendered underneath with its own
+                      // node ref. Depth 3 (not the whole pile) keeps a 35-card
+                      // discard from mounting hundreds of invisible Konva nodes:
+                      // only the topmost node is grabbable, so drag paths never
+                      // reference a buried card, and 3 covers rapid repeat drags.
+                      sortedCards.slice(-3).map((c) => {
                         const effective = zoneKey === 'reserve' && c.isFlipped
                           ? { ...c, isFlipped: false }
                           : c;
@@ -11251,7 +11255,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           activeId={activeJumpId}
           canPanHorizontally={canPanHorizontally}
           onPanHorizontal={panHorizontal}
-          onBrowseBoard={isSpectator ? undefined : () => { closeAllMenus(); setBoardBrowseOpen(true); }}
+          onBrowseBoard={() => { closeAllMenus(); setBoardBrowseOpen(true); }}
+          topOffsetPx={isSpectator ? 0 : undefined}
           rightOffsetPx={
             mpLayout
               ? containerWidth - (fit.offsetX + mpLayout.playAreaWidth * fit.scale) + 8

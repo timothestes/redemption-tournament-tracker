@@ -52,6 +52,9 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onEx
   return (
     <div
       ref={ref}
+      // The context-menu touch rule lifts these ~29px rows to 44px — "Top of
+      // Deck" vs "Bottom of Deck" is a silent misdeal when thumb-sized.
+      data-context-menu
       style={{
         position: 'fixed',
         left: Math.min(x, window.innerWidth - 170),

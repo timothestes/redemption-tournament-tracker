@@ -165,9 +165,12 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
 
   // Focus the search input when the modal first mounts. A ref + effect is more
   // reliable than the autoFocus attribute inside this framer-motion modal.
+  // Not on touch — the player opened this to LOOK at cards, and the keyboard
+  // immediately ate half the grid before they typed anything.
   useEffect(() => {
+    if (isTouch) return;
     searchInputRef.current?.focus();
-  }, []);
+  }, [isTouch]);
 
   // Refs for card DOM elements (for lasso hit-testing)
   const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -651,7 +654,8 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 border: '1px solid var(--gf-border)',
                 borderRadius: 4,
                 color: 'var(--gf-text)',
-                fontSize: 13,
+                // 16px on touch stops iOS zooming the page when it takes focus.
+                fontSize: isTouch ? 16 : 13,
                 outline: 'none',
               }}
             />

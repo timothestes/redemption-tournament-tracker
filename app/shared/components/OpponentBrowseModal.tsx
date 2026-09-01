@@ -163,8 +163,9 @@ export function OpponentBrowseModal({
   isDragActive,
 }: OpponentBrowseModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
+  const isTouchModal = useInputMode() === 'touch';
   // Touch has no clicks, hovers or right-clicks — say what actually works.
-  const hintText = useInputMode() === 'touch'
+  const hintText = isTouchModal
     ? 'Tap to select · Long-press a card for actions'
     : 'Right-click for actions · Drag to a zone · Click to select · Hover to enlarge';
   const [search, setSearch] = useState('');
@@ -577,7 +578,9 @@ export function OpponentBrowseModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={searchField === 'all' ? 'Search all fields...' : `Search by ${SEARCH_FIELDS.find(f => f.id === searchField)?.label.toLowerCase()}...`}
-              autoFocus
+              // No autofocus on touch — the keyboard ate half the card grid
+              // the moment the modal opened. 16px stops iOS focus-zoom.
+              autoFocus={!isTouchModal}
               style={{
                 width: '100%',
                 padding: '8px 30px 8px 30px',
@@ -585,7 +588,7 @@ export function OpponentBrowseModal({
                 border: '1px solid var(--gf-border)',
                 borderRadius: 4,
                 color: 'var(--gf-text)',
-                fontSize: 13,
+                fontSize: isTouchModal ? 16 : 13,
                 outline: 'none',
               }}
             />

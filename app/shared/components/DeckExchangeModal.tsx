@@ -10,6 +10,7 @@ import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './M
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { DraggableTitleBar } from './DraggableTitleBar';
 
 interface DeckExchangeModalProps {
@@ -38,6 +39,7 @@ export function DeckExchangeModal({
   targetZone = 'deck',
 }: DeckExchangeModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
+  const isTouch = useInputMode() === 'touch';
   const { zones, actions } = useModalGame();
   const { moveCardToTopOfDeck, shuffleDeck, exchangeFromDeck } = actions;
   const [search, setSearch] = useState('');
@@ -280,7 +282,10 @@ export function DeckExchangeModal({
         style={{
           position: 'fixed',
           inset: 0,
-          right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
+          // Desktop loupe-column dodge only — on touch the right panel is a
+          // full-screen overlay, and this inset shoved the 80vw modal mostly
+          // off the left edge of a portrait phone.
+          right: isTouch ? 0 : isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
           background: 'rgba(0,0,0,0.6)',
           display: 'flex',
           alignItems: 'center',
@@ -400,7 +405,9 @@ export function DeckExchangeModal({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchField === 'all' ? 'Search all fields...' : `Search by ${SEARCH_FIELDS.find(f => f.id === searchField)?.label.toLowerCase()}...`}
-                autoFocus
+                // No autofocus on touch — the keyboard ate half the card grid
+                // the moment the modal opened. 16px stops iOS focus-zoom.
+                autoFocus={!isTouch}
                 style={{
                   width: '100%',
                   padding: '8px 30px 8px 30px',
@@ -408,7 +415,7 @@ export function DeckExchangeModal({
                   border: '1px solid var(--gf-border)',
                   borderRadius: 4,
                   color: 'var(--gf-text)',
-                  fontSize: 13,
+                  fontSize: isTouch ? 16 : 13,
                   outline: 'none',
                 }}
               />

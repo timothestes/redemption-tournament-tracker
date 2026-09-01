@@ -231,7 +231,33 @@ export function SpacetimeConnectionResetWrapper({ createBuilder, children }: Pro
     [triggerReset, connectionHealth, gaveUp, manualRetry],
   );
 
+  // "Your connection dropped" readout. connectionHealth initializes to
+  // 'dropped' before the first connect, so gate the banner on having been
+  // live at least once — otherwise it flashes on every normal page load.
+  const [hasBeenLive, setHasBeenLive] = useState(false);
+  useEffect(() => {
+    if (connectionHealth === 'live') setHasBeenLive(true);
+  }, [connectionHealth]);
+
+  // Distinguish "your phone lost its network" from "the server dropped you".
+  const [browserOffline, setBrowserOffline] = useState(false);
+  useEffect(() => {
+    const sync = () => setBrowserOffline(!navigator.onLine);
+    sync();
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    return () => {
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', sync);
+    };
+  }, []);
+
   const isProviderMounted = resetPhase === 'idle';
+  // browserOffline is ORed in: the OS knows the network is gone well before
+  // the WebSocket times out, and "you're offline" is exactly the readout a
+  // phone player needs in that gap.
+  const showReconnectBanner =
+    hasBeenLive && !gaveUp && (connectionHealth !== 'live' || browserOffline);
 
   return (
     <Ctx.Provider value={ctxValue}>
@@ -243,8 +269,33 @@ export function SpacetimeConnectionResetWrapper({ createBuilder, children }: Pro
           {children}
         </SpacetimeProvider>
       )}
+      {showReconnectBanner && (
+        <ReconnectBanner offline={browserOffline} health={connectionHealth} />
+      )}
       {gaveUp && <FatalConnectionScreen onRetry={manualRetry} />}
     </Ctx.Provider>
+  );
+}
+
+// Small always-on-top readout while the auto-reconnect machinery works.
+// Purely informational: pointer-events none so it can never eat a tap, and
+// z-[60] keeps it under FatalConnectionScreen (z-[70]) and blocking prompts.
+function ReconnectBanner({ offline, health }: { offline: boolean; health: ConnectionHealthKind }) {
+  const label = offline
+    ? "You're offline — waiting for network…"
+    : health === 'down'
+      ? 'Connection lost — retrying…'
+      : 'Reconnecting…';
+  return (
+    <div
+      className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center"
+      style={{ top: 'calc(56px + env(safe-area-inset-top, 0px))' }}
+    >
+      <div className="flex items-center gap-2 rounded-full border border-amber-500/40 bg-black/80 px-4 py-2 text-[13px] font-medium text-amber-200 shadow-lg backdrop-blur-sm">
+        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+        {label}
+      </div>
+    </div>
   );
 }
 

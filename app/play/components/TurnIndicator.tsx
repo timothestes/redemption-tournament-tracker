@@ -430,7 +430,7 @@ export default function TurnIndicator({
   useEffect(() => {
     if (!isTouchBar) return;
     const btn = buttonRefs.current[activeKey];
-    btn?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+    btn?.scrollIntoView?.({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }, [isTouchBar, activeKey]);
 
   // Measure the bar's own width so we can hide non-essential bits (the timer)
@@ -654,6 +654,25 @@ export default function TurnIndicator({
           }}
         >
           T{turnNumber}
+          {/* Ultra-narrow bars hide the score cluster — and with it the only
+              opponent-connection dot in the app, exactly on the portrait
+              phones where the opponent silently dropping matters most. Show
+              the dot beside the turn number there instead. */}
+          {isBarUltraNarrow && !readOnly && (
+            <span
+              title={`Opponent ${opponentConnectionStatus === 'connected' ? 'connected' : opponentConnectionStatus === 'reconnecting' ? 'reconnecting' : 'disconnected'}`}
+              style={{
+                display: 'inline-block',
+                width: 6,
+                height: 6,
+                marginLeft: 5,
+                borderRadius: '50%',
+                verticalAlign: 'middle',
+                background: opponentConnectionStatus === 'connected' ? '#22c55e' : opponentConnectionStatus === 'reconnecting' ? '#eab308' : '#ef4444',
+                boxShadow: `0 0 5px ${opponentConnectionStatus === 'connected' ? 'rgba(34, 197, 94, 0.6)' : opponentConnectionStatus === 'reconnecting' ? 'rgba(234, 179, 8, 0.6)' : 'rgba(239, 68, 68, 0.6)'}`,
+              }}
+            />
+          )}
         </span>
       )}
 
@@ -873,6 +892,16 @@ export default function TurnIndicator({
           // instead of overprinting the right cluster.
           flex: isTouchBar ? '1 1 0' : undefined,
           overflowX: isTouchBar ? 'auto' : undefined,
+          // Scroll affordance: iOS shows no scrollbar at rest, so a strip
+          // that overflows looked complete. Fade the clipped edges instead —
+          // when the row fits, the edges are empty space and the fade is
+          // invisible, so this costs nothing on wider bars.
+          maskImage: isTouchBar
+            ? 'linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%)'
+            : undefined,
+          WebkitMaskImage: isTouchBar
+            ? 'linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%)'
+            : undefined,
         }}
       >
         {/* Previous phase arrow — hidden during the pre-game alongside the next
@@ -1358,7 +1387,10 @@ export default function TurnIndicator({
             top: 0,
             left: 0,
             bottom: 0,
-            right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
+            // Desktop loupe-column dodge only — on touch the panel is a
+            // full-screen overlay, and the inset squeezed this dialog into
+            // the leftover gutter on portrait phones.
+            right: isTouchBar ? 0 : isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
             zIndex: 900,
             display: 'flex',
             alignItems: 'center',
@@ -1458,7 +1490,8 @@ export default function TurnIndicator({
             top: 0,
             left: 0,
             bottom: 0,
-            right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
+            // Same touch-vs-loupe reasoning as the concede modal above.
+            right: isTouchBar ? 0 : isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
             zIndex: 900,
             display: 'flex',
             alignItems: 'center',

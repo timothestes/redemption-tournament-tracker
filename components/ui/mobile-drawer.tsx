@@ -30,18 +30,24 @@ export function MobileDrawer({ isOpen, onClose, children, title }: MobileDrawerP
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop - z-40, below the bottom nav (z-50) */}
+          {/* Backdrop - z-40, below the bottom nav (z-50).
+              No md:hidden — the parent decides drawer vs dialog (the deck
+              pickers now branch on height too, so a ≥768px landscape phone
+              legitimately renders the drawer). */}
           <motion.div
-            className="md:hidden fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-black/50 z-40"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          {/* Drawer - sits above backdrop but leaves room for bottom nav */}
+          {/* Drawer. Flush with the bottom edge — the old 3.5rem reservation
+              was for a bottom nav that no consumer of this drawer has, and on
+              a 360px-tall landscape phone it left the sheet 248px tall over a
+              56px dead gap. */}
           <motion.div
-            className="md:hidden fixed inset-x-0 z-40 bg-background rounded-t-2xl shadow-2xl flex flex-col"
-            style={{ bottom: "3.5rem", height: "calc(100dvh - 7rem)" }}
+            className="fixed inset-x-0 z-40 bg-background rounded-t-2xl shadow-2xl flex flex-col"
+            style={{ bottom: 0, height: "calc(100dvh - 3.5rem)" }}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}

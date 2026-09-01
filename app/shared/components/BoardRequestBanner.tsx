@@ -39,6 +39,10 @@ export function BoardRequestBanner({
 
   return (
     <div
+      // Grant/Deny (phase stops, action priority, initiative) are answered
+      // mid-battle with a thumb; the blocking-prompt rule raises the ~35px
+      // buttons to 44px on touch. A mis-tapped Deny is logged to the opponent.
+      data-blocking-prompt
       style={{
         position: 'absolute',
         top: '50%',
