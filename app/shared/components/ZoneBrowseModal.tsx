@@ -186,6 +186,10 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         { name: b.cardName, type: b.type, brigade: b.brigade, alignment: b.alignment, strength: b.strength, reference: b.reference },
       ))
     : rawCards;
+  // Field of Battle only: both sides share the grid, so per-card owner badges
+  // are what distinguish attacker from blocker (see ownerBadge below).
+  const battleMixedOwners =
+    zoneId === 'battle' && new Set(cards.map((c) => c.ownerId)).size > 1;
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(200, { setPreviewCard, isLoupeVisible });
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
@@ -612,6 +616,16 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
             {cards.map((card) => {
               const imageUrl = getCardImageUrl(card.cardImgFile);
               const isSelected = selectedIds.has(card.instanceId);
+              // Field of Battle merges both sides into one grid, and a
+              // contested pair renders stacked on the board — this grid is
+              // how a phone player tells attacker from blocker, so each card
+              // says whose it is. ownerId is the viewer-relative seat label
+              // ('player1' = mine), not a player id. Only shown when the
+              // grid actually mixes owners (goldfish battle stays unbadged).
+              const ownerBadge =
+                zoneId === 'battle' && battleMixedOwners
+                  ? (card.ownerId === 'player1' ? 'Yours' : 'Theirs')
+                  : null;
               return (
                 <div
                   key={card.instanceId}
@@ -682,6 +696,26 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                       </div>
                     );
                   })()}
+                  {ownerBadge && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 4,
+                        left: 4,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
+                        pointerEvents: 'none',
+                        background: ownerBadge === 'Yours' ? 'rgba(60, 42, 16, 0.92)' : 'rgba(16, 32, 60, 0.92)',
+                        border: `1px solid ${ownerBadge === 'Yours' ? 'rgba(196, 149, 90, 0.7)' : 'rgba(100, 149, 237, 0.7)'}`,
+                        color: ownerBadge === 'Yours' ? '#e8d5a3' : '#a3c5e8',
+                      }}
+                    >
+                      {ownerBadge}
+                    </span>
+                  )}
                 </div>
               );
             })}

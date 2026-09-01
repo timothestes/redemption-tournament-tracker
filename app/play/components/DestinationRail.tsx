@@ -16,6 +16,13 @@ interface DestinationRailProps {
    *  rather than over it: a card is usually armed FROM the hand, so covering
    *  the hand would hide the card just picked and block re-arming another. */
   handBandHeight?: number;
+  /** Portrait board: the single scroll row leaves ~110px for chips on a
+   *  393px-wide phone — one chip visible, the rest scrolled out with no
+   *  affordance (wave-3 QA: players could not find Discard/Deck/LOR at all).
+   *  Wrap lays the chips out as a full-width multi-row grid instead; the
+   *  tall portrait column has the vertical room the landscape hand strip
+   *  doesn't. */
+  wrap?: boolean;
   onPick: (zone: ZoneId, owner: ZoneOwner) => void;
   onCancel: () => void;
   /** The segmented Mine/Theirs/Shared control drives the armed state's `side`
@@ -52,7 +59,7 @@ function label(zone: ZoneId): string {
  * the camera happens to be showing.
  */
 export function DestinationRail({
-  state, format, cardName, isLostSoul = false, handBandHeight = 0, onPick, onCancel, onSideChange,
+  state, format, cardName, isLostSoul = false, handBandHeight = 0, wrap = false, onPick, onCancel, onSideChange,
 }: DestinationRailProps) {
   // The side lives in the tap-to-move reducer (tapCard resets it to 'my', so
   // the rail never opens on a stale tab from the previous move).
@@ -71,8 +78,9 @@ export function DestinationRail({
     <AnimatePresence>
       {state.kind === 'armed' && (
         <motion.div
-          className="pointer-events-auto absolute inset-x-0 z-[300] flex items-center gap-2
-                     border-y border-[#6b4e27]/60 bg-[#0e0a06]/95 px-2 py-1 backdrop-blur"
+          className={`pointer-events-auto absolute inset-x-0 z-[300] flex items-center gap-2
+                     border-y border-[#6b4e27]/60 bg-[#0e0a06]/95 px-2 py-1 backdrop-blur
+                     ${wrap ? 'flex-wrap' : ''}`}
           style={{ bottom: handBandHeight }}
           initial={{ y: '100%', opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -124,7 +132,17 @@ export function DestinationRail({
             ))}
           </div>
 
-          <div className="flex flex-1 gap-2 overflow-x-auto">
+          {/* Wrap (portrait): a full-width multi-row grid below the selector
+              row. Otherwise: one scrolling row, with a right-edge fade as the
+              scroll affordance — without it the trailing chips (LOB for a
+              soul) read as absent rather than scrolled out. */}
+          <div
+            className={
+              wrap
+                ? 'order-last flex basis-full flex-wrap gap-2 pt-1'
+                : 'flex flex-1 gap-2 overflow-x-auto [mask-image:linear-gradient(to_right,black_0,black_calc(100%-28px),transparent)]'
+            }
+          >
             {visible.map((d) => (
               <button
                 key={`${d.owner}:${d.zone}`}
@@ -148,7 +166,8 @@ export function DestinationRail({
             aria-label={`Cancel moving ${cardName ?? 'card'}`}
             className={`min-h-[44px] min-w-[44px] shrink-0 rounded-lg border border-red-900/70
                        px-3 text-[12px] uppercase tracking-wide text-red-300/90
-                       active:bg-red-950/60 active:text-red-200 ${CINZEL}`}
+                       active:bg-red-950/60 active:text-red-200 ${CINZEL}
+                       ${wrap ? 'ml-auto' : ''}`}
           >
             Cancel
           </button>

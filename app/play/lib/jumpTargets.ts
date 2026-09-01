@@ -22,6 +22,9 @@ export interface JumpTarget {
   rect: Rect | null;
   /** Which axis fitRectToViewport should use for this target. */
   axis: 'both' | 'height';
+  /** Horizontal anchor when the height-fit viewport is narrower than the
+   *  rect — see FitOptions.anchorX. Only the battle target centers. */
+  anchorX?: 'left' | 'center';
 }
 
 function compact(rects: Array<Rect | undefined>): Rect[] {
@@ -78,11 +81,16 @@ export function buildJumpTargets(
     const contextPad = layout.mainCard.cardHeight / 2;
     const top = Math.max(0, z.battle.y - contextPad);
     const bottom = Math.min(VIRTUAL_HEIGHT, z.battle.y + z.battle.height + contextPad);
+    // anchorX 'center': the battle slots, totals chips and initiative caption
+    // all cluster around the band's midline. The default left-anchor showed
+    // the band's empty left half and parked the action at the right viewport
+    // edge, under the pan cluster and the chat rail (phone QA, wave 3).
     targets.push({
       id: 'battle',
       label: 'Battle',
       rect: { x: z.battle.x, y: top, width: z.battle.width, height: bottom - top },
       axis: 'height',
+      anchorX: 'center',
     });
   }
 

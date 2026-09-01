@@ -142,6 +142,22 @@ describe('fitRectToViewport', () => {
     expect(soulScreenX).toBeLessThan(cw);
   });
 
+  // The battle band's action (card slots, totals chips, initiative caption)
+  // clusters around its midline; the left-anchor default parked it at the
+  // viewport's right edge on phones. anchorX 'center' keeps the midline
+  // on-screen even when the rect overflows horizontally.
+  it("height-fit with anchorX 'center' keeps the rect midline at the viewport centre", () => {
+    const cw = 852, ch = 393;
+    const fit = calculateScale(cw, ch);
+    const band = { x: 0, y: 300, width: fit.virtualWidth, height: 480 };
+    const cam = fitRectToViewport(band, fit.scale, fit.virtualWidth, cw, ch, {
+      axis: 'height', anchorX: 'center',
+    });
+    const composed = composeCamera(fit, cam, cw, ch);
+    const midScreenX = (band.x + band.width / 2) * composed.scale + composed.offsetX;
+    expect(midScreenX).toBeCloseTo(cw / 2, 4);
+  });
+
   it('height-fit still centres a rect the viewport can fully show', () => {
     const cw = 852, ch = 393;
     const fit = calculateScale(cw, ch);

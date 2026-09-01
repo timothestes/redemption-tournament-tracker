@@ -128,6 +128,14 @@ export interface FitOptions {
    *  touch turn bar). The rect is fitted and centered within the area BELOW
    *  it, so a side jump doesn't hide its top row under the bar. */
   insetTop?: number;
+  /** When a height fit leaves the viewport narrower than the rect: 'left'
+   *  (default) aligns the viewport to the rect's left edge — right for
+   *  left-anchored content like auto-arranged LoB souls. 'center' keeps the
+   *  rect's midline on screen instead — the battle band's action (the card
+   *  slots, totals chips and initiative caption) all cluster around its
+   *  midline, and a left-aligned battle jump parked them at the viewport's
+   *  right edge under the camera chrome on phones. */
+  anchorX?: 'left' | 'center';
 }
 
 /** Camera that frames `rect` in the viewport. */
@@ -139,7 +147,7 @@ export function fitRectToViewport(
   containerHeight: number,
   opts: FitOptions = {},
 ): Camera {
-  const { axis = 'both', padding = 1.06, insetTop = 0 } = opts;
+  const { axis = 'both', padding = 1.06, insetTop = 0, anchorX = 'left' } = opts;
   const needW = rect.width * padding;
   const needH = rect.height * padding;
   const availH = Math.max(1, containerHeight - insetTop);
@@ -158,7 +166,7 @@ export function fitRectToViewport(
   // and the visible half-width must be computed at the zoom actually used.
   let centerX = rect.x + rect.width / 2;
   const effectiveScale = fitScale * clamp(zoom, MIN_ZOOM, MAX_ZOOM);
-  if (Number.isFinite(effectiveScale) && effectiveScale > 0) {
+  if (anchorX === 'left' && Number.isFinite(effectiveScale) && effectiveScale > 0) {
     const halfViewW = containerWidth / (2 * effectiveScale);
     if (rect.width > 2 * halfViewW) {
       centerX = rect.x + halfViewW;

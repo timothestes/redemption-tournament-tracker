@@ -87,6 +87,12 @@ interface BattleResolutionUIProps {
    *  tap can't fall through to an armed Konva stage. Pointer mode is
    *  byte-identical when this is false/omitted. */
   compact?: boolean;
+  /** A card is armed for tap-to-move (touch). The Win/End Battle row sits
+   *  INSIDE the band's tap area, so with a card armed a band-aimed tap could
+   *  fire a confirm-free, consequence-heavy resolution instead of committing
+   *  the move. Hide the row until the arm resolves; the awaiting-soul UI is
+   *  unaffected (no arm can be live behind its scrim). */
+  suppressResolution?: boolean;
 }
 
 const BUTTON_COPY: Record<ResolutionAction, { label: string }> = {
@@ -512,6 +518,7 @@ export default function BattleResolutionUI({
   onSurrenderSoul,
   holdPhase,
   compact,
+  suppressResolution,
 }: BattleResolutionUIProps) {
   // Guards against a double-fire from a fast repeat click while the pick is
   // in flight (self-review requirement, Task 14). Resets whenever the
@@ -564,6 +571,9 @@ export default function BattleResolutionUI({
   }
 
   if (battleState !== 'active' || isSpectator) return null;
+  // Armed tap-to-move: get the resolution row out of the band's tap area so a
+  // commit tap can't land on ⚑ Win Battle (see suppressResolution docs).
+  if (suppressResolution === true) return null;
 
   const isAttacker = mySeat !== '' && mySeat === attackerSeat;
   const isDefender = mySeat !== '' && attackerSeat !== '' && mySeat !== attackerSeat;
