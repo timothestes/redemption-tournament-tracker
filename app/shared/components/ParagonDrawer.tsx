@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useInputMode } from '../hooks/useInputMode';
 import type { ParagonEntry } from '../types/paragonEntry';
 
 interface ParagonDrawerProps {
@@ -13,6 +14,12 @@ const HANDLE_WIDTH = 180;
 const HANDLE_HEIGHT = 36;
 
 export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
+  // The 396/400px right offsets below exist to clear the desktop chat column.
+  // On touch that column is a full-screen overlay instead, so the offset just
+  // shoved the handle AND the drawer entirely off the left edge of a phone
+  // (on a 393px viewport the handle sat at x -187..-7) — a Paragon player had
+  // no way to open, or even see, their own Paragon.
+  const isTouch = useInputMode() === 'touch';
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
@@ -108,7 +115,9 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
         tabIndex={open ? -1 : 0}
         style={{
           position: 'fixed',
-          right: 400,
+          // 52 clears the 45px chat rail that the touch layout docks on the
+          // right edge; the desktop 400 clears the full chat column.
+          right: isTouch ? 52 : 400,
           bottom: 16,
           zIndex: 899,
           display: 'flex',
@@ -160,11 +169,18 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
         aria-hidden={!open}
         style={{
           position: 'fixed',
-          right: 396,
           bottom: 0,
           zIndex: 900,
-          width: DRAWER_WIDTH,
-          maxWidth: 'calc(100vw - 32px)',
+          // Touch spans the viewport between the left edge and the chat rail
+          // rather than taking a fixed width off a desktop-sized right offset.
+          // `width: auto` is required for `right` to apply alongside `left`.
+          ...(isTouch
+            ? { left: 8, right: 53, width: 'auto', maxWidth: 'none',
+                // A landscape phone is 393px tall and the open drawer is taller
+                // than that, so without a cap its header (and the close button)
+                // render above the top of the viewport.
+                maxHeight: 'calc(100vh - 8px)', overflowY: 'auto' as const }
+            : { right: 396, width: DRAWER_WIDTH, maxWidth: 'calc(100vw - 32px)' }),
           transform: open ? 'translateY(0)' : 'translateY(100%)',
           transition: 'transform 360ms cubic-bezier(0.32, 0.72, 0, 1)',
           willChange: 'transform',

@@ -542,6 +542,16 @@ html[data-input-mode='touch'] [data-card-choice-prompt] button {
   min-width: 44px !important;
 }
 
+/* The prompts a player is *forced* to answer — consent to an opponent's deck
+   search, keep-one, resurrect-heroes, the deck exchange, and the count prompt
+   ("look at top X"). Every other blocking surface got a touch pass in earlier
+   waves; these five kept pointer-sized controls (31-36px), including the
+   count prompt's 36x36 +/- steppers. */
+html[data-input-mode='touch'] [data-blocking-prompt] button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
 /* The turn bar's exit-to-lobby button is 28px wide. */
 html[data-input-mode='touch'] [data-phase-bar] button[title='Back to lobby'] {
   min-width: 44px !important;

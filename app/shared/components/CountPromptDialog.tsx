@@ -38,10 +38,17 @@ export function CountPromptDialog({ req, centerX }: CountPromptDialogProps) {
 
   return (
     <div
+      data-blocking-prompt
       style={{
         position: 'absolute',
         top: '50%',
-        left: centerX ?? '50%',
+        // `centerX` is the play area's midpoint in SCREEN space, so it moves
+        // with the camera and is unbounded — pinch in on the right of your
+        // territory (exactly what you do before tapping a card there) and this
+        // prompt rendered fully off-screen, in a clipped container, with no
+        // backdrop and no dismissal but Escape. Keep the box on screen; the
+        // 190px is half its 320 min-width plus padding.
+        left: centerX != null ? `clamp(190px, ${centerX}px, calc(100% - 190px))` : '50%',
         transform: 'translate(-50%, -50%)',
         zIndex: 900,
         pointerEvents: 'auto',

@@ -47,6 +47,7 @@ export function KeepOneModal({
 
   return (
     <div
+      data-blocking-prompt
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
       style={{
         position: 'absolute',

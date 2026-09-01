@@ -5118,8 +5118,27 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       );
     }
     entries.push({ owner: 'my', zone: 'hand', label: 'Hand', count: (myCards['hand'] ?? []).length });
+
+    // The pile zones. Their only other tap target is the right rail's count
+    // badge, which is ~24x17 CSS px on a landscape phone with ~15px between
+    // neighbours — a fingertip covers Discard, the gap and Banish at once
+    // (measured: two taps 16px apart opened two different zones). Checking a
+    // discard or your Land of Redemption is constant in this game, so route it
+    // through the same 48px rows as everything else here.
+    const pileZones: Array<{ zone: ZoneId; label: string }> = [
+      { zone: 'discard', label: 'Discard' },
+      { zone: 'land-of-redemption', label: 'Land of Redemption' },
+      { zone: 'reserve', label: 'Reserve' },
+      { zone: 'banish', label: 'Banish' },
+    ];
+    for (const { zone, label } of pileZones) {
+      entries.push({ owner: 'my', zone, label, count: (myCards[zone] ?? []).length });
+      // Their reserve is face-down unless revealed — same gate the rail uses.
+      if (zone === 'reserve' && !canViewOppReserve) continue;
+      entries.push({ owner: 'opponent', zone, label, count: (opponentCards[zone] ?? []).length });
+    }
     return entries;
-  }, [myCards, opponentCards, sharedCards, normalizedFormat, battleActive]);
+  }, [myCards, opponentCards, sharedCards, normalizedFormat, battleActive, canViewOppReserve]);
 
   /** Which jump the camera is currently sitting in, so the cluster can show
    *  it. Cleared by any manual pan/pinch — the framing is no longer that
@@ -10939,7 +10958,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           <div
             style={{
               position: 'absolute',
-              left: playCenterScreenX,
+              // Camera-derived and unbounded (see CountPromptDialog): zoomed in
+              // near a board edge this panel rendered off-screen while its own
+              // scrim still covered the board. Half of maxWidth, plus a margin.
+              left: `clamp(190px, ${playCenterScreenX}px, calc(100% - 190px))`,
               top: '50%',
               transform: 'translate(-50%, -50%)',
               background: 'var(--gf-bg, #1a1510)',

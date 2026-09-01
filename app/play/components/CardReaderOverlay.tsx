@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import type { GameCard } from '@/app/shared/types/gameCard';
 
@@ -24,8 +24,23 @@ interface CardReaderOverlayProps {
  * This is that missing surface — reached from the touch context sheet's header
  * and from the board browse sheets. Landscape phones are wide and short, so the
  * layout is a row: the scan fills the height, the text column scrolls beside it.
+ * Portrait is the opposite shape and gets a column instead — see `isPortrait`.
  */
 export function CardReaderOverlay({ card, imageUrl, onClose }: CardReaderOverlayProps) {
+  // The row layout above assumes a short, wide viewport. A player who took
+  // "Continue anyway" past the rotate gate reads cards in portrait, where a row
+  // squeezed the scan into 205px of a 393px screen (a third of the height it
+  // could use) and left the text in a 154px column — unreadable, which defeats
+  // the whole point of this overlay.
+  const [isPortrait, setIsPortrait] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: portrait)');
+    const sync = () => setIsPortrait(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
@@ -55,7 +70,9 @@ export function CardReaderOverlay({ card, imageUrl, onClose }: CardReaderOverlay
         padding: 'max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left))',
         // The scan is tall; a landscape phone is short. Row keeps the image as
         // large as the height allows and gives the text the leftover width.
-        flexDirection: 'row',
+        // Portrait is tall and narrow, so stack instead and let the scan take
+        // the width.
+        flexDirection: isPortrait ? 'column' : 'row',
       }}
     >
       {imageUrl ? (
@@ -65,9 +82,9 @@ export function CardReaderOverlay({ card, imageUrl, onClose }: CardReaderOverlay
           alt={card.cardName}
           onClick={(e) => e.stopPropagation()}
           style={{
-            height: '100%',
-            width: 'auto',
-            maxWidth: '55%',
+            ...(isPortrait
+              ? { width: '100%', height: 'auto', maxHeight: '64%' }
+              : { height: '100%', width: 'auto', maxWidth: '55%' }),
             objectFit: 'contain',
             borderRadius: 8,
             boxShadow: '0 10px 40px rgba(0,0,0,0.7)',
@@ -78,7 +95,7 @@ export function CardReaderOverlay({ card, imageUrl, onClose }: CardReaderOverlay
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
-            height: '100%',
+            ...(isPortrait ? { width: '100%', maxHeight: '64%' } : { height: '100%' }),
             aspectRatio: '5 / 7',
             borderRadius: 8,
             border: '1px solid rgba(107,78,39,0.5)',
@@ -100,7 +117,8 @@ export function CardReaderOverlay({ card, imageUrl, onClose }: CardReaderOverlay
         style={{
           flex: 1,
           minWidth: 0,
-          maxWidth: 460,
+          width: isPortrait ? '100%' : undefined,
+          maxWidth: isPortrait ? '100%' : 460,
           maxHeight: '100%',
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
