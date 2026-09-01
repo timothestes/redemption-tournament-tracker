@@ -5141,7 +5141,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (t.id === 'battle' && activeJumpIdRef.current !== 'battle') {
       preBattleJumpRef.current = activeJumpIdRef.current;
     }
-    jumpTo(t.rect, { axis: t.axis, insetTop: useCompactLayout ? 48 : 0 });
+    jumpTo(t.rect, { axis: t.axis, insetTop: useCompactLayout ? 48 : 0, anchorX: t.anchorX });
     setActiveJumpId(t.id);
   }, [jumpTo, useCompactLayout]);
 
@@ -9768,6 +9768,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onSurrenderSoul={gameState.surrenderSoul}
           holdPhase={gameState.holdPhase}
           compact={useCompactLayout}
+          suppressResolution={isTouch && tapMoveState.kind === 'armed'}
         />
       )}
 
@@ -11271,6 +11272,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               ? findAnyCardById(tapMoveState.cardId)?.cardName
               : undefined
           }
+          wrap={portraitBoard}
           onPick={(zone, owner) => tapMoveDispatch({ type: 'tapDestinationChip', zone, owner })}
           onCancel={tapMoveReset}
           onSideChange={(s) => tapMoveDispatch({ type: 'setSide', side: s })}

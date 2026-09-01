@@ -320,7 +320,10 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'SET_PHASE' && payload) {
     try {
       const data = JSON.parse(payload);
-      if (data.phase) return `moved to ${data.phase}`;
+      // "entered the X phase", not "moved to X" — "moved to battle" /
+      // "moved to discard" read exactly like a card move with a missing
+      // card name next to the real move lines (wave-3 QA).
+      if (data.phase) return `entered the ${data.phase} phase`;
     } catch { /* fall through */ }
   }
   if (actionType === 'SPAWN_LOST_SOUL') {

@@ -67,6 +67,24 @@ export function tapMoveReducer(state: TapMoveState, event: TapMoveEvent): TapMov
       if (state.kind === 'armed' && state.cardId === event.cardId) {
         return { state: IDLE, commit: null };
       }
+      // A tap on a card already standing in the Field of Battle commits the
+      // armed card INTO the battle, like tapping the band itself. The battle
+      // cards sit dead-center of the band — exactly where a finger aiming
+      // "into the battle" lands — and the old arm-switch here silently left
+      // the rail pointing at the opponent's blocker, one chip-tap away from
+      // moving THEIR card (wave-3 phone QA). Arm-switching onto a battle
+      // card is still reachable: cancel first, then tap it.
+      if (state.kind === 'armed' && event.zone === 'battle' && state.sourceZone !== 'battle') {
+        return {
+          state: IDLE,
+          commit: {
+            cardId: state.cardId,
+            toZone: 'battle',
+            toOwner: event.owner,
+            atPoint: null,
+          },
+        };
+      }
       return {
         state: {
           kind: 'armed',

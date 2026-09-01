@@ -27,6 +27,29 @@ describe('tapMoveReducer', () => {
     expect(r.commit).toBeNull();
   });
 
+  it('commits into battle when the tap lands ON a battle card, not an arm-switch', () => {
+    // The battle cards sit dead-center of the band — exactly where a finger
+    // aiming "into the battle" lands. Arm-switching there silently left the
+    // rail pointed at the opponent's blocker (wave-3 phone QA).
+    const r = tapMoveReducer(armed, { type: 'tapCard', cardId: 'blocker', zone: 'battle', owner: 'opponent' });
+    expect(r.commit).toEqual({
+      cardId: 'c1', toZone: 'battle', toOwner: 'opponent', atPoint: null,
+    });
+    expect(r.state.kind).toBe('idle');
+  });
+
+  it('still arm-switches between battle cards when the armed card is already in battle', () => {
+    // battle -> battle is a no-op move; switching the arm is the useful read.
+    const battleArmed: TapMoveState = {
+      kind: 'armed', cardId: 'c1', sourceZone: 'battle', sourceOwner: 'my', side: 'my',
+    };
+    const r = tapMoveReducer(battleArmed, { type: 'tapCard', cardId: 'blocker', zone: 'battle', owner: 'opponent' });
+    expect(r.commit).toBeNull();
+    expect(r.state).toEqual({
+      kind: 'armed', cardId: 'blocker', sourceZone: 'battle', sourceOwner: 'opponent', side: 'my',
+    });
+  });
+
   it('commits with a point when a zone is tapped on canvas', () => {
     const r = tapMoveReducer(armed, {
       type: 'tapZone', zone: 'territory', owner: 'my', point: { x: 500, y: 700 },
