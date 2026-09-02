@@ -18,6 +18,10 @@ import { loadDeckForGame, getInviteGameInfo } from '../actions';
 import type { InviteGameInfo } from '../actions';
 import type { DeckOption } from './DeckPickerCard';
 
+/** Survives the /play → /play/[code] → /play bounce a failed join causes.
+ *  Deliberately sessionStorage: scoped to this tab's visit, not a preference. */
+const SELECTED_DECK_KEY = 'play_selected_deck';
+
 interface GameLobbyProps {
   decks: DeckOption[];
   userId: string;
@@ -114,6 +118,21 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
     }
   }, []);
 
+  // Restore the deck choice after a bounce through /play/[code]. A failed join
+  // remounts this component, and `selectedDeck` only ever initialises from the
+  // user's OWN decks — so a community deck (the only option for someone who
+  // owns none) was silently discarded, disabling Create Game and forcing the
+  // whole picker flow again just because a code was mistyped.
+  useEffect(() => {
+    if (selectedDeck) return;
+    try {
+      const saved = sessionStorage.getItem(SELECTED_DECK_KEY);
+      if (saved) setSelectedDeck(JSON.parse(saved) as DeckOption);
+    } catch {
+      // Malformed or unavailable storage — fall through to the normal picker.
+    }
+  }, []);
+
   const [isPrivate, setIsPrivate] = useState(false);
 
   // SpacetimeDB connection for lobby
@@ -123,6 +142,11 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
     setSelectedDeck(deck);
     setPickerOpen(false);
     setError(null);
+    try {
+      sessionStorage.setItem(SELECTED_DECK_KEY, JSON.stringify(deck));
+    } catch {
+      // Storage unavailable (private mode): the pick still works for this view.
+    }
   }
 
   function handleUsernameSet(newUsername: string) {
@@ -582,6 +606,13 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                   />
                 </button>
               </div>
+              {/* The Join button is disabled until the code is complete, which
+                  on its own reads as a dead button. Say what it's waiting for. */}
+              {gameCode.length > 0 && gameCode.length < 4 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Game codes are 4 characters — {4 - gameCode.length} to go.
+                </p>
+              )}
               {isSpectate && (
                 <p className="text-xs text-muted-foreground text-center">
                   Spectating — you&apos;ll watch this game, not play.

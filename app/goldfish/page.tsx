@@ -22,10 +22,25 @@ export default function GoldfishEntryPage() {
           Practice Mode
         </h1>
         <p className="text-center mb-6" style={{ color: 'var(--gf-text)' }}>
-          Load a deck from the community or paste a deck list to start practicing.
+          Draw hands and play out turns against no opponent — the fastest way to
+          test whether a deck actually does what you built it to do.
         </p>
 
         <div className="flex flex-col gap-4">
+          {/* Your own decks were unreachable from here: the only button led to
+              the community list, which never contains your private decks. */}
+          <Link
+            href="/decklist/my-decks"
+            className="block text-center py-3 px-4 rounded font-medium transition-colors"
+            style={{
+              background: 'var(--gf-accent, #c4955a)',
+              color: '#1a1206',
+              border: '1px solid var(--gf-accent, #c4955a)',
+            }}
+          >
+            Practice One of My Decks
+          </Link>
+
           <Link
             href="/decklist/community"
             className="block text-center py-3 px-4 rounded font-medium transition-colors"
@@ -39,7 +54,7 @@ export default function GoldfishEntryPage() {
           </Link>
 
           <div className="text-center text-sm" style={{ color: 'var(--gf-text-dim)' }}>
-            or open a deck directly at <code className="text-xs">/goldfish/[deckId]</code>
+            Open any deck, then use the play button to practice with it.
           </div>
         </div>
       </div>

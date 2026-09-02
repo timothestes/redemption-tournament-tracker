@@ -326,19 +326,32 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [toggleLoupe]);
 
-  // Unread chat count — increments while panel is collapsed
+  // Unread chat count — increments while panel is collapsed.
+  // The player shell fixed both of these bugs; this shell kept its own copy and
+  // was missed. (1) System rows (senderId 0n — "X started spectating", privacy
+  // toggles) are not chat and must not light the badge; they render in the Log
+  // tab. (2) Baselining at 0 counted the whole backlog as unread the moment the
+  // subscription landed, and this component remounts on every reconnect — so a
+  // flaky phone re-flagged the entire game history each time.
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const prevChatCountRef = useRef(0);
+  const [chatSyncSettled, setChatSyncSettled] = useState(false);
   useEffect(() => {
-    const current = gameState.chatMessages.length;
-    if (current > prevChatCountRef.current) {
-      const newCount = current - prevChatCountRef.current;
-      if (!isLoupeVisible) {
-        setUnreadChatCount((n) => n + newCount);
-      }
-    }
+    if (!gameState.isChatReady) return;
+    const t = setTimeout(() => setChatSyncSettled(true), 1500);
+    return () => clearTimeout(t);
+  }, [gameState.isChatReady]);
+  useEffect(() => {
+    const current = gameState.chatMessages.reduce(
+      (n, m) => (m.senderId !== 0n ? n + 1 : n),
+      0,
+    );
+    const prev = prevChatCountRef.current;
     prevChatCountRef.current = current;
-  }, [gameState.chatMessages.length, isLoupeVisible]);
+    if (!chatSyncSettled || current <= prev) return;
+    if (isLoupeVisible) return;
+    setUnreadChatCount((n) => n + (current - prev));
+  }, [gameState.chatMessages, chatSyncSettled, isLoupeVisible]);
 
   // Clear unread when panel opens
   useEffect(() => {
@@ -584,6 +597,67 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                   }
                 />
               </div>
+              {/* Who is playing, what the score is, and whose turn it is — the
+                  three things someone opens a stream to find out. The shared
+                  bar drops all of it at phone widths, so in portrait a
+                  spectator saw only "T1" and a phase chip. */}
+              {compactTouchShell && (
+                <div
+                  style={{
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    padding: '3px 8px',
+                    background: 'rgba(13, 9, 5, 0.92)',
+                    borderBottom: '1px solid var(--gf-border, rgba(107,78,39,0.4))',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                    fontSize: 11,
+                    letterSpacing: '0.04em',
+                    color: 'rgba(232, 213, 163, 0.85)',
+                    minWidth: 0,
+                  }}
+                >
+                  {[
+                    { p: gameState.myPlayer, score: myScore },
+                    { p: gameState.opponentPlayer, score: opponentScore },
+                  ].map((side, i) => {
+                    // `currentTurn` is a SEAT number (0/1), not a player id.
+                    const isActiveTurn =
+                      side.p != null && gameState.game?.currentTurn === side.p.seat;
+                    return (
+                      <span
+                        key={i}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          minWidth: 0,
+                          flex: '0 1 auto',
+                        }}
+                      >
+                        {i === 1 && <span style={{ opacity: 0.4, marginRight: 4 }}>vs</span>}
+                        {/* The turn marker has to survive name truncation. */}
+                        {isActiveTurn && <span style={{ color: 'var(--gf-accent, #c4955a)' }}>▶</span>}
+                        <span
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: 92,
+                            fontWeight: isActiveTurn ? 700 : 400,
+                            color: isActiveTurn ? '#e8d5a3' : 'inherit',
+                          }}
+                        >
+                          {side.p?.displayName ?? (i === 0 ? 'Player 1' : 'Player 2')}
+                        </span>
+                        <span style={{ color: '#e8d5a3', fontWeight: 700 }}>{side.score}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
               <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                 <MultiplayerCanvas
                   gameId={gameId}

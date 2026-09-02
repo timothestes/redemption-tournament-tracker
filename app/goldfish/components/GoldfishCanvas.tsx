@@ -25,6 +25,7 @@ import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
 import { DeckDropPopup } from '@/app/shared/components/DeckDropPopup';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
 import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -391,6 +392,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const isDraggingRef = useRef(false);
   const dragSourceZoneRef = useRef<ZoneId | null>(null);
   const [browseZone, setBrowseZone] = useState<ZoneId | null>(null);
+  // Goldfish only ever bound `contextmenu`, so on a phone there was no path to
+  // any card menu, pile browse, shuffle or flip — the whole action layer was
+  // mouse-only. Touch gets the same long-press adapter multiplayer uses.
+  const isTouch = useInputMode() === 'touch';
+  const dragCancelledRef = useRef(false);
 
   // Keep hover preview in sync with game state (e.g. when meekifying a hovered card)
   useEffect(() => {
@@ -923,6 +929,27 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
   const handleCardDragEnd = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<DragEvent>) => {
+      // A long-press that opened a menu ends the drag it interrupted. Snap the
+      // node home instead of committing a move the player never aimed.
+      if (dragCancelledRef.current) {
+        dragCancelledRef.current = false;
+        isDraggingRef.current = false;
+        isCanvasDragging.current = false;
+        setDraggingCardIds(new Set());
+        canvasDragZoneRef.current = null;
+        dragSourceZoneRef.current = null;
+        dragFollowerOffsets.current = null;
+        dragGhostOffsetRef.current = null;
+        const start = dragStartPositionRef.current;
+        dragStartPositionRef.current = null;
+        setCanvasDragZone(null);
+        setDragSourceZone(null);
+        if (start) {
+          e.target.position({ x: start.x, y: start.y });
+          e.target.getLayer()?.batchDraw();
+        }
+        return;
+      }
       // Capture follower offsets before clearing
       const followerOffsets = dragFollowerOffsets.current;
       isDraggingRef.current = false;
@@ -1446,6 +1473,45 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       }
     },
     []
+  );
+
+  /** Touch equivalent of right-click, mirroring MultiplayerCanvas: the context
+   *  handlers read clientX/clientY off the event and position against the
+   *  stage, so a synthetic event carrying the press point is enough. */
+  const synthPointerEvent = useCallback(
+    (p: { x: number; y: number }) =>
+      ({
+        evt: { clientX: p.x, clientY: p.y, preventDefault() {} },
+        cancelBubble: false,
+      }) as unknown as Konva.KonvaEventObject<PointerEvent>,
+    [],
+  );
+
+  const handleCardLongPress = useCallback(
+    (card: GameCard, p: { x: number; y: number }) => {
+      // GameCardNode fires this immediately before stopDrag(); marking the drag
+      // cancelled keeps the resulting dragend from committing a move the player
+      // never asked for.
+      if (isDraggingRef.current) dragCancelledRef.current = true;
+      const zone = card.zone;
+      if (zone && BROWSE_ONLY_ZONES.includes(zone)) {
+        setBrowseZone(zone);
+        return;
+      }
+      handleCardContextMenu(card, synthPointerEvent(p));
+    },
+    [handleCardContextMenu, synthPointerEvent],
+  );
+
+  /** They kept dragging after the menu appeared — they were aiming, not asking
+   *  for a menu. Take it back rather than making them dismiss it. */
+  const handleCardLongPressCancel = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const handleDeckLongPress = useCallback(
+    (p: { x: number; y: number }) => handleDeckContextMenu(synthPointerEvent(p)),
+    [handleDeckContextMenu, synthPointerEvent],
   );
 
   const handleBrowseZoneCardClick = useCallback(
@@ -2053,6 +2119,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         e.target.getLayer()?.batchDraw();
                       }}
                       onContextMenu={(_c, e) => handleDeckContextMenu(e)}
+                      onLongPress={isTouch ? (_c, p) => handleDeckLongPress(p) : undefined}
+                      onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                       onDblClick={() => {}}
                       onMouseEnter={handleCardMouseEnter}
                       onMouseLeave={handleCardMouseLeave}
@@ -2065,6 +2133,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                       offsetX={oX}
                       offsetY={oY}
                       onContextMenu={handleDeckContextMenu}
+                      // Touch has no right-click: without a tap handler the
+                      // deck pile did nothing at all on a phone — no draw, no
+                      // search, no shuffle.
+                      onTap={(e) => handleDeckLongPress({ x: e.evt.changedTouches?.[0]?.clientX ?? 0, y: e.evt.changedTouches?.[0]?.clientY ?? 0 })}
                     >
                       <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                     </Group>
@@ -2113,6 +2185,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleBrowseZoneCardContextMenu}
+                        onLongPress={isTouch ? handleCardLongPress : undefined}
+                        onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                         onClick={handleBrowseZoneCardClick}
                         onDblClick={handleCardDblClick}
                         onMouseEnter={handleCardMouseEnter}
@@ -2196,6 +2270,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleBrowseZoneCardContextMenu}
+                        onLongPress={isTouch ? handleCardLongPress : undefined}
+                        onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                         onClick={handleBrowseZoneCardClick}
                         onDblClick={handleCardDblClick}
                         onMouseEnter={handleCardMouseEnter}
@@ -2235,6 +2311,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
                       onContextMenu={handleCardContextMenu}
+                      onLongPress={isTouch ? handleCardLongPress : undefined}
+                      onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                       onClick={handleCardClick}
                       onDblClick={handleCardDblClick}
                       onMouseEnter={handleCardMouseEnter}
@@ -2287,6 +2365,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                           onDragMove={handleCardDragMove}
                           onDragEnd={handleCardDragEnd}
                           onContextMenu={handleCardContextMenu}
+                          onLongPress={isTouch ? handleCardLongPress : undefined}
+                          onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                           onClick={handleCardClick}
                           onDblClick={handleCardDblClick}
                           onMouseEnter={handleCardMouseEnter}
@@ -2314,6 +2394,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleCardContextMenu}
+                        onLongPress={isTouch ? handleCardLongPress : undefined}
+                        onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                         onClick={handleCardClick}
                         onDblClick={handleCardDblClick}
                         onMouseEnter={handleCardMouseEnter}
@@ -2359,6 +2441,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={handleCardContextMenu}
+                        onLongPress={isTouch ? handleCardLongPress : undefined}
+                        onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                         onClick={handleCardClick}
                         onDblClick={handleCardDblClick}
                         onMouseEnter={handleCardMouseEnter}
@@ -2402,6 +2486,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
                       onContextMenu={isBrowseOnly ? handleBrowseZoneCardContextMenu : handleCardContextMenu}
+                      onLongPress={isTouch ? handleCardLongPress : undefined}
+                      onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                       onClick={isBrowseOnly ? handleBrowseZoneCardClick : handleCardClick}
                       onDblClick={handleCardDblClick}
                       onMouseEnter={handleCardMouseEnter}
@@ -2533,6 +2619,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                 onDragMove={handleCardDragMove}
                 onDragEnd={handleCardDragEnd}
                 onContextMenu={handleCardContextMenu}
+                onLongPress={isTouch ? handleCardLongPress : undefined}
+                onLongPressCancel={isTouch ? handleCardLongPressCancel : undefined}
                 onClick={handleCardClick}
                 onDblClick={handleCardDblClick}
                 onMouseEnter={handleCardMouseEnter}
