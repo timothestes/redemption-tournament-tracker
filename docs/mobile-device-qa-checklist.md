@@ -59,6 +59,21 @@ Device: ____________________  OS/browser: ____________________  Date: __________
 - [ ] Counter steppers (+/−) are hittable without zooming.
 - [ ] Sidebar piles (discard, banish, reserve, LoR) open on tap.
 
+## Wave 9 (2026-09-02) — emulation-verified, needs real-iOS confirmation
+- [ ] Portrait "Continue anyway": the top bar is TWO rows (End Turn/Concede on
+      top, phase chips below). The chip strip scrolls by swipe with edge fades;
+      a tap near Upkeep must never fire End Turn or Concede.
+- [ ] With the iOS keyboard open over the chat composer, the composer and any
+      Grant/Deny banner stay visible and tappable (emulated 235px viewport was
+      fine; `visualViewport` behavior differs on real Safari).
+- [ ] After winning a battle, the "↩ End" button turns into red "No soul?" on
+      the first tap and only ends the battle on a second tap within 3 s —
+      confirm the armed state is noticeable at arm's length.
+- [ ] Tapping the card scan inside the full-screen reader closes it, and no
+      iOS image-save callout appears on the tap.
+- [ ] The pause (⏸) button beside the turn chip requests a pause and the
+      opponent's accept flows back.
+
 ## Known gaps — confirm these are still only annoyances, not blockers
 - [ ] Hand / Land of Bondage zone menus are unreachable on touch.
 - [ ] Multi-card selection is unavailable on touch.

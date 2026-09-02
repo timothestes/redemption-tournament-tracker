@@ -1913,19 +1913,22 @@ export default function ChatPanel({
             </button>
           )}
           {/* ---- Header with tabs ---- */}
+          {/* Flex, not `1fr auto 1fr` grid: the intrinsic tab row (330px once
+              the touch rule inflates the buttons) maximized the middle track,
+              collapsed the 1fr sides, and pushed the search button past the
+              panel's right edge — at 1024px it sat fully off-viewport. */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr auto 1fr',
+              display: 'flex',
               alignItems: 'center',
+              gap: 4,
               padding: '6px 8px',
               borderBottom: '1px solid rgba(107, 78, 39, 0.3)',
               flexShrink: 0,
             }}
           >
-            <span aria-hidden />
-            {/* Tabs */}
-            <div style={{ display: 'flex', gap: 4 }}>
+            {/* Tabs — scroll within the panel instead of overflowing it */}
+            <div style={{ display: 'flex', gap: 4, flex: '1 1 0', minWidth: 0, overflowX: 'auto' }}>
               {((showSpectatorsTab
                 ? (['all', 'chat', 'log', 'spectators'] as const)
                 : (['all', 'chat', 'log'] as const)) as readonly TabKey[]).map((tab) => {
@@ -1976,8 +1979,8 @@ export default function ChatPanel({
                 );
               })}
             </div>
-            {/* Search toggle (right-aligned in the grid) */}
-            <div style={{ justifySelf: 'end' }}>
+            {/* Search toggle (fixed at the row's right edge) */}
+            <div style={{ flexShrink: 0, marginLeft: 'auto' }}>
               <button
                 onClick={() => {
                   setSearchOpen((prev) => {

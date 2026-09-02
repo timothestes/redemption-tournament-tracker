@@ -227,6 +227,18 @@ function AwaitingSoulUI({
   // live Konva stage. The visible scrim stays compact-only.
   const isTouchInput = useInputMode() === 'touch';
 
+  // The attacker's escape-hatch End Battle is two-step: it renders exactly
+  // where ⚑ Win / ↩ End just were, so a habitual second tap (or a stray one,
+  // one finger-width away on a phone) forfeited the soul the attacker had
+  // just won — verified live: End during the opponent's open chooser closes
+  // it and awards nothing. First tap arms, second tap within 3s dispatches.
+  const [endArmed, setEndArmed] = useState(false);
+  useEffect(() => {
+    if (!endArmed) return;
+    const t = setTimeout(() => setEndArmed(false), 3000);
+    return () => clearTimeout(t);
+  }, [endArmed]);
+
   if (!isChooser) {
     // The "Waiting for <chooser> to choose a soul…" status lives in the
     // band HEADER now (owner direction — the old pill here read as a second
@@ -256,9 +268,16 @@ function AwaitingSoulUI({
           }}
         >
           <ResolutionButton
-            label={compact ? BUTTON_COPY['end-battle'].compactLabel : BUTTON_COPY['end-battle'].label}
-            tone="neutral"
-            onClick={onEndBattle}
+            label={
+              endArmed
+                ? (compact ? 'No soul?' : 'End without a soul?')
+                : (compact ? BUTTON_COPY['end-battle'].compactLabel : BUTTON_COPY['end-battle'].label)
+            }
+            tone={endArmed ? 'red' : 'neutral'}
+            onClick={() => {
+              if (endArmed) onEndBattle();
+              else setEndArmed(true);
+            }}
             compact={compact}
           />
         </div>
