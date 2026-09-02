@@ -66,9 +66,10 @@ Device: ____________________  OS/browser: ____________________  Date: __________
 - [ ] With the iOS keyboard open over the chat composer, the composer and any
       Grant/Deny banner stay visible and tappable (emulated 235px viewport was
       fine; `visualViewport` behavior differs on real Safari).
-- [ ] After winning a battle, the "↩ End" button turns into red "No soul?" on
-      the first tap and only ends the battle on a second tap within 3 s —
-      confirm the armed state is noticeable at arm's length.
+- [ ] There is no End Battle button anywhere: the attacker's band shows only
+      "⚑ Win", the defender's only "🏳 Battle Lost", and tapping another phase
+      chip (or End Turn) closes an open battle — including while the opponent's
+      soul chooser is up (a deliberate walk-away, no soul awarded).
 - [ ] Tapping the card scan inside the full-screen reader closes it, and no
       iOS image-save callout appears on the tap.
 - [ ] The pause (⏸) button beside the turn chip requests a pause and the
