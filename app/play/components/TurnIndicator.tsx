@@ -577,7 +577,13 @@ export default function TurnIndicator({
         // Touch: fixed 48px with symmetric breathing room — sized by content,
         // the 44px buttons sat flush against the screen's top edge (clipped
         // pill/borders) with all the slack pooled at the bottom.
-        height: isTouchBar ? 48 : '100%',
+        // Ultra-narrow (portrait phones) wraps to TWO rows — clusters on top,
+        // full-width phase strip below. In one row the strip's scroll window
+        // collapsed to ~87px and End Turn/Concede sat exactly where the
+        // clipped Upkeep/Prep chips were laid out, so a tap aimed at a phase
+        // chip ended the turn or opened Concede (measured via
+        // elementFromPoint at 393px).
+        height: isTouchBar ? (isBarUltraNarrow ? 94 : 48) : '100%',
         boxSizing: 'border-box',
         paddingTop: isTouchBar ? 2 : 0,
         paddingBottom: isTouchBar ? 1 : 0,
@@ -601,8 +607,13 @@ export default function TurnIndicator({
         // shrinks and scrolls instead of overprinting Concede.
         display: isTouchBar ? 'flex' : 'grid',
         gridTemplateColumns: isTouchBar ? undefined : '1fr auto 1fr',
+        // Two-row wrap on ultra-narrow: the center strip takes flex-basis
+        // 100% + order 3 (below), so row 1 is [left cluster … right cluster]
+        // and row 2 is the phase strip at full bar width.
+        flexWrap: isTouchBar && isBarUltraNarrow ? 'wrap' : undefined,
         alignItems: 'center',
         gap: 8,
+        rowGap: 0,
         paddingLeft: 12,
         paddingRight: 12,
       }}
@@ -883,6 +894,62 @@ export default function TurnIndicator({
           )}
         </span>
       )}
+      {/* Narrow bars hide the timer block above, and pause/resume lived only
+          inside it — so no phone had any way to pause at all. A standalone
+          44px control keeps the feature reachable on touch. */}
+      {isTouchBar && isBarNarrow && !readOnly && pauseButtonMode !== 'hidden' && (
+        <button
+          type="button"
+          onClick={() => {
+            if (pauseButtonMode === 'pause') onRequestPause?.();
+            else if (pauseButtonMode === 'play') onRequestResume?.();
+            else if (pauseButtonMode === 'cancel') onCancelPauseRequest?.();
+          }}
+          title={
+            pauseButtonMode === 'pause' ? 'Pause game (asks opponent)' :
+            pauseButtonMode === 'play' ? 'Resume game (asks opponent)' :
+            'Cancel pending request'
+          }
+          aria-label={
+            pauseButtonMode === 'pause' ? 'Pause game' :
+            pauseButtonMode === 'play' ? 'Resume game' :
+            'Cancel pause request'
+          }
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: 44,
+            minHeight: 44,
+            padding: 0,
+            background: 'transparent',
+            border: '1px solid rgba(232, 213, 163, 0.25)',
+            borderRadius: 4,
+            color: pauseButtonMode === 'cancel'
+              ? 'rgba(234, 179, 8, 0.85)'
+              : 'rgba(232, 213, 163, 0.65)',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          {pauseButtonMode === 'pause' && (
+            <svg width="14" height="15" viewBox="0 0 10 11" fill="currentColor" aria-hidden="true">
+              <rect x="1" y="1" width="2.5" height="9" rx="0.5" />
+              <rect x="6.5" y="1" width="2.5" height="9" rx="0.5" />
+            </svg>
+          )}
+          {pauseButtonMode === 'play' && (
+            <svg width="14" height="15" viewBox="0 0 10 11" fill="currentColor" aria-hidden="true">
+              <path d="M2 1.5 L2 9.5 L9 5.5 Z" />
+            </svg>
+          )}
+          {pauseButtonMode === 'cancel' && (
+            <svg width="14" height="14" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+              <path d="M2 2 L8 8 M8 2 L2 8" />
+            </svg>
+          )}
+        </button>
+      )}
       </div>
       </div>
 
@@ -910,8 +977,11 @@ export default function TurnIndicator({
           minWidth: isTouchBar ? 64 : 0,
           // Touch: the center takes exactly the space between the fixed side
           // clusters and scrolls its own content on narrow (portrait) widths
-          // instead of overprinting the right cluster.
-          flex: isTouchBar ? '1 1 0' : undefined,
+          // instead of overprinting the right cluster. Ultra-narrow: wrap to
+          // a second, full-width row (order 3 puts it after the right
+          // cluster) so every chip and phase-stop gate is actually hittable.
+          flex: isTouchBar ? (isBarUltraNarrow ? '1 1 100%' : '1 1 0') : undefined,
+          order: isTouchBar && isBarUltraNarrow ? 3 : undefined,
           overflowX: isTouchBar ? 'auto' : undefined,
           // Scroll affordance: iOS shows no scrollbar at rest, so a strip
           // that overflows looked complete. Fade the clipped edges instead —

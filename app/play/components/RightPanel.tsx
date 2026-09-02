@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import ChatPanel from '@/app/play/components/ChatPanel';
@@ -80,6 +80,19 @@ export default function RightPanel({
 }: RightPanelProps) {
   const { isLoupeVisible, toggleLoupe, previewCard, isPreviewFlipped } = useCardPreview();
   const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all' | 'spectators'>('all');
+  // Opening the panel clears the unread badge (client.tsx), so it must land
+  // on a tab that actually SHOWS the messages. The tab is remembered across
+  // opens, and reopening on Spectators/Log silently swallowed the unread
+  // count — the player "read" nothing (found live: 2 unread → panel opened
+  // on Spectators → badge gone, messages never seen).
+  const wasOpenRef = useRef(isLoupeVisible);
+  useEffect(() => {
+    const justOpened = isLoupeVisible && !wasOpenRef.current;
+    wasOpenRef.current = isLoupeVisible;
+    if (justOpened && unreadChatCount > 0 && (chatTab === 'spectators' || chatTab === 'log')) {
+      setChatTab('all');
+    }
+  }, [isLoupeVisible, unreadChatCount, chatTab]);
   // The draft lives here, not in ChatPanel: collapsing the panel unmounts
   // ChatPanel, and on a phone collapsing is the ONLY way to see the board, so
   // a half-typed message was destroyed every time a player checked their

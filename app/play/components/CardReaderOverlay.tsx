@@ -80,7 +80,12 @@ export function CardReaderOverlay({ card, imageUrl, onClose }: CardReaderOverlay
         <img
           src={imageUrl}
           alt={card.cardName}
-          onClick={(e) => e.stopPropagation()}
+          // The scan plus the text column cover nearly the whole screen, so
+          // the closes-on-tap "backdrop" was just the padding ring — in
+          // practice only the 44px × closed the reader. Tapping the scan is
+          // the natural dismiss; the text column keeps swallowing taps so
+          // scrolling it never closes the reader.
+          onClick={onClose}
           style={{
             ...(isPortrait
               ? { width: '100%', height: 'auto', maxHeight: '64%' }

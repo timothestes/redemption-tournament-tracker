@@ -626,18 +626,18 @@ test.describe("Phase Stops", () => {
       await expect.poll(() => cardsInBand(active), { timeout: 10_000 }).toBeGreaterThan(0);
 
       // --- 4. E17: the band's conclude buttons are dead while held ----------
+      // (There is no End Battle button anymore — the attacker walks away by
+      // progressing the phase, which is exactly what step 3 above attempted
+      // and the gate held. Win Battle is the only attacker band button.)
       const winBattleBtn = active.getByRole("button", { name: /Win Battle/ });
-      const endBattleBtn = active.getByRole("button", { name: /End Battle/ });
       await expect(winBattleBtn).toBeVisible();
       await expect(winBattleBtn).toBeDisabled();
-      await expect(endBattleBtn).toBeDisabled();
 
-      // Force-clicking the disabled buttons must not dispatch — no reducer
+      // Force-clicking the disabled button must not dispatch — no reducer
       // call, so no SenderError, so no unhandled-rejection pageerror.
       const battlePageErrors: string[] = [];
       active.on("pageerror", (e) => battlePageErrors.push(String(e)));
       await winBattleBtn.click({ force: true }).catch(() => {});
-      await endBattleBtn.click({ force: true }).catch(() => {});
       await active.waitForTimeout(500);
       expect(battlePageErrors).toEqual([]);
       await expect.poll(() => cardsInBand(active), { timeout: 5_000 }).toBeGreaterThan(0);
