@@ -386,7 +386,28 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       window.removeEventListener('orientationchange', update);
     };
   }, []);
+  // Remembered per game, per tab: a phone that reloads mid-match (backgrounded
+  // tab discarded, accidental pull-to-refresh, a genuine drop) re-mounted this
+  // component and re-armed the gate, so a player who had already chosen to play
+  // in portrait got the rotate wall again — while the opponent's clock kept
+  // running behind it. The choice belongs to the game, not the mount.
+  const portraitGateKey = `portrait_gate_ok_${code}`;
   const [portraitGateDismissed, setPortraitGateDismissed] = useState(false);
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(portraitGateKey) === '1') setPortraitGateDismissed(true);
+    } catch {
+      // Storage unavailable — the gate simply behaves as before.
+    }
+  }, [portraitGateKey]);
+  const dismissPortraitGate = useCallback(() => {
+    setPortraitGateDismissed(true);
+    try {
+      sessionStorage.setItem(portraitGateKey, '1');
+    } catch {
+      // Non-fatal: the dismissal still holds for this mount.
+    }
+  }, [portraitGateKey]);
   const gateForPortrait =
     !portraitGateDismissed &&
     shouldGateForPortrait(shellViewport.w, shellViewport.h, shellInputMode);
@@ -1099,7 +1120,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const isGameNotFound = lifecycle === 'error' && errorMessage?.includes('No game found');
   useEffect(() => {
     if (!isGameNotFound) return;
-    sessionStorage.setItem('lobby_error', `Game "${code}" is no longer available.`);
+    // "No longer available" reads as "your friend's game just ended" — but the
+    // overwhelmingly common cause is a mistyped code for a game that never
+    // existed. Say what the player can actually act on.
+    sessionStorage.setItem(
+      'lobby_error',
+      `No open game with the code "${code}". Codes are 4 characters — check it, or ask for a fresh invite link.`,
+    );
     router.replace(lobbyPath);
   }, [isGameNotFound, code, router, lobbyPath]);
 
@@ -1518,7 +1545,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   if (gateForPortrait) {
     return (
       <RotateDevicePrompt
-        onContinueAnyway={() => setPortraitGateDismissed(true)}
+        onContinueAnyway={dismissPortraitGate}
         lobbyHref={lobbyPath}
       />
     );
