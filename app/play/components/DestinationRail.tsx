@@ -98,7 +98,10 @@ export function DestinationRail({
                          rounded-t-md border border-b-0 border-[#6b4e27]/60 bg-[#0e0a06]/95
                          px-2 py-0.5 text-[11px] font-medium text-amber-200/90"
             >
-              {cardName}
+              {/* "Moving" makes the tab self-explanatory — a bare card name
+                  over the board read as a phantom card after a stray tap
+                  armed something (phone QA, wave 8). */}
+              Moving: {cardName}
             </span>
           )}
           {/* One compact row. Three stacked rows were ~130px tall, which on a

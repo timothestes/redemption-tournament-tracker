@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { ChevronLeft, ChevronRight, LayoutList } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, ChevronsRight, Crosshair, LayoutList } from 'lucide-react';
 import type { JumpTarget, JumpTargetId } from '@/app/play/lib/jumpTargets';
 
 interface TouchControlsProps {
@@ -22,6 +22,10 @@ interface TouchControlsProps {
    *  the canvas (default 48); the spectator shell gives the bar its own row,
    *  so the canvas starts below it already — pass 0 there. */
   topOffsetPx?: number;
+  /** Start collapsed (portrait: the expanded cluster sat directly on the
+   *  opponent's hand row and hid it entirely). The player can expand/collapse
+   *  either way; a change in this prop (rotation) re-applies the default. */
+  defaultCollapsed?: boolean;
 }
 
 const BTN =
@@ -36,6 +40,11 @@ const BTN =
  * zoom 1, which made "Fit" a one-way trip: pressing it took the jump buttons
  * away with it and the only route back was a pinch.
  *
+ * Collapsible: the expanded row covers whatever sits under the top-right of
+ * the board (opponent hand count in landscape, the whole opponent hand row in
+ * portrait), so it can fold down to a single crosshair button. Portrait
+ * defaults collapsed; landscape defaults expanded.
+ *
  * The second row is the answer to "I can never see the right-hand side of the
  * opponent's board". A side jump fills the viewport on the height axis, and a
  * side spans the whole board width, so roughly half of it is off-screen by
@@ -45,7 +54,15 @@ const BTN =
 export function TouchControls({
   targets, onJump, activeId, rightOffsetPx,
   canPanHorizontally, onPanHorizontal, onBrowseBoard, topOffsetPx,
+  defaultCollapsed,
 }: TouchControlsProps) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false);
+  // Rotation flips the default: portrait needs the opponent-hand row back,
+  // landscape has room for the full cluster again.
+  useEffect(() => {
+    setCollapsed(defaultCollapsed ?? false);
+  }, [defaultCollapsed]);
+
   return (
     <div
       // Docked below the turn bar at the RIGHT end of the play area, clear of
@@ -61,63 +78,86 @@ export function TouchControls({
       }}
       data-testid="touch-controls"
     >
-      <div className="flex flex-row gap-1 rounded-lg border border-neutral-700 bg-neutral-900/90 p-1 backdrop-blur">
-        {targets.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            disabled={!t.rect}
-            onClick={() => t.rect && onJump(t)}
-            data-testid={`jump-${t.id}`}
-            aria-label={`Jump camera to ${t.label}`}
-            aria-pressed={activeId === t.id}
-            className={
-              BTN + ' ' +
-              (activeId === t.id
-                ? 'bg-neutral-700 text-neutral-50'
-                : 'text-neutral-300 active:bg-neutral-800')
-            }
-          >
-            {t.label}
-          </button>
-        ))}
-        {onBrowseBoard && (
-          <button
-            type="button"
-            onClick={onBrowseBoard}
-            data-testid="browse-board"
-            aria-label="Browse the cards on the board"
-            className={BTN + ' border-l border-neutral-700 text-neutral-300 active:bg-neutral-800'}
-          >
-            <LayoutList size={18} />
-          </button>
-        )}
-      </div>
-
-      {canPanHorizontally && onPanHorizontal && (
-        <div
-          className="flex flex-row gap-1 rounded-lg border border-neutral-700 bg-neutral-900/90 p-1 backdrop-blur"
-          data-testid="touch-pan-controls"
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          data-testid="camera-cluster-expand"
+          aria-label="Show camera controls"
+          className={BTN + ' rounded-lg border border-neutral-700 bg-neutral-900/90 text-neutral-300 backdrop-blur active:bg-neutral-800'}
         >
-          <button
-            type="button"
-            onClick={() => onPanHorizontal(-1)}
-            data-testid="pan-left"
-            aria-label="Pan left"
-            className={BTN + ' text-neutral-300 active:bg-neutral-800'}
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onPanHorizontal(1)}
-            data-testid="pan-right"
-            aria-label="Pan right"
-            className={BTN + ' text-neutral-300 active:bg-neutral-800'}
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
+          <Crosshair size={18} />
+        </button>
+      ) : (
+        <>
+          <div className="flex flex-row gap-1 rounded-lg border border-neutral-700 bg-neutral-900/90 p-1 backdrop-blur">
+            {targets.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                disabled={!t.rect}
+                onClick={() => t.rect && onJump(t)}
+                data-testid={`jump-${t.id}`}
+                aria-label={`Jump camera to ${t.label}`}
+                aria-pressed={activeId === t.id}
+                className={
+                  BTN + ' ' +
+                  (activeId === t.id
+                    ? 'bg-neutral-700 text-neutral-50'
+                    : 'text-neutral-300 active:bg-neutral-800')
+                }
+              >
+                {t.label}
+              </button>
+            ))}
+            {onBrowseBoard && (
+              <button
+                type="button"
+                onClick={onBrowseBoard}
+                data-testid="browse-board"
+                aria-label="Browse the cards on the board"
+                className={BTN + ' border-l border-neutral-700 text-neutral-300 active:bg-neutral-800'}
+              >
+                <LayoutList size={18} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setCollapsed(true)}
+              data-testid="camera-cluster-collapse"
+              aria-label="Hide camera controls"
+              className={BTN + ' border-l border-neutral-700 text-neutral-400 active:bg-neutral-800'}
+            >
+              <ChevronsRight size={18} />
+            </button>
+          </div>
+
+          {canPanHorizontally && onPanHorizontal && (
+            <div
+              className="flex flex-row gap-1 rounded-lg border border-neutral-700 bg-neutral-900/90 p-1 backdrop-blur"
+              data-testid="touch-pan-controls"
+            >
+              <button
+                type="button"
+                onClick={() => onPanHorizontal(-1)}
+                data-testid="pan-left"
+                aria-label="Pan left"
+                className={BTN + ' text-neutral-300 active:bg-neutral-800'}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onPanHorizontal(1)}
+                data-testid="pan-right"
+                aria-label="Pan right"
+                className={BTN + ' text-neutral-300 active:bg-neutral-800'}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

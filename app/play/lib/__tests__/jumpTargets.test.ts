@@ -42,15 +42,23 @@ describe('buildJumpTargets', () => {
     expect(buildJumpTargets(layout, VW, false).some((t) => t.id === 'battle')).toBe(false);
   });
 
-  it('includes battle when a band is active, framed with half a card of context', () => {
+  it('includes battle when a band is active, framing the band centre with context', () => {
     const battleLayout = calculateMultiplayerLayout(VW, VIRTUAL_HEIGHT, 'T1', 'player', true);
     const band = battleLayout.zones.battle!;
-    const rect = buildJumpTargets(battleLayout, VW, true).find((x) => x.id === 'battle')!.rect!;
+    const target = buildJumpTargets(battleLayout, VW, true).find((x) => x.id === 'battle')!;
+    const rect = target.rect!;
     // A height-fit of the bare band clipped the flanking cards at the frame
     // edges — the jump rect extends ~half a card above and below the band.
     const pad = battleLayout.mainCard.cardHeight / 2;
-    expect(rect.x).toBe(band.x);
-    expect(rect.width).toBe(band.width);
+    // Horizontally the rect frames the band's CENTRE (six cards wide), not
+    // its full width: a full-width height-fit on a narrow viewport zoomed
+    // until the battle pair itself sat off-screen. Contain-fit ('both') lets
+    // width bind on phones so the pair and its neighbours stay visible.
+    const frameW = Math.min(band.width, battleLayout.mainCard.cardWidth * 6);
+    expect(rect.width).toBeCloseTo(frameW, 6);
+    expect(rect.x + rect.width / 2).toBeCloseTo(band.x + band.width / 2, 6);
+    expect(target.axis).toBe('both');
+    expect(target.anchorX).toBe('center');
     expect(rect.y).toBeCloseTo(Math.max(0, band.y - pad), 6);
     expect(rect.y + rect.height).toBeCloseTo(Math.min(VIRTUAL_HEIGHT, band.y + band.height + pad), 6);
   });

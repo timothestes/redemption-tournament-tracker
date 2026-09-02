@@ -5112,12 +5112,36 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ---- Camera jump targets + e2e hook ----
   const jumpTargets = useMemo(() => {
     if (!mpLayout) return [];
+    // Where the battle cards actually stand: free-form drops land anywhere
+    // along the band, so the Battle jump centres on the cards rather than
+    // the band midline (which left an off-centre attacker outside a phone
+    // viewport). Node x is the card's top-left for my side but the rotated
+    // bottom-right for the opponent's half — hence the ± half-card.
+    let battleFocus: { centerX: number; span: number } | undefined;
+    if (battleActive && battleBandRect) {
+      const xs: number[] = [];
+      for (const [rows, side] of [
+        [myCards['battle'] ?? [], 'my'],
+        [opponentCards['battle'] ?? [], 'opponent'],
+      ] as const) {
+        for (const c of rows) {
+          if (!c.posX) continue;
+          const p = toScreenPos(parseFloat(c.posX), parseFloat(c.posY), battleBandRect, side);
+          xs.push(p.x + (side === 'my' ? cardWidth / 2 : -cardWidth / 2));
+        }
+      }
+      if (xs.length > 0) {
+        const min = Math.min(...xs);
+        const max = Math.max(...xs);
+        battleFocus = { centerX: (min + max) / 2, span: max - min + cardWidth };
+      }
+    }
     // Portrait's card-column "Fit" is a PLAYER framing (your hand, your
     // column). A spectator wants the overview, so they keep the whole-board
     // fit even in portrait — small, but complete, with the side jumps and
     // pinch for detail. Without this a portrait spectator's default view was
     // a column of empty ground with every pile off-screen.
-    const targets = buildJumpTargets(mpLayout, virtualWidth, battleActive, portraitBoard && !isSpectator);
+    const targets = buildJumpTargets(mpLayout, virtualWidth, battleActive, portraitBoard && !isSpectator, battleFocus);
     if (!isSpectator) return targets;
     // A spectator has no "Mine"/"Theirs" — relabel the side jumps with the
     // seat names (seat-0 renders at the bottom, seat-1 at the top).
@@ -5133,7 +5157,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           ? { ...t, label: seatLabel(gameState.opponentPlayer?.displayName, 'P2') }
           : t,
     );
-  }, [mpLayout, virtualWidth, battleActive, portraitBoard, isSpectator, gameState.myPlayer?.displayName, gameState.opponentPlayer?.displayName]);
+  }, [mpLayout, virtualWidth, battleActive, portraitBoard, isSpectator, gameState.myPlayer?.displayName, gameState.opponentPlayer?.displayName, battleBandRect, myCards, opponentCards, cardWidth]);
 
   /** The in-play zones offered by the "cards in play" sheet, with live counts.
    *  Sidebar piles already open a grid when tapped; these are the zones on the
@@ -5715,6 +5739,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // double-tap-to-meek still works.
       if (isTouch && !isSpectator) {
         cardTapHandledRef.current = true;
+        // A tap on the OPPONENT'S card with nothing armed is "let me read
+        // that", not "let me move their card" — arming it offered to pull
+        // their card into the viewer's own zones, and one stray board tap
+        // did it (live QA: a card silently landed in Mine · Discard). While
+        // a card IS armed, the tap keeps its move semantics (commit into
+        // battle / re-target), so armed flows are untouched.
+        if (tapMoveStateRef.current.kind !== 'armed' && card.ownerId !== 'player1') {
+          if (!isCardFaceHiddenFromViewer(card)) setReaderCard(card);
+          return;
+        }
         tapMoveDispatch({
           type: 'tapCard',
           cardId: card.instanceId,
@@ -7238,8 +7272,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
               // The touchend of a zone long-press also emits a tap — swallow it.
               if (zoneLongPressFiredRef.current) { zoneLongPressFiredRef.current = false; return; }
+              // A tap while a card is armed is a MOVE (the stage tap handler
+              // commits it into this pile) — opening a browse/menu on top of
+              // the commit buried the board under an unrequested surface.
+              if (isTouch && tapMoveStateRef.current.kind === 'armed') return;
               if (key === 'discard' || key === 'banish') setBrowseMyZone(key);
               else if (key === 'reserve' && canViewMyReserve) setBrowseMyZone('reserve');
+              // Viewing rescued souls is the whole point of the LoR pile —
+              // tap/click browses it like the discard (the action menu stays
+              // on long-press / right-click).
+              else if (key === 'land-of-redemption') setBrowseMyZone('land-of-redemption');
+              // Touch: a tap on the deck opens the deck menu (Search, Draw,
+              // …). Before this the tap was a silent no-op and the only route
+              // in was an undiscoverable long-press (phone QA, wave 8).
+              // Desktop keeps click-through (right-click has the menu).
+              else if (key === 'deck' && isTouch && !isSpectator) {
+                const ev = e.evt as unknown as { clientX?: number; clientY?: number; changedTouches?: TouchList };
+                const t = ev.changedTouches?.[0];
+                closeAllMenus();
+                setDeckMenu({ x: t?.clientX ?? ev.clientX ?? 0, y: t?.clientY ?? ev.clientY ?? 0 });
+              }
             };
             return (
               <Group key={`my-${key}`}>
@@ -7334,8 +7386,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               if (!isPrimaryPointer(e.evt)) return;  // TouchEvent has no `button`
               // The touchend of a zone long-press also emits a tap — swallow it.
               if (zoneLongPressFiredRef.current) { zoneLongPressFiredRef.current = false; return; }
+              // Armed tap = move commit — see myPileClickHandler.
+              if (isTouch && tapMoveStateRef.current.kind === 'armed') return;
               if (key === 'discard' || key === 'banish') setBrowseOpponentZone(key);
               else if (key === 'reserve' && canViewOppReserve) setBrowseOpponentZone('reserve');
+              // Their LoR is public information — browse on tap like discard.
+              else if (key === 'land-of-redemption') setBrowseOpponentZone('land-of-redemption');
             };
             return (
               <Group key={`opp-${key}`}>
@@ -7555,7 +7611,52 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   <Rect width={bw} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text text={String(myCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#e8d5a3" width={bw} height={18} align="center" verticalAlign="middle" perfectDrawEnabled={false} />
                 </Group>
-                {myHandBrigadeCounts.total > 0 && (
+                {myHandBrigadeCounts.total > 0 && useCompactLayout && (() => {
+                  // Compact: the four labelled rows were a ~210×70px block —
+                  // bigger than the cards it sat beside on a phone. Numbers
+                  // only, one row; the colours already carry the meaning
+                  // (cream total · green good · red evil · tan neutral).
+                  const numW = 26 * fsGrowth(12);
+                  const stripW = numW * 4;
+                  const stripX = areaRight - stripW - 6;
+                  const cells: Array<[number, string]> = [
+                    [myHandBrigadeCounts.total, '#e8d5a3'],
+                    [myHandBrigadeCounts.good, '#9ab86a'],
+                    [myHandBrigadeCounts.evil, '#e87560'],
+                    [myHandBrigadeCounts.neutral, '#c4955a'],
+                  ];
+                  return (
+                    <>
+                      <Rect
+                        x={stripX - 6}
+                        y={brigadeTop - 4}
+                        width={stripW + 12}
+                        height={rowH + 8}
+                        fill="rgba(10, 8, 5, 0.72)"
+                        cornerRadius={4}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                      {cells.map(([n, color], i) => (
+                        <Text
+                          key={color}
+                          x={stripX + i * numW}
+                          y={brigadeTop}
+                          width={numW}
+                          text={String(n)}
+                          fontSize={fs(12)}
+                          fontStyle="bold"
+                          fontFamily="Cinzel, Georgia, serif"
+                          fill={color}
+                          align="center"
+                          listening={false}
+                          perfectDrawEnabled={false}
+                        />
+                      ))}
+                    </>
+                  );
+                })()}
+                {myHandBrigadeCounts.total > 0 && !useCompactLayout && (
                   <>
                     {/* Scrim behind the totals — the NEUTRAL/EVIL lines were
                         unreadable over bright background art. */}
@@ -7685,7 +7786,39 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 {/* Count pill lives AFTER the strip (see the opp-hand cards
                     section) so the card backs can never bury it. */}
                 <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} listening={false} perfectDrawEnabled={false} />
-                {opponentHandRevealed && opponentHandBrigadeCounts.total > 0 && (
+                {opponentHandRevealed && opponentHandBrigadeCounts.total > 0 && useCompactLayout && (() => {
+                  // Compact: numbers only, one row — see the my-hand strip.
+                  const numW = 26 * fsGrowth(12);
+                  const stripW = numW * 4;
+                  const stripX = areaRight - stripW - 6;
+                  const cells: Array<[number, string]> = [
+                    [opponentHandBrigadeCounts.total, '#a3c5e8'],
+                    [opponentHandBrigadeCounts.good, '#9ab86a'],
+                    [opponentHandBrigadeCounts.evil, '#e87560'],
+                    [opponentHandBrigadeCounts.neutral, '#c4955a'],
+                  ];
+                  return (
+                    <>
+                      {cells.map(([n, color], i) => (
+                        <Text
+                          key={color}
+                          x={stripX + i * numW}
+                          y={brigadeTop}
+                          width={numW}
+                          text={String(n)}
+                          fontSize={fs(12)}
+                          fontStyle="bold"
+                          fontFamily="Cinzel, Georgia, serif"
+                          fill={color}
+                          align="center"
+                          listening={false}
+                          perfectDrawEnabled={false}
+                        />
+                      ))}
+                    </>
+                  );
+                })()}
+                {opponentHandRevealed && opponentHandBrigadeCounts.total > 0 && !useCompactLayout && (
                   <>
                     <Text
                       x={col1X}
@@ -9378,10 +9511,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   const gameCard = adaptCard(card, 'player1');
                   const isArmedCard = armedCardId === gameCard.instanceId;
                   // The DestinationRail (a ~54px DOM overlay just above the
-                  // hand band) covers the fan's arc — lift the armed card far
-                  // enough that its top third (and amber ring) clears the
-                  // rail. The rail is screen-sized, so convert to virtual.
-                  const armedLift = isArmedCard ? Math.round(54 / safeScale + handCardHeight * 0.6) : 0;
+                  // hand band) covers the fan's arc — lift the armed card
+                  // just far enough that its top edge (and amber ring) clears
+                  // the rail. The rail is screen-sized, so convert to
+                  // virtual. The old extra +0.6 card heights launched the
+                  // card into the territory row, which read as the card
+                  // having MOVED rather than being selected (phone QA wave 8:
+                  // "why can't it just stay in hand?").
+                  const armedLift = isArmedCard ? Math.round(54 / safeScale) : 0;
                   return (
                     <GameCardNode
                       key={idStr}
@@ -11309,11 +11446,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ---- Touch overlays ---- */}
       {/* Shown at every zoom level. Gating it on isZoomed made Fit a one-way
           trip — pressing it took the jump buttons away with it, and the only
-          way back was a pinch. Hidden while THIS viewer's soul chooser is up:
+          way back was a pinch. Gated on status 'playing': during pregame the
+          ceremony dialogs (deck reveal, dice roll, star window) stack on the
+          board centre and the cluster poked out from underneath them; after
+          the game finishes the game-over overlay owns the screen. Hidden
+          while THIS viewer's soul chooser is up:
           the z-30 cluster painted over the chooser's top-right corner, and the
           chooser's wait is momentary. The non-chooser (and spectators) keep
           the cluster — they have no modal and still need the camera. */}
-      {isTouch &&
+      {isTouch && gameStatus === 'playing' && !pregameStep &&
         !(
           gameState.battleState === 'awaiting-soul' &&
           !isSpectator &&
@@ -11331,6 +11472,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           canPanHorizontally={canPanHorizontally}
           onPanHorizontal={panHorizontal}
           onBrowseBoard={() => { closeAllMenus(); setBoardBrowseOpen(true); }}
+          // Portrait: the expanded cluster sat directly on the opponent's
+          // hand row (the portrait fit is a card-wide column, so the row is
+          // exactly under the top-right dock) and hid it entirely.
+          defaultCollapsed={portraitBoard}
           topOffsetPx={isSpectator ? 0 : undefined}
           rightOffsetPx={
             mpLayout

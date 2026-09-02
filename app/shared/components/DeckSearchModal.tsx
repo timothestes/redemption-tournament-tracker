@@ -172,6 +172,21 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     searchInputRef.current?.focus();
   }, [isTouch]);
 
+  // Touch: size the panel to the VISUAL viewport, not the layout viewport.
+  // vh ignores the software keyboard, so with it open the input and results
+  // sat behind the keys with nothing visible. Subscribing (not reading once)
+  // matters — the keyboard opens after mount (CardNotePopover pattern).
+  const [vvHeight, setVvHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (!isTouch) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const sync = () => setVvHeight(vv.height);
+    sync();
+    vv.addEventListener('resize', sync);
+    return () => vv.removeEventListener('resize', sync);
+  }, [isTouch]);
+
   // Refs for card DOM elements (for lasso hit-testing)
   const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const registerCardEl = useCallback((instanceId: string, el: HTMLDivElement | null) => {
@@ -433,6 +448,9 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
   // Lasso selection: pointer down on empty space
   const handleContentPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    // Touch selects by tapping, never by lasso — and the preventDefault below
+    // killed the scroller's swipe when a finger landed between cards.
+    if (e.pointerType === 'touch') return;
     const target = e.target as HTMLElement;
     const tag = target.tagName.toLowerCase();
     if (tag === 'button' || tag === 'img' || tag === 'input' || tag === 'select' || tag === 'label') return;
@@ -528,11 +546,14 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
       style={{
         position: 'fixed',
         inset: 0,
-        right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
+        // Desktop loupe-column dodge only — on touch the panel needs the
+        // whole width, and the panel pins to the top so the search input
+        // stays above the software keyboard.
+        right: isTouch ? 0 : isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
         background: 'rgba(0,0,0,0.35)',
         display: 'flex',
         alignItems: 'flex-start',
-        paddingTop: '5vh',
+        paddingTop: isTouch ? 8 : '5vh',
         justifyContent: 'center',
         zIndex: 500,
         pointerEvents: 'none',
@@ -546,10 +567,12 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
           background: 'var(--gf-bg)',
           border: '1px solid var(--gf-border)',
           borderRadius: 8,
-          padding: 20,
-          width: '80vw',
-          maxWidth: 700,
-          height: '80vh',
+          padding: isTouch ? 12 : 20,
+          width: isTouch ? 'calc(100vw - 16px)' : '80vw',
+          maxWidth: isTouch ? undefined : 700,
+          // Visual-viewport height on touch: the panel shrinks with the
+          // keyboard so the input + a full row of results stay visible.
+          height: isTouch ? (vvHeight != null ? vvHeight - 16 : '88vh') : '80vh',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -646,6 +669,11 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              // The filter is live, so Enter's job is "done typing" — blur
+              // dismisses the software keyboard and gives the results the
+              // screen back (it never went away on its own on a phone).
+              enterKeyHint="search"
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
               placeholder={searchField === 'all' ? 'Search all fields...' : `Search by ${SEARCH_FIELDS.find(f => f.id === searchField)?.label.toLowerCase()}...`}
               style={{
                 width: '100%',
@@ -803,7 +831,19 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
           ) : (
             <div
               ref={gridRef}
-              style={{
+              // Touch: one height-filling row that scrolls sideways — the
+              // grid showed four cropped card tops under a landscape
+              // keyboard. Cards render whole at whatever height the visual
+              // viewport leaves, and a swipe walks the deck.
+              style={isTouch ? {
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'stretch',
+                gap: 8,
+                height: '100%',
+                position: 'relative',
+                userSelect: 'none',
+              } : {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
                 gap: 8,
@@ -819,7 +859,9 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                     key={card.instanceId}
                     ref={(el) => registerCardEl(card.instanceId, el)}
                     data-card-id={card.instanceId}
-                    style={{ position: 'relative', cursor: 'grab' }}
+                    style={isTouch
+                      ? { position: 'relative', cursor: 'grab', flex: '0 0 auto', height: '100%', aspectRatio: '5 / 7' }
+                      : { position: 'relative', cursor: 'grab' }}
                     onContextMenu={(e) => handleCardContextMenu(card, e)}
                     onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
                     onPointerUp={() => handlePointerUp(card)}
@@ -841,6 +883,10 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                           draggable={false}
                           style={{
                             width: '100%',
+                            // The wrapper is height-constrained in the touch
+                            // scroller — fill it instead of deriving height
+                            // from width (which overflowed the row).
+                            ...(isTouch ? { height: '100%', objectFit: 'contain' as const, display: 'block' as const } : null),
                             borderRadius: 4,
                             border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                             boxShadow: glowStyle?.boxShadow ?? selectedShadow,
@@ -851,6 +897,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                         <div
                           style={{
                             width: '100%',
+                            ...(isTouch ? { height: '100%' } : null),
                             aspectRatio: '1/1.4',
                             background: '#1e1610',
                             border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',

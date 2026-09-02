@@ -36,6 +36,11 @@ export function buildJumpTargets(
   virtualWidth: number,
   battleActive: boolean,
   portrait = false,
+  /** Where the battle cards actually stand (virtual x). Free-form drops can
+   *  land anywhere along the band, so the battle frame centres on the cards
+   *  themselves; without this a band-midline frame left an off-centre
+   *  attacker outside the viewport on phones. */
+  battleFocus?: { centerX: number; span: number },
 ): JumpTarget[] {
   const z = layout.zones;
 
@@ -70,7 +75,12 @@ export function buildJumpTargets(
       axis: portrait ? 'height' : 'both',
     },
     { id: 'opponent-side', label: 'Theirs', rect: theirs, axis: 'height' },
-    { id: 'my-side', label: 'Mine', rect: mine, axis: 'height' },
+    // 'center', unlike Theirs: the left-anchor exists for left-packed LoB
+    // souls, which is what a player aims at on THEIR side (rescue targeting).
+    // On MY side the thing a player reaches for is their own hand fan, which
+    // is centred — left-anchoring parked the viewport on empty territory and
+    // cut the fan's right half off-screen (phone QA, wave 8).
+    { id: 'my-side', label: 'Mine', rect: mine, axis: 'height', anchorX: 'center' },
   ];
 
   if (battleActive && z.battle) {
@@ -81,15 +91,37 @@ export function buildJumpTargets(
     const contextPad = layout.mainCard.cardHeight / 2;
     const top = Math.max(0, z.battle.y - contextPad);
     const bottom = Math.min(VIRTUAL_HEIGHT, z.battle.y + z.battle.height + contextPad);
-    // anchorX 'center': the battle slots, totals chips and initiative caption
-    // all cluster around the band's midline. The default left-anchor showed
-    // the band's empty left half and parked the action at the right viewport
-    // edge, under the pan cluster and the chat rail (phone QA, wave 3).
+    // Horizontally, frame the band's CENTRE (where auto-arranged battle cards
+    // and the totals chips live), not its full width, and contain-fit ('both')
+    // rather than height-fit. A height-fit of the full-width band on a narrow
+    // viewport zoomed until only the exact midline was visible — the battle
+    // pair itself landed off-screen (phone QA, waves 3-8). Width binding on a
+    // narrow screen also zooms out enough that the flanking territory rows
+    // stay partly visible. anchorX 'center' is kept for the height-bound case.
+    const battleFrameWidth = Math.min(
+      z.battle.width,
+      Math.max(
+        layout.mainCard.cardWidth * 6,
+        // Widen to cover a spread-out battle (plus a card of margin each side).
+        battleFocus ? battleFocus.span + layout.mainCard.cardWidth * 2 : 0,
+      ),
+    );
+    const rawCenter = battleFocus ? battleFocus.centerX : z.battle.x + z.battle.width / 2;
+    // Keep the frame inside the band's horizontal extent.
+    const centerX = Math.min(
+      z.battle.x + z.battle.width - battleFrameWidth / 2,
+      Math.max(z.battle.x + battleFrameWidth / 2, rawCenter),
+    );
     targets.push({
       id: 'battle',
       label: 'Battle',
-      rect: { x: z.battle.x, y: top, width: z.battle.width, height: bottom - top },
-      axis: 'height',
+      rect: {
+        x: centerX - battleFrameWidth / 2,
+        y: top,
+        width: battleFrameWidth,
+        height: bottom - top,
+      },
+      axis: 'both',
       anchorX: 'center',
     });
   }

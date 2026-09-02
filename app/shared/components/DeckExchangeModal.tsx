@@ -290,7 +290,11 @@ export function DeckExchangeModal({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 500,
+          // 800, not 500: the battle-resolution row (Win/End Battle) renders
+          // at 600 and floated ON TOP of an open exchange. A must-answer
+          // modal sits with the other must-answer surfaces at 800 so the
+          // board chrome stays behind its scrim.
+          zIndex: 800,
           pointerEvents: 'none',
         }}
       >
