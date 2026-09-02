@@ -95,10 +95,12 @@ interface BattleResolutionUIProps {
   suppressResolution?: boolean;
 }
 
-const BUTTON_COPY: Record<ResolutionAction, { label: string }> = {
-  'claim-victory': { label: '⚑ Win Battle' },
-  'battle-lost': { label: '🏳 Battle Lost' },
-  'end-battle': { label: '↩ End Battle' },
+const BUTTON_COPY: Record<ResolutionAction, { label: string; compactLabel: string }> = {
+  // Compact labels: on a phone the full row spanned most of the band and sat
+  // over its bottom card edge — the icons carry the verb, so the noun goes.
+  'claim-victory': { label: '⚑ Win Battle', compactLabel: '⚑ Win' },
+  'battle-lost': { label: '🏳 Battle Lost', compactLabel: '🏳 Lost' },
+  'end-battle': { label: '↩ End Battle', compactLabel: '↩ End' },
 };
 
 type Tone = 'gold' | 'red' | 'neutral';
@@ -115,6 +117,7 @@ function ResolutionButton({
   onClick,
   disabled,
   title,
+  compact,
 }: {
   label: string;
   tone: Tone;
@@ -122,6 +125,8 @@ function ResolutionButton({
   /** Phase Stops: true while a hold blocks the reducer this button dispatches. */
   disabled?: boolean;
   title?: string;
+  /** Phone layout: tighter padding + smaller type (labels shrink too). */
+  compact?: boolean;
 }) {
   const t = TONE_STYLE[tone];
   return (
@@ -130,13 +135,13 @@ function ResolutionButton({
       disabled={disabled}
       title={title}
       style={{
-        padding: '6px 14px',
+        padding: compact ? '4px 10px' : '6px 14px',
         background: t.bg,
         border: `1px solid ${t.border}`,
         borderRadius: 6,
         color: t.color,
         fontFamily: 'var(--font-cinzel), Georgia, serif',
-        fontSize: 12,
+        fontSize: compact ? 11 : 12,
         fontWeight: 600,
         letterSpacing: '0.05em',
         whiteSpace: 'nowrap',
@@ -251,9 +256,10 @@ function AwaitingSoulUI({
           }}
         >
           <ResolutionButton
-            label={BUTTON_COPY['end-battle'].label}
+            label={compact ? BUTTON_COPY['end-battle'].compactLabel : BUTTON_COPY['end-battle'].label}
             tone="neutral"
             onClick={onEndBattle}
+            compact={compact}
           />
         </div>
       </div>
@@ -609,11 +615,12 @@ export default function BattleResolutionUI({
       >
         {isAttacker && bandHasCards && (
           <ResolutionButton
-            label={BUTTON_COPY['claim-victory'].label}
+            label={compact ? BUTTON_COPY['claim-victory'].compactLabel : BUTTON_COPY['claim-victory'].label}
             tone="gold"
             onClick={onResolveBattle}
             disabled={isTurnHeld}
             title={holdTitle}
+            compact={compact}
           />
         )}
         {/* End Battle is attacker-only (owner direction): two side-by-side
@@ -622,20 +629,22 @@ export default function BattleResolutionUI({
             close; phase change / end turn remain the server-side hatches. */}
         {isAttacker && (
           <ResolutionButton
-            label={BUTTON_COPY['end-battle'].label}
+            label={compact ? BUTTON_COPY['end-battle'].compactLabel : BUTTON_COPY['end-battle'].label}
             tone="neutral"
             onClick={onEndBattle}
             disabled={isTurnHeld}
             title={holdTitle}
+            compact={compact}
           />
         )}
         {isDefender && bandHasCards && (
           <ResolutionButton
-            label={BUTTON_COPY['battle-lost'].label}
+            label={compact ? BUTTON_COPY['battle-lost'].compactLabel : BUTTON_COPY['battle-lost'].label}
             tone="red"
             onClick={onResolveBattle}
             disabled={isTurnHeld}
             title={holdTitle}
+            compact={compact}
           />
         )}
       </div>

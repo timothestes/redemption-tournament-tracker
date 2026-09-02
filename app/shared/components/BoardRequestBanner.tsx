@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
 import { useToastKeyboardNav, toastFocusShadow } from './toastKeyboardNav';
 
 interface BoardRequestBannerProps {
@@ -33,6 +34,10 @@ export function BoardRequestBanner({
     onSelect: idx => (idx === 0 ? onAffirm() : onDeny()),
     onCancel: onDeny,
   });
+  // Touch: the desktop-sized banner parked dead-centre covered most of the
+  // battle band it was asking about. Tighter chrome, and anchored in the
+  // upper third so the board stays readable while deciding.
+  const isTouch = useInputMode() === 'touch';
 
   const affirmFocused = focusedIndex === 0;
   const denyFocused = focusedIndex === 1;
@@ -45,7 +50,7 @@ export function BoardRequestBanner({
       data-blocking-prompt
       style={{
         position: 'absolute',
-        top: '50%',
+        top: isTouch ? '28%' : '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
         // 800, not 300: on a phone the chat panel is a full-screen `inset: 0`
@@ -65,18 +70,18 @@ export function BoardRequestBanner({
           background: 'rgba(14, 10, 6, 0.95)',
           border: '1px solid rgba(196, 149, 90, 0.35)',
           borderRadius: 10,
-          padding: '16px 24px',
+          padding: isTouch ? '10px 14px' : '16px 24px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: 12,
+          gap: isTouch ? 8 : 12,
           boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(196, 149, 90, 0.08)',
           ...(maxWidth ? { maxWidth } : null),
         }}
       >
         <div
           style={{
-            fontSize: 15,
+            fontSize: isTouch ? 13 : 15,
             color: '#e8d5a3',
             fontFamily: 'var(--font-cinzel), Georgia, serif',
             letterSpacing: '0.06em',
@@ -91,7 +96,7 @@ export function BoardRequestBanner({
             onClick={onAffirm}
             onMouseEnter={() => setFocusedIndex(0)}
             style={{
-              padding: '9px 20px',
+              padding: isTouch ? '7px 14px' : '9px 20px',
               background: affirmFocused ? '#3a7332' : '#2d5a27',
               border: '1px solid #4a8a42',
               borderRadius: 6,
@@ -110,7 +115,7 @@ export function BoardRequestBanner({
             onClick={onDeny}
             onMouseEnter={() => setFocusedIndex(1)}
             style={{
-              padding: '9px 20px',
+              padding: isTouch ? '7px 14px' : '9px 20px',
               background: denyFocused ? '#733232' : '#5a2727',
               border: '1px solid #8a4242',
               borderRadius: 6,
