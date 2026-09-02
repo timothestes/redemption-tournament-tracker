@@ -33,7 +33,7 @@ interface RightPanelProps {
   chatMessages: ChatMessage[];
   gameActions: GameAction[];
   myPlayerId: bigint;
-  onSendChat: (text: string) => void;
+  onSendChat: (text: string) => void | Promise<unknown>;
   playerNames: Record<string, string>;
   chatScale: number;
   unreadChatCount?: number;
@@ -80,6 +80,11 @@ export default function RightPanel({
 }: RightPanelProps) {
   const { isLoupeVisible, toggleLoupe, previewCard, isPreviewFlipped } = useCardPreview();
   const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all' | 'spectators'>('all');
+  // The draft lives here, not in ChatPanel: collapsing the panel unmounts
+  // ChatPanel, and on a phone collapsing is the ONLY way to see the board, so
+  // a half-typed message was destroyed every time a player checked their
+  // territory mid-sentence.
+  const [chatDraft, setChatDraft] = useState('');
   const isTouch = useInputMode() === 'touch';
   const collapsedWidth = isTouch ? PANEL_COLLAPSED_WIDTH_TOUCH : PANEL_COLLAPSED_WIDTH;
   // Collapsed on touch, only the top 48px of the 44px-wide rail did anything —
@@ -153,19 +158,33 @@ export default function RightPanel({
             <span style={{ fontSize: 14, position: 'relative' }}>
               ‹
               {unreadChatCount > 0 && (
+                // Was a 7x7px dot on the far screen edge — 0.015% of a phone
+                // screen, outside the player's scan path, and the only signal
+                // that an opponent had said anything. A counted badge at least
+                // survives a glance; the toast in client.tsx does the rest.
                 <span
+                  aria-label={`${unreadChatCount} unread`}
                   style={{
                     position: 'absolute',
-                    top: -2,
-                    right: -6,
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
+                    top: -9,
+                    right: -11,
+                    minWidth: 17,
+                    height: 17,
+                    padding: '0 4px',
+                    borderRadius: 999,
                     background: '#c4955a',
-                    boxShadow: '0 0 4px rgba(196, 149, 90, 0.6)',
+                    color: '#1a1206',
+                    fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    lineHeight: '17px',
+                    textAlign: 'center',
+                    boxShadow: '0 0 6px rgba(196, 149, 90, 0.7)',
                     animation: 'unread-pulse 2s ease-in-out infinite',
                   }}
-                />
+                >
+                  {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                </span>
               )}
             </span>
             {isRail && (
@@ -293,6 +312,8 @@ export default function RightPanel({
               // close control collapses the panel back to the rail instead of
               // leaving a full-width shell over the board.
               onCollapsePanel={isTouch ? toggleLoupe : undefined}
+              draft={chatDraft}
+              onDraftChange={setChatDraft}
             />
           </div>
         </>

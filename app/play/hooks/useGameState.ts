@@ -80,6 +80,10 @@ export interface GameState {
    */
   adaptedCardsById: Map<bigint, GameCard>;
   chatMessages: ChatMessageRow[];
+  /** useTable's subscribeApplied for ChatMessage: false until the initial
+   *  sync has landed. Lets callers tell "history arrived" from "a new
+   *  message arrived" instead of counting the whole backlog as unread. */
+  isChatReady: boolean;
   gameActions: GameActionRow[];
   spectators: SpectatorRow[];
   soulsRescued: { me: number; opponent: number };
@@ -137,7 +141,7 @@ export interface GameState {
   setPhase: (phase: string) => void;
   endTurn: () => void;
   rollDice: (sides: bigint) => void;
-  sendChat: (text: string) => void;
+  sendChat: (text: string) => void | Promise<unknown>;
   setPlayerOption: (optionName: string, value: string) => void;
   revealHand: (revealed: boolean) => void;
   revealReserve: (revealed: boolean) => void;
@@ -740,7 +744,19 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
 
   const sendChat = useCallback(
     (text: string) => {
-      conn?.reducers.sendChat({ gameId, text });
+      // Returns the promise so the caller can put the draft back. `conn?.` on
+      // its own made a dropped socket a silent no-op: the input cleared, the
+      // message was never sent, and nothing was shown — the exact shape of
+      // "I typed it and they never got it".
+      if (!conn) {
+        const err = new Error('Not connected — message not sent');
+        toastReducerError(err);
+        return Promise.reject(err);
+      }
+      return conn.reducers.sendChat({ gameId, text }).catch((e: unknown) => {
+        toastReducerError(e);
+        throw e;
+      });
     },
     [conn, gameId],
   );
@@ -1092,6 +1108,7 @@ export function useGameState(gameId: bigint, forgeResolver?: ForgeResolverMap | 
     counters,
     adaptedCardsById,
     chatMessages,
+    isChatReady: chatLoading,
     gameActions,
     spectators,
     soulsRescued,
@@ -1233,7 +1250,7 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     tables.CardInstance.where((c) => c.gameId.eq(effectiveGameId)),
   ) as [CardInstanceRow[], boolean];
   const [allCounters] = useTable(tables.CardCounter) as [CardCounterRow[], boolean];
-  const [allChat] = useTable(
+  const [allChat, spectatorChatLoading] = useTable(
     tables.ChatMessage.where((m) => m.gameId.eq(effectiveGameId)),
   ) as [ChatMessageRow[], boolean];
   const [allActions] = useTable(
@@ -1448,6 +1465,7 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     counters,
     adaptedCardsById,
     chatMessages,
+    isChatReady: spectatorChatLoading,
     gameActions,
     spectators,
     soulsRescued,
@@ -1498,8 +1516,15 @@ export function useSpectatorGameState(gameId: bigint | null, forgeResolver?: For
     endTurn: noop,
     rollDice: noopBigint,
     sendChat: useCallback((text: string) => {
-      if (!conn || !gameId) return;
-      conn.reducers.sendChat({ gameId, text });
+      if (!conn || !gameId) {
+        const err = new Error('Not connected — message not sent');
+        toastReducerError(err);
+        return Promise.reject(err);
+      }
+      return conn.reducers.sendChat({ gameId, text }).catch((e: unknown) => {
+        toastReducerError(e);
+        throw e;
+      });
     }, [conn, gameId]),
     setPlayerOption: useCallback((_optionName: string, _value: string) => {}, []),
     revealHand: noopBool,

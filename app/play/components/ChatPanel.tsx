@@ -1,7 +1,9 @@
 'use client';
 
-import { isValidElement, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type CSSProperties } from 'react';
+import { createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type CSSProperties, type UIEvent } from 'react';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
+import { useInputMode } from '@/app/shared/hooks/useInputMode';
+import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,7 +34,8 @@ interface ChatPanelProps {
   chatMessages: ChatMessage[];
   gameActions: GameAction[];
   myPlayerId: bigint;
-  onSendChat: (text: string) => void;
+  /** May return a promise; a rejection restores the draft. */
+  onSendChat: (text: string) => void | Promise<unknown>;
   playerNames: Record<string, string>; // playerId.toString() → display name
   activeTab?: TabKey;
   onActiveTabChange?: (tab: TabKey) => void;
@@ -58,6 +61,11 @@ interface ChatPanelProps {
    *  content, so collapsing the section alone left a full-screen empty panel
    *  swallowing every tap until the tiny header rail was found. */
   onCollapsePanel?: () => void;
+  /** Draft message text, owned by the parent. On a phone the panel collapses
+   *  to see the board, which unmounts this component — with the draft in local
+   *  state a half-typed message was destroyed every time. */
+  draft: string;
+  onDraftChange: (text: string) => void;
 }
 
 // Discriminated union for interleaved timeline entries
@@ -76,12 +84,26 @@ const PREGAME_ROLL_REVEAL_DELAY_MS = 1800;
 
 /** Flatten a ReactNode (string, number, array, fragment, element) to plain text.
  *  Used to build searchable strings from the rich JSX returned by formatActionType. */
-function nodeToText(node: ReactNode): string {
+export function nodeToText(node: ReactNode): string {
   if (node == null || typeof node === 'boolean') return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(nodeToText).join(' ');
   if (isValidElement(node)) {
-    const props = node.props as { children?: ReactNode; name?: unknown };
+    const props = node.props as {
+      children?: ReactNode;
+      name?: unknown;
+      cards?: unknown;
+    };
+    // CardNameList passes its cards as a `cards` array with neither `name` nor
+    // `children`, so it used to flatten to '' — which meant search could not
+    // find any card in a multi-card line, and multi-card lines are the common
+    // ones on a phone (drag-select a few cards, discard them all at once).
+    if (Array.isArray(props.cards)) {
+      return props.cards
+        .map((c) => (c && typeof c === 'object' && 'name' in c ? String((c as { name?: unknown }).name ?? '') : ''))
+        .filter(Boolean)
+        .join(' ');
+    }
     // HoverableCard / similar pass the card name as a `name` prop, not children.
     if (typeof props.name === 'string' && !props.children) return props.name;
     return nodeToText(props.children);
@@ -92,7 +114,11 @@ function nodeToText(node: ReactNode): string {
 function formatTimestamp(micros: bigint): string {
   const ms = Number(micros / BigInt(1000));
   const date = new Date(ms);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Seconds matter: a Redemption turn fires a dozen actions inside one minute,
+  // and "was the discard before or after the battle was called?" is exactly
+  // the question the log gets opened to settle. Without them every entry in a
+  // busy turn reads with the same timestamp.
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
@@ -152,11 +178,100 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   // The Foretelling Angel's toggle — payload rendered in formatActionType;
   // this is the parse-failure fallback.
   TOGGLE_TOP_DECK_REVEAL: 'toggled their top-deck reveal',
+  // How the game ENDED had no entry at all, so the single most important line
+  // in the log rendered through the raw-type fallback as the literal word
+  // "win" ("alice win"). WIN/TIMEOUT carry payloads rendered in
+  // formatActionType; these are the parse-failure fallbacks.
+  WIN: 'won the game',
+  TIMEOUT: 'won on the clock',
+  DISCONNECT_TIMEOUT_WARNING: 'disconnected — forfeit countdown started',
+  // Pause / resume — a paused game is the most confusing state to walk into
+  // with no explanation of who paused it.
+  PAUSE_REQUESTED: 'asked to pause the game',
+  PAUSE_ACCEPTED: 'agreed to pause',
+  PAUSE_DECLINED: 'declined the pause',
+  PAUSE_REQUEST_CANCELLED: 'withdrew the pause request',
+  RESUME_REQUESTED: 'asked to resume',
+  RESUME_ACCEPTED: 'agreed to resume',
+  RESUME_DECLINED: 'declined the resume',
+  // Rematch — the log runs on into the next game (the rematch reuses the same
+  // game id), so this line is the only boundary between them.
+  REMATCH_STARTED: 'started a rematch',
+  REMATCH_DECLINED: 'declined the rematch',
+  REMATCH_CANCELLED: 'cancelled the rematch',
+  PREGAME_DECK_CHANGE: 'switched decks before the game',
+  PLAYER_LEFT: 'left the game',
+  RELOAD_DECK: 'reloaded their deck',
+  SHUFFLE_OPPONENT_DECK: "shuffled their opponent's deck",
+  SHUFFLE_SOUL_DECK: 'shuffled the soul deck',
+  KEEP_ONE_SHUFFLE_DRAW: 'shuffled a card back and drew',
+  RANDOM_OPPONENT_HAND_TO_ZONE: "took a card at random from their opponent's hand",
+  RANDOM_RESERVE_TO_ZONE: 'moved a card at random out of reserve',
+  REORDER_LOB: 'reordered the Land of Bondage',
+  REMOVE_TOKEN: 'removed a token',
+  DISCARD_CHARACTERS_FROM_RESERVE_CANCELLED: 'cancelled the reserve discard',
 };
+
+/**
+ * Action types whose log line is a fixed sentence with nothing per-entry to
+ * read, so a run of them by the same player collapses to one line with a
+ * count. Anything that names a card, carries a roll, or reports a result is
+ * deliberately absent — folding those would hide information.
+ */
+const REPEATABLE_ACTION_TYPES = new Set([
+  'DRAW',
+  'SHUFFLE',
+  'SHUFFLE_DECK',
+  'ADD_COUNTER',
+  'REMOVE_COUNTER',
+  'UPDATE_CARD_POSITION',
+]);
+
+/** Human phrasing for a collapsed run, keyed by the underlying action type. */
+const REPEAT_PHRASES: Record<string, (n: number) => string> = {
+  DRAW: (n) => `drew ${n} cards`,
+  SHUFFLE: (n) => `shuffled their deck ${n} times`,
+  SHUFFLE_DECK: (n) => `shuffled their deck ${n} times`,
+  ADD_COUNTER: (n) => `added ${n} counters`,
+  REMOVE_COUNTER: (n) => `removed ${n} counters`,
+  UPDATE_CARD_POSITION: (n) => `repositioned ${n} cards`,
+};
+
+/**
+ * Set on touch so a card name in the log can open a reader. On a pointer
+ * device the name feeds the right panel's loupe on hover; that loupe is
+ * `display: none` on touch (globals.css), so the dotted underline and
+ * `cursor: pointer` were advertising an affordance that did nothing — on the
+ * one surface a phone player actually uses to ask "what card was that?".
+ */
+const LogCardTapContext = createContext<((card: { name: string; img: string }) => void) | null>(null);
 
 function HoverableCard({ name, img }: { name: string; img?: string }) {
   const { setPreviewCard } = useCardPreview();
+  const onTapCard = useContext(LogCardTapContext);
   if (name === 'a face-down card' || !img) return <span>{name}</span>;
+  if (onTapCard) {
+    return (
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={() => onTapCard({ name, img })}
+        style={{
+          textDecoration: 'underline',
+          textDecorationStyle: 'dotted',
+          textUnderlineOffset: 2,
+          cursor: 'pointer',
+          // The name sits mid-sentence, so it can't be padded to 44px without
+          // wrecking the line. Widen the strike zone vertically instead — the
+          // inline box grows, the visual line height does not.
+          padding: '6px 0',
+          margin: '-6px 0',
+        }}
+      >
+        {name}
+      </span>
+    );
+  }
   return (
     <span
       style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer' }}
@@ -165,6 +280,45 @@ function HoverableCard({ name, img }: { name: string; img?: string }) {
     >
       {name}
     </span>
+  );
+}
+
+/** Full-screen card scan, opened by tapping a card name in the log on touch. */
+function LogCardReader({ card, onClose }: { card: { name: string; img: string }; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        // Above the panel's own 300 and above the blocking prompts at 800 is
+        // wrong — this is dismissible and must not outrank a Grant/Deny. 1200
+        // matches CardReaderOverlay, which is also a read-only surface the
+        // player opened deliberately.
+        zIndex: 1200,
+        background: 'rgba(0, 0, 0, 0.88)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        padding: 'max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom))',
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={getCardImageUrl(card.img) || '/gameplay/cardback.webp'}
+        alt={card.name}
+        style={{ maxHeight: '78%', maxWidth: '100%', objectFit: 'contain', borderRadius: 8 }}
+      />
+      <div style={{ color: '#e8d5a3', fontSize: 15, textAlign: 'center', wordBreak: 'break-word' }}>{card.name}</div>
+      <div style={{ color: 'rgba(232, 213, 163, 0.5)', fontSize: 12 }}>Tap anywhere to close</div>
+    </div>
   );
 }
 
@@ -181,7 +335,43 @@ function CardNameList({ cards }: { cards: { name: string; img: string }[] }) {
   );
 }
 
-function formatActionType(actionType: string, payload?: string, playerNames?: Record<string, string>, actorPlayerId?: string, viewerPlayerId?: string): ReactNode {
+export function formatActionType(actionType: string, payload?: string, playerNames?: Record<string, string>, actorPlayerId?: string, viewerPlayerId?: string): ReactNode {
+  if (actionType.endsWith('_REPEAT') && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const phrase = REPEAT_PHRASES[data.of];
+      if (phrase && typeof data.count === 'number') return phrase(data.count);
+    } catch { /* fall through */ }
+  }
+  // How the game ended. Both of these used to fall through to the raw-type
+  // fallback, so the last and most consequential line in the log read "alice
+  // win" / "bob timeout" with the payload — the soul count that decided it,
+  // and which side the timeout actually went against — thrown away.
+  if (actionType === 'WIN' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const goal = data.format === 'T2' ? 7 : 5;
+      return (
+        <>
+          <strong>won the game</strong>
+          {typeof data.soulCount === 'number' ? ` — ${data.soulCount}/${goal} souls rescued` : ''}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'TIMEOUT' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      // The two reasons are logged against OPPOSITE players: a claimed win is
+      // logged by the winner, a disconnect timeout by the player who dropped.
+      if (data.reason === 'claimed_by_opponent') {
+        return <><strong>won the game</strong> — claimed after their opponent ran out of time</>;
+      }
+      if (data.reason === 'disconnect_timeout') {
+        return <><strong>lost the game</strong> — disconnected and the timer ran out</>;
+      }
+    } catch { /* fall through */ }
+  }
   if (actionType === 'ROLL_DICE' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -1233,24 +1423,33 @@ export default function ChatPanel({
   onKickSpectator,
   onSetGamePrivate,
   onCollapsePanel,
+  draft,
+  onDraftChange,
 }: ChatPanelProps) {
   const showSpectatorsTab = spectators !== undefined;
+  const isTouch = useInputMode() === 'touch';
   const [isOpen, setIsOpen] = useState(true);
   const [internalTab, setInternalTab] = useState<TabKey>('all');
   const activeTab = controlledTab ?? internalTab;
   const setActiveTab = onActiveTabChange ?? setInternalTab;
-  const [inputText, setInputText] = useState('');
+  const inputText = draft;
+  const setInputText = onDraftChange;
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const [unreadCount, setUnreadCount] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const isSearching = normalizedQuery.length > 0;
+  /** Card scan opened by tapping a card name in the log (touch only). */
+  const [readerCard, setReaderCard] = useState<{ name: string; img: string } | null>(null);
 
   // Delay PREGAME_ROLL log entries so they appear when the dice land, not
   // when the server broadcasts the roll. Actions present on first mount are
   // considered "already revealed" so a mid-game refresh doesn't re-hide them.
   const seenActionIdsRef = useRef<Set<string> | null>(null);
+  const revealTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [hiddenActionIds, setHiddenActionIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
@@ -1271,46 +1470,75 @@ export default function ChatPanel({
       for (const id of newIds) next.add(id);
       return next;
     });
-    const timers = newIds.map((id) =>
-      setTimeout(() => {
+    for (const id of newIds) {
+      // Timers are tracked in a ref and cleared only on unmount. They used to
+      // be cleaned up by this effect, which re-runs on every `gameActions`
+      // change: any action landing inside the 1.8s window cleared the pending
+      // reveal, and the re-run returned early at `newIds.length === 0` without
+      // rescheduling — so the roll line stayed hidden for the rest of the
+      // session, and "who won the roll" silently vanished from the log.
+      const t = setTimeout(() => {
+        revealTimersRef.current.delete(id);
         setHiddenActionIds((prev) => {
           if (!prev.has(id)) return prev;
           const next = new Set(prev);
           next.delete(id);
           return next;
         });
-      }, PREGAME_ROLL_REVEAL_DELAY_MS),
-    );
-    return () => timers.forEach(clearTimeout);
+      }, PREGAME_ROLL_REVEAL_DELAY_MS);
+      revealTimersRef.current.set(id, t);
+    }
   }, [gameActions]);
 
-  const visibleGameActions = (hiddenActionIds.size === 0
-    ? gameActions
-    : gameActions.filter((a) => !hiddenActionIds.has(a.id.toString()))
-  ).filter((a) => {
-    // Suppress "finished action priority" / "finished initiative" — the grant/request pair is enough.
-    if (a.actionType === 'COMPLETE_ZONE_SEARCH' && a.payload) {
-      try {
-        const z = JSON.parse(a.payload).zone;
-        if (z === 'action-priority' || z === 'initiative') return false;
-      } catch { /* fall through */ }
-    }
-    return true;
-  });
+  useEffect(() => {
+    const timers = revealTimersRef.current;
+    return () => { timers.forEach((t) => clearTimeout(t)); timers.clear(); };
+  }, []);
+
+  // Memoised: the trailing `.filter` allocated a fresh array on EVERY render,
+  // so `actionSearchText` and `displayActions` downstream never hit their memo
+  // cache — the whole log was re-formatted (JSON.parse + JSX build per entry,
+  // twice over) on every keystroke in the chat and search inputs.
+  const visibleGameActions = useMemo(() => (
+    (hiddenActionIds.size === 0
+      ? gameActions
+      : gameActions.filter((a) => !hiddenActionIds.has(a.id.toString()))
+    ).filter((a) => {
+      // Suppress "finished action priority" / "finished initiative" — the grant/request pair is enough.
+      if (a.actionType === 'COMPLETE_ZONE_SEARCH' && a.payload) {
+        try {
+          const z = JSON.parse(a.payload).zone;
+          if (z === 'action-priority' || z === 'initiative') return false;
+        } catch { /* fall through */ }
+      }
+      return true;
+    })
+  ), [gameActions, hiddenActionIds]);
 
   // ---- Search filter ----
   // Build a lowercased searchable string for each visible action by flattening
   // the rich JSX returned by formatActionType to plain text. Memoized by id +
   // payload so re-renders don't redo the work.
+  // Built only while a search is actually running. It used to be computed on
+  // every render — a JSON.parse plus a full JSX build plus a tree walk for
+  // every entry in the game's history — so 100% of normal play paid for an
+  // index nobody was querying.
   const actionSearchText = useMemo(() => {
     const map = new Map<string, string>();
+    if (!isSearching) return map;
     for (const a of visibleGameActions) {
       const playerName = playerNames[a.playerId.toString()] ?? `Player ${a.playerId}`;
       const verb = formatActionType(a.actionType, a.payload, playerNames, a.playerId.toString(), myPlayerId.toString());
-      map.set(a.id.toString(), `${playerName} ${nodeToText(verb)} ${a.actionType}`.toLowerCase());
+      // Turn and phase are rendered on every entry ("T4 · battle · …") but
+      // were absent from the index, so searching "t4" or "battle" — the two
+      // things you actually search a game log for — matched nothing.
+      map.set(
+        a.id.toString(),
+        `${playerName} ${nodeToText(verb)} ${a.actionType} t${a.turnNumber} ${a.phase}`.toLowerCase(),
+      );
     }
     return map;
-  }, [visibleGameActions, playerNames, myPlayerId]);
+  }, [isSearching, visibleGameActions, playerNames, myPlayerId]);
 
   const matchesQuery = (text: string) => !isSearching || text.includes(normalizedQuery);
 
@@ -1378,6 +1606,35 @@ export default function ChatPanel({
           continue;
         }
       }
+      // Collapse a run of the same actor repeating the same plain action.
+      // Drawing eight cards wrote eight identical "drew a card" entries, each
+      // two lines tall — on a landscape phone the log shows about five entries
+      // at a time, so one opening draw filled the entire visible log with the
+      // same sentence and pushed everything that mattered off the top.
+      // Restricted to types with no per-entry detail to render, so nothing
+      // that names a card or carries a payload is ever folded away.
+      if (REPEATABLE_ACTION_TYPES.has(action.actionType)) {
+        let j = i + 1;
+        while (
+          j < filteredActions.length
+          && filteredActions[j].actionType === action.actionType
+          && filteredActions[j].playerId === action.playerId
+        ) {
+          j++;
+        }
+        const runLength = j - i;
+        if (runLength >= 2) {
+          const last = filteredActions[j - 1];
+          result.push({
+            ...last,
+            id: action.id,
+            actionType: `${action.actionType}_REPEAT`,
+            payload: JSON.stringify({ count: runLength, of: action.actionType }),
+          });
+          i = j;
+          continue;
+        }
+      }
       result.push(action);
       i++;
     }
@@ -1386,9 +1643,6 @@ export default function ChatPanel({
 
   const totalMatches = isSearching ? filteredChat.length + filteredActions.length : 0;
 
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const logEndRef = useRef<HTMLDivElement>(null);
-  const allEndRef = useRef<HTMLDivElement>(null);
   // System messages (senderId === 0n) render in LOG, not CHAT — don't count
   // them toward the CHAT unread badge.
   const userChatCount = useMemo(
@@ -1413,37 +1667,64 @@ export default function ChatPanel({
     }
   }, [isOpen, activeTab]);
 
-  // Auto-scroll chat to bottom when new messages arrive (paused while searching
-  // so the user can read filtered results without being yanked to the bottom).
-  useEffect(() => {
-    if (isSearching) return;
-    if (isOpen && activeTab === 'chat') {
-      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatMessages, isOpen, activeTab, isSearching]);
+  // ---- Auto-scroll -------------------------------------------------------
+  // Replaces three near-duplicate per-tab effects that each called
+  // `scrollIntoView` on a trailing sentinel. Two things were wrong with that:
+  //
+  //  1. The chat tab had no "just switched" case at all, so every time you
+  //     tabbed over to Chat it SMOOTH-scrolled from the top of a freshly
+  //     mounted list all the way down — a long, visible animation through the
+  //     whole history, on every single switch. The same thing happened on
+  //     every panel open for all three tabs: the panel unmounts when it
+  //     collapses, so the refs that were meant to detect "just switched"
+  //     re-initialised to the current tab and reported `false`.
+  //  2. Nothing checked where the reader actually was, so a new action — and
+  //     in this game the log grows every few seconds — yanked you to the
+  //     bottom mid-sentence while you were reading back through the turn.
+  //
+  // Now: changing what's on screen (open / tab / search) jumps with no
+  // animation, and new content only follows you if you were already at the
+  // bottom. Otherwise a "new activity" pill offers the jump.
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const pinnedRef = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
-  // Auto-scroll log to bottom when new actions arrive or tab switches
-  const prevLogTab = useRef(activeTab);
-  useEffect(() => {
-    if (isSearching) { prevLogTab.current = activeTab; return; }
-    if (isOpen && activeTab === 'log') {
-      // Instant scroll when first switching to log tab, smooth for new entries
-      const justSwitched = prevLogTab.current !== 'log';
-      logEndRef.current?.scrollIntoView({ behavior: justSwitched ? 'instant' : 'smooth' });
-    }
-    prevLogTab.current = activeTab;
-  }, [gameActions, isOpen, activeTab, hiddenActionIds, isSearching]);
+  const scrollListToBottom = useCallback((smooth: boolean) => {
+    const el = listRef.current;
+    if (!el) return;
+    if (smooth) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    else el.scrollTop = el.scrollHeight;
+    pinnedRef.current = true;
+    setShowJumpToLatest(false);
+  }, []);
 
-  // Auto-scroll combined "all" tab to bottom
-  const prevAllTab = useRef(activeTab);
+  const handleListScroll = useCallback((e: UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    // A generous slop: momentum scrolling on iOS routinely stops a handful of
+    // pixels short, and a reader who is "basically at the bottom" wants to
+    // keep following.
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 48;
+    pinnedRef.current = atBottom;
+    setShowJumpToLatest((prev) => (prev === !atBottom ? prev : !atBottom));
+  }, []);
+
+  // What's on screen changed (panel opened, tab switched, search toggled) —
+  // land at the bottom with no animation.
+  const listKey = `${isOpen ? 'open' : 'closed'}:${activeTab}:${isSearching ? 'search' : 'live'}`;
+  const prevListKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (isSearching) { prevAllTab.current = activeTab; return; }
-    if (isOpen && activeTab === 'all') {
-      const justSwitched = prevAllTab.current !== 'all';
-      allEndRef.current?.scrollIntoView({ behavior: justSwitched ? 'instant' : 'smooth' });
-    }
-    prevAllTab.current = activeTab;
-  }, [chatMessages, gameActions, isOpen, activeTab, hiddenActionIds, isSearching]);
+    if (prevListKeyRef.current === listKey) return;
+    prevListKeyRef.current = listKey;
+    if (!isOpen || isSearching) { setShowJumpToLatest(false); return; }
+    scrollListToBottom(false);
+  }, [listKey, isOpen, isSearching, scrollListToBottom]);
+
+  // New content arrived — follow it only if the reader hadn't scrolled away.
+  useEffect(() => {
+    if (!isOpen || isSearching) return;
+    if (pinnedRef.current) scrollListToBottom(true);
+    else setShowJumpToLatest(true);
+  }, [chatMessages, gameActions, hiddenActionIds, isOpen, isSearching, scrollListToBottom]);
 
   // Focus the search input when the search bar opens.
   useEffect(() => {
@@ -1453,8 +1734,19 @@ export default function ChatPanel({
   const handleSend = () => {
     const trimmed = inputText.trim();
     if (!trimmed) return;
-    onSendChat(trimmed);
+    // Clear optimistically so typing stays responsive, but put the text back
+    // if the send actually failed. Previously the field was cleared
+    // unconditionally against a fire-and-forget reducer call: on a phone that
+    // had dropped its socket (backgrounded tab, wifi→cellular handoff) the
+    // message went nowhere, the draft was gone, and nothing was shown.
+    const result = onSendChat(trimmed);
     setInputText('');
+    if (result && typeof (result as Promise<unknown>).catch === 'function') {
+      (result as Promise<unknown>).catch(() => {
+        // Only restore if the player hasn't started a new message meanwhile.
+        if (!draftRef.current) setInputText(trimmed);
+      });
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -1473,6 +1765,8 @@ export default function ChatPanel({
   };
 
   return (
+    <LogCardTapContext.Provider value={isTouch ? setReaderCard : null}>
+    {readerCard && <LogCardReader card={readerCard} onClose={() => setReaderCard(null)} />}
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -1481,6 +1775,12 @@ export default function ChatPanel({
       fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)',
       ['--chat-fs' as string]: chatScale,
     } as CSSProperties}>
+      {/* On touch the panel is a full-screen overlay whose own collapse
+          control (RightPanel's header, 48px) sits directly above this one,
+          and `togglePanel` routes here to the SAME action — two stacked,
+          identically-behaved buttons costing 44px of a 393px-tall landscape
+          phone, where only ~186px was left for messages. Pointer keeps it. */}
+      {!onCollapsePanel && (<>
       {/* ================================================================
           Toggle button — horizontal row in the sidebar
           ================================================================ */}
@@ -1566,6 +1866,7 @@ export default function ChatPanel({
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
+      </>)}
 
       {/* ================================================================
           Panel content — conditionally rendered when open
@@ -1580,8 +1881,37 @@ export default function ChatPanel({
             flexDirection: 'column',
             overflow: 'hidden',
             background: 'rgba(10, 8, 5, 0.97)',
+            // Anchors the jump-to-latest pill below.
+            position: 'relative',
           }}
         >
+          {/* Shown only when the reader has scrolled away from the bottom, so
+              new activity is announced instead of stealing their place. */}
+          {showJumpToLatest && activeTab !== 'spectators' && (
+            <button
+              onClick={() => scrollListToBottom(true)}
+              style={{
+                position: 'absolute',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                bottom: activeTab === 'log' ? 12 : 64,
+                zIndex: 2,
+                padding: '8px 14px',
+                borderRadius: 999,
+                border: '1px solid rgba(196, 149, 90, 0.55)',
+                background: 'rgba(28, 20, 12, 0.96)',
+                color: '#e8d5a3',
+                fontFamily: 'inherit',
+                fontSize: 'calc(11px * var(--chat-fs, 1))',
+                letterSpacing: '0.04em',
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              ↓ New activity
+            </button>
+          )}
           {/* ---- Header with tabs ---- */}
           <div
             style={{
@@ -1753,9 +2083,12 @@ export default function ChatPanel({
             <>
               {/* Message list */}
               <div
+                ref={listRef}
+                onScroll={handleListScroll}
                 style={{
                   flex: 1,
                   overflowY: 'auto',
+                  overscrollBehavior: 'contain',
                   padding: '8px 8px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1862,7 +2195,6 @@ export default function ChatPanel({
                     </div>
                   );
                 })}
-                <div ref={chatEndRef} />
               </div>
 
               {/* Input row */}
@@ -1931,9 +2263,12 @@ export default function ChatPanel({
           {/* ---- Tab: Game Log ---- */}
           {activeTab === 'log' && (
             <div
+              ref={listRef}
+              onScroll={handleListScroll}
               style={{
                 flex: 1,
                 overflowY: 'auto',
+                overscrollBehavior: 'contain',
                 padding: '8px 8px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -2022,7 +2357,6 @@ export default function ChatPanel({
                   );
                 });
               })()}
-              <div ref={logEndRef} />
             </div>
           )}
 
@@ -2031,9 +2365,12 @@ export default function ChatPanel({
             <>
               {/* Combined timeline */}
               <div
+                ref={listRef}
+                onScroll={handleListScroll}
                 style={{
                   flex: 1,
                   overflowY: 'auto',
+                  overscrollBehavior: 'contain',
                   padding: '8px 8px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -2199,7 +2536,6 @@ export default function ChatPanel({
                     }
                   });
                 })()}
-                <div ref={allEndRef} />
               </div>
 
               {/* Input row (same as chat tab) */}
@@ -2435,5 +2771,6 @@ export default function ChatPanel({
         </div>
       )}
     </div>
+    </LogCardTapContext.Provider>
   );
 }
