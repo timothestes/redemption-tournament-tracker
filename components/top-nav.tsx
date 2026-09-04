@@ -292,7 +292,7 @@ const TopNav: React.FC = () => {
                           YTG Store
                         </Link>
                       )}
-                      {isSuperuser && (
+                      {(isSuperuser || permissions.includes('manage_catalog')) && (
                         <Link
                           href="/admin/catalog"
                           onClick={() => setIsAdminOpen(false)}
@@ -664,7 +664,7 @@ const TopNav: React.FC = () => {
                         YTG Store
                       </Link>
                     )}
-                    {isSuperuser && (
+                    {(isSuperuser || permissions.includes('manage_catalog')) && (
                       <Link
                         href="/admin/catalog"
                         onClick={closeMobileMenu}
