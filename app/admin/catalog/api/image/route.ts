@@ -1,5 +1,5 @@
 import { put, copy, BlobNotFoundError } from "@vercel/blob";
-import { requireSuperuser } from "@/app/admin/permissions/lib/auth";
+import { requireCatalogEditor } from "@/app/admin/permissions/lib/auth";
 import { parseImageTransform } from "@/app/forge/lib/catalogRow";
 import { transformReleaseImage } from "@/app/forge/lib/releaseImage";
 import { findCardStrict } from "@/app/admin/catalog/lib/editorShared";
@@ -16,7 +16,7 @@ const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 // Bump-first means a crash can leave a bumped version with old bytes (visible
 // in the UI, healed by re-running) but never a new image with no cache-bust.
 export async function POST(req: Request): Promise<Response> {
-  const ctx = await requireSuperuser();
+  const ctx = await requireCatalogEditor();
   if (!ctx) return new Response("Not Found", { status: 404 }); // invisible, portal precedent
 
   const token = process.env.BLOB_READ_WRITE_TOKEN;
