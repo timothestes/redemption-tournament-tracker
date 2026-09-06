@@ -22,7 +22,7 @@ export interface PublicPost {
   tags: string[];
   status: "draft" | "published";
   author_id: string;
-  published_at: string;
+  published_at: string | null;
   author: { username: string | null } | null;
 }
 
@@ -40,13 +40,12 @@ async function loadPublishedPostsFresh(page: number, tag: string | null) {
     .from("posts")
     .select(COLUMNS, { count: "exact" })
     .eq("status", "published")
-    .order("published_at", { ascending: false })
+    .order("published_at", { ascending: false, nullsFirst: false })
     .range(from, from + PAGE_SIZE - 1);
-  if (tag) q = q.contains("tags", [tag]);
+  if (tag) q = q.filter("tags", "cs", `{"${tag.replace(/["\\]/g, (c) => "\\" + c)}"}`);
   const { data, error, count } = await q;
   if (error) {
-    console.error("loadPublishedPosts:", error);
-    return { posts: [] as PublicPost[], total: 0 };
+    throw new Error(`loadPublishedPosts: ${error.message}`);
   }
   return { posts: (data ?? []) as unknown as PublicPost[], total: count ?? 0 };
 }
@@ -69,8 +68,7 @@ async function loadPostBySlugFresh(slug: string): Promise<PublicPost | null> {
     .eq("slug", slug)
     .maybeSingle();
   if (error) {
-    console.error("loadPostBySlug:", error);
-    return null;
+    throw new Error(`loadPostBySlug: ${error.message}`);
   }
   return (data as unknown as PublicPost | null) ?? null;
 }
@@ -87,11 +85,10 @@ async function loadFeedPostsFresh(): Promise<PublicPost[]> {
     .from("posts")
     .select(COLUMNS)
     .eq("status", "published")
-    .order("published_at", { ascending: false })
+    .order("published_at", { ascending: false, nullsFirst: false })
     .limit(FEED_SIZE);
   if (error) {
-    console.error("loadFeedPosts:", error);
-    return [];
+    throw new Error(`loadFeedPosts: ${error.message}`);
   }
   return (data ?? []) as unknown as PublicPost[];
 }
@@ -103,8 +100,7 @@ export function loadFeedPosts(): Promise<PublicPost[]> {
 async function listPublishedTagsFresh(): Promise<string[]> {
   const { data, error } = await createAnonClient().from("posts").select("tags").eq("status", "published");
   if (error) {
-    console.error("listPublishedTags:", error);
-    return [];
+    throw new Error(`listPublishedTags: ${error.message}`);
   }
   const counts = new Map<string, number>();
   for (const row of data ?? []) {

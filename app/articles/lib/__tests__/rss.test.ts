@@ -44,4 +44,10 @@ describe("buildRss", () => {
   it("handles zero posts", () => {
     expect(buildRss([], "https://s")).toContain("</channel>");
   });
+
+  it("omits pubDate when published_at is null but keeps the title", () => {
+    const xml = buildRss([post({ published_at: null })], "https://s");
+    expect(xml).not.toContain("<pubDate>");
+    expect(xml).toContain("<title>Hello &amp; &lt;World&gt;</title>");
+  });
 });

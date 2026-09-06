@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description,
       type: "article",
       siteName: "RedemptionCCG App",
-      publishedTime: post.published_at,
+      publishedTime: post.published_at ?? undefined,
       authors: post.author?.username ? [post.author.username] : undefined,
       images,
     },

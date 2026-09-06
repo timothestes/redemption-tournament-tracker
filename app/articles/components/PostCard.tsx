@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { postExcerpt, type PublicPost } from "../lib/queries";
 
-export function formatPostDate(iso: string): string {
+export function formatPostDate(iso: string | null): string {
+  if (!iso) return "";
   return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
@@ -37,7 +38,7 @@ export default function PostCard({ post }: { post: PublicPost }) {
               <li key={t}>
                 <Link
                   href={`/articles?tag=${encodeURIComponent(t)}`}
-                  className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                  className="inline-flex min-h-11 items-center rounded-full bg-muted px-3 text-sm text-muted-foreground hover:text-foreground"
                 >
                   {t}
                 </Link>

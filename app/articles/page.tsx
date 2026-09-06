@@ -44,7 +44,7 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
                 <li>
                   <Link
                     href="/articles"
-                    className="inline-flex min-h-9 items-center gap-1 rounded-full bg-primary px-3 text-sm text-primary-foreground"
+                    className="inline-flex min-h-11 items-center gap-1 rounded-full bg-primary px-3 text-sm text-primary-foreground"
                   >
                     {tag} <span aria-hidden>×</span>
                     <span className="sr-only">clear tag filter</span>
@@ -58,7 +58,7 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
                   <li key={t}>
                     <Link
                       href={pageHref(1, t)}
-                      className="inline-flex min-h-9 items-center rounded-full bg-muted px-3 text-sm text-muted-foreground hover:text-foreground"
+                      className="inline-flex min-h-11 items-center rounded-full bg-muted px-3 text-sm text-muted-foreground hover:text-foreground"
                     >
                       {t}
                     </Link>

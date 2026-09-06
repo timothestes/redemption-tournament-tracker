@@ -14,16 +14,19 @@ export function buildRss(posts: PublicPost[], site: string): string {
   const items = posts
     .map((p) => {
       const url = `${site}/articles/${p.slug}`;
-      return [
+      const lines = [
         "  <item>",
         `    <title>${escapeXml(p.title)}</title>`,
         `    <link>${escapeXml(url)}</link>`,
         `    <guid isPermaLink="true">${escapeXml(url)}</guid>`,
-        `    <pubDate>${new Date(p.published_at).toUTCString()}</pubDate>`,
+      ];
+      if (p.published_at) lines.push(`    <pubDate>${new Date(p.published_at).toUTCString()}</pubDate>`);
+      lines.push(
         `    <dc:creator>${escapeXml(p.author?.username ?? "Land of Redemption")}</dc:creator>`,
         `    <description>${escapeXml(postExcerpt(p))}</description>`,
         "  </item>",
-      ].join("\n");
+      );
+      return lines.join("\n");
     })
     .join("\n");
   return [
