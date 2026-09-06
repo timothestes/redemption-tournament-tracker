@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { HiArrowSmRight, HiDocumentText } from "react-icons/hi";
+import { HiArrowSmRight, HiDocumentText, HiHeart } from "react-icons/hi";
 
 import { RESOURCE_SECTIONS, type ResourceLink } from "../lib/resources";
 
@@ -116,8 +116,16 @@ export function ResourcesMenu({
         );
       })}
 
-      {/* Report a Bug */}
+      {/* Sponsors + Report a Bug */}
       <div className="border-t border-border mt-2 pt-2">
+        <Link
+          href="/sponsors"
+          onClick={onNavigate}
+          className={`${row} text-muted-foreground hover:bg-muted hover:text-foreground`}
+        >
+          <HiHeart className="w-4 h-4" />
+          Sponsors
+        </Link>
         <Link
           href="/tracker/bug"
           onClick={onNavigate}
