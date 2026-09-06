@@ -105,7 +105,9 @@ create index posts_tags_idx on public.posts using gin (tags);
 - `published_at` is set the first time status flips to `published` and is
   never cleared; unpublishing sets `status='draft'` only, so re-publishing
   keeps the original date. (This is also what a future import needs: a
-  settable `published_at`.)
+  settable `published_at`.) There is no NOT NULL constraint, so the column
+  stays nullable in the `PublicPost` type and the public loaders order by it
+  with `nullsFirst: false`.
 - `updated_at`: no trigger (the schema has none to copy); every update
   statement in the server actions sets `updated_at = now()` explicitly.
 
@@ -130,7 +132,7 @@ default table grants):
 |---|---|---|
 | select | anon, authenticated | `status = 'published'` |
 | select | authenticated | `author_id = auth.uid()` (own drafts) OR `public.is_superuser()` |
-| insert | authenticated | `author_id = auth.uid()` AND `'publish_posts' = any(public.get_my_admin_permissions())` |
+| insert | authenticated | `author_id = auth.uid()` AND (`'publish_posts' = any(public.get_my_admin_permissions())` OR `public.is_superuser()`) |
 | update | authenticated | using/with check: (`author_id = auth.uid()` AND has `publish_posts`) OR `public.is_superuser()` |
 | delete | authenticated | same as update |
 
@@ -187,12 +189,16 @@ it from there, and build the public loaders in `app/articles/lib/queries.ts`
 on it: `loadPublishedPosts({ page, tag })`, `loadPostBySlug(slug)`,
 `loadFeedPosts()`, `listPublishedTags()`. RLS does the filtering; the loaders
 add `.eq("status", "published")` anyway so intent is visible in the code.
+`unstable_cache` is stale-while-revalidate on tag revalidation, so the first
+public read after a write can still serve a cached copy for a second or two
+while the fresh copy rebuilds in the background; the e2e suite asserts
+eventual consistency rather than an immediate update.
 
 ### 5.3 `/articles/feed.xml`
 
 - Route handler returning RSS 2.0 for the 30 latest published posts:
-  `title`, `link`, `guid`, `pubDate`, `dc:creator`, `description` = excerpt,
-  `enclosure` for the cover image. Absolute URLs from
+  `title`, `link`, `guid`, `pubDate`, `dc:creator`, `description` = excerpt.
+  Absolute URLs from
   `NEXT_PUBLIC_SITE_URL` (fallback `https://redemptionccg.app`, same as
   `utils/email.ts`). `Content-Type: application/rss+xml; charset=utf-8`,
   `Cache-Control: s-maxage=3600`. Hand-built XML with an escaping helper; no
@@ -380,8 +386,8 @@ token route, so audio files never pass through a function body:
   `published_at`, `author_id` mapping, and convert HTML → markdown).
 - Comments, scheduling, revisions/history, co-authors, per-post byline
   override, a media library UI, search, an "Articles" block on the home page,
-  serving `/articles` under landofredemption.com (that is the archive
-  project's rewrite, later).
+  a cover image in the feed, serving `/articles` under landofredemption.com
+  (that is the archive project's rewrite, later).
 
 ## 12. Hazards for implementers
 
