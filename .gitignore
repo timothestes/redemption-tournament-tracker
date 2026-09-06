@@ -115,3 +115,6 @@ nationals-history-source.html
 
 # Mobile screenshot artifacts
 .artifacts/
+
+# WordPress import artifacts (scripts/import-wxr.ts)
+scripts/output/wxr/

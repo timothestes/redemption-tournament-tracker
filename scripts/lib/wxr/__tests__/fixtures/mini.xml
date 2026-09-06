@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0"
+	xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:wp="http://wordpress.org/export/1.2/"
+>
+<channel>
+	<title>Land of Redemption</title>
+	<wp:wxr_version>1.2</wp:wxr_version>
+	<wp:author><wp:author_id>1</wp:author_id><wp:author_login><![CDATA[admin]]></wp:author_login><wp:author_email><![CDATA[Gabe@LandOfRedemption.com]]></wp:author_email><wp:author_display_name><![CDATA[Gabe]]></wp:author_display_name></wp:author>
+	<wp:author><wp:author_id>7</wp:author_id><wp:author_login><![CDATA[TimE]]></wp:author_login><wp:author_email><![CDATA[timothestes@gmail.com]]></wp:author_email><wp:author_display_name><![CDATA[BaboonyTim]]></wp:author_display_name></wp:author>
+	<item>
+		<title>YTG Q&amp;A | 2016</title>
+		<link>https://landofredemption.com/ytg-qa-2016/</link>
+		<dc:creator><![CDATA[admin]]></dc:creator>
+		<content:encoded><![CDATA[<p>Hi &amp; bye</p>]]></content:encoded>
+		<excerpt:encoded><![CDATA[<p>Short &amp; sweet</p>]]></excerpt:encoded>
+		<wp:post_id>2016</wp:post_id>
+		<wp:post_date><![CDATA[2016-05-01 10:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2016-05-01 17:00:00]]></wp:post_date_gmt>
+		<wp:post_modified_gmt><![CDATA[2016-05-02 01:02:03]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[ytg-qa-2016]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_type><![CDATA[post]]></wp:post_type>
+		<category domain="category" nicename="fun-funny"><![CDATA[Fun &amp; funny]]></category>
+		<category domain="category" nicename="news"><![CDATA[News]]></category>
+		<category domain="post_tag" nicename="t1"><![CDATA[t1]]></category>
+		<wp:postmeta><wp:meta_key><![CDATA[_thumbnail_id]]></wp:meta_key><wp:meta_value><![CDATA[55]]></wp:meta_value></wp:postmeta>
+	</item>
+	<item>
+		<title>Classic post</title>
+		<link>https://landofredemption.com/classic-post/</link>
+		<dc:creator><![CDATA[TimE]]></dc:creator>
+		<content:encoded><![CDATA[Line one
+Line two
+
+Para two]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>2017</wp:post_id>
+		<wp:post_date><![CDATA[2017-01-01 00:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[0000-00-00 00:00:00]]></wp:post_date_gmt>
+		<wp:post_modified_gmt><![CDATA[2017-01-01 00:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[classic-post]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_type><![CDATA[post]]></wp:post_type>
+		<category domain="category" nicename="news"><![CDATA[News]]></category>
+	</item>
+	<item>
+		<title>A draft</title>
+		<link>https://landofredemption.com/?p=3</link>
+		<dc:creator><![CDATA[TimE]]></dc:creator>
+		<content:encoded><![CDATA[draft]]></content:encoded>
+		<wp:post_id>3</wp:post_id>
+		<wp:post_name><![CDATA[a-draft]]></wp:post_name>
+		<wp:status><![CDATA[draft]]></wp:status>
+		<wp:post_type><![CDATA[post]]></wp:post_type>
+	</item>
+	<item>
+		<title>About</title>
+		<link>https://landofredemption.com/about/</link>
+		<dc:creator><![CDATA[admin]]></dc:creator>
+		<content:encoded><![CDATA[page]]></content:encoded>
+		<wp:post_id>4</wp:post_id>
+		<wp:post_name><![CDATA[about]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_type><![CDATA[page]]></wp:post_type>
+	</item>
+	<item>
+		<title>cover</title>
+		<wp:post_id>55</wp:post_id>
+		<wp:status><![CDATA[inherit]]></wp:status>
+		<wp:post_type><![CDATA[attachment]]></wp:post_type>
+		<wp:attachment_url><![CDATA[https://landofredemption.com/wp-content/uploads/2016/05/cover.jpg]]></wp:attachment_url>
+	</item>
+	<item>
+		<title>SPONSORS!</title>
+		<wp:post_id>14682</wp:post_id>
+		<content:encoded><![CDATA[<!-- wp:paragraph -->
+<p><strong><em>Please <a href="https://landofredemption.com/?page_id=11455">visit our sponsors</a>!</em></strong></p>
+<!-- /wp:paragraph -->]]></content:encoded>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_type><![CDATA[wp_block]]></wp:post_type>
+	</item>
+</channel>
+</rss>
