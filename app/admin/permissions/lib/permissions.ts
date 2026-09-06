@@ -8,6 +8,7 @@ export const ADMIN_PERMISSIONS = [
   { key: "manage_rulings", label: "Rulings" },
   { key: "manage_shopify_imports", label: "Shopify Imports" },
   { key: "threshing_floor", label: "Threshing Floor" },
+  { key: "publish_posts", label: "Posts" },
 ] as const;
 
 export const ADMIN_PERMISSION_KEYS: string[] = ADMIN_PERMISSIONS.map((p) => p.key);
