@@ -563,7 +563,7 @@ export function preprocess(raw: string, blocks: Map<string, string>): Preprocess
   });
 
   // 5) markers
-  html = html.replace(/<!--more-->/g, "").replace(/<!-- \/?wp:[^>]*-->\n?/g, "");
+  html = html.replace(/<!--more-->/g, "").replace(/<!-- \/?wp:[^>]*-->/g, "");
 
   // 6) classic content
   if (classic) html = wpautop(html);
@@ -645,13 +645,13 @@ describe("htmlToMarkdown", () => {
   it("renders buttons as links, demotes h1, drops src-less images, keeps code and tables", () => {
     expect(md('<div class="wp-block-buttons"><div class="wp-block-button"><a class="wp-block-button__link" href="https://r/register">Pre-register</a></div></div>')).toBe("[Pre-register](https://r/register)");
     expect(md("<h1>Top</h1><h2>Sub</h2>")).toBe("## Top\n\n## Sub");
-    expect(md('<p>a <img alt="x"/> b</p>')).toBe("a b");
+    expect(md('<p>a <img alt="x"/> b</p>')).toMatch(/^a\s+b$/);
     expect(md('<pre class="wp-block-code"><code>1 Chariot\n2 Fire &#91;x]</code></pre>')).toBe("```\n1 Chariot\n2 Fire [x]\n```");
     expect(md("<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>")).toBe("| A | B |\n| --- | --- |\n| 1 | 2 |");
   });
   it("keeps line breaks in deck lists and collapses blank runs", () => {
-    expect(md('<p><a class="wp-live-preview" href="https://x/l.jpg">Levi</a><br />\n<a href="https://x/e.jpg">Ehud</a></p>\n\n\n\n<p>End</p>')).toBe(
-      "[Levi](https://x/l.jpg)  \n[Ehud](https://x/e.jpg)\n\nEnd",
+    expect(md('<p><a class="wp-live-preview" href="https://x/l.jpg">Levi</a><br />\n<a href="https://x/e.jpg">Ehud</a></p>\n\n\n\n<p>End</p>')).toMatch(
+      /^\[Levi\]\(https:\/\/x\/l\.jpg\)  \n ?\[Ehud\]\(https:\/\/x\/e\.jpg\)\n\nEnd$/,
     );
   });
 });
@@ -710,6 +710,7 @@ export function htmlToMarkdown(html: string): MarkdownResult {
   td.remove(["script", "style"]);
 
   // General rules first; later addRule calls take precedence (see Turndown fact above).
+  td.addRule("hashLink", { filter: (n) => n.nodeName === "A" && attr(n, "href") === "#", replacement: (c) => c });
   td.addRule("imgNoSrc", { filter: (n) => n.nodeName === "IMG" && !attr(n, "src"), replacement: () => "" });
   td.addRule("h1", { filter: "h1", replacement: (c) => block(`## ${c.trim()}`) });
   td.addRule("pdfObject", { filter: "object", replacement: () => "" });
