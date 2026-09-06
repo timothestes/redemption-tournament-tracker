@@ -34,13 +34,16 @@ const problem = (p: PostReport) =>
   !!p.error || p.stats.residualHtml.length > 0 || p.stats.residualMarkers.length > 0 || p.stats.unknownRefs.length > 0 ||
   p.stats.removedIframes.length > 0 || p.stats.missingMedia.length > 0 || Object.keys(p.stats.droppedBlocks).length > 0;
 
+/** Makes a string safe to interpolate into a markdown table cell: escapes `|` and collapses newlines. */
+const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+
 export function writeReport(dir: string, report: Report): void {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "report.json"), JSON.stringify(report, null, 2));
   const lines: string[] = [`# WXR import report (${report.mode}, ${report.generatedAt})`, ""];
   lines.push("## Totals", "", ...Object.entries(report.totals).map(([k, v]) => `- ${k}: ${v}`), "");
   lines.push("## Authors", "", "| login | name | posts | email | resolved |", "|---|---|---|---|---|");
-  for (const a of report.authors) lines.push(`| ${a.login} | ${a.name} | ${a.posts} | ${a.email ?? ""} | ${a.resolved} |`);
+  for (const a of report.authors) lines.push(`| ${cell(a.login)} | ${cell(a.name)} | ${a.posts} | ${cell(a.email ?? "")} | ${cell(a.resolved)} |`);
   lines.push("", "## Slug changes", "", ...report.slugChanges.map((s) => `- ${s.from} → ${s.to}`), "");
   lines.push("## Posts needing a look", "", "| slug | issue |", "|---|---|");
   for (const p of report.posts.filter(problem)) {
@@ -52,7 +55,7 @@ export function writeReport(dir: string, report: Report): void {
     if (p.stats.removedIframes.length) issues.push(`iframes removed: ${p.stats.removedIframes.join(" ")}`);
     if (p.stats.missingMedia.length) issues.push(`missing media: ${p.stats.missingMedia.join(" ")}`);
     for (const [k, v] of Object.entries(p.stats.droppedBlocks)) issues.push(`dropped ${k}×${v}`);
-    lines.push(`| ${p.slug} | ${issues.join("; ").replace(/\|/g, "\\|")} |`);
+    lines.push(`| ${cell(p.slug)} | ${cell(issues.join("; "))} |`);
   }
   writeFileSync(join(dir, "report.md"), lines.join("\n") + "\n");
 }

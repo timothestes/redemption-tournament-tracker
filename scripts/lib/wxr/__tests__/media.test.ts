@@ -16,6 +16,11 @@ describe("contentTypeFor", () => {
     expect(contentTypeFor("wp/a.xlsx")).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     expect(contentTypeFor("wp/a.weird")).toBe("application/octet-stream");
   });
+
+  it("maps svg and zip", () => {
+    expect(contentTypeFor("wp/a.svg")).toBe("image/svg+xml");
+    expect(contentTypeFor("wp/a.zip")).toBe("application/zip");
+  });
 });
 
 describe("planMedia", () => {
@@ -31,5 +36,20 @@ describe("planMedia", () => {
       bytes: 10, status: "planned",
     });
     expect(m["/podcasts/none.mp3"]).toEqual({ pathname: "wp/podcasts/none.mp3", url: "https://blob.test/wp/podcasts/none.mp3", bytes: 0, status: "missing" });
+  });
+
+  it("treats a malformed % escape in the site path as missing instead of throwing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "wxr-"));
+    const m = planMedia(["/wp-content/uploads/100%.png"], dir, "https://blob.test");
+    expect(m["/wp-content/uploads/100%.png"].status).toBe("missing");
+    expect(m["/wp-content/uploads/100%.png"].bytes).toBe(0);
+  });
+
+  it("treats a path that escapes the backup dir via .. as missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "wxr-"));
+    const traversal = "/" + "../".repeat(20) + "etc/passwd";
+    const m = planMedia([traversal], dir, "https://blob.test");
+    expect(m[traversal].status).toBe("missing");
+    expect(m[traversal].bytes).toBe(0);
   });
 });

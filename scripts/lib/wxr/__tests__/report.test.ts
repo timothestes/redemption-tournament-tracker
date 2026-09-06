@@ -33,4 +33,24 @@ describe("writeReport", () => {
     expect(md).toContain("insert failed");
     expect(md).not.toMatch(/\| ok \|/);
   });
+
+  it("keeps a multi-line, pipe-containing error as a single well-formed table row", () => {
+    const dir = mkdtempSync(join(tmpdir(), "wxr-"));
+    const report: Report = {
+      generatedAt: "2026-09-06T00:00:00.000Z", mode: "dry-run", totals: { posts: 1, failed: 1 },
+      authors: [{ login: "admin", name: "Gabe", posts: 1, email: null, resolved: "ARCHIVE" }],
+      slugChanges: [],
+      posts: [
+        { slug: "messy", originalSlug: "messy", title: "Messy", login: "admin", wpId: "3", classic: false,
+          stats: { images: 0, links: 0, embeds: 0, residualHtml: [], residualMarkers: [], externalImageHosts: [], droppedBlocks: {}, unknownRefs: [], removedIframes: [], missingMedia: [] },
+          error: "insert failed | at row 2\nsecond line of the error" },
+      ],
+    };
+    writeReport(dir, report);
+    const md = readFileSync(join(dir, "report.md"), "utf8");
+    const rowLines = md.split("\n").filter((l) => l.includes("second line of the error"));
+    expect(rowLines).toHaveLength(1);
+    expect(rowLines[0].startsWith("| messy |")).toBe(true);
+    expect(rowLines[0]).toContain("\\|");
+  });
 });
