@@ -52,7 +52,7 @@ export default async function ArticlePage({ params }: PageProps) {
       <article className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:py-10">
         <Link
           href="/articles"
-          className="mb-5 inline-flex min-h-9 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="mb-5 inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           ← All articles
         </Link>
@@ -65,12 +65,12 @@ export default async function ArticlePage({ params }: PageProps) {
             <EditLink postId={post.id} authorId={post.author_id} />
           </div>
           {post.tags.length > 0 && (
-            <ul className="mt-3 flex flex-wrap gap-1.5">
+            <ul className="mt-3 flex flex-wrap gap-2">
               {post.tags.map((t) => (
                 <li key={t}>
                   <Link
                     href={`/articles?tag=${encodeURIComponent(t)}`}
-                    className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                    className="inline-flex min-h-11 items-center rounded-full bg-muted px-3 text-sm text-muted-foreground hover:text-foreground"
                   >
                     {t}
                   </Link>
