@@ -373,7 +373,7 @@ export function readWxr(path: string): WxrExport {
 ```bash
 npx tsx -e 'import { readWxr } from "./scripts/lib/wxr/parse"; const e = readWxr("/Users/timestes/projects/redemption-tournament-tracker/tmp/landofredemption.WordPress.2026-09-05.xml"); console.log(e.authors.length, e.posts.length, e.attachments.size, e.blocks.size)'
 ```
-Expected: `84 1298 6891 5`.
+Expected: `85 1298 6891 5` (85 author records; 84 of them have published posts).
 
 - [ ] **Step 7: Commit**
 
@@ -1120,7 +1120,7 @@ writeFileSync("scripts/data/wxr-authors.json", JSON.stringify(rows, null, 2) + "
 console.log(rows.length, "authors,", rows.filter((r) => r.email).length, "mapped");
 '
 ```
-Expected: `84 authors, 11 mapped`. The file contains WordPress display names and the eleven emails only (no other emails).
+Expected: `85 authors, 11 mapped`. The file contains WordPress display names and the eleven emails only (no other emails).
 
 - [ ] **Step 5: Run** `npx vitest run scripts/lib/wxr` → PASS.
 
