@@ -1,5 +1,5 @@
 // Permission catalog for the superuser portal. MIRROR of the SQL allowlist in
-// supabase/migrations/062_superuser_admin_portal.sql — update both together.
+// supabase/migrations/095_posts.sql — update both together.
 export const ADMIN_PERMISSIONS = [
   { key: "manage_registrations", label: "Registrations" },
   { key: "manage_tags", label: "Tags" },
@@ -9,6 +9,7 @@ export const ADMIN_PERMISSIONS = [
   { key: "manage_rulings", label: "Rulings" },
   { key: "manage_shopify_imports", label: "Shopify Imports" },
   { key: "threshing_floor", label: "Threshing Floor" },
+  { key: "publish_posts", label: "Posts" },
 ] as const;
 
 export const ADMIN_PERMISSION_KEYS: string[] = ADMIN_PERMISSIONS.map((p) => p.key);

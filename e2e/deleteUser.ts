@@ -17,6 +17,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *   profiles.id          NO ACTION   ← auto-created by the signup trigger
  *   decks.user_id        NO ACTION
  *   deck_folders.user_id NO ACTION
+ *   posts.author_id      RESTRICT
  * Everything else that matters (tournaments, playtest_members, forge_*,
  * collection_cards, api_keys) is ON DELETE CASCADE and needs no help.
  *
@@ -30,6 +31,7 @@ export async function deleteTestUser(
   // Order matters: these block the auth.users delete.
   await admin.from("decks").delete().eq("user_id", userId);
   await admin.from("deck_folders").delete().eq("user_id", userId);
+  await admin.from("posts").delete().eq("author_id", userId);
   await admin.from("profiles").delete().eq("id", userId);
 
   const { error } = await admin.auth.admin.deleteUser(userId);

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { IconType } from "react-icons";
-import { HiMenu, HiDocumentText, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey, HiClipboardList, HiShoppingCart, HiPencilAlt } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection, HiChartBar, HiKey, HiClipboardList, HiShoppingCart, HiPencilAlt, HiNewspaper } from "react-icons/hi";
 import { GiCrossedSwords, GiAnvil } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
@@ -133,6 +133,7 @@ const TopNav: React.FC = () => {
     { href: "/play", label: "Play", icon: GiCrossedSwords },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
+    { href: "/articles", label: "Articles", icon: HiNewspaper },
   ];
 
   const tournamentLinks: NavLink[] = [
@@ -290,6 +291,16 @@ const TopNav: React.FC = () => {
                         >
                           <HiShoppingCart className="w-4 h-4" />
                           YTG Store
+                        </Link>
+                      )}
+                      {permissions.includes('publish_posts') && (
+                        <Link
+                          href="/admin/posts"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiNewspaper className="w-4 h-4" />
+                          Posts
                         </Link>
                       )}
                       {(isSuperuser || permissions.includes('manage_catalog')) && (
@@ -662,6 +673,16 @@ const TopNav: React.FC = () => {
                       >
                         <HiShoppingCart className="w-4 h-4" />
                         YTG Store
+                      </Link>
+                    )}
+                    {permissions.includes('publish_posts') && (
+                      <Link
+                        href="/admin/posts"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiNewspaper className="w-4 h-4" />
+                        Posts
                       </Link>
                     )}
                     {(isSuperuser || permissions.includes('manage_catalog')) && (

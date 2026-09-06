@@ -1,0 +1,89 @@
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type { Element } from "hast";
+import { isAudioUrl, youtubeId } from "../lib/markdown";
+
+// The ONE markdown renderer: public article page (server) and editor preview
+// (client) both use it, so what the poster previews is what readers get.
+// No rehype-raw: raw HTML in the markdown is escaped, which is the whole XSS
+// story. react-markdown's default urlTransform already drops javascript: URLs.
+
+/** href of the paragraph's only child when that child is a link, else null. */
+function soleLinkHref(node: Element | undefined): string | null {
+  if (!node) return null;
+  const kids = node.children.filter((c) => !(c.type === "text" && c.value.trim() === ""));
+  if (kids.length !== 1) return null;
+  const only = kids[0];
+  if (only.type !== "element" || only.tagName !== "a") return null;
+  const href = only.properties?.href;
+  return typeof href === "string" ? href : null;
+}
+
+export function YouTubeEmbed({ id }: { id: string }) {
+  return (
+    <div
+      className="article-embed relative my-6 w-full overflow-hidden rounded-lg bg-muted"
+      style={{ aspectRatio: "16 / 9" }}
+    >
+      <iframe
+        className="absolute inset-0 h-full w-full"
+        src={`https://www.youtube-nocookie.com/embed/${id}`}
+        title="YouTube video"
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
+    </div>
+  );
+}
+
+const components: Components = {
+  // A paragraph that is ONLY a YouTube link becomes the embed instead of a
+  // <p> — an iframe inside <p> is invalid HTML and warns on hydration.
+  p: ({ node, children, ...props }) => {
+    const href = soleLinkHref(node);
+    const id = href ? youtubeId(href) : null;
+    if (id) return <YouTubeEmbed id={id} />;
+    return <p {...props}>{children}</p>;
+  },
+  a: ({ node: _node, href, children, ...props }) => {
+    if (href && isAudioUrl(href)) {
+      return (
+        <span className="article-audio my-4 block">
+          <audio controls preload="none" src={href} className="w-full" />
+          <a href={href} className="mt-1 inline-block text-xs text-muted-foreground" download>
+            {children}
+          </a>
+        </span>
+      );
+    }
+    const external = !!href && /^https?:\/\//i.test(href);
+    return (
+      <a href={href} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})} {...props}>
+        {children}
+      </a>
+    );
+  },
+  img: ({ node: _node, src, alt, ...props }) => (
+    // Plain <img>: dimensions are unknown and hosts vary (Blob today, the old
+    // WordPress uploads after the import). next/image needs width/height.
+    <img
+      src={typeof src === "string" ? src : undefined}
+      alt={alt ?? ""}
+      loading="lazy"
+      decoding="async"
+      className="mx-auto max-w-full rounded-md"
+      {...props}
+    />
+  ),
+};
+
+export default function ArticleBody({ markdown }: { markdown: string }) {
+  return (
+    <div className="article-body prose prose-neutral dark:prose-invert max-w-none">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {markdown}
+      </ReactMarkdown>
+    </div>
+  );
+}
