@@ -5,6 +5,7 @@ export const ADMIN_PERMISSIONS = [
   { key: "manage_tags", label: "Tags" },
   { key: "manage_spoilers", label: "Spoilers" },
   { key: "manage_cards", label: "Cards" },
+  { key: "manage_catalog", label: "Catalog" },
   { key: "manage_rulings", label: "Rulings" },
   { key: "manage_shopify_imports", label: "Shopify Imports" },
   { key: "threshing_floor", label: "Threshing Floor" },
