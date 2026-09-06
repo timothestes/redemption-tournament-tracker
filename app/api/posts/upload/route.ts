@@ -10,8 +10,8 @@ import { canEditPost } from "@/app/admin/posts/lib/validate";
 // cannot reach localhost — the SDK logs a warning in dev; that is expected and
 // harmless because the browser already receives the final URL.
 export async function POST(request: Request) {
-  const body = (await request.json()) as HandleUploadBody;
   try {
+    const body = (await request.json()) as HandleUploadBody;
     const json = await handleUpload({
       body,
       request,
@@ -20,7 +20,8 @@ export async function POST(request: Request) {
         const ctx = await requirePoster();
         const payload = parseClientPayload(clientPayload);
         if (!payload) throw new Error("Bad upload payload");
-        if (!pathname.startsWith(`posts/${payload.postId}/`)) throw new Error("Bad upload path");
+        const prefix = `posts/${payload.postId}/`;
+        if (!pathname.startsWith(prefix) || pathname.includes("..")) throw new Error("Bad upload path");
 
         const { data: post } = await ctx.supabase
           .from("posts")
