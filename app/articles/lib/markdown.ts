@@ -51,9 +51,9 @@ export const MAX_SLUG = 80;
 export function slugify(title: string): string {
   return title
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[''"""]/g, "")
+    .replace(/['\u2019""\u201c\u201d]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, MAX_SLUG)
