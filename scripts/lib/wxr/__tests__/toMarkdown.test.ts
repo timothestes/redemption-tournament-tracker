@@ -54,6 +54,44 @@ describe("htmlToMarkdown", () => {
       /^\[Levi\]\(https:\/\/x\/l\.jpg\)  \n ?\[Ehud\]\(https:\/\/x\/e\.jpg\)\n\nEnd$/,
     );
   });
+  it("keeps a captioned embed's URL and caption as separate paragraphs", () => {
+    expect(md('<figure class="wp-block-embed is-type-video"><div class="wp-block-embed__wrapper">\nhttps://youtu.be/abc123\n</div><figcaption>Round 3 feature match</figcaption></figure>')).toBe(
+      "https://youtu.be/abc123\n\n*Round 3 feature match*",
+    );
+  });
+  it("turns a YouTube iframe inside an embed wrapper into a watch URL", () => {
+    expect(md('<figure class="wp-block-embed is-type-video"><div class="wp-block-embed__wrapper"><iframe src="https://www.youtube.com/embed/XqBkP-TcfeU"></iframe></div></figure>')).toBe(
+      "https://www.youtube.com/watch?v=XqBkP-TcfeU",
+    );
+  });
+  it("drops a non-YouTube iframe inside an embed wrapper and reports it instead of losing it silently", () => {
+    const r = htmlToMarkdown('<figure class="wp-block-embed"><div class="wp-block-embed__wrapper"><iframe src="https://example.com/x"></iframe></div></figure>');
+    expect(r.markdown).toBe("");
+    expect(r.removedIframes).toEqual(["https://example.com/x"]);
+  });
+  it("does not report an iframe with no src", () => {
+    expect(htmlToMarkdown("<iframe></iframe>").removedIframes).toEqual([]);
+  });
+  it("escapes hand-built link/caption text and wraps a URL containing a space", () => {
+    expect(md('<div class="wp-block-file"><a href="https://x/a.pdf">Nationals [2019 Winners</a></div>')).toBe(
+      "[Nationals \\[2019 Winners](https://x/a.pdf)",
+    );
+    expect(md('<figure><img src="https://x/a.jpg" alt=""/><figcaption>Rated 5 * out of 5</figcaption></figure>')).toBe(
+      "![](https://x/a.jpg)\n*Rated 5 \\* out of 5*",
+    );
+    expect(md('<div class="wp-block-file"><a href="https://x/Winners (2019).pdf">Winners</a></div>')).toBe(
+      "[Winners](<https://x/Winners (2019).pdf>)",
+    );
+  });
+  it("emits a classic-editor bare URL paragraph unescaped", () => {
+    expect(md("<p>https://youtu.be/Rfn_VkOGm7o</p>")).toBe("https://youtu.be/Rfn_VkOGm7o");
+  });
+  it("normalises a shortcode-derived self-linked bare URL paragraph", () => {
+    expect(md('<p><a href="https://youtu.be/x_y">https://youtu.be/x_y</a></p>')).toBe("https://youtu.be/x_y");
+  });
+  it("still escapes underscores when a paragraph has more than a bare URL", () => {
+    expect(md("<p>Watch here: https://youtu.be/x_y</p>")).toBe("Watch here: https://youtu.be/x\\_y");
+  });
 });
 
 describe("measureMarkdown", () => {
@@ -66,5 +104,13 @@ describe("measureMarkdown", () => {
   });
   it("flags leftover WordPress markers", () => {
     expect(measureMarkdown("<!-- wp:paragraph --> [youtube]x[/youtube]", "https://b").residualMarkers).toEqual(["<!-- wp:", "[youtube]"]);
+  });
+  it("skips an unparseable image URL instead of throwing", () => {
+    expect(() => measureMarkdown("![x](http://)", "https://blob.test")).not.toThrow();
+    expect(measureMarkdown("![x](http://)", "https://blob.test").externalImageHosts).toEqual([]);
+  });
+  it("counts protocol-relative and root-relative images as unmirrored", () => {
+    const s = measureMarkdown("![a](//cdn.example.com/x.jpg) ![b](/uploads/y.jpg)", "https://blob.test");
+    expect(s.externalImageHosts).toEqual(["cdn.example.com", "(relative)"]);
   });
 });
