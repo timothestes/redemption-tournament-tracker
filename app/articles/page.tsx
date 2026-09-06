@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import TopNav from "@/components/top-nav";
 import SponsorFooter from "@/components/sponsor-footer";
 import { loadPublishedPosts, listPublishedTags, PAGE_SIZE } from "./lib/queries";
@@ -31,6 +32,10 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
 
   const [{ posts, total }, tags] = await Promise.all([loadPublishedPosts({ page, tag }), listPublishedTags()]);
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Past-the-end (?page=99, or the last post on a page being unpublished)
+  // used to render an empty list with no pager and no way back. Land the
+  // reader on the last real page instead.
+  if (page > pageCount) redirect(pageHref(pageCount, tag));
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -68,7 +73,7 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
           )}
         </header>
 
-        {posts.length === 0 ? (
+        {total === 0 ? (
           <p className="text-muted-foreground">No articles yet{tag ? ` tagged “${tag}”` : ""}.</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

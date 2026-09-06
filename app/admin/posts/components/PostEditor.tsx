@@ -65,6 +65,16 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   // Bumped by every field change. save() snapshots it before the request and
   // only echoes the server's tags/slug back if nothing changed in flight.
   const editVersion = useRef(0);
+  // ensureId() resolves asynchronously and is memoized, so it must read the
+  // CURRENT slug state rather than whatever was captured when it was built.
+  const slugRef = useRef(slug);
+  const slugTouchedRef = useRef(slugTouched);
+  slugRef.current = slug;
+  slugTouchedRef.current = slugTouched;
+  // The slug createDraftAction actually assigned, which may be suffixed
+  // ("hello-2") when the derived one was already taken. onTitle clears it
+  // whenever it re-derives the slug locally so it can never go stale.
+  const serverSlugRef = useRef<string | null>(null);
 
   useEffect(() => {
     listTagsAction()
@@ -90,17 +100,24 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
     // Once published the slug field is disabled (slugTouched can never flip
     // true), so this must not re-derive after publish or it silently poisons
     // the locked slug on the next save.
-    if (status === "draft" && !slugTouched) setSlug(slugify(v));
+    if (status === "draft" && !slugTouched) {
+      setSlug(slugify(v));
+      serverSlugRef.current = null;
+    }
     editVersion.current += 1;
     setDirty(true);
   };
 
   // Resolves the draft's id and its SERVER slug. createDraftAction may
-  // suffix the slug on collision (e.g. "hello-2"), which can differ from the
-  // client-derived slug still sitting in state — callers that care must use
-  // the returned slug rather than the `slug` state directly.
+  // suffix the slug on collision (e.g. "hello-2"), or fill in a derived slug
+  // that came out empty (a CJK/emoji-only title), so the row's slug can
+  // differ from the client-derived one still sitting in state. Reconciling
+  // here rather than in save() means EVERY entry point gets it — the media
+  // and cover pickers create the draft too, and a picker-created draft whose
+  // slug was never reconciled made the next save fail with "That slug is
+  // already taken" (or the slug regex, for the empty case).
   const ensureId = useCallback((): Promise<{ id: string; slug: string } | null> => {
-    if (idRef.current) return Promise.resolve({ id: idRef.current, slug });
+    if (idRef.current) return Promise.resolve({ id: idRef.current, slug: serverSlugRef.current ?? slugRef.current });
     if (creatingRef.current) return creatingRef.current;
     const promise = (async (): Promise<{ id: string; slug: string } | null> => {
       try {
@@ -111,6 +128,13 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
         }
         idRef.current = r.post.id;
         setId(r.post.id);
+        serverSlugRef.current = r.post.slug;
+        // Lock the server's slug in when it differs, so a later title edit
+        // doesn't re-derive the one that just collided.
+        if (!slugTouchedRef.current) {
+          setSlug(r.post.slug);
+          if (r.post.slug !== slugRef.current) setSlugTouched(true);
+        }
         window.history.replaceState(null, "", `/admin/posts/${r.post.id}`);
         return { id: r.post.id, slug: r.post.slug };
       } finally {
@@ -119,7 +143,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
     })();
     creatingRef.current = promise;
     return promise;
-  }, [title, slug]);
+  }, [title]);
 
   const selection = () => {
     const el = bodyRef.current;
