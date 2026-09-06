@@ -3,6 +3,7 @@
 import { DeckCheckResult, DeckCheckIssue } from "@/utils/deckcheck/types";
 import { DeckValidation } from "../utils/deckValidation";
 import { normalizeFormat } from "@/lib/formats";
+import { DOCS } from "@/lib/resources";
 
 interface DeckLegalityChecklistProps {
   clientValidation: DeckValidation;
@@ -214,7 +215,7 @@ export default function DeckLegalityChecklist({
             )}
           </div>
           <a
-            href="https://landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf"
+            href={DOCS.deckBuildingRules}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"

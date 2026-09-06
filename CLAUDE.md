@@ -45,9 +45,9 @@ make update-cards        # Download latest carddata.txt and regenerate TypeScrip
 | Deck state | `app/decklist/card-search/hooks/useDeckState.ts` |
 | Card data access | `lib/cards/lookup.ts` — canonical `CARDS` / `findCard` / `CardData`. Backed by generated `lib/cards/generated/cardData.ts`; regen with `make update-cards`. |
 | Nationals config | `app/config/nationals.ts` |
-| Official REG (v11) | landofredemption.com/wp-content/uploads/2026/03/REG_PDF_11.0.0.pdf |
-| Official ORDIR (v7) | landofredemption.com/wp-content/uploads/2026/03/ORDIR_PDF_7.0.0.pdf |
-| Deck Building Rules (v1.3) | landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf |
+| Official REG (v11) | qrpnuz0u6exnvyt8.public.blob.vercel-storage.com/wp/wp-content/uploads/2026/03/REG_PDF_11.0.0.pdf (`DOCS.reg` in `lib/resources.ts`) |
+| Official ORDIR (v7) | qrpnuz0u6exnvyt8.public.blob.vercel-storage.com/wp/wp-content/uploads/2026/03/ORDIR_PDF_7.0.0.pdf (`DOCS.ordir`) |
+| Deck Building Rules (v1.3) | qrpnuz0u6exnvyt8.public.blob.vercel-storage.com/wp/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf (`DOCS.deckBuildingRules`) |
 | Design system | `prompt_context/design_system.md` |
 | Forge card versioning | `prompt_context/forge_versioning.md` — autosave vs proposals vs versions, who sees what, where the "why" lives |
 | Forge set promotion ("big red button") | `docs/superpowers/specs/2026-08-22-forge-public-set-release-design.md` + `app/forge/lib/promote.ts`; overlay `scripts/data/forge-released.json` via `make pull-forge-releases` |
