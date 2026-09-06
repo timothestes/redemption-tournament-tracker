@@ -22,16 +22,22 @@ export interface PublicPost {
   tags: string[];
   status: "draft" | "published";
   author_id: string;
+  author_name: string | null;
   published_at: string | null;
   author: { username: string | null } | null;
 }
 
 const COLUMNS =
-  "id, slug, title, excerpt, body_md, cover_image_url, tags, status, author_id, published_at, author:profiles(username)";
+  "id, slug, title, excerpt, body_md, cover_image_url, tags, status, author_id, author_name, published_at, author:profiles(username)";
 
 export function postExcerpt(post: Pick<PublicPost, "excerpt" | "body_md">): string {
   const explicit = post.excerpt?.trim();
   return explicit ? explicit : excerptFromMarkdown(post.body_md);
+}
+
+/** Byline: the import's author_name, else the owner's username, else the site name. */
+export function postByline(post: Pick<PublicPost, "author_name" | "author">): string {
+  return post.author_name ?? post.author?.username ?? "Land of Redemption";
 }
 
 async function loadPublishedPostsFresh(page: number, tag: string | null) {

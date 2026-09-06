@@ -5,7 +5,7 @@ import TopNav from "@/components/top-nav";
 import SponsorFooter from "@/components/sponsor-footer";
 import ArticleBody from "../components/ArticleBody";
 import { formatPostDate } from "../components/PostCard";
-import { loadPostBySlug, postExcerpt } from "../lib/queries";
+import { loadPostBySlug, postByline, postExcerpt } from "../lib/queries";
 import EditLink from "./EditLink";
 
 export const revalidate = 3600;
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: "article",
       siteName: "RedemptionCCG App",
       publishedTime: post.published_at ?? undefined,
-      authors: post.author?.username ? [post.author.username] : undefined,
+      authors: [postByline(post)],
       images,
     },
     twitter: {
@@ -60,7 +60,7 @@ export default async function ArticlePage({ params }: PageProps) {
           <h1 className="font-cinzel text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{post.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
             <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-              by {post.author?.username ?? "Land of Redemption"} · {formatPostDate(post.published_at)}
+              by {postByline(post)} · {formatPostDate(post.published_at)}
             </p>
             <EditLink postId={post.id} authorId={post.author_id} />
           </div>
