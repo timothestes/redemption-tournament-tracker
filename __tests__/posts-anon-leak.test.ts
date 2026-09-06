@@ -18,10 +18,19 @@ type TestUser = { id: string; email: string; client: SupabaseClient };
 const PASSWORD = "Testpass12345";
 const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
+// `Promise.all([makeUser(...), makeUser(...), makeUser(...)])` only assigns
+// posterA/posterB/plain if all three resolve — if one throws AFTER its own
+// createUser already succeeded (e.g. the admin_users insert or sign-in step
+// fails), the destructuring never runs and afterAll has nothing to clean up.
+// Every id lands here the instant createUser succeeds, independent of the
+// rest of makeUser, so afterAll can always find and delete it.
+const createdUserIds: string[] = [];
+
 async function makeUser(admin: SupabaseClient, permissions: string[]): Promise<TestUser> {
   const email = `posts-${permissions.length ? "poster" : "plain"}-${stamp}-${Math.random().toString(36).slice(2, 5)}@e2e.test`;
   const { data, error } = await admin.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
   if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`);
+  createdUserIds.push(data.user.id);
   if (permissions.length > 0) {
     const { error: permErr } = await admin.from("admin_users").insert({ user_id: data.user.id, permissions });
     if (permErr) throw new Error(`admin_users insert failed: ${permErr.message}`);
@@ -71,11 +80,12 @@ describe.runIf(ENABLED)("posts RLS guardrail", () => {
 
   afterAll(async () => {
     if (!admin) return;
-    for (const u of [posterA, posterB, plain]) {
-      if (!u) continue;
-      await admin.from("admin_users").delete().eq("user_id", u.id);
-      const gone = await deleteTestUser(admin, u.id);
-      expect(gone, `test user ${u.email} leaked`).toBe(true);
+    // Iterate createdUserIds (not [posterA, posterB, plain]) so a partial
+    // beforeAll failure still cleans up whichever accounts were created.
+    for (const id of createdUserIds) {
+      await admin.from("admin_users").delete().eq("user_id", id);
+      const gone = await deleteTestUser(admin, id);
+      expect(gone, `test user ${id} leaked`).toBe(true);
     }
   }, 60_000);
 
@@ -129,5 +139,43 @@ describe.runIf(ENABLED)("posts RLS guardrail", () => {
       .single();
     expect(error).toBeNull();
     expect(data?.excerpt).toBe("edited");
+  });
+
+  it("anon cannot write", async () => {
+    const anon = createClient(URL!, ANON!);
+
+    const { error } = await anon
+      .from("posts")
+      .insert({ title: "Anon draft", slug: `leak-anon-insert-${stamp}`, author_id: posterA.id });
+    expect(error?.code, "anon insert should be rejected by RLS (42501)").toBe("42501");
+
+    const { data: updated } = await anon.from("posts").update({ title: "Anon hijack" }).eq("id", publishedId).select("id");
+    expect(updated ?? []).toHaveLength(0); // RLS filters the row out silently
+    const { data: afterUpdate } = await admin.from("posts").select("title").eq("id", publishedId).single();
+    expect(afterUpdate?.title).toBe("Leak published");
+
+    const { data: deleted } = await anon.from("posts").delete().eq("id", publishedId).select("id");
+    expect(deleted ?? []).toHaveLength(0);
+    const { data: afterDelete } = await admin.from("posts").select("id").eq("id", publishedId).maybeSingle();
+    expect(afterDelete).not.toBeNull();
+  });
+
+  it("a poster cannot delete another poster's post", async () => {
+    const { data } = await posterB.client.from("posts").delete().eq("id", draftId).select("id");
+    expect(data ?? []).toHaveLength(0);
+    const { data: check } = await admin.from("posts").select("id").eq("id", draftId).maybeSingle();
+    expect(check).not.toBeNull();
+  });
+
+  it("a poster can insert their own draft", async () => {
+    const { data, error } = await posterA.client
+      .from("posts")
+      .insert({ title: "Poster's own draft", slug: `leak-own-draft-${stamp}`, author_id: posterA.id })
+      .select("status")
+      .single();
+    expect(error).toBeNull();
+    expect(data?.status).toBe("draft");
+    // Cleaned up by afterAll's deleteTestUser, which deletes all of
+    // posterA's posts before deleting the profile.
   });
 });

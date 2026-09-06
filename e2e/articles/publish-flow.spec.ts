@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import { admin, adminAvailable } from "../seed";
 import { deleteTestUser } from "../deleteUser";
 
@@ -27,6 +27,31 @@ async function gotoStable(page: Page, url: string) {
       await page.goto(url);
     } else {
       throw e;
+    }
+  }
+}
+
+// AdminProvider's isAdmin check (components/providers/AdminProvider.tsx) can
+// transiently miss on the very first page load right after sign-in — the
+// same class of local-dev fetch blip utils/supabase/getUserSafe.ts documents
+// and tolerates elsewhere — but unlike getUserSafe it has no retry of its
+// own: it only re-checks on the next auth-state-change event, which never
+// fires again on this page. A reload re-runs the check cleanly. Confirmed by
+// hand: the Admin dropdown is reliably present after at most one reload.
+// The caller is expected to have already opened the mobile menu once (for
+// the Articles-link check); a reload always closes it again, so it's
+// reopened only on the retry path, never on the fast (already-open) path.
+async function openAdminMenu(page: Page, isMobile: boolean): Promise<Locator> {
+  const adminToggle = page.getByRole("button", { name: "Admin", exact: true }).and(page.locator(":visible"));
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await expect(adminToggle).toBeVisible({ timeout: attempt === 0 ? 5_000 : 10_000 });
+      return adminToggle;
+    } catch (e) {
+      if (attempt >= 2) throw e;
+      await page.reload();
+      await page.waitForLoadState("load");
+      if (isMobile) await page.locator("nav").locator('button[class*="lg:hidden"]').first().click();
     }
   }
 }
@@ -75,8 +100,30 @@ test.describe("articles: poster publish flow", () => {
     if (isMobile) await page.locator("nav").locator('button[class*="lg:hidden"]').first().click();
     await expect(page.getByRole("link", { name: "Articles" }).first()).toBeVisible();
 
+    // "Articles" above is the public nav link — visible to everyone signed
+    // out, so it never exercises the publish_posts grant. Walk the actual
+    // gated entry point: the Admin dropdown's "Posts" link only renders once
+    // the signed-in user holds publish_posts. Desktop and mobile share one
+    // isAdminOpen toggle, so both dropdown panels mount into the DOM the
+    // moment it flips regardless of viewport — ":visible" picks out whichever
+    // one this viewport actually shows.
+    const adminToggle = await openAdminMenu(page, isMobile);
+    await adminToggle.click();
+    const postsLink = page.getByRole("link", { name: "Posts", exact: true }).and(page.locator(":visible"));
+    await expect(postsLink).toBeVisible();
+    await postsLink.click();
+    await expect(page).toHaveURL(/\/admin\/posts$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Posts", exact: true })).toBeVisible();
+
     await gotoStable(page, "/admin/posts/new");
-    const title = `E2E article ${Date.now()}`;
+    // Date.now() alone can collide between the two Playwright projects
+    // running concurrently against the same dev server, and the app's own
+    // slug-collision check only looks at posts the caller can see (RLS hides
+    // other posters' drafts) — so two workers picking the same millisecond
+    // would both try to insert the same globally-unique slug. The random
+    // suffix (same idea as the emails above) keeps each run's slug unique.
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const title = `E2E article ${Date.now()}-${suffix}`;
     await page.getByLabel("Title").fill(title);
     await page.getByLabel("Body").fill("# Heading\n\nHello **world**.\n\nhttps://youtu.be/dQw4w9WgXcQ");
 
@@ -98,7 +145,11 @@ test.describe("articles: poster publish flow", () => {
       await page.getByRole("tab", { name: "Write" }).click();
     }
 
-    await page.getByRole("button", { name: "Publish" }).click();
+    // Playwright's `name` is a case-insensitive substring match by default,
+    // and "Publish" is literally a substring of "Unpublish" — every
+    // Publish/Unpublish button lookup below is `exact: true` so a lookup for
+    // one can never accidentally match the other's button.
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
     // The "Published" toast is a decorative, self-dismissing (~3.2s) client
     // notification, and the dev server's first-ever compile of a Server
     // Action mid-test can force a Fast Refresh full reload of the open admin
@@ -107,10 +158,10 @@ test.describe("articles: poster publish flow", () => {
     // flips to published in the DB regardless. The Publish button turning
     // into "Unpublish" is the durable, equally-specific signal that the same
     // publish actually succeeded, so assert on that instead of the toast.
-    await expect(page.getByRole("button", { name: "Unpublish" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: "Unpublish", exact: true })).toBeVisible({ timeout: 30_000 });
     const editUrl = page.url();
     const slug = await page.getByLabel("Slug").inputValue();
-    expect(slug).toMatch(/^e2e-article-\d+$/);
+    expect(slug).toMatch(/^e2e-article-\d+-[a-z0-9]+$/);
 
     // Public page: title, byline, image, embed. next/cache's unstable_cache
     // implements stale-while-revalidate on revalidateTag: the first read after
@@ -129,16 +180,17 @@ test.describe("articles: poster publish flow", () => {
     // Feed lists it — same stale-while-revalidate window as above, so poll.
     await expect
       .poll(async () => (await page.request.get("/articles/feed.xml")).text(), { timeout: 15_000, intervals: [500] })
-      .toContain(`/articles/${slug}`);
+      .toContain(`/articles/${slug}</link>`);
     const feed = await page.request.get("/articles/feed.xml");
     expect(feed.headers()["content-type"]).toContain("application/rss+xml");
 
     // Unpublish → public 404.
     await gotoStable(page, editUrl);
-    await page.getByRole("button", { name: "Unpublish" }).click();
+    await page.getByRole("button", { name: "Unpublish", exact: true }).click();
     // Same rationale as the Publish step above: assert the durable button
-    // flip rather than the transient "Unpublished" toast.
-    await expect(page.getByRole("button", { name: "Publish" })).toBeVisible({ timeout: 30_000 });
+    // flip rather than the transient "Unpublished" toast. Exact match — see
+    // the note above the first Publish click.
+    await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeVisible({ timeout: 30_000 });
     await expect
       .poll(async () => (await page.request.get(`/articles/${slug}`)).status(), { timeout: 15_000, intervals: [500] })
       .toBe(404);
