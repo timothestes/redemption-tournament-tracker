@@ -92,6 +92,19 @@ describe("htmlToMarkdown", () => {
   it("still escapes underscores when a paragraph has more than a bare URL", () => {
     expect(md("<p>Watch here: https://youtu.be/x_y</p>")).toBe("Watch here: https://youtu.be/x\\_y");
   });
+  it("converts a WordPress table (all <td>, no heading row) instead of keeping raw HTML", () => {
+    expect(md('<table class="has-fixed-layout"><tbody><tr><td><strong>BLUE</strong></td><td><strong>GOLD</strong></td></tr><tr><td>Genesis</td><td>Joshua</td></tr></tbody></table>')).toBe(
+      "| **BLUE** | **GOLD** |\n| --- | --- |\n| Genesis | Joshua |",
+    );
+  });
+  it("leaves a table that already has a heading row to the gfm plugin", () => {
+    expect(md("<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>")).toBe(
+      "| A | B |\n| --- | --- |\n| 1 | 2 |",
+    );
+  });
+  it("drops a table whose cells are all empty", () => {
+    expect(md('<table class="has-fixed-layout"><tbody><tr><td></td><td rowspan="2"></td></tr></tbody></table>')).toBe("");
+  });
 });
 
 describe("measureMarkdown", () => {

@@ -24,6 +24,19 @@ const mdUrl = (u: string) => {
 
 const image = (img: Element) => `![${mdText(attr(img, "alt"))}](${mdUrl(attr(img, "src"))})`;
 
+// Mirrors turndown-plugin-gfm's own isHeadingRow, so `headerlessTable` matches exactly
+// the tables the plugin `keep`s (see the rule for why that matters).
+function isHeadingRow(tr: Element | null | undefined): boolean {
+  const parent = tr?.parentNode as Element | null;
+  if (!tr || !parent) return false;
+  if (parent.nodeName === "THEAD") return true;
+  const prev = parent.previousSibling;
+  const firstTbody = parent.nodeName === "TBODY" &&
+    (!prev || (prev.nodeName === "THEAD" && /^\s*$/.test(prev.textContent ?? "")));
+  return parent.firstChild === tr && (parent.nodeName === "TABLE" || firstTbody) &&
+    Array.from(tr.childNodes).every((n) => n.nodeName === "TH");
+}
+
 function figureMarkdown(el: HTMLElement): string {
   const img = el.querySelector("img[src]");
   if (!img) return "";
@@ -107,6 +120,19 @@ export function htmlToMarkdown(html: string): MarkdownResult {
       const src = attr(n.querySelector("audio[src]")!, "src");
       const cap = n.querySelector("figcaption")?.textContent?.trim();
       return block(`[${mdText(fileName(src))}](${mdUrl(src)})${cap ? `\n*${mdText(cap)}*` : ""}`);
+    },
+  });
+  td.addRule("headerlessTable", {
+    // WordPress tables are all <td> — no <th> anywhere — so turndown-plugin-gfm `keep`s
+    // them and the raw <table> HTML survives into the markdown, where ArticleBody (no
+    // rehype-raw) escapes it and the reader sees the tags. Turndown checks addRule'd
+    // rules before keeps, so converting here wins: the first row becomes the header.
+    filter: (n) => n.nodeName === "TABLE" && !isHeadingRow((n as HTMLTableElement).rows?.[0]),
+    replacement: (content, n) => {
+      const rows = content.trim().split("\n").filter((r) => r.trim());
+      if (!rows.length || !/[^|\s]/.test(rows.join(""))) return ""; // nothing but empty cells
+      const cols = (n as HTMLTableElement).rows[0]?.children.length ?? 0;
+      return block([rows[0], `|${" --- |".repeat(Math.max(cols, 1))}`, ...rows.slice(1)].join("\n"));
     },
   });
   td.addRule("embedWrapper", {
