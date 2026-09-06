@@ -43,6 +43,16 @@ describe("rewriteUrls", () => {
       '<a href="/articles/old-post">a</a><a href="/articles/a-very-long#top">b</a><a href="https://landofredemption.com/about/">c</a><a href="https://landofredemption.com/old-post/feed/">d</a>',
     );
   });
+  it("rewrites ?p= short links to imported posts and leaves unknown ids alone", () => {
+    const idMap = new Map([["7612", "old-post"], ["9001", "a-very-long"]]);
+    expect(rewriteUrls('<a href="https://landofredemption.com/?p=7612">a</a><a href="http://www.landofredemption.com/?p=9001#round-3">b</a><a href="https://landofredemption.com/?p=11455">c</a>', { mirror, slugMap, idMap })).toBe(
+      '<a href="/articles/old-post">a</a><a href="/articles/a-very-long#round-3">b</a><a href="https://landofredemption.com/?p=11455">c</a>',
+    );
+    expect(rewriteUrls('<a href="https://landofredemption.com/?page_id=11455">s</a>', { mirror, slugMap, idMap })).toBe('<a href="https://landofredemption.com/our-sponsors/">s</a>');
+  });
+  it("leaves ?p= short links alone when no id map is supplied", () => {
+    expect(rewriteUrls('<a href="https://landofredemption.com/?p=7612">a</a>', { mirror, slugMap })).toBe('<a href="https://landofredemption.com/?p=7612">a</a>');
+  });
   it("rewrites the sponsors page_id link to its permalink", () => {
     expect(rewriteUrls('<a href="https://landofredemption.com/?page_id=11455">s</a>', { mirror, slugMap })).toBe('<a href="https://landofredemption.com/our-sponsors/">s</a>');
   });

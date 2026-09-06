@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { contentTypeFor, planMedia } from "../media";
+import { BlobError, BlobNotFoundError, BlobServiceNotAvailable, BlobServiceRateLimited } from "@vercel/blob";
+import { contentTypeFor, isRetryableBlobError, planMedia } from "../media";
 
 describe("contentTypeFor", () => {
   it("maps known extensions and defaults to octet-stream", () => {
@@ -51,5 +52,20 @@ describe("planMedia", () => {
     const m = planMedia([traversal], dir, "https://blob.test");
     expect(m[traversal].status).toBe("missing");
     expect(m[traversal].bytes).toBe(0);
+  });
+});
+
+describe("isRetryableBlobError", () => {
+  it("retries rate limits, outages and transient network failures", () => {
+    expect(isRetryableBlobError(new BlobServiceRateLimited(30))).toBe(true);
+    expect(isRetryableBlobError(new BlobServiceNotAvailable())).toBe(true);
+    expect(isRetryableBlobError(new Error("fetch failed: ETIMEDOUT"))).toBe(true);
+    expect(isRetryableBlobError(new Error("Vercel Blob: 503 Service Unavailable"))).toBe(true);
+  });
+  it("does not retry a missing blob or a credential/permission failure", () => {
+    expect(isRetryableBlobError(new BlobNotFoundError())).toBe(false);
+    // What a run with no BLOB_READ_WRITE_TOKEN actually throws.
+    expect(isRetryableBlobError(new BlobError("No blob credentials found. Pass a `token` or set BLOB_READ_WRITE_TOKEN"))).toBe(false);
+    expect(isRetryableBlobError("nope")).toBe(false);
   });
 });

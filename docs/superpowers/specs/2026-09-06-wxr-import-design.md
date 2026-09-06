@@ -124,7 +124,7 @@ used by `PostCard`, `app/articles/[slug]/page.tsx` (visible byline and `openGrap
 - **Manifest** `scripts/output/wxr/media-manifest.json`: `{ [sitePath]: { pathname, url, bytes, status: "planned" | "exists" | "uploaded" | "missing" } }`.
 - **Rewrites applied to the HTML before conversion**, in this order:
   1. Site file URL → mirror URL (files present in the backup only).
-  2. Internal post link `https?://(www.)?landofredemption.com/<post_name>/` (optional `#fragment`) where `<post_name>` is an imported post's original slug → `/articles/<final slug>` plus the fragment.
+  2. Internal post link `https?://(www.)?landofredemption.com/<post_name>/` (optional `#fragment`) where `<post_name>` is an imported post's original slug → `/articles/<final slug>` plus the fragment, and `/?p=<wpId>` short links to imported posts are rewritten the same way.
   3. `https?://(www.)?landofredemption.com/?page_id=11455` → `https://landofredemption.com/our-sponsors/`.
   4. Everything else unchanged (pages, external hosts).
 
@@ -195,7 +195,7 @@ npx tsx scripts/import-wxr.ts [--wxr PATH] [--backup PATH] [--dry-run] [--media-
 2. Full-corpus dry run: zero residual markers; every residual HTML tag reviewed; every site media URL either planned or in `missingMedia`.
 3. Render check: `scripts/wxr-render-sample.ts --slugs a,b,c` renders the dry-run markdown through the real `ArticleBody` (`react-dom/server`) into `scripts/output/wxr/render/<slug>.html` with a minimal stylesheet; reviewed in a browser for images, embeds, links, headings and deck-list line breaks across a classic post, a Gutenberg image post, an accordion deck post, a podcast post, a table post and a long-slug post.
 4. Live: apply 096, `--media-only` for everything, then `--limit 20`, check `/articles` and a handful of posts on production, then the full run.
-5. PR carries the migration, byline change, script, tests, spec, plan and a `CLAUDE.md` Key References row. The byline change deploys on merge; the import may run before or after (the deployed `COLUMNS` list only reads `author_name` once the byline code ships).
+5. PR carries the migration, byline change, script, tests, spec, plan and a `CLAUDE.md` Key References row. The byline change deploys on merge; the import may run before or after (the deployed `COLUMNS` list only reads `author_name` once the byline code ships). Migration 096 must be applied before any deploy of this branch: `COLUMNS` selects `author_name`, so an un-migrated database fails every `/articles` page.
 
 ## 14. Cache
 

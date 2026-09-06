@@ -41,7 +41,9 @@ export function preprocess(raw: string, blocks: Map<string, string>): Preprocess
   html = html.replace(/<!-- wp:audio \/-->\n?/g, () => { bump("audio(empty)"); return ""; });
 
   // 4) shortcodes
-  html = html.replace(/\[(youtube|embed)\]\s*(https?:\/\/\S+?)\s*\[\/\1\]/g, (_m, _t, url: string) => `<p><a href="${url}">${url}</a></p>`);
+  // The tag may carry attributes ([youtube width="720" height="480"]...), and `\b` keeps
+  // lookalikes such as [youtube_thumb] out.
+  html = html.replace(/\[(youtube|embed)\b[^\]]*\]\s*(https?:\/\/\S+?)\s*\[\/\1\]/g, (_m, _t, url: string) => `<p><a href="${url}">${url}</a></p>`);
   html = html.replace(/\[caption\b[^\]]*\]([\s\S]*?)\[\/caption\]/g, (_m, inner: string) => {
     const img = inner.match(/<a\b[^>]*>\s*<img\b[^>]*>\s*<\/a>|<img\b[^>]*>/i)?.[0] ?? "";
     const cap = inner.replace(img, "").replace(/<[^>]+>/g, "").trim();

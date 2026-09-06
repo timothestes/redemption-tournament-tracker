@@ -16,7 +16,7 @@ describe("htmlToMarkdown", () => {
   });
   it("renders an image figure with link and caption", () => {
     expect(md('<figure class="wp-block-image size-large"><a href="https://x/full.png"><img src="https://x/v-1024.png" alt=""/></a><figcaption>Cap &amp; tion</figcaption></figure>')).toBe(
-      "[![](https://x/v-1024.png)](https://x/full.png)\n*Cap & tion*",
+      "[![](https://x/v-1024.png)](https://x/full.png)  \n*Cap & tion*",
     );
     expect(md('<figure><img src="https://x/a.jpg" alt="Alt"/></figure>')).toBe("![Alt](https://x/a.jpg)");
     expect(md('<figure><a href="https://x/a.jpg"><img src="https://x/a.jpg" alt=""/></a></figure>')).toBe("![](https://x/a.jpg)");
@@ -33,7 +33,7 @@ describe("htmlToMarkdown", () => {
   });
   it("renders audio as a link paragraph with its caption", () => {
     expect(md('<figure class="wp-block-audio"><audio controls src="https://x/2022-10-20-vsJohnE.mp3"></audio><figcaption>Audio version.</figcaption></figure>')).toBe(
-      "[2022-10-20-vsJohnE.mp3](https://x/2022-10-20-vsJohnE.mp3)\n*Audio version.*",
+      "[2022-10-20-vsJohnE.mp3](https://x/2022-10-20-vsJohnE.mp3)  \n*Audio version.*",
     );
     expect(md('<p><audio src="https://x/a.mp3"></audio></p>')).toBe("[a.mp3](https://x/a.mp3)");
   });
@@ -77,7 +77,7 @@ describe("htmlToMarkdown", () => {
       "[Nationals \\[2019 Winners](https://x/a.pdf)",
     );
     expect(md('<figure><img src="https://x/a.jpg" alt=""/><figcaption>Rated 5 * out of 5</figcaption></figure>')).toBe(
-      "![](https://x/a.jpg)\n*Rated 5 \\* out of 5*",
+      "![](https://x/a.jpg)  \n*Rated 5 \\* out of 5*",
     );
     expect(md('<div class="wp-block-file"><a href="https://x/Winners (2019).pdf">Winners</a></div>')).toBe(
       "[Winners](<https://x/Winners (2019).pdf>)",
@@ -120,8 +120,17 @@ describe("measureMarkdown", () => {
     );
     expect(s).toEqual({ images: 2, links: 1, embeds: 1, residualHtml: ["<div>"], residualMarkers: [], externalImageHosts: ["lh7.googleusercontent.com"] });
   });
-  it("flags leftover WordPress markers", () => {
-    expect(measureMarkdown("<!-- wp:paragraph --> [youtube]x[/youtube]", "https://b").residualMarkers).toEqual(["<!-- wp:", "[youtube]"]);
+  it("flags leftover WordPress markers whether or not turndown escaped their brackets", () => {
+    expect(measureMarkdown("<!-- wp:paragraph --> [youtube]x[/youtube]", "https://b").residualMarkers).toEqual(["<!-- wp:", "[youtube"]);
+    // What a surviving shortcode actually looks like in the output: turndown escapes the brackets.
+    expect(measureMarkdown('\\[youtube width="720"\\]x\\[/youtube\\]', "https://b").residualMarkers).toEqual(["\\[youtube"]);
+    expect(measureMarkdown("\\[caption id=\"x\"\\]y\\[/caption\\]", "https://b").residualMarkers).toEqual(["\\[caption"]);
+    expect(measureMarkdown("Deck list [2022] stays", "https://b").residualMarkers).toEqual([]);
+  });
+  it("does not count an angle-bracketed link or image destination as residual HTML", () => {
+    const s = measureMarkdown('[Winners](<https://x/Winners (2019).pdf>) ![a](<https://x/a b.jpg>) [email](<mailto:g@x.com?subject=Email from LoR> "Click here")', "https://blob.test");
+    expect(s.residualHtml).toEqual([]);
+    expect(s.links).toBe(2);
   });
   it("skips an unparseable image URL instead of throwing", () => {
     expect(() => measureMarkdown("![x](http://)", "https://blob.test")).not.toThrow();

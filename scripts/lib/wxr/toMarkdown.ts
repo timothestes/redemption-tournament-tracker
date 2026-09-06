@@ -43,7 +43,8 @@ function figureMarkdown(el: HTMLElement): string {
   const a = img.parentElement && img.parentElement.nodeName === "A" ? attr(img.parentElement, "href") : "";
   const cap = el.querySelector("figcaption")?.textContent?.trim();
   const core = a && a !== attr(img, "src") ? `[${image(img)}](${mdUrl(a)})` : image(img);
-  return block(cap ? `${core}\n*${mdText(cap)}*` : core);
+  // Two trailing spaces: a hard line break, so the caption renders UNDER the image, not after it.
+  return block(cap ? `${core}  \n*${mdText(cap)}*` : core);
 }
 
 export function htmlToMarkdown(html: string): MarkdownResult {
@@ -119,7 +120,7 @@ export function htmlToMarkdown(html: string): MarkdownResult {
     replacement: (_c, n) => {
       const src = attr(n.querySelector("audio[src]")!, "src");
       const cap = n.querySelector("figcaption")?.textContent?.trim();
-      return block(`[${mdText(fileName(src))}](${mdUrl(src)})${cap ? `\n*${mdText(cap)}*` : ""}`);
+      return block(`[${mdText(fileName(src))}](${mdUrl(src)})${cap ? `  \n*${mdText(cap)}*` : ""}`);
     },
   });
   td.addRule("headerlessTable", {
@@ -164,8 +165,11 @@ export function measureMarkdown(md: string, mirrorBase: string): MarkdownStats {
   const images = [...noCode.matchAll(/!\[[^\]]*\]\(([^)\s]+)/g)].map((m) => m[1]);
   const links = (noCode.match(/(?<!!)\[[^\]]*\]\([^)\s]+/g) ?? []).length;
   const embeds = (noCode.match(/^https?:\/\/(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\/\S+$/gm) ?? []).length;
-  const residualHtml = [...new Set(noCode.match(/<[a-zA-Z][^>]*>/g) ?? [])];
-  const residualMarkers = [...new Set(noCode.match(/<!-- \/?wp:|\[youtube\]|\[caption\b|\[embed\]/g) ?? [])];
+  // `](<...> "title")` is markdown's own escape for a destination containing spaces or parens,
+  // not HTML — turndown emits it for file links and mailto: addresses.
+  const residualHtml = [...new Set(noCode.replace(/\]\(<[^>]*>[^)]*\)/g, "]()").match(/<[a-zA-Z][^>]*>/g) ?? [])];
+  // Turndown escapes brackets in text, so a surviving shortcode reads `\[youtube ...\]`.
+  const residualMarkers = [...new Set(noCode.match(/<!-- \/?wp:|\\?\[(?:youtube|embed|caption)\b/g) ?? [])];
   const externalImageHosts = new Set<string>();
   for (const u of images) {
     if (u.startsWith(mirrorBase)) continue;

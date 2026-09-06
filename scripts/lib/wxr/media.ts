@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { BlobNotFoundError, head, put } from "@vercel/blob";
+import { BlobError, BlobNotFoundError, BlobServiceNotAvailable, BlobServiceRateLimited, head, put } from "@vercel/blob";
 import { blobPathname, mirrorUrl } from "./urls";
 
 const TYPES: Record<string, string> = {
@@ -46,6 +46,26 @@ export function planMedia(sitePaths: string[], backupDir: string, blobBase: stri
   return m;
 }
 
+/** 5xx, a timeout or a dropped socket in a generic (non-Blob) error's message. */
+const TRANSIENT_RE = /\b5\d\d\b|timeout|timed out|network|socket hang up|fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN/i;
+
+/**
+ * Retry only what a retry can fix. A credential or permission failure ("No blob credentials
+ * found", 403) is a `BlobError` that would fail identically three times, so retrying it just
+ * triples the time it takes to reach the same wrong answer.
+ */
+export function isRetryableBlobError(e: unknown): boolean {
+  if (e instanceof BlobServiceRateLimited || e instanceof BlobServiceNotAvailable) return true;
+  if (e instanceof BlobError) return false; // includes BlobNotFoundError
+  return e instanceof Error && TRANSIENT_RE.test(e.message);
+}
+
+/** A rate limit tells us how long to wait; everything else backs off exponentially. */
+const backoffMs = (e: unknown, attempt: number) =>
+  e instanceof BlobServiceRateLimited && Number.isFinite(e.retryAfter) && e.retryAfter > 0
+    ? e.retryAfter * 1000
+    : 500 * 2 ** attempt;
+
 async function withRetry<T>(fn: () => Promise<T>, tries = 3, retryable: (e: unknown) => boolean = () => true): Promise<T> {
   let last: unknown;
   for (let i = 0; i < tries; i++) {
@@ -53,7 +73,7 @@ async function withRetry<T>(fn: () => Promise<T>, tries = 3, retryable: (e: unkn
     catch (e) {
       last = e;
       if (i === tries - 1 || !retryable(e)) throw e;
-      await new Promise((r) => setTimeout(r, 500 * 2 ** i));
+      await new Promise((r) => setTimeout(r, backoffMs(e, i)));
     }
   }
   throw last;
@@ -73,7 +93,7 @@ export async function mirrorMedia(manifest: Manifest, opts: { backupDir: string;
         try {
           // Look up by pathname (not the locally-computed URL) so idempotency doesn't depend on our
           // URL construction matching Vercel's own encoding for the store.
-          const result = await withRetry(() => head(entry.pathname), 3, (e) => !(e instanceof BlobNotFoundError));
+          const result = await withRetry(() => head(entry.pathname), 3, isRetryableBlobError);
           entry.status = "exists"; entry.url = result.url;
         } catch (e) {
           if (!(e instanceof BlobNotFoundError)) throw e;

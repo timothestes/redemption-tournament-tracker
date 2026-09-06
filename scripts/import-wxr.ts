@@ -23,6 +23,7 @@ import { mirrorMedia, planMedia, type Manifest } from "./lib/wxr/media";
 import { readWxr, type WxrPost } from "./lib/wxr/parse";
 import { preprocess } from "./lib/wxr/preprocess";
 import { frontMatter, writeReport, type PostReport, type Report } from "./lib/wxr/report";
+import { newest, usableStatuses } from "./lib/wxr/select";
 import { htmlToMarkdown, measureMarkdown, type MarkdownStats } from "./lib/wxr/toMarkdown";
 import { collectSiteFiles, rewriteUrls, siteFilePath } from "./lib/wxr/urls";
 
@@ -97,13 +98,6 @@ const emptyStats = (): PostReport["stats"] => ({
   droppedBlocks: {}, unknownRefs: [], removedIframes: [], missingMedia: [], unmirroredMedia: [],
 });
 
-/** The sort key wpDateToIso uses: the GMT date, unless it is WordPress's 0000 sentinel. */
-const dateKey = (p: WxrPost) => (p.dateGmt && !p.dateGmt.startsWith("0000-") ? p.dateGmt : p.date);
-
-/** The N newest published posts. */
-const newest = (posts: WxrPost[], n: number): WxrPost[] =>
-  [...posts].sort((a, b) => dateKey(b).localeCompare(dateKey(a)) || b.date.localeCompare(a.date)).slice(0, n);
-
 function selectPosts(posts: WxrPost[], opts: Options): WxrPost[] {
   if (opts.onlySlugs.length) {
     const wanted = new Set(opts.onlySlugs);
@@ -137,9 +131,12 @@ async function main() {
   const opts = parseOptions();
   const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
   if (!blobBase) throw new CliError("Missing NEXT_PUBLIC_BLOB_BASE_URL");
+  // Every mode but a dry run mirrors to Blob; without the token every head/put fails one by one.
+  if (!opts.dryRun && !process.env.BLOB_READ_WRITE_TOKEN) throw new CliError("Missing BLOB_READ_WRITE_TOKEN");
 
   const { posts, attachments, blocks } = readWxr(opts.wxr);
   const slugMap = finalSlugs(posts); // over ALL posts, so links to unselected posts still map
+  const idMap = new Map(posts.map((p) => [p.wpId, slugMap.get(p.slug)!])); // for /?p=<id> short links
   const authorMap = loadAuthorMap(AUTHOR_MAP);
   const byLogin = authorsByLogin(authorMap, posts);
   const selected = selectPosts(posts, opts);
@@ -211,10 +208,15 @@ async function main() {
     return;
   }
 
+  // A mirror pass where not one file uploaded is a broken setup (bad or missing token), not
+  // 5,983 unlucky files: writing rows now would publish a whole archive of original WordPress
+  // URLs. Partial failures still proceed — they are reported per post.
+  if (mirrorRan && planned > 0 && unmirrored === planned) {
+    throw new CliError(`media mirror made no progress (${planned} planned, 0 uploaded/exists) — check BLOB_READ_WRITE_TOKEN; no rows written`);
+  }
+
   // 3) rewrite → markdown → row, one markdown file per post.
-  // A dry run has nothing in the store yet, so it previews what the mirror URL WILL be; a live
-  // run rewrites only what the store confirmed, so a failed upload keeps the original URL (§9).
-  const usable: ReadonlySet<string> = opts.dryRun ? new Set(["planned", "exists", "uploaded"]) : new Set(["exists", "uploaded"]);
+  const usable = usableStatuses(opts.dryRun ? "dry-run" : "live");
   const mirror = (sitePath: string) => {
     const e = manifest[sitePath];
     return e && usable.has(e.status) ? e.url : null;
@@ -224,7 +226,7 @@ async function main() {
   let converted = 0;
   for (const p of prepared) {
     try {
-      const html = rewriteUrls(p.html, { mirror, slugMap });
+      const html = rewriteUrls(p.html, { mirror, slugMap, idMap });
       const { markdown, removedIframes } = htmlToMarkdown(html);
       const stats: MarkdownStats = measureMarkdown(markdown, blobBase);
       const row = assemblePost(p.post, {
