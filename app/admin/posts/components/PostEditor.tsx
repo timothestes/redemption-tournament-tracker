@@ -61,7 +61,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   // Coalesces concurrent ensureId() callers (e.g. picking an image and
   // clicking Save before the first createDraftAction round trip lands) onto
   // a single in-flight draft-creation promise so we never insert two rows.
-  const creatingRef = useRef<Promise<string | null> | null>(null);
+  const creatingRef = useRef<Promise<{ id: string; slug: string } | null> | null>(null);
   // Bumped by every field change. save() snapshots it before the request and
   // only echoes the server's tags/slug back if nothing changed in flight.
   const editVersion = useRef(0);
@@ -95,10 +95,14 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
     setDirty(true);
   };
 
-  const ensureId = useCallback((): Promise<string | null> => {
-    if (idRef.current) return Promise.resolve(idRef.current);
+  // Resolves the draft's id and its SERVER slug. createDraftAction may
+  // suffix the slug on collision (e.g. "hello-2"), which can differ from the
+  // client-derived slug still sitting in state — callers that care must use
+  // the returned slug rather than the `slug` state directly.
+  const ensureId = useCallback((): Promise<{ id: string; slug: string } | null> => {
+    if (idRef.current) return Promise.resolve({ id: idRef.current, slug });
     if (creatingRef.current) return creatingRef.current;
-    const promise = (async (): Promise<string | null> => {
+    const promise = (async (): Promise<{ id: string; slug: string } | null> => {
       try {
         const r = await createDraftAction({ title });
         if (r.success === false) {
@@ -107,16 +111,15 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
         }
         idRef.current = r.post.id;
         setId(r.post.id);
-        setSlug((s) => s || r.post.slug);
         window.history.replaceState(null, "", `/admin/posts/${r.post.id}`);
-        return r.post.id;
+        return { id: r.post.id, slug: r.post.slug };
       } finally {
         creatingRef.current = null;
       }
     })();
     creatingRef.current = promise;
     return promise;
-  }, [title]);
+  }, [title, slug]);
 
   const selection = () => {
     const el = bodyRef.current;
@@ -169,8 +172,15 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   const onPickMedia = async (kind: UploadKind, files: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
-    const postId = await ensureId();
-    if (!postId) return;
+    let postId: string;
+    try {
+      const draft = await ensureId();
+      if (!draft) return;
+      postId = draft.id;
+    } catch {
+      fail("Something went wrong. Check your connection and try again.");
+      return;
+    }
     const placeholder = kind === "image" ? `![Uploading ${file.name}…]()` : `[Uploading ${file.name}…]()`;
     setBody((b) => insertBlock(b, selection(), placeholder).value);
     editVersion.current += 1;
@@ -194,8 +204,15 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   const onPickCover = async (files: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
-    const postId = await ensureId();
-    if (!postId) return;
+    let postId: string;
+    try {
+      const draft = await ensureId();
+      if (!draft) return;
+      postId = draft.id;
+    } catch {
+      fail("Something went wrong. Check your connection and try again.");
+      return;
+    }
     setUploading(true);
     try {
       const { url } = await uploadPostMedia(postId, file, "image");
@@ -213,11 +230,21 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
     setBusy("save");
     const v = editVersion.current;
     try {
-      const postId = await ensureId();
-      if (!postId) return false;
-      const r = await updatePostAction(postId, {
+      const draft = await ensureId();
+      if (!draft) return false;
+      // On the very first save, ensureId() may have just created the draft
+      // with a server-suffixed slug (title collision) that differs from the
+      // client-derived one still in state — send the server's slug instead,
+      // and lock it in so a later title edit doesn't re-derive the collision.
+      let patchSlug = slug;
+      if (!slugTouched) {
+        patchSlug = draft.slug;
+        setSlug(draft.slug);
+        if (draft.slug !== slug) setSlugTouched(true);
+      }
+      const r = await updatePostAction(draft.id, {
         title,
-        slug,
+        slug: patchSlug,
         excerpt: excerpt || null,
         body_md: body,
         cover_image_url: cover,

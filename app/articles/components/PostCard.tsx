@@ -10,7 +10,7 @@ export default function PostCard({ post }: { post: PublicPost }) {
   const href = `/articles/${post.slug}`;
   return (
     <article className="flex flex-col overflow-hidden rounded-lg bg-card transition-colors hover:bg-muted/60">
-      <Link href={href} className="block aspect-[16/9] w-full bg-muted/50">
+      <Link href={href} aria-label={post.title} className="block aspect-[16/9] w-full bg-muted/50">
         {post.cover_image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

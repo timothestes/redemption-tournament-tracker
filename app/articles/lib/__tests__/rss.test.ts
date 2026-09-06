@@ -21,6 +21,10 @@ describe("escapeXml", () => {
   it("escapes the five XML specials", () => {
     expect(escapeXml(`<a href="x">&'</a>`)).toBe("&lt;a href=&quot;x&quot;&gt;&amp;&apos;&lt;/a&gt;");
   });
+
+  it("strips XML-illegal control characters", () => {
+    expect(escapeXml("Hello\x0BWorld")).toBe("HelloWorld");
+  });
 });
 
 describe("buildRss", () => {

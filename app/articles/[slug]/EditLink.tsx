@@ -30,7 +30,7 @@ export default function EditLink({ postId, authorId }: { postId: string; authorI
   return (
     <Link
       href={`/admin/posts/${postId}`}
-      className="inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm hover:bg-muted"
+      className="inline-flex min-h-11 items-center rounded-md border border-input px-3 text-sm hover:bg-muted"
     >
       Edit
     </Link>

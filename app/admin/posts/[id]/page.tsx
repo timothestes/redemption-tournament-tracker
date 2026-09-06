@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import TopNav from "@/components/top-nav";
 import { getPosterContext } from "../lib/auth";
+import { canEditPost } from "../lib/validate";
 import PostEditor from "../components/PostEditor";
 import type { PostRow } from "../actions";
 
@@ -14,9 +15,10 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
   const ctx = await getPosterContext();
   if (!ctx) notFound();
   const { id } = await params;
-  // RLS: a poster only gets their own rows back; the superuser gets any.
+  // posts_select_published lets ANY authenticated user read ANY published
+  // row, so visibility alone doesn't prove editability — gate on canEditPost.
   const { data } = await ctx.supabase.from("posts").select(ROW).eq("id", id).maybeSingle();
-  if (!data) notFound();
+  if (!data || !canEditPost({ userId: ctx.user.id, isSuperuser: ctx.isSuperuser }, data)) notFound();
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <TopNav />

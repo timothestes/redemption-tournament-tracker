@@ -55,7 +55,7 @@ async function uniqueSlug(ctx: PosterContext, base: string): Promise<string> {
     const candidate = `${base.slice(0, MAX_SLUG - suffix.length).replace(/-+$/, "")}${suffix}`;
     if (!taken.has(candidate)) return candidate;
   }
-  return `${base.slice(0, 60)}-${Date.now()}`;
+  return `${base.slice(0, 60).replace(/-+$/, "")}-${Date.now()}`;
 }
 
 // posts_select_published lets ANY authenticated user read ANY published

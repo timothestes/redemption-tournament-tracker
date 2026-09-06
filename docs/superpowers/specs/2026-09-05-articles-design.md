@@ -139,8 +139,9 @@ default table grants):
 Revoking `publish_posts` from a user leaves their published posts visible
 (they are content, not a session) but removes their ability to edit them.
 
-Server actions additionally call `requirePermission("publish_posts")` before
-every mutation (belt and braces, and a clearer error than an RLS failure).
+Server actions additionally call `requirePoster()` (which also admits the
+superuser) before every mutation (belt and braces, and a clearer error than
+an RLS failure).
 
 ## 5. Public surface
 
@@ -151,10 +152,11 @@ every mutation (belt and braces, and a clearer error than an RLS failure).
   tag shown as a dismissible chip.
 - Each entry: cover thumbnail (or a neutral placeholder block when absent),
   title, byline (`profiles.username`), date, tags, excerpt.
-- Server component + `export const revalidate = 3600`; mutations call
-  `revalidatePath("/articles")`. **Public loaders use a cookie-less anon
-  client** (§5.4) so the route is genuinely static/ISR; a cookie-bound
-  client would opt the whole route into per-request rendering.
+- Server component, dynamic on `searchParams` (`?page`/`?tag`); mutations
+  call `revalidatePath("/articles")`. **Public loaders use a cookie-less
+  anon client** (§5.4) and cache their reads in `unstable_cache` with
+  `revalidate: 3600`, so the expensive work is still cached even though the
+  route itself renders per request.
 - Mobile-first list (single column); two-column card grid from `md`.
 
 ### 5.2 `/articles/[slug]` (post)
@@ -269,8 +271,7 @@ Body = `<textarea>` + toolbar + preview:
   **Unpublish** (published), **Delete** (confirm dialog). Save/Publish are
   disabled while an upload is in flight. Unsaved-changes guard on navigation
   (`beforeunload`).
-- Errors from server actions surface inline (toast + field message), never
-  silently.
+- Errors from server actions surface as a toast, never silently.
 
 ### 6.5 `/admin/posts` (list) and routing
 

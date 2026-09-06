@@ -6,7 +6,7 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://redemption
 const ESC: Record<string, string> = { "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" };
 
 export function escapeXml(s: string): string {
-  return s.replace(/[<>&'"]/g, (c) => ESC[c]);
+  return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").replace(/[<>&'"]/g, (c) => ESC[c]);
 }
 
 /** RSS 2.0 document for the given published posts, newest first as given. */

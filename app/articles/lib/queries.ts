@@ -45,6 +45,16 @@ async function loadPublishedPostsFresh(page: number, tag: string | null) {
   if (tag) q = q.filter("tags", "cs", `{"${tag.replace(/["\\]/g, (c) => "\\" + c)}"}`);
   const { data, error, count } = await q;
   if (error) {
+    // PGRST103 = "Requested range not satisfiable" — caller paginated past
+    // the last page. Return an empty page with the real total instead of
+    // erroring (see lib/api/cache.ts for the same precedent).
+    if (error.code === "PGRST103") {
+      if (count != null) return { posts: [], total: count };
+      let countQ = createAnonClient().from("posts").select("id", { head: true, count: "exact" }).eq("status", "published");
+      if (tag) countQ = countQ.filter("tags", "cs", `{"${tag.replace(/["\\]/g, (c) => "\\" + c)}"}`);
+      const { count: totalCount } = await countQ;
+      return { posts: [], total: totalCount ?? 0 };
+    }
     throw new Error(`loadPublishedPosts: ${error.message}`);
   }
   return { posts: (data ?? []) as unknown as PublicPost[], total: count ?? 0 };
