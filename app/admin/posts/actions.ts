@@ -5,7 +5,7 @@ import { del, list } from "@vercel/blob";
 import { ARTICLES_TAG } from "@/app/articles/lib/queries";
 import { slugify, MAX_SLUG } from "@/app/articles/lib/markdown";
 import { requirePoster, type PosterContext } from "./lib/auth";
-import { normalizeTags, validatePatch, validateForPublish, type PostPatch } from "./lib/validate";
+import { normalizeTags, validatePatch, validateForPublish, canEditPost, type PostPatch } from "./lib/validate";
 
 export interface PostRow {
   id: string;
@@ -58,8 +58,10 @@ async function uniqueSlug(ctx: PosterContext, base: string): Promise<string> {
   return `${base.slice(0, 60)}-${Date.now()}`;
 }
 
-/** The row if the caller may edit it (own post, or any post for the superuser — RLS decides). */
-async function loadOwnedPost(ctx: PosterContext, id: string): Promise<PostRow | null> {
+// posts_select_published lets ANY authenticated user read ANY published
+// post, so this only proves the row is visible to the caller — never that
+// they may edit it. Callers must run canEditPost() before mutating.
+async function loadVisiblePost(ctx: PosterContext, id: string): Promise<PostRow | null> {
   const { data } = await ctx.supabase.from("posts").select(ROW).eq("id", id).maybeSingle();
   return (data as PostRow | null) ?? null;
 }
@@ -88,8 +90,11 @@ export async function createDraftAction(input: { title: string }): Promise<Actio
 export async function updatePostAction(id: string, patch: PostPatch): Promise<ActionResult<{ post: PostRow }>> {
   try {
     const ctx = await requirePoster();
-    const current = await loadOwnedPost(ctx, id);
+    const current = await loadVisiblePost(ctx, id);
     if (!current) return { success: false, error: "Post not found" };
+    if (!canEditPost({ userId: ctx.user.id, isSuperuser: ctx.isSuperuser }, current)) {
+      return { success: false, error: "You can only edit your own posts" };
+    }
 
     const clean: PostPatch = {
       title: patch.title.trim(),
@@ -126,8 +131,11 @@ export async function updatePostAction(id: string, patch: PostPatch): Promise<Ac
 export async function publishPostAction(id: string): Promise<ActionResult<{ post: PostRow }>> {
   try {
     const ctx = await requirePoster();
-    const current = await loadOwnedPost(ctx, id);
+    const current = await loadVisiblePost(ctx, id);
     if (!current) return { success: false, error: "Post not found" };
+    if (!canEditPost({ userId: ctx.user.id, isSuperuser: ctx.isSuperuser }, current)) {
+      return { success: false, error: "You can only edit your own posts" };
+    }
     const problem = validateForPublish(current);
     if (problem) return { success: false, error: problem };
 
@@ -153,8 +161,11 @@ export async function publishPostAction(id: string): Promise<ActionResult<{ post
 export async function unpublishPostAction(id: string): Promise<ActionResult<{ post: PostRow }>> {
   try {
     const ctx = await requirePoster();
-    const current = await loadOwnedPost(ctx, id);
+    const current = await loadVisiblePost(ctx, id);
     if (!current) return { success: false, error: "Post not found" };
+    if (!canEditPost({ userId: ctx.user.id, isSuperuser: ctx.isSuperuser }, current)) {
+      return { success: false, error: "You can only edit your own posts" };
+    }
     const { data, error } = await ctx.supabase
       .from("posts")
       .update({ status: "draft", updated_at: new Date().toISOString() })
@@ -175,11 +186,16 @@ export async function unpublishPostAction(id: string): Promise<ActionResult<{ po
 export async function deletePostAction(id: string): Promise<ActionResult> {
   try {
     const ctx = await requirePoster();
-    const current = await loadOwnedPost(ctx, id);
+    const current = await loadVisiblePost(ctx, id);
     if (!current) return { success: false, error: "Post not found" };
-    const { error } = await ctx.supabase.from("posts").delete().eq("id", id);
-    if (error) {
-      console.error("deletePost:", error);
+    if (!canEditPost({ userId: ctx.user.id, isSuperuser: ctx.isSuperuser }, current)) {
+      return { success: false, error: "You can only edit your own posts" };
+    }
+    // .select("id") makes a zero-row RLS-blocked delete distinguishable from
+    // a real one: without it a blocked delete still comes back error === null.
+    const { data: deleted, error } = await ctx.supabase.from("posts").delete().eq("id", id).select("id");
+    if (error || !deleted || deleted.length === 0) {
+      if (error) console.error("deletePost:", error);
       return { success: false, error: "Could not delete the post" };
     }
     if (current.status === "published") revalidateArticles([current.slug]);

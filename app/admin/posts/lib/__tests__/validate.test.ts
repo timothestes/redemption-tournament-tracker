@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeTags, validatePatch, validateForPublish, MAX_TAGS, type PostPatch } from "../validate";
+import { normalizeTags, validatePatch, validateForPublish, canEditPost, MAX_TAGS, type PostPatch } from "../validate";
 
 const ok: PostPatch = {
   title: "A fine title",
@@ -35,4 +35,16 @@ describe("validateForPublish", () => {
   it("passes a titled post with a body", () => expect(validateForPublish({ title: "T", body_md: "b" })).toBeNull());
   it("blocks the default title", () => expect(validateForPublish({ title: "Untitled", body_md: "b" })).toMatch(/title/i));
   it("blocks an empty body", () => expect(validateForPublish({ title: "T", body_md: " \n" })).toMatch(/write/i));
+});
+
+describe("canEditPost", () => {
+  it("lets the owner edit their own post", () => {
+    expect(canEditPost({ userId: "u1", isSuperuser: false }, { author_id: "u1" })).toBe(true);
+  });
+  it("lets the superuser edit anyone's post", () => {
+    expect(canEditPost({ userId: "u1", isSuperuser: true }, { author_id: "u2" })).toBe(true);
+  });
+  it("blocks another poster from editing", () => {
+    expect(canEditPost({ userId: "u1", isSuperuser: false }, { author_id: "u2" })).toBe(false);
+  });
 });

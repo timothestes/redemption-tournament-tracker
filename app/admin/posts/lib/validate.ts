@@ -50,3 +50,13 @@ export function validateForPublish(row: { title: string; body_md: string }): str
   if (!row.body_md.trim()) return "Write something before publishing";
   return null;
 }
+
+/**
+ * Edit/delete predicate: RLS's posts_select_published policy lets any
+ * authenticated user READ another poster's published post, so visibility
+ * must never be mistaken for editability. Only the owner or the superuser
+ * may mutate a row.
+ */
+export function canEditPost(ctx: { userId: string; isSuperuser: boolean }, row: { author_id: string }): boolean {
+  return ctx.isSuperuser || row.author_id === ctx.userId;
+}
