@@ -77,7 +77,7 @@ used by `PostCard`, `app/articles/[slug]/page.tsx` (visible byline and `openGrap
 | `excerpt` | `excerpt:encoded` when non-blank after entity decode and tag strip, cut to 500 chars; else `null` (the renderer derives one from the body) |
 | `body_md` | §10 |
 | `cover_image_url` | URL of the attachment whose `wp:post_id` equals postmeta `_thumbnail_id`, rewritten per §9; `null` when the attachment is unknown or missing from the backup |
-| `tags` | the post's `<category domain="category">` display names (CDATA text), entity-decoded, passed through `normalizeTags` from `app/admin/posts/lib/validate.ts` (dedupe, ≤ 30 chars each, ≤ 10) |
+| `tags` | the post's `<category domain="category">` display names (CDATA text), entity-decoded, passed through `normalizeTags` from `app/admin/posts/lib/validate.ts` (dedupe, ≤ 40 chars each, ≤ 10) |
 | `status` | `published` (`draft` with `--as-draft`) |
 | `author_id` | §7 |
 | `author_name` | `wp:author_display_name` of the author whose `wp:author_login` equals the post's `dc:creator`; the login itself if the author list lacks it |
