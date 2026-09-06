@@ -27,6 +27,27 @@ export type ResourceSection = {
   links: ResourceLink[];
 };
 
+// Official documents that used to be served from landofredemption.com. They are mirrored to
+// Vercel Blob under the same pathname the WordPress import used for article media
+// (`wp/wp-content/uploads/...`), so an article link and a tracker link to the same file
+// resolve to one object. Mirror a new file with `scripts/mirror-lor-files.ts`.
+const LOR_UPLOADS =
+  "https://qrpnuz0u6exnvyt8.public.blob.vercel-storage.com/wp/wp-content/uploads";
+
+export const DOCS = {
+  reg: `${LOR_UPLOADS}/2026/03/REG_PDF_11.0.0.pdf`,
+  ordir: `${LOR_UPLOADS}/2026/03/ORDIR_PDF_7.0.0.pdf`,
+  deckBuildingRules: `${LOR_UPLOADS}/2026/03/Deck_Building_Rules_1.3.pdf`,
+  paragonRules: `${LOR_UPLOADS}/2026/07/Redemption-Paragon-Format-Rules.pdf`,
+  paragonCards: `${LOR_UPLOADS}/2025/11/Paragon-Format-Paragons-v1.pdf`,
+  paragonLostSoulsColor: `${LOR_UPLOADS}/2025/11/Paragon-Format-Lost-Souls-Color-v1.pdf`,
+  paragonLostSoulsBw: `${LOR_UPLOADS}/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf`,
+  t1DeckCheck: `${LOR_UPLOADS}/2026/07/t1_deck_check_v2.pdf`,
+  t1Reserve: `${LOR_UPLOADS}/2025/03/Reserve-List-T1.pdf`,
+  t2DeckCheck: `${LOR_UPLOADS}/2026/07/t2_deck_check_v2.pdf`,
+  t2Reserve: `${LOR_UPLOADS}/2026/07/T2-Reserve-list.pdf`,
+} as const;
+
 export const RESOURCE_SECTIONS: ResourceSection[] = [
   {
     id: "tools",
@@ -57,7 +78,7 @@ export const RESOURCE_SECTIONS: ResourceSection[] = [
     description: "The rules of the game and how decks are built.",
     links: [
       {
-        href: "https://landofredemption.com/wp-content/uploads/2026/03/REG_PDF_11.0.0.pdf",
+        href: DOCS.reg,
         label: "REG (Official Rulebook)",
         description:
           "The Redemption Exegesis Guide — special ability structure, timing, and how the rules of the game actually resolve.",
@@ -66,7 +87,7 @@ export const RESOURCE_SECTIONS: ResourceSection[] = [
         icon: PiPencilLineBold,
       },
       {
-        href: "https://landofredemption.com/wp-content/uploads/2026/03/ORDIR_PDF_7.0.0.pdf",
+        href: DOCS.ordir,
         label: "ORDIR (Dictionary)",
         description:
           "The Official Redemption Dictionary of Identifiers and References — set abbreviations, errata, and the glossary of terms.",
@@ -75,7 +96,7 @@ export const RESOURCE_SECTIONS: ResourceSection[] = [
         icon: FaBookOpen,
       },
       {
-        href: "https://landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf",
+        href: DOCS.deckBuildingRules,
         label: "Deck Building Rules",
         description:
           "Deck construction and format-specific rules — deck size, Lost Soul counts, reserve, and card limits.",
@@ -99,24 +120,24 @@ export const RESOURCE_SECTIONS: ResourceSection[] = [
     description: "Everything needed to play the Paragon format.",
     links: [
       {
-        href: "https://landofredemption.com/wp-content/uploads/2026/07/Redemption-Paragon-Format-Rules.pdf",
+        href: DOCS.paragonRules,
         label: "Paragon Rules",
         description: "The official rules for the Paragon format.",
       },
       {
-        href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Paragons-v1.pdf",
+        href: DOCS.paragonCards,
         label: "Paragon Cards",
         description: "Printable sheet of the Paragon cards themselves.",
         version: "v1",
       },
       {
-        href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-Color-v1.pdf",
+        href: DOCS.paragonLostSoulsColor,
         label: "Lost Souls (Color)",
         description: "Printable Paragon Lost Souls, full color.",
         version: "v1",
       },
       {
-        href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf",
+        href: DOCS.paragonLostSoulsBw,
         label: "Lost Souls (B&W)",
         description: "Printable Paragon Lost Souls, black & white for cheaper printing.",
         version: "v1",
@@ -158,24 +179,24 @@ export const RESOURCE_SECTIONS: ResourceSection[] = [
         description: "Printable sheet for signing players in at the door.",
       },
       {
-        href: "https://landofredemption.com/wp-content/uploads/2026/07/t1_deck_check_v2.pdf",
+        href: DOCS.t1DeckCheck,
         label: "T1 Deck Check Sheet",
         description: "Printable deck check sheet for Type 1 decks.",
         version: "v2",
       },
       {
-        href: "https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-T1.pdf",
+        href: DOCS.t1Reserve,
         label: "T1 Reserve List",
         description: "Printable reserve list for Type 1 decks.",
       },
       {
-        href: "https://landofredemption.com/wp-content/uploads/2026/07/t2_deck_check_v2.pdf",
+        href: DOCS.t2DeckCheck,
         label: "T2 Deck Check Sheet",
         description: "Printable deck check sheet for Type 2 decks.",
         version: "v2",
       },
       {
-        href: "https://landofredemption.com/wp-content/uploads/2026/07/T2-Reserve-list.pdf",
+        href: DOCS.t2Reserve,
         label: "T2 Reserve List",
         description: "Printable reserve list for Type 2 decks.",
       },

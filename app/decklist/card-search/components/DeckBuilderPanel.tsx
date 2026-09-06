@@ -25,6 +25,7 @@ import FullDeckView from "./FullDeckView";
 import DragGhost from "./DragGhost";
 import { Switch } from "@headlessui/react";
 import { Card, normalizeBrigadeField } from "../utils";
+import { DOCS } from "@/lib/resources";
 import { compareCardsByType, compareCardsDefault, compareTypeGroups } from "@/lib/cards/defaultSort";
 import { FormatId, FORMAT_IDS, FORMATS, normalizeFormat } from "@/lib/formats";
 import { validateDeck } from "../utils/deckValidation";
@@ -3181,7 +3182,7 @@ export default function DeckBuilderPanel({
                     </h4>
                     <div className="space-y-1">
                       <a 
-                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Paragons-v1.pdf"
+                        href={DOCS.paragonCards}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
@@ -3189,7 +3190,7 @@ export default function DeckBuilderPanel({
                         Paragon Cards PDF
                       </a>
                       <a 
-                        href="https://landofredemption.com/wp-content/uploads/2026/07/Redemption-Paragon-Format-Rules.pdf"
+                        href={DOCS.paragonRules}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
@@ -3197,7 +3198,7 @@ export default function DeckBuilderPanel({
                         Paragon Rules PDF
                       </a>
                       <a 
-                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-Color-v1.pdf"
+                        href={DOCS.paragonLostSoulsColor}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
@@ -3205,7 +3206,7 @@ export default function DeckBuilderPanel({
                         Lost Souls (Color) PDF
                       </a>
                       <a 
-                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf"
+                        href={DOCS.paragonLostSoulsBw}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"

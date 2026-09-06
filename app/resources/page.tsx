@@ -139,23 +139,14 @@ export default function ResourcesPage() {
         </section>
 
         <p className="mt-12 text-xs text-muted-foreground leading-relaxed">
-          Documents are published by Cactus Game Design and hosted on{" "}
-          <a
-            href="https://landofredemption.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-foreground"
-          >
-            landofredemption.com
-          </a>{" "}
-          and{" "}
+          Documents are published by{" "}
           <a
             href="https://www.cactusgamedesign.com"
             target="_blank"
             rel="noopener noreferrer"
             className="underline underline-offset-2 hover:text-foreground"
           >
-            cactusgamedesign.com
+            Cactus Game Design
           </a>
           . Spotted a broken or out-of-date link?{" "}
           <Link href="/tracker/bug" className="underline underline-offset-2 hover:text-foreground">
