@@ -55,6 +55,7 @@ make update-cards        # Download latest carddata.txt and regenerate TypeScrip
 | Goldfish mode | `prompt_context/goldfish_practice_mode.md` |
 | Mobile touch support | `docs/superpowers/specs/2026-08-29-mobile-multiplayer-touch-design.md` + `app/shared/layout/camera.ts`; `npm run shots:mobile` for the screenshot matrix. Konva fires `tap` not `click` on touch — see the implementation notes. |
 | Goldfish design system | `prompt_context/goldfish_design_system.md` |
+| Articles (posts) | `docs/superpowers/specs/2026-09-05-articles-design.md` + `app/articles/` (public) and `app/admin/posts/` (editor); `publish_posts` permission; markdown storage, `ArticleBody` is the one renderer |
 | Multiplayer design spec | `docs/superpowers/specs/2026-03-23-multiplayer-spacetimedb-design.md` |
 | Battle zone design | `docs/superpowers/specs/2026-07-12-battle-zone-design.md` |
 | SpacetimeDB SDK rules | `spacetimedb/CLAUDE.md` — **READ THIS before writing any SpacetimeDB code.** Contains critical SDK gotchas, hallucinated API warnings, and correct patterns. |
