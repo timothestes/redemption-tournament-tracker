@@ -12,6 +12,7 @@ const post = (over: Partial<PublicPost> = {}): PublicPost => ({
   tags: ["news"],
   status: "published",
   author_id: "22222222-2222-2222-2222-222222222222",
+  author_name: null,
   published_at: "2026-09-05T12:00:00.000Z",
   author: { username: "TimE" },
   ...over,
@@ -43,6 +44,11 @@ describe("buildRss", () => {
   it("prefers an explicit excerpt", () => {
     const xml = buildRss([post({ excerpt: "Custom blurb" })], "https://s");
     expect(xml).toContain("<description>Custom blurb</description>");
+  });
+
+  it("prefers author_name over the profile username", () => {
+    const xml = buildRss([post({ author_name: "Jayden" })], "https://s");
+    expect(xml).toContain("<dc:creator>Jayden</dc:creator>");
   });
 
   it("handles zero posts", () => {

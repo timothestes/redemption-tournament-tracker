@@ -1,4 +1,4 @@
-import { postExcerpt, type PublicPost } from "./queries";
+import { postByline, postExcerpt, type PublicPost } from "./queries";
 
 // Same fallback as utils/email.ts: prod sets NEXT_PUBLIC_SITE_URL.
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://redemptionccg.app").replace(/\/$/, "");
@@ -22,7 +22,7 @@ export function buildRss(posts: PublicPost[], site: string): string {
       ];
       if (p.published_at) lines.push(`    <pubDate>${new Date(p.published_at).toUTCString()}</pubDate>`);
       lines.push(
-        `    <dc:creator>${escapeXml(p.author?.username ?? "Land of Redemption")}</dc:creator>`,
+        `    <dc:creator>${escapeXml(postByline(p))}</dc:creator>`,
         `    <description>${escapeXml(postExcerpt(p))}</description>`,
         "  </item>",
       );

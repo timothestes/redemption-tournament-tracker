@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { postExcerpt, type PublicPost } from "../lib/queries";
+import { postByline, postExcerpt, type PublicPost } from "../lib/queries";
 
 export function formatPostDate(iso: string | null): string {
   if (!iso) return "";
@@ -24,7 +24,7 @@ export default function PostCard({ post }: { post: PublicPost }) {
       </Link>
       <div className="flex flex-1 flex-col gap-2 p-4">
         <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-          {post.author?.username ?? "Land of Redemption"} · {formatPostDate(post.published_at)}
+          {postByline(post)} · {formatPostDate(post.published_at)}
         </p>
         <h2 className="font-cinzel text-lg font-semibold leading-snug">
           <Link href={href} className="hover:underline">
