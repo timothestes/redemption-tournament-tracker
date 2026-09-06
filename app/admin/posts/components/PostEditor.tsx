@@ -58,11 +58,20 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   const audioInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
   const idRef = useRef<string | null>(id);
+  // Coalesces concurrent ensureId() callers (e.g. picking an image and
+  // clicking Save before the first createDraftAction round trip lands) onto
+  // a single in-flight draft-creation promise so we never insert two rows.
+  const creatingRef = useRef<Promise<string | null> | null>(null);
+  // Bumped by every field change. save() snapshots it before the request and
+  // only echoes the server's tags/slug back if nothing changed in flight.
+  const editVersion = useRef(0);
 
   useEffect(() => {
-    listTagsAction().then((r) => {
-      if (r.success !== false) setSuggestions(r.tags);
-    });
+    listTagsAction()
+      .then((r) => {
+        if (r.success !== false) setSuggestions(r.tags);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -78,22 +87,35 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
 
   const onTitle = (v: string) => {
     setTitle(v);
-    if (!slugTouched) setSlug(slugify(v));
+    // Once published the slug field is disabled (slugTouched can never flip
+    // true), so this must not re-derive after publish or it silently poisons
+    // the locked slug on the next save.
+    if (status === "draft" && !slugTouched) setSlug(slugify(v));
+    editVersion.current += 1;
     setDirty(true);
   };
 
-  const ensureId = useCallback(async (): Promise<string | null> => {
-    if (idRef.current) return idRef.current;
-    const r = await createDraftAction({ title });
-    if (r.success === false) {
-      fail(r.error);
-      return null;
-    }
-    idRef.current = r.post.id;
-    setId(r.post.id);
-    setSlug((s) => s || r.post.slug);
-    window.history.replaceState(null, "", `/admin/posts/${r.post.id}`);
-    return r.post.id;
+  const ensureId = useCallback((): Promise<string | null> => {
+    if (idRef.current) return Promise.resolve(idRef.current);
+    if (creatingRef.current) return creatingRef.current;
+    const promise = (async (): Promise<string | null> => {
+      try {
+        const r = await createDraftAction({ title });
+        if (r.success === false) {
+          fail(r.error);
+          return null;
+        }
+        idRef.current = r.post.id;
+        setId(r.post.id);
+        setSlug((s) => s || r.post.slug);
+        window.history.replaceState(null, "", `/admin/posts/${r.post.id}`);
+        return r.post.id;
+      } finally {
+        creatingRef.current = null;
+      }
+    })();
+    creatingRef.current = promise;
+    return promise;
   }, [title]);
 
   const selection = () => {
@@ -103,6 +125,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
 
   const applyEdit = (res: EditResult) => {
     setBody(res.value);
+    editVersion.current += 1;
     setDirty(true);
     requestAnimationFrame(() => {
       const el = bodyRef.current;
@@ -150,6 +173,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
     if (!postId) return;
     const placeholder = kind === "image" ? `![Uploading ${file.name}…]()` : `[Uploading ${file.name}…]()`;
     setBody((b) => insertBlock(b, selection(), placeholder).value);
+    editVersion.current += 1;
     setDirty(true);
     setUploading(true);
     try {
@@ -157,8 +181,10 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       const label = file.name.replace(/\.[^.]+$/, "");
       const md = kind === "image" ? `![${label}](${url})` : `[${label}](${url})`;
       setBody((b) => replaceOnce(b, placeholder, md));
+      editVersion.current += 1;
     } catch (e) {
       setBody((b) => replaceOnce(b, placeholder, ""));
+      editVersion.current += 1;
       fail(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setUploading(false);
@@ -174,6 +200,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
     try {
       const { url } = await uploadPostMedia(postId, file, "image");
       setCover(url);
+      editVersion.current += 1;
       setDirty(true);
     } catch (e) {
       fail(e instanceof Error ? e.message : "Upload failed");
@@ -184,6 +211,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
 
   const save = async (): Promise<boolean> => {
     setBusy("save");
+    const v = editVersion.current;
     try {
       const postId = await ensureId();
       if (!postId) return false;
@@ -199,10 +227,18 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
         fail(r.error);
         return false;
       }
-      setTags(r.post.tags);
-      setSlug(r.post.slug);
-      setDirty(false);
+      // Only echo the server's tags/slug and clear dirty if nothing changed
+      // while the request was in flight — otherwise we'd stomp a newer edit
+      // and falsely tell the poster there's nothing left to save.
+      if (editVersion.current === v) {
+        setTags(r.post.tags);
+        setSlug(r.post.slug);
+        setDirty(false);
+      }
       return true;
+    } catch {
+      fail("Something went wrong. Check your connection and try again.");
+      return false;
     } finally {
       setBusy(null);
     }
@@ -220,6 +256,8 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       if (r.success === false) return fail(r.error);
       setStatus("published");
       setToast({ message: "Published", type: "success" });
+    } catch {
+      fail("Something went wrong. Check your connection and try again.");
     } finally {
       setBusy(null);
     }
@@ -232,6 +270,8 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       if (r.success === false) return fail(r.error);
       setStatus("draft");
       setToast({ message: "Unpublished", type: "success" });
+    } catch {
+      fail("Something went wrong. Check your connection and try again.");
     } finally {
       setBusy(null);
     }
@@ -244,6 +284,8 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       if (r.success === false) return fail(r.error);
       setDirty(false);
       router.push("/admin/posts");
+    } catch {
+      fail("Something went wrong. Check your connection and try again.");
     } finally {
       setBusy(null);
     }
@@ -335,6 +377,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
                   value={body}
                   onChange={(e) => {
                     setBody(e.target.value);
+                    editVersion.current += 1;
                     setDirty(true);
                   }}
                   placeholder="Write in markdown…"
@@ -362,10 +405,11 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
               onChange={(e) => {
                 setSlugTouched(true);
                 setSlug(e.target.value.toLowerCase());
+                editVersion.current += 1;
                 setDirty(true);
               }}
               disabled={status === "published"}
-              className="mt-1 font-mono text-sm normal-case tracking-normal"
+              className="mt-1 h-12 font-mono text-sm normal-case tracking-normal"
             />
             {status === "published" && <span className="mt-1 block normal-case tracking-normal">Locked after publishing</span>}
           </label>
@@ -377,6 +421,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
                 value={tags}
                 onChange={(t) => {
                   setTags(t);
+                  editVersion.current += 1;
                   setDirty(true);
                 }}
                 suggestions={suggestions}
@@ -397,6 +442,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
                   className="min-h-11"
                   onClick={() => {
                     setCover(null);
+                    editVersion.current += 1;
                     setDirty(true);
                   }}
                   disabled={locked}
@@ -417,6 +463,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
               value={excerpt}
               onChange={(e) => {
                 setExcerpt(e.target.value);
+                editVersion.current += 1;
                 setDirty(true);
               }}
               maxLength={MAX_EXCERPT}

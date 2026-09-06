@@ -44,7 +44,7 @@ export default function TagInput({
               aria-label={`Remove tag ${t}`}
               onClick={() => remove(t)}
               disabled={disabled}
-              className="inline-flex h-11 w-9 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
             >
               ×
             </button>
