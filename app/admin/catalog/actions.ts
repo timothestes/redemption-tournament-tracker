@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireSuperuser } from "@/app/admin/permissions/lib/auth";
+import { requireCatalogEditor } from "@/app/admin/permissions/lib/auth";
 import { findCardStrict } from "./lib/editorShared";
 import { validateOverrideFields } from "./lib/validateOverride";
 
@@ -23,7 +23,7 @@ export async function listCatalogState(): Promise<{
   overrides: OverrideRow[];
   imageVersions: ImageVersionRow[];
 }> {
-  const ctx = await requireSuperuser();
+  const ctx = await requireCatalogEditor();
   if (!ctx) return { overrides: [], imageVersions: [] };
   const [{ data: overrides }, { data: imageVersions }] = await Promise.all([
     ctx.supabase
@@ -47,7 +47,7 @@ export async function saveOverride(
   rawFields: Record<string, unknown>,
   note: string,
 ): Promise<{ ok: true; deleted: boolean } | { ok: false; error: string }> {
-  const ctx = await requireSuperuser();
+  const ctx = await requireCatalogEditor();
   if (!ctx) return { ok: false, error: "Not authorized" };
 
   // Strict identity (spec F3): a typo'd set must never resolve to another print.
@@ -94,7 +94,7 @@ export async function deleteOverride(
   name: string,
   set: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const ctx = await requireSuperuser();
+  const ctx = await requireCatalogEditor();
   if (!ctx) return { ok: false, error: "Not authorized" };
   const { error } = await ctx.supabase
     .from("card_overrides")
