@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
+
+import { SPONSORS } from "../lib/sponsors";
 
 // Routes that intentionally skip the sponsor footer because they own the full
 // viewport (the deck-builder editors render a sticky-bottom Maybeboard strip
@@ -13,25 +16,6 @@ const HIDE_ON_PATHS = new Set<string>([
   "/decklist/card-search",
 ]);
 
-interface Sponsor {
-  name: string;
-  href: string;
-  logoDark: string;
-  logoLight: string;
-  width: number;
-  height: number;
-}
-
-const sponsors: Sponsor[] = [
-  {
-    name: "Your Turn Games",
-    href: "https://www.yourturngames.biz",
-    logoDark: "/sponsors/ytg-dark.png",
-    logoLight: "/sponsors/ytg-light.png",
-    width: 100,
-    height: 100,
-  },
-];
 
 export default function SponsorFooter() {
   const { theme, resolvedTheme } = useTheme();
@@ -57,12 +41,15 @@ export default function SponsorFooter() {
       </div>
 
       <div className="max-w-screen-xl mx-auto px-4 py-3 flex flex-col items-center gap-1.5">
-        <span className="font-cinzel text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 select-none">
+        <Link
+          href="/sponsors"
+          className="font-cinzel text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        >
           Sponsored by
-        </span>
+        </Link>
 
         <div className="flex items-center justify-center gap-8">
-          {sponsors.map((sponsor) => (
+          {SPONSORS.map((sponsor) => (
             <a
               key={sponsor.name}
               href={sponsor.href}
