@@ -40,6 +40,7 @@
     "react-icons": "^5.4.0",
     "react-konva": "^19.2.2",
     "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "resend": "^6.7.0",
     "sharp": "^0.35.3",
     "spacetimedb": "^2.5.0",
