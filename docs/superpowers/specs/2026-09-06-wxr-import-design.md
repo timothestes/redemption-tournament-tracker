@@ -73,7 +73,7 @@ used by `PostCard`, `app/articles/[slug]/page.tsx` (visible byline and `openGrap
 |---|---|
 | `id` | generated |
 | `slug` | `wp:post_name`, adjusted per §8 |
-| `title` | `<title>`, HTML entities decoded (`he`), whitespace collapsed, trimmed |
+| `title` | `<title>`, HTML entities decoded (`he`), whitespace collapsed, trimmed. A post whose title is empty after that (one known: wpId 12819, lorem-ipsum spam) is skipped, counted under `skippedEmptyTitle`, and listed in the report; it does not fail the run |
 | `excerpt` | `excerpt:encoded` when non-blank after entity decode and tag strip, cut to 500 chars; else `null` (the renderer derives one from the body) |
 | `body_md` | §10 |
 | `cover_image_url` | URL of the attachment whose `wp:post_id` equals postmeta `_thumbnail_id`, rewritten per §9; `null` when the attachment is unknown or missing from the backup |
@@ -119,8 +119,8 @@ used by `PostCard`, `app/articles/[slug]/page.tsx` (visible byline and `openGrap
 - **Site file** = any URL in a post's `src` or `href` attributes, or its featured image, whose host is `landofredemption.com` or `www.landofredemption.com` (http or https) and whose path starts with `/wp-content/uploads/` or `/podcasts/`. Query strings and trailing whitespace are stripped; the path is percent-decoded to locate the local file `<backup>/<path>`.
 - **Blob pathname** = `wp/<site path without the leading slash>`, e.g. `wp/wp-content/uploads/2024/04/agur-1.png`, `wp/podcasts/CoW-Primer-with-John.mp3`. Public URL = `${NEXT_PUBLIC_BLOB_BASE_URL}/${pathname}`, deterministic because uploads use `addRandomSuffix: false`. Same store as poster uploads (`BLOB_READ_WRITE_TOKEN`). Track 1 later mirrors the rest of `public_html` under the same prefix with the same rule.
 - **Which file**: the exact URL the post references (a `-1024x545` variant stays a variant) so page weight stays what WordPress served.
-- **Upload**: `put(pathname, stream, { access: "public", addRandomSuffix: false, contentType, cacheControlMaxAge: 31536000 })`; skip when `head(url)` succeeds; concurrency 8; 3 retries with backoff. Content type by extension: jpg/jpeg `image/jpeg`, png `image/png`, webp `image/webp`, gif `image/gif`, mp3 `audio/mpeg`, m4a `audio/mp4`, mp4 `video/mp4`, pdf `application/pdf`, txt/dek `text/plain`, xlsx `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, htm/html `text/html`, else `application/octet-stream`.
-- **Missing locally** (10 known): URL left unchanged, listed under `missingMedia` in the report.
+- **Upload**: `put(pathname, body, { access: "public", addRandomSuffix: false, contentType, cacheControlMaxAge: 31536000 })`; skip when `head(pathname)` succeeds (by pathname, never by a locally computed URL — an encoding mismatch would otherwise make every re-run fail); the manifest `url` is whatever the store returns from `head`/`put`, so it is the same on every run; concurrency 8 (minimum 1); 3 retries with backoff for `put` and for non-404 `head` failures. Content type by extension: jpg/jpeg `image/jpeg`, png `image/png`, webp `image/webp`, gif `image/gif`, mp3 `audio/mpeg`, m4a `audio/mp4`, mp4 `video/mp4`, pdf `application/pdf`, txt/dek `text/plain`, xlsx `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, htm/html `text/html`, else `application/octet-stream`.
+- **Missing locally** (9–10 known): URL left unchanged, listed under `missingMedia` in the report. A site path that cannot be percent-decoded, or that resolves outside the backup directory, is treated as missing too. In a live run only entries whose status is `exists` or `uploaded` are rewritten; a `planned` entry (failed upload) keeps its original URL rather than publishing a dead Blob link.
 - **Manifest** `scripts/output/wxr/media-manifest.json`: `{ [sitePath]: { pathname, url, bytes, status: "planned" | "exists" | "uploaded" | "missing" } }`.
 - **Rewrites applied to the HTML before conversion**, in this order:
   1. Site file URL → mirror URL (files present in the backup only).
@@ -183,9 +183,9 @@ npx tsx scripts/import-wxr.ts [--wxr PATH] [--backup PATH] [--dry-run] [--media-
 - **Live default**: resolve authors (fatal on an unresolved mapped email; creates only the archive account), mirror media for the selected posts, insert posts whose `source_url` is absent; existing rows are skipped and counted.
 - `--update`: upsert the selected rows on `source_url`, overwriting title, excerpt, body_md, cover_image_url, tags, author_id, author_name, published_at, updated_at. Never changes `slug` or `status` of an existing row.
 - `--dry-run`: no network; writes the markdown, report and a `planned` manifest.
-- `--media-only`: mirror media for the selected posts and stop.
+- `--media-only`: mirror media for the selected posts and stop; it never opens a Supabase client (so it cannot create the archive account).
 - `--limit N`: the N most recent published posts (the current front page first). `--only`: by original `post_name`.
-- Per-post failures are recorded and the run continues; exit code 1 if any post failed.
+- Per-post failures are recorded and the run continues; exit code 1 if any post failed (skipped empty-title posts are not failures). Authors are resolved before conversion (rows need the real `author_id`).
 - Env (`.env.local` via dotenv, as in `scripts/backfill-deck-legality.ts`): `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BLOB_READ_WRITE_TOKEN`, `NEXT_PUBLIC_BLOB_BASE_URL`.
 
 ## 13. Quality gates and rollout
