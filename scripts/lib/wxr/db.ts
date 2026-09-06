@@ -24,7 +24,7 @@ export async function ensureArchiveUser(sb: SupabaseClient, users: { id: string;
   let id = users.find((u) => u.email === ARCHIVE_EMAIL)?.id;
   if (!id) {
     const { data, error } = await sb.auth.admin.createUser({ email: ARCHIVE_EMAIL, email_confirm: true, user_metadata: { wxr_archive: true } });
-    if (error || !data.user) throw new Error(`createUser(${ARCHIVE_EMAIL}): ${error?.message}`);
+    if (error || !data.user) throw new Error(`createUser(${ARCHIVE_EMAIL}): ${error?.message ?? "no user returned"}`);
     id = data.user.id;
     users.push({ id, email: ARCHIVE_EMAIL });
   }
@@ -49,21 +49,29 @@ export function resolveAuthors(map: AuthorMapEntry[], users: { id: string; email
 export async function existingSourceUrls(sb: SupabaseClient): Promise<Set<string>> {
   const out = new Set<string>();
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await sb.from("posts").select("source_url").not("source_url", "is", null).range(from, from + 999);
+    const { data, error } = await sb.from("posts").select("source_url").not("source_url", "is", null).order("source_url").range(from, from + 999);
     if (error) throw new Error(`posts.source_url: ${error.message}`);
     for (const r of data) if (r.source_url) out.add(r.source_url);
     if (data.length < 1000) return out;
   }
 }
 
-/** insert: fails on an existing source_url (unique). update: everything but slug/status. */
+/** update: everything but slug/status/created_at */
+export function updatePatch(row: ImportRow): Omit<ImportRow, "slug" | "status" | "created_at" | "source_url"> {
+  const { slug: _s, status: _st, created_at: _ca, source_url: _su, ...patch } = row;
+  return patch;
+}
+
+/** insert: fails on an existing source_url (unique). update: everything but slug/status/created_at. */
 export async function writePost(sb: SupabaseClient, row: ImportRow, mode: "insert" | "update"): Promise<{ id: string } | { error: string }> {
   if (!row.author_id) return { error: "author_id unresolved" };
   if (mode === "insert") {
     const { data, error } = await sb.from("posts").insert(row).select("id").single();
     return error ? { error: error.message } : { id: data.id };
   }
-  const { slug: _s, status: _st, ...patch } = row;
+  const patch = updatePatch(row);
   const { data, error } = await sb.from("posts").update(patch).eq("source_url", row.source_url).select("id").single();
-  return error ? { error: error.message } : { id: data.id };
+  if (error) return { error: `update ${row.source_url}: ${error.message}` };
+  if (!data) return { error: `no row for ${row.source_url}` };
+  return { id: data.id };
 }
