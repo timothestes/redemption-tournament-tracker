@@ -112,17 +112,26 @@ test.describe("articles: poster publish flow", () => {
     const slug = await page.getByLabel("Slug").inputValue();
     expect(slug).toMatch(/^e2e-article-\d+$/);
 
-    // Public page: title, byline, image, embed.
+    // Public page: title, byline, image, embed. next/cache's unstable_cache
+    // implements stale-while-revalidate on revalidateTag: the first read after
+    // a write can still return the old (cached) value while it refreshes in
+    // the background, so poll until the fresh copy is live rather than
+    // asserting on the very next request.
+    await expect
+      .poll(async () => (await page.request.get(`/articles/${slug}`)).status(), { timeout: 15_000, intervals: [500] })
+      .toBe(200);
     await gotoStable(page, `/articles/${slug}`);
     await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
     await expect(page.locator(".article-body img")).toHaveCount(1);
     await expect(page.locator(".article-body iframe[src*='youtube-nocookie.com/embed/dQw4w9WgXcQ']")).toHaveCount(1);
     await expect(page.getByRole("link", { name: "Edit" })).toBeVisible();
 
-    // Feed lists it.
+    // Feed lists it — same stale-while-revalidate window as above, so poll.
+    await expect
+      .poll(async () => (await page.request.get("/articles/feed.xml")).text(), { timeout: 15_000, intervals: [500] })
+      .toContain(`/articles/${slug}`);
     const feed = await page.request.get("/articles/feed.xml");
     expect(feed.headers()["content-type"]).toContain("application/rss+xml");
-    expect(await feed.text()).toContain(`/articles/${slug}</link>`);
 
     // Unpublish → public 404.
     await gotoStable(page, editUrl);
@@ -130,8 +139,9 @@ test.describe("articles: poster publish flow", () => {
     // Same rationale as the Publish step above: assert the durable button
     // flip rather than the transient "Unpublished" toast.
     await expect(page.getByRole("button", { name: "Publish" })).toBeVisible({ timeout: 30_000 });
-    const gone = await page.request.get(`/articles/${slug}`);
-    expect(gone.status()).toBe(404);
+    await expect
+      .poll(async () => (await page.request.get(`/articles/${slug}`)).status(), { timeout: 15_000, intervals: [500] })
+      .toBe(404);
 
     // Delete (cleans the Blob prefix server-side).
     await page.getByRole("button", { name: "Delete" }).click();
