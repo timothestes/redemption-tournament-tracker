@@ -13,7 +13,7 @@ export function preprocess(raw: string, blocks: Map<string, string>): Preprocess
 
   // 1) reusable blocks
   const inline = (s: string, depth: number): string =>
-    s.replace(/<!-- wp:block \{"ref":(\d+)\} \/-->/g, (_m, ref: string) => {
+    s.replace(/<!-- wp:block (\{[^\n]*?"ref":(\d+)[^\n]*?\}) \/-->/g, (_m, _json: string, ref: string) => {
       const body = blocks.get(ref);
       if (body == null) { unknownRefs.push(ref); return ""; }
       return depth < 5 ? inline(body, depth + 1) : "";

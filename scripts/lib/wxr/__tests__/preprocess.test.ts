@@ -13,6 +13,12 @@ describe("preprocess", () => {
     expect(r.unknownRefs).toEqual(["404"]);
     expect(r.classic).toBe(false);
   });
+  it("inlines a reusable block ref whose JSON payload carries extra keys, and reports an unknown ref the same way", () => {
+    const withExtra = preprocess('<!-- wp:block {"ref":14682,"align":"wide"} /-->', blocks);
+    expect(withExtra.html).toBe("\n<p><strong>Sponsors</strong></p>\n");
+    const unknownWithExtra = preprocess('<!-- wp:block {"ref":404,"align":"wide"} /-->', blocks);
+    expect(unknownWithExtra.unknownRefs).toEqual(["404"]);
+  });
   it("turns a grimlock section into a link paragraph", () => {
     const r = preprocess(
       '<!-- wp:grimlock/section {"thumbnail":15169,"title":"Episode 81","subtitle":"","text":"","button_text":"Listen Here","button_link":"thethreshingfloor.podbean.com/e/ep-81/"} /-->',
