@@ -102,6 +102,11 @@ describe("htmlToMarkdown", () => {
       "| A | B |\n| --- | --- |\n| 1 | 2 |",
     );
   });
+  it("keeps a row on one line when a cell contains a line break", () => {
+    expect(md("<table><tbody><tr><td>Deck<br>List</td><td>Owner</td></tr><tr><td>a<br />b</td><td>Tim</td></tr></tbody></table>")).toBe(
+      "| Deck List | Owner |\n| --- | --- |\n| a b | Tim |",
+    );
+  });
   it("drops a table whose cells are all empty", () => {
     expect(md('<table class="has-fixed-layout"><tbody><tr><td></td><td rowspan="2"></td></tr></tbody></table>')).toBe("");
   });

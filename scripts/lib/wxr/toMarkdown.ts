@@ -129,7 +129,10 @@ export function htmlToMarkdown(html: string): MarkdownResult {
     // rules before keeps, so converting here wins: the first row becomes the header.
     filter: (n) => n.nodeName === "TABLE" && !isHeadingRow((n as HTMLTableElement).rows?.[0]),
     replacement: (content, n) => {
-      const rows = content.trim().split("\n").filter((r) => r.trim());
+      // gfm's tableRow prefixes every row with "\n|", so only a newline before a "|" is a row
+      // boundary; any other newline came from inside a cell (a <br>, a list, a paragraph) and
+      // would otherwise split one row across two lines and wreck the table.
+      const rows = content.trim().replace(/[ \t]*\r?\n(?!\|)[ \t]*/g, " ").split("\n").filter((r) => r.trim());
       if (!rows.length || !/[^|\s]/.test(rows.join(""))) return ""; // nothing but empty cells
       const cols = (n as HTMLTableElement).rows[0]?.children.length ?? 0;
       return block([rows[0], `|${" --- |".repeat(Math.max(cols, 1))}`, ...rows.slice(1)].join("\n"));
