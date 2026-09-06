@@ -180,10 +180,11 @@ npx tsx scripts/import-wxr.ts [--wxr PATH] [--backup PATH] [--dry-run] [--media-
     [--limit N] [--only slug,slug] [--skip-media] [--update] [--as-draft] [--concurrency 8]
 ```
 
-- **Live default**: resolve authors (fatal on an unresolved mapped email; creates only the archive account), mirror media for the selected posts, insert posts whose `source_url` is absent; existing rows are skipped and counted.
+- **Live default**: resolve authors (fatal on an unresolved mapped email; creates only the archive account), mirror media for the selected posts, insert posts whose `source_url` is absent; existing rows are skipped and counted. A referenced file whose upload failed (entry still `planned`) keeps its original URL and is listed under `unmirroredMedia` for that post.
 - `--update`: upsert the selected rows on `source_url`, overwriting title, excerpt, body_md, cover_image_url, tags, author_id, author_name, published_at, updated_at. Never changes `slug` or `status` of an existing row.
 - `--dry-run`: no network; writes the markdown, report and a `planned` manifest.
-- `--media-only`: mirror media for the selected posts and stop; it never opens a Supabase client (so it cannot create the archive account).
+- `--media-only`: mirror media for the selected posts, write the manifest, and stop (no markdown, no report); it never opens a Supabase client (so it cannot create the archive account).
+- `--skip-media`: valid only with `--dry-run`. A live run always runs the mirror step — `head` by pathname first, so a second pass is a verification pass — and rewrites only `exists`/`uploaded` entries.
 - `--limit N`: the N most recent published posts (the current front page first). `--only`: by original `post_name`.
 - Per-post failures are recorded and the run continues; exit code 1 if any post failed (skipped empty-title posts are not failures). Authors are resolved before conversion (rows need the real `author_id`).
 - Env (`.env.local` via dotenv, as in `scripts/backfill-deck-legality.ts`): `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BLOB_READ_WRITE_TOKEN`, `NEXT_PUBLIC_BLOB_BASE_URL`.

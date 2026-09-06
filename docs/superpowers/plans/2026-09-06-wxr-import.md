@@ -1644,6 +1644,6 @@ Include in your report: the summary line, the counts from `report.md` (posts nee
 - [ ] Open the six rendered HTML files in a browser; check images, embeds, audio, deck-list line breaks, headings, internal links. Dispatch fixes as scoped tasks if needed; re-run the dry run.
 - [ ] Apply migration 096 to production (Supabase MCP `apply_migration`, name `096_posts_import_columns`); verify the `posts` columns show `author_name` and the constraint `posts_source_url_key` exists.
 - [ ] `npx tsx scripts/import-wxr.ts --media-only --wxr … --backup …` (≈ 2.94 GB); confirm `media-manifest.json` has no `planned` left except failures; re-run to retry failures.
-- [ ] `npx tsx scripts/import-wxr.ts --limit 20 --skip-media --wxr … --backup …`; confirm the archive user exists, 20 rows inserted, then check `/articles` and three posts on production (cache: up to an hour, or publish/unpublish any post from the editor).
-- [ ] Full run: `npx tsx scripts/import-wxr.ts --skip-media --wxr … --backup …`; expect `inserted 1278, skipped 20, failed 0`.
+- [ ] `npx tsx scripts/import-wxr.ts --limit 20 --wxr … --backup …` (`--skip-media` is dry-run-only; the live mirror step re-verifies by `head`); confirm the archive user exists, 20 rows inserted, then check `/articles` and three posts on production (cache: up to an hour, or publish/unpublish any post from the editor).
+- [ ] Full run: `npx tsx scripts/import-wxr.ts --wxr … --backup …`; expect `inserted 1277, skipped 20, skipped_empty_title 1, failed 0`.
 - [ ] Push, open the PR (spec, plan, migration, byline, script, tests, CLAUDE.md), merge. Then remove the worktree.
