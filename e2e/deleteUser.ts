@@ -14,10 +14,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * `duplicate key value violates unique constraint "profiles_username_key"`.
  *
  * The blocking children, confirmed against the live schema:
- *   profiles.id          NO ACTION   ← auto-created by the signup trigger
- *   decks.user_id        NO ACTION
- *   deck_folders.user_id NO ACTION
- *   posts.author_id      RESTRICT
+ *   profiles.id             NO ACTION   ← auto-created by the signup trigger
+ *   decks.user_id           NO ACTION
+ *   deck_folders.user_id    NO ACTION
+ *   posts.author_id         RESTRICT
+ *   poster_invites.invited_by  NO ACTION
  * Everything else that matters (tournaments, playtest_members, forge_*,
  * collection_cards, api_keys) is ON DELETE CASCADE and needs no help.
  *
@@ -32,6 +33,7 @@ export async function deleteTestUser(
   await admin.from("decks").delete().eq("user_id", userId);
   await admin.from("deck_folders").delete().eq("user_id", userId);
   await admin.from("posts").delete().eq("author_id", userId);
+  await admin.from("poster_invites").delete().eq("invited_by", userId);
   await admin.from("profiles").delete().eq("id", userId);
 
   const { error } = await admin.auth.admin.deleteUser(userId);

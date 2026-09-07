@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import TopNav from "@/components/top-nav";
 import SponsorFooter from "@/components/sponsor-footer";
 import ArticleBody from "../components/ArticleBody";
+import AuthorBio from "../components/AuthorBio";
 import { formatPostDate } from "../components/PostCard";
 import { loadPostBySlug, postByline, postExcerpt } from "../lib/queries";
 import EditLink from "./EditLink";
@@ -89,6 +90,7 @@ export default async function ArticlePage({ params }: PageProps) {
           />
         )}
         <ArticleBody markdown={post.body_md} />
+        <AuthorBio post={post} />
       </article>
       <SponsorFooter />
     </div>

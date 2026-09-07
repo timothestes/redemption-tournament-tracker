@@ -36,6 +36,9 @@ describe.runIf(ENABLED)("Superuser portal anon-leak guardrail", () => {
     ["super_search_users", { p_query: "xx" }],
     ["super_set_admin_permissions", { p_user_id: "00000000-0000-0000-0000-000000000000", p_permissions: [] }],
     ["super_remove_admin", { p_user_id: "00000000-0000-0000-0000-000000000000" }],
+    ["mint_poster_invite", { p_token_hash: "x", p_email: null, p_expires_at: null }],
+    ["list_poster_invites", {}],
+    ["redeem_poster_invite", { p_token_hash: "x" }],
   ];
 
   for (const [fn, args] of SUPER_RPCS) {
