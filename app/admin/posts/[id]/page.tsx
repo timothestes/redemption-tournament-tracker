@@ -5,7 +5,7 @@ import { canEditPost } from "../lib/validate";
 import PostEditor from "../components/PostEditor";
 import type { PostRow } from "../actions";
 
-export const metadata = { title: "Edit post - RedemptionCCG App" };
+export const metadata = { title: "Edit post" };
 export const dynamic = "force-dynamic";
 
 const ROW =

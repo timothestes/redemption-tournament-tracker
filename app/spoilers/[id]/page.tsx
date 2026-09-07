@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: spoiler.card_name,
       description,
       type: "article",
-      siteName: "RedemptionCCG App",
+      siteName: "Land of Redemption",
       images: [
         {
           url: spoiler.image_url,

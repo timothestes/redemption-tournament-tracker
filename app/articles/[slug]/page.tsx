@@ -17,17 +17,18 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const post = await loadPostBySlug(slug);
-  if (!post) return { title: "Article not found - RedemptionCCG App" };
+  if (!post) return { title: "Article not found" };
   const description = postExcerpt(post);
   const images = post.cover_image_url ? [{ url: post.cover_image_url, alt: post.title }] : undefined;
   return {
-    title: `${post.title} - RedemptionCCG App`,
+    title: post.title,
     description,
+    alternates: { canonical: `/articles/${slug}` },
     openGraph: {
       title: post.title,
       description,
       type: "article",
-      siteName: "RedemptionCCG App",
+      siteName: "Land of Redemption",
       publishedTime: post.published_at ?? undefined,
       authors: [postByline(post)],
       images,
@@ -50,6 +51,19 @@ export default async function ArticlePage({ params }: PageProps) {
     <div className="flex min-h-screen flex-col bg-background">
       <TopNav />
       <article className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:py-10">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Article",
+              headline: post.title,
+              datePublished: post.published_at ?? undefined,
+              author: { "@type": "Person", name: postByline(post) },
+              ...(post.cover_image_url ? { image: [post.cover_image_url] } : {}),
+            }),
+          }}
+        />
         <Link
           href="/articles"
           className="mb-5 inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

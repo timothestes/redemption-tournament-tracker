@@ -3,6 +3,8 @@ import SponsorFooter from "../../components/sponsor-footer";
 import { loadPublicSpoilersAction } from "./actions";
 import SpoilersClient from "./spoilers-client";
 
+export const metadata = { alternates: { canonical: "/spoilers" } };
+
 export default async function SpoilersPage() {
   const { spoilers } = await loadPublicSpoilersAction();
 

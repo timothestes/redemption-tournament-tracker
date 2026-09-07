@@ -7,6 +7,7 @@ export const metadata = {
   title: "Redemption Resources | Redemption CCG",
   description:
     "Every official Redemption CCG document in one place — the REG rulebook, ORDIR dictionary, deck building rules, Paragon format files, and tournament host forms.",
+  alternates: { canonical: "/resources" },
 };
 
 function ExternalIcon() {

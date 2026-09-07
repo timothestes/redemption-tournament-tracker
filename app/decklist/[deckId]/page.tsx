@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: deck.name,
       description,
       type: "article",
-      siteName: "RedemptionCCG App",
+      siteName: "Land of Redemption",
       ...(ogImage && {
         images: [{ url: ogImage, width: 375, height: 525, alt: deck.name }],
       }),

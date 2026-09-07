@@ -7,6 +7,7 @@ export const metadata = {
   title: "Upcoming Tournaments | Redemption CCG",
   description:
     "Find upcoming Redemption card game tournaments near you. Browse dates, locations, formats, and entry fees.",
+  alternates: { canonical: "/tournaments" },
 };
 
 export default async function TournamentsPage() {
