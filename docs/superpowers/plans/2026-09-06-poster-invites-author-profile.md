@@ -103,7 +103,11 @@ begin
   return true;
 end;
 $$;
+```
 
+**Correction:** the `||` operator here is ambiguous in Postgres and throws 22P02 on every successful redemption — use `array_append(admin_users.permissions, 'publish_posts')` instead. Fixed in migration 099 after this was caught by Task 6's live-DB tests.
+
+```sql
 -- Admin read: invites WITHOUT token_hash, superuser only (empty for everyone else).
 create or replace function public.list_poster_invites()
 returns table(id uuid, email text, invited_by uuid, expires_at timestamptz, used_at timestamptz, created_at timestamptz)
