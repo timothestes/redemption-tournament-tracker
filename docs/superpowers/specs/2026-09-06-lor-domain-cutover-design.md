@@ -58,8 +58,9 @@ New code, all in the tracker app (runs on whichever host serves it):
 | `/our-sponsors/` | `/sponsors` (shipped) |
 | `/paragon/` | `/resources#paragon` (shipped) |
 | `/rankings/` | `/tournaments/rnrs-points` (shipped) |
-| `/resources/`, `/resources-old/` | `/resources` (new static rules) |
-| `/spoilers/` | `/spoilers` (new static rule) |
+| `/resources/` | same path exists natively — nothing to do |
+| `/resources-old/` | `/resources` (new static rule) |
+| `/spoilers/` | same path exists natively — nothing to do |
 | `/deck-lists/` | `/decklist/community` (new static rule) |
 | `/articles/` | same path exists natively — nothing to do |
 | `/home-2/` | `/` (new static rule) |
