@@ -6,6 +6,9 @@ import { ARTICLES_TAG } from "@/app/articles/lib/queries";
 import { slugify, MAX_SLUG } from "@/app/articles/lib/markdown";
 import { requirePoster, type PosterContext } from "./lib/auth";
 import { normalizeTags, validatePatch, validateForPublish, canEditPost, type PostPatch } from "./lib/validate";
+import { searchCardNames, type CardSearchHit } from "@/lib/cards/search";
+import { resolveArticleRefs } from "@/app/articles/lib/refs";
+import type { ArticleRefs } from "@/app/articles/lib/refTypes";
 
 export interface PostRow {
   id: string;
@@ -250,6 +253,58 @@ export async function listTagsAction(): Promise<ActionResult<{ tags: string[] }>
     }
     const tags = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
     return { success: true, tags };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Card mentions and deck embeds (editor pickers + preview)
+// ---------------------------------------------------------------------------
+
+export async function searchCardsAction(query: string): Promise<ActionResult<{ cards: CardSearchHit[] }>> {
+  try {
+    await requirePoster();
+    return { success: true, cards: searchCardNames(String(query ?? "").slice(0, 80), 12) };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export interface EmbeddableDeck {
+  id: string;
+  name: string;
+  format: string | null;
+  visibility: "private" | "unlisted" | "public";
+  card_count: number;
+  updated_at: string;
+}
+
+/** The poster's own decks, newest first, for the deck picker. */
+export async function listMyDecksForEmbedAction(): Promise<ActionResult<{ decks: EmbeddableDeck[] }>> {
+  try {
+    const ctx = await requirePoster();
+    const { data, error } = await ctx.supabase
+      .from("decks")
+      .select("id, name, format, visibility, card_count, updated_at")
+      .eq("user_id", ctx.user.id)
+      .order("updated_at", { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    return { success: true, decks: (data ?? []) as EmbeddableDeck[] };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+const MAX_RESOLVE_BODY = 200_000;
+
+/** Same resolution the public article page does, for the editor preview. */
+export async function resolveArticleRefsAction(markdown: string): Promise<ActionResult<{ refs: ArticleRefs }>> {
+  try {
+    await requirePoster();
+    const refs = await resolveArticleRefs(String(markdown ?? "").slice(0, MAX_RESOLVE_BODY));
+    return { success: true, refs };
   } catch (e) {
     return fail(e);
   }

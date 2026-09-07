@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 import ToastNotification from "@/components/ui/toast-notification";
 import ArticleBody from "@/app/articles/components/ArticleBody";
+import { EMPTY_REFS, type ArticleRefs } from "@/app/articles/lib/refTypes";
 import { slugify, youtubeId } from "@/app/articles/lib/markdown";
 import {
   createDraftAction,
@@ -16,6 +17,7 @@ import {
   unpublishPostAction,
   deletePostAction,
   listTagsAction,
+  resolveArticleRefsAction,
   type PostRow,
 } from "../actions";
 import { ACCEPT, type UploadKind } from "../lib/media";
@@ -24,6 +26,8 @@ import { insertBlock, prefixLines, replaceOnce, wrapSelection, type EditResult }
 import { MAX_EXCERPT, MAX_TITLE } from "../lib/validate";
 import MarkdownToolbar, { type ToolbarAction } from "./MarkdownToolbar";
 import TagInput from "./TagInput";
+import CardPicker from "./CardPicker";
+import DeckPicker from "./DeckPicker";
 
 type Toast = { message: string; type: "success" | "error" } | null;
 type Busy = null | "save" | "publish" | "unpublish" | "delete";
@@ -52,6 +56,19 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   const [tab, setTab] = useState<"write" | "preview">("write");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  // Card picker: opened by the toolbar (the selection becomes the query) or
+  // by typing "[[" (the two brackets are the range the pick replaces).
+  const [cardPicker, setCardPicker] = useState<{ open: boolean; query: string; from: number; to: number }>({
+    open: false,
+    query: "",
+    from: 0,
+    to: 0,
+  });
+  const [deckPickerOpen, setDeckPickerOpen] = useState(false);
+  // Resolved card mentions and deck embeds for the preview — the same
+  // resolution the public page runs (app/articles/lib/refs.ts).
+  const [refs, setRefs] = useState<ArticleRefs>(EMPTY_REFS);
+  const refsSeq = useRef(0);
 
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
@@ -92,6 +109,23 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
+
+  useEffect(() => {
+    if (!body.includes("[[") && !body.includes("/decklist/")) {
+      setRefs(EMPTY_REFS);
+      return;
+    }
+    const id = ++refsSeq.current;
+    const t = window.setTimeout(async () => {
+      try {
+        const r = await resolveArticleRefsAction(body);
+        if (id === refsSeq.current && r.success !== false) setRefs(r.refs);
+      } catch {
+        // The preview keeps the last good refs; the next edit retries.
+      }
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [body]);
 
   const fail = (message: string) => setToast({ message, type: "error" });
 
@@ -186,11 +220,32 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
         if (!youtubeId(url)) return fail("That doesn't look like a YouTube URL");
         return applyEdit(insertBlock(body, sel, url.trim()));
       }
+      case "card":
+        return setCardPicker({ open: true, query: body.slice(sel.start, sel.end).trim(), from: sel.start, to: sel.end });
+      case "deck":
+        return setDeckPickerOpen(true);
       case "image":
         return imageInput.current?.click();
       case "audio":
         return audioInput.current?.click();
     }
+  };
+
+  const refocusBody = () => {
+    requestAnimationFrame(() => bodyRef.current?.focus());
+  };
+
+  const onPickCard = (name: string) => {
+    const { from, to } = cardPicker;
+    const text = `[[${name}]]`;
+    const caret = from + text.length;
+    setCardPicker((p) => ({ ...p, open: false }));
+    applyEdit({ value: body.slice(0, from) + text + body.slice(to), selectionStart: caret, selectionEnd: caret });
+  };
+
+  const onPickDeck = (url: string) => {
+    setDeckPickerOpen(false);
+    applyEdit(insertBlock(body, selection(), url));
   };
 
   const onPickMedia = async (kind: UploadKind, files: FileList | null) => {
@@ -427,11 +482,17 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
                   ref={bodyRef}
                   value={body}
                   onChange={(e) => {
-                    setBody(e.target.value);
+                    const v = e.target.value;
+                    setBody(v);
                     editVersion.current += 1;
                     setDirty(true);
+                    // Typing "[[" opens the card picker; the pick replaces the brackets.
+                    const caret = e.target.selectionStart;
+                    if (caret >= 2 && v.slice(caret - 2, caret) === "[[" && v[caret - 3] !== "[" && v[caret] !== "[") {
+                      setCardPicker({ open: true, query: "", from: caret - 2, to: caret });
+                    }
                   }}
-                  placeholder="Write in markdown…"
+                  placeholder="Write in markdown… Type [[ to mention a card."
                   aria-label="Body"
                   spellCheck
                   className="min-h-[50vh] w-full resize-y bg-transparent p-3 font-mono text-sm leading-relaxed outline-none lg:min-h-[70vh]"
@@ -439,7 +500,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
               </div>
               <div className={`${tab === "preview" ? "" : "hidden lg:block"} rounded-b-md bg-muted/20 p-4 lg:rounded-r-md`}>
                 {body.trim() ? (
-                  <ArticleBody markdown={body} />
+                  <ArticleBody markdown={body} refs={refs} draft />
                 ) : (
                   <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>
                 )}
@@ -557,6 +618,23 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
         }}
       />
 
+      <CardPicker
+        open={cardPicker.open}
+        initialQuery={cardPicker.query}
+        onPick={onPickCard}
+        onClose={() => {
+          setCardPicker((p) => ({ ...p, open: false }));
+          refocusBody();
+        }}
+      />
+      <DeckPicker
+        open={deckPickerOpen}
+        onPick={onPickDeck}
+        onClose={() => {
+          setDeckPickerOpen(false);
+          refocusBody();
+        }}
+      />
       <ConfirmationDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}

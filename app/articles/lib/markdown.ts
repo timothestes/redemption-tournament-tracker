@@ -1,5 +1,6 @@
 // Pure helpers shared by the renderer, the editor, and the server actions.
 // No React, no Supabase, no Node-only APIs — keep it unit-testable.
+import { cardNameKey } from "@/lib/cards/nameKey";
 
 const YT_HOSTS = new Set([
   "youtube.com",
@@ -64,6 +65,7 @@ export function slugify(title: string): string {
 export function excerptFromMarkdown(md: string, max = 200): string {
   const text = md
     .replace(/```[\s\S]*?```/g, " ")
+    .replace(/\[\[([^\[\]\n]+?)\]\]/g, "$1")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/^\s{0,3}#{1,6}\s+/gm, "")
@@ -82,4 +84,66 @@ export function excerptFromMarkdown(md: string, max = 200): string {
   const lastSpace = cut.lastIndexOf(" ");
   const base = lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut;
   return base.replace(/[\s,;:.!?-]+$/, "") + "…";
+}
+
+// ---------------------------------------------------------------------------
+// Card mentions and deck embeds
+// (docs/superpowers/specs/2026-09-07-article-card-deck-embeds-design.md)
+// ---------------------------------------------------------------------------
+
+/** `[[Card Name]]` — no brackets or newlines inside; whitespace around the name is ignored. */
+export const CARD_MENTION_RE = /\[\[([^\[\]\n]+?)\]\]/g;
+
+/** Lookup key for a mention — the shared loose card-name key. */
+export const mentionKey = cardNameKey;
+
+const FENCE_RE = /```[\s\S]*?```/g;
+const INLINE_CODE_RE = /`[^`\n]*`/g;
+
+/** Distinct mention names (as typed) outside code, in document order, capped. */
+export function extractCardMentions(md: string, max = 200): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const text = md.replace(FENCE_RE, " ").replace(INLINE_CODE_RE, " ");
+  for (const m of text.matchAll(CARD_MENTION_RE)) {
+    const name = m[1].replace(/\s+/g, " ").trim();
+    const key = mentionKey(name);
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+    if (out.length === max) break;
+  }
+  return out;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Hosts whose /decklist/<uuid> links embed. Anything else stays a plain link.
+const DECK_HOSTS = [/(^|\.)landofredemption\.com$/, /(^|\.)redemptionccg\.app$/, /^localhost$/, /^127\.0\.0\.1$/, /\.vercel\.app$/];
+
+/** Deck id from a deck-page URL (absolute on one of our hosts, or root-relative), else null. */
+export function deckIdFromUrl(url: string): string | null {
+  const s = url.trim();
+  let u: URL;
+  try {
+    u = new URL(s, "https://placeholder.invalid");
+  } catch {
+    return null;
+  }
+  const relative = u.hostname === "placeholder.invalid";
+  if (relative ? !s.startsWith("/") : !DECK_HOSTS.some((re) => re.test(u.hostname))) return null;
+  const m = u.pathname.match(/^\/decklist\/([^/]+)\/?$/);
+  return m && UUID_RE.test(m[1]) ? m[1].toLowerCase() : null;
+}
+
+const DECK_URL_RE = /(?:https?:\/\/[^\s<>()\[\]]+)?\/decklist\/[0-9a-fA-F-]{36}\b/g;
+
+/** Distinct deck ids referenced anywhere in the markdown, in document order, capped. */
+export function extractDeckIds(md: string, max = 10): string[] {
+  const out: string[] = [];
+  for (const m of md.matchAll(DECK_URL_RE)) {
+    const id = deckIdFromUrl(m[0]);
+    if (id && !out.includes(id)) out.push(id);
+    if (out.length === max) break;
+  }
+  return out;
 }

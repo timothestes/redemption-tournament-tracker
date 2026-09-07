@@ -1,12 +1,21 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Element } from "hast";
-import { isAudioUrl, youtubeId } from "../lib/markdown";
+import { deckIdFromUrl, isAudioUrl, mentionKey, youtubeId } from "../lib/markdown";
+import remarkCardMentions from "../lib/remarkCardMentions";
+import { EMPTY_REFS, type ArticleRefs } from "../lib/refTypes";
+import CardMention from "./CardMention";
+import DeckEmbed from "./DeckEmbed";
 
 // The ONE markdown renderer: public article page (server) and editor preview
 // (client) both use it, so what the poster previews is what readers get.
 // No rehype-raw: raw HTML in the markdown is escaped, which is the whole XSS
 // story. react-markdown's default urlTransform already drops javascript: URLs.
+//
+// Card mentions (`[[Name]]`) and deck embeds (a deck URL alone on a paragraph)
+// need the card index and Supabase, which must stay off the client — so the
+// caller resolves them (app/articles/lib/refs.ts) and hands the result in as
+// `refs`. Without refs, mentions are plain text and deck URLs are links.
 
 /** href of the paragraph's only child when that child is a link, else null. */
 function soleLinkHref(node: Element | undefined): string | null {
@@ -37,51 +46,74 @@ export function YouTubeEmbed({ id }: { id: string }) {
   );
 }
 
-const components: Components = {
-  // A paragraph that is ONLY a YouTube link becomes the embed instead of a
-  // <p> — an iframe inside <p> is invalid HTML and warns on hydration.
-  p: ({ node, children, ...props }) => {
-    const href = soleLinkHref(node);
-    const id = href ? youtubeId(href) : null;
-    if (id) return <YouTubeEmbed id={id} />;
-    return <p {...props}>{children}</p>;
-  },
-  a: ({ node: _node, href, children, ...props }) => {
-    if (href && isAudioUrl(href)) {
+function buildComponents(refs: ArticleRefs, draft: boolean): Components {
+  const components = {
+    // A paragraph that is ONLY a YouTube link becomes the embed instead of a
+    // <p> — an iframe inside <p> is invalid HTML and warns on hydration. A
+    // paragraph that is only a deck link becomes the deck, for the same reason.
+    p: ({ node, children, ...props }) => {
+      const href = soleLinkHref(node);
+      const id = href ? youtubeId(href) : null;
+      if (id) return <YouTubeEmbed id={id} />;
+      const deckId = href ? deckIdFromUrl(href) : null;
+      // Absent from refs (nothing resolved, or the loader failed) keeps the link.
+      if (deckId && deckId in refs.decks) return <DeckEmbed id={deckId} deck={refs.decks[deckId]} />;
+      return <p {...props}>{children}</p>;
+    },
+    a: ({ node: _node, href, children, ...props }) => {
+      if (href && isAudioUrl(href)) {
+        return (
+          <span className="article-audio my-4 block">
+            <audio controls preload="none" src={href} className="w-full" />
+            <a href={href} className="mt-1 inline-block text-xs text-muted-foreground" download>
+              {children}
+            </a>
+          </span>
+        );
+      }
+      const external = !!href && /^https?:\/\//i.test(href);
       return (
-        <span className="article-audio my-4 block">
-          <audio controls preload="none" src={href} className="w-full" />
-          <a href={href} className="mt-1 inline-block text-xs text-muted-foreground" download>
-            {children}
-          </a>
-        </span>
+        <a href={href} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})} {...props}>
+          {children}
+        </a>
       );
-    }
-    const external = !!href && /^https?:\/\//i.test(href);
-    return (
-      <a href={href} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})} {...props}>
-        {children}
-      </a>
-    );
-  },
-  img: ({ node: _node, src, alt, ...props }) => (
-    // Plain <img>: dimensions are unknown and hosts vary (Blob today, the old
-    // WordPress uploads after the import). next/image needs width/height.
-    <img
-      src={typeof src === "string" ? src : undefined}
-      alt={alt ?? ""}
-      loading="lazy"
-      decoding="async"
-      className="mx-auto max-w-full rounded-md"
-      {...props}
-    />
-  ),
-};
+    },
+    img: ({ node: _node, src, alt, ...props }) => (
+      // Plain <img>: dimensions are unknown and hosts vary (Blob today, the old
+      // WordPress uploads after the import). next/image needs width/height.
+      <img
+        src={typeof src === "string" ? src : undefined}
+        alt={alt ?? ""}
+        loading="lazy"
+        decoding="async"
+        className="mx-auto max-w-full rounded-md"
+        {...props}
+      />
+    ),
+    // Produced by remarkCardMentions; `name` is the text between the brackets.
+    "card-mention": ({ name }: { name?: string }) => {
+      const typed = typeof name === "string" ? name : "";
+      const ref = refs.cards[mentionKey(typed)];
+      return <CardMention name={typed} imgFile={ref?.imgFile} draft={draft} />;
+    },
+  } satisfies Components & { "card-mention": unknown };
+  return components as Components;
+}
 
-export default function ArticleBody({ markdown }: { markdown: string }) {
+export default function ArticleBody({
+  markdown,
+  refs = EMPTY_REFS,
+  draft = false,
+}: {
+  markdown: string;
+  /** Resolved card mentions and deck embeds; see app/articles/lib/refs.ts. */
+  refs?: ArticleRefs;
+  /** Editor preview: mark mentions that resolved to nothing. */
+  draft?: boolean;
+}) {
   return (
     <div className="article-body prose prose-neutral max-w-none sm:prose-lg">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkCardMentions]} components={buildComponents(refs, draft)}>
         {markdown}
       </ReactMarkdown>
     </div>

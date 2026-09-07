@@ -5,6 +5,7 @@ import TopNav from "@/components/top-nav";
 import SponsorFooter from "@/components/sponsor-footer";
 import ArticleBody from "../components/ArticleBody";
 import AuthorBio from "../components/AuthorBio";
+import { resolveArticleRefs } from "../lib/refs";
 import PostCard, { formatPostDate } from "../components/PostCard";
 import {
   listPublishedTags,
@@ -70,6 +71,9 @@ export default async function ArticlePage({ params }: PageProps) {
   const isSeries = inSeries.length > 0;
   const more = (isSeries ? inSeries : (await loadPublishedPosts({ page: 1 })).posts.filter((p) => p.id !== post.id)).slice(0, 3);
   const byline = [postByline(post), formatPostDate(post.published_at)].filter(Boolean).join(" · ");
+  // Card mentions and deck embeds: resolved here so the shared renderer stays
+  // free of the card index and Supabase.
+  const refs = await resolveArticleRefs(post.body_md);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -125,7 +129,7 @@ export default async function ArticlePage({ params }: PageProps) {
             />
           </div>
         )}
-        <ArticleBody markdown={post.body_md} />
+        <ArticleBody markdown={post.body_md} refs={refs} />
         <AuthorBio post={post} />
         {more.length > 0 && (
           <section aria-labelledby="keep-reading" className="mt-10 border-t border-border/60 pt-6">
