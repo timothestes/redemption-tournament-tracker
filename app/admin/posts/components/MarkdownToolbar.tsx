@@ -1,8 +1,19 @@
 "use client";
 
-import { Bold, Italic, Heading2, Quote, List, Link2, Image as ImageIcon, Youtube, Music } from "lucide-react";
+import { Bold, Italic, Heading2, Quote, List, Link2, Image as ImageIcon, Youtube, Music, WalletCards, Layers } from "lucide-react";
 
-export type ToolbarAction = "bold" | "italic" | "heading" | "quote" | "list" | "link" | "image" | "youtube" | "audio";
+export type ToolbarAction =
+  | "bold"
+  | "italic"
+  | "heading"
+  | "quote"
+  | "list"
+  | "link"
+  | "card"
+  | "deck"
+  | "image"
+  | "youtube"
+  | "audio";
 
 const BUTTONS: Array<{ action: ToolbarAction; label: string; Icon: typeof Bold }> = [
   { action: "bold", label: "Bold", Icon: Bold },
@@ -11,6 +22,8 @@ const BUTTONS: Array<{ action: ToolbarAction; label: string; Icon: typeof Bold }
   { action: "quote", label: "Quote", Icon: Quote },
   { action: "list", label: "Bulleted list", Icon: List },
   { action: "link", label: "Link", Icon: Link2 },
+  { action: "card", label: "Mention a card (or type [[)", Icon: WalletCards },
+  { action: "deck", label: "Embed a deck", Icon: Layers },
   { action: "image", label: "Upload image", Icon: ImageIcon },
   { action: "youtube", label: "Embed YouTube video", Icon: Youtube },
   { action: "audio", label: "Upload audio", Icon: Music },

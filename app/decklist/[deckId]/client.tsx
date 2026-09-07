@@ -27,6 +27,7 @@ import { Deck as DeckType } from "../card-search/types/deck";
 import { generateDeckText } from "../card-search/utils/deckImportExport";
 import CardTile from "@/components/ui/CardTile";
 import { compareCardsByType, compareCardsDefault, compareTypeGroups, type SortableCard } from "@/lib/cards/defaultSort";
+import { prettifyTypeName, getGroupKey, getGroupDisplayName } from "@/lib/decks/typeGroups";
 import { getFormatDef } from "@/lib/formats";
 import { TrophyIcon, getPlacementLabel } from "@/components/trophy-icon";
 import type { DeckTournamentContext } from "../deckTournamentContext";
@@ -111,54 +112,6 @@ function toSortable(c: EnrichedCard): SortableCard {
     strength: c.fullCard?.strength,
     reference: c.fullCard?.reference,
   };
-}
-
-// Prettify raw type abbreviations
-function prettifyTypeName(type: string): string {
-  const map: Record<string, string> = {
-    "GE": "Good Enhancement",
-    "EE": "Evil Enhancement",
-    "EC": "Evil Character",
-    "HC": "Hero Character",
-    "GC": "Good Character",
-    "LS": "Lost Soul",
-    "Dom": "Dominant",
-    "Cov": "Covenant",
-    "Cur": "Curse",
-    "Art": "Artifact",
-    "Fort": "Fortress",
-    "Hero/GE": "Good Enhancement",
-    "Evil Character/EE": "Evil Enhancement",
-  };
-  return map[type] || type;
-}
-
-// Group name used for display — combine small related types
-function getGroupKey(type: string): string {
-  const pretty = prettifyTypeName(type);
-  if (pretty === "Artifact" || pretty === "Covenant" || pretty === "Curse") {
-    return "Artifact/Covenant/Curse";
-  }
-  if (pretty === "Fortress" || pretty === "Site" || pretty === "City") {
-    return "Fortress/Site";
-  }
-  return pretty;
-}
-
-// Display-friendly group names (pluralized)
-function getGroupDisplayName(group: string): string {
-  const map: Record<string, string> = {
-    "Hero": "Heroes",
-    "Good Enhancement": "Good Enhancements",
-    "Evil Character": "Evil Characters",
-    "Evil Enhancement": "Evil Enhancements",
-    "Dual-Alignment Enhancement": "Dual-Alignment Enhancements",
-    "Lost Soul": "Lost Souls",
-    "Artifact/Covenant/Curse": "Artifacts / Covenants / Curses",
-    "Fortress/Site": "Fortresses / Sites",
-    "Dominant": "Dominants",
-  };
-  return map[group] || group;
 }
 
 function formatDeckType(format?: string): string {
