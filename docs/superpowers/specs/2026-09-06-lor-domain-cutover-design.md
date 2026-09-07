@@ -46,7 +46,7 @@ New code, all in the tracker app (runs on whichever host serves it):
 | `/wp-admin`, `/wp-login.php`, `/xmlrpc.php` | 404 (no rule; bots) |
 
 **Data:**
-- **Migration 097:** `alter table posts add column wp_post_id integer unique;` backfilled by `scripts/backfill-wp-post-ids.ts` (service role, one-off) matching WXR `wp:post_id` → `source_url`. Imported pages (section 2) get theirs at import time.
+- **Migration 100 (file `100_posts_wp_post_id.sql`; DB-side name `posts_wp_post_id`):** `alter table posts add column wp_post_id integer unique;` backfilled by `scripts/backfill-wp-post-ids.ts` (service role, one-off) matching WXR `wp:post_id` → `source_url`. Imported pages (section 2) get theirs at import time.
 - **Generated map:** `scripts/generate-wp-redirects.ts` reads the WXR and writes `lib/wp/categoryMap.ts` — `{ [wpSlug]: tagName }` for the 51 categories plus `{ [wpTermId]: tagName }` for `?cat=`. Checked in (the WXR lives only in gitignored `tmp/`); regeneration is a dev-only command documented in the script header.
 
 ## 2. WordPress page dispositions (all 36)

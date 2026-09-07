@@ -15,7 +15,7 @@
 - Worktree: ALL work in `/Users/timestes/projects/rtt-lor-cutover` (branch `feat/lor-domain-cutover`), absolute paths only. Another agent may own the main checkout — never touch it.
 - **NEVER run `npm install` / `npm ci` here.** `node_modules` is (after Task 0) a symlink into the main checkout; installing would corrupt the sibling's packages.
 - Live-write commands (`import-wxr.ts` without `--dry-run`, `backfill-wp-post-ids.ts` without `--dry-run`, the migration) hit **production** Supabase + Blob. Run them exactly as written, dry-run first where a dry-run step exists.
-- Migrations 001–096 are applied to prod; this plan adds `097_posts_wp_post_id.sql`. Apply once, via Supabase MCP `apply_migration` (name `posts_wp_post_id`).
+- Migrations 001–096 are applied to prod; this plan adds `100_posts_wp_post_id.sql`. Apply once, via Supabase MCP `apply_migration` (name `posts_wp_post_id`).
 - The WXR export and site backup live in the MAIN checkout's gitignored tmp:
   `WXR=/Users/timestes/projects/redemption-tournament-tracker/tmp/landofredemption.WordPress.2026-09-05.xml`
   `BACKUP=/Users/timestes/projects/redemption-tournament-tracker/tmp/public_html`
@@ -231,14 +231,14 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 3: Migration 097 + wp_post_id backfill
 
 **Files:**
-- Create: `supabase/migrations/097_posts_wp_post_id.sql`
+- Create: `supabase/migrations/100_posts_wp_post_id.sql`
 - Create: `scripts/backfill-wp-post-ids.ts`
 
 **Interfaces:**
 - Consumes: `readWxr(path, { postType })` from Task 2; `serviceClient` from `scripts/lib/wxr/db.ts` (existing).
 - Produces: `posts.wp_post_id integer unique` populated for every row whose `source_url` matches a WXR item link. Consumed by Task 4 (page rows get stamped on its backfill re-run) and Task 5 (the `?p=` lookup).
 
-- [ ] **Step 1: Write the migration** (`supabase/migrations/097_posts_wp_post_id.sql`)
+- [ ] **Step 1: Write the migration** (`supabase/migrations/100_posts_wp_post_id.sql`)
 
 ```sql
 -- WordPress post/page id, for legacy short-link redirects (/?p=<id>, /?page_id=<id>).
@@ -248,7 +248,7 @@ alter table public.posts add column wp_post_id integer unique;
 
 - [ ] **Step 2: Apply it to prod**
 
-Via Supabase MCP `apply_migration` (name `posts_wp_post_id`) if MCP tools are available to you; otherwise `source .env.local && psql "$POSTGRES_URL_NON_POOLING" -f supabase/migrations/097_posts_wp_post_id.sql`. Verify: `execute_sql` → `select column_name from information_schema.columns where table_name='posts' and column_name='wp_post_id';` returns one row.
+Via Supabase MCP `apply_migration` (name `posts_wp_post_id`) if MCP tools are available to you; otherwise `source .env.local && psql "$POSTGRES_URL_NON_POOLING" -f supabase/migrations/100_posts_wp_post_id.sql`. Verify: `execute_sql` → `select column_name from information_schema.columns where table_name='posts' and column_name='wp_post_id';` returns one row.
 
 - [ ] **Step 3: Write the backfill script** (`scripts/backfill-wp-post-ids.ts`)
 
@@ -314,7 +314,7 @@ Verify the ranking short link: Supabase MCP `execute_sql` → `select slug from 
 Run: `npx tsc --noEmit 2>&1 | tail -5` — same 8 pre-existing errors, nothing new.
 
 ```bash
-git add supabase/migrations/097_posts_wp_post_id.sql scripts/backfill-wp-post-ids.ts
+git add supabase/migrations/100_posts_wp_post_id.sql scripts/backfill-wp-post-ids.ts
 git commit -m "feat(redirects): posts.wp_post_id (migration 097) + WXR backfill script
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
