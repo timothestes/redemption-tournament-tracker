@@ -478,6 +478,11 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
             <div className="grid lg:grid-cols-2">
               <div className={tab === "write" ? "" : "hidden lg:block"}>
                 <MarkdownToolbar onAction={onToolbar} disabled={locked} />
+                {/* The two non-obvious moves, always in view so nobody has to find a tooltip. */}
+                <p className="bg-muted/40 px-3 py-1.5 text-xs leading-relaxed text-muted-foreground">
+                  Type <kbd className="rounded bg-background px-1 font-mono text-[11px] text-foreground">[[</kbd> to mention
+                  a card. Paste a deck link on its own line to embed the deck.
+                </p>
                 <textarea
                   ref={bodyRef}
                   value={body}
@@ -492,7 +497,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
                       setCardPicker({ open: true, query: "", from: caret - 2, to: caret });
                     }
                   }}
-                  placeholder="Write in markdown… Type [[ to mention a card."
+                  placeholder="Write in markdown…"
                   aria-label="Body"
                   spellCheck
                   className="min-h-[50vh] w-full resize-y bg-transparent p-3 font-mono text-sm leading-relaxed outline-none lg:min-h-[70vh]"
@@ -502,7 +507,10 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
                 {body.trim() ? (
                   <ArticleBody markdown={body} refs={refs} draft />
                 ) : (
-                  <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Nothing to preview yet. Card mentions show the card on hover; a deck link on its own line becomes the
+                    deck.
+                  </p>
                 )}
               </div>
             </div>
