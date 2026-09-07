@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return {
-    title: `${result.name} - Card Breakdown | Redemption CCG`,
+    title: `${result.name} - Card Breakdown`,
     description: `Card frequency and metagame analysis across ${result.breakdown.deckCount} published decklists from ${result.name}.`,
   };
 }

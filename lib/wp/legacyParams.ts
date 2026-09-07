@@ -25,7 +25,8 @@ export async function resolveLegacyWpParams(
   }
   if (params.cat !== undefined) {
     if (typeof params.cat !== "string") return { kind: "not-found" };
-    const name = CATEGORY_BY_TERM_ID[params.cat.trim()];
+    const key = params.cat.trim();
+    const name = Object.hasOwn(CATEGORY_BY_TERM_ID, key) ? CATEGORY_BY_TERM_ID[key] : undefined;
     return name
       ? { kind: "redirect", to: `/articles?tag=${encodeURIComponent(name)}` }
       : { kind: "not-found" };

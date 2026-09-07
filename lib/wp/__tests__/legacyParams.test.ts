@@ -38,4 +38,9 @@ describe("resolveLegacyWpParams", () => {
       await resolveLegacyWpParams({ p: ["3582"] as unknown as string }, lookup),
     ).toEqual({ kind: "not-found" });
   });
+  it("404s prototype-property keys instead of resolving them (?cat=constructor)", async () => {
+    expect(await resolveLegacyWpParams({ cat: "constructor" }, lookup)).toEqual({
+      kind: "not-found",
+    });
+  });
 });

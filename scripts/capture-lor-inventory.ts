@@ -10,6 +10,23 @@ type Entry = { url: string; expect: 200 | 404 };
 const ORIGIN = "https://landofredemption.com";
 // Group C pages + drafts: no tracker home, deliberate 404s (spec §2).
 const GONE_PAGES = new Set(["activity", "access-restricted"]);
+// 12 WordPress posts that were spam and were deleted from the tracker (not
+// imported) on 2026-09-06. WordPress still serves them (200), so a re-capture
+// would otherwise re-classify them as expect:200 and regress the inventory.
+const GONE_POST_SLUGS = new Set([
+  "minecraft-dungeons-official-launch-trailer",
+  "beginners-guide-and-tips-for-underworld-adventurers",
+  "more-advanced-gameplay-tips-and-tricks-for-valorant",
+  "minecraft-dungeons-a-fun-family-friendly-romp-the-review",
+  "burning-through-my-cards-of-deck-of-ashes-the-review",
+  "valorant-the-art-of-execution-the-review",
+  "gunsight-seeing-hunting-simulator-2-preview",
+  "port-royale-4-preview",
+  "the-waylanders-draggin-age-the-preview",
+  "match-of-the-week-esl-xiog123-vs-kraad4",
+  "match-of-the-week-esl-oppo-lv-vs-gripexx",
+  "i-have-no-regrets-an-interview-with-the-esl-cup-finalist",
+]);
 
 const locs = (xml: string): string[] =>
   [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
@@ -20,6 +37,8 @@ function classify(url: string): Entry {
   if (path.startsWith("/tag/") || path.startsWith("/author/") || path.startsWith("/type/")) return { url, expect: 404 };
   const slug = path.replaceAll("/", "");
   if (GONE_PAGES.has(slug)) return { url, expect: 404 };
+  const segments = path.split("/").filter(Boolean);
+  if (segments.length === 1 && GONE_POST_SLUGS.has(segments[0])) return { url, expect: 404 };
   return { url, expect: 200 };
 }
 

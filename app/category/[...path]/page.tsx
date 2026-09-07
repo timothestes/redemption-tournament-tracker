@@ -15,7 +15,7 @@ export default async function LegacyCategoryRedirect({
 }) {
   const { path } = await params;
   const slug = path[path.length - 1]?.toLowerCase() ?? "";
-  const name = CATEGORY_BY_SLUG[slug];
+  const name = Object.hasOwn(CATEGORY_BY_SLUG, slug) ? CATEGORY_BY_SLUG[slug] : undefined;
   if (!name) notFound();
   permanentRedirect(`/articles?tag=${encodeURIComponent(name)}`);
 }

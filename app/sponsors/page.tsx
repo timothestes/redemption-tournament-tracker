@@ -3,7 +3,7 @@ import TopNav from "@/components/top-nav";
 import { SPONSORS } from "@/lib/sponsors";
 
 export const metadata = {
-  title: "Sponsors | Redemption CCG",
+  title: "Sponsors",
   description: "The sponsors who help keep Land of Redemption free for Redemption players.",
   alternates: { canonical: "/sponsors" },
 };

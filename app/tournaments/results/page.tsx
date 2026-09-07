@@ -5,7 +5,7 @@ import { loadPublicResultsIndexAction } from "../actions";
 import ResultsSectionTabs from "@/components/metagame/ResultsSectionTabs";
 
 export const metadata = {
-  title: "Tournament Results | Redemption CCG",
+  title: "Tournament Results",
   description: "Browse published standings and decklists from past Redemption CCG tournaments.",
 };
 

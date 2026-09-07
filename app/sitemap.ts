@@ -109,11 +109,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Dynamic routes: published articles (the imported WordPress archive + new posts)
   // PostgREST caps every select at 1000 rows regardless of an explicit .limit(),
   // so paginate with .range() until a page comes back short.
-  const posts: { slug: string; published_at: string | null }[] = [];
+  const posts: { slug: string; published_at: string | null; updated_at: string | null }[] = [];
   for (let from = 0; ; from += 1000) {
     const { data: page } = await supabase
       .from("posts")
-      .select("slug, published_at")
+      .select("slug, published_at, updated_at")
       .eq("status", "published")
       .order("published_at", { ascending: false })
       .range(from, from + 999);
@@ -125,7 +125,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const articleRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${baseUrl}/articles/${post.slug}`,
-    lastModified: post.published_at ?? undefined,
+    lastModified: post.updated_at ?? post.published_at ?? undefined,
     changeFrequency: "monthly" as const,
     priority: 0.6,
   }));

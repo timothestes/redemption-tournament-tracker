@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: "Results Not Found" };
   }
 
-  return { title: `${result.name} - Results | Redemption CCG` };
+  return { title: `${result.name} - Results` };
 }
 
 function ordinal(n: number): string {

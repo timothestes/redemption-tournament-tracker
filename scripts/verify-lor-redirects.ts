@@ -1,6 +1,7 @@
 /**
  * Replays the captured WordPress URL inventory against a tracker host and asserts
- * each URL's final status (following ≤5 redirect hops) matches the expectation.
+ * each URL's final status (following at most 3 redirect hops, per spec) matches
+ * the expectation.
  * Usage: npx tsx scripts/verify-lor-redirects.ts --base http://localhost:3103
  *        npx tsx scripts/verify-lor-redirects.ts --base https://landofredemption.com
  */
@@ -14,7 +15,8 @@ const base = values.base.replace(/\/$/, "");
 
 async function finalStatus(url: string): Promise<number> {
   let current = url;
-  for (let hop = 0; hop < 6; hop++) {
+  // 4 fetches total = at most 3 redirects followed before giving up.
+  for (let hop = 0; hop < 4; hop++) {
     const res = await fetch(current, { redirect: "manual" });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");

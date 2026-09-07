@@ -59,6 +59,7 @@ export default async function ArticlePage({ params }: PageProps) {
               "@type": "Article",
               headline: post.title,
               datePublished: post.published_at ?? undefined,
+              dateModified: post.updated_at ?? undefined,
               author: { "@type": "Person", name: postByline(post) },
               ...(post.cover_image_url ? { image: [post.cover_image_url] } : {}),
             }),
