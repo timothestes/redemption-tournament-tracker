@@ -34,11 +34,12 @@ export async function updateAuthorProfileAction(
     // A bio/avatar change is invisible on already-rendered article pages
     // until these run (or the hourly ISR window passes) — revalidate every
     // published slug this author owns, not just the ones edited today.
-    const { data: mine } = await ctx.supabase
+    const { data: mine, error: slugsError } = await ctx.supabase
       .from("posts")
       .select("slug")
       .eq("author_id", ctx.user.id)
       .eq("status", "published");
+    if (slugsError) console.error("updateAuthorProfile: could not load slugs to revalidate:", slugsError);
     revalidatePath("/articles");
     for (const row of (mine ?? []) as { slug: string }[]) revalidatePath(`/articles/${row.slug}`);
 

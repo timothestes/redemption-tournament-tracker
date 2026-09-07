@@ -7,9 +7,9 @@ import { revalidatePath } from "next/cache";
 import { requirePoster } from "../auth";
 import { updateAuthorProfileAction } from "../authorProfile";
 
-function ctx(overrides: { error?: unknown; posts?: { slug: string }[] } = {}) {
+function ctx(overrides: { error?: unknown; posts?: { slug: string }[]; postsError?: unknown } = {}) {
   const updateEq = vi.fn(async () => ({ error: overrides.error ?? null }));
-  const postsEq2 = vi.fn(async () => ({ data: overrides.posts ?? [] }));
+  const postsEq2 = vi.fn(async () => ({ data: overrides.posts ?? [], error: overrides.postsError ?? null }));
   return {
     user: { id: "u1" },
     supabase: {
@@ -55,5 +55,18 @@ describe("updateAuthorProfileAction", () => {
     (requirePoster as any).mockResolvedValue(ctx({ error: { message: "boom" } }));
     const r = await updateAuthorProfileAction("hi", null);
     expect(r).toEqual({ success: false, error: "Could not save your author profile" });
+  });
+
+  it("logs a slugs query error but still returns success for profile write", async () => {
+    const c = ctx({ posts: [], postsError: { message: "slugs query failed" } });
+    (requirePoster as any).mockResolvedValue(c);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await updateAuthorProfileAction("bio text", "https://x/y.png");
+    expect(r).toEqual({ success: true });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "updateAuthorProfile: could not load slugs to revalidate:",
+      { message: "slugs query failed" }
+    );
+    consoleErrorSpy.mockRestore();
   });
 });
