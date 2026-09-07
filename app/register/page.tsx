@@ -220,7 +220,7 @@ export default function RegistrationPage() {
             {NATIONALS_CONFIG.dates}
             {" \u00B7 "}
             <a
-              href="https://landofredemption.com/2026-redemption-national-tournament-wilmore-ky/"
+              href="/articles/2026-redemption-national-tournament-wilmore-ky"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"
