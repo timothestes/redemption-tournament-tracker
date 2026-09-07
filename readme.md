@@ -1,6 +1,6 @@
 <div align="center">
 
-# Redemption CCG App
+# Land of Redemption
 
 **The community platform for the Redemption CCG card game.**
 
