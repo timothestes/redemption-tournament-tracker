@@ -14,14 +14,6 @@ function needsAuth(pathname: string): boolean {
   return PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-function hasAuthCookies(request: NextRequest): boolean {
-  return request.cookies
-    .getAll()
-    .some(
-      (c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"),
-    );
-}
-
 export const updateSession = async (request: NextRequest) => {
   try {
     let response = NextResponse.next({
@@ -55,16 +47,13 @@ export const updateSession = async (request: NextRequest) => {
 
     const pathname = request.nextUrl.pathname;
 
-    // Only call getUser() when we actually need it:
-    //  - protected routes need it to enforce sign-in redirect
-    //  - root path with auth cookies needs it to redirect logged-in users to /tracker
-    // For everything else, anonymous fan-out (RSC payloads, prefetches across
-    // Edge regions) was hammering /auth/v1/user. Pass through cleanly instead.
+    // Only call getUser() when we actually need it: protected routes need it
+    // to enforce the sign-in redirect. For everything else, anonymous fan-out
+    // (RSC payloads, prefetches across Edge regions) was hammering
+    // /auth/v1/user. Pass through cleanly instead.
     const requiresAuth = needsAuth(pathname);
-    const isRootWithCookies = pathname === "/" && hasAuthCookies(request);
-    const shouldCheckUser = requiresAuth || isRootWithCookies;
 
-    if (!shouldCheckUser) {
+    if (!requiresAuth) {
       return response;
     }
 
@@ -123,17 +112,6 @@ export const updateSession = async (request: NextRequest) => {
       signInUrl.searchParams.set("redirectTo", fullPath);
       const redirectResponse = NextResponse.redirect(signInUrl);
       // Copy refreshed auth cookies onto the redirect so they aren't lost
-      response.cookies.getAll().forEach((cookie) => {
-        redirectResponse.cookies.set(cookie.name, cookie.value);
-      });
-      return redirectResponse;
-    }
-
-    // Logged-in users hitting root get sent to the tracker
-    if (pathname === "/" && user) {
-      const redirectResponse = NextResponse.redirect(
-        new URL("/tracker", request.url),
-      );
       response.cookies.getAll().forEach((cookie) => {
         redirectResponse.cookies.set(cookie.name, cookie.value);
       });
