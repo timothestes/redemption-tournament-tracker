@@ -16,6 +16,12 @@ interface PageProps {
   searchParams: Promise<{ page?: string; tag?: string }>;
 }
 
+/** Series chips in the rail before the long tail folds into "All topics". */
+const RAIL = 10;
+
+const CHIP =
+  "inline-flex min-h-11 items-center rounded-full border border-border bg-foreground/[0.03] px-3 text-sm text-muted-foreground hover:border-foreground/40 hover:text-foreground";
+
 function pageHref(page: number, tag: string | null): string {
   const sp = new URLSearchParams();
   if (tag) sp.set("tag", tag);
@@ -30,12 +36,21 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
   const page = Number.isInteger(requested) && requested > 0 ? requested : 1;
   const tag = sp.tag?.trim() || null;
 
-  const [{ posts, total }, tags] = await Promise.all([loadPublishedPosts({ page, tag }), listPublishedTags()]);
+  // Validate ?tag against the (cached) tag list before it reaches a cache key
+  // and a count:exact scan — an unknown tag is the empty state, no DB work.
+  const tags = await listPublishedTags();
+  const known = tag && tags.includes(tag) ? tag : null;
+  const { posts, total } =
+    tag && !known ? { posts: [], total: 0 } : await loadPublishedPosts({ page, tag: known });
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // Past-the-end (?page=99, or the last post on a page being unpublished)
   // used to render an empty list with no pager and no way back. Land the
   // reader on the last real page instead.
   if (page > pageCount) redirect(pageHref(pageCount, tag));
+
+  const others = tags.filter((t) => t !== tag);
+  const rail = others.slice(0, RAIL);
+  const more = others.slice(RAIL);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -43,40 +58,71 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
       <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:py-10">
         <header className="mb-6 flex flex-col gap-3 sm:mb-8">
           <h1 className="font-cinzel text-3xl font-bold tracking-tight sm:text-4xl">Articles</h1>
+          <p className="text-sm text-muted-foreground">
+            {total.toLocaleString()} {total === 1 ? "article" : "articles"}
+            {tag ? ` in “${tag}”` : ""}
+          </p>
           {tags.length > 0 && (
-            <ul className="flex flex-wrap gap-2">
-              {tag && (
-                <li>
-                  <Link
-                    href="/articles"
-                    className="inline-flex min-h-11 items-center gap-1 rounded-full bg-primary px-3 text-sm text-primary-foreground"
-                  >
-                    {tag} <span aria-hidden>×</span>
-                    <span className="sr-only">clear tag filter</span>
-                  </Link>
-                </li>
-              )}
-              {tags
-                .filter((t) => t !== tag)
-                .slice(0, 20)
-                .map((t) => (
-                  <li key={t}>
+            <div className="mt-2 flex flex-col gap-2">
+              <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                Browse by series
+              </p>
+              {/* One row that scrolls on phones (no visible scrollbar), wraps from sm up. */}
+              <ul className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+                {tag && (
+                  <li className="shrink-0">
                     <Link
-                      href={pageHref(1, t)}
-                      className="inline-flex min-h-11 items-center rounded-full bg-muted px-3 text-sm text-muted-foreground hover:text-foreground"
+                      href="/articles"
+                      className="inline-flex min-h-11 items-center gap-1 rounded-full bg-primary px-3 text-sm text-primary-foreground dark:text-background"
                     >
+                      {tag} <span aria-hidden>×</span>
+                      <span className="sr-only">clear tag filter</span>
+                    </Link>
+                  </li>
+                )}
+                {rail.map((t) => (
+                  <li key={t} className="shrink-0">
+                    <Link href={pageHref(1, t)} className={CHIP}>
                       {t}
                     </Link>
                   </li>
                 ))}
-            </ul>
+              </ul>
+              {more.length > 0 && (
+                <details className="mt-1">
+                  <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 text-sm text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+                    All topics ({more.length}) <span aria-hidden>▾</span>
+                  </summary>
+                  <ul className="mt-2 flex flex-wrap gap-2">
+                    {more.map((t) => (
+                      <li key={t}>
+                        <Link href={pageHref(1, t)} className={CHIP}>
+                          {t}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
           )}
         </header>
 
         {total === 0 ? (
-          <p className="text-muted-foreground">No articles yet{tag ? ` tagged “${tag}”` : ""}.</p>
+          <p className="text-muted-foreground">
+            {tag ? (
+              <>
+                No articles tagged “{tag}”.{" "}
+                <Link href="/articles" className="underline hover:text-foreground">
+                  Show all articles
+                </Link>
+              </>
+            ) : (
+              "No articles yet."
+            )}
+          </p>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {posts.map((p) => (
               <PostCard key={p.id} post={p} />
             ))}

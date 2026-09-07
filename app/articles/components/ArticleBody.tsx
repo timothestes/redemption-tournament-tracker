@@ -80,7 +80,7 @@ const components: Components = {
 
 export default function ArticleBody({ markdown }: { markdown: string }) {
   return (
-    <div className="article-body prose prose-neutral dark:prose-invert max-w-none">
+    <div className="article-body prose prose-neutral max-w-none sm:prose-lg">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {markdown}
       </ReactMarkdown>

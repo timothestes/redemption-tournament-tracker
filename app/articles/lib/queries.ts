@@ -41,6 +41,9 @@ export function postByline(post: Pick<PublicPost, "author_name" | "author">): st
   return post.author_name ?? post.author?.username ?? "Land of Redemption";
 }
 
+/** PostgREST array literal for `tags cs {"tag"}` — quotes and backslashes escaped. */
+const tagContains = (tag: string) => `{"${tag.replace(/["\\]/g, (c) => "\\" + c)}"}`;
+
 async function loadPublishedPostsFresh(page: number, tag: string | null) {
   const from = (page - 1) * PAGE_SIZE;
   let q = createAnonClient()
@@ -49,7 +52,7 @@ async function loadPublishedPostsFresh(page: number, tag: string | null) {
     .eq("status", "published")
     .order("published_at", { ascending: false, nullsFirst: false })
     .range(from, from + PAGE_SIZE - 1);
-  if (tag) q = q.filter("tags", "cs", `{"${tag.replace(/["\\]/g, (c) => "\\" + c)}"}`);
+  if (tag) q = q.filter("tags", "cs", tagContains(tag));
   const { data, error, count } = await q;
   if (error) {
     // PGRST103 = "Requested range not satisfiable" — caller paginated past
@@ -58,7 +61,7 @@ async function loadPublishedPostsFresh(page: number, tag: string | null) {
     if (error.code === "PGRST103") {
       if (count != null) return { posts: [], total: count };
       let countQ = createAnonClient().from("posts").select("id", { head: true, count: "exact" }).eq("status", "published");
-      if (tag) countQ = countQ.filter("tags", "cs", `{"${tag.replace(/["\\]/g, (c) => "\\" + c)}"}`);
+      if (tag) countQ = countQ.filter("tags", "cs", tagContains(tag));
       const { count: totalCount } = await countQ;
       return { posts: [], total: totalCount ?? 0 };
     }
@@ -128,4 +131,26 @@ async function listPublishedTagsFresh(): Promise<string[]> {
 
 export function listPublishedTags(): Promise<string[]> {
   return unstable_cache(listPublishedTagsFresh, ["articles-tags"], { tags: [ARTICLES_TAG], revalidate: 3600 })();
+}
+
+async function loadPostsByTagFresh(tag: string, limit: number): Promise<PublicPost[]> {
+  const { data, error } = await createAnonClient()
+    .from("posts")
+    .select(COLUMNS)
+    .eq("status", "published")
+    .filter("tags", "cs", tagContains(tag))
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) {
+    throw new Error(`loadPostsByTag: ${error.message}`);
+  }
+  return (data ?? []) as unknown as PublicPost[];
+}
+
+/** Newest `limit` posts in a tag (= series) — the article page's "More in …" strip. */
+export function loadPostsByTag(tag: string, limit = 4): Promise<PublicPost[]> {
+  return unstable_cache(() => loadPostsByTagFresh(tag, limit), ["articles-by-tag", tag, String(limit)], {
+    tags: [ARTICLES_TAG],
+    revalidate: 3600,
+  })();
 }

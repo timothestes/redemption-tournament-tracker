@@ -4,7 +4,7 @@ export default function AuthorBio({ post }: { post: Pick<PublicPost, "author_nam
   const { author } = post;
   if (!author || (!author.avatar_url && !author.bio)) return null;
   return (
-    <div className="mt-8 flex gap-4 rounded-lg bg-card p-4">
+    <div className="mt-8 flex gap-4 rounded-lg bg-foreground/[0.03] p-4 ring-1 ring-border/60">
       {author.avatar_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={author.avatar_url} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" />

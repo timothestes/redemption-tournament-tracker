@@ -5,8 +5,15 @@ import TopNav from "@/components/top-nav";
 import SponsorFooter from "@/components/sponsor-footer";
 import ArticleBody from "../components/ArticleBody";
 import AuthorBio from "../components/AuthorBio";
-import { formatPostDate } from "../components/PostCard";
-import { loadPostBySlug, postByline, postExcerpt } from "../lib/queries";
+import PostCard, { formatPostDate } from "../components/PostCard";
+import {
+  listPublishedTags,
+  loadPostBySlug,
+  loadPostsByTag,
+  loadPublishedPosts,
+  postByline,
+  postExcerpt,
+} from "../lib/queries";
 import EditLink from "./EditLink";
 
 export const revalidate = 3600;
@@ -48,10 +55,26 @@ export default async function ArticlePage({ params }: PageProps) {
   const post = await loadPostBySlug(slug);
   if (!post) notFound();
 
+  // Tags act as series. Prefer the post's RAREST tag (the author's own series)
+  // over a broad category such as "News", which the WordPress import often put
+  // first. listPublishedTags() is cached and sorted most-common first, so a
+  // higher index means rarer. Untagged posts, and posts whose series has
+  // nothing else in it, fall back to the already-cached page-1 list.
+  const byFrequency = await listPublishedTags();
+  const rarity = (t: string) => {
+    const i = byFrequency.indexOf(t);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const series = post.tags.length > 0 ? [...post.tags].sort((a, b) => rarity(b) - rarity(a))[0] : null;
+  const inSeries = series ? (await loadPostsByTag(series, 4)).filter((p) => p.id !== post.id) : [];
+  const isSeries = inSeries.length > 0;
+  const more = (isSeries ? inSeries : (await loadPublishedPosts({ page: 1 })).posts.filter((p) => p.id !== post.id)).slice(0, 3);
+  const byline = [postByline(post), formatPostDate(post.published_at)].filter(Boolean).join(" · ");
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <TopNav />
-      <article className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:py-10">
+      <article className="mx-auto w-full max-w-2xl flex-1 px-4 py-6 sm:py-10">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -73,39 +96,57 @@ export default async function ArticlePage({ params }: PageProps) {
           ← All articles
         </Link>
         <header className="mb-6">
+          {post.tags.length > 0 && (
+            <p className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+              {post.tags.map((t) => (
+                <Link key={t} href={`/articles?tag=${encodeURIComponent(t)}`} className="hover:text-foreground">
+                  {t}
+                </Link>
+              ))}
+            </p>
+          )}
           <h1 className="font-cinzel text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{post.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-              by {postByline(post)} · {formatPostDate(post.published_at)}
-            </p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">by {byline}</p>
             <EditLink postId={post.id} authorId={post.author_id} />
           </div>
-          {post.tags.length > 0 && (
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {post.tags.map((t) => (
-                <li key={t}>
-                  <Link
-                    href={`/articles?tag=${encodeURIComponent(t)}`}
-                    className="inline-flex min-h-11 items-center rounded-full bg-muted px-3 text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    {t}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
         </header>
         {post.cover_image_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={post.cover_image_url}
-            alt=""
-            className="mb-6 w-full rounded-lg object-cover"
-            style={{ aspectRatio: "16 / 9" }}
-          />
+          // A fixed 16:9 frame reserves the space before the bitmap arrives (no
+          // layout shift); object-contain keeps tall card art uncropped inside it.
+          <div className="relative mb-6 aspect-[16/9] w-full overflow-hidden rounded-lg bg-foreground/[0.05]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={post.cover_image_url}
+              alt=""
+              fetchPriority="high"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-contain"
+            />
+          </div>
         )}
         <ArticleBody markdown={post.body_md} />
         <AuthorBio post={post} />
+        {more.length > 0 && (
+          <section aria-labelledby="keep-reading" className="mt-10 border-t border-border/60 pt-6">
+            <div className="flex items-baseline justify-between gap-4">
+              <h2 id="keep-reading" className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                {isSeries ? `More in ${series}` : "Latest articles"}
+              </h2>
+              <Link
+                href={isSeries ? `/articles?tag=${encodeURIComponent(series)}` : "/articles"}
+                className="shrink-0 text-sm text-muted-foreground hover:text-foreground"
+              >
+                {isSeries ? "All in this series →" : "All articles →"}
+              </Link>
+            </div>
+            <div className="mt-4 flex flex-col divide-y divide-border/60">
+              {more.map((p) => (
+                <PostCard key={p.id} post={p} variant="compact" headingLevel={3} />
+              ))}
+            </div>
+          </section>
+        )}
       </article>
       <SponsorFooter />
     </div>

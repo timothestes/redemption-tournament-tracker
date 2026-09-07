@@ -175,7 +175,7 @@ test.describe("articles: poster publish flow", () => {
     await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
     await expect(page.locator(".article-body img")).toHaveCount(1);
     await expect(page.locator(".article-body iframe[src*='youtube-nocookie.com/embed/dQw4w9WgXcQ']")).toHaveCount(1);
-    await expect(page.getByRole("link", { name: "Edit" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Edit", exact: true })).toBeVisible();
 
     // Feed lists it — same stale-while-revalidate window as above, so poll.
     await expect

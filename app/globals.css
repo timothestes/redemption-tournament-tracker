@@ -661,3 +661,45 @@ html[data-input-mode='touch'] [data-battle-resolution] button {
   font-size: 13px !important;
   padding: 8px 16px !important;
 }
+
+/* Article prose: @tailwindcss/typography colors from theme tokens. One block
+   covers light / .dark / .jayden because the tokens themselves change per
+   theme (ArticleBody deliberately drops dark:prose-invert). Outside @layer so
+   it wins over the plugin's component-layer defaults on source order. Every
+   color var is set — any left out would keep prose-neutral's LIGHT value in
+   dark. --tw-prose-pre-* (dark-on-dark already) and --tw-prose-kbd-shadows
+   (an R G B triple) are left alone. */
+.prose.article-body {
+  --tw-prose-body: hsl(var(--foreground) / 0.86);
+  --tw-prose-headings: hsl(var(--foreground));
+  --tw-prose-lead: hsl(var(--muted-foreground));
+  --tw-prose-links: hsl(var(--foreground));
+  --tw-prose-bold: hsl(var(--foreground));
+  --tw-prose-counters: hsl(var(--muted-foreground));
+  --tw-prose-bullets: hsl(var(--muted-foreground));
+  --tw-prose-hr: hsl(var(--border));
+  --tw-prose-quotes: hsl(var(--foreground) / 0.9);
+  --tw-prose-quote-borders: hsl(var(--border));
+  --tw-prose-captions: hsl(var(--muted-foreground));
+  --tw-prose-kbd: hsl(var(--foreground));
+  --tw-prose-code: hsl(var(--foreground));
+  --tw-prose-th-borders: hsl(var(--border));
+  --tw-prose-td-borders: hsl(var(--border));
+}
+/* Links: neutral at rest (accent is reserved for hover/active), primary on hover. */
+.prose.article-body a {
+  text-decoration-color: hsl(var(--foreground) / 0.35);
+  text-underline-offset: 0.2em;
+}
+.prose.article-body a:hover {
+  color: hsl(var(--primary));
+  text-decoration-color: hsl(var(--primary));
+}
+/* One heading voice: body h2 matches the Cinzel h1 but sits a clear step below
+   it (the h1 is 30px on phones, 36px from sm; prose-lg's default h2 is 30px).
+   h3 stays Geist for rank. */
+.prose.article-body h2 {
+  font-family: var(--font-cinzel), Georgia, serif;
+  font-size: 1.45em;
+  letter-spacing: -0.01em;
+}
