@@ -15,7 +15,7 @@ const post = (over: Partial<PublicPost> = {}): PublicPost => ({
   author_name: null,
   published_at: "2026-09-05T12:00:00.000Z",
   updated_at: null,
-  author: { username: "TimE" },
+  author: { username: "TimE", avatar_url: null, bio: null },
   ...over,
 });
 

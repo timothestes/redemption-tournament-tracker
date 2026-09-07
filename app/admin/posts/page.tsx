@@ -4,6 +4,7 @@ import TopNav from "@/components/top-nav";
 import { Button } from "@/components/ui/button";
 import { getPosterContext } from "./lib/auth";
 import { listMyPostsAction, type PostRow } from "./actions";
+import AuthorProfileCard from "./components/AuthorProfileCard";
 
 export const metadata = { title: "Posts" };
 export const dynamic = "force-dynamic";
@@ -45,8 +46,12 @@ function Section({ heading, posts, showAuthor }: { heading: string; posts: PostR
 export default async function PostsAdminPage() {
   const ctx = await getPosterContext();
   if (!ctx) notFound(); // invisible to everyone else — portal precedent
-  const r = await listMyPostsAction();
+  const [r, profileRes] = await Promise.all([
+    listMyPostsAction(),
+    ctx.supabase.from("profiles").select("username, avatar_url, bio").eq("id", ctx.user.id).single(),
+  ]);
   const posts = r.success === false ? [] : r.posts;
+  const profile = profileRes.data;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -58,6 +63,11 @@ export default async function PostsAdminPage() {
             <Link href="/admin/posts/new">New post</Link>
           </Button>
         </div>
+        <AuthorProfileCard
+          username={profile?.username ?? null}
+          initialAvatarUrl={profile?.avatar_url ?? null}
+          initialBio={profile?.bio ?? null}
+        />
         {r.success === false && <p className="mb-4 text-sm text-destructive">{r.error}</p>}
         <Section heading="Drafts" posts={posts.filter((p) => p.status === "draft")} showAuthor={ctx.isSuperuser} />
         <Section heading="Published" posts={posts.filter((p) => p.status === "published")} showAuthor={ctx.isSuperuser} />

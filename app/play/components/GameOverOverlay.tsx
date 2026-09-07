@@ -202,10 +202,15 @@ export default function GameOverOverlay({
   };
 
   // Show opponent's rematch request as a persistent banner
-  // Hidden while the picker is open — the banner (z-800) would float above
-  // the body-portaled dialog (z-50) and steal clicks in its footprint. It
+  // Hidden while the picker is open — the banner would float above the
+  // body-portaled dialog (z-50) and steal clicks in its footprint. It
   // returns if the picker is dismissed without a selection.
-  const showRematchBanner = opponentRequested && !rematchResponse && !pickerOpen;
+  // Also hidden while the result modal is up: the modal backdrop (z-900) sat
+  // on top of the banner (z-800), so Accept was visible but unclickable —
+  // elementFromPoint returned the backdrop. While the modal is showing, the
+  // request is surfaced inside it instead (Accept Rematch).
+  const showRematchBanner =
+    opponentRequested && !rematchResponse && !pickerOpen && (modalDismissed || !showResultModal);
   // Show waiting status
   const showWaitingStatus = iRequested && !rematchResponse;
   // Show rematch result
@@ -219,6 +224,7 @@ export default function GameOverOverlay({
           didWin={didWin}
           label={label}
           oppName={oppName}
+          opponentRequested={opponentRequested && !rematchResponse}
           isLoupeVisible={isLoupeVisible}
           // If the opponent already requested a rematch while this modal was
           // up, "play again" / "change deck" must RESPOND to their request —
@@ -402,6 +408,7 @@ function GameOverModal({
   didWin,
   label,
   oppName,
+  opponentRequested,
   isLoupeVisible,
   onPlayAgain,
   onChangeDeck,
@@ -410,6 +417,8 @@ function GameOverModal({
   didWin: boolean;
   label: string;
   oppName: string;
+  /** The opponent already asked for a rematch — Play Again becomes Accept. */
+  opponentRequested?: boolean;
   isLoupeVisible: boolean;
   onPlayAgain: () => void;
   /** Normal games only — open the deck picker instead of one-tap reuse. */
@@ -495,6 +504,17 @@ function GameOverModal({
           color: 'rgba(196, 149, 90, 0.5)',
         }}>{subtitle}</p>
 
+        {opponentRequested && (
+          <p style={{
+            marginTop: 12,
+            fontFamily: 'Georgia, serif',
+            fontSize: 13,
+            color: '#e8d5a3',
+          }}>
+            {oppName} wants to play again
+          </p>
+        )}
+
         <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
           <button
             onClick={onPlayAgain}
@@ -517,7 +537,7 @@ function GameOverModal({
               transition: 'background 0.14s, box-shadow 0.14s, color 0.14s, border-color 0.14s',
             }}
           >
-            Play Again
+            {opponentRequested ? 'Accept Rematch' : 'Play Again'}
           </button>
           <button
             onClick={onDismiss}
@@ -609,7 +629,9 @@ function RematchRequestBanner({
       bottom: 70,
       left: '50%',
       transform: 'translateX(-50%)',
-      zIndex: 800,
+      // Above the result modal (z-900): this is a must-answer prompt, and at
+      // 800 it rendered under the modal backdrop — visible but unclickable.
+      zIndex: 950,
       // The single nowrap row is ~540px intrinsic — on a portrait phone it
       // clipped the name off the left edge and "Change deck" entirely off the
       // right (the parent is overflow:hidden). Cap and wrap instead.

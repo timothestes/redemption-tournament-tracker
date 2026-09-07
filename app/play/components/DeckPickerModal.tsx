@@ -226,7 +226,9 @@ function DeckPickerContent({
   const setSearchValue = activeTab === "my" ? setMySearch : setCommunitySearch;
 
   return (
-    <div className="flex flex-col gap-2 flex-1 overflow-hidden">
+    // data-deck-picker: globals.css grows the tabs / search / filter selects
+    // to 44px on touch (they're 32-36px from the Tailwind classes here).
+    <div data-deck-picker className="flex flex-col gap-2 flex-1 overflow-hidden">
       {/* Tabs */}
       <div className="flex gap-1 shrink-0">
         <button

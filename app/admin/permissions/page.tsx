@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireSuperuser } from "@/app/admin/permissions/lib/auth";
 import { listMembers } from "@/app/forge/lib/members";
+import { listPosterInvites } from "@/app/admin/posts/lib/invites";
 import { listAdmins } from "./actions";
 import PermissionsPortal, { type ForgeMemberRow } from "./PermissionsPortal";
 import TopNav from "@/components/top-nav";
@@ -12,7 +13,11 @@ export default async function PermissionsPage() {
   const ctx = await requireSuperuser();
   if (!ctx) notFound();
 
-  const [admins, forgeMembers] = await Promise.all([listAdmins(), listMembers()]);
+  const [admins, forgeMembers, posterInvites] = await Promise.all([
+    listAdmins(),
+    listMembers(),
+    listPosterInvites(),
+  ]);
 
   return (
     <>
@@ -20,6 +25,7 @@ export default async function PermissionsPage() {
       <PermissionsPortal
         initialAdmins={admins}
         forgeMembers={forgeMembers as ForgeMemberRow[]}
+        initialPosterInvites={posterInvites}
         selfId={ctx.user.id}
       />
     </>
