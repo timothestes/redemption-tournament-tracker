@@ -96,8 +96,14 @@ const nextConfig = {
       // WordPress feed + sitemap surfaces (spec §1).
       { source: '/comments/feed', destination: '/articles/feed.xml', permanent: true },
       { source: '/comments/feed/', destination: '/articles/feed.xml', permanent: true },
-      { source: '/category/:slug/feed', destination: '/articles/feed.xml', permanent: true },
-      { source: '/category/:slug/feed/', destination: '/articles/feed.xml', permanent: true },
+      { source: '/category/:path*/feed', destination: '/articles/feed.xml', permanent: true },
+      { source: '/category/:path*/feed/', destination: '/articles/feed.xml', permanent: true },
+      // Nested WordPress pages under /resources-old/deck-lists/ — imported as
+      // articles whose tracker slug equals the original page's last path segment.
+      { source: '/resources-old/deck-lists', destination: '/decklist/community', permanent: true },
+      { source: '/resources-old/deck-lists/', destination: '/decklist/community', permanent: true },
+      { source: '/resources-old/deck-lists/:slug', destination: '/articles/:slug', permanent: true },
+      { source: '/resources-old/deck-lists/:slug/', destination: '/articles/:slug', permanent: true },
       { source: '/wp-sitemap.xml', destination: '/sitemap.xml', permanent: true },
       { source: '/wp-sitemap-:rest', destination: '/sitemap.xml', permanent: true },
       { source: '/sitemap_index.xml', destination: '/sitemap.xml', permanent: true },
