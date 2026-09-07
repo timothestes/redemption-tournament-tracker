@@ -1,8 +1,7 @@
-// landofredemption.com is being pointed at this app as an alias domain (see
-// docs/superpowers... project_lor_siteground_shutdown memory) with
-// redemptionccg.app staying canonical — Vercel's domain settings 301 the
-// alias to canonical, preserving path + query, so these rules only need to
-// run once, on the canonical host.
+// landofredemption.com is becoming this app's canonical domain (Track 1 spec:
+// docs/superpowers/specs/2026-09-06-lor-domain-cutover-design.md); redemptionccg.app
+// 308s to it at the Vercel domain level, preserving path + query, so these rules
+// only need to run once, on the canonical host.
 const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
 
 /** @type {import('next').NextConfig} */
@@ -87,6 +86,21 @@ const nextConfig = {
       { source: '/paragon/', destination: '/resources#paragon', permanent: true },
       { source: '/rankings', destination: '/tournaments/rnrs-points', permanent: true },
       { source: '/rankings/', destination: '/tournaments/rnrs-points', permanent: true },
+      // Remaining WordPress pages with a fixed tracker home (Track 1 spec §2 Group A).
+      { source: '/deck-lists', destination: '/decklist/community', permanent: true },
+      { source: '/deck-lists/', destination: '/decklist/community', permanent: true },
+      { source: '/resources-old', destination: '/resources', permanent: true },
+      { source: '/resources-old/', destination: '/resources', permanent: true },
+      { source: '/home-2', destination: '/', permanent: true },
+      { source: '/home-2/', destination: '/', permanent: true },
+      // WordPress feed + sitemap surfaces (spec §1).
+      { source: '/comments/feed', destination: '/articles/feed.xml', permanent: true },
+      { source: '/comments/feed/', destination: '/articles/feed.xml', permanent: true },
+      { source: '/category/:slug/feed', destination: '/articles/feed.xml', permanent: true },
+      { source: '/category/:slug/feed/', destination: '/articles/feed.xml', permanent: true },
+      { source: '/wp-sitemap.xml', destination: '/sitemap.xml', permanent: true },
+      { source: '/wp-sitemap-:rest', destination: '/sitemap.xml', permanent: true },
+      { source: '/sitemap_index.xml', destination: '/sitemap.xml', permanent: true },
     ];
   },
 };
