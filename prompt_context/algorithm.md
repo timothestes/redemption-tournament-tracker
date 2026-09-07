@@ -1,6 +1,6 @@
 # Redemption Swiss Tournament Algorithm
 
-This document specifies the pairing algorithm and tournament rules for Redemption CCG Swiss-style tournaments. It is the authoritative reference for the tournament tracker's behavior.
+This document specifies the pairing algorithm and tournament rules for Redemption CCG Swiss-style tournaments. It is the authoritative reference for the app's behavior.
 
 ## Sources of Authority
 

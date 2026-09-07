@@ -38,7 +38,7 @@ function TournamentsPageInner() {
   useEffect(() => {
     fetchTournaments();
     // Reset document title when viewing tournaments list
-    document.title = "RedemptionCCG App";
+    document.title = "Land of Redemption";
 
     // Auto-open modal if coming from "Host This Event" on /tournaments
     const listingId = searchParams.get("from_listing");

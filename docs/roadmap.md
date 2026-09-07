@@ -4,7 +4,7 @@ Working notes moved out of `readme.md`. These are ideas and known rough edges, n
 
 ## Shipped
 
-Tournament Tracker · Deck building (with Paragon support) · Spotlight Mode · YTG Add to Cart ·
+Tournament hosting · Deck building (with Paragon support) · Spotlight Mode · YTG Add to Cart ·
 Min Price · Cube improvements · Jayden Mode · Official Deck Checks · Goldfish practice ·
 Spoiler page · Official upcoming tournaments · Tournament deck publishing · Card-specific rulings ·
 Card groupings · AoD calculations · Print match slips · QR code tournament join · Deck linking

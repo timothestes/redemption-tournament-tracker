@@ -1,6 +1,6 @@
-# Redemption Tournament Tracker
+# Land of Redemption
 
-Web app for Redemption CCG tournaments, deck building, and event registration.
+Web app for Redemption CCG tournaments, deck building, articles, and event registration.
 
 ## Tech Stack
 

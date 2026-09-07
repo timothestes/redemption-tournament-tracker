@@ -137,9 +137,9 @@ export default function TournamentPage({
   // Update document title when tournament name changes
   useEffect(() => {
     if (tournament?.name) {
-      document.title = `${tournament.name} - RedemptionCCG App`;
+      document.title = `${tournament.name} - Land of Redemption`;
     } else {
-      document.title = "RedemptionCCG App";
+      document.title = "Land of Redemption";
     }
   }, [tournament?.name]);
 

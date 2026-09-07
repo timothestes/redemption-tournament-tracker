@@ -1,7 +1,7 @@
 # Granting Write Access for the Set Importer — YTG Store Owner Guide
 
 A walk-through for adding the `write_products` permission to the existing
-RedemptionCCG.app integration on `your-turn-games.myshopify.com`. Written to be
+Land of Redemption integration on `your-turn-games.myshopify.com`. Written to be
 read together over a call. About 5–10 minutes.
 
 ## What we're asking for, in plain terms

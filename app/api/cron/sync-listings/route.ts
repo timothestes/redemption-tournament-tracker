@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       console.warn('[cron] Sending alert email:', alertReason);
       await sendEmail({
         to: ALERT_EMAIL,
-        subject: `[RedemptionCCG] Tournament sync alert`,
+        subject: `[Land of Redemption] Tournament sync alert`,
         html: buildAlertEmail(alertReason, result),
       });
     }

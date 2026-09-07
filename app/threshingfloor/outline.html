@@ -3410,7 +3410,7 @@
           <div class="field">
             <label class="field-label">Deck Profile Link</label>
             <div style="display:flex; gap:6px; align-items:center;">
-              <input class="field-input" id="dotw-link" placeholder="https://redemptionccg.app/decklist/..." autocomplete="off" style="flex:1;">
+              <input class="field-input" id="dotw-link" placeholder="https://landofredemption.com/decklist/..." autocomplete="off" style="flex:1;">
               <button class="btn btn-ghost" type="button" style="padding:3px 10px; font-size:10px; white-space:nowrap;" onclick="fetchDeckInfo()">Fetch</button>
             </div>
             <div id="dotw-fetch-status" style="font-size:9px; color:var(--placeholder); font-style:italic; margin-top:2px;"></div>
@@ -5204,7 +5204,7 @@
     // Fire both requests in parallel:
     // 1) Page HTML — for preview_card_1/2 and card_img_file (not exposed by proxy)
     // 2) API proxy — for full cards array with card_img_file (Tim's endpoint)
-    var pageUrl = 'https://redemptionccg.app/decklist/' + deckId;
+    var pageUrl = 'https://landofredemption.com/decklist/' + deckId;
     var apiUrl = '/threshingfloor/api/data?kind=deck&id=' + deckId;
 
     Promise.all([

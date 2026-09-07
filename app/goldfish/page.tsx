@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Practice Mode | RedemptionCCG',
+  title: 'Practice Mode | Land of Redemption',
   description: 'Practice your Redemption deck in goldfish mode',
 };
 

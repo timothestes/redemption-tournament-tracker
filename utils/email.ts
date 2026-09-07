@@ -57,7 +57,7 @@ export async function sendEmail({ to, subject, html, from, replyTo }: EmailOptio
 export function wrapEmailInTemplate(bodyHtml: string): string {
   const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : process.env.NEXT_PUBLIC_SITE_URL || "https://redemptionccg.app";
+    : process.env.NEXT_PUBLIC_SITE_URL || "https://landofredemption.com";
 
   const logoUrl = `${baseUrl}/darkmode_redemptionccgapp.png`;
 

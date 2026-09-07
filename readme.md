@@ -2,16 +2,18 @@
 
 # Redemption CCG App
 
-**The tournament software, deck builder, and online play client for the Redemption trading card game.**
+**The community platform for the Redemption CCG card game.**
 
-[![Live](https://img.shields.io/badge/live-redemptionccg.app-2ea043?style=flat-square)](https://redemptionccg.app)
+The tournament software, deck builder, and online play client — and now also community articles.
+
+[![Live](https://img.shields.io/badge/live-landofredemption.com-2ea043?style=flat-square)](https://landofredemption.com)
 [![Next.js](https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
 [![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3ecf8e?style=flat-square&logo=supabase)](https://supabase.com)
 [![SpacetimeDB](https://img.shields.io/badge/SpacetimeDB-realtime-8b5cf6?style=flat-square)](https://spacetimedb.com)
 
-[**redemptionccg.app**](https://redemptionccg.app)
+[**landofredemption.com**](https://landofredemption.com)
 
 </div>
 
@@ -208,8 +210,8 @@ card lookups are a synchronous in-memory index rather than a query.
 **Prerequisites:** Node.js 22+, a Supabase project.
 
 ```bash
-git clone https://github.com/timothestes/redemption-tournament-tracker
-cd redemption-tournament-tracker
+git clone https://github.com/timothestes/landofredemption
+cd landofredemption
 npm install
 cp .env.example .env.local   # fill in Supabase URL + keys
 npm run dev                  # http://localhost:3000

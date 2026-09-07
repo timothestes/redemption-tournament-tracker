@@ -7,7 +7,7 @@ import GoldfishClient from './client';
 import type { DeckDataForGoldfish } from '../types';
 
 export const metadata = {
-  title: 'Practice Mode | RedemptionCCG',
+  title: 'Practice Mode | Land of Redemption',
   description: 'Practice your Redemption deck in goldfish mode',
 };
 
