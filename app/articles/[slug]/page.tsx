@@ -90,7 +90,7 @@ export default async function ArticlePage({ params }: PageProps) {
           />
         )}
         <ArticleBody markdown={post.body_md} />
-        <AuthorBio author={post.author} />
+        <AuthorBio post={post} />
       </article>
       <SponsorFooter />
     </div>
