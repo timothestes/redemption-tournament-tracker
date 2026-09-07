@@ -404,8 +404,8 @@ const TopNav: React.FC = () => {
               )}
             </div>
 
-            {/* Rest of nav links (Play and Spoilers are rendered separately, so exclude them) */}
-            {navLinks.filter((link) => !link.highlight && link.href !== "/play" && link.href !== "/spoilers").map((link) => {
+            {/* Rest of nav links (Play, Spoilers and Articles are rendered separately, so exclude them) */}
+            {navLinks.filter((link) => !link.highlight && link.href !== "/play" && link.href !== "/spoilers" && link.href !== "/articles").map((link) => {
               if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
@@ -487,6 +487,19 @@ const TopNav: React.FC = () => {
             >
               <HiSparkles className="w-4 h-4" />
               Spoilers
+            </Link>
+
+            {/* Articles link - after Spoilers */}
+            <Link
+              href="/articles"
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                ${isActive('/articles')
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+            >
+              <HiNewspaper className="w-4 h-4" />
+              Articles
             </Link>
 
             {/* Resources Dropdown */}

@@ -62,33 +62,49 @@ export default async function Index(props: {
     <div className="flex min-h-screen flex-col bg-background">
       <TopNav />
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-4 py-8">
-        <section className="border-b border-border/60 pb-8 sm:pb-10">
-          <h1 className="sr-only">
-            Land of Redemption – Redemption CCG Strategy, Deck Building, and Tournaments
-          </h1>
-          {/* Both wordmarks ship; `dark:` matches .dark AND .jayden (tailwind.config.ts),
-              so the swap is pure CSS — no theme hook, no hydration flash. */}
-          <img
-            src="/brand/lor-wordmark-dark.webp"
-            alt=""
-            aria-hidden
-            width={450}
-            height={122}
-            className="h-auto w-full max-w-md dark:hidden"
-          />
-          <img
-            src="/brand/lor-wordmark.webp"
-            alt=""
-            aria-hidden
-            width={450}
-            height={122}
-            className="hidden h-auto w-full max-w-md dark:block"
-          />
-          <p className="mt-6 max-w-2xl text-muted-foreground sm:text-lg">
-            Strategy, deck building, and tournaments for Redemption — the collectible card
-            game of biblical battles. Build and share decks, register for events, read
-            player articles, and play online.
-          </p>
+        <section className="flex gap-8 border-b border-border/60 pb-8 sm:pb-10">
+          <div className="min-w-0 flex-1">
+            <h1 className="sr-only">
+              Land of Redemption – Redemption CCG Strategy, Deck Building, and Tournaments
+            </h1>
+            {/* Both wordmarks ship; `dark:` matches .dark AND .jayden (tailwind.config.ts),
+                so the swap is pure CSS — no theme hook, no hydration flash. */}
+            <img
+              src="/brand/lor-wordmark-dark.webp"
+              alt=""
+              aria-hidden
+              width={450}
+              height={122}
+              className="h-auto w-full max-w-md dark:hidden"
+            />
+            <img
+              src="/brand/lor-wordmark.webp"
+              alt=""
+              aria-hidden
+              width={450}
+              height={122}
+              className="hidden h-auto w-full max-w-md dark:block"
+            />
+            <p className="mt-6 max-w-2xl text-muted-foreground sm:text-lg">
+              Strategy, deck building, and tournaments for Redemption — the collectible card
+              game of biblical battles. Build and share decks, register for events, read
+              player articles, and play online.
+            </p>
+          </div>
+          {/* Archived splash art from the old landofredemption.com WordPress header. A radial
+              mask dissolves it on all four sides so it reads as texture, not a pasted box;
+              `dark:` covers both .dark and .jayden (tailwind.config.ts). Hidden below `lg` —
+              no free column to put it in. */}
+          <div className="relative hidden w-64 shrink-0 lg:block xl:w-80">
+            <img
+              src="/brand/hero-splash.webp"
+              alt=""
+              aria-hidden
+              width={900}
+              height={650}
+              className="absolute inset-0 h-full w-full object-cover opacity-[0.55] mix-blend-multiply [mask-image:radial-gradient(65%_65%_at_50%_45%,black_20%,transparent_100%)] dark:opacity-70 dark:mix-blend-normal"
+            />
+          </div>
         </section>
 
         {/* Section index, newspaper-style: hairlines instead of five identical boxes. */}
