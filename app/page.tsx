@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { createAnonClient } from "@/utils/supabase/anon";
 import { resolveLegacyWpParams } from "@/lib/wp/legacyParams";
+import { cn } from "@/lib/utils";
 import TopNav from "@/components/top-nav";
 import SponsorFooter from "@/components/sponsor-footer";
 import { loadPublishedPosts } from "@/app/articles/lib/queries";
@@ -55,43 +56,61 @@ export default async function Index(props: {
   if (legacy.kind === "redirect") permanentRedirect(legacy.to);
 
   const { posts } = await loadPublishedPosts({ page: 1 });
-  const latest = posts.slice(0, 5);
+  const [lead, ...rest] = posts.slice(0, 5);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <TopNav />
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-4 py-8">
-        <section className="rounded-xl bg-zinc-950 px-6 py-10 sm:px-10">
+        <section className="border-b border-border/60 pb-8 sm:pb-10">
           <h1 className="sr-only">
             Land of Redemption – Redemption CCG Strategy, Deck Building, and Tournaments
           </h1>
+          {/* Both wordmarks ship; `dark:` matches .dark AND .jayden (tailwind.config.ts),
+              so the swap is pure CSS — no theme hook, no hydration flash. */}
+          <img
+            src="/brand/lor-wordmark-dark.webp"
+            alt=""
+            aria-hidden
+            width={450}
+            height={122}
+            className="h-auto w-full max-w-md dark:hidden"
+          />
           <img
             src="/brand/lor-wordmark.webp"
             alt=""
             aria-hidden
             width={450}
             height={122}
-            className="h-auto w-full max-w-md"
+            className="hidden h-auto w-full max-w-md dark:block"
           />
-          <p className="mt-6 max-w-2xl text-zinc-300">
+          <p className="mt-6 max-w-2xl text-muted-foreground sm:text-lg">
             Strategy, deck building, and tournaments for Redemption — the collectible card
             game of biblical battles. Build and share decks, register for events, read
             player articles, and play online.
           </p>
         </section>
 
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {LINKS.map((l) => (
+        {/* Section index, newspaper-style: hairlines instead of five identical boxes. */}
+        <nav
+          aria-label="Site sections"
+          className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-5 sm:gap-x-0 sm:divide-x sm:divide-border/60"
+        >
+          {LINKS.map((l, i) => (
             <Link
               key={l.href}
               href={l.href}
-              className="rounded-lg border bg-card p-4 transition-colors hover:border-primary"
+              className={cn(
+                "group min-w-0 sm:px-5 sm:first:pl-0 sm:last:pr-0",
+                // Five items in two columns would orphan the last one.
+                i === LINKS.length - 1 && "col-span-2 sm:col-span-1",
+              )}
             >
-              <div className="font-semibold">{l.title}</div>
+              <div className="font-semibold transition-colors group-hover:text-primary">{l.title}</div>
               <p className="mt-1 text-sm text-muted-foreground">{l.desc}</p>
             </Link>
           ))}
-        </section>
+        </nav>
 
         <section className="flex flex-col gap-4">
           <div className="flex items-baseline justify-between">
@@ -100,11 +119,16 @@ export default async function Index(props: {
               All articles →
             </Link>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {latest.map((post) => (
-              <PostCard key={post.slug} post={post} />
-            ))}
-          </div>
+          {lead && (
+            <div className="grid gap-6 md:grid-cols-2">
+              <PostCard post={lead} priority headingLevel={3} />
+              <div className="flex flex-col divide-y divide-border/60">
+                {rest.map((post) => (
+                  <PostCard key={post.slug} post={post} variant="compact" headingLevel={3} />
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       </div>
       <SponsorFooter />
