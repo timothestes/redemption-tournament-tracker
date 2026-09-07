@@ -1,32 +1,27 @@
 #!/usr/bin/env node
 /**
  * Golden-output battery: POSTs identical request bodies to the local
- * Next.js /api/v1/* routes and the live Flask API (redemption-tournament-api),
+ * Next.js /api/v1/* routes and a Flask API (originally redemption-tournament-api),
  * downloads the resulting PDF/WebP artifacts side by side into OUT_DIR, and
  * diffs the JSON count payloads (AoD/M) against the spec tolerances.
  *
  * See docs/superpowers/specs/2026-08-23-api-fold-in-and-zero-pr-releases-design.md
  * §6 (Verification) for the battery this implements and the tolerances used.
  *
+ * NOTE: as of 2026-09, redemption-tournament-api has been deprecated (GitHub
+ * repo archived, Vercel project deleted) now that the fold-in (PR #323) has
+ * been live for weeks. This script can no longer run against a deployed
+ * Flask API -- FLASK_BASE must point at a Flask instance you run yourself
+ * from a local checkout of the archived repo, if one is still needed.
+ *
  * Usage:
  *   npm run dev   # in one terminal
- *   node scripts/decksheets-golden.mjs
+ *   FLASK_BASE=http://localhost:5000 node scripts/decksheets-golden.mjs
  *
  * Env:
- *   FLASK_BASE   - overrides the Flask API base URL entirely. If unset, falls
- *                  back to $NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT, then to the
- *                  same-named key in .env.local, then to the deployed Flask
- *                  API as a last resort.
- *
- *                  NOTE: as of 2026-08, .env.local's *active*
- *                  NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT line points at
- *                  http://127.0.0.1:5000, which on macOS is squatted by
- *                  ControlCenter (AirPlay receiver), NOT a local Flask
- *                  server -- it answers every request with 403. Unless you
- *                  are actually running the Flask app locally on :5000, set
- *                  FLASK_BASE explicitly, e.g.:
- *                    FLASK_BASE=https://redemption-tournament-api.vercel.app \
- *                      node scripts/decksheets-golden.mjs
+ *   FLASK_BASE   - the Flask API base URL. Required (no live default exists
+ *                  anymore); also checked against $NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT
+ *                  and the same-named key in .env.local if unset.
  *   LOCAL_BASE   - defaults to http://localhost:3000 (the `npm run dev` port).
  *   OUT_DIR      - defaults to <os tmpdir>/decksheets-golden.
  */
@@ -53,12 +48,18 @@ function readEnvLocal(key) {
   return undefined;
 }
 
-const FLASK_BASE = (
+const FLASK_BASE_RAW =
   process.env.FLASK_BASE ||
   process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT ||
-  readEnvLocal("NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT") ||
-  "https://redemption-tournament-api.vercel.app"
-).replace(/\/$/, "");
+  readEnvLocal("NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT");
+if (!FLASK_BASE_RAW) {
+  console.error(
+    "FLASK_BASE is required -- redemption-tournament-api has been deprecated, " +
+      "there is no live default anymore. Point it at a Flask instance you run yourself."
+  );
+  process.exit(1);
+}
+const FLASK_BASE = FLASK_BASE_RAW.replace(/\/$/, "");
 const LOCAL_BASE = (process.env.LOCAL_BASE || "http://localhost:3000").replace(/\/$/, "");
 const OUT_DIR = process.env.OUT_DIR || path.join(os.tmpdir(), "decksheets-golden");
 const FIXTURES_DIR = path.join(process.cwd(), "lib/decksheets/__tests__/fixtures/decks");
