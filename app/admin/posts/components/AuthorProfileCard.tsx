@@ -108,7 +108,7 @@ export default function AuthorProfileCard({
               className="mt-1 w-full resize-y rounded-md border border-input bg-background p-2 text-sm outline-none"
             />
           </label>
-          <Button type="button" className="mt-2 min-h-11" onClick={save} disabled={saving || !dirty}>
+          <Button type="button" className="mt-2 min-h-11" onClick={save} disabled={saving || uploading || !dirty}>
             {saving ? "Saving…" : "Save"}
           </Button>
         </div>
