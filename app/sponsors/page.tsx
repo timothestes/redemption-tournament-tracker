@@ -4,7 +4,7 @@ import { SPONSORS } from "@/lib/sponsors";
 
 export const metadata = {
   title: "Sponsors | Redemption CCG",
-  description: "The sponsors who help keep RedemptionCCG.app free for Redemption players.",
+  description: "The sponsors who help keep Land of Redemption free for Redemption players.",
   alternates: { canonical: "/sponsors" },
 };
 

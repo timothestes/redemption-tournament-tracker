@@ -33,7 +33,7 @@ export function buildRss(posts: PublicPost[], site: string): string {
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom">',
     "<channel>",
-    "  <title>RedemptionCCG App Articles</title>",
+    "  <title>Land of Redemption Articles</title>",
     `  <link>${escapeXml(site)}/articles</link>`,
     `  <atom:link href="${escapeXml(site)}/articles/feed.xml" rel="self" type="application/rss+xml" />`,
     "  <description>Strategy, deck techs, tournament reports and news for Redemption CCG.</description>",
