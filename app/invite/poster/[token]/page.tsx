@@ -28,7 +28,7 @@ export default async function InvitePosterPage({
       <header className="flex items-center justify-center gap-2 border-b py-4">
         <Newspaper className="h-5 w-5" aria-hidden="true" />
         <span className="text-lg" style={{ fontFamily: "Cinzel, serif" }}>
-          RedemptionCCG App
+          Land of Redemption
         </span>
       </header>
       <AcceptPosterForm token={token} />

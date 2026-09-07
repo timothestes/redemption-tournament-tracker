@@ -34,7 +34,7 @@ export default function SponsorsPage() {
       <main className="flex-1 max-w-3xl mx-auto px-4 pt-8 pb-16 w-full">
         <h1 className="font-cinzel text-3xl font-bold tracking-tight text-foreground">Sponsors</h1>
         <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-          RedemptionCCG.app is free to use. These sponsors help cover what it costs to run, and
+          Land of Redemption is free to use. These sponsors help cover what it costs to run, and
           every link on this page goes straight to them.
         </p>
 

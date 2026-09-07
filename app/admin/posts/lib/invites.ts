@@ -46,7 +46,7 @@ export async function mintPosterInvite(
   const url = `${siteUrl()}/invite/poster/${raw}`;
   if (cleanEmail) {
     const body = `
-      <h1 style="font-size:22px;margin:0 0 12px 0;">You're invited to post on RedemptionCCG App</h1>
+      <h1 style="font-size:22px;margin:0 0 12px 0;">You're invited to post on Land of Redemption</h1>
       <p>You've been invited to write articles at <a href="${siteUrl()}/articles">/articles</a>.</p>
       <p style="margin:24px 0;"><a href="${url}"
          style="background:#10b981;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;">Accept invite</a></p>

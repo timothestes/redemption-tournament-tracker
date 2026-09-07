@@ -16,7 +16,7 @@ import { promosForYear } from "@/lib/nationals/promos";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-// Turn bare URLs in freeform notes (e.g. "redemptionccg.app/register") into
+// Turn bare URLs in freeform notes (e.g. "landofredemption.com/register") into
 // clickable links. Matches http(s) URLs and bare domain/path tokens; links read
 // as plain text at rest (underline, not color) and go green on hover.
 function linkifyNotes(text: string): ReactNode[] {

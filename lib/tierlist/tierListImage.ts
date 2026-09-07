@@ -189,7 +189,7 @@ async function buildFooter(width: number): Promise<Buffer> {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${FOOTER_HEIGHT}">`
     + `<rect width="${width}" height="${FOOTER_HEIGHT}" fill="${BACKGROUND}" />`
     + `<text x="${width - PAD}" y="${FOOTER_HEIGHT / 2}" dominant-baseline="central" text-anchor="end"`
-    + ` font-family="DejaVu Sans" font-size="20" fill="${FOOTER_TEXT}">RedemptionCCG.app</text>`
+    + ` font-family="DejaVu Sans" font-size="20" fill="${FOOTER_TEXT}">landofredemption.com</text>`
     + `</svg>`;
   return renderSvgToPng(svg);
 }

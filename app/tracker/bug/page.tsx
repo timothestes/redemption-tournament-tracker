@@ -14,9 +14,9 @@ export default function BugPage() {
           >
             Redemption Discord
           </a>{" "}
-          or file an issue on the RedemptionCCG App's GitHub{" "}
+          or file an issue on Land of Redemption's GitHub{" "}
           <a
-            href="https://github.com/timothestes/redemption-tournament-tracker/issues"
+            href="https://github.com/timothestes/landofredemption/issues"
             className="text-primary underline font-medium hover:text-primary/80"
             target="_blank"
             rel="noopener noreferrer"
@@ -35,7 +35,7 @@ export default function BugPage() {
             Join Redemption Discord
           </a>
           <a
-            href="https://github.com/timothestes/redemption-tournament-tracker/issues"
+            href="https://github.com/timothestes/landofredemption/issues"
             className="px-6 py-3 bg-red-800 text-white rounded-lg shadow-lg hover:bg-red-900"
             target="_blank"
             rel="noopener noreferrer"

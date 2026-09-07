@@ -5,7 +5,7 @@ import { GameLobby } from './components/GameLobby';
 import { Button } from '@/components/ui/button';
 
 export const metadata = {
-  title: 'Play Online | RedemptionCCG',
+  title: 'Play Online | Land of Redemption',
   description: 'Create or join an online game',
 };
 

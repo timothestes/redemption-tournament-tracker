@@ -28,7 +28,7 @@ export const metadata = {
     template: "%s | Land of Redemption",
   },
   description:
-    "Deck builder, tournament tracker, articles, and rulings for the Redemption collectible card game.",
+    "Deck builder, tournament software, online play, articles, and rulings for the Redemption collectible card game.",
 };
 
 export default function RootLayout({

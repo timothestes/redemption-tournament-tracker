@@ -9,7 +9,7 @@ const ALERT_EMAIL = 'landofredemption@gmail.com';
 export async function sendCronAlert(jobName: string, errorMessage: string) {
   await sendEmail({
     to: ALERT_EMAIL,
-    subject: `[RedemptionCCG] ${jobName} FAILED`,
+    subject: `[Land of Redemption] ${jobName} FAILED`,
     html: `
       <h2 style="margin:0 0 16px 0; color:#f87171;">${jobName} Failed</h2>
       <p style="margin:0; font-family:monospace; font-size:13px; color:#fca5a5;">${errorMessage}</p>

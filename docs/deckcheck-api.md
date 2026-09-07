@@ -214,13 +214,13 @@ if (result.valid) {
 ## Setup for Cross-Project Access
 
 1. Generate a secret token (e.g., `openssl rand -hex 32`)
-2. Add `DECKCHECK_API_TOKEN=<token>` to the tournament tracker's Vercel environment variables
+2. Add `DECKCHECK_API_TOKEN=<token>` to Land of Redemption's Vercel environment variables
 3. Add the same token to the consuming project's environment
 4. Use Bearer auth in all requests from the consuming project
 
 ## Downstream API Integration
 
-The tournament tracker sends legality results directly to the downstream PDF/image generation API. The downstream API does **not** need to call the deckcheck endpoint itself.
+Land of Redemption sends legality results directly to the downstream PDF/image generation API. The downstream API does **not** need to call the deckcheck endpoint itself.
 
 ### What the downstream API receives
 
@@ -273,7 +273,7 @@ If the downstream API needs to perform its own validation (e.g., for a different
 ```python
 import requests
 
-DECKCHECK_BASE_URL = "https://redemptionccg.app"
+DECKCHECK_BASE_URL = "https://landofredemption.com"
 DECKCHECK_API_TOKEN = "<your-token>"
 
 def check_deck_legality(deck_id: str) -> dict:
@@ -296,7 +296,7 @@ CORS is configured for the following origins:
 - `localhost:3000`
 - `localhost:5000`
 - `redemption-tournament-tracker.vercel.app`
-- `redemptionccg.app`
+- `landofredemption.com`
 
 Server-to-server calls (e.g., from the Python API) are not subject to CORS and only need a valid Bearer token.
 

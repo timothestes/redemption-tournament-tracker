@@ -1,7 +1,7 @@
 import { postByline, postExcerpt, type PublicPost } from "./queries";
 
 // Same fallback as utils/email.ts: prod sets NEXT_PUBLIC_SITE_URL.
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://redemptionccg.app").replace(/\/$/, "");
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://landofredemption.com").replace(/\/$/, "");
 
 const ESC: Record<string, string> = { "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" };
 

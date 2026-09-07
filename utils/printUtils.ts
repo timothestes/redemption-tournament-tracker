@@ -82,7 +82,7 @@ export const printFinalStandings = (
         </style>
       </head>
       <body>
-        <img src="${window.location.origin}/lightmode_redemptionccgapp.webp" alt="RedemptionCCG App Logo" class="logo" />
+        <img src="${window.location.origin}/brand/lor-wordmark-dark.webp" alt="Land of Redemption" class="logo" />
         <h1>${pageTitle}</h1>
         <button onclick="window.print();return false;" style="padding:10px 20px; margin:10px 0; background:#4a90e2; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
   `;
@@ -295,7 +295,7 @@ export const printTournamentPairings = (
       <body>
         <button class="print-btn" onclick="window.print();return false;">Print</button>
         <div class="header">
-          <img src="${window.location.origin}/lightmode_redemptionccgapp.webp" alt="" class="logo" />
+          <img src="${window.location.origin}/brand/lor-wordmark-dark.webp" alt="" class="logo" />
           <div class="title">${escapeHtml(heading)}</div>
           <div class="round">Round ${roundNumber}</div>
         </div>
