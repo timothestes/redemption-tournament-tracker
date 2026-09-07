@@ -187,7 +187,7 @@ function SpectatorRequestBanner({
         }}
       >
         <span style={{ fontWeight: 700 }}>{spectatorName}</span>
-        {' is spectating and would like to see hands.'}
+        {' would like to see your hand.'}
       </p>
 
       {/* Actions */}

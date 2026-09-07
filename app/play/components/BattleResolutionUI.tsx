@@ -15,7 +15,7 @@
 // the resolution-button row and the awaiting-soul pill/modal safely reuse
 // the same anchor geometry below.
 //
-// Every resolution action (Win Battle / Battle Lost / End Battle)
+// Every resolution action (Win Battle / Battle Lost)
 // dispatches its reducer IMMEDIATELY on click — no confirm dialog (product
 // direction: the confirm-summary step was cut). The post-battle summary is
 // now a transient toast fired by the caller (MultiplayerCanvas) once the
@@ -29,7 +29,7 @@ import type { CardInstance } from '@/lib/spacetimedb/module_bindings/types';
 import type { DeckFormat } from '@/lib/deck-format';
 import { resolveCardImageUrl, type ForgeResolverMap } from '../utils/forgeResolver';
 
-type ResolutionAction = 'claim-victory' | 'battle-lost' | 'end-battle';
+type ResolutionAction = 'claim-victory' | 'battle-lost';
 
 interface BattleResolutionUIProps {
   /** Battle band rect (virtual coords). Caller gates mounting on this being present. */
@@ -69,11 +69,16 @@ interface BattleResolutionUIProps {
   /** True once the band holds at least one card. Win Battle / Battle Lost are
    *  confirm-free and consequence-heavy (a misclicked 🏳 with souls at stake
    *  goes straight into the surrender flow), so they stay hidden over an
-   *  empty band; ↩ End Battle remains the always-available escape hatch. */
+   *  empty band. There is no End Battle button — the attacker walks away by
+   *  progressing the phase (set_phase / end_turn auto-return any open battle
+   *  server-side, from 'active' AND 'awaiting-soul'). */
   bandHasCards: boolean;
   /** Both Win Battle and Battle Lost dispatch the same server reducer (resolve_battle) —
    *  the server decides win/loss from caller identity, not from which button was pressed. */
   onResolveBattle: () => void;
+  /** Dispatches end_battle. Only the awaiting-soul CHOOSER uses it now (the
+   *  Decline / no-souls-left buttons) — the defender can't phase-progress on
+   *  the attacker's turn, so those need an explicit control. */
   onEndBattle: () => void;
   onSurrenderSoul: (cardInstanceId: bigint) => void;
   /** Phase Stops: phase currently holding the turn ('' = no hold). end_battle/
@@ -87,7 +92,7 @@ interface BattleResolutionUIProps {
    *  tap can't fall through to an armed Konva stage. Pointer mode is
    *  byte-identical when this is false/omitted. */
   compact?: boolean;
-  /** A card is armed for tap-to-move (touch). The Win/End Battle row sits
+  /** A card is armed for tap-to-move (touch). The resolution row sits
    *  INSIDE the band's tap area, so with a card armed a band-aimed tap could
    *  fire a confirm-free, consequence-heavy resolution instead of committing
    *  the move. Hide the row until the arm resolves; the awaiting-soul UI is
@@ -100,7 +105,6 @@ const BUTTON_COPY: Record<ResolutionAction, { label: string; compactLabel: strin
   // over its bottom card edge — the icons carry the verb, so the noun goes.
   'claim-victory': { label: '⚑ Win Battle', compactLabel: '⚑ Win' },
   'battle-lost': { label: '🏳 Battle Lost', compactLabel: '🏳 Lost' },
-  'end-battle': { label: '↩ End Battle', compactLabel: '↩ End' },
 };
 
 type Tone = 'gold' | 'red' | 'neutral';
@@ -227,44 +231,15 @@ function AwaitingSoulUI({
   // live Konva stage. The visible scrim stays compact-only.
   const isTouchInput = useInputMode() === 'touch';
 
-  if (!isChooser) {
-    // The "Waiting for <chooser> to choose a soul…" status lives in the
-    // band HEADER now (owner direction — the old pill here read as a second
-    // button and collided with the totals chips). What remains is the
-    // spec §7 escape hatch: the server's end_battle deliberately accepts
-    // either player from 'awaiting-soul' (a stalling-but-connected chooser
-    // otherwise strands the non-chooser), but per the one-button-per-role
-    // direction it renders for the ATTACKER only — never spectators, never
-    // the defender. A T2/Paragon defender waiting on a stalled attacker
-    // still has the server-side end_turn hook as the ultimate fallback.
-    if (isSpectator || mySeat !== attackerSeat) return null;
-    return (
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 600 }}>
-        <div
-          data-battle-resolution
-          style={{
-            position: 'absolute',
-            left: topLeft.x,
-            top: topLeft.y,
-            transform: 'translateY(-100%)',
-            width: right.x - topLeft.x,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            gap: 8,
-            pointerEvents: 'auto',
-          }}
-        >
-          <ResolutionButton
-            label={compact ? BUTTON_COPY['end-battle'].compactLabel : BUTTON_COPY['end-battle'].label}
-            tone="neutral"
-            onClick={onEndBattle}
-            compact={compact}
-          />
-        </div>
-      </div>
-    );
-  }
+  // The "Waiting for <chooser> to choose a soul…" status lives in the band
+  // HEADER. The attacker's old ↩ End escape hatch here is GONE: it rendered
+  // exactly where ⚑ Win / ↩ End had just been, so one stray tap during the
+  // opponent's open chooser forfeited the soul the attacker had just won
+  // (verified live). The server-side hatch survives without a button —
+  // set_phase / end_turn auto-return any open battle from 'awaiting-soul'
+  // too, so a stalling-but-connected chooser still can't strand the
+  // attacker: they just progress the phase, the normal "move on" gesture.
+  if (!isChooser) return null;
 
   const title = chooserSeat === attackerSeat ? 'Choose a Lost Soul to rescue' : 'Choose a Lost Soul to surrender';
   // One line of context so the picker stands on its own for a chooser who
@@ -623,20 +598,10 @@ export default function BattleResolutionUI({
             compact={compact}
           />
         )}
-        {/* End Battle is attacker-only (owner direction): two side-by-side
-            actions confused defenders — their one call during a battle is
-            🏳 Battle Lost. The attacker (= turn player) keeps the no-stakes
-            close; phase change / end turn remain the server-side hatches. */}
-        {isAttacker && (
-          <ResolutionButton
-            label={compact ? BUTTON_COPY['end-battle'].compactLabel : BUTTON_COPY['end-battle'].label}
-            tone="neutral"
-            onClick={onEndBattle}
-            disabled={isTurnHeld}
-            title={holdTitle}
-            compact={compact}
-          />
-        )}
+        {/* No End Battle button: the attacker (= turn player) walks away by
+            progressing the phase — set_phase / end_turn auto-return the
+            battle server-side. One button per role: attacker ⚑ Win,
+            defender 🏳 Battle Lost. */}
         {isDefender && bandHasCards && (
           <ResolutionButton
             label={compact ? BUTTON_COPY['battle-lost'].compactLabel : BUTTON_COPY['battle-lost'].label}

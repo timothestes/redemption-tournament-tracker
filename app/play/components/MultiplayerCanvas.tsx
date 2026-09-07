@@ -7334,11 +7334,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       fontFamily="Cinzel, Georgia, serif"
                       fill="#e8d5a3"
                       letterSpacing={useCompactLayout ? 0 : 1}
-                      width={useCompactLayout ? undefined : zone.width - 12}
+                      // Always clip to the zone: fs() floors the on-screen font
+                      // size, so at tiny scales (spectator portrait whole-board
+                      // fit) an unclipped label outgrows its column and prints
+                      // over the neighbor pile's — "DISC"+"BAN" read "DISBA".
+                      width={zone.width - 8}
                       // wrap must be 'none' for ellipsis to apply — the default
                       // 'word' wrap char-breaks long words instead ("REDEMPTIO/N")
                       wrap="none"
-                      ellipsis={!useCompactLayout}
+                      ellipsis
                       listening={false}
                       perfectDrawEnabled={false}
                     />
@@ -7429,11 +7433,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       fontFamily="Cinzel, Georgia, serif"
                       fill="#a3c5e8"
                       letterSpacing={useCompactLayout ? 0 : 1}
-                      width={useCompactLayout ? undefined : zone.width - 12}
+                      // Clip to the zone — see the my-zones label note above.
+                      width={zone.width - 8}
                       // wrap must be 'none' for ellipsis to apply — the default
                       // 'word' wrap char-breaks long words instead ("REDEMPTIO/N")
                       wrap="none"
-                      ellipsis={!useCompactLayout}
+                      ellipsis
                       listening={false}
                       perfectDrawEnabled={false}
                     />
@@ -8660,6 +8665,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (oppTerr) territoryEntries.push({ zone: oppTerr, isOpponent: true, cards: opponentCards['territory'] ?? [] });
             return territoryEntries.map(({ zone, isOpponent, cards }) => {
               const labelFs = fs(11);
+              // Spectators sit in neither seat, so "TERRITORY" vs "OPPONENT'S
+              // TERRITORY" answers nothing — name the owner instead. (For a
+              // spectator, gameState.myPlayer is seat 0 by convention.)
+              const labelText = (isSpectator
+                ? `${(isOpponent ? gameState.opponentPlayer?.displayName : gameState.myPlayer?.displayName) || (isOpponent ? 'Player 2' : 'Player 1')}'s Territory`
+                : zone.label
+              ).toUpperCase();
               const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
               const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
@@ -8667,7 +8679,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               const badgeW = Math.max(24, Math.round(labelFs * 2.2));
               const badgeH = labelFs + 3;
               const bandH = Math.max(20, labelFs + 9);
-              const fullLabelWidth = measureLabelWidth(zone.label.toUpperCase(), labelFs, 1);
+              const fullLabelWidth = measureLabelWidth(labelText, labelFs, 1);
               // Band clamps to the zone; the label truncates before the badge does.
               const maxLabelWidth = Math.max(10, zone.width - badgeW - 22);
               const labelTextWidth = Math.min(fullLabelWidth, maxLabelWidth);
@@ -8690,7 +8702,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   <Text
                     x={labelX}
                     y={textY}
-                    text={zone.label.toUpperCase()}
+                    text={labelText}
                     fontSize={labelFs}
                     fontFamily="Cinzel, Georgia, serif"
                     fill={fillColor}
@@ -11476,7 +11488,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           // hand row (the portrait fit is a card-wide column, so the row is
           // exactly under the top-right dock) and hid it entirely.
           defaultCollapsed={portraitBoard}
-          topOffsetPx={isSpectator ? 0 : undefined}
+          // The player turn bar wraps to two rows (94px) when its own width
+          // drops under 520 — the bar spans the canvas plus the 44px chat
+          // handle, so containerWidth < 476 is the same breakpoint.
+          topOffsetPx={isSpectator ? 0 : containerWidth < 476 ? 94 : undefined}
           rightOffsetPx={
             mpLayout
               ? containerWidth - (fit.offsetX + mpLayout.playAreaWidth * fit.scale) + 8

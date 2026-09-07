@@ -557,6 +557,16 @@ html[data-input-mode='touch'] [data-phase-bar] button[title='Back to lobby'] {
   min-width: 44px !important;
 }
 
+/* Deck picker (game-over Change deck / lobby): the My Decks/Community tabs
+   are 32px tall and the search/filter controls 36px from their Tailwind
+   classes — grow them to the touch target on coarse pointers. min-height
+   beats the fixed Tailwind h-9. */
+html[data-input-mode='touch'] [data-deck-picker] button,
+html[data-input-mode='touch'] [data-deck-picker] input,
+html[data-input-mode='touch'] [data-deck-picker] select {
+  min-height: 44px;
+}
+
 /* The pre-game rail's own controls — "No stars", "Done", the star chips —
    render at 11px in a 5px-tall box. Every player passes through this screen
    at the start of every game. */
