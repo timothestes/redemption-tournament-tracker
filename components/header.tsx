@@ -11,9 +11,9 @@ export default function Header() {
     <nav className="w-full flex justify-center border-b border-b-foreground/10 h-17 bg-white dark:bg-gray-900 [.jayden_&]:bg-[hsl(270,20%,4%)]">
       <div className="w-full max-w-1xl flex justify-between items-center p-3 px-5 text-sm">
         <div className="flex gap-5 items-center font-semibold">
-          <Link href="/decklist/community">
-            <img src="/lightmode_redemptionccgapp.webp" className="w-48 dark:hidden [.jayden_&]:hidden" alt="RedemptionCCG App Logo" />
-            <img src="/darkmode_redemptionccgapp.webp" className="w-48 hidden dark:block [.jayden_&]:block" alt="RedemptionCCG App Logo" />
+          <Link href="/">
+            <img src="/brand/lor-wordmark-dark.webp" className="w-48 dark:hidden [.jayden_&]:hidden" alt="Land of Redemption" />
+            <img src="/brand/lor-wordmark.webp" className="w-48 hidden dark:block [.jayden_&]:block" alt="Land of Redemption" />
           </Link>
         </div>
         <div className="flex items-center gap-3">

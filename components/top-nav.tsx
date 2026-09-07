@@ -160,21 +160,21 @@ const TopNav: React.FC = () => {
       <div className="max-w-full mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/decklist/community" className="flex-shrink-0">
+          <Link href="/" className="flex-shrink-0">
             <div className="cursor-pointer" style={{ width: 120, height: 32 }}>
               <Image
-                src="/lightmode_redemptionccgapp.webp"
-                alt="RedemptionCCG App Logo"
-                width={120}
+                src="/brand/lor-wordmark-dark.webp"
+                alt="Land of Redemption"
+                width={118}
                 height={32}
                 style={{ width: "auto", height: "auto", maxHeight: "32px" }}
                 className="dark:hidden [.jayden_&]:hidden"
                 priority
               />
               <Image
-                src="/darkmode_redemptionccgapp.webp"
-                alt="RedemptionCCG App Logo"
-                width={120}
+                src="/brand/lor-wordmark.webp"
+                alt="Land of Redemption"
+                width={118}
                 height={32}
                 style={{ width: "auto", height: "auto", maxHeight: "32px" }}
                 className="hidden dark:block [.jayden_&]:block"
