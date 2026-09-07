@@ -20,7 +20,8 @@ const text = (v: unknown): string =>
 const list = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : v == null ? [] : [v as T]);
 const clean = (s: string) => he.decode(s).replace(/\s+/g, " ").trim();
 
-export function parseWxr(xml: string): WxrExport {
+export function parseWxr(xml: string, opts: { postType?: "post" | "page" } = {}): WxrExport {
+  const postType = opts.postType ?? "post";
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
@@ -52,7 +53,7 @@ export function parseWxr(xml: string): WxrExport {
       continue;
     }
     if (type === "wp_block") { blocks.set(wpId, text(it["content:encoded"])); continue; }
-    if (type !== "post" || status !== "publish") continue;
+    if (type !== postType || status !== "publish") continue;
 
     let thumbnailId: string | null = null;
     for (const m of list<Node>(it["wp:postmeta"])) {
@@ -80,6 +81,6 @@ export function parseWxr(xml: string): WxrExport {
   return { authors, posts, attachments, blocks };
 }
 
-export function readWxr(path: string): WxrExport {
-  return parseWxr(readFileSync(path, "utf8"));
+export function readWxr(path: string, opts: { postType?: "post" | "page" } = {}): WxrExport {
+  return parseWxr(readFileSync(path, "utf8"), opts);
 }
