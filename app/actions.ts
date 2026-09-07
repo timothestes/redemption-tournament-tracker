@@ -70,7 +70,7 @@ export const signInAction = async (formData: FormData) => {
     return redirect(`/sign-in?${searchParams.toString()}`);
   }
 
-  return redirect(redirectTo || "/decklist/community");
+  return redirect(redirectTo || "/");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {

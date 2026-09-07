@@ -189,7 +189,7 @@ export function PhaseBar({ hideBackButton = false }: { hideBackButton?: boolean 
             }}
           >
             <Image
-              src="/darkmode_redemptionccgapp.webp"
+              src="/brand/lor-wordmark.webp"
               alt="Back to deck"
               width={96}
               height={28}
