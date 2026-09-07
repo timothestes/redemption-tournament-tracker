@@ -12,6 +12,7 @@ import {
   type UserHit,
 } from "./actions";
 import { changeRole, removeMember } from "@/app/forge/lib/members";
+import { mintPosterInvite, type PosterInviteRow } from "@/app/admin/posts/lib/invites";
 
 export type ForgeMemberRow = {
   user_id: string;
@@ -29,10 +30,12 @@ function sameSet(a: string[], b: string[]): boolean {
 export default function PermissionsPortal({
   initialAdmins,
   forgeMembers,
+  initialPosterInvites,
   selfId,
 }: {
   initialAdmins: AdminRow[];
   forgeMembers: ForgeMemberRow[];
+  initialPosterInvites: PosterInviteRow[];
   selfId: string;
 }) {
   const router = useRouter();
@@ -40,6 +43,9 @@ export default function PermissionsPortal({
   const [edits, setEdits] = useState<Record<string, string[]>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [posterEmail, setPosterEmail] = useState("");
+  const [posterBusy, setPosterBusy] = useState(false);
+  const [posterLink, setPosterLink] = useState<string | null>(null);
 
   // Add-admin search
   const [query, setQuery] = useState("");
@@ -106,6 +112,39 @@ export default function PermissionsPortal({
       setAdmins((rows) => rows.filter((a) => a.user_id !== row.user_id));
     }
     setBusyId(null);
+  };
+
+  const revokePoster = async (row: AdminRow) => {
+    if (!window.confirm(`Remove posting access for ${row.username ?? row.email ?? row.user_id}?`)) return;
+    setBusyId(row.user_id);
+    setError(null);
+    const next = row.permissions.filter((k) => k !== "publish_posts");
+    const r = await setAdminPermissions(row.user_id, next);
+    if (r.ok === false) {
+      setError(r.error ?? "Revoke failed");
+    } else {
+      setAdmins((rows) => rows.map((a) => (a.user_id === row.user_id ? { ...a, permissions: next } : a)));
+      setEdits((e) => {
+        const { [row.user_id]: _, ...rest } = e;
+        return rest;
+      });
+    }
+    setBusyId(null);
+  };
+
+  const createPosterInvite = async () => {
+    setPosterBusy(true);
+    setError(null);
+    setPosterLink(null);
+    const r = await mintPosterInvite(posterEmail.trim() || null);
+    if (r.ok === false) {
+      setError(r.error ?? "Could not create invite");
+    } else {
+      setPosterLink(r.url);
+      setPosterEmail("");
+      router.refresh(); // re-fetches listPosterInvites() via the server page
+    }
+    setPosterBusy(false);
   };
 
   const addAdmin = (hit: UserHit) => {
@@ -285,6 +324,129 @@ export default function PermissionsPortal({
               ))}
             </ul>
           )}
+        </div>
+      </section>
+
+      {/* Posters --------------------------------------------------------- */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-medium">Posters</h2>
+        <p className="text-sm text-muted-foreground">
+          Grants publish_posts — a poster can write and publish their own articles at /articles,
+          and edit only their own.
+        </p>
+
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50 text-left">
+                <th className="px-3 py-2 font-medium">Poster</th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {admins
+                .filter((a) => a.permissions.includes("publish_posts"))
+                .map((row) => (
+                  <tr key={row.user_id} className="border-b border-border last:border-0">
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{row.username ?? "(no username)"}</div>
+                      <div className="text-xs text-muted-foreground">{row.email}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        onClick={() => revokePoster(row)}
+                        disabled={busyId === row.user_id}
+                        className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-red-600 hover:border-red-300"
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              {admins.filter((a) => a.permissions.includes("publish_posts")).length === 0 && (
+                <tr>
+                  <td colSpan={2} className="px-3 py-6 text-center text-muted-foreground">
+                    No posters yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="max-w-md space-y-2">
+          <label className="text-sm font-medium" htmlFor="poster-email">
+            Invite a poster
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="poster-email"
+              value={posterEmail}
+              onChange={(e) => setPosterEmail(e.target.value)}
+              placeholder="Email (optional — leave blank for an open link)"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+            <button
+              onClick={createPosterInvite}
+              disabled={posterBusy}
+              className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
+            >
+              {posterBusy ? "Creating…" : "Create invite"}
+            </button>
+          </div>
+          {posterLink && (
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={posterLink}
+                className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm"
+              />
+              <button
+                onClick={() => navigator.clipboard.writeText(posterLink)}
+                className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Copy
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50 text-left">
+                <th className="px-3 py-2 font-medium">Invite</th>
+                <th className="px-3 py-2 font-medium">Expires</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {initialPosterInvites.map((inv) => (
+                <tr key={inv.id} className="border-b border-border last:border-0">
+                  <td className="px-3 py-2">{inv.email ?? "(open link)"}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {new Date(inv.expires_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-3 py-2">
+                    {inv.used_at ? (
+                      <span className="text-xs text-muted-foreground">used</span>
+                    ) : new Date(inv.expires_at) < new Date() ? (
+                      <span className="text-xs text-amber-600 dark:text-amber-400">expired</span>
+                    ) : (
+                      <span className="text-xs font-medium text-foreground">pending</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {initialPosterInvites.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-3 py-6 text-center text-muted-foreground">
+                    No invites yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
 
