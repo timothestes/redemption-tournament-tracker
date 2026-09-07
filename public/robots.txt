@@ -12,3 +12,5 @@ Disallow: /reset-password/
 Allow: /decklist/community/
 Allow: /decklist/public/
 Allow: /register/
+
+Sitemap: https://landofredemption.com/sitemap.xml
