@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("../auth", () => ({ requirePoster: vi.fn() }));
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requirePoster } from "../auth";
 import { updateAuthorProfileAction } from "../authorProfile";
+import { ARTICLES_TAG } from "@/app/articles/lib/queries";
 
 function ctx(overrides: { error?: unknown; posts?: { slug: string }[]; postsError?: unknown } = {}) {
   const updateEq = vi.fn(async () => ({ error: overrides.error ?? null }));
@@ -49,6 +50,7 @@ describe("updateAuthorProfileAction", () => {
     expect(r).toEqual({ success: true });
     expect(revalidatePath).toHaveBeenCalledWith("/articles");
     expect(revalidatePath).toHaveBeenCalledWith("/articles/hello-world");
+    expect(revalidateTag).toHaveBeenCalledWith(ARTICLES_TAG);
   });
 
   it("surfaces a database error", async () => {

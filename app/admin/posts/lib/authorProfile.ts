@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requirePoster } from "./auth";
+import { ARTICLES_TAG } from "@/app/articles/lib/queries";
 import type { ActionResult } from "../actions";
 
 const MAX_BIO = 500;
@@ -40,6 +41,7 @@ export async function updateAuthorProfileAction(
       .eq("author_id", ctx.user.id)
       .eq("status", "published");
     if (slugsError) console.error("updateAuthorProfile: could not load slugs to revalidate:", slugsError);
+    revalidateTag(ARTICLES_TAG);
     revalidatePath("/articles");
     for (const row of (mine ?? []) as { slug: string }[]) revalidatePath(`/articles/${row.slug}`);
 
