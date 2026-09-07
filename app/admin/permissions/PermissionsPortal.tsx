@@ -115,7 +115,11 @@ export default function PermissionsPortal({
   };
 
   const revokePoster = async (row: AdminRow) => {
-    if (!window.confirm(`Remove posting access for ${row.username ?? row.email ?? row.user_id}?`)) return;
+    const warning =
+      row.user_id === selfId
+        ? "This is YOUR account — you'll lose posting access too (your superuser status is unaffected). Revoke?"
+        : `Remove posting access for ${row.username ?? row.email ?? row.user_id}?`;
+    if (!window.confirm(warning)) return;
     setBusyId(row.user_id);
     setError(null);
     const next = row.permissions.filter((k) => k !== "publish_posts");
@@ -269,6 +273,7 @@ export default function PermissionsPortal({
                       <button
                         onClick={() => remove(row)}
                         disabled={busyId === row.user_id}
+                        aria-label={`Remove admin permissions for ${row.username ?? row.email ?? row.user_id}`}
                         className="ml-2 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-red-600 hover:border-red-300"
                       >
                         Remove
@@ -356,6 +361,7 @@ export default function PermissionsPortal({
                       <button
                         onClick={() => revokePoster(row)}
                         disabled={busyId === row.user_id}
+                        aria-label={`Revoke posting access for ${row.username ?? row.email ?? row.user_id}`}
                         className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-red-600 hover:border-red-300"
                       >
                         Revoke
@@ -394,6 +400,9 @@ export default function PermissionsPortal({
               {posterBusy ? "Creating…" : "Create invite"}
             </button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            An open link can be redeemed by whoever clicks it first.
+          </p>
           {posterLink && (
             <div className="flex gap-2">
               <input
