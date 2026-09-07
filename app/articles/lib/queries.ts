@@ -24,11 +24,12 @@ export interface PublicPost {
   author_id: string;
   author_name: string | null;
   published_at: string | null;
+  updated_at: string | null;
   author: { username: string | null; avatar_url: string | null; bio: string | null } | null;
 }
 
 const COLUMNS =
-  "id, slug, title, excerpt, body_md, cover_image_url, tags, status, author_id, author_name, published_at, author:profiles(username, avatar_url, bio)";
+  "id, slug, title, excerpt, body_md, cover_image_url, tags, status, author_id, author_name, published_at, updated_at, author:profiles(username, avatar_url, bio)";
 
 export function postExcerpt(post: Pick<PublicPost, "excerpt" | "body_md">): string {
   const explicit = post.excerpt?.trim();

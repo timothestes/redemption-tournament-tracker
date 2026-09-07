@@ -6,7 +6,7 @@ import HistoryClient from "./HistoryClient";
 import { loadLeaderboard } from "./actions";
 
 export const metadata = {
-  title: "Nationals History | Redemption CCG",
+  title: "Nationals History",
   description:
     "Complete history of Redemption Nationals tournaments: champions, players, stats, and trivia.",
 };

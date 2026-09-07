@@ -3,7 +3,7 @@ import TopNav from "@/components/top-nav";
 import { getPosterContext } from "../lib/auth";
 import PostEditor from "../components/PostEditor";
 
-export const metadata = { title: "New post - RedemptionCCG App" };
+export const metadata = { title: "New post" };
 export const dynamic = "force-dynamic";
 
 export default async function NewPostPage() {

@@ -19,10 +19,16 @@ export const viewport = {
   maximumScale: 1,
 };
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || defaultUrl;
+
 export const metadata = {
-  metadataBase: new URL(defaultUrl),
-  title: "RedemptionCCG App",
-  description: "The best way to experience Redemption online",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Land of Redemption – Redemption CCG Strategy, Deck Building, and Tournaments",
+    template: "%s | Land of Redemption",
+  },
+  description:
+    "Deck builder, tournament tracker, articles, and rulings for the Redemption collectible card game.",
 };
 
 export default function RootLayout({

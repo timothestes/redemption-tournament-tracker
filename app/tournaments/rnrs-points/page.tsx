@@ -5,7 +5,7 @@ import { fetchAllRnrsData } from "@/lib/rnrs/fetch";
 import RnrsClient from "./RnrsClient";
 
 export const metadata = {
-  title: "RNRS Points | Redemption CCG",
+  title: "RNRS Points",
   description:
     "Redemption National Ranking System standings — leaderboards and player lookup across seasons and formats, with per-format point caps shown.",
 };

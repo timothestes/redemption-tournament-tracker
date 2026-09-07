@@ -4,12 +4,14 @@
  *
  * Usage: npx tsx scripts/import-wxr.ts [--wxr PATH] [--backup PATH] [--dry-run] [--media-only]
  *          [--limit N] [--only slug,slug] [--skip-media] [--update] [--as-draft] [--concurrency 8]
+ *          [--pages]
  *
  * --dry-run     no network: writes scripts/output/wxr/{posts,report.json,report.md,media-manifest.json}
  * --media-only  mirror media for the selected posts to Blob, then stop
  * --skip-media  dry-run only: plan the manifest without uploading. A live run always mirrors,
  *               because only a file the store confirms (exists/uploaded) may be rewritten into a post.
  * --update      overwrite rows that already exist (matched on source_url); never changes slug/status
+ * --pages       import WordPress pages instead of posts; requires --only (explicit allowlist)
  * Everything else is LIVE against production Supabase + Blob.
  */
 import { config } from "dotenv";
@@ -34,12 +36,13 @@ class CliError extends Error {}
 
 const USAGE =
   "usage: npx tsx scripts/import-wxr.ts [--wxr PATH] [--backup PATH] [--dry-run] [--media-only]\n" +
-  "         [--limit N] [--only slug,slug] [--skip-media] [--update] [--as-draft] [--concurrency 8]";
+  "         [--limit N] [--only slug,slug] [--skip-media] [--update] [--as-draft] [--concurrency 8]\n" +
+  "         [--pages]";
 
 interface Options {
   wxr: string; backup: string; dryRun: boolean; mediaOnly: boolean; skipMedia: boolean;
   update: boolean; status: ImportRow["status"]; limit: number | null; onlySlugs: string[];
-  concurrency: number; mode: string;
+  concurrency: number; mode: string; pages: boolean;
 }
 
 function positiveInt(raw: string, flag: string): number {
@@ -64,6 +67,7 @@ function parseOptions(): Options {
         update: { type: "boolean", default: false },
         "as-draft": { type: "boolean", default: false },
         concurrency: { type: "string", default: "8" },
+        pages: { type: "boolean", default: false },
       },
     }));
   } catch (e) {
@@ -78,6 +82,11 @@ function parseOptions(): Options {
   }
   const mediaOnly = values["media-only"] === true;
   const asDraft = values["as-draft"] === true;
+  const onlySlugs = ((values.only as string) ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const pages = values.pages === true;
+  if (pages && onlySlugs.length === 0) {
+    throw new CliError("--pages requires --only <slug,...> — pages are imported by explicit allowlist (spec §2 Group B)");
+  }
   return {
     wxr: values.wxr as string,
     backup: values.backup as string,
@@ -85,8 +94,9 @@ function parseOptions(): Options {
     update: values.update === true,
     status: asDraft ? "draft" : "published",
     limit: values.limit === undefined ? null : positiveInt(values.limit as string, "--limit"),
-    onlySlugs: ((values.only as string) ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+    onlySlugs,
     concurrency: positiveInt(values.concurrency as string, "--concurrency"),
+    pages,
     mode: [dryRun ? "dry-run" : mediaOnly ? "media-only" : "live", values.update ? "--update" : "", asDraft ? "--as-draft" : ""]
       .filter(Boolean).join(" "),
   };
@@ -134,7 +144,7 @@ async function main() {
   // Every mode but a dry run mirrors to Blob; without the token every head/put fails one by one.
   if (!opts.dryRun && !process.env.BLOB_READ_WRITE_TOKEN) throw new CliError("Missing BLOB_READ_WRITE_TOKEN");
 
-  const { posts, attachments, blocks } = readWxr(opts.wxr);
+  const { posts, attachments, blocks } = readWxr(opts.wxr, { postType: opts.pages ? "page" : "post" });
   const slugMap = finalSlugs(posts); // over ALL posts, so links to unselected posts still map
   const idMap = new Map(posts.map((p) => [p.wpId, slugMap.get(p.slug)!])); // for /?p=<id> short links
   const authorMap = loadAuthorMap(AUTHOR_MAP);

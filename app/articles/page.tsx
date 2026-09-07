@@ -7,9 +7,9 @@ import { loadPublishedPosts, listPublishedTags, PAGE_SIZE } from "./lib/queries"
 import PostCard from "./components/PostCard";
 
 export const metadata: Metadata = {
-  title: "Articles - RedemptionCCG App",
+  title: "Articles",
   description: "Strategy, deck techs, tournament reports and news for Redemption CCG.",
-  alternates: { types: { "application/rss+xml": "/articles/feed.xml" } },
+  alternates: { canonical: "/articles", types: { "application/rss+xml": "/articles/feed.xml" } },
 };
 
 interface PageProps {

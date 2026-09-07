@@ -6,6 +6,7 @@ import { createClient } from "../../../utils/supabase/server";
 export const metadata: Metadata = {
   title: "Community Decks",
   description: "Browse public Redemption decks shared by the community",
+  alternates: { canonical: "/decklist/community" },
 };
 
 export default async function CommunityDecksPage() {

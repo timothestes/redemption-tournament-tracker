@@ -6,7 +6,7 @@ import { getPosterContext } from "./lib/auth";
 import { listMyPostsAction, type PostRow } from "./actions";
 import AuthorProfileCard from "./components/AuthorProfileCard";
 
-export const metadata = { title: "Posts - RedemptionCCG App" };
+export const metadata = { title: "Posts" };
 export const dynamic = "force-dynamic";
 
 function fmt(iso: string): string {

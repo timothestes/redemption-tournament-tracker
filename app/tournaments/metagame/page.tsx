@@ -14,7 +14,7 @@ import EventPool from "@/components/metagame/EventPool";
 import MetagameClient from "./client";
 
 export const metadata: Metadata = {
-  title: "Metagame | Redemption CCG",
+  title: "Metagame",
   description:
     "Card frequency and metagame analysis pooled across published Redemption CCG tournament decklists, by format and time window.",
 };

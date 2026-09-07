@@ -236,7 +236,7 @@ export default function DeckSourcePicker({
             <p className="text-xs text-muted-foreground mb-2">
               Paste from{" "}
               <a
-                href="https://landofredemption.com/installing-lackey-with-redemption-plugin/"
+                href="/articles/installing-lackey-with-redemption-plugin"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline"

@@ -1,11 +1,13 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@/utils/supabase/server";
 
-const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-  : process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+  ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+  : process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient();
@@ -67,6 +69,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.6,
     },
+    {
+      url: `${baseUrl}/articles`,
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
   ];
 
   // Dynamic routes: public community decks (unlisted decks are excluded)
@@ -99,5 +106,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
   );
 
-  return [...staticRoutes, ...deckRoutes, ...spoilerRoutes];
+  // Dynamic routes: published articles (the imported WordPress archive + new posts)
+  // PostgREST caps every select at 1000 rows regardless of an explicit .limit(),
+  // so paginate with .range() until a page comes back short.
+  const posts: { slug: string; published_at: string | null; updated_at: string | null }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: page } = await supabase
+      .from("posts")
+      .select("slug, published_at, updated_at")
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .range(from, from + 999);
+
+    if (!page || page.length === 0) break;
+    posts.push(...page);
+    if (page.length < 1000) break;
+  }
+
+  const articleRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
+    url: `${baseUrl}/articles/${post.slug}`,
+    lastModified: post.updated_at ?? post.published_at ?? undefined,
+    changeFrequency: "monthly" as const,
+    priority: 0.6,
+  }));
+
+  return [...staticRoutes, ...deckRoutes, ...spoilerRoutes, ...articleRoutes];
 }

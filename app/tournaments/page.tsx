@@ -4,9 +4,10 @@ import { loadUpcomingListings } from "./actions";
 import TournamentsClient from "./tournaments-client";
 
 export const metadata = {
-  title: "Upcoming Tournaments | Redemption CCG",
+  title: "Upcoming Tournaments",
   description:
     "Find upcoming Redemption card game tournaments near you. Browse dates, locations, formats, and entry fees.",
+  alternates: { canonical: "/tournaments" },
 };
 
 export default async function TournamentsPage() {

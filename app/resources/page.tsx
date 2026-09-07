@@ -4,9 +4,10 @@ import SponsorFooter from "@/components/sponsor-footer";
 import { RESOURCE_SECTIONS, RESOURCE_APP_TOOLS, type ResourceLink } from "@/lib/resources";
 
 export const metadata = {
-  title: "Redemption Resources | Redemption CCG",
+  title: "Redemption Resources",
   description:
     "Every official Redemption CCG document in one place — the REG rulebook, ORDIR dictionary, deck building rules, Paragon format files, and tournament host forms.",
+  alternates: { canonical: "/resources" },
 };
 
 function ExternalIcon() {
