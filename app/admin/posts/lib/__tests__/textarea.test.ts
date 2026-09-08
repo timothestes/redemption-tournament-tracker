@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { wrapSelection, prefixLines, insertBlock, replaceOnce } from "../textarea";
+import { wrapSelection, prefixLines, insertBlock, replaceOnce, minimalEdit, continueList } from "../textarea";
 
 describe("wrapSelection", () => {
   it("wraps the selected text and keeps it selected", () => {
@@ -53,5 +53,53 @@ describe("replaceOnce", () => {
   });
   it("returns the input unchanged when the needle is absent", () => {
     expect(replaceOnce("abc", "zzz", "Q")).toBe("abc");
+  });
+});
+
+describe("minimalEdit", () => {
+  it("returns null when nothing changed", () => {
+    expect(minimalEdit("abc", "abc")).toBeNull();
+  });
+  it("finds the range a bold wrap changed", () => {
+    expect(minimalEdit("hello world", "hello **world**")).toEqual({ start: 6, end: 11, text: "**world**" });
+  });
+  it("handles a prefix inserted at 0", () => {
+    expect(minimalEdit("a", "- a")).toEqual({ start: 0, end: 0, text: "- " });
+  });
+  it("does not let the prefix and suffix overlap", () => {
+    expect(minimalEdit("aa", "aaa")).toEqual({ start: 2, end: 2, text: "a" });
+  });
+  it("reports a pure deletion as an empty replacement", () => {
+    expect(minimalEdit("- \nx", "\nx")).toEqual({ start: 0, end: 2, text: "" });
+  });
+});
+
+describe("continueList", () => {
+  it("continues a bulleted list", () => {
+    const r = continueList("- item", { start: 6, end: 6 });
+    expect(r?.value).toBe("- item\n- ");
+    expect(r?.selectionStart).toBe(9);
+  });
+  it("increments a numbered list", () => {
+    expect(continueList("1. one", { start: 6, end: 6 })?.value).toBe("1. one\n2. ");
+  });
+  it("continues a quote", () => {
+    expect(continueList("> q", { start: 3, end: 3 })?.value).toBe("> q\n> ");
+  });
+  it("preserves nested indentation", () => {
+    expect(continueList("- a\n  - b", { start: 9, end: 9 })?.value).toBe("- a\n  - b\n  - ");
+  });
+  it("ends the list on an empty item", () => {
+    const r = continueList("- a\n- ", { start: 6, end: 6 });
+    expect(r?.value).toBe("- a\n");
+    expect([r?.selectionStart, r?.selectionEnd]).toEqual([4, 4]);
+  });
+  it("splits an item when the caret is mid-line", () => {
+    expect(continueList("- ab", { start: 3, end: 3 })?.value).toBe("- a\n- b");
+  });
+  it("returns null on a plain line, a bare marker, or a range selection", () => {
+    expect(continueList("plain", { start: 5, end: 5 })).toBeNull();
+    expect(continueList("-", { start: 1, end: 1 })).toBeNull();
+    expect(continueList("- a", { start: 2, end: 3 })).toBeNull();
   });
 });

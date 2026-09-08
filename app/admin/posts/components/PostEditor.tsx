@@ -9,7 +9,7 @@ import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 import ToastNotification from "@/components/ui/toast-notification";
 import ArticleBody from "@/app/articles/components/ArticleBody";
 import { EMPTY_REFS, type ArticleRefs } from "@/app/articles/lib/refTypes";
-import { slugify, youtubeId } from "@/app/articles/lib/markdown";
+import { excerptFromMarkdown, slugify, youtubeId } from "@/app/articles/lib/markdown";
 import {
   createDraftAction,
   updatePostAction,
@@ -22,7 +22,15 @@ import {
 } from "../actions";
 import { ACCEPT, type UploadKind } from "../lib/media";
 import { uploadPostMedia } from "../lib/uploadMedia";
-import { insertBlock, prefixLines, replaceOnce, wrapSelection, type EditResult } from "../lib/textarea";
+import {
+  continueList,
+  insertBlock,
+  minimalEdit,
+  prefixLines,
+  replaceOnce,
+  wrapSelection,
+  type EditResult,
+} from "../lib/textarea";
 import { MAX_EXCERPT, MAX_TITLE } from "../lib/validate";
 import MarkdownToolbar, { type ToolbarAction } from "./MarkdownToolbar";
 import TagInput from "./TagInput";
@@ -51,7 +59,15 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   const [body, setBody] = useState(initial?.body_md ?? "");
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState<Busy>(null);
-  const [uploading, setUploading] = useState(false);
+  // Drafts autosave silently (no busy, so the toolbar stays enabled); this is
+  // the side channel the status text reads. Published posts never autosave:
+  // updatePostAction revalidates the public page, so they keep explicit Update.
+  const [autosave, setAutosave] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  // In-flight uploads. A counter, not a boolean: paste/drop bypass the locked
+  // toolbar, so two uploads can overlap and must not clear each other's flag.
+  const [uploadCount, setUploadCount] = useState(0);
+  const uploading = uploadCount > 0;
   const [toast, setToast] = useState<Toast>(null);
   const [tab, setTab] = useState<"write" | "preview">("write");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -92,6 +108,16 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   // ("hello-2") when the derived one was already taken. onTitle clears it
   // whenever it re-derives the slug locally so it can never go stale.
   const serverSlugRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
+  // The editVersion a failed save was built from. Autosave doesn't retry
+  // until an edit moves past it, so a persistent error can't loop every 1.5s.
+  const failedVersion = useRef<number | null>(null);
+  // Numbers upload placeholders so two concurrent replaceOnce calls can't cross-resolve.
+  const uploadSeq = useRef(0);
+  // Render-assigned snapshot for the flush-on-unmount effect below save().
+  const patch = { title, slug, excerpt: excerpt || null, body_md: body, cover_image_url: cover, tags };
+  const latest = useRef({ dirty, status, patch });
+  latest.current = { dirty, status, patch };
 
   useEffect(() => {
     listTagsAction()
@@ -185,6 +211,26 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   };
 
   const applyEdit = (res: EditResult) => {
+    const el = bodyRef.current;
+    const d = minimalEdit(body, res.value);
+    if (!d) return; // e.g. prefixLines on an already-prefixed line
+    // insertText/delete over just the changed range keeps the browser's undo
+    // stack; the textarea's onChange fires synchronously inside the command
+    // and updates body/editVersion/dirty exactly as if the text had been
+    // typed. Fall back to replacing the controlled value when it is unavailable.
+    if (el) {
+      el.focus();
+      el.setSelectionRange(d.start, d.end);
+      // Firefox treats an empty insertText as a no-op, so deletions use "delete".
+      const done = d.text === "" ? document.execCommand("delete") : document.execCommand("insertText", false, d.text);
+      if (done && el.value === res.value) {
+        // Set the selection now, not in a rAF: DOM and state already agree so
+        // React leaves the value alone, and a deferred move would yank the
+        // caret back from under a fast typist's next keystroke.
+        el.setSelectionRange(res.selectionStart, res.selectionEnd);
+        return;
+      }
+    }
     setBody(res.value);
     editVersion.current += 1;
     setDirty(true);
@@ -212,7 +258,11 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       case "link": {
         const url = window.prompt("Link URL");
         if (!url) return;
-        return applyEdit(wrapSelection(body, sel, "[", `](${url.trim()})`, "link text"));
+        // A scheme-less "example.com" would become a RELATIVE href under
+        // /articles/<slug>; keep schemes, site-relative paths and anchors as typed.
+        const u = url.trim();
+        const href = /^([a-z][a-z0-9+.-]*:|\/|#)/i.test(u) ? u : `https://${u}`;
+        return applyEdit(wrapSelection(body, sel, "[", `](${href})`, "link text"));
       }
       case "youtube": {
         const url = window.prompt("YouTube URL");
@@ -260,11 +310,12 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       fail("Something went wrong. Check your connection and try again.");
       return;
     }
-    const placeholder = kind === "image" ? `![Uploading ${file.name}…]()` : `[Uploading ${file.name}…]()`;
+    const seq = ++uploadSeq.current;
+    const placeholder = kind === "image" ? `![Uploading ${file.name} ${seq}…]()` : `[Uploading ${file.name} ${seq}…]()`;
     setBody((b) => insertBlock(b, selection(), placeholder).value);
     editVersion.current += 1;
     setDirty(true);
-    setUploading(true);
+    setUploadCount((n) => n + 1);
     try {
       const { url } = await uploadPostMedia(postId, file, kind);
       const label = file.name.replace(/\.[^.]+$/, "");
@@ -276,7 +327,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       editVersion.current += 1;
       fail(e instanceof Error ? e.message : "Upload failed");
     } finally {
-      setUploading(false);
+      setUploadCount((n) => n - 1);
     }
   };
 
@@ -292,7 +343,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       fail("Something went wrong. Check your connection and try again.");
       return;
     }
-    setUploading(true);
+    setUploadCount((n) => n + 1);
     try {
       const { url } = await uploadPostMedia(postId, file, "image");
       setCover(url);
@@ -301,16 +352,24 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
     } catch (e) {
       fail(e instanceof Error ? e.message : "Upload failed");
     } finally {
-      setUploading(false);
+      setUploadCount((n) => n - 1);
     }
   };
 
-  const save = async (): Promise<boolean> => {
-    setBusy("save");
+  // `silent` is the autosave path: it reports through `autosave` instead of
+  // busy/toast, so the toolbar never locks and errors don't spam toasts.
+  const save = async (opts: { silent?: boolean } = {}): Promise<boolean> => {
+    savingRef.current = true;
+    if (opts.silent) setAutosave("saving");
+    else setBusy("save");
     const v = editVersion.current;
     try {
       const draft = await ensureId();
-      if (!draft) return false;
+      if (!draft) {
+        if (opts.silent) setAutosave("error");
+        failedVersion.current = v;
+        return false;
+      }
       // On the very first save, ensureId() may have just created the draft
       // with a server-suffixed slug (title collision) that differs from the
       // client-derived one still in state — send the server's slug instead,
@@ -330,7 +389,9 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
         tags,
       });
       if (r.success === false) {
-        fail(r.error);
+        if (opts.silent) setAutosave("error");
+        else fail(r.error);
+        failedVersion.current = v;
         return false;
       }
       // Only echo the server's tags/slug and clear dirty if nothing changed
@@ -340,15 +401,47 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
         setTags(r.post.tags);
         setSlug(r.post.slug);
         setDirty(false);
+        setAutosave("saved");
+      } else {
+        setAutosave("idle");
       }
       return true;
     } catch {
-      fail("Something went wrong. Check your connection and try again.");
+      if (opts.silent) setAutosave("error");
+      else fail("Something went wrong. Check your connection and try again.");
+      failedVersion.current = v;
       return false;
     } finally {
-      setBusy(null);
+      savingRef.current = false;
+      if (!opts.silent) setBusy(null);
     }
   };
+
+  // Autosave (drafts only). Every field is a dep so the fired closure is the
+  // latest; `autosave` is a dep so a save that finished while the writer kept
+  // typing re-arms. The title gate keeps ensureId() from creating "Untitled"
+  // rows on the first keystrokes of a new post, and `!uploading` keeps an
+  // "Uploading…" placeholder out of the saved body.
+  useEffect(() => {
+    if (status !== "draft" || !dirty || busy !== null || uploading || !title.trim()) return;
+    if (failedVersion.current === editVersion.current) return;
+    const t = window.setTimeout(() => {
+      if (!savingRef.current) void save({ silent: true });
+    }, 1500);
+    return () => window.clearTimeout(t);
+    // `save` is intentionally omitted: it is recreated every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [body, title, slug, excerpt, tags, cover, dirty, status, busy, uploading, autosave]);
+
+  // A top-nav link inside the debounce window unmounts the editor before the
+  // timer fires; flush the pending draft edit so it isn't silently dropped.
+  useEffect(
+    () => () => {
+      const l = latest.current;
+      if (idRef.current && l.dirty && l.status === "draft") void updatePostAction(idRef.current, l.patch);
+    },
+    [],
+  );
 
   const onSave = async () => {
     if (await save()) setToast({ message: status === "published" ? "Updated" : "Draft saved", type: "success" });
@@ -389,6 +482,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       const r = await deletePostAction(idRef.current!);
       if (r.success === false) return fail(r.error);
       setDirty(false);
+      latest.current.dirty = false;
       router.push("/admin/posts");
     } catch {
       fail("Something went wrong. Check your connection and try again.");
@@ -399,67 +493,97 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
 
   const locked = busy !== null || uploading;
 
+  // "← Posts" is a client-side navigation, which beforeunload never sees.
+  // Save a draft and go; anything else (published edits, a failed save) asks.
+  const onLeave = async (e: React.MouseEvent) => {
+    if (!dirty || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    if (status === "draft" && !locked && (await save())) {
+      router.push("/admin/posts");
+      return;
+    }
+    setConfirmLeave(true);
+  };
+
+  const saveState = uploading
+    ? "Uploading…"
+    : busy === "save" || autosave === "saving"
+      ? "Saving\u2026"
+      : autosave === "error"
+        ? "Save failed"
+        : dirty
+          ? "Unsaved"
+          : autosave === "saved"
+            ? "Saved"
+            : null;
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 xl:max-w-[1400px]">
+      {/* Sticky under the z-50 h-16 TopNav so Save/Publish stay reachable while
+          writing on a phone; dialogs (z-50, portaled) and the toast still win. */}
+      <div className="sticky top-16 z-40 -mx-4 mb-4 flex items-center justify-between gap-2 bg-background/95 px-4 py-2 backdrop-blur">
         <div className="flex items-center gap-3">
-          <Link href="/admin/posts" className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            href="/admin/posts"
+            onClick={onLeave}
+            className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground"
+          >
             ← Posts
           </Link>
           <span
-            className={`rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
+            className={`hidden rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider sm:inline-flex ${
               status === "published" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
             }`}
           >
             {status}
           </span>
-          {uploading ? (
-            <span className="text-xs text-muted-foreground">Uploading…</span>
-          ) : dirty ? (
-            <span className="text-xs text-muted-foreground">Unsaved changes</span>
-          ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <span aria-live="polite" className={`text-xs ${saveState === "Save failed" ? "text-destructive" : "text-muted-foreground"}`}>
+            {saveState}
+          </span>
           {status === "published" && (
-            <Button asChild variant="outline" className="min-h-11">
+            <Button asChild variant="outline" className="min-h-11 px-3 sm:px-4">
               <a href={`/articles/${slug}`} target="_blank" rel="noreferrer">
                 View
               </a>
             </Button>
           )}
-          <Button variant="outline" className="min-h-11" onClick={onSave} disabled={locked}>
-            {status === "published" ? "Update" : "Save draft"}
+          <Button variant="outline" className="min-h-11 px-3 sm:px-4" onClick={onSave} disabled={locked}>
+            {busy === "save" ? "Saving\u2026" : status === "published" ? "Update" : "Save draft"}
           </Button>
           {status === "draft" ? (
-            <Button className="min-h-11" onClick={onPublish} disabled={locked}>
-              Publish
+            <Button className="min-h-11 px-3 sm:px-4" onClick={onPublish} disabled={locked}>
+              {busy === "publish" ? "Publishing\u2026" : "Publish"}
             </Button>
           ) : (
-            <Button variant="outline" className="min-h-11" onClick={onUnpublish} disabled={locked}>
-              Unpublish
-            </Button>
-          )}
-          {id && (
-            <Button variant="destructive" className="min-h-11" onClick={() => setConfirmDelete(true)} disabled={locked}>
-              Delete
+            <Button variant="outline" className="min-h-11 px-3 sm:px-4" onClick={onUnpublish} disabled={locked}>
+              {busy === "unpublish" ? "Unpublishing\u2026" : "Unpublish"}
             </Button>
           )}
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-4">
-          <Input
-            value={title}
-            onChange={(e) => onTitle(e.target.value)}
-            placeholder="Title"
-            maxLength={MAX_TITLE}
-            aria-label="Title"
-            className="h-12 text-lg font-semibold"
-          />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-4">
+          <div>
+            <Input
+              value={title}
+              onChange={(e) => onTitle(e.target.value)}
+              placeholder="Title"
+              maxLength={MAX_TITLE}
+              aria-label="Title"
+              className="h-12 text-lg font-semibold"
+            />
+            {title.length >= MAX_TITLE - 20 && (
+              <span className="mt-1 block text-right text-xs text-muted-foreground">
+                {title.length}/{MAX_TITLE}
+              </span>
+            )}
+          </div>
 
           <div className="rounded-md bg-card">
-            <div role="tablist" aria-label="Editor view" className="flex lg:hidden">
+            <div role="tablist" aria-label="Editor view" className="m-2 inline-flex rounded-md bg-muted/40 p-0.5 lg:hidden">
               {(["write", "preview"] as const).map((t) => (
                 <button
                   key={t}
@@ -467,8 +591,8 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
                   type="button"
                   aria-selected={tab === t}
                   onClick={() => setTab(t)}
-                  className={`min-h-11 px-4 text-sm capitalize ${
-                    tab === t ? "font-semibold text-foreground" : "text-muted-foreground"
+                  className={`min-h-11 rounded px-4 text-sm capitalize ${
+                    tab === t ? "bg-background font-semibold text-foreground" : "text-muted-foreground"
                   }`}
                 >
                   {t}
@@ -476,12 +600,14 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
               ))}
             </div>
             <div className="grid lg:grid-cols-2">
-              <div className={tab === "write" ? "" : "hidden lg:block"}>
+              {/* min-w-0: the toolbar's one-row min-content width must scroll inside the pane, not widen the page. */}
+              <div className={`min-w-0 ${tab === "write" ? "" : "hidden lg:block"}`}>
                 <MarkdownToolbar onAction={onToolbar} disabled={locked} />
-                {/* The two non-obvious moves, always in view so nobody has to find a tooltip. */}
-                <p className="bg-muted/40 px-3 py-1.5 text-xs leading-relaxed text-muted-foreground">
+                {/* Always in view on desktop so nobody has to find a tooltip; phones
+                    get the same two moves from the placeholder and the preview tip. */}
+                <p className="hidden bg-muted/40 px-3 py-1 text-xs text-muted-foreground lg:block">
                   Type <kbd className="rounded bg-background px-1 font-mono text-[11px] text-foreground">[[</kbd> to mention
-                  a card. Paste a deck link on its own line to embed the deck.
+                  a card {"\u00b7"} a deck link on its own line embeds it
                 </p>
                 <textarea
                   ref={bodyRef}
@@ -492,22 +618,70 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
                     editVersion.current += 1;
                     setDirty(true);
                     // Typing "[[" opens the card picker; the pick replaces the brackets.
+                    // Not on undo: reverting a pick leaves "[[" behind and must not reopen it.
                     const caret = e.target.selectionStart;
-                    if (caret >= 2 && v.slice(caret - 2, caret) === "[[" && v[caret - 3] !== "[" && v[caret] !== "[") {
+                    if (
+                      (e.nativeEvent as InputEvent).inputType !== "historyUndo" &&
+                      caret >= 2 &&
+                      v.slice(caret - 2, caret) === "[[" &&
+                      v[caret - 3] !== "[" &&
+                      v[caret] !== "["
+                    ) {
                       setCardPicker({ open: true, query: "", from: caret - 2, to: caret });
                     }
                   }}
-                  placeholder="Write in markdown…"
+                  onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing) return;
+                    const mod = e.metaKey || e.ctrlKey;
+                    if (mod && !e.altKey && !e.shiftKey) {
+                      const k = e.key.toLowerCase();
+                      const action = k === "b" ? "bold" : k === "i" ? "italic" : k === "k" ? "link" : null;
+                      if (action) {
+                        e.preventDefault();
+                        if (!locked) onToolbar(action);
+                      } else if (k === "s") {
+                        e.preventDefault();
+                        if (!locked) void onSave();
+                      }
+                      return;
+                    }
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      const r = continueList(body, selection());
+                      if (r) {
+                        e.preventDefault();
+                        applyEdit(r);
+                      }
+                    }
+                  }}
+                  // Files only; plain text paste/drop keeps the browser default.
+                  onPaste={(e) => {
+                    const f = e.clipboardData.files;
+                    if (f.length) {
+                      e.preventDefault();
+                      void onPickMedia("image", f);
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    const f = e.dataTransfer.files;
+                    if (f.length) {
+                      e.preventDefault();
+                      void onPickMedia("image", f);
+                    }
+                  }}
+                  placeholder="Write in markdown… Type [[ to mention a card. A deck link on its own line embeds the deck."
                   aria-label="Body"
                   spellCheck
-                  className="min-h-[50vh] w-full resize-y bg-transparent p-3 font-mono text-sm leading-relaxed outline-none lg:min-h-[70vh]"
+                  className="min-h-[50vh] w-full resize-y bg-transparent p-3 font-mono text-base leading-relaxed outline-none lg:min-h-[70vh] lg:text-sm"
                 />
               </div>
               <div className={`${tab === "preview" ? "" : "hidden lg:block"} rounded-b-md bg-muted/20 p-4 lg:rounded-r-md`}>
                 {body.trim() ? (
                   <ArticleBody markdown={body} refs={refs} draft />
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="flex min-h-[40vh] items-center justify-center px-6 text-center text-sm text-muted-foreground">
                     Nothing to preview yet. Card mentions show the card on hover; a deck link on its own line becomes the
                     deck.
                   </p>
@@ -517,7 +691,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
           </div>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
           <label className={LABEL}>
             Slug
             <Input
@@ -578,7 +752,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
           </div>
 
           <label className={LABEL}>
-            Excerpt
+            Excerpt ({excerpt.length}/{MAX_EXCERPT})
             <textarea
               value={excerpt}
               onChange={(e) => {
@@ -588,10 +762,26 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
               }}
               maxLength={MAX_EXCERPT}
               rows={4}
-              placeholder="Optional. Defaults to the first 200 characters of the post."
+              placeholder="Optional. Shown on article cards, in the feed and in link previews."
               className="mt-1 w-full rounded-md bg-muted/40 p-2 text-sm normal-case tracking-normal text-foreground outline-none"
             />
+            {!excerpt.trim() && body.trim() !== "" && (
+              <span className="mt-1 line-clamp-2 text-xs normal-case tracking-normal text-muted-foreground">
+                Readers will see: {excerptFromMarkdown(body)}
+              </span>
+            )}
           </label>
+
+          {id && (
+            <Button
+              variant="ghost"
+              className="min-h-11 justify-self-start text-muted-foreground hover:text-destructive sm:col-span-2 xl:col-span-1"
+              onClick={() => setConfirmDelete(true)}
+              disabled={locked}
+            >
+              Delete
+            </Button>
+          )}
         </aside>
       </div>
 
@@ -650,6 +840,19 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
         title="Delete this post?"
         description="This removes the post and its uploaded media. It cannot be undone."
         confirmLabel="Delete"
+      />
+      <ConfirmationDialog
+        open={confirmLeave}
+        onOpenChange={setConfirmLeave}
+        variant="warning"
+        title="Leave without saving?"
+        description="Unsaved changes will be lost."
+        confirmLabel="Leave"
+        onConfirm={() => {
+          setDirty(false);
+          latest.current.dirty = false;
+          router.push("/admin/posts");
+        }}
       />
       <ToastNotification
         show={toast !== null}
