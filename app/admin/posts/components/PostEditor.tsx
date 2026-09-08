@@ -691,7 +691,11 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
           </div>
         </div>
 
-        <aside className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+        {/* content-start: at xl the aside shares a grid row with the editor, whose
+            preview can be thousands of px tall for a long article; without it the
+            grid's default align-content:stretch spreads the five fields over that
+            whole height. */}
+        <aside className="grid content-start gap-4 sm:grid-cols-2 xl:grid-cols-1">
           <label className={LABEL}>
             Slug
             <Input
