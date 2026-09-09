@@ -116,6 +116,9 @@ export type ForgeCardFull = {
   setId: string | null;
   publishedVersionId: string | null;
   approvedVersionId: string | null;
+  // Who pressed "New card" (or ran the import) and when. Never reassigned.
+  ownerId: string;
+  createdAt: string;
 };
 
 function toFull(row: any): ForgeCardFull {
@@ -131,10 +134,12 @@ function toFull(row: any): ForgeCardFull {
     setId: row.set_id ?? null,
     publishedVersionId: row.published_version_id ?? null,
     approvedVersionId: row.approved_version_id ?? null,
+    ownerId: row.owner_id,
+    createdAt: row.created_at,
   };
 }
 
-const CARD_COLS = "id, title, working_snapshot, working_art_key, working_art_is_placeholder, working_finished_key, status, updated_at, set_id, published_version_id, approved_version_id";
+const CARD_COLS = "id, title, working_snapshot, working_art_key, working_art_is_placeholder, working_finished_key, status, updated_at, set_id, published_version_id, approved_version_id, owner_id, created_at";
 
 export async function saveCard(
   cardId: string,
