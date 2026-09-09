@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { HiArrowSmRight, HiDocumentText, HiHeart } from "react-icons/hi";
+import { Coffee } from "lucide-react";
 
 import { RESOURCE_SECTIONS, type ResourceLink } from "../lib/resources";
 
@@ -125,6 +126,14 @@ export function ResourcesMenu({
         >
           <HiHeart className="w-4 h-4" />
           Sponsors
+        </Link>
+        <Link
+          href="/coffee"
+          onClick={onNavigate}
+          className={`${row} text-muted-foreground hover:bg-muted hover:text-foreground`}
+        >
+          <Coffee className="w-4 h-4" />
+          Buy me a coffee
         </Link>
         <Link
           href="/tracker/bug"

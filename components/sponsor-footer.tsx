@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { Coffee } from "lucide-react";
 
 import { SPONSORS } from "../lib/sponsors";
 
@@ -69,6 +70,16 @@ export default function SponsorFooter() {
               />
             </a>
           ))}
+
+          <span className="w-0.5 h-0.5 rounded-full bg-border/60" aria-hidden />
+
+          <Link
+            href="/coffee"
+            className="flex items-center gap-1.5 py-2 text-[11px] font-medium text-muted-foreground opacity-60 hover:opacity-100 transition-opacity"
+          >
+            <Coffee className="w-3.5 h-3.5" aria-hidden />
+            Buy me a coffee
+          </Link>
         </div>
       </div>
     </footer>
