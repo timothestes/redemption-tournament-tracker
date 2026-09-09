@@ -154,7 +154,8 @@ export const RESOURCE_SECTIONS: ResourceSection[] = [
         href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/Redemption_Host_Guide_2026-1.pdf",
         label: "Hosting Guide",
         description: "How to run a sanctioned Redemption tournament, start to finish.",
-        version: "2026",
+        version: "v26.0.0",
+        published: "August 13, 2026",
       },
       {
         href: "https://www.cactusgamedesign.com/wp-content/uploads/2026/08/host_instructions.pdf",
