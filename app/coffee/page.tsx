@@ -81,9 +81,8 @@ export default function CoffeePage() {
             Buy me a coffee
           </h1>
           <p className="mt-4 max-w-2xl leading-relaxed text-zinc-300">
-            I build and run Land of Redemption in my spare time. It&apos;s free and has no ads.
-            If the deck builder, the tournament tracker, or online play has been useful to you,
-            a coffee is a great way to say thanks.
+            Land of Redemption is a fan run site. It&apos;s free and has no ads!
+            If you want to support and encourage me, feel free to buy me a coffee!
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <a
