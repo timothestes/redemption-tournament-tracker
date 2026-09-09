@@ -194,11 +194,20 @@ button:focus, button:focus-visible,
     animation: card-fade-in 300ms cubic-bezier(0.25, 1, 0.5, 1) both;
   }
 }
+/* /coffee — steam wisps drift up and fade on a slow loop */
+@keyframes coffee-steam {
+  0%, 100% { opacity: 0.25; transform: translateY(0.5px); }
+  50% { opacity: 1; transform: translateY(-1px); }
+}
+.coffee-steam {
+  animation: coffee-steam 2.6s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .animate-pill-enter,
   .animate-qty-pop,
   .animate-card-in,
-  .deck-card-enter {
+  .deck-card-enter,
+  .coffee-steam {
     animation: none;
   }
 }

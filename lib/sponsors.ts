@@ -28,3 +28,6 @@ export const SPONSORS: Sponsor[] = [
     height: 100,
   },
 ];
+
+/** Tim's Buy Me a Coffee page. The footer, the resources menu, and /coffee all link here. */
+export const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/landofredemption";

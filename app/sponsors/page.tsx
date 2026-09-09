@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import TopNav from "@/components/top-nav";
 import { SPONSORS } from "@/lib/sponsors";
 
@@ -77,6 +78,17 @@ export default function SponsorsPage() {
             </a>
           ))}
         </div>
+
+        <p className="mt-10 text-sm text-muted-foreground">
+          Not a business? You can still help keep the site running.{" "}
+          <Link
+            href="/coffee"
+            className="font-medium text-foreground underline underline-offset-2 transition-colors hover:text-primary"
+          >
+            Buy me a coffee
+          </Link>
+          .
+        </p>
       </main>
     </div>
   );
