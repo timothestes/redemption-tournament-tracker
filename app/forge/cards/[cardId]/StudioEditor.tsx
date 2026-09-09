@@ -33,11 +33,13 @@ const arrowClass =
   "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border bg-background/70 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-background hover:text-foreground";
 
 export default function StudioEditor({
-  card, sets, currentUser, setId, setName, prevId, nextId, artCandidates, openProposals,
+  card, sets, currentUser, creator, setId, setName, prevId, nextId, artCandidates, openProposals,
 }: {
   card: ForgeCardFull;
   sets: ForgeSetSummary[];
   currentUser: { userId: string; displayName: string | null };
+  // Original author of the card (forge_cards.owner_id) — resolved server-side.
+  creator: { name: string; at: string };
   setId: string | null;
   setName: string | null;
   prevId?: string | null;
@@ -161,6 +163,11 @@ export default function StudioEditor({
             {saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Save failed" : ""}
           </span>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Created by <span className="font-medium text-foreground">{creator.name}</span>
+          {" · "}
+          {new Date(creator.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+        </p>
         <LifecycleControls card={card} sets={sets} openProposals={openProposals} />
         {card.setId && (
           <p className="text-xs text-muted-foreground">

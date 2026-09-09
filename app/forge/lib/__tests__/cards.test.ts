@@ -57,6 +57,16 @@ describe("getCard / listForgeCards", () => {
     const got = await getCard("c1");
     expect(got).toMatchObject({ id: "c1", title: "Goliath", snapshot: { name: "Goliath" }, hasArt: true, status: "private_idea", setId: null });
   });
+  it("exposes who created the card and when (owner_id / created_at)", async () => {
+    const row = { id: "c1", title: "Goliath", working_snapshot: {}, status: "draft", updated_at: "t", set_id: "s1", owner_id: "u9", created_at: "2026-07-01T00:00:00Z" };
+    const c = ctx(undefined, [row]);
+    (requireForge as any).mockResolvedValue(c);
+    const got = await getCard("c1");
+    expect(got).toMatchObject({ ownerId: "u9", createdAt: "2026-07-01T00:00:00Z" });
+    const cols = (c.supabase.from as any).mock.results[0].value.select.mock.calls[0][0] as string;
+    expect(cols).toContain("owner_id");
+    expect(cols).toContain("created_at");
+  });
   it("listForgeCards selects only private ideas (set_id IS NULL)", async () => {
     const c = ctx(undefined, []);
     (requireForge as any).mockResolvedValue(c);

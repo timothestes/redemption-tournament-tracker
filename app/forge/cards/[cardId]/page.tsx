@@ -59,9 +59,17 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
     .single();
   const currentUser = { userId: ctx.user.id, displayName: meRow?.display_name ?? null };
 
+  // "Created by" line in the studio header. Same member-readable name lookup as History.
+  const { data: ownerRow } = await ctx.supabase
+    .from("playtest_members")
+    .select("display_name")
+    .eq("user_id", card.ownerId)
+    .maybeSingle();
+  const creator = { name: ownerRow?.display_name ?? "Forge member", at: card.createdAt };
+
   return (
     <>
-      <StudioEditor card={card} sets={sets} currentUser={currentUser} setId={card.setId ?? null} setName={set?.name ?? null} prevId={prevId} nextId={nextId} artCandidates={artCandidates} openProposals={openProposals} />
+      <StudioEditor card={card} sets={sets} currentUser={currentUser} creator={creator} setId={card.setId ?? null} setName={set?.name ?? null} prevId={prevId} nextId={nextId} artCandidates={artCandidates} openProposals={openProposals} />
       {inSet && (
         <ReviewPanel
           card={card}
