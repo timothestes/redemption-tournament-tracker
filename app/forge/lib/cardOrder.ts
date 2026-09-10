@@ -1,5 +1,5 @@
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
-import { compareCardsDefault, type SortableCard } from "@/lib/cards/defaultSort";
+import { compareCardsDefault, compareCardsEndOfTimes, type SortableCard } from "@/lib/cards/defaultSort";
 
 // Adapt a forge card snapshot (array-valued cardType/brigades, numeric-or-string
 // strength) to the canonical comparator's shape. Cards with no primary type get
@@ -19,10 +19,37 @@ function toSortable(c: ForgeCardFull): SortableCard {
   };
 }
 
+// End of Times is a confirmed one-off, not a pattern to generalize: its
+// final numbering (a) counts a leading "The" as a real word and breaks
+// same-strength ties by toughness ascending, where every other validated
+// set does the opposite (see compareCardsEndOfTimes), and (b) hand-orders
+// its five Dominants in a sequence that doesn't reduce to any rule —
+// Beast's Mark deliberately prints last despite alphabetizing before
+// "Deceiving the Nations".
+export const END_OF_TIMES_SET_ID = "908b4ce7-9bf8-474c-b3bf-ff957462f983";
+const END_OF_TIMES_DOMINANT_ORDER = [
+  "Alpha and Omega", "Word of the Lord", "Armageddon", "Deceiving the Nations", "Beast's Mark",
+];
+
+function dominantOverrideRank(title: string): number {
+  const idx = END_OF_TIMES_DOMINANT_ORDER.indexOf(title);
+  return idx === -1 ? END_OF_TIMES_DOMINANT_ORDER.length : idx;
+}
+
+function compareEndOfTimesSetCards(a: ForgeCardFull, b: ForgeCardFull): number {
+  const diff = dominantOverrideRank(a.title ?? "") - dominantOverrideRank(b.title ?? "");
+  if (diff !== 0) return diff;
+  return compareCardsEndOfTimes(toSortable(a), toSortable(b));
+}
+
 // Default set-card display order: the canonical default card sort (sections →
 // brigades → strength → name). Shared by the set grid (SetCardsBrowser) and the
 // single-card detail view's prev/next arrows so both walk the set in the same
 // order.
 export function sortSetCards(cards: ForgeCardFull[]): ForgeCardFull[] {
-  return [...cards].sort((a, b) => compareCardsDefault(toSortable(a), toSortable(b)));
+  const isEndOfTimes = cards.some((c) => c.setId === END_OF_TIMES_SET_ID);
+  const compare = isEndOfTimes
+    ? compareEndOfTimesSetCards
+    : (a: ForgeCardFull, b: ForgeCardFull) => compareCardsDefault(toSortable(a), toSortable(b));
+  return [...cards].sort(compare);
 }
