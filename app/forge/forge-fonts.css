@@ -1,5 +1,9 @@
 @font-face { font-family: "ForgeBody"; src: url("/forge/fonts/Arimo-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: "ForgeBody"; src: url("/forge/fonts/Arimo-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: "ForgeBody"; src: url("/forge/fonts/Arimo-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
-@font-face { font-family: "ForgeTitle"; src: url("/forge/fonts/Mukta-ExtraBold.ttf") format("truetype"); font-weight: 800; font-style: normal; font-display: swap; }
-@font-face { font-family: "ForgeStat"; src: url("/forge/fonts/PTSerif-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+/* Title and stats: the printed faces (Symphony Black, Grail Light) stream from the private Blob
+   store through the member-only /forge/api/fonts route — licensed, never in the repo. When that
+   src fails (no session, blob missing) the browser activates the OFL substitute listed next.
+   Bump ?v= after re-uploading with scripts/forge-upload-fonts.ts; the route caches per member. */
+@font-face { font-family: "ForgeTitle"; src: url("/forge/api/fonts/title?v=1") format("truetype"), url("/forge/fonts/Mukta-ExtraBold.ttf") format("truetype"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "ForgeStat"; src: url("/forge/api/fonts/stat?v=1") format("truetype"), url("/forge/fonts/PTSerif-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
