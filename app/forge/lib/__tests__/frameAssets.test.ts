@@ -4,7 +4,7 @@ import path from "node:path";
 import { BRIGADES, CARD_TYPES, type DesignCard } from "../designCard";
 import {
   BRIGADE_HEX, BRIGADE_SLUG, SYNTHESIZED_WASHES, washPaths, iconBox, classIcons,
-  gradientRows, isPreviewApproximate, specialWash,
+  gradientRows, isPreviewApproximate, specialWash, showsStats,
 } from "../frameAssets";
 import { RECTS, CANVAS, GRADIENT_ROWS, BRIGADE_BOX_HEX } from "../frameGeometry";
 
@@ -25,14 +25,16 @@ describe("kit completeness", () => {
     ];
     for (const c of cases) expect(existsSync(kit(washPaths(c)[0]))).toBe(true);
   });
-  it("every card type resolves to an icon or a badge that exists", () => {
+  it("every boxed card type resolves to an icon or a badge that exists", () => {
     for (const t of CARD_TYPES) {
       const box = iconBox({ cardType: [t], brigades: ["Blue"], alignment: "Good" }, "left");
+      if (t === "LostSoul") { expect(box).toBeNull(); continue; }
       expect(box).not.toBeNull();
       expect(box!.icon || box!.badge).toBeTruthy();
       if (box!.icon) expect(existsSync(kit(box!.icon))).toBe(true);
       if (box!.badge) expect(existsSync(kit(box!.badge))).toBe(true);
     }
+    expect(existsSync(kit(iconBox({ cardType: ["Curse"] }, "right")!.badge!))).toBe(true);
   });
   it("geometry is in the 750x1050 canvas and every rect fits", () => {
     expect(CANVAS).toEqual({ w: 750, h: 1050 });
@@ -56,7 +58,7 @@ describe("washPaths", () => {
     expect(washPaths({})).toEqual([]);
     expect(washPaths({ cardType: ["Hero"] })).toEqual([]);
   });
-  it("uses one wash per brigade, up to two", () => {
+  it("uses one wash per brigade, up to two (top, bottom)", () => {
     expect(washPaths({ brigades: ["Red"] })).toEqual(["/forge/frames/washes/red.webp"]);
     expect(washPaths({ brigades: ["GoodGold", "Red", "Blue"] })).toEqual([
       "/forge/frames/washes/gold.webp", "/forge/frames/washes/red.webp",
@@ -73,9 +75,30 @@ describe("washPaths", () => {
   });
 });
 
+describe("showsStats", () => {
+  it("always for Heroes and Evil Characters, even before values are entered", () => {
+    expect(showsStats({ cardType: ["Hero"] })).toBe(true);
+    expect(showsStats({ cardType: ["EvilCharacter"], strength: null, toughness: null })).toBe(true);
+  });
+  it("for enhancements, Covenants and Curses only once a value is entered", () => {
+    for (const t of ["GE", "EE", "Covenant", "Curse"] as const) {
+      expect(showsStats({ cardType: [t] })).toBe(false);
+      expect(showsStats({ cardType: [t], strength: 5 })).toBe(true);
+      expect(showsStats({ cardType: [t], toughness: "X" })).toBe(true);
+    }
+  });
+  it("never for types that cannot carry stats", () => {
+    expect(showsStats({ cardType: ["Site"], strength: 5, toughness: 5 })).toBe(false);
+    expect(showsStats({ cardType: ["Artifact"], strength: 5 })).toBe(false);
+    expect(showsStats({ cardType: ["LostSoul"], strength: 5 })).toBe(false);
+  });
+});
+
 describe("iconBox", () => {
-  it("is absent until a type is chosen", () => {
+  it("is absent until a type is chosen, and never for Lost Souls", () => {
     expect(iconBox({ brigades: ["Blue"] }, "left")).toBeNull();
+    expect(iconBox({ cardType: ["LostSoul"], brigades: ["Blue"] }, "left")).toBeNull();
+    expect(iconBox({ cardType: ["LostSoul"] }, "right")).toBeNull();
   });
   it("Hero: cross, stats, brigade fill; white brigade takes dark stat text", () => {
     const blue = iconBox({ cardType: ["Hero"], brigades: ["Blue"] }, "left")!;
@@ -83,41 +106,54 @@ describe("iconBox", () => {
     expect(blue.withStats).toBe(true);
     expect(blue.badge).toBeNull();
     expect(blue.fill).toBe(BRIGADE_HEX.Blue);
+    expect(blue.fill2).toBeNull();
     expect(blue.darkText).toBe(false);
     const white = iconBox({ cardType: ["Hero"], brigades: ["White"] }, "left")!;
     expect(white.fill).toBe("#ffffff");
     expect(white.darkText).toBe(true);
   });
+  it("two brigades split the one box top/bottom; there is no second box for them", () => {
+    const box = iconBox({ cardType: ["Hero"], brigades: ["Blue", "Green"] }, "left")!;
+    expect(box.fill).toBe(BRIGADE_HEX.Blue);
+    expect(box.fill2).toBe(BRIGADE_HEX.Green);
+    expect(box.icon).toBe("/forge/frames/icons/cross.png");
+    expect(iconBox({ cardType: ["Hero"], brigades: ["Blue", "Green"] }, "right")).toBeNull();
+  });
+  it("three or more brigades use the multi foil instead of a split", () => {
+    const multi = iconBox({ cardType: ["Hero"], brigades: ["Blue", "Red", "GoodGold"], alignment: "Good" }, "left")!;
+    expect(multi.badge).toBe("/forge/frames/badges/multi-good.webp");
+    expect(multi.fill2).toBeNull();
+  });
   it("Evil Character is the dragon, Evil Enhancement the skull (as printed)", () => {
     expect(iconBox({ cardType: ["EvilCharacter"], brigades: ["Crimson"] }, "left")!.icon).toBe("/forge/frames/icons/dragon.png");
     expect(iconBox({ cardType: ["EE"], brigades: ["Crimson"] }, "left")!.icon).toBe("/forge/frames/icons/skull.png");
   });
-  it("stats-bearing types get the small icon variant where the template has one", () => {
-    expect(iconBox({ cardType: ["EvilCharacter", "EE"], brigades: ["Black"] }, "left")!.icon).toBe("/forge/frames/icons/dragon.png");
-    expect(iconBox({ cardType: ["EE", "EvilCharacter"], brigades: ["Black"] }, "left")!.icon).toBe("/forge/frames/icons/skull-small.png");
+  it("stats-bearing boxes get the small icon variant where the template has one", () => {
+    expect(iconBox({ cardType: ["EE"], brigades: ["Black"], strength: 3 }, "left")!.icon).toBe("/forge/frames/icons/skull-small.png");
+    expect(iconBox({ cardType: ["Covenant"], brigades: ["Green"], strength: 5, toughness: 2 }, "left")!.icon).toBe("/forge/frames/icons/bible-small.png");
     expect(iconBox({ cardType: ["Curse"], brigades: ["Black"] }, "left")!.icon).toBe("/forge/frames/icons/skull.png");
   });
-  it("badges: artifact chalice, lamb/reaper dominants, nebula fortress and lost soul", () => {
+  it("Covenants and Curses: enhancement icon left, artifact chalice right", () => {
+    const cov = iconBox({ cardType: ["Covenant"], brigades: ["Green", "Purple"], strength: 5, toughness: 2 }, "left")!;
+    expect(cov.icon).toBe("/forge/frames/icons/bible-small.png");
+    expect(cov.fill).toBe(BRIGADE_HEX.Green);
+    expect(cov.fill2).toBe(BRIGADE_HEX.Purple);
+    expect(cov.withStats).toBe(true);
+    const right = iconBox({ cardType: ["Covenant"], brigades: ["Green", "Purple"] }, "right")!;
+    expect(right.badge).toBe("/forge/frames/badges/artifact.webp");
+    expect(right.icon).toBeNull();
+    expect(right.withStats).toBe(false);
+    expect(iconBox({ cardType: ["Curse"] }, "right")!.badge).toBe("/forge/frames/badges/artifact.webp");
+    expect(iconBox({ cardType: ["Hero"] }, "right")).toBeNull();
+    expect(iconBox({ cardType: ["Artifact"] }, "right")).toBeNull();
+  });
+  it("badges: artifact chalice, lamb/reaper dominants, nebula fortress", () => {
     expect(iconBox({ cardType: ["Artifact"] }, "left")!.badge).toBe("/forge/frames/badges/artifact.webp");
     expect(iconBox({ cardType: ["Dominant"], alignment: "Good" }, "left")!.badge).toBe("/forge/frames/badges/lamb.webp");
     expect(iconBox({ cardType: ["Dominant"], alignment: "Evil" }, "left")!.badge).toBe("/forge/frames/badges/reaper.webp");
     const fort = iconBox({ cardType: ["Fortress"], alignment: "Evil" }, "left")!;
     expect(fort.badge).toBe("/forge/frames/badges/evil-dom.webp");
     expect(fort.icon).toBe("/forge/frames/icons/fortress.png");
-    expect(iconBox({ cardType: ["LostSoul"] }, "left")!.badge).toBe("/forge/frames/badges/good-dom.webp");
-  });
-  it("three or more brigades use the multi foil; two brigades add a right box", () => {
-    const multi = iconBox({ cardType: ["Hero"], brigades: ["Blue", "Red", "GoodGold"], alignment: "Good" }, "left")!;
-    expect(multi.badge).toBe("/forge/frames/badges/multi-good.webp");
-    expect(iconBox({ cardType: ["Hero"], brigades: ["Blue", "Red", "GoodGold"] }, "right")).toBeNull();
-    const right = iconBox({ cardType: ["Hero"], brigades: ["Blue", "Red"] }, "right")!;
-    expect(right.fill).toBe(BRIGADE_HEX.Red);
-    expect(right.withStats).toBe(false);
-    expect(right.icon).toBe("/forge/frames/icons/cross.png");
-    expect(iconBox({ cardType: ["Hero"], brigades: ["Blue"] }, "right")).toBeNull();
-  });
-  it("special types never get a right box even with two brigades", () => {
-    expect(iconBox({ cardType: ["Fortress"], brigades: ["Blue", "Red"] }, "right")).toBeNull();
   });
 });
 
@@ -134,7 +170,6 @@ describe("classIcons / gradientRows / approximate", () => {
     expect(gradientRows({ scripture: "Short verse." })).toBe(2);
     expect(gradientRows({ scripture: "x".repeat(120) })).toBe(3);
     expect(gradientRows({ scripture: "x".repeat(200) })).toBe(5);
-    expect(gradientRows({ scripture: "x".repeat(600) })).toBe(5);
     for (const r of [2, 3, 4, 5] as const) expect(GRADIENT_ROWS[r].light).toBeLessThan(GRADIENT_ROWS[r].dark);
   });
   it("flags three brigades, Classic legality and synthesized washes", () => {

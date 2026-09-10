@@ -19,6 +19,12 @@ import { CANVAS, RECTS, GRADIENT_ROWS, BORDER_STROKE } from "@/app/forge/lib/fra
 const { w: CW, h: CH } = CANVAS;
 const INK = "#231f20"; // the template's 100% K through its SWOP profile
 const COPYRIGHT_YEAR = new Date().getFullYear();
+const TITLE_FONT = "ForgeTitle, 'Trebuchet MS', 'Segoe UI', sans-serif";
+const STAT_FONT = "ForgeStat, Georgia, 'Times New Roman', serif";
+// ForgeTitle (Mukta ExtraBold) averages ~0.55em per character; used to size and squeeze titles.
+// Sizes are cap heights measured off printed cards (title ~26 px, stats ~22 px on the canvas).
+const TITLE_EM = 0.55;
+const TITLE_MAX = 40, TITLE_MIN = 28;
 
 type Rect = { readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly r?: number };
 
@@ -37,35 +43,38 @@ function statText(s: StatValue | undefined, t: StatValue | undefined): string {
   return `${f(s)}/${f(t)}`;
 }
 
-// Icon box: brigade-colored (or badge-filled) tab tucked into the frame corner, with an
-// inner rounded corner. The frame's border clip trims its outer edges.
+// Icon box: a tab tucked into the frame corner with an inner rounded corner. Fill is the
+// brigade color (split into a top/bottom band for two brigades) or a badge; stats sit in
+// the top band with the type icon below them. The frame's border clip trims the outer edges.
 function IconBoxG({ id, box, rect, side, stat }: {
   id: string; box: IconBox; rect: Rect; side: "left" | "right"; stat: string | null;
 }) {
   const { x, y, w, h } = rect;
-  const r = 24;
+  const r = 28;
   const d = side === "left"
     ? `M${x} ${y}H${x + w}V${y + h - r}A${r} ${r} 0 0 1 ${x + w - r} ${y + h}H${x}Z`
     : `M${x} ${y}H${x + w}V${y + h}H${x + r}A${r} ${r} 0 0 1 ${x} ${y + h - r}Z`;
   const inset = 16;
-  const iconTop = stat ? y + 44 : y + inset;
+  const split = y + h * 0.45;
+  const iconTop = stat ? split + 4 : y + inset;
+  const statSize = stat && stat.length > 7 ? 23 : stat && stat.length > 4 ? 28 : 34;
   return (
     <g>
-      <path d={d} fill={box.fill} stroke={INK} strokeWidth={4} />
+      <clipPath id={id}><path d={d} /></clipPath>
+      <path d={d} fill={box.fill} />
+      {box.fill2 && <rect x={x} y={split} width={w} height={y + h - split} fill={box.fill2} clipPath={`url(#${id})`} />}
       {box.badge && (
-        <>
-          <clipPath id={id}><path d={d} /></clipPath>
-          <image href={box.badge} x={x} y={y} width={w} height={h} preserveAspectRatio="xMidYMid slice" clipPath={`url(#${id})`} />
-        </>
+        <image href={box.badge} x={x} y={y} width={w} height={h} preserveAspectRatio="xMidYMid slice" clipPath={`url(#${id})`} />
       )}
+      <path d={d} fill="none" stroke={INK} strokeWidth={4} />
       {box.icon && (
-        <image href={box.icon} x={x + inset} y={iconTop} width={w - inset * 2} height={y + h - inset - iconTop} preserveAspectRatio="xMidYMid meet" />
+        <image href={box.icon} x={x + inset} y={iconTop} width={w - inset * 2} height={y + h - inset + 2 - iconTop} preserveAspectRatio="xMidYMid meet" />
       )}
       {stat && (
         <text
-          x={x + w / 2 + (side === "left" ? 4 : -4)} y={y + 42} textAnchor="middle"
-          fontFamily="ForgeTitle, Impact, sans-serif" fontSize={stat.length > 4 ? 30 : 38} letterSpacing={1}
-          fill={box.darkText ? INK : "#fff"} stroke={box.darkText ? "#fff" : INK} strokeWidth={3}
+          x={x + w / 2 + (side === "left" ? 4 : -4)} y={y + 43} textAnchor="middle"
+          fontFamily={STAT_FONT} fontSize={statSize}
+          fill={box.darkText ? INK : "#fff"} stroke={box.darkText ? "#fff" : INK} strokeWidth={2.6}
           paintOrder="stroke" style={{ paintOrder: "stroke" }}
         >
           {stat}
@@ -89,15 +98,17 @@ export default function ForgeCardPreview({
 
   const B = RECTS.border, A = RECTS.art, T = RECTS.textBox, I = RECTS.textInset;
   const name = card.name?.trim() || "Card Name";
-  // Title: right-aligned, stops short of a second brigade's box. Shrinks for long names,
-  // then squeezes the glyphs like the printed cards do (Anton averages ~0.45em/char).
-  const titleRight = right ? RECTS.rightBox.x - 12 : RECTS.title.x + RECTS.title.w;
-  const titleAvail = titleRight - RECTS.title.x;
-  const titleWidth = (size: number) => name.length * size * 0.45;
-  const titleSize = titleWidth(48) > titleAvail ? Math.max(36, (48 * titleAvail) / titleWidth(48)) : 48;
+  // Title: right-aligned, or centered between the boxes when there is a right box (as
+  // printed Covenants / Curses are). Shrinks for long names, then squeezes the glyphs the
+  // way printed cards condense long titles.
+  const titleLeft = RECTS.title.x;
+  const titleRight = right ? RECTS.rightBox.x - 12 : titleLeft + RECTS.title.w;
+  const titleAvail = titleRight - titleLeft;
+  const titleWidth = (size: number) => name.length * size * TITLE_EM;
+  const titleSize = titleWidth(TITLE_MAX) > titleAvail ? Math.max(TITLE_MIN, (TITLE_MAX * titleAvail) / titleWidth(TITLE_MAX)) : TITLE_MAX;
   const titleSqueeze = titleWidth(titleSize) > titleAvail;
   const ability = cardRawText(card).trim();
-  const abilitySize = Math.max(17, Math.min(26, 26 - Math.max(0, ability.length - 90) * 0.045));
+  const abilitySize = Math.max(19, Math.min(27, 27 - Math.max(0, ability.length - 110) * 0.03));
   const abilityBottom = T.y + (T.h * light) / 100 - 6;
   const scriptureTop = T.y + (T.h * dark) / 100 - 3;
   const ids = card.identifiers ?? [];
@@ -114,12 +125,13 @@ export default function ForgeCardPreview({
         fontFamily: "ForgeBody, system-ui, sans-serif", userSelect: "none",
       }}
     >
-      {/* 1. wash(es) inside the border rect; a second brigade fades in from the right */}
+      {/* 1. wash(es) inside the border rect; a second brigade blends in from the bottom,
+            matching the split of the icon box */}
       {washes.length === 0 && <div style={{ ...place(B), borderRadius: cqw(B.r ?? 0), background: "#b9b3aa" }} />}
       {washes.map((src, i) => (
         <Img key={src} src={src} style={{
           ...place(B), borderRadius: cqw(B.r ?? 0), objectFit: "cover",
-          ...(i === 1 ? { WebkitMaskImage: "linear-gradient(to right, transparent 40%, #000 60%)", maskImage: "linear-gradient(to right, transparent 40%, #000 60%)" } : {}),
+          ...(i === 1 ? { WebkitMaskImage: "linear-gradient(to bottom, transparent 40%, #000 60%)", maskImage: "linear-gradient(to bottom, transparent 40%, #000 60%)" } : {}),
         }} />
       ))}
 
@@ -134,7 +146,7 @@ export default function ForgeCardPreview({
         )}
       </div>
 
-      {/* 3. chrome: text box, window outline, icon boxes, class icons, frame border */}
+      {/* 3. chrome: text box, window outline, icon boxes, class icons, frame border, title */}
       <svg viewBox={`0 0 ${CW} ${CH}`} aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}>
         <defs>
           <clipPath id={`${uid}b`}><rect x={B.x} y={B.y} width={B.w} height={B.h} rx={B.r} /></clipPath>
@@ -151,23 +163,22 @@ export default function ForgeCardPreview({
           {left && <IconBoxG id={`${uid}l`} box={left} rect={RECTS.leftBox} side="left" stat={stat} />}
           {right && <IconBoxG id={`${uid}r`} box={right} rect={RECTS.rightBox} side="right" stat={null} />}
           {classes.map((src, i) => (
-            <image key={src} href={src} x={RECTS.classIcons.x + 12} y={RECTS.classIcons.y + 8 + i * 62} width={84} height={56} preserveAspectRatio="xMidYMid meet" />
+            <image key={src} href={src} x={RECTS.classIcons.x + 8} y={RECTS.classIcons.y + 4 + i * 66} width={100} height={62} preserveAspectRatio="xMidYMid meet" />
           ))}
         </g>
         <rect x={B.x} y={B.y} width={B.w} height={B.h} rx={B.r} fill="none" stroke={INK} strokeWidth={BORDER_STROKE} />
-        {/* 4. title */}
-        <clipPath id={`${uid}t`}><rect x={RECTS.title.x} y={RECTS.title.y - 12} width={titleAvail} height={RECTS.title.h + 24} /></clipPath>
+        <clipPath id={`${uid}t`}><rect x={titleLeft} y={RECTS.title.y - 12} width={titleAvail} height={RECTS.title.h + 24} /></clipPath>
         <text
-          x={titleRight} y={RECTS.title.y + 45} textAnchor="end" clipPath={`url(#${uid}t)`}
-          fontFamily="ForgeTitle, Impact, sans-serif" fontSize={titleSize} fill="#fff" stroke={INK} strokeWidth={3.2}
-          paintOrder="stroke" style={{ paintOrder: "stroke" }}
+          x={right ? (titleLeft + titleRight) / 2 : titleRight} y={RECTS.title.y + 42} textAnchor={right ? "middle" : "end"}
+          clipPath={`url(#${uid}t)`} fontFamily={TITLE_FONT} fontSize={titleSize}
+          fill="#fff" stroke={INK} strokeWidth={2.8} paintOrder="stroke" style={{ paintOrder: "stroke" }}
           {...(titleSqueeze ? { textLength: titleAvail, lengthAdjust: "spacingAndGlyphs" as const } : {})}
         >
           {name}
         </text>
       </svg>
 
-      {/* 5. identifier bubble — straddles the art window and the text box */}
+      {/* 4. identifier bubble — straddles the art window and the text box */}
       {ids.length > 0 && (
         <div style={{ ...place(RECTS.idBubble), display: "flex", justifyContent: "center", alignItems: "stretch" }}>
           <span style={{
@@ -180,7 +191,7 @@ export default function ForgeCardPreview({
         </div>
       )}
 
-      {/* 6. ability text on the light part of the box */}
+      {/* 5. ability text on the light part of the box */}
       <div style={{
         position: "absolute", left: pctX(I.x), top: pctY(I.y), width: pctX(I.w), height: pctY(abilityBottom - I.y),
         display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", overflow: "hidden",
@@ -189,17 +200,17 @@ export default function ForgeCardPreview({
         {ability}
       </div>
 
-      {/* 7. scripture + reference on the dark part */}
+      {/* 6. scripture + reference on the dark part */}
       <div style={{
         position: "absolute", left: pctX(I.x), top: pctY(scriptureTop), width: pctX(I.w), height: pctY(I.y + I.h - scriptureTop),
         display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden", color: "#f2efe4",
-        fontSize: cqw(17), lineHeight: 1.12, padding: `0 ${cqw(4)}`, boxSizing: "border-box",
+        fontSize: cqw(18), lineHeight: 1.12, padding: `0 ${cqw(4)}`, boxSizing: "border-box",
       }}>
         <span style={{ fontStyle: "italic", overflow: "hidden" }}>{card.scripture ?? ""}</span>
         <span style={{ textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}>{card.reference ?? ""}</span>
       </div>
 
-      {/* 8. credits */}
+      {/* 7. credits */}
       <div style={{
         ...place(RECTS.credits), display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "flex-end",
         color: "#fff", fontWeight: 700, lineHeight: 1.3, textShadow: `0 ${cqw(1)} ${cqw(2)} rgba(0,0,0,.8)`, whiteSpace: "nowrap",

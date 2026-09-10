@@ -13,17 +13,17 @@ gradient, icon boxes) as SVG from that geometry.
 `blue clay gold green purple silver white black brown crimson gray orange pale-green`, plus the
 type washes `artifact good-dom evil-dom good-fort evil-fort` and
 `lost-soul-{roots,rebellion,inheritance}` (`lost-soul.webp` is a copy of the rebellion one).
+Lost Souls print without an icon box.
 Both golds share `gold`. `red` and `teal` are **not in the template**: they are hue-shifted from
 `crimson` / `blue`, and the preview flags cards using them as approximate.
 
 ## `icons/` — type and class icons (PNG with keyed alpha)
 `cross skull skull-small dragon bible bible-small site fortress star cloud territory weapon
-warrior lostsoul-roots lostsoul-rebellion`. The `-small` variants are the template's
-stats-height versions. The template stores icons without alpha, so the flat background is keyed
+warrior`. The `-small` variants are the template's stats-height versions. The template stores icons without alpha, so the flat background is keyed
 out at extraction and edges are approximate.
 
 ## `badges/` — box-filling composites (WebP)
 `artifact` (chalice), `lamb` / `reaper` (Good / Evil Dominant), `good-dom` / `evil-dom` (the
-nebulae, also under Fortress and Lost Soul boxes), `multi-good` / `multi-evil` (3+ brigade foil).
+nebulae, also under Fortress boxes), `multi-good` / `multi-evil` (3+ brigade foil).
 
 Fonts (libre substitutes for the template's Symphony Black / Arial) live in `../fonts/`.

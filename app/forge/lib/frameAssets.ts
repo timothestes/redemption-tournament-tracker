@@ -2,9 +2,18 @@
 // (washes, icon boxes, type icons, ability-box gradient). No DOM, no React.
 // The kit and app/forge/lib/frameGeometry.ts are generated from the design team's
 // Illustrator template by scripts/forge-extract-template.py — see the kit README.
+//
+// Print rules this follows (checked against printed cards, 2026-09-10):
+//  * One icon box, top-left. A second brigade splits it into a top/bottom band; three or
+//    more brigades use the multi-brigade foil. The wash blends the same way, top to bottom.
+//  * Lost Souls have no icon box.
+//  * Covenants and Curses carry the enhancement icon (bible / skull) on the left and the
+//    artifact chalice in a second box on the right; the title centers between them.
+//  * Stats print for Heroes and Evil Characters always, and for enhancements, Covenants
+//    and Curses when a value is entered.
 
-import type { Alignment, Brigade, CardType, DesignCard } from "./designCard";
-import { isStatBearing } from "./designCard";
+import type { Alignment, Brigade, CardType, DesignCard, StatValue } from "./designCard";
+import { cardApplicability } from "./designCard";
 import { BRIGADE_BOX_HEX, GRADIENT_ROWS } from "./frameGeometry";
 
 const KIT = "/forge/frames";
@@ -42,8 +51,9 @@ export function specialWash(card: DesignCard): SpecialWash | null {
   return null;
 }
 
-/** Wash image URLs, bottom to top: [] (no brigade yet), [one], or [left, right] for a
- *  dual-brigade card. A special type always yields exactly one. */
+/** Wash image URLs, bottom to top: [] (no brigade yet), [one], or [top, bottom] for a
+ *  dual-brigade card (the renderer blends the second in from the bottom). A special type
+ *  always yields exactly one. */
 export function washPaths(card: DesignCard): string[] {
   const special = specialWash(card);
   if (special) return [`${KIT}/washes/${special}.webp`];
@@ -52,13 +62,15 @@ export function washPaths(card: DesignCard): string[] {
 }
 
 export type IconBox = {
-  /** Solid fill when there is no badge. */
+  /** Fill of the box — the top band when `fill2` is set. */
   fill: string;
+  /** Bottom band for a second brigade. */
+  fill2: string | null;
   /** Box-filling composite (artifact chalice, dominant nebula, multi-brigade foil). */
   badge: string | null;
   /** Type icon drawn over the fill/badge, if any. */
   icon: string | null;
-  /** Stats text ("S/T") shares the box; the icon shrinks to make room. */
+  /** Stats text ("S/T") shares the box; the icon drops into the lower band. */
   withStats: boolean;
   /** Light fills take dark stat text (the template ships #/# in white and black). */
   darkText: boolean;
@@ -67,16 +79,30 @@ export type IconBox = {
 const ICON_BY_TYPE: Record<CardType, string | null> = {
   Hero: "cross", EvilCharacter: "dragon", GE: "bible", EE: "skull",
   Artifact: null, Dominant: null, Fortress: "fortress", Site: "site", City: "site",
-  Curse: "skull", Covenant: "bible", LostSoul: "lostsoul-rebellion",
+  Curse: "skull", Covenant: "bible", LostSoul: null,
 };
 // Types whose icon has a stats-height variant in the template.
 const SMALL_VARIANT = new Set(["skull", "bible"]);
+// Enhancement-or-artifact types: chalice box on the right.
+const ARTIFACT_LIKE: readonly CardType[] = ["Covenant", "Curse"];
+
+function hasStat(v: StatValue | undefined): boolean {
+  return v !== null && v !== undefined && v !== "";
+}
+
+/** Whether the box carries a strength/toughness readout: always for stat-required types
+ *  (Hero, Evil Character), when a value is entered for stat-optional ones. */
+export function showsStats(card: DesignCard): boolean {
+  const stats = cardApplicability(card.cardType ?? []).stats;
+  if (stats === "na") return false;
+  return stats === "required" || hasStat(card.strength) || hasStat(card.toughness);
+}
 
 function badgeFor(types: CardType[], alignment: Alignment | undefined, brigadeCount: number): string | null {
   const evil = alignment === "Evil";
   if (types.includes("Artifact")) return "artifact";
   if (types.includes("Dominant")) return evil ? "reaper" : "lamb";
-  if (types.includes("Fortress") || types.includes("LostSoul")) return evil ? "evil-dom" : "good-dom";
+  if (types.includes("Fortress")) return evil ? "evil-dom" : "good-dom";
   if (brigadeCount >= 3) return evil ? "multi-evil" : "multi-good";
   return null;
 }
@@ -87,21 +113,25 @@ function luminance(hex: string): number {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }
 
-/** The icon box for one side. Left always exists once a type is chosen; right only for
- *  a dual-brigade card (second brigade, same icon, no stats). */
+/** The icon box for one side. Left exists once a type is chosen (never for Lost Souls);
+ *  right only for Covenants and Curses, holding the artifact chalice. */
 export function iconBox(card: DesignCard, side: "left" | "right"): IconBox | null {
   const types = card.cardType ?? [];
+  if (types.length === 0 || types.includes("LostSoul")) return null;
+  if (side === "right") {
+    if (!types.some((t) => ARTIFACT_LIKE.includes(t))) return null;
+    return { fill: NEUTRAL_BOX, fill2: null, badge: `${KIT}/badges/artifact.webp`, icon: null, withStats: false, darkText: false };
+  }
   const brigades = card.brigades ?? [];
-  if (types.length === 0) return null;
-  if (side === "right" && (brigades.length !== 2 || specialWash(card))) return null;
-  const brigade = side === "right" ? brigades[1] : brigades[0];
-  const badge = side === "left" ? badgeFor(types, card.alignment, brigades.length) : null;
-  const fill = brigade ? BRIGADE_HEX[brigade] : NEUTRAL_BOX;
-  const withStats = side === "left" && isStatBearing(types);
+  const badge = badgeFor(types, card.alignment, brigades.length);
+  const fill = brigades[0] ? BRIGADE_HEX[brigades[0]] : NEUTRAL_BOX;
+  const fill2 = !badge && brigades.length === 2 ? BRIGADE_HEX[brigades[1]] : null;
+  const withStats = showsStats(card);
   const base = ICON_BY_TYPE[types[0]];
   const icon = base && withStats && SMALL_VARIANT.has(base) ? `${base}-small` : base;
   return {
     fill,
+    fill2,
     badge: badge ? `${KIT}/badges/${badge}.webp` : null,
     icon: icon ? `${KIT}/icons/${icon}.png` : null,
     withStats,

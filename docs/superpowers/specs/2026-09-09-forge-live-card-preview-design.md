@@ -136,6 +136,30 @@ for grids, reveal, deck view and proposal diff. The deck builder already uses
   POST blocked so nothing was written, confirmed: pick Hero → cross icon; pick Red → red wash;
   add Blue → second box and blended wash; identifiers, reference and scripture flow through.
 
+## Print-rule corrections (2026-09-10, from printed cards)
+
+Tim reviewed the first render against printed cards (Enoch CoW, Covenant with David K51):
+
+- **One icon box.** A second brigade splits the top-left box into a top band (first
+  brigade, with the stats) and a bottom band (second brigade, with the icon); the wash
+  blends the same way, first brigade on top, second below. Three or more brigades use the
+  multi-brigade foil in the box. There is no second box for brigades.
+- **Lost Souls have no icon box.** The template's Lost Soul era icons are not shipped.
+- **Covenants and Curses** carry the enhancement icon (bible / skull) in the left box and
+  the artifact chalice in a second box on the right; the title centers between the boxes.
+- **Stats** print for Heroes and Evil Characters always, and for GE / EE / Covenant / Curse
+  when a value is entered (`stats: "optional"` in the applicability matrix; the form's
+  stat inputs were already unconditional).
+- **Type faces**, chosen by rendering candidates next to printed Roots / Roots 2 / Israel's
+  Inheritance / Times to Come cards: titles in **Mukta ExtraBold** (humanist, spurless G,
+  slanted t — the printed face is CG Symphony, a Syntax clone), stats in **PT Serif Bold**
+  (the printed numerals are a bold serif). Anton (too condensed) and Archivo Black (too
+  grotesque) were tried and rejected. Sizes are set from printed cap heights: title 40 px,
+  stats 34 px on the 750-wide canvas.
+- **Verification**: twelve recent printed cards rendered side by side with the preview fed
+  their own catalog data and cropped art (dual-brigade Heroes and Evil Character, GE and EE
+  with stats, Lost Soul, Artifact, Dominant, Fortress, dual-brigade Curse, two Covenants).
+
 ## Follow-ups (not in this change)
 
 - Real alpha for icons (the .ai stores it separately; keyed backgrounds are good enough for a

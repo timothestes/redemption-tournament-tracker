@@ -91,9 +91,9 @@ RASTERS = {
     "Artifact": ("artifact", "badge"), "Star": ("star", "icon"), "Cloud": ("cloud", "icon"),
     "Territory_small_2_": ("territory", "icon"), "Weapon_small_3_": ("weapon", "icon"),
     "Warrior_small_3_": ("warrior", "icon"), "Multi_Evil_2_": ("multi-evil", "badge"),
-    "Multi_Good_2_": ("multi-good", "badge"), "Roots-Green": ("lostsoul-roots", "icon"),
-    "Rebellion-Black": ("lostsoul-rebellion", "icon"),
-    # Inheritance-White is a white icon on white; keying leaves nothing. Not shipped.
+    "Multi_Good_2_": ("multi-good", "badge"),
+    # The Lost Soul era icons (Roots-Green, Rebellion-Black, Inheritance-White) are not
+    # shipped: printed Lost Souls have no icon box.
 }
 BRIGADE_BOX_NAMES = ["Pale_Green", "Orange", "Gray", "Crimson", "Brown", "Black", "White",
                      "Silver", "Purple", "Green", "Gold", "Clay", "Blue"]
