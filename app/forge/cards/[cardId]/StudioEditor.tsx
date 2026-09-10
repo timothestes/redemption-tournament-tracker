@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
+import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
 import FilePicker from "@/app/forge/components/FilePicker";
 import ArtCandidatesPanel from "@/app/forge/components/ArtCandidatesPanel";
@@ -22,10 +23,11 @@ import { useForgeCardChannel } from "@/app/forge/lib/useForgeRealtime";
 import PresenceBar from "./PresenceBar";
 import CardDetailsFields from "./CardDetailsFields";
 
-// DESCOPE (2026-07-03): the structured template (FullModeForm) and the composite
-// renderer (ForgeCardPreview) were removed from the studio. A card is now a name +
-// raw text + optional artwork + optional finished-card image. Both files remain on
-// disk (unused here) for recovery.
+// DESCOPE (2026-07-03): the structured template (FullModeForm) was removed from the
+// studio; it remains on disk (unused) for recovery. A card is a name + raw text +
+// optional details + optional artwork + optional finished-card image.
+// The composite renderer (ForgeCardPreview) came back on 2026-09-10 (#387): while
+// there is no finished-card image, it draws the live snapshot in the design team's frame.
 
 // Prev/next arrows overlaid on the card face edges. Inside the edges (not the
 // gutter) so they never clip on mobile.
@@ -180,12 +182,16 @@ export default function StudioEditor({
         {/* Face — sticky on desktop, top on mobile */}
         <div className="md:sticky md:top-4 md:self-start">
           <div className="relative">
-            <ForgeCardFace
-              name={snapshot.name ?? null}
-              rawText={cardRawText(snapshot)}
-              finishedUrl={card.hasFinished ? `/forge/api/art/${card.id}?kind=finished&t=${t}` : null}
-              artUrl={card.hasArt ? `/forge/api/art/${card.id}?t=${t}` : null}
-            />
+            {card.hasFinished ? (
+              <ForgeCardFace
+                name={snapshot.name ?? null}
+                rawText={cardRawText(snapshot)}
+                finishedUrl={`/forge/api/art/${card.id}?kind=finished&t=${t}`}
+                artUrl={card.hasArt ? `/forge/api/art/${card.id}?t=${t}` : null}
+              />
+            ) : (
+              <ForgeCardPreview card={snapshot} artUrl={card.hasArt ? `/forge/api/art/${card.id}?t=${t}` : null} />
+            )}
             {/* Prev/next within the set — same order as the grid, no wrap at ends. */}
             {prevId && (
               <Link href={`/forge/cards/${prevId}`} aria-label="Previous card in set" className={arrowClass + " left-1.5"}>

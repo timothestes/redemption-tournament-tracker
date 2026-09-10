@@ -36,6 +36,7 @@ help:
 	@echo "  make update-cards    - Download latest card data and regenerate TypeScript"
 	@echo "  make cards           - Alias for update-cards"
 	@echo "  make pull-forge-releases - Sync forge-released sets into the catalog overlay"
+	@echo "  make forge-frames    - Regenerate the Forge frame kit from the card template (.ai)"
 	@echo "  make pull-card-overrides - Sync catalog admin edits into the overlay"
 	@echo ""
 
@@ -118,4 +119,12 @@ pull-card-overrides:
 	@echo "📥 Syncing card overrides from Supabase..."
 	@node scripts/pull-card-overrides.js
 
-.PHONY: all install run dev dev-windows build start stop setup clean fresh update-paragons paragons update-cards cards pull-forge-releases pull-card-overrides
+# Regenerate the Forge frame kit (public/forge/frames) + app/forge/lib/frameGeometry.ts from
+# the design team's Illustrator card template. The .ai is confidential and gitignored (tmp/);
+# only the derived files are committed. Needs python3.11 + Pillow, zstd, poppler.
+FORGE_TEMPLATE_AI ?= tmp/Card_Template-SHUFFLED_3.7.ai
+forge-frames:
+	@echo "🎨 Extracting the Forge frame kit from $(FORGE_TEMPLATE_AI)..."
+	@python3.11 scripts/forge-extract-template.py --ai "$(FORGE_TEMPLATE_AI)"
+
+.PHONY: all install run dev dev-windows build start stop setup clean fresh update-paragons paragons update-cards cards pull-forge-releases pull-card-overrides forge-frames
