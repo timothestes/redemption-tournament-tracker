@@ -24,6 +24,13 @@
  * Rebellion — e.g. "The Book of Knowledge" prints between "Abomination..."
  * and "Darius' Decree", i.e. alphabetized as "Book of Knowledge").
  *
+ * `compareCardsEndOfTimes` is a validated one-off for that single set (real
+ * print numbers, not a generalizable rule — see app/forge/lib/cardOrder.ts
+ * for where it's applied): it counts a leading "The" as a real word ("The
+ * Book of Life" prints after "Letters to Thessalonica", not before) and
+ * breaks same-strength ties by toughness ascending instead of descending
+ * (Risen by Christ 2/3 prints before Stand Firm 2/5).
+ *
  * The comparator degrades gracefully: given only `name` + `type` it still
  * yields section order then alphabetical.
  */
@@ -96,10 +103,12 @@ function norm(s: string): string {
 }
 
 // Lowercased alphabetization key for a card name, ignoring a leading "The "
-// the way the designers do (see module docstring). "Theodore..." is left
-// alone — only a standalone leading "The" article is stripped.
-function alphaKey(name: string | undefined): string {
-  return (name ?? "").toLowerCase().replace(/^the\s+/, "");
+// the way the designers do (see module docstring) unless `literalArticles`
+// is set, in which case "The" sorts as a real word. "Theodore..." is left
+// alone either way — only a standalone leading "The" article is stripped.
+function alphaKey(name: string | undefined, literalArticles: boolean = false): string {
+  const n = (name ?? "").toLowerCase();
+  return literalArticles === true ? n : n.replace(/^the\s+/, "");
 }
 
 const GOOD_CHAR_TYPES = new Set(["hero", "heroes", "herocharacter", "hc", "goodcharacter", "gc"]);
@@ -238,11 +247,18 @@ function brigadeRank(brigade: string | undefined, side: "good" | "evil" | "any")
 }
 
 // Numbered strength first (descending), then X / * / empty; same-strength
-// ties by toughness the same way (the printed sets break ties on toughness).
-function strengthKey(strength: string | undefined, toughness: string | undefined): [number, number, number, number] {
+// ties by toughness — descending, the way every other validated set breaks
+// them, except End of Times, which breaks them ascending (Risen by Christ
+// 2/3 prints before Stand Firm 2/5).
+function strengthKey(
+  strength: string | undefined,
+  toughness: string | undefined,
+  toughnessAscending: boolean = false,
+): [number, number, number, number] {
   const str = strengthValue(strength);
   const tough = strengthValue(toughness);
-  return [str !== null ? 0 : 1, str !== null ? -str : 0, tough !== null ? 0 : 1, tough !== null ? -tough : 0];
+  const toughSign = toughnessAscending === true ? 1 : -1;
+  return [str !== null ? 0 : 1, str !== null ? -str : 0, tough !== null ? 0 : 1, tough !== null ? toughSign * tough : 0];
 }
 
 function dominantAlignmentRank(alignment: string | undefined): number {
@@ -259,24 +275,27 @@ type SortKey = (string | number)[];
 
 // Covenants, Curses, Cities, Sites: brigade group (multi first), optionally
 // strength descending (Covenants/Curses carry power), then name.
-function brigadeGroupKey(section: number, card: SortableCard, byStrength: boolean): SortKey {
+function brigadeGroupKey(section: number, card: SortableCard, byStrength: boolean, eot: boolean): SortKey {
   const { rank, tie } = brigadeRank(card.brigade, "any");
   return byStrength === true
-    ? [section, rank, tie, ...strengthKey(card.strength, card.toughness), alphaKey(card.name)]
-    : [section, rank, tie, alphaKey(card.name)];
+    ? [section, rank, tie, ...strengthKey(card.strength, card.toughness, eot), alphaKey(card.name, eot)]
+    : [section, rank, tie, alphaKey(card.name, eot)];
 }
 
 // Dual section: characters, then character+enhancement dual-types
 // (GE/Evil Character, Hero/EE), then enhancements — each strength descending.
-function dualKey(card: SortableCard, parts: string[]): SortKey {
+function dualKey(card: SortableCard, parts: string[], eot: boolean): SortKey {
   const hasChar = parts.some((p) => GOOD_CHAR_TYPES.has(norm(p)) === true || EVIL_CHAR_TYPES.has(norm(p)) === true);
   const hasEnh = parts.some((p) => GOOD_ENH_TYPES.has(norm(p)) === true || EVIL_ENH_TYPES.has(norm(p)) === true);
   const group = hasChar === true && hasEnh === true ? 1 : hasChar === true ? 0 : 2;
-  return [SECTION_DUAL, group, ...strengthKey(card.strength, card.toughness), alphaKey(card.name)];
+  return [SECTION_DUAL, group, ...strengthKey(card.strength, card.toughness, eot), alphaKey(card.name, eot)];
 }
 
-function buildKey(card: SortableCard): SortKey {
-  const name = alphaKey(card.name);
+// `eot` bundles End of Times' validated deviations from every other set: a
+// literal (not ignored) leading "The", and toughness ties broken ascending
+// instead of descending. See compareCardsEndOfTimes and cardOrder.ts.
+function buildKey(card: SortableCard, eot: boolean): SortKey {
+  const name = alphaKey(card.name, eot);
   const type = card.type ?? "";
   const parts = typeParts(type);
   const first = parts.length > 0 ? parts[0] : "";
@@ -286,11 +305,11 @@ function buildKey(card: SortableCard): SortKey {
     return [SECTION_DOMINANT, dominantAlignmentRank(card.alignment), name];
   }
   if (firstNorm === "artifact" || firstNorm === "art") return [SECTION_ARTIFACT, name];
-  if (firstNorm === "covenant" || firstNorm === "cov") return brigadeGroupKey(SECTION_COVENANT, card, true);
-  if (firstNorm === "curse" || firstNorm === "cur") return brigadeGroupKey(SECTION_CURSE, card, true);
-  if (firstNorm === "city") return brigadeGroupKey(SECTION_CITY, card, false);
+  if (firstNorm === "covenant" || firstNorm === "cov") return brigadeGroupKey(SECTION_COVENANT, card, true, eot);
+  if (firstNorm === "curse" || firstNorm === "cur") return brigadeGroupKey(SECTION_CURSE, card, true, eot);
+  if (firstNorm === "city") return brigadeGroupKey(SECTION_CITY, card, false, eot);
   if (firstNorm === "fortress" || firstNorm === "fort") return [SECTION_FORTRESS, name];
-  if (firstNorm === "site") return brigadeGroupKey(SECTION_SITE, card, false);
+  if (firstNorm === "site") return brigadeGroupKey(SECTION_SITE, card, false, eot);
   if (firstNorm === "lostsoul" || firstNorm === "ls") {
     const key = referenceKey(card.reference);
     return [SECTION_LOST_SOUL, key.book, key.chapter, key.verse, (card.reference ?? "").toLowerCase(), name];
@@ -301,11 +320,11 @@ function buildKey(card: SortableCard): SortKey {
   // Dual: type parts span both sides (GE/EE, Hero/Evil Character, …), or a
   // character/enhancement whose brigades span both alignments
   // ("Green/White and Brown/Crimson").
-  if (hasGoodType === true && hasEvilType === true) return dualKey(card, parts);
+  if (hasGoodType === true && hasEvilType === true) return dualKey(card, parts, eot);
 
   if (hasGoodType === true || hasEvilType === true) {
     if (brigadeSpansBothAlignments(parseBrigade(card.brigade ?? "")) === true) {
-      return dualKey(card, parts);
+      return dualKey(card, parts, eot);
     }
     const side: "good" | "evil" = hasGoodType === true ? "good" : "evil";
     const { rank, tie } = brigadeRank(card.brigade, side);
@@ -316,7 +335,7 @@ function buildKey(card: SortableCard): SortKey {
       rank,
       tie,
       isCharacter === true ? 0 : 1,
-      ...strengthKey(card.strength, card.toughness),
+      ...strengthKey(card.strength, card.toughness, eot),
       name,
     ];
   }
@@ -325,21 +344,24 @@ function buildKey(card: SortableCard): SortKey {
 }
 
 // Keys are pure functions of the card; cache per object so big lists don't
-// rebuild them O(n log n) times.
+// rebuild them O(n log n) times. Separate caches per `eot` value — the same
+// card object could otherwise return a stale key for the other variant.
 const keyCache = new WeakMap<SortableCard, SortKey>();
+const keyCacheEndOfTimes = new WeakMap<SortableCard, SortKey>();
 
-function keyOf(card: SortableCard): SortKey {
-  let key = keyCache.get(card);
+function keyOf(card: SortableCard, eot: boolean): SortKey {
+  const cache = eot === true ? keyCacheEndOfTimes : keyCache;
+  let key = cache.get(card);
   if (key === undefined) {
-    key = buildKey(card);
-    keyCache.set(card, key);
+    key = buildKey(card, eot);
+    cache.set(card, key);
   }
   return key;
 }
 
-export function compareCardsDefault(a: SortableCard, b: SortableCard): number {
-  const ka = keyOf(a);
-  const kb = keyOf(b);
+function compare(a: SortableCard, b: SortableCard, eot: boolean): number {
+  const ka = keyOf(a, eot);
+  const kb = keyOf(b, eot);
   const len = Math.min(ka.length, kb.length);
   for (let i = 0; i < len; i++) {
     const x = ka[i];
@@ -350,6 +372,17 @@ export function compareCardsDefault(a: SortableCard, b: SortableCard): number {
     if (r !== 0) return r;
   }
   return ka.length - kb.length;
+}
+
+export function compareCardsDefault(a: SortableCard, b: SortableCard): number {
+  return compare(a, b, false);
+}
+
+// One-off for End of Times (see module docstring) — counts a leading "The"
+// as a real word, and breaks same-strength ties by toughness ascending
+// instead of descending.
+export function compareCardsEndOfTimes(a: SortableCard, b: SortableCard): number {
+  return compare(a, b, true);
 }
 
 // ---------------------------------------------------------------------------

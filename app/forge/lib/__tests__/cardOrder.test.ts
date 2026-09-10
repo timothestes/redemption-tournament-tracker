@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { sortSetCards } from "../cardOrder";
+import { sortSetCards, END_OF_TIMES_SET_ID } from "../cardOrder";
 import type { ForgeCardFull } from "../cards";
 import type { DesignCard } from "../designCard";
 
 let seq = 0;
-const forgeCard = (title: string, snapshot: DesignCard): ForgeCardFull => ({
+const forgeCard = (title: string, snapshot: DesignCard, setId: string = END_OF_TIMES_SET_ID): ForgeCardFull => ({
   id: `card-${++seq}`,
   title,
   snapshot,
@@ -13,7 +13,7 @@ const forgeCard = (title: string, snapshot: DesignCard): ForgeCardFull => ({
   isPlaceholder: false,
   status: "approved",
   updatedAt: "",
-  setId: "eot",
+  setId,
   publishedVersionId: null,
   approvedVersionId: null,
   ownerId: "owner",
@@ -46,12 +46,22 @@ describe("sortSetCards — End of Times print order", () => {
   });
 
   it("passes toughness through so same-strength cards keep the printed tie order", () => {
+    // Non-EoT set: the general comparator breaks ties toughness descending.
     const cards = [
-      forgeCard("The Lawless One", { cardType: ["EvilCharacter"], brigades: ["PaleGreen"], alignment: "Evil", strength: "4", toughness: "2" }),
-      forgeCard("Meddling Mage", { cardType: ["EvilCharacter"], brigades: ["PaleGreen"], alignment: "Evil", strength: "4", toughness: "4" }),
+      forgeCard("The Lawless One", { cardType: ["EvilCharacter"], brigades: ["PaleGreen"], alignment: "Evil", strength: "4", toughness: "2" }, "some-other-set"),
+      forgeCard("Meddling Mage", { cardType: ["EvilCharacter"], brigades: ["PaleGreen"], alignment: "Evil", strength: "4", toughness: "4" }, "some-other-set"),
     ];
     // Alphabetical would put "Lawless One" first; toughness 4 beats 2.
     expect(titles(cards)).toEqual(["Meddling Mage", "The Lawless One"]);
+  });
+
+  it("breaks same-strength ties by toughness ascending, opposite of every other set", () => {
+    const cards = [
+      forgeCard("Stand Firm [EoT]", { cardType: ["GE"], brigades: ["Clay"], alignment: "Good", strength: "2", toughness: "5" }),
+      forgeCard("Risen by Christ", { cardType: ["GE"], brigades: ["Clay"], alignment: "Good", strength: "2", toughness: "3" }),
+    ];
+    // Real EoT print order (49-50): Risen by Christ (2/3) before Stand Firm (2/5).
+    expect(titles(cards)).toEqual(["Risen by Christ", "Stand Firm [EoT]"]);
   });
 
   it("re-reads the snapshot on every sort, so a brigade change moves the card without a manual step", () => {
@@ -63,5 +73,42 @@ describe("sortSetCards — End of Times print order", () => {
     expect(titles(cards)).toEqual(["Paul, Church Planter", "The Days of Noah"]);
     noah.snapshot = { ...noah.snapshot, brigades: ["Purple", "Blue"] };
     expect(titles(cards)).toEqual(["The Days of Noah", "Paul, Church Planter"]);
+  });
+
+  it("counts a leading 'The' as a real word among Artifacts, unlike every other validated set", () => {
+    // Real EoT numbering (6-10): Letters, Seven Lamps, Stumbling Block, then
+    // the two "The"-titled cards — "The" is not stripped here.
+    const cards = [
+      forgeCard("The Book of Life", { cardType: ["Artifact"], alignment: "Neutral" }),
+      forgeCard("The Golden Altar", { cardType: ["Artifact"], alignment: "Neutral" }),
+      forgeCard("Letters to Thessalonica", { cardType: ["Artifact"], alignment: "Neutral" }),
+      forgeCard("Seven Lamps of Fire", { cardType: ["Artifact"], alignment: "Neutral" }),
+      forgeCard("Stumbling Block", { cardType: ["Artifact"], alignment: "Evil" }),
+    ];
+    expect(titles(cards)).toEqual([
+      "Letters to Thessalonica", "Seven Lamps of Fire", "Stumbling Block", "The Book of Life", "The Golden Altar",
+    ]);
+  });
+
+  it("hand-orders the five Dominants — Alpha and Omega leads; Beast's Mark prints last despite alphabetizing before Deceiving the Nations", () => {
+    const cards = [
+      forgeCard("Beast's Mark", { cardType: ["Dominant", "Artifact", "Curse"], alignment: "Evil" }),
+      forgeCard("Deceiving the Nations", { cardType: ["Dominant"], alignment: "Evil" }),
+      forgeCard("Armageddon", { cardType: ["Dominant"], alignment: "Good_Evil" }),
+      forgeCard("Word of the Lord", { cardType: ["Dominant"], alignment: "Good" }),
+      forgeCard("Alpha and Omega", { cardType: ["Dominant"], alignment: "Good" }),
+    ];
+    expect(titles(cards)).toEqual([
+      "Alpha and Omega", "Word of the Lord", "Armageddon", "Deceiving the Nations", "Beast's Mark",
+    ]);
+  });
+
+  it("leaves other sets alone: 'The' still strips and the Dominant list doesn't apply", () => {
+    const cards = [
+      forgeCard("The Book of Knowledge", { cardType: ["Artifact"], alignment: "Neutral" }, "some-other-set"),
+      forgeCard("Darius' Decree", { cardType: ["Artifact"], alignment: "Neutral" }, "some-other-set"),
+      forgeCard("Abomination of Desolation", { cardType: ["Artifact"], alignment: "Neutral" }, "some-other-set"),
+    ];
+    expect(titles(cards)).toEqual(["Abomination of Desolation", "The Book of Knowledge", "Darius' Decree"]);
   });
 });

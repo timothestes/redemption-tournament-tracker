@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   compareCardsDefault,
+  compareCardsEndOfTimes,
   compareCardsByType,
   compareTypeGroups,
   defaultTypeGroupRank,
@@ -579,5 +580,42 @@ describe("designers' print order (issue #383)", () => {
     expect(sortNames(cards)).toEqual([
       "Joab, the General", "Blood Avenger", "Goats & Sheep", "Quake in Edom", "War in Heaven", "Inherit Canaan",
     ]);
+  });
+});
+
+describe("compareCardsEndOfTimes — End of Times' one-off rules", () => {
+  const sortNamesEot = (cards: SortableCard[]): string[] =>
+    [...cards].sort(compareCardsEndOfTimes).map((c) => c.name);
+
+  it("counts a leading 'The' as a real word instead of ignoring it", () => {
+    // Real EoT print order (6-10): "The"-titled cards sort after "Letters"
+    // and "Stumbling", unlike compareCardsDefault's ignore-"The" rule.
+    const cards = [
+      card({ name: "The Book of Life", type: "Artifact" }),
+      card({ name: "Stumbling Block", type: "Artifact" }),
+      card({ name: "Letters to Thessalonica", type: "Artifact" }),
+    ];
+    expect(sortNamesEot(cards)).toEqual(["Letters to Thessalonica", "Stumbling Block", "The Book of Life"]);
+  });
+
+  it("still ignores 'The' under the default comparator on the same cards", () => {
+    const cards = [
+      card({ name: "The Book of Life", type: "Artifact" }),
+      card({ name: "Stumbling Block", type: "Artifact" }),
+      card({ name: "Letters to Thessalonica", type: "Artifact" }),
+    ];
+    expect(sortNames(cards)).toEqual(["The Book of Life", "Letters to Thessalonica", "Stumbling Block"]);
+  });
+
+  it("breaks same-strength ties by toughness ascending, opposite of the default comparator", () => {
+    // Real EoT print order (49-50): Risen by Christ (2/3) prints before
+    // Stand Firm (2/5) — lower toughness first, unlike every other set.
+    const cards = [
+      card({ name: "Stand Firm", type: "GE", brigade: "Clay", alignment: "Good", strength: "2", toughness: "5" }),
+      card({ name: "Risen by Christ", type: "GE", brigade: "Clay", alignment: "Good", strength: "2", toughness: "3" }),
+    ];
+    expect(sortNamesEot(cards)).toEqual(["Risen by Christ", "Stand Firm"]);
+    // The default comparator breaks the same tie the other way.
+    expect(sortNames(cards)).toEqual(["Stand Firm", "Risen by Christ"]);
   });
 });
