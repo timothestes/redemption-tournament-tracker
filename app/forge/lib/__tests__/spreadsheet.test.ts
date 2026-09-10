@@ -412,6 +412,8 @@ describe("findLooseImageEntry", () => {
     "nested/dir/226-Spreading-Mildew.JPG",
     "._227-Altar-of-Ahaz.png",
     "227-Altar-of-Ahaz.webp",
+    "228-End-of-Times.tif",
+    "229-Roots-Two.TIFF",
     "not-an-image.txt",
   ];
 
@@ -427,6 +429,11 @@ describe("findLooseImageEntry", () => {
 
   it("tolerates the column already including an extension", () => {
     expect(findLooseImageEntry("225-Kings-Sword.png", entries)).toBe("225-Kings-Sword.png");
+  });
+
+  it("matches TIFF entries (.tif and .tiff, case-insensitively)", () => {
+    expect(findLooseImageEntry("228-End-of-Times", entries)).toBe("228-End-of-Times.tif");
+    expect(findLooseImageEntry("229-Roots-Two", entries)).toBe("229-Roots-Two.TIFF");
   });
 
   it("never matches __MACOSX or AppleDouble entries, and returns null when absent", () => {
