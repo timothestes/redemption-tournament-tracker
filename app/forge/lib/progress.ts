@@ -1,47 +1,10 @@
 // Pure dashboard-model computation. No DB, no UI. Counts a card in every
 // (type, brigade) cell it occupies; brigade-less types use the "none" bucket.
 
-import { CARD_TYPES, type CardType } from "@/app/forge/lib/designCard";
-
 export type TargetCounts = {
   total?: number;
   cells?: Record<string, Record<string, number>>;
 };
-
-// Default per-type proportions for seeding a brand-new set. Rationale:
-// characters (Hero/EvilCharacter), enhancements (GE/EE) and Lost Souls are the
-// playable bulk of any Redemption set — they fill decks and drive gameplay, so
-// they carry the heaviest weight. Utility types (Artifact/Dominant) appear in
-// smaller numbers, and territory/special cards
-// (Site/Fortress/City/Curse/Covenant) are lighter still. Weights sum to ~1.0;
-// they are a defensible starting point the designer refines, not a rule.
-export const DEFAULT_TYPE_WEIGHTS: Record<CardType, number> = {
-  Hero: 0.15,
-  EvilCharacter: 0.13,
-  GE: 0.14,
-  EE: 0.12,
-  LostSoul: 0.12,
-  Artifact: 0.07,
-  Dominant: 0.06,
-  Site: 0.06,
-  Fortress: 0.05,
-  City: 0.04,
-  Curse: 0.03,
-  Covenant: 0.03,
-};
-
-// Build a brigade-agnostic seed from a desired grand total: each type's share of
-// `total` is stored under its "none" bucket (the designer breaks it out per
-// brigade later via the targets editor). Keeps the { total, cells } shape the
-// progress heatmap consumes.
-export function defaultTargets(total: number): TargetCounts {
-  const cells: Record<string, Record<string, number>> = {};
-  for (const type of CARD_TYPES) {
-    const count = Math.round(DEFAULT_TYPE_WEIGHTS[type] * total);
-    if (count > 0) cells[type] = { none: count };
-  }
-  return { total, cells };
-}
 
 export type ProgressCell = { type: string; brigade: string; actual: number; target: number };
 
@@ -56,7 +19,8 @@ export type ProgressModel = {
 
 type CardLike = { snapshot: { cardType?: string[]; brigades?: string[] }; status: string };
 
-export function computeProgress(cards: CardLike[], targets: TargetCounts): ProgressModel {
+export function computeProgress(cards: CardLike[], targets: TargetCounts | null | undefined): ProgressModel {
+  const safeTargets = targets ?? {};
   const live = cards.filter((c) => c.status !== "archived");
 
   const byStatus: Record<string, number> = {};
@@ -76,7 +40,7 @@ export function computeProgress(cards: CardLike[], targets: TargetCounts): Progr
     }
   }
 
-  const cellTargets = targets.cells ?? {};
+  const cellTargets = safeTargets.cells ?? {};
   const types = Array.from(new Set([...Object.keys(cellTargets), ...Object.keys(actual)])).sort();
   const brigades = Array.from(
     new Set([
@@ -96,7 +60,7 @@ export function computeProgress(cards: CardLike[], targets: TargetCounts): Progr
     }
   }
 
-  const target = targets.total ?? 0;
+  const target = safeTargets.total ?? 0;
   const pct = target > 0 ? Math.round((live.length / target) * 100) : 0;
 
   return { headline: { actual: live.length, target, pct }, byStatus, types, brigades, cells, checklist };
