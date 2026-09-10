@@ -17,4 +17,6 @@ redistribution/DMCA exposure in this public repo:
 Drop the chosen `.ttf`/`.woff2` files here and wire them via `@font-face` in
 `app/forge/forge-fonts.css` (`ForgeTitle`, `ForgeStat`, `ForgeBody`). A different substitute is a
 one-line swap there; the preview sizes titles for Symphony Black (~0.53em per character,
-`TITLE_EM` in `ForgeCardPreview.tsx`), so retune that if the primary face changes width.
+`TITLE_EM` in `ForgeCardPreview.tsx`), so retune that if the primary face changes width. The
+body face also feeds the text-fit check: `make forge-font-metrics` regenerates
+`app/forge/lib/fontMetrics.ts` (Arimo Bold / Italic advance widths) if `ForgeBody` ever changes.

@@ -4,9 +4,9 @@ import path from "node:path";
 import { BRIGADES, CARD_TYPES, type DesignCard } from "../designCard";
 import {
   BRIGADE_HEX, BRIGADE_SLUG, SYNTHESIZED_WASHES, washPaths, iconBox, classIcons,
-  gradientRows, isPreviewApproximate, specialWash, showsStats,
+  isPreviewApproximate, specialWash, showsStats,
 } from "../frameAssets";
-import { RECTS, CANVAS, GRADIENT_ROWS, BRIGADE_BOX_HEX, ICON_RECTS } from "../frameGeometry";
+import { RECTS, CANVAS, BRIGADE_BOX_HEX, ICON_RECTS } from "../frameGeometry";
 
 const kit = (p: string) => path.join(__dirname, "../../../../public", p);
 
@@ -188,7 +188,7 @@ describe("iconBox", () => {
   });
 });
 
-describe("classIcons / gradientRows / approximate", () => {
+describe("classIcons / approximate", () => {
   it("stacks the shield(s) then the territory plate down the left edge, at template size", () => {
     const all = classIcons({ class: ["Warrior", "Weapon"], icons: ["Territory"] });
     expect(all.map((c) => c.src)).toEqual([
@@ -203,13 +203,6 @@ describe("classIcons / gradientRows / approximate", () => {
     expect(alone).toHaveLength(1);
     expect(alone[0].rect.y).toBe(ICON_RECTS.territory.y);
     expect(classIcons({})).toEqual([]);
-  });
-  it("picks the gradient row variant from the verse length", () => {
-    expect(gradientRows({})).toBe(2);
-    expect(gradientRows({ scripture: "Short verse." })).toBe(2);
-    expect(gradientRows({ scripture: "x".repeat(120) })).toBe(3);
-    expect(gradientRows({ scripture: "x".repeat(200) })).toBe(5);
-    for (const r of [2, 3, 4, 5] as const) expect(GRADIENT_ROWS[r].light).toBeLessThan(GRADIENT_ROWS[r].dark);
   });
   it("flags three brigades, Classic legality and synthesized washes", () => {
     expect(isPreviewApproximate({ brigades: ["Blue"] })).toBe(false);
