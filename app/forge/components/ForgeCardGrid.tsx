@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { MessageSquare, GitPullRequest } from "lucide-react";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
+import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 import { cardRawText } from "@/app/forge/lib/designCard";
 import { STATUS_LABEL, STATUS_BADGE_CLASS } from "@/app/forge/lib/lifecycleCopy";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
@@ -33,19 +34,27 @@ export default function ForgeCardGrid({
         // Shelved cards recede: desaturate + dim the face so they read as inactive
         // at a glance. Title + dashed status badge stay legible.
         const shelved = c.status === "archived";
+        const faceClass = shelved ? "opacity-60 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0" : undefined;
+        const artUrl = c.hasArt ? `/forge/api/art/${c.id}?t=${t}` : null;
         const count = commentCounts?.[c.id] ?? 0;
         const propCount = proposalCounts?.[c.id] ?? 0;
         const release = releaseBadges?.[c.id];
         const inner = (
           <>
             <div className="relative">
-              <ForgeCardFace
-                name={c.snapshot.name ?? null}
-                rawText={cardRawText(c.snapshot)}
-                finishedUrl={c.hasFinished ? `/forge/api/art/${c.id}?kind=finished&t=${t}` : null}
-                artUrl={c.hasArt ? `/forge/api/art/${c.id}?t=${t}` : null}
-                className={shelved ? "opacity-60 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0" : undefined}
-              />
+              {/* Finished image when there is one; otherwise the rendered composite of the
+                  live snapshot (same rule as the studio). */}
+              {c.hasFinished ? (
+                <ForgeCardFace
+                  name={c.snapshot.name ?? null}
+                  rawText={cardRawText(c.snapshot)}
+                  finishedUrl={`/forge/api/art/${c.id}?kind=finished&t=${t}`}
+                  artUrl={artUrl}
+                  className={faceClass}
+                />
+              ) : (
+                <ForgeCardPreview card={c.snapshot} artUrl={artUrl} className={faceClass} />
+              )}
               {count > 0 && (
                 <span
                   className="absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-full border bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur-sm"
