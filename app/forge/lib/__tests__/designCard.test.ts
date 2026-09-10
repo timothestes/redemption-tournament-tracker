@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cardApplicability, isStatBearing, validate, BRIGADES, cardRawText } from "../designCard";
+import { cardApplicability, isStatBearing, validate, BRIGADES, cardRawText, deriveAlignmentFromTypes } from "../designCard";
 
 describe("cardApplicability", () => {
   it("Hero requires brigade + stats", () => {
@@ -47,6 +47,36 @@ describe("BRIGADES enum", () => {
   it("excludes the ambiguous Multi sentinels", () => {
     expect(BRIGADES).not.toContain("GoodMulti");
     expect(BRIGADES).not.toContain("EvilMulti");
+  });
+});
+
+describe("deriveAlignmentFromTypes", () => {
+  it("no types selected => leave unchanged (null)", () => {
+    expect(deriveAlignmentFromTypes([])).toBeNull();
+  });
+  it("Hero => Good", () => {
+    expect(deriveAlignmentFromTypes(["Hero"])).toBe("Good");
+  });
+  it("GE => Good", () => {
+    expect(deriveAlignmentFromTypes(["GE"])).toBe("Good");
+  });
+  it("EvilCharacter => Evil", () => {
+    expect(deriveAlignmentFromTypes(["EvilCharacter"])).toBe("Evil");
+  });
+  it("EE => Evil", () => {
+    expect(deriveAlignmentFromTypes(["EE"])).toBe("Evil");
+  });
+  it("Hero + EvilCharacter => Good_Evil", () => {
+    expect(deriveAlignmentFromTypes(["Hero", "EvilCharacter"])).toBe("Good_Evil");
+  });
+  it("Hero + Dominant => Good (ambiguous type ignored when a good type is present)", () => {
+    expect(deriveAlignmentFromTypes(["Hero", "Dominant"])).toBe("Good");
+  });
+  it("Dominant alone => leave unchanged (null)", () => {
+    expect(deriveAlignmentFromTypes(["Dominant"])).toBeNull();
+  });
+  it("Fortress + Site => leave unchanged (null)", () => {
+    expect(deriveAlignmentFromTypes(["Fortress", "Site"])).toBeNull();
   });
 });
 

@@ -2,6 +2,7 @@
 
 import {
   CARD_TYPES, ALIGNMENTS, BRIGADES, CLASSES, ICONS, RARITIES,
+  deriveAlignmentFromTypes,
   type DesignCard, type CardType, type Brigade,
 } from "@/app/forge/lib/designCard";
 import StatInput from "./StatInput";
@@ -29,6 +30,21 @@ export default function CardDetailsFields({
   snapshot, update,
 }: { snapshot: DesignCard; update: (patch: Partial<DesignCard>) => void }) {
   const types = snapshot.cardType ?? [];
+
+  // Auto-fill alignment from the selected types, without clobbering a manual
+  // pick: only applies when alignment is unset, or still equals what the
+  // previous type set would have derived (i.e. it hasn't been overridden).
+  function onToggleType(t: CardType) {
+    const newTypes = toggle<CardType>(snapshot.cardType, t);
+    const prevAlignment = deriveAlignmentFromTypes(types);
+    const nextAlignment = deriveAlignmentFromTypes(newTypes);
+    const patch: Partial<DesignCard> = { cardType: newTypes };
+    if (nextAlignment !== null && (!snapshot.alignment || snapshot.alignment === prevAlignment)) {
+      patch.alignment = nextAlignment;
+    }
+    update(patch);
+  }
+
   // Testament is never stored — it's derived from the reference. Mirror what the
   // deckbuilder's N.T./O.T. filter will see so designers get instant feedback
   // (and catch a mistyped reference that wouldn't classify).
@@ -66,7 +82,7 @@ export default function CardDetailsFields({
         <div className="flex flex-wrap gap-2">
           {CARD_TYPES.map((t) => (
             <button key={t} type="button"
-              onClick={() => update({ cardType: toggle<CardType>(snapshot.cardType, t) })}
+              onClick={() => onToggleType(t)}
               className={`rounded-full border px-3 py-1 text-xs ${types.includes(t) ? "border-transparent bg-emerald-600 text-white" : "text-foreground"}`}>
               {t}
             </button>
