@@ -19,6 +19,22 @@ export const RECTS = {
   credits: {x: 212.5, y: 956.3, w: 462.5, h: 50.0, r: 0.0},
 } as const;
 
+// Where the type and class icons sit, from the template's raster placements: type
+// icons inside the top-left box (`…Stats` = the lower slot under strength/toughness),
+// the class shield and territory plate below it. Rects are the rasters' own aspect.
+export const ICON_RECTS = {
+  cross: {x: 92.4, y: 83.0, w: 53.6, h: 61.0}, // 75% of the template slot, as printed
+  dragon: {x: 59.4, y: 67.2, w: 122.4, h: 96.6},
+  skull: {x: 85.9, y: 51.2, w: 63.3, h: 88.8},
+  skullStats: {x: 85.9, y: 72.0, w: 63.3, h: 88.8},
+  bible: {x: 74.3, y: 70.8, w: 88.9, h: 60.2},
+  bibleStats: {x: 74.9, y: 83.3, w: 88.9, h: 60.2},
+  fortress: {x: 56.7, y: 62.4, w: 125.1, h: 63.9},
+  site: {x: 44.4, y: 58.3, w: 146.0, h: 72.0},
+  shield: {x: 33.9, y: 179.5, w: 88.9, h: 104.3},
+  territory: {x: 25.5, y: 182.0, w: 106.5, h: 46.8},
+} as const;
+
 // Ability box gradient: light until `light`% of the box, black from `dark`%.
 export const GRADIENT_ROWS = {
   2: { light: 73, dark: 86 },

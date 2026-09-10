@@ -19,8 +19,13 @@ How the .ai is laid out (Illustrator 30.x, "PDF compatible" save):
   * Washes and badges are placed PDFs stored as ASCII85 blocks (line-prefixed with `%`,
     and `%` is also a valid ASCII85 digit, so strip only the line-leading one). Two washes
     (Gray, Black) are full-artboard DeviceGray rasters instead.
-  * Icons are raw rasters: `... W H bits type alpha ... %%BeginData: N\\rXI\\n<N-3 bytes>`,
-    CMYK or Gray, no alpha in the pixel data.
+  * Icons are raw rasters: `[a 0 0 d tx ty] W H 0 Xh ... %%BeginData: N\\rXI\\n<N-3 bytes>`,
+    CMYK or Gray, no alpha in the pixel data (Illustrator keeps it in a cache the file does
+    not carry). Alpha is rebuilt here: the flat background is whatever touches the raster's
+    border (flood fill), so an icon's dark outlines and interior survive; the two class
+    shields are the same shield with opposite halves lit, so their union is the silhouette.
+    The matrix places the raster's TOP-left at (tx, ty) in artboard points, at a*W x d*H —
+    that is where every icon rect in frameGeometry.ts comes from.
   * The document CMYK profile (U.S. Web Coated SWOP v2) is an ICCBased /N 4 stream in the
     PDF wrapper; every CMYK->sRGB conversion here goes through it.
 """
@@ -37,9 +42,11 @@ import subprocess
 import sys
 import tempfile
 import zlib
+from collections import deque
 from pathlib import Path
+from typing import NamedTuple
 
-from PIL import Image, ImageCms
+from PIL import Image, ImageChops, ImageCms, ImageDraw, ImageFilter
 
 # ----------------------------------------------------------------------------- geometry
 # Artboard is 198x270 pt (origin bottom-left). Trim box = 9..189 x 9..261 (2.5 x 3.5 in).
@@ -81,27 +88,54 @@ LOST_SOUL_DEFAULT = "lost-soul-rebellion"
 SYNTHESIZED = [("red", "crimson", 25), ("teal", "blue", -50)]
 # Placed-PDF badges: name prefix -> output slug
 BADGE_PDFS = {"Evil": "evil-dom", "Good": "good-dom", "Reaper": "reaper", "Lamb": "lamb"}
-# Raw rasters, keyed by the XMLUID that FOLLOWS the raster data: name -> (output, kind)
-# kind: "icon" (key flat background to alpha) or "badge" (opaque, box-filling)
+# Raw rasters, keyed by the base name of the XMLUID that FOLLOWS the raster data
+# (copies share pixels): name -> (output slug, kind).
+# kind: "icon" = flat background keyed to alpha; "shield" = the two class shields, keyed
+# together; "plate" = opaque rounded plate (territory); "badge" = opaque, box-filling.
 RASTERS = {
-    "Cross": ("cross", "icon"), "Skull_no_Stats": ("skull", "icon"),
-    "Skull_w_x2F_Stats": ("skull-small", "icon"), "Dragon": ("dragon", "icon"),
-    "Bible_no_Stats": ("bible", "icon"), "Bible_w_x2F_Stats": ("bible-small", "icon"),
-    "icon_x5F_site_1_": ("site", "icon"), "Fortress_Icon": ("fortress", "icon"),
-    "Artifact": ("artifact", "badge"), "Star": ("star", "icon"), "Cloud": ("cloud", "icon"),
-    "Territory_small_2_": ("territory", "icon"), "Weapon_small_3_": ("weapon", "icon"),
-    "Warrior_small_3_": ("warrior", "icon"), "Multi_Evil_2_": ("multi-evil", "badge"),
-    "Multi_Good_2_": ("multi-good", "badge"),
+    "Cross": ("cross", "icon"), "Skull_no_Stats": ("skull", "icon"), "Dragon": ("dragon", "icon"),
+    "Bible_no_Stats": ("bible", "icon"), "icon_x5F_site": ("site", "icon"),
+    "Fortress_Icon": ("fortress", "icon"), "Star": ("star", "icon"), "Cloud": ("cloud", "icon"),
+    "Warrior_small": ("warrior", "shield"), "Weapon_small": ("weapon", "shield"),
+    "Territory_small": ("territory", "plate"),
+    "Artifact": ("artifact", "badge"), "Multi_Evil": ("multi-evil", "badge"),
+    "Multi_Good": ("multi-good", "badge"),
     # The Lost Soul era icons (Roots-Green, Rebellion-Black, Inheritance-White) are not
     # shipped: printed Lost Souls have no icon box.
 }
+# Where each icon sits in the top-left box (frameGeometry.ICON_RECTS key -> base name).
+# The "Stats" variants are the same pixels placed lower, under the strength/toughness.
+PLACEMENTS = {
+    "cross": "Cross", "dragon": "Dragon", "skull": "Skull_no_Stats",
+    "skullStats": "Skull_w_x2F_Stats", "bible": "Bible_no_Stats",
+    "bibleStats": "Bible_w_x2F_Stats", "fortress": "Fortress_Icon", "site": "icon_x5F_site",
+    "shield": "Warrior_small", "territory": "Territory_small",
+}
+# Printed cards (Roots through Times to Come) run the cross at ~75% of the template's slot,
+# centered on the same point; every other icon prints at the template's size.
+PRINT_SCALE = {"cross": 0.75}
 BRIGADE_BOX_NAMES = ["Pale_Green", "Orange", "Gray", "Crimson", "Brown", "Black", "White",
                      "Silver", "Purple", "Green", "Gold", "Clay", "Blue"]
 
 RASTER_HEADER = re.compile(
-    rb"/(Device\w+) XN\r\[[^\]]*\] \d+ \d+ 0 Xh\r\[[^\]]*\] \d+ \d+ \d+ \d+ "
+    rb"/(Device\w+) XN\r\[ ?([-\d.]+) [-\d.]+ [-\d.]+ ([-\d.]+) ([-\d.]+) ([-\d.]+) ?\] "
+    rb"\d+ \d+ 0 Xh\r\[[^\]]*\] \d+ \d+ \d+ \d+ "
     rb"(\d+) (\d+) (\d+) (\d+) \d+ \d+ \d+ \d+ \d+ \d+ \d+ \d+\r%%BeginData: (\d+)\rXI\n"
 )
+
+
+class Raster(NamedTuple):
+    name: str | None
+    cs: str
+    w: int
+    h: int
+    bits: int
+    data: bytes
+    # Placement matrix: raster TOP-left at (tx, ty) artboard pt, scaled by (sx, sy).
+    sx: float
+    sy: float
+    tx: float
+    ty: float
 FILL_OP = re.compile(rb"[\r\n]([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) k[\r\n]")
 
 
@@ -183,11 +217,12 @@ class Doc:
 
     def rasters(self):
         for m in RASTER_HEADER.finditer(self.t):
-            w, h, bits = int(m.group(2)), int(m.group(3)), int(m.group(4))
-            n = int(m.group(6))
+            w, h, bits = int(m.group(6)), int(m.group(7)), int(m.group(8))
+            n = int(m.group(10))
             data = self.t[m.end():m.end() + n - 3]
             name = next((nm for s, _, nm in self.names if s > m.end() + n), None)
-            yield name, m.group(1).decode(), w, h, bits, data
+            sx, sy, tx, ty = (float(m.group(i)) for i in (2, 3, 4, 5))
+            yield Raster(name, m.group(1).decode(), w, h, bits, data, abs(sx), abs(sy), tx, ty)
 
     def hex_from_cmyk(self, c: float, m: float, y: float, k: float) -> str:
         im = Image.new("CMYK", (1, 1), tuple(round(v * 255) for v in (c, m, y, k)))
@@ -244,28 +279,105 @@ def crop_wash(page: Image.Image, placed: tuple[float, float, float, float]) -> I
     return page.crop(box)
 
 
-def key_background(im: Image.Image) -> Image.Image:
-    """Turn a flat white or black background into alpha (soft key on distance)."""
-    im = im.convert("RGB")
+def outside_mask(inside: Image.Image) -> Image.Image:
+    """255 where a pixel of `inside` (an L mask, 0 = maybe background) is reachable from the
+    image border through 0-pixels; i.e. the background, holes excluded."""
+    w, h = inside.size
+    px = inside.load()
+    seen = bytearray(w * h)
+    q: deque[tuple[int, int]] = deque()
+    for x, y in [(x, y) for x in range(w) for y in (0, h - 1)] + [(x, y) for y in range(h) for x in (0, w - 1)]:
+        if px[x, y] == 0 and not seen[y * w + x]:
+            seen[y * w + x] = 1
+            q.append((x, y))
+    while q:
+        x, y = q.popleft()
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= nx < w and 0 <= ny < h and not seen[ny * w + nx] and px[nx, ny] == 0:
+                seen[ny * w + nx] = 1
+                q.append((nx, ny))
+    return Image.frombytes("L", (w, h), bytes(255 if s else 0 for s in seen))
+
+
+def bg_color(im: Image.Image) -> tuple[int, int, int]:
     px = im.load()
     w, h = im.size
     corners = [px[0, 0], px[w - 1, 0], px[0, h - 1], px[w - 1, h - 1]]
-    bg = max(set(corners), key=corners.count)
-    out = Image.new("RGBA", im.size)
-    op = out.load()
-    for y in range(h):
-        for x in range(w):
-            r, g, b = px[x, y]
-            dist = max(abs(r - bg[0]), abs(g - bg[1]), abs(b - bg[2]))
-            op[x, y] = (r, g, b, min(255, dist * 4))
+    return max(set(corners), key=corners.count)
+
+
+def distance_mask(im: Image.Image, bg: tuple[int, int, int], gain: int) -> Image.Image:
+    """Per-pixel max-channel distance from `bg`, times `gain`, as an L image."""
+    r, g, b = im.split()
+    d = None
+    for ch, v in ((r, bg[0]), (g, bg[1]), (b, bg[2])):
+        m = ch.point(lambda p, v=v: min(255, abs(p - v) * gain))
+        d = m if d is None else ImageChops.lighter(d, m)
+    return d
+
+
+def key_icon(im: Image.Image) -> Image.Image:
+    """Key the flat background to alpha. Only the region connected to the raster's border
+    counts as background (soft-keyed by color distance), so an icon's dark outlines and
+    interior stay opaque even when they match the background — the dragon on black."""
+    im = im.convert("RGB")
+    soft = distance_mask(im, bg_color(im), 4)
+    outside = outside_mask(soft.point(lambda p: 255 if p > 40 else 0))
+    alpha = ImageChops.lighter(soft, ImageChops.invert(outside))
+    out = im.convert("RGBA")
+    out.putalpha(alpha)
     return out
 
 
-def raster_to_image(doc: Doc, cs: str, w: int, h: int, data: bytes) -> Image.Image:
-    if cs == "DeviceCMYK":
-        im = Image.frombytes("CMYK", (w, h), data[: w * h * 4])
+def key_shields(warrior: Image.Image, weapon: Image.Image) -> tuple[Image.Image, Image.Image]:
+    """The class shields are one shield with the other half flattened to the background
+    gray, so neither raster alone knows its own outline. Their union does."""
+    warrior, weapon = warrior.convert("RGB"), weapon.convert("RGB")
+    bg = bg_color(warrior)
+    lit = ImageChops.lighter(distance_mask(warrior, bg, 25), distance_mask(weapon, bg, 25))
+    alpha = ImageChops.invert(outside_mask(lit.point(lambda p: 255 if p > 128 else 0)))
+    alpha = alpha.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
+    outs = []
+    for im in (warrior, weapon):
+        o = im.convert("RGBA")
+        o.putalpha(alpha)
+        outs.append(o)
+    return outs[0], outs[1]
+
+
+def plate(im: Image.Image) -> Image.Image:
+    """Opaque rounded plate with the print's dark outline (the territory map)."""
+    im = im.convert("RGBA")
+    w, h = im.size
+    r = round(h * 0.16)
+    mask = Image.new("L", im.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, w - 1, h - 1], radius=r, fill=255)
+    ImageDraw.Draw(im).rounded_rectangle([0, 0, w - 1, h - 1], radius=r, outline=(35, 31, 32), width=3)
+    im.putalpha(mask)
+    return im
+
+
+def raster_to_image(doc: Doc, r: Raster) -> Image.Image:
+    if r.cs == "DeviceCMYK":
+        im = Image.frombytes("CMYK", (r.w, r.h), r.data[: r.w * r.h * 4])
         return ImageCms.applyTransform(im, doc.cmyk2rgb).convert("RGB")
-    return Image.frombytes("L", (w, h), data[: w * h]).convert("RGB")
+    return Image.frombytes("L", (r.w, r.h), r.data[: r.w * r.h]).convert("RGB")
+
+
+def corner_copy(copies: list[Raster]) -> Raster:
+    """Of an icon's copies, the one placed in the top-left icon box (the text legend holds
+    smaller copies with different pixels, e.g. the Artifact chalice)."""
+    boxed = [r for r in copies if r.tx < 100 and r.ty > 200]
+    return min(boxed, key=lambda r: r.tx) if boxed else copies[0]
+
+
+def canvas_rect(r: Raster, scale: float = 1.0) -> dict[str, float]:
+    """Canvas-px rect of a placed raster, optionally shrunk about its center."""
+    sx, sy = CANVAS[0] / (TRIM[2] - TRIM[0]), CANVAS[1] / (TRIM[3] - TRIM[1])
+    w, h = r.sx * r.w * sx, r.sy * r.h * sy
+    x, y = (r.tx - TRIM[0]) * sx, (TRIM[3] - r.ty) * sy
+    x, y, w, h = x + w * (1 - scale) / 2, y + h * (1 - scale) / 2, w * scale, h * scale
+    return {"x": round(x, 1), "y": round(y, 1), "w": round(w, 1), "h": round(h, 1)}
 
 
 def hue_shift_image(im: Image.Image, degrees: float) -> Image.Image:
@@ -289,7 +401,8 @@ def pt_rect(r):
             "w": round((x1 - x0) * sx, 1), "h": round((y1 - y0) * sy, 1), "r": round(rad * sx, 1)}
 
 
-def write_geometry(path: Path, brigade_hex: dict[str, str], synthesized: dict[str, str]):
+def write_geometry(path: Path, brigade_hex: dict[str, str], synthesized: dict[str, str],
+                   icon_rects: dict[str, dict[str, float]]):
     sx = CANVAS[0] / (TRIM[2] - TRIM[0])
     lines = [
         "// GENERATED by scripts/forge-extract-template.py from the design team's Illustrator",
@@ -303,6 +416,14 @@ def write_geometry(path: Path, brigade_hex: dict[str, str], synthesized: dict[st
     ]
     for k, r in RECTS_PT.items():
         lines.append(f"  {k}: {json.dumps(pt_rect(r)).replace(chr(34), '')},")
+    lines += ["} as const;", "",
+              "// Where the type and class icons sit, from the template's raster placements: type",
+              "// icons inside the top-left box (`…Stats` = the lower slot under strength/toughness),",
+              "// the class shield and territory plate below it. Rects are the rasters' own aspect.",
+              "export const ICON_RECTS = {"]
+    for k, r in icon_rects.items():
+        note = f" // {PRINT_SCALE[k]:.0%} of the template slot, as printed" if k in PRINT_SCALE else ""
+        lines.append(f"  {k}: {json.dumps(r).replace(chr(34), '')},{note}")
     lines += ["} as const;", "",
               "// Ability box gradient: light until `light`% of the box, black from `dark`%.",
               "export const GRADIENT_ROWS = {"]
@@ -341,9 +462,9 @@ def main():
 
     # --- washes. Most are placed PDFs; Gray and Black are full-artboard DeviceGray rasters.
     gray_washes = {}
-    for name, cs, w, h, bits, data in doc.rasters():
-        if name and cs == "DeviceGray" and w >= 800 and bits == 8:
-            gray_washes[base_name(name)] = (w, h, data)
+    for r in doc.rasters():
+        if r.name and r.cs == "DeviceGray" and r.w >= 800 and r.bits == 8:
+            gray_washes[base_name(r.name)] = (r.w, r.h, r.data)
     done = set()
     for s, _, n in doc.names:
         b = base_name(n)
@@ -386,30 +507,37 @@ def main():
         seen.add(b)
         print(f"  badge {BADGE_PDFS[b]}: {im.size[0]}x{im.size[1]}")
 
-    # --- raw rasters
-    got = set()
-    for name, cs, w, h, bits, data in doc.rasters():
-        if name is None or bits != 8:
-            continue
-        key = name if name in RASTERS else base_name(name)
-        if key not in RASTERS or key in got:
-            continue
-        slug, kind = RASTERS[key]
-        im = raster_to_image(doc, cs, w, h, data)
-        if kind == "icon":
-            key_background(im).save(out / "icons" / f"{slug}.png", optimize=True)
-        else:
-            im.save(out / "badges" / f"{slug}.webp", quality=90, method=6)
-        got.add(key)
-        print(f"  {kind} {slug}: {w}x{h} {cs}")
-    missing = set(RASTERS) - got
+    # --- raw rasters: one copy per base name, the one placed in the top-left icon box
+    wanted = set(RASTERS) | set(PLACEMENTS.values())
+    copies: dict[str, list[Raster]] = {}
+    for r in doc.rasters():
+        if r.name is not None and r.bits == 8 and base_name(r.name) in wanted:
+            copies.setdefault(base_name(r.name), []).append(r)
+    missing = wanted - set(copies)
     if missing:
         sys.exit(f"rasters not found in template: {sorted(missing)}")
+    chosen = {key: corner_copy(rs) for key, rs in copies.items()}
+    images = {key: raster_to_image(doc, r) for key, r in chosen.items()}
+    for key, (slug, kind) in RASTERS.items():
+        im, r = images[key], chosen[key]
+        if kind == "icon":
+            key_icon(im).save(out / "icons" / f"{slug}.png", optimize=True)
+        elif kind == "plate":
+            plate(im).save(out / "icons" / f"{slug}.png", optimize=True)
+        elif kind == "badge":
+            im.save(out / "badges" / f"{slug}.webp", quality=90, method=6)
+        if kind != "shield":
+            print(f"  {kind} {slug}: {r.w}x{r.h} {r.cs}")
+    warrior, weapon = key_shields(images["Warrior_small"], images["Weapon_small"])
+    warrior.save(out / "icons" / "warrior.png", optimize=True)
+    weapon.save(out / "icons" / "weapon.png", optimize=True)
+    print(f"  shields warrior + weapon: {warrior.size[0]}x{warrior.size[1]}")
+    icon_rects = {k: canvas_rect(chosen[name], PRINT_SCALE.get(k, 1.0)) for k, name in PLACEMENTS.items()}
 
     # --- brigade colors + geometry
     hexes = {c.lower().replace("_", "-"): doc.brigade_fill(c) for c in BRIGADE_BOX_NAMES}
     synth = {slug: hue_shift_hex(hexes[src], deg) for slug, src, deg in SYNTHESIZED}
-    write_geometry(Path(args.geometry), hexes, synth)
+    write_geometry(Path(args.geometry), hexes, synth, icon_rects)
     print("  geometry ->", args.geometry)
     print({**hexes, **synth})
 

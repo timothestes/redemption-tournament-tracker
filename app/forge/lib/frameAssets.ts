@@ -14,7 +14,7 @@
 
 import type { Alignment, Brigade, CardType, DesignCard, StatValue } from "./designCard";
 import { cardApplicability } from "./designCard";
-import { BRIGADE_BOX_HEX, GRADIENT_ROWS } from "./frameGeometry";
+import { BRIGADE_BOX_HEX, GRADIENT_ROWS, ICON_RECTS } from "./frameGeometry";
 
 const KIT = "/forge/frames";
 
@@ -61,6 +61,8 @@ export function washPaths(card: DesignCard): string[] {
   return slugs.map((s) => `${KIT}/washes/${s}.webp`);
 }
 
+export type IconRect = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+
 export type IconBox = {
   /** Fill of the box — the top band when `fill2` is set. */
   fill: string;
@@ -68,21 +70,29 @@ export type IconBox = {
   fill2: string | null;
   /** Box-filling composite (artifact chalice, dominant nebula, multi-brigade foil). */
   badge: string | null;
+  /** How the badge is cropped to the box (SVG preserveAspectRatio alignment): the template
+   *  anchors the chalice to the bottom and the good foil to the top. */
+  badgeAlign: "xMidYMin" | "xMidYMid" | "xMidYMax";
   /** Type icon drawn over the fill/badge, if any. */
   icon: string | null;
-  /** Stats text ("S/T") shares the box; the icon drops into the lower band. */
+  /** Where the icon sits, canvas px, from the template's placement. */
+  iconRect: IconRect | null;
+  /** Stats text ("S/T") shares the box; the icon drops into the lower slot. */
   withStats: boolean;
   /** Light fills take dark stat text (the template ships #/# in white and black). */
   darkText: boolean;
 };
 
-const ICON_BY_TYPE: Record<CardType, string | null> = {
+type TypeIcon = "cross" | "dragon" | "bible" | "skull" | "fortress" | "site";
+const ICON_BY_TYPE: Record<CardType, TypeIcon | null> = {
   Hero: "cross", EvilCharacter: "dragon", GE: "bible", EE: "skull",
   Artifact: null, Dominant: null, Fortress: "fortress", Site: "site", City: "site",
   Curse: "skull", Covenant: "bible", LostSoul: null,
 };
-// Types whose icon has a stats-height variant in the template.
-const SMALL_VARIANT = new Set(["skull", "bible"]);
+// Icons the template places lower when stats print (the cross and dragon only ever print
+// with stats, so their one slot already allows for them).
+const STATS_SLOT: ReadonlySet<TypeIcon> = new Set(["skull", "bible"]);
+const BADGE_ALIGN: Record<string, IconBox["badgeAlign"]> = { artifact: "xMidYMax", "multi-good": "xMidYMin" };
 // Enhancement-or-artifact types: chalice box on the right.
 const ARTIFACT_LIKE: readonly CardType[] = ["Covenant", "Curse"];
 
@@ -120,7 +130,10 @@ export function iconBox(card: DesignCard, side: "left" | "right"): IconBox | nul
   if (types.length === 0 || types.includes("LostSoul")) return null;
   if (side === "right") {
     if (!types.some((t) => ARTIFACT_LIKE.includes(t))) return null;
-    return { fill: NEUTRAL_BOX, fill2: null, badge: `${KIT}/badges/artifact.webp`, icon: null, withStats: false, darkText: false };
+    return {
+      fill: NEUTRAL_BOX, fill2: null, badge: `${KIT}/badges/artifact.webp`, badgeAlign: BADGE_ALIGN.artifact,
+      icon: null, iconRect: null, withStats: false, darkText: false,
+    };
   }
   const brigades = card.brigades ?? [];
   const badge = badgeFor(types, card.alignment, brigades.length);
@@ -128,24 +141,33 @@ export function iconBox(card: DesignCard, side: "left" | "right"): IconBox | nul
   const fill2 = !badge && brigades.length === 2 ? BRIGADE_HEX[brigades[1]] : null;
   const withStats = showsStats(card);
   const base = ICON_BY_TYPE[types[0]];
-  const icon = base && withStats && SMALL_VARIANT.has(base) ? `${base}-small` : base;
+  const slot = (base && withStats && STATS_SLOT.has(base) ? `${base}Stats` : base) as keyof typeof ICON_RECTS | null;
   return {
     fill,
     fill2,
     badge: badge ? `${KIT}/badges/${badge}.webp` : null,
-    icon: icon ? `${KIT}/icons/${icon}.png` : null,
+    badgeAlign: (badge && BADGE_ALIGN[badge]) || "xMidYMid",
+    icon: base ? `${KIT}/icons/${base}.png` : null,
+    iconRect: slot ? ICON_RECTS[slot] : null,
     withStats,
     darkText: !badge && luminance(fill) > 0.55,
   };
 }
 
-export type ClassIcon = "warrior" | "weapon" | "territory";
-/** Class icons stack under the left box, in the template's order. */
-export function classIcons(card: DesignCard): string[] {
-  const out: ClassIcon[] = [];
-  for (const c of card.class ?? []) out.push(c === "Warrior" ? "warrior" : "weapon");
-  if ((card.icons ?? []).includes("Territory")) out.push("territory");
-  return out.slice(0, 2).map((c) => `${KIT}/icons/${c}.png`);
+export type ClassIcon = { src: string; rect: IconRect };
+/** Class icons under the left box: the shield(s), then the territory plate, stacked down
+ *  the left edge at the template's sizes. */
+export function classIcons(card: DesignCard): ClassIcon[] {
+  const slugs: ("warrior" | "weapon" | "territory")[] = [];
+  for (const c of card.class ?? []) slugs.push(c === "Warrior" ? "warrior" : "weapon");
+  if ((card.icons ?? []).includes("Territory")) slugs.push("territory");
+  let next: number | null = null;
+  return slugs.map((s) => {
+    const slot = s === "territory" ? ICON_RECTS.territory : ICON_RECTS.shield;
+    const rect = { x: ICON_RECTS.shield.x, y: next ?? slot.y, w: slot.w, h: slot.h };
+    next = rect.y + rect.h + 6;
+    return { src: `${KIT}/icons/${s}.png`, rect };
+  });
 }
 
 /** Ability-box gradient variant: the dark (scripture) region grows with the verse.

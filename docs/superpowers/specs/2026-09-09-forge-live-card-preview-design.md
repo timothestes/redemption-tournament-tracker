@@ -60,10 +60,9 @@ public/forge/frames/
   washes/<slug>.webp      blue clay gold green purple silver white black brown crimson gray
                           orange pale-green red* teal* lost-soul-{roots,rebellion,inheritance}
                           artifact good-dom evil-dom good-fort evil-fort
-  icons/<name>.png        cross skull skull-small dragon bible bible-small site fortress
-                          artifact reaper lamb star cloud territory weapon warrior
-                          lostsoul-roots lostsoul-rebellion lostsoul-inheritance
-  badges/<name>.webp      artifact good-dom evil-dom multi-good multi-evil
+  icons/<name>.png        cross skull dragon bible site fortress star cloud
+                          territory weapon warrior
+  badges/<name>.webp      artifact good-dom evil-dom lamb reaper multi-good multi-evil
 ```
 `*` synthesized. Fonts stay in `public/forge/fonts` (Anton for Symphony Black, Arimo for Arial).
 
@@ -77,10 +76,11 @@ public/forge/frames/
 | Text box | 27..171 x 32.48..100.69, r 7.8 | vertical gradient light to black |
 | Text inset | 30.6..167.4 | ability text top, scripture bottom |
 | Identifier bubble | y 97.74..105.3, centered x 99, w 21.6..144 | black 75%, 0.5 stroke |
-| Left icon box | 17.53..57.71 x 221.47..253.23 | clipped by border; brigade fill |
-| Right icon box | 139.47..181.39 x 220.54..254.87 | second brigade only |
+| Left icon box | 17.53..57.71 x 221.47..253.23 | over the border, 4 rounded corners; brigade fill |
+| Right icon box | 139.47..181.39 x 220.54..254.87 | Covenant / Curse chalice only |
 | Stat text | 22.92..51.33 x 244.62..252.76 | white, dark outline, in left box |
-| Class icons | below left box, y 200..228 | up to two, stacked |
+| Type icons | `ICON_RECTS` in frameGeometry.ts | from the rasters' placement matrices |
+| Class icons | shield 17.14..38.47 x 192.9..217.9, territory plate below | over the border, stacked |
 | Title band | y 235.1..248.55, right-aligned to x 171 | white, dark outline |
 | Credits | y 20..31, right-aligned | "Illus. X", copyright |
 
@@ -160,9 +160,43 @@ Tim reviewed the first render against printed cards (Enoch CoW, Covenant with Da
   their own catalog data and cropped art (dual-brigade Heroes and Evil Character, GE and EE
   with stats, Lost Soul, Artifact, Dominant, Fortress, dual-brigade Curse, two Covenants).
 
+## Icon corrections (2026-09-10, second pass against printed cards)
+
+Tim flagged the bible and class icons as the wrong size, a white border around the chalice,
+mixed sharp / round box corners, an illegible dragon and a territory icon with no plate. Each
+was checked by overlaying the template's numbers on printed Roots / RR2 / II / T2C corners:
+
+- **Icon placement comes from the template, not guesswork.** Every raster's `Xh` matrix
+  places its top-left at (tx, ty) artboard pt at a·W x d·H; the extractor now emits those
+  as `ICON_RECTS` (canvas px), including the lower "Stats" slot the template keeps for the
+  skull and bible. Overlaid on prints, the bible, skull, dragon and fortress land exactly.
+  The cross prints at ~75% of its template slot on every card checked, so it is scaled
+  down about its center (`PRINT_SCALE`). The duplicate `-small` PNGs are gone (same pixels).
+- **The chalice badge was the wrong raster.** The template holds three "Artifact" rasters;
+  base-name matching picked the text-legend copy (204x162, white rounded corners baked in)
+  over the box copy (170x158). The extractor now picks the copy placed in the top-left box
+  (`corner_copy`), and badges carry the template's crop anchor (chalice bottom-aligned,
+  good foil top-aligned).
+- **Box shape.** Printed boxes have four rounded corners (~22 px on the canvas) and sit over
+  the border, overhanging it by a hair, with the outer corner following the card corner. The
+  preview now draws the box after the border stroke, unclipped, with that path.
+- **Alpha is rebuilt by flood fill, not color distance.** Only the flat color reachable from
+  the raster's edge is background, so the dragon (stored on the black box color) keeps its
+  dark body and outline and reads on brown, black and the multi foil. The two class shields
+  are one shield with opposite halves flattened to the background gray; their union is the
+  silhouette, so each ships whole with its faded half opaque, as printed. The territory is
+  an opaque rounded plate with the print's dark outline.
+- **Class icons** draw at the template's size (shield 89x104 canvas px) directly under the
+  box, over the border, stacked shield(s) then territory.
+- **Fonts, for the record:** the printed title face is Symphony Black (Agfa/Monotype) and the
+  printed stats face is Grail Light (SoftKey/WSI, "redistribution strictly prohibited"); both
+  are proprietary and stay out of the repo. Mukta ExtraBold and PT Serif Bold remain the
+  shipped substitutes. Arimo (OFL) is already the body face.
+- **Verification**: twelve printed cards | preview pairs plus four synthetic cases (3-brigade
+  Evil Character on the foil, dual-brigade Covenant with a territory plate, Hero with both
+  shields and a territory, Site).
+
 ## Follow-ups (not in this change)
 
-- Real alpha for icons (the .ai stores it separately; keyed backgrounds are good enough for a
-  rough preview).
 - Inline ability icons, set symbol, card number, watermark.
 - Other surfaces (grid, reveal, deck view) adopting the composite.
