@@ -14,6 +14,7 @@ function toSortable(c: ForgeCardFull): SortableCard {
     brigade: (s?.brigades ?? []).join("/"),
     alignment: s?.alignment,
     strength: s?.strength == null ? "" : String(s.strength),
+    toughness: s?.toughness == null ? "" : String(s.toughness),
     reference: s?.reference,
   };
 }

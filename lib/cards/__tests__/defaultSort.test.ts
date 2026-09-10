@@ -22,7 +22,7 @@ const sortNames = (cards: SortableCard[]): string[] =>
   [...cards].sort(compareCardsDefault).map((c) => c.name);
 
 describe("section ordering", () => {
-  it("orders all sections: dominants, artifacts, covenants, curses, fortresses, sites, lost souls, duals, good, evil, misc", () => {
+  it("orders all sections: dominants, artifacts, covenants, curses, cities, fortresses, sites, lost souls, duals, good, evil, misc", () => {
     const cards = [
       card({ name: "Token", type: "Hero Token" }),
       card({ name: "EvilChar", type: "Evil Character", brigade: "Brown", alignment: "Evil" }),
@@ -31,13 +31,14 @@ describe("section ordering", () => {
       card({ name: "Soul", type: "Lost Soul", reference: "Genesis 1:1" }),
       card({ name: "Site", type: "Site", brigade: "Black" }),
       card({ name: "Fort", type: "Fortress" }),
+      card({ name: "City", type: "City", brigade: "Blue" }),
       card({ name: "Curse", type: "Curse" }),
       card({ name: "Cov", type: "Covenant" }),
       card({ name: "Art", type: "Artifact" }),
       card({ name: "Dom", type: "Dominant", alignment: "Good" }),
     ];
     expect(sortNames(cards)).toEqual([
-      "Dom", "Art", "Cov", "Curse", "Fort", "Site", "Soul", "Dual", "GoodEnh", "EvilChar", "Token",
+      "Dom", "Art", "Cov", "Curse", "City", "Fort", "Site", "Soul", "Dual", "GoodEnh", "EvilChar", "Token",
     ]);
   });
 
@@ -46,7 +47,7 @@ describe("section ordering", () => {
       card({ name: "FortEC", type: "Fortress / Evil Character", brigade: "Black", alignment: "Evil" }),
       card({ name: "ECFort", type: "Evil Character/Fortress", brigade: "Black", alignment: "Evil" }),
     ];
-    // "Fortress / Evil Character" → Fortress section (4), before evil section (9)
+    // "Fortress / Evil Character" → Fortress section (5), before evil section (10)
     expect(sortNames(cards)).toEqual(["FortEC", "ECFort"]);
   });
 });
@@ -82,16 +83,16 @@ describe("artifacts / covenants / curses / fortresses", () => {
     ]);
   });
 
-  it("interleaves Cities with Fortresses alphabetically, Sites after", () => {
+  it("puts Cities in their own section before Fortresses, Sites after", () => {
     const cards = [
       card({ name: "Aeneas Site", type: "Site" }),
-      card({ name: "Babylon", type: "City" }),
+      card({ name: "Babylon", type: "City", brigade: "Red" }),
       card({ name: "Ark Fortress", type: "Fortress" }),
-      card({ name: "City of Enoch", type: "City" }),
+      card({ name: "City of Enoch", type: "City", brigade: "Blue" }),
       card({ name: "Zion Fortress", type: "Fortress" }),
     ];
     expect(sortNames(cards)).toEqual([
-      "Ark Fortress", "Babylon", "City of Enoch", "Zion Fortress", "Aeneas Site",
+      "City of Enoch", "Babylon", "Ark Fortress", "Zion Fortress", "Aeneas Site",
     ]);
   });
 });
@@ -143,14 +144,14 @@ describe("lost souls — biblical reference order", () => {
 });
 
 describe("dual characters and enhancements", () => {
-  it("puts type-spanning duals (GE/EE, Hero/Evil Character) in the dual section, alpha by name", () => {
+  it("puts type-spanning duals (GE/EE, Hero/Evil Character) in the dual section, characters first", () => {
     const cards = [
       card({ name: "Blue Hero", type: "Hero", brigade: "Blue", alignment: "Good", strength: "9" }),
       card({ name: "Zeta Dual", type: "Hero/Evil Character", brigade: "Gold (Good Gold/Evil Gold)" }),
       card({ name: "Alpha Dual", type: "GE/EE", brigade: "Green/White and Brown/Crimson" }),
       card({ name: "Soul", type: "Lost Soul", reference: "Acts 2:21" }),
     ];
-    expect(sortNames(cards)).toEqual(["Soul", "Alpha Dual", "Zeta Dual", "Blue Hero"]);
+    expect(sortNames(cards)).toEqual(["Soul", "Zeta Dual", "Alpha Dual", "Blue Hero"]);
   });
 
   it("treats a single-type enhancement with brigades spanning both alignments as dual", () => {
@@ -163,30 +164,30 @@ describe("dual characters and enhancements", () => {
 });
 
 describe("good and evil brigade sections", () => {
-  it("orders good brigades Blue → Clay → Gold → Green → Multi → Purple → Red → Silver → Teal → White", () => {
+  it("orders good brigades Multi → Blue → Clay → Gold → Green → Purple → Red → Silver → Teal → White", () => {
     const brigades = ["White", "Teal", "Silver", "Red", "Purple", "Multi", "Green", "Gold", "Clay", "Blue"];
     const cards = brigades.map((b) =>
       card({ name: `${b} Hero`, type: "Hero", brigade: b, alignment: "Good", strength: "5" })
     );
     expect(sortNames(cards)).toEqual([
-      "Blue Hero", "Clay Hero", "Gold Hero", "Green Hero", "Multi Hero",
+      "Multi Hero", "Blue Hero", "Clay Hero", "Gold Hero", "Green Hero",
       "Purple Hero", "Red Hero", "Silver Hero", "Teal Hero", "White Hero",
     ]);
     expect([...GOOD_BRIGADE_ORDER]).toEqual([
-      "Blue", "Clay", "Gold", "Green", "Multi", "Purple", "Red", "Silver", "Teal", "White",
+      "Multi", "Blue", "Clay", "Gold", "Green", "Purple", "Red", "Silver", "Teal", "White",
     ]);
   });
 
-  it("orders evil brigades Black → Brown → Crimson → Gold → Gray → Multi → Orange → Pale Green", () => {
+  it("orders evil brigades Multi → Black → Brown → Crimson → Gold → Gray → Orange → Pale Green", () => {
     const brigades = ["Pale Green", "Orange", "Multi", "Gray", "Gold", "Crimson", "Brown", "Black"];
     const cards = brigades.map((b) =>
       card({ name: `${b} EC`, type: "Evil Character", brigade: b, alignment: "Evil", strength: "5" })
     );
     expect(sortNames(cards)).toEqual([
-      "Black EC", "Brown EC", "Crimson EC", "Gold EC", "Gray EC", "Multi EC", "Orange EC", "Pale Green EC",
+      "Multi EC", "Black EC", "Brown EC", "Crimson EC", "Gold EC", "Gray EC", "Orange EC", "Pale Green EC",
     ]);
     expect([...EVIL_BRIGADE_ORDER]).toEqual([
-      "Black", "Brown", "Crimson", "Gold", "Gray", "Multi", "Orange", "Pale Green",
+      "Multi", "Black", "Brown", "Crimson", "Gold", "Gray", "Orange", "Pale Green",
     ]);
   });
 
@@ -211,14 +212,15 @@ describe("good and evil brigade sections", () => {
     expect(sortNames(cards)).toEqual(["Paired", "Neg", "Alf Star", "Empty", "Zed X"]);
   });
 
-  it("parses primary brigade from parenthesized and multi forms", () => {
+  it("reads brigades outside parentheses: two bare tokens are multi, a paren-only alternate is not", () => {
     const cards = [
       card({ name: "GreenTeal", type: "Hero", brigade: "Green/Teal", alignment: "Good", strength: "5" }),
       card({ name: "GoldParen", type: "Hero", brigade: "Gold (Gold/Red)", alignment: "Good", strength: "5" }),
       card({ name: "BlueFirst", type: "Hero", brigade: "Blue/Green (Multi)", alignment: "Good", strength: "5" }),
     ];
-    // Primary brigades: Blue, Gold, Green
-    expect(sortNames(cards)).toEqual(["BlueFirst", "GoldParen", "GreenTeal"]);
+    // Green/Teal and Blue/Green are multi (alpha among themselves); "Gold (Gold/Red)"
+    // is a single Gold brigade — the LoC back-side note in parens doesn't count.
+    expect(sortNames(cards)).toEqual(["BlueFirst", "GreenTeal", "GoldParen"]);
   });
 
   it("disambiguates Gold by alignment: good Gold with good brigades, evil Gold with evil brigades", () => {
@@ -399,5 +401,183 @@ describe("compareCardsByType", () => {
       card({ name: "Alpha", type: "" }),
     ];
     expect(sortByType(cards)).toEqual(["Alpha", "Zeta"]);
+  });
+});
+
+describe("designers' print order (issue #383)", () => {
+  it("multi-brigade heroes and enhancements lead the Good section, characters then enhancements by strength (Times to Come)", () => {
+    const cards = [
+      card({ name: "Daniel, the Treasured", type: "Hero", brigade: "White", alignment: "Good", strength: "12" }),
+      card({ name: "Gabriel, Sent by God", type: "Hero", brigade: "Silver", alignment: "Good", strength: "10" }),
+      card({ name: "Pride Laid Low", type: "GE", brigade: "Green", alignment: "Good", strength: "7" }),
+      card({ name: "Amos of Tekoa", type: "Hero", brigade: "Green", alignment: "Good", strength: "9" }),
+      card({ name: "Shattered and Scorched", type: "GE", brigade: "Silver/White", alignment: "Good", strength: "5" }),
+      card({ name: "Michael, the Guardian", type: "Hero", brigade: "Silver/White", alignment: "Good", strength: "12" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "Michael, the Guardian", "Shattered and Scorched",
+      "Amos of Tekoa", "Pride Laid Low",
+      "Gabriel, Sent by God", "Daniel, the Treasured",
+    ]);
+  });
+
+  it("The Days of Noah (Purple/Blue) leads End of Times' Good section ahead of every single brigade", () => {
+    const cards = [
+      card({ name: "Beware of Abominations", type: "GE", brigade: "Purple", alignment: "Good", strength: "5" }),
+      card({ name: "Peter, Son of Jonah", type: "Hero", brigade: "Purple", alignment: "Good", strength: "4" }),
+      card({ name: "Paul, Church Planter", type: "Hero", brigade: "Clay", alignment: "Good", strength: "11" }),
+      card({ name: "Asher, the Rich", type: "Hero", brigade: "Blue", alignment: "Good", strength: "5" }),
+      card({ name: "The Days of Noah", type: "GE", brigade: "Purple/Blue", alignment: "Good", strength: "4" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "The Days of Noah", "Asher, the Rich", "Paul, Church Planter", "Peter, Son of Jonah", "Beware of Abominations",
+    ]);
+  });
+
+  it("multi evil characters form one group by strength regardless of brigade mix (Times to Come), then single brigades", () => {
+    const cards = [
+      card({ name: "Cyrus, the Great", type: "Evil Character", brigade: "Brown", alignment: "Evil", strength: "11" }),
+      card({ name: "Greek Forces", type: "Evil Character", brigade: "Black", alignment: "Evil", strength: "12" }),
+      card({ name: "Chaldeans", type: "Evil Character", brigade: "Crimson/Pale Green", alignment: "Evil", strength: "2" }),
+      card({ name: "The Ram with Two Horns", type: "Evil Character", brigade: "Brown/Orange", alignment: "Evil", strength: "5" }),
+      card({ name: "The Prince of Persia", type: "Evil Character", brigade: "Brown/Orange", alignment: "Evil", strength: "7" }),
+      card({ name: "The Prince of Greece", type: "Evil Character", brigade: "Black/Orange", alignment: "Evil", strength: "8" }),
+      card({ name: "The Goat with a Horn", type: "Evil Character", brigade: "Black/Orange", alignment: "Evil", strength: "11" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "The Goat with a Horn", "The Prince of Greece", "The Prince of Persia", "The Ram with Two Horns", "Chaldeans",
+      "Greek Forces", "Cyrus, the Great",
+    ]);
+  });
+
+  it("End of Times' multi evil cards lead the Evil section (forge-style compact names)", () => {
+    const cards = [
+      card({ name: "Conquer, the White Rider", type: "EvilCharacter", brigade: "PaleGreen", alignment: "Evil", strength: "10" }),
+      card({ name: "Crushing Carnivores", type: "EvilCharacter", brigade: "Crimson", alignment: "Evil", strength: "9" }),
+      card({ name: "Out of the Mouths", type: "EE", brigade: "Crimson/Orange/PaleGreen", alignment: "Evil", strength: "3" }),
+      card({ name: "The False Prophet", type: "EvilCharacter", brigade: "PaleGreen/Crimson", alignment: "Evil", strength: "2" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "The False Prophet", "Out of the Mouths", "Crushing Carnivores", "Conquer, the White Rider",
+    ]);
+  });
+
+  it("a literal Multi token counts as multi, even alongside a named brigade", () => {
+    const cards = [
+      card({ name: "Blue Hero", type: "Hero", brigade: "Blue", alignment: "Good", strength: "12" }),
+      card({ name: "Multi Enh", type: "GE", brigade: "Multi", alignment: "Good", strength: "3" }),
+      card({ name: "Black EC", type: "Evil Character", brigade: "Black", alignment: "Evil", strength: "12" }),
+      card({ name: "Gray Multi EC", type: "Evil Character", brigade: "Gray/Multi", alignment: "Evil", strength: "5" }),
+    ];
+    expect(sortNames(cards)).toEqual(["Multi Enh", "Blue Hero", "Gray Multi EC", "Black EC"]);
+  });
+
+  it("only recognized brigade tokens count toward multi; a dirty extra token does not", () => {
+    const cards = [
+      card({ name: "Blue Hero", type: "Hero", brigade: "Blue", alignment: "Good", strength: "5" }),
+      card({ name: "Dirty White", type: "Hero", brigade: "Good/White", alignment: "Good", strength: "5" }),
+    ];
+    // "Good/White" carries one real brigade (White) → single, after Blue.
+    expect(sortNames(cards)).toEqual(["Blue Hero", "Dirty White"]);
+  });
+
+  it("covenants group by brigade (multi first), then strength descending, then name", () => {
+    // End of Times covenants.
+    const eot = [
+      card({ name: "No More Pain", type: "Covenant", brigade: "White", alignment: "Good", strength: "4" }),
+      card({ name: "Saved by Faith", type: "Covenant", brigade: "Clay", alignment: "Good", strength: "5" }),
+      card({ name: "Tree of Life", type: "Covenant", brigade: "Blue/Silver", alignment: "Good", strength: "4" }),
+      card({ name: "Covenant of Prayer", type: "Covenant", brigade: "Silver/White", alignment: "Good", strength: "3" }),
+    ];
+    expect(sortNames(eot)).toEqual(["Tree of Life", "Covenant of Prayer", "Saved by Faith", "No More Pain"]);
+    // Times to Come print order runs Green → Silver → White: brigade beats strength.
+    const t2c = [
+      card({ name: "Seventy Weeks", type: "Covenant", brigade: "White", alignment: "Good", strength: "7" }),
+      card({ name: "God's Judgment", type: "Covenant", brigade: "Silver", alignment: "Good", strength: "2" }),
+      card({ name: "Covenant of Time", type: "Covenant", brigade: "Green", alignment: "Good", strength: "5" }),
+    ];
+    expect(sortNames(t2c)).toEqual(["Covenant of Time", "God's Judgment", "Seventy Weeks"]);
+    // Same brigade: strength beats name.
+    const blue = [
+      card({ name: "Covenant of Noah", type: "Covenant", brigade: "Blue", alignment: "Good", strength: "2" }),
+      card({ name: "I am Holy", type: "Covenant", brigade: "Blue", alignment: "Good", strength: "5" }),
+    ];
+    expect(sortNames(blue)).toEqual(["I am Holy", "Covenant of Noah"]);
+  });
+
+  it("curses group the same way (End of Times)", () => {
+    const cards = [
+      card({ name: "Prohibit Progress", type: "Curse", brigade: "PaleGreen", alignment: "Evil", strength: "0" }),
+      card({ name: "Sinful Semiosis", type: "Curse", brigade: "PaleGreen", alignment: "Evil", strength: "5" }),
+      card({ name: "From the Abyss", type: "Curse", brigade: "Orange", alignment: "Evil", strength: "1" }),
+      card({ name: "Evil Authority", type: "Curse", brigade: "Orange", alignment: "Evil", strength: "4" }),
+      card({ name: "Killed by Animals", type: "Curse", brigade: "Crimson", alignment: "Evil", strength: "5" }),
+      card({ name: "Last Curse", type: "Curse", brigade: "Orange/PaleGreen", alignment: "Evil", strength: "3" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "Last Curse", "Killed by Animals", "Evil Authority", "From the Abyss", "Sinful Semiosis", "Prohibit Progress",
+    ]);
+  });
+
+  it("cities sit between curses and fortresses, grouped by brigade (multi first) then name", () => {
+    const cards = [
+      card({ name: "Ark Fortress", type: "Fortress" }),
+      card({ name: "Hebron", type: "City", brigade: "Red", alignment: "Good" }),
+      card({ name: "Ashkelon", type: "City", brigade: "Gold", alignment: "Evil" }),
+      card({ name: "City of Enoch", type: "City", brigade: "Blue", alignment: "Evil" }),
+      card({ name: "Babel", type: "City", brigade: "Blue", alignment: "Evil" }),
+      card({ name: "Bethlehem", type: "City", brigade: "Gold/White", alignment: "Good" }),
+      card({ name: "Zeal Curse", type: "Curse", brigade: "Black", strength: "1" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "Zeal Curse", "Bethlehem", "Babel", "City of Enoch", "Ashkelon", "Hebron", "Ark Fortress",
+    ]);
+  });
+
+  it("sites group by brigade (multi first) then name", () => {
+    const cards = [
+      card({ name: "Caesarea Philippi", type: "Site", brigade: "Red" }),
+      card({ name: "Ashdod", type: "Site", brigade: "Red" }),
+      card({ name: "Assyria", type: "Site", brigade: "Purple" }),
+      card({ name: "Babylonian Banquet Hall", type: "Site", brigade: "Green" }),
+      card({ name: "New Jerusalem", type: "Site", brigade: "Multi" }),
+      card({ name: "Babylon The Harlot", type: "Site", brigade: "Silver/Red/Crimson/Orange" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "Babylon The Harlot", "New Jerusalem", "Babylonian Banquet Hall", "Assyria", "Ashdod", "Caesarea Philippi",
+    ]);
+  });
+
+  it("breaks same-strength ties by toughness descending, as the printed sets do", () => {
+    // Times to Come print order: Patrollers of the Earth 9/6 before The
+    // Interceder 9/3; Persian Presidents 6/7 before The Depraved [Brown] 6/5;
+    // Told to Take 3/3 before Axe 3/2 — alphabetical would flip all three.
+    const cards = [
+      card({ name: "The Interceder", type: "Hero", brigade: "Silver", alignment: "Good", strength: "9", toughness: "3" }),
+      card({ name: "Patrollers of the Earth", type: "Hero", brigade: "Silver", alignment: "Good", strength: "9", toughness: "6" }),
+      card({ name: "The Depraved [Brown]", type: "Evil Character", brigade: "Brown", alignment: "Evil", strength: "6", toughness: "5" }),
+      card({ name: "Persian Presidents", type: "Evil Character", brigade: "Brown", alignment: "Evil", strength: "6", toughness: "7" }),
+      card({ name: "Axe", type: "EE", brigade: "Crimson", alignment: "Evil", strength: "3", toughness: "2" }),
+      card({ name: "Told to Take", type: "EE", brigade: "Crimson", alignment: "Evil", strength: "3", toughness: "3" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "Patrollers of the Earth", "The Interceder",
+      "Persian Presidents", "The Depraved [Brown]",
+      "Told to Take", "Axe",
+    ]);
+  });
+
+  it("dual section: characters, then character/enhancement dual-types, then enhancements, each by strength", () => {
+    const cards = [
+      card({ name: "Inherit Canaan", type: "GE/EE", brigade: "Green (Black)", strength: "2 (4)" }),
+      card({ name: "War in Heaven", type: "GE/EE", brigade: "Silver/Orange", alignment: "Good_Evil", strength: "5" }),
+      card({ name: "Quake in Edom", type: "GE/EE", brigade: "Green (Crimson)", strength: "6 (0)" }),
+      card({ name: "Goats & Sheep", type: "GE/EvilCharacter", brigade: "Purple/Crimson", alignment: "Good_Evil", strength: "" }),
+      card({ name: "Blood Avenger", type: "Hero/Evil Character", brigade: "White/Brown", strength: "3 (2)" }),
+      card({ name: "Joab, the General", type: "Hero/Evil Character", brigade: "Purple (Brown)", strength: "12 (6)" }),
+    ];
+    expect(sortNames(cards)).toEqual([
+      "Joab, the General", "Blood Avenger", "Goats & Sheep", "Quake in Edom", "War in Heaven", "Inherit Canaan",
+    ]);
   });
 });

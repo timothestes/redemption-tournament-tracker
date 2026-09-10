@@ -4,10 +4,20 @@
  * browsing, collection). Pure and dependency-free — no card data imports —
  * so it can be bundled anywhere and mirrored 1:1 in the sister Python API.
  *
- * Order: Dominants, Artifacts, Covenants, Curses, Fortresses (+Cities),
- * Sites, Lost Souls (biblical reference order), dual-alignment
- * characters/enhancements, Good brigades (characters then enhancements,
- * strength descending), Evil brigades (same), then everything else.
+ * Order (the design team's print order): Dominants (neutral/dual, good,
+ * evil), Artifacts, Covenants, Curses, Cities, Fortresses, Sites, Lost Souls
+ * (biblical reference order), dual characters/enhancements (characters,
+ * character+enhancement dual-types, enhancements — each strength
+ * descending), Good brigades, Evil brigades, then everything else.
+ *
+ * Brigade-grouped sections (Covenants, Curses, Cities, Sites, Good, Evil)
+ * put MULTI FIRST — any card with 2+ brigades or a literal "Multi" — then
+ * single brigades alphabetically by color. Inside a Good/Evil brigade:
+ * characters (strength descending) then enhancements (strength descending).
+ * Covenants and Curses also sort strength descending inside a brigade;
+ * Cities and Sites go straight to name. Same-strength ties go by toughness
+ * descending, then name. Validated against Times to Come and Israel's
+ * Inheritance, whose card-data file order is the print order.
  *
  * Alphabetical tie-breaks ignore a leading "The " (confirmed against real
  * print-number order in Times to Come, Revelation of John, and Israel's
@@ -24,17 +34,25 @@ export interface SortableCard {
   brigade?: string;
   alignment?: string;
   strength?: string;
+  toughness?: string;
   reference?: string;
 }
 
-// Alphabetical-by-color brigade orders. "Gold" covers Good Gold / Evil Gold
-// per the list it appears in; "Multi" sorts alphabetically within each list.
+// Brigade orders: Multi first, then alphabetical by color. "Gold" covers
+// Good Gold / Evil Gold per the list it appears in.
 export const GOOD_BRIGADE_ORDER = [
-  "Blue", "Clay", "Gold", "Green", "Multi", "Purple", "Red", "Silver", "Teal", "White",
+  "Multi", "Blue", "Clay", "Gold", "Green", "Purple", "Red", "Silver", "Teal", "White",
 ] as const;
 
 export const EVIL_BRIGADE_ORDER = [
-  "Black", "Brown", "Crimson", "Gold", "Gray", "Multi", "Orange", "Pale Green",
+  "Multi", "Black", "Brown", "Crimson", "Gold", "Gray", "Orange", "Pale Green",
+] as const;
+
+// Sections whose cards can carry either alignment's colors (Covenants, Curses,
+// Cities, Sites) group by this merged order — the same rule, both palettes.
+const ALL_BRIGADE_ORDER = [
+  "Multi", "Black", "Blue", "Brown", "Clay", "Crimson", "Gold", "Gray", "Green",
+  "Orange", "Pale Green", "Purple", "Red", "Silver", "Teal", "White",
 ] as const;
 
 // Books as they appear in card data (Roman numerals, "Psalms").
@@ -61,13 +79,14 @@ const SECTION_DOMINANT = 0;
 const SECTION_ARTIFACT = 1;
 const SECTION_COVENANT = 2;
 const SECTION_CURSE = 3;
-const SECTION_FORTRESS = 4; // Fortresses and Cities interleave alphabetically
-const SECTION_SITE = 5;
-const SECTION_LOST_SOUL = 6;
-const SECTION_DUAL = 7;
-const SECTION_GOOD = 8;
-const SECTION_EVIL = 9;
-const SECTION_MISC = 10;
+const SECTION_CITY = 4;
+const SECTION_FORTRESS = 5;
+const SECTION_SITE = 6;
+const SECTION_LOST_SOUL = 7;
+const SECTION_DUAL = 8;
+const SECTION_GOOD = 9;
+const SECTION_EVIL = 10;
+const SECTION_MISC = 11;
 
 // Normalize a type/brigade token for matching: lowercase, drop spaces/hyphens.
 // Handles both raw carddata forms ("Evil Character", "Lost Soul", "Pale Green")
@@ -195,18 +214,35 @@ function referenceKey(reference: string | undefined): { book: number; chapter: n
   };
 }
 
-// Rank of the card's primary brigade within its alignment's order array.
-// Unknown/dirty/empty → after all known brigades, tie-broken by raw string.
-function brigadeRank(card: SortableCard, side: "good" | "evil"): { rank: number; tie: string } {
-  const order: readonly string[] = side === "good" ? GOOD_BRIGADE_ORDER : EVIL_BRIGADE_ORDER;
-  const info = parseBrigade(card.brigade ?? "");
-  const primary = info.tokens.length > 0 ? info.tokens[0] : "";
-  const canonical = CANONICAL_BRIGADE[norm(primary)];
-  if (canonical !== undefined) {
-    const idx = order.indexOf(canonical);
+// Rank of the card's brigade group within an order array. Multi — a literal
+// "Multi" token, or 2+ distinct recognized colors outside any parens — ranks
+// first; a single color ranks by its position; unknown/dirty/empty → after all
+// known brigades, tie-broken by raw string. Only recognized colors count, so a
+// stray token ("Good/White") doesn't make a card multi.
+function brigadeRank(brigade: string | undefined, side: "good" | "evil" | "any"): { rank: number; tie: string } {
+  const order: readonly string[] =
+    side === "good" ? GOOD_BRIGADE_ORDER : side === "evil" ? EVIL_BRIGADE_ORDER : ALL_BRIGADE_ORDER;
+  const colors = new Set<string>();
+  let literalMulti = false;
+  for (const t of parseBrigade(brigade ?? "").tokens) {
+    const canonical = CANONICAL_BRIGADE[norm(t)];
+    if (canonical === "Multi") literalMulti = true;
+    else if (canonical !== undefined) colors.add(canonical);
+  }
+  if (literalMulti === true || colors.size >= 2) return { rank: order.indexOf("Multi"), tie: "" };
+  if (colors.size === 1) {
+    const idx = order.indexOf([...colors][0]);
     if (idx !== -1) return { rank: idx, tie: "" };
   }
-  return { rank: order.length, tie: (card.brigade ?? "").toLowerCase() };
+  return { rank: order.length, tie: (brigade ?? "").toLowerCase() };
+}
+
+// Numbered strength first (descending), then X / * / empty; same-strength
+// ties by toughness the same way (the printed sets break ties on toughness).
+function strengthKey(strength: string | undefined, toughness: string | undefined): [number, number, number, number] {
+  const str = strengthValue(strength);
+  const tough = strengthValue(toughness);
+  return [str !== null ? 0 : 1, str !== null ? -str : 0, tough !== null ? 0 : 1, tough !== null ? -tough : 0];
 }
 
 function dominantAlignmentRank(alignment: string | undefined): number {
@@ -221,6 +257,24 @@ function dominantAlignmentRank(alignment: string | undefined): number {
 
 type SortKey = (string | number)[];
 
+// Covenants, Curses, Cities, Sites: brigade group (multi first), optionally
+// strength descending (Covenants/Curses carry power), then name.
+function brigadeGroupKey(section: number, card: SortableCard, byStrength: boolean): SortKey {
+  const { rank, tie } = brigadeRank(card.brigade, "any");
+  return byStrength === true
+    ? [section, rank, tie, ...strengthKey(card.strength, card.toughness), alphaKey(card.name)]
+    : [section, rank, tie, alphaKey(card.name)];
+}
+
+// Dual section: characters, then character+enhancement dual-types
+// (GE/Evil Character, Hero/EE), then enhancements — each strength descending.
+function dualKey(card: SortableCard, parts: string[]): SortKey {
+  const hasChar = parts.some((p) => GOOD_CHAR_TYPES.has(norm(p)) === true || EVIL_CHAR_TYPES.has(norm(p)) === true);
+  const hasEnh = parts.some((p) => GOOD_ENH_TYPES.has(norm(p)) === true || EVIL_ENH_TYPES.has(norm(p)) === true);
+  const group = hasChar === true && hasEnh === true ? 1 : hasChar === true ? 0 : 2;
+  return [SECTION_DUAL, group, ...strengthKey(card.strength, card.toughness), alphaKey(card.name)];
+}
+
 function buildKey(card: SortableCard): SortKey {
   const name = alphaKey(card.name);
   const type = card.type ?? "";
@@ -232,12 +286,11 @@ function buildKey(card: SortableCard): SortKey {
     return [SECTION_DOMINANT, dominantAlignmentRank(card.alignment), name];
   }
   if (firstNorm === "artifact" || firstNorm === "art") return [SECTION_ARTIFACT, name];
-  if (firstNorm === "covenant" || firstNorm === "cov") return [SECTION_COVENANT, name];
-  if (firstNorm === "curse" || firstNorm === "cur") return [SECTION_CURSE, name];
-  if (firstNorm === "fortress" || firstNorm === "fort" || firstNorm === "city") {
-    return [SECTION_FORTRESS, name];
-  }
-  if (firstNorm === "site") return [SECTION_SITE, name];
+  if (firstNorm === "covenant" || firstNorm === "cov") return brigadeGroupKey(SECTION_COVENANT, card, true);
+  if (firstNorm === "curse" || firstNorm === "cur") return brigadeGroupKey(SECTION_CURSE, card, true);
+  if (firstNorm === "city") return brigadeGroupKey(SECTION_CITY, card, false);
+  if (firstNorm === "fortress" || firstNorm === "fort") return [SECTION_FORTRESS, name];
+  if (firstNorm === "site") return brigadeGroupKey(SECTION_SITE, card, false);
   if (firstNorm === "lostsoul" || firstNorm === "ls") {
     const key = referenceKey(card.reference);
     return [SECTION_LOST_SOUL, key.book, key.chapter, key.verse, (card.reference ?? "").toLowerCase(), name];
@@ -248,24 +301,22 @@ function buildKey(card: SortableCard): SortKey {
   // Dual: type parts span both sides (GE/EE, Hero/Evil Character, …), or a
   // character/enhancement whose brigades span both alignments
   // ("Green/White and Brown/Crimson").
-  if (hasGoodType === true && hasEvilType === true) return [SECTION_DUAL, name];
+  if (hasGoodType === true && hasEvilType === true) return dualKey(card, parts);
 
   if (hasGoodType === true || hasEvilType === true) {
     if (brigadeSpansBothAlignments(parseBrigade(card.brigade ?? "")) === true) {
-      return [SECTION_DUAL, name];
+      return dualKey(card, parts);
     }
     const side: "good" | "evil" = hasGoodType === true ? "good" : "evil";
-    const { rank, tie } = brigadeRank(card, side);
+    const { rank, tie } = brigadeRank(card.brigade, side);
     const isCharacter =
       side === "good" ? GOOD_CHAR_TYPES.has(firstNorm) : EVIL_CHAR_TYPES.has(firstNorm);
-    const str = strengthValue(card.strength);
     return [
       side === "good" ? SECTION_GOOD : SECTION_EVIL,
       rank,
       tie,
       isCharacter === true ? 0 : 1,
-      str !== null ? 0 : 1, // numbered strength before X/*/empty
-      str !== null ? -str : 0, // strength descending
+      ...strengthKey(card.strength, card.toughness),
       name,
     ];
   }
