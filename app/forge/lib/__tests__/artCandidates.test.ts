@@ -18,7 +18,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 import { requireElder } from "@/app/forge/lib/auth";
 import { validateArtFile, uploadForgeArt, uploadForgeArtRaw, readForgeArt, readForgeUpload, deleteForgeArt } from "@/app/forge/lib/art";
 import { clampCropRect, cropCardImage } from "@/app/forge/lib/imageCrop";
-import { addArtCandidate, applyCrop, deleteArtCandidate } from "../artCandidates";
+import { addArtCandidate, applyCrop, deleteArtCandidate, listArtCandidates, setArtCandidateSource } from "../artCandidates";
 
 /** Supabase mock: from() returns a self-chaining builder resolving to `rows`
  * keyed by table name; rpc() resolves from `rpcResults` keyed by fn name. */
@@ -132,6 +132,70 @@ describe("deleteArtCandidate", () => {
     const r = await deleteArtCandidate("card1", "cand1");
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/source of the current artwork/i);
+  });
+});
+
+describe("listArtCandidates", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("maps source_url to sourceUrl, defaulting missing ones to null", async () => {
+    mockCtx({
+      rows: {
+        forge_card_art_candidates: [
+          { id: "c1", key: "forge-art/1", created_at: "t1", source_url: "https://example.com/a" },
+          { id: "c2", key: "forge-art/2", created_at: "t2", source_url: null },
+        ],
+        forge_cards: { working_art_key: "forge-art/1", working_art_original_key: "forge-art/1" },
+      },
+    });
+    const rows = await listArtCandidates("card1");
+    expect(rows).toEqual([
+      { id: "c1", createdAt: "t1", isActiveSource: true, sourceUrl: "https://example.com/a" },
+      { id: "c2", createdAt: "t2", isActiveSource: false, sourceUrl: null },
+    ]);
+  });
+});
+
+describe("setArtCandidateSource", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("trims the url and saves it via the RPC", async () => {
+    const { rpc } = mockCtx({});
+    const r = await setArtCandidateSource("card1", "cand1", "  https://example.com/art  ");
+    expect(r.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("forge_set_art_candidate_source", {
+      p_candidate_id: "cand1",
+      p_source_url: "https://example.com/art",
+    });
+  });
+
+  it("clears the url when given null", async () => {
+    const { rpc } = mockCtx({});
+    const r = await setArtCandidateSource("card1", "cand1", null);
+    expect(r.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("forge_set_art_candidate_source", {
+      p_candidate_id: "cand1",
+      p_source_url: null,
+    });
+  });
+
+  it("rejects a non-http(s) url without calling the RPC", async () => {
+    const { rpc } = mockCtx({});
+    const r = await setArtCandidateSource("card1", "cand1", "javascript:alert(1)");
+    expect(r.ok).toBe(false);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps an RPC error to friendly copy", async () => {
+    mockCtx({ rpcResults: { forge_set_art_candidate_source: { error: { message: "not authorized to edit this card" } } } });
+    const r = await setArtCandidateSource("card1", "cand1", "https://example.com");
+    expect(r.ok).toBe(false);
+  });
+
+  it("refuses when not an elder", async () => {
+    (requireElder as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    const r = await setArtCandidateSource("card1", "cand1", "https://example.com");
+    expect(r.ok).toBe(false);
   });
 });
 

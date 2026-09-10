@@ -8,7 +8,7 @@ import type { CropRect } from "@/app/forge/lib/cropPreview";
 
 // Candidate ids/timestamps only — blob keys never leave the server; the client
 // renders images through /forge/api/art/[cardId]?candidate=<id>.
-export type ArtCandidate = { id: string; createdAt: string; isActiveSource: boolean };
+export type ArtCandidate = { id: string; createdAt: string; isActiveSource: boolean; sourceUrl: string | null };
 
 export async function listArtCandidates(cardId: string): Promise<ArtCandidate[]> {
   const ctx = await requireElder();
@@ -16,7 +16,7 @@ export async function listArtCandidates(cardId: string): Promise<ArtCandidate[]>
   const [{ data: rows }, { data: card }] = await Promise.all([
     ctx.supabase
       .from("forge_card_art_candidates")
-      .select("id, key, created_at")
+      .select("id, key, created_at, source_url")
       .eq("card_id", cardId)
       .order("created_at", { ascending: true }),
     ctx.supabase
@@ -30,6 +30,7 @@ export async function listArtCandidates(cardId: string): Promise<ArtCandidate[]>
     id: r.id,
     createdAt: r.created_at,
     isActiveSource: !!activeKey && r.key === activeKey,
+    sourceUrl: r.source_url ?? null,
   }));
 }
 
@@ -97,6 +98,34 @@ export async function deleteArtCandidate(
   if (error) {
     return { ok: false, error: /source of the current artwork/i.test(error.message) ? "This image is the source of the current artwork." : "Could not delete image" };
   }
+  revalidatePath(`/forge/cards/${cardId}`);
+  return { ok: true };
+}
+
+export async function setArtCandidateSource(
+  cardId: string,
+  candidateId: string,
+  sourceUrl: string | null
+): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await requireElder();
+  if (!ctx) return { ok: false, error: "Not authorized" };
+  const trimmed = sourceUrl?.trim() || null;
+  if (trimmed) {
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return { ok: false, error: "Enter a valid URL (starting with http:// or https://)" };
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return { ok: false, error: "Enter a valid URL (starting with http:// or https://)" };
+    }
+  }
+  const { error } = await ctx.supabase.rpc("forge_set_art_candidate_source", {
+    p_candidate_id: candidateId,
+    p_source_url: trimmed,
+  });
+  if (error) return { ok: false, error: "Could not save link" };
   revalidatePath(`/forge/cards/${cardId}`);
   return { ok: true };
 }
