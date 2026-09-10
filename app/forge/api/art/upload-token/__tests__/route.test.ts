@@ -51,4 +51,19 @@ describe("POST /forge/api/art/upload-token", () => {
     const res = await POST(reqWith({ type: "blob.generate-client-token", payload: {} }));
     expect(res.status).toBe(200);
   });
+
+  it("bounds the upload size and rejects a pathname outside forge-art-raw/", async () => {
+    asMock(requireElder).mockResolvedValue({ role: "elder" });
+    let onBeforeGenerateToken: any;
+    asMock(handleUpload).mockImplementation(async (opts: any) => {
+      onBeforeGenerateToken = opts.onBeforeGenerateToken;
+      return { ok: true };
+    });
+    await POST(reqWith({ type: "blob.generate-client-token", payload: {} }));
+
+    const result = await onBeforeGenerateToken("forge-art-raw/x.tiff");
+    expect(result.maximumSizeInBytes).toBe(50 * 1024 * 1024);
+
+    await expect(onBeforeGenerateToken("forge-art/someone-elses-key")).rejects.toThrow("Bad upload path");
+  });
 });

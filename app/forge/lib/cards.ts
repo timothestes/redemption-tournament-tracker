@@ -39,6 +39,7 @@ export async function uploadArt(
 ): Promise<{ ok: boolean; error?: string }> {
   const ctx = await requireElder();
   if (!ctx) return { ok: false, error: "Not authorized" };
+  if (!pathname.startsWith("forge-art-raw/")) return { ok: false, error: "Invalid upload" };
 
   const raw = await readForgeUpload(pathname);
   if (!raw) return { ok: false, error: "Could not read uploaded image" };
@@ -73,6 +74,7 @@ export async function uploadFinished(
 ): Promise<{ ok: boolean; error?: string }> {
   const ctx = await requireElder();
   if (!ctx) return { ok: false, error: "Not authorized" };
+  if (!pathname.startsWith("forge-art-raw/")) return { ok: false, error: "Invalid upload" };
 
   const raw = await readForgeUpload(pathname);
   if (!raw) return { ok: false, error: "Could not read uploaded image" };

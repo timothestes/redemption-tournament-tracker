@@ -16,7 +16,7 @@ vi.mock("@/app/forge/lib/imageCrop", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { requireElder } from "@/app/forge/lib/auth";
-import { uploadForgeArt, uploadForgeArtRaw, readForgeArt, readForgeUpload, deleteForgeArt } from "@/app/forge/lib/art";
+import { validateArtFile, uploadForgeArt, uploadForgeArtRaw, readForgeArt, readForgeUpload, deleteForgeArt } from "@/app/forge/lib/art";
 import { clampCropRect, cropCardImage } from "@/app/forge/lib/imageCrop";
 import { addArtCandidate, applyCrop, deleteArtCandidate } from "../artCandidates";
 
@@ -48,6 +48,10 @@ describe("addArtCandidate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (readForgeUpload as ReturnType<typeof vi.fn>).mockResolvedValue({ data: Buffer.from([1]), contentType: "image/png" });
+    // vi.clearAllMocks() clears call history but NOT a prior mockReturnValue — the
+    // validation-failure test below overrides this to a string, so restore the default
+    // "valid" passthrough here or that override leaks into later tests.
+    (validateArtFile as ReturnType<typeof vi.fn>).mockReturnValue(null);
   });
 
   it("uploads, registers the candidate, and auto-activates on an art-less card", async () => {
@@ -55,9 +59,28 @@ describe("addArtCandidate", () => {
     (uploadForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue("forge-art/k1");
     const r = await addArtCandidate("card1", pathname);
     expect(r.ok).toBe(true);
+    expect(validateArtFile).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "image/png" }),
+    );
     expect(rpc).toHaveBeenCalledWith("forge_add_art_candidate", { p_card_id: "card1", p_key: "forge-art/k1" });
     expect(rpc).toHaveBeenCalledWith("forge_set_working_art", { p_card_id: "card1", p_key: "forge-art/k1", p_original_key: "forge-art/k1" });
     expect(deleteForgeArt).toHaveBeenCalledWith(pathname);
+  });
+
+  it("returns the validation error and cleans up the raw upload when the file is invalid", async () => {
+    mockCtx({});
+    (validateArtFile as ReturnType<typeof vi.fn>).mockReturnValue("File too large. Maximum 50MB.");
+    const r = await addArtCandidate("card1", pathname);
+    expect(r).toEqual({ ok: false, error: "File too large. Maximum 50MB." });
+    expect(deleteForgeArt).toHaveBeenCalledWith(pathname);
+    expect(uploadForgeArt).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pathname outside forge-art-raw/", async () => {
+    mockCtx({});
+    const r = await addArtCandidate("card1", "forge-art/someone-elses-key");
+    expect(r).toEqual({ ok: false, error: "Invalid upload" });
+    expect(readForgeUpload).not.toHaveBeenCalled();
   });
 
   it("surfaces an auto-activate failure even though the candidate row was saved", async () => {

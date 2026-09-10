@@ -5,17 +5,19 @@
 import { NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { requireElder } from "@/app/forge/lib/auth";
+import { MAX_ART_BYTES } from "@/app/forge/lib/art";
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const body = (await request.json()) as HandleUploadBody;
   try {
+    const body = (await request.json()) as HandleUploadBody;
     const json = await handleUpload({
       body,
       request,
       token: process.env.FORGE_BLOB_READ_WRITE_TOKEN, // the FORGE store's token, not the app's default one
-      onBeforeGenerateToken: async () => {
+      onBeforeGenerateToken: async (pathname) => {
         const ctx = await requireElder();
         if (!ctx) throw new Error("Not authorized");
+        if (!pathname.startsWith("forge-art-raw/") || pathname.includes("..")) throw new Error("Bad upload path");
         return {
           // application/octet-stream stays allowed because browsers routinely misreport
           // .tif/.tiff with a generic or empty MIME type — the real content gate is
@@ -24,6 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             "image/jpeg", "image/png", "image/webp",
             "image/tiff", "image/tif", "application/octet-stream",
           ],
+          maximumSizeInBytes: MAX_ART_BYTES,
           addRandomSuffix: true,
         };
       },
