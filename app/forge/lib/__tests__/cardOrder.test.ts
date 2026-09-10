@@ -55,13 +55,38 @@ describe("sortSetCards — End of Times print order", () => {
     expect(titles(cards)).toEqual(["Meddling Mage", "The Lawless One"]);
   });
 
-  it("breaks same-strength ties by toughness ascending, opposite of every other set", () => {
+  it("breaks same-strength Good Enhancement ties by toughness ascending, opposite of every other set", () => {
     const cards = [
       forgeCard("Stand Firm [EoT]", { cardType: ["GE"], brigades: ["Clay"], alignment: "Good", strength: "2", toughness: "5" }),
       forgeCard("Risen by Christ", { cardType: ["GE"], brigades: ["Clay"], alignment: "Good", strength: "2", toughness: "3" }),
     ];
     // Real EoT print order (49-50): Risen by Christ (2/3) before Stand Firm (2/5).
     expect(titles(cards)).toEqual(["Risen by Christ", "Stand Firm [EoT]"]);
+  });
+
+  it("does NOT extend the ascending rule to Evil Enhancements, Heroes, or Evil Characters", () => {
+    // Real EoT (111-112): Great Feast (0/6) prints before Filled with Flesh
+    // (0/0) — Evil Enhancements still descend.
+    const eeCards = [
+      forgeCard("Filled with Flesh", { cardType: ["EE"], brigades: ["Crimson"], alignment: "Evil", strength: "0", toughness: "0" }),
+      forgeCard("Great Feast", { cardType: ["EE"], brigades: ["Crimson"], alignment: "Evil", strength: "0", toughness: "6" }),
+    ];
+    expect(titles(eeCards)).toEqual(["Great Feast", "Filled with Flesh"]);
+
+    // Real EoT: Seven Trumpet Sounders (7/7) prints before The Third
+    // Creature (7/5) — Heroes still descend.
+    const heroCards = [
+      forgeCard("The Third Creature", { cardType: ["Hero"], brigades: ["Silver"], alignment: "Good", strength: "7", toughness: "5" }),
+      forgeCard("Seven Trumpet Sounders", { cardType: ["Hero"], brigades: ["Silver"], alignment: "Good", strength: "7", toughness: "7" }),
+    ];
+    expect(titles(heroCards)).toEqual(["Seven Trumpet Sounders", "The Third Creature"]);
+
+    // Real EoT pair (PaleGreen): Evil Characters still descend too.
+    const evilCharCards = [
+      forgeCard("The Lawless One", { cardType: ["EvilCharacter"], brigades: ["PaleGreen"], alignment: "Evil", strength: "4", toughness: "2" }),
+      forgeCard("Meddling Mage", { cardType: ["EvilCharacter"], brigades: ["PaleGreen"], alignment: "Evil", strength: "4", toughness: "4" }),
+    ];
+    expect(titles(evilCharCards)).toEqual(["Meddling Mage", "The Lawless One"]);
   });
 
   it("re-reads the snapshot on every sort, so a brigade change moves the card without a manual step", () => {

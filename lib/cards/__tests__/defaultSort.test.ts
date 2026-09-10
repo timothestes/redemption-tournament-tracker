@@ -607,7 +607,7 @@ describe("compareCardsEndOfTimes — End of Times' one-off rules", () => {
     expect(sortNames(cards)).toEqual(["The Book of Life", "Letters to Thessalonica", "Stumbling Block"]);
   });
 
-  it("breaks same-strength ties by toughness ascending, opposite of the default comparator", () => {
+  it("breaks same-strength Good Enhancement ties by toughness ascending, opposite of the default comparator", () => {
     // Real EoT print order (49-50): Risen by Christ (2/3) prints before
     // Stand Firm (2/5) — lower toughness first, unlike every other set.
     const cards = [
@@ -617,5 +617,30 @@ describe("compareCardsEndOfTimes — End of Times' one-off rules", () => {
     expect(sortNamesEot(cards)).toEqual(["Risen by Christ", "Stand Firm"]);
     // The default comparator breaks the same tie the other way.
     expect(sortNames(cards)).toEqual(["Stand Firm", "Risen by Christ"]);
+  });
+
+  it("does NOT extend the ascending rule to Evil Enhancements, Heroes, or Evil Characters — only GE", () => {
+    // Real EoT: Great Feast (0/6) prints before Filled with Flesh (0/0) —
+    // Evil Enhancements still descend, unlike Good Enhancements.
+    const eeCards = [
+      card({ name: "Filled with Flesh", type: "EE", brigade: "Crimson", alignment: "Evil", strength: "0", toughness: "0" }),
+      card({ name: "Great Feast", type: "EE", brigade: "Crimson", alignment: "Evil", strength: "0", toughness: "6" }),
+    ];
+    expect(sortNamesEot(eeCards)).toEqual(["Great Feast", "Filled with Flesh"]);
+
+    // Real EoT: Seven Trumpet Sounders (7/7) prints before The Third
+    // Creature (7/5) — higher toughness first, same as compareCardsDefault.
+    const heroes = [
+      card({ name: "The Third Creature", type: "Hero", brigade: "Silver", alignment: "Good", strength: "7", toughness: "5" }),
+      card({ name: "Seven Trumpet Sounders", type: "Hero", brigade: "Silver", alignment: "Good", strength: "7", toughness: "7" }),
+    ];
+    expect(sortNamesEot(heroes)).toEqual(["Seven Trumpet Sounders", "The Third Creature"]);
+
+    // Same rule for Evil Characters (real EoT pair, PaleGreen).
+    const evilCharacters = [
+      card({ name: "The Lawless One", type: "Evil Character", brigade: "PaleGreen", alignment: "Evil", strength: "4", toughness: "2" }),
+      card({ name: "Meddling Mage", type: "Evil Character", brigade: "PaleGreen", alignment: "Evil", strength: "4", toughness: "4" }),
+    ];
+    expect(sortNamesEot(evilCharacters)).toEqual(["Meddling Mage", "The Lawless One"]);
   });
 });
