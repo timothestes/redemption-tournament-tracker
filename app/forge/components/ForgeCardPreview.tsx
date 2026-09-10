@@ -26,6 +26,9 @@ const STAT_FONT = "ForgeStat, Georgia, 'Times New Roman', serif";
 // Sizes are cap heights measured off printed cards (title ~26 px, stats ~22 px on the canvas).
 const TITLE_EM = 0.57;
 const TITLE_MAX = 36, TITLE_MIN = 25;
+// Printed titles: a hard shadow offset to the lower right (canvas px) and a hairline edge.
+const TITLE_SHADOW = { dx: 3, dy: 3, spread: 1.0 };
+const TITLE_EDGE = 1.2;
 
 type Rect = { readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly r?: number };
 
@@ -168,14 +171,20 @@ export default function ForgeCardPreview({
           <image key={c.src} href={c.src} x={c.rect.x} y={c.rect.y} width={c.rect.w} height={c.rect.h} preserveAspectRatio="xMidYMid meet" />
         ))}
         <clipPath id={`${uid}t`}><rect x={titleLeft} y={RECTS.title.y - 12} width={titleAvail} height={RECTS.title.h + 24} /></clipPath>
-        <text
-          x={right ? (titleLeft + titleRight) / 2 : titleRight} y={RECTS.title.y + 42} textAnchor={right ? "middle" : "end"}
-          clipPath={`url(#${uid}t)`} fontFamily={TITLE_FONT} fontSize={titleSize}
-          fill="#fff" stroke={INK} strokeWidth={2.8} paintOrder="stroke" style={{ paintOrder: "stroke" }}
-          {...(titleSqueeze ? { textLength: titleAvail, lengthAdjust: "spacingAndGlyphs" as const } : {})}
-        >
-          {name}
-        </text>
+        {/* Title: printed names carry a hard shadow to the lower right plus a hairline edge,
+              not a uniform outline — a dark copy offset behind the white face. */}
+        {[TITLE_SHADOW, null].map((shadow, i) => (
+          <text
+            key={i}
+            x={right ? (titleLeft + titleRight) / 2 : titleRight} y={RECTS.title.y + 42} textAnchor={right ? "middle" : "end"}
+            clipPath={`url(#${uid}t)`} fontFamily={TITLE_FONT} fontSize={titleSize}
+            fill={shadow ? INK : "#fff"} stroke={INK} strokeWidth={shadow ? TITLE_SHADOW.spread : TITLE_EDGE} paintOrder="stroke" style={{ paintOrder: "stroke" }}
+            transform={shadow ? `translate(${shadow.dx} ${shadow.dy})` : undefined}
+            {...(titleSqueeze ? { textLength: titleAvail, lengthAdjust: "spacingAndGlyphs" as const } : {})}
+          >
+            {name}
+          </text>
+        ))}
       </svg>
 
       {/* 4. identifier bubble — straddles the art window and the text box */}

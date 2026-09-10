@@ -196,6 +196,12 @@ was checked by overlaying the template's numbers on printed Roots / RR2 / II / T
   "10/11" — 41 px on the canvas, which matches the printed widths of "11/9" (62 px) and
   "10/11" (75 px). The preview had drawn them at 34 px (28 for five characters) with a
   2.6 px outline, ten pixels lower. Dark digits on light boxes (white, silver) stay, outline gone.
+- **Title shadow (2026-09-10):** printed names are not outlined; they carry a hard shadow
+  offset to the lower right (about 3 canvas px each way, the glyph's own weight) and a
+  hairline dark edge that reads as the ink spread around white type. The preview drew a
+  uniform 2.8 px outline. It now draws the name twice: a dark copy translated (3, 3) with a
+  1 px stroke, then the white face with a 1.2 px edge (`TITLE_SHADOW`, `TITLE_EDGE`), both
+  with the same squeeze and clip. Checked against Michael, Abram, The Goat, I Am Patience at 6x.
 - **Fonts, for the record:** the printed title face is Symphony Black (Agfa/Monotype) and the
   printed stats face is Grail Light (SoftKey/WSI, "redistribution strictly prohibited"); both
   are proprietary and stay out of the repo. Arimo (OFL) is already the body face.
