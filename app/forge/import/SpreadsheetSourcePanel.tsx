@@ -32,7 +32,9 @@ interface ImagesZip {
   oversized: number; // images skipped for exceeding the server's per-file cap
 }
 
-// Mirrors MAX_ART_BYTES in app/forge/lib/art.ts (server-only module — can't import here).
+// Independent of MAX_ART_BYTES in app/forge/lib/art.ts (server-only module — can't import
+// here); that cap moved to 50MB for Forge's own client-upload flow, but this bulk importer
+// keeps its own conservative 15MB gate.
 // Bigger entries would fail server validation after a wasted multi-MB upload, so they
 // are excluded up front and surfaced as a count.
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
