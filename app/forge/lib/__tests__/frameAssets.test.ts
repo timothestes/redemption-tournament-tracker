@@ -6,7 +6,7 @@ import {
   BRIGADE_HEX, BRIGADE_SLUG, SYNTHESIZED_WASHES, washPaths, iconBox, classIcons,
   gradientRows, isPreviewApproximate, specialWash, showsStats,
 } from "../frameAssets";
-import { RECTS, CANVAS, GRADIENT_ROWS, BRIGADE_BOX_HEX } from "../frameGeometry";
+import { RECTS, CANVAS, GRADIENT_ROWS, BRIGADE_BOX_HEX, ICON_RECTS } from "../frameGeometry";
 
 const kit = (p: string) => path.join(__dirname, "../../../../public", p);
 
@@ -128,14 +128,45 @@ describe("iconBox", () => {
     expect(iconBox({ cardType: ["EvilCharacter"], brigades: ["Crimson"] }, "left")!.icon).toBe("/forge/frames/icons/dragon.png");
     expect(iconBox({ cardType: ["EE"], brigades: ["Crimson"] }, "left")!.icon).toBe("/forge/frames/icons/skull.png");
   });
-  it("stats-bearing boxes get the small icon variant where the template has one", () => {
-    expect(iconBox({ cardType: ["EE"], brigades: ["Black"], strength: 3 }, "left")!.icon).toBe("/forge/frames/icons/skull-small.png");
-    expect(iconBox({ cardType: ["Covenant"], brigades: ["Green"], strength: 5, toughness: 2 }, "left")!.icon).toBe("/forge/frames/icons/bible-small.png");
-    expect(iconBox({ cardType: ["Curse"], brigades: ["Black"] }, "left")!.icon).toBe("/forge/frames/icons/skull.png");
+  it("icons sit at the template's slot, dropping to the lower one when stats print", () => {
+    const plain = iconBox({ cardType: ["EE"], brigades: ["Black"] }, "left")!;
+    const stats = iconBox({ cardType: ["EE"], brigades: ["Black"], strength: 3 }, "left")!;
+    expect(plain.icon).toBe("/forge/frames/icons/skull.png");
+    expect(stats.icon).toBe("/forge/frames/icons/skull.png");
+    expect(plain.iconRect).toEqual(ICON_RECTS.skull);
+    expect(stats.iconRect).toEqual(ICON_RECTS.skullStats);
+    expect(stats.iconRect!.y).toBeGreaterThan(plain.iconRect!.y);
+    expect(iconBox({ cardType: ["Covenant"], brigades: ["Green"], strength: 5, toughness: 2 }, "left")!.iconRect).toEqual(ICON_RECTS.bibleStats);
+    expect(iconBox({ cardType: ["Hero"], brigades: ["Blue"] }, "left")!.iconRect).toEqual(ICON_RECTS.cross);
+    expect(iconBox({ cardType: ["Artifact"] }, "left")!.iconRect).toBeNull();
+  });
+  it("every icon slot is inside the left box and keeps its raster's aspect", () => {
+    const box = RECTS.leftBox;
+    for (const [k, r] of Object.entries(ICON_RECTS)) {
+      if (k === "shield" || k === "territory") continue;
+      expect(r.x, k).toBeGreaterThanOrEqual(box.x);
+      expect(r.x + r.w, k).toBeLessThanOrEqual(box.x + box.w);
+      expect(r.y, k).toBeGreaterThanOrEqual(box.y + 10);
+      expect(r.y + r.h, k).toBeLessThanOrEqual(box.y + box.h + 1);
+    }
+    // The stats slots start below the strength/toughness line.
+    expect(ICON_RECTS.skullStats.y).toBeGreaterThan(RECTS.statText.y + RECTS.statText.h);
+    expect(ICON_RECTS.bibleStats.y).toBeGreaterThan(RECTS.statText.y + RECTS.statText.h);
+    expect(ICON_RECTS.cross.y).toBeGreaterThan(RECTS.statText.y + RECTS.statText.h);
+    expect(ICON_RECTS.dragon.y).toBeGreaterThan(RECTS.statText.y - 5);
+    // Class icons hang below the box, off its left edge.
+    expect(ICON_RECTS.shield.y).toBeGreaterThan(box.y + box.h);
+    expect(ICON_RECTS.shield.x).toBeLessThan(RECTS.art.x);
+  });
+  it("badges anchor the way the template crops them", () => {
+    expect(iconBox({ cardType: ["Artifact"] }, "left")!.badgeAlign).toBe("xMidYMax");
+    expect(iconBox({ cardType: ["Curse"] }, "right")!.badgeAlign).toBe("xMidYMax");
+    expect(iconBox({ cardType: ["Hero"], brigades: ["Blue", "Red", "Green"], alignment: "Good" }, "left")!.badgeAlign).toBe("xMidYMin");
+    expect(iconBox({ cardType: ["Dominant"], alignment: "Evil" }, "left")!.badgeAlign).toBe("xMidYMid");
   });
   it("Covenants and Curses: enhancement icon left, artifact chalice right", () => {
     const cov = iconBox({ cardType: ["Covenant"], brigades: ["Green", "Purple"], strength: 5, toughness: 2 }, "left")!;
-    expect(cov.icon).toBe("/forge/frames/icons/bible-small.png");
+    expect(cov.icon).toBe("/forge/frames/icons/bible.png");
     expect(cov.fill).toBe(BRIGADE_HEX.Green);
     expect(cov.fill2).toBe(BRIGADE_HEX.Purple);
     expect(cov.withStats).toBe(true);
@@ -158,11 +189,19 @@ describe("iconBox", () => {
 });
 
 describe("classIcons / gradientRows / approximate", () => {
-  it("stacks warrior/weapon then territory, at most two", () => {
-    expect(classIcons({ class: ["Warrior", "Weapon"], icons: ["Territory"] })).toEqual([
-      "/forge/frames/icons/warrior.png", "/forge/frames/icons/weapon.png",
+  it("stacks the shield(s) then the territory plate down the left edge, at template size", () => {
+    const all = classIcons({ class: ["Warrior", "Weapon"], icons: ["Territory"] });
+    expect(all.map((c) => c.src)).toEqual([
+      "/forge/frames/icons/warrior.png", "/forge/frames/icons/weapon.png", "/forge/frames/icons/territory.png",
     ]);
-    expect(classIcons({ icons: ["Territory"] })).toEqual(["/forge/frames/icons/territory.png"]);
+    expect(all[0].rect).toEqual(ICON_RECTS.shield);
+    expect(all[1].rect.y).toBeGreaterThan(all[0].rect.y + all[0].rect.h);
+    expect(all[2].rect.y).toBeGreaterThan(all[1].rect.y + all[1].rect.h);
+    expect(all[2].rect.w).toBe(ICON_RECTS.territory.w);
+    for (const c of all) { expect(c.rect.x).toBe(ICON_RECTS.shield.x); expect(existsSync(kit(c.src))).toBe(true); }
+    const alone = classIcons({ icons: ["Territory"] });
+    expect(alone).toHaveLength(1);
+    expect(alone[0].rect.y).toBe(ICON_RECTS.territory.y);
     expect(classIcons({})).toEqual([]);
   });
   it("picks the gradient row variant from the verse length", () => {

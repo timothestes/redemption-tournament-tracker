@@ -17,10 +17,15 @@ Lost Souls print without an icon box.
 Both golds share `gold`. `red` and `teal` are **not in the template**: they are hue-shifted from
 `crimson` / `blue`, and the preview flags cards using them as approximate.
 
-## `icons/` — type and class icons (PNG with keyed alpha)
-`cross skull skull-small dragon bible bible-small site fortress star cloud territory weapon
-warrior`. The `-small` variants are the template's stats-height versions. The template stores icons without alpha, so the flat background is keyed
-out at extraction and edges are approximate.
+## `icons/` — type and class icons (PNG with rebuilt alpha)
+`cross skull dragon bible site fortress star cloud territory weapon warrior`. The template
+stores icons without alpha, so it is rebuilt at extraction: only the flat color touching the
+raster's edge is background (flood fill), which keeps dark outlines and interiors — the dragon
+sits on black in the template. `warrior` / `weapon` are one shield with opposite halves lit;
+their union is the silhouette, so each ships whole with its faded half opaque, as printed.
+`territory` is an opaque rounded plate with the print's dark outline. Where each icon sits
+(and the lower slot used when stats print) is `ICON_RECTS` in `frameGeometry.ts`, from the
+template's placement matrices; the cross is scaled to 75% of its slot, the size it prints.
 
 ## `badges/` — box-filling composites (WebP)
 `artifact` (chalice), `lamb` / `reaper` (Good / Evil Dominant), `good-dom` / `evil-dom` (the

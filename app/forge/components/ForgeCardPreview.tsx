@@ -43,20 +43,24 @@ function statText(s: StatValue | undefined, t: StatValue | undefined): string {
   return `${f(s)}/${f(t)}`;
 }
 
-// Icon box: a tab tucked into the frame corner with an inner rounded corner. Fill is the
-// brigade color (split into a top/bottom band for two brigades) or a badge; stats sit in
-// the top band with the type icon below them. The frame's border clip trims the outer edges.
+// Icon box: a rounded tab in the frame corner, drawn over the border the way printed boxes
+// are (they overhang it by a hair). The outer corner follows the card corner; the other
+// three are tighter. Fill is the brigade color (split into a top/bottom band for two
+// brigades) or a badge; stats sit in the top band, the type icon at the template's slot.
+const BOX_R = 22, BOX_OUTER_R = 42;
+function tabPath({ x, y, w, h }: Rect, side: "left" | "right"): string {
+  const [tl, tr] = side === "left" ? [BOX_OUTER_R, BOX_R] : [BOX_R, BOX_OUTER_R];
+  const r = BOX_R;
+  return `M${x + tl} ${y}H${x + w - tr}A${tr} ${tr} 0 0 1 ${x + w} ${y + tr}V${y + h - r}A${r} ${r} 0 0 1 ${x + w - r} ${y + h}`
+    + `H${x + r}A${r} ${r} 0 0 1 ${x} ${y + h - r}V${y + tl}A${tl} ${tl} 0 0 1 ${x + tl} ${y}Z`;
+}
+
 function IconBoxG({ id, box, rect, side, stat }: {
   id: string; box: IconBox; rect: Rect; side: "left" | "right"; stat: string | null;
 }) {
   const { x, y, w, h } = rect;
-  const r = 28;
-  const d = side === "left"
-    ? `M${x} ${y}H${x + w}V${y + h - r}A${r} ${r} 0 0 1 ${x + w - r} ${y + h}H${x}Z`
-    : `M${x} ${y}H${x + w}V${y + h}H${x + r}A${r} ${r} 0 0 1 ${x} ${y + h - r}Z`;
-  const inset = 16;
+  const d = tabPath(rect, side);
   const split = y + h * 0.45;
-  const iconTop = stat ? split + 4 : y + inset;
   const statSize = stat && stat.length > 7 ? 23 : stat && stat.length > 4 ? 28 : 34;
   return (
     <g>
@@ -64,12 +68,12 @@ function IconBoxG({ id, box, rect, side, stat }: {
       <path d={d} fill={box.fill} />
       {box.fill2 && <rect x={x} y={split} width={w} height={y + h - split} fill={box.fill2} clipPath={`url(#${id})`} />}
       {box.badge && (
-        <image href={box.badge} x={x} y={y} width={w} height={h} preserveAspectRatio="xMidYMid slice" clipPath={`url(#${id})`} />
+        <image href={box.badge} x={x} y={y} width={w} height={h} preserveAspectRatio={`${box.badgeAlign} slice`} clipPath={`url(#${id})`} />
+      )}
+      {box.icon && box.iconRect && (
+        <image href={box.icon} x={box.iconRect.x} y={box.iconRect.y} width={box.iconRect.w} height={box.iconRect.h} preserveAspectRatio="xMidYMid meet" />
       )}
       <path d={d} fill="none" stroke={INK} strokeWidth={4} />
-      {box.icon && (
-        <image href={box.icon} x={x + inset} y={iconTop} width={w - inset * 2} height={y + h - inset + 2 - iconTop} preserveAspectRatio="xMidYMid meet" />
-      )}
       {stat && (
         <text
           x={x + w / 2 + (side === "left" ? 4 : -4)} y={y + 43} textAnchor="middle"
@@ -146,10 +150,10 @@ export default function ForgeCardPreview({
         )}
       </div>
 
-      {/* 3. chrome: text box, window outline, icon boxes, class icons, frame border, title */}
+      {/* 3. chrome: text box, window outline, frame border, then the icon boxes and class
+            icons over it (as printed), and the title */}
       <svg viewBox={`0 0 ${CW} ${CH}`} aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}>
         <defs>
-          <clipPath id={`${uid}b`}><rect x={B.x} y={B.y} width={B.w} height={B.h} rx={B.r} /></clipPath>
           <linearGradient id={`${uid}g`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#fff" stopOpacity="0.8" />
             <stop offset={light / 100} stopColor="#fff" stopOpacity="0.8" />
@@ -159,14 +163,12 @@ export default function ForgeCardPreview({
         </defs>
         <rect x={T.x} y={T.y} width={T.w} height={T.h} rx={T.r} fill={`url(#${uid}g)`} stroke={INK} strokeWidth={2.5} />
         <rect x={A.x} y={A.y} width={A.w} height={A.h} rx={A.r} fill="none" stroke={INK} strokeWidth={4} />
-        <g clipPath={`url(#${uid}b)`}>
-          {left && <IconBoxG id={`${uid}l`} box={left} rect={RECTS.leftBox} side="left" stat={stat} />}
-          {right && <IconBoxG id={`${uid}r`} box={right} rect={RECTS.rightBox} side="right" stat={null} />}
-          {classes.map((src, i) => (
-            <image key={src} href={src} x={RECTS.classIcons.x + 8} y={RECTS.classIcons.y + 4 + i * 66} width={100} height={62} preserveAspectRatio="xMidYMid meet" />
-          ))}
-        </g>
         <rect x={B.x} y={B.y} width={B.w} height={B.h} rx={B.r} fill="none" stroke={INK} strokeWidth={BORDER_STROKE} />
+        {left && <IconBoxG id={`${uid}l`} box={left} rect={RECTS.leftBox} side="left" stat={stat} />}
+        {right && <IconBoxG id={`${uid}r`} box={right} rect={RECTS.rightBox} side="right" stat={null} />}
+        {classes.map((c) => (
+          <image key={c.src} href={c.src} x={c.rect.x} y={c.rect.y} width={c.rect.w} height={c.rect.h} preserveAspectRatio="xMidYMid meet" />
+        ))}
         <clipPath id={`${uid}t`}><rect x={titleLeft} y={RECTS.title.y - 12} width={titleAvail} height={RECTS.title.h + 24} /></clipPath>
         <text
           x={right ? (titleLeft + titleRight) / 2 : titleRight} y={RECTS.title.y + 42} textAnchor={right ? "middle" : "end"}
