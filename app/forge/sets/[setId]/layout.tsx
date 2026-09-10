@@ -1,10 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { requireForge } from "@/app/forge/lib/auth";
-import { getSet } from "@/app/forge/lib/sets";
+import { getSet, canDesignSet } from "@/app/forge/lib/sets";
 import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
 import PrivateBadge from "@/app/forge/components/PrivateBadge";
 import SetTabs from "./SetTabs";
 import SetRealtime from "./SetRealtime";
+import SetNameHeader from "./SetNameHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export default async function SetLayout({ children, params }: { children: React.
   if (!ctx) notFound();
   if (ctx.role === "playtester") redirect("/forge/play");
   const { setId } = await params;
-  const set = await getSet(setId);
+  const [set, canRename] = await Promise.all([getSet(setId), canDesignSet(setId)]);
   if (!set) notFound(); // RLS hides sets the caller can't see → 404
   return (
     <div className="mx-auto max-w-6xl p-4">
@@ -24,7 +25,7 @@ export default async function SetLayout({ children, params }: { children: React.
           { label: set.name },
         ]} />
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">{set.name}</h1>
+          <SetNameHeader setId={setId} name={set.name} canRename={canRename} />
           {set.isPrivate && <PrivateBadge />}
           {set.status === "released" && (
             <span className="rounded-full border border-emerald-600/40 bg-emerald-600/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">

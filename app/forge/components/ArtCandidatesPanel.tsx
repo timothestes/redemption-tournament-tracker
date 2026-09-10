@@ -52,7 +52,7 @@ export default function ArtCandidatesPanel({
 
   return (
     <div>
-      <FilePicker label="Add images…" accept="image/jpeg,image/png,image/webp" multiple
+      <FilePicker label="Add images…" accept="image/jpeg,image/png,image/webp,.tif,.tiff,image/tiff" multiple
         disabled={progress !== null} onFiles={onFiles}
         hint={progress
           ? `Uploading ${progress.done + 1} of ${progress.total} — ${progress.name}`

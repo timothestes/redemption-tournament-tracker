@@ -140,7 +140,7 @@ export default function FullModeForm({
       {/* Art control (reuses 1a.3) */}
       <fieldset className="rounded-md border p-3">
         <legend className="px-1 font-medium">Art</legend>
-        <input type="file" accept="image/jpeg,image/png,image/webp"
+        <input type="file" accept="image/jpeg,image/png,image/webp,.tif,.tiff,image/tiff"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }}
           className="block w-full text-xs" />
         <label className="mt-3 flex items-start gap-2">

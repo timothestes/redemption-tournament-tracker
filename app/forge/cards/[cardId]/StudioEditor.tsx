@@ -244,7 +244,7 @@ export default function StudioEditor({
               Finished card (full composed image)
               {uploading === "finished" && <span className="ml-2 text-xs text-muted-foreground">Uploading…</span>}
             </legend>
-            <FilePicker label="Choose image…" accept="image/jpeg,image/png,image/webp" disabled={uploading !== null}
+            <FilePicker label="Choose image…" accept="image/jpeg,image/png,image/webp,.tif,.tiff,image/tiff" disabled={uploading !== null}
               onFile={(f) => {
                 // Replacing an existing finished image without touching any field this session
                 // usually means the printed ability text changed — confirm before overwriting.

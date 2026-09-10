@@ -202,6 +202,40 @@ describe("detectColumns", () => {
     const { mapping } = detectColumns(["Name", "name:"]);
     expect(mapping.name).toBe(0);
   });
+
+  it("maps Align and Brigade Color aliases", () => {
+    const { mapping, ignored } = detectColumns(["Name", "Align", "Brigade Color"]);
+    expect(mapping.alignment).toBe(1);
+    expect(mapping.brigade).toBe(2);
+    expect(ignored).toEqual([]);
+  });
+
+  it("maps common alignment header spellings", () => {
+    expect(detectColumns(["Name", "Side"]).mapping.alignment).toBe(1);
+    expect(detectColumns(["Name", "Good/Evil"]).mapping.alignment).toBe(1);
+    expect(detectColumns(["Name", "Alignment (Good/Evil)"]).mapping.alignment).toBe(1);
+    expect(detectColumns(["Name", "Good Evil"]).mapping.alignment).toBe(1);
+  });
+
+  it("maps common brigade/color header spellings", () => {
+    expect(detectColumns(["Name", "Colors"]).mapping.brigade).toBe(1);
+    expect(detectColumns(["Name", "Color"]).mapping.brigade).toBe(1);
+    expect(detectColumns(["Name", "Brigade Colour"]).mapping.brigade).toBe(1);
+  });
+
+  it("falls back to a contains match for creatively-worded headers", () => {
+    const { mapping, ignored } = detectColumns(["Name", "Card Alignment", "Brigade(s) / Color"]);
+    expect(mapping.alignment).toBe(1);
+    expect(mapping.brigade).toBe(2);
+    expect(ignored).toEqual([]);
+  });
+
+  it("reports a second column for the same field as a duplicate, not ignored", () => {
+    const { mapping, duplicates, ignored } = detectColumns(["Name", "Alignment", "Align"]);
+    expect(mapping.alignment).toBe(1);
+    expect(duplicates).toEqual([{ field: "alignment", index: 2 }]);
+    expect(ignored).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -265,37 +299,38 @@ describe("tableToCards", () => {
   });
 
   it("cleans dash placeholders and float-formatted stats", () => {
-    const header = ["Name", "Type", "Brigade", "Strength", "Toughness"];
+    const header = ["Name", "Type", "Brigade", "Strength", "Toughness", "Alignment"];
     const { mapping } = detectColumns(header);
     const { cards } = tableToCards(
-      [header, ["Hero Guy", "Hero", "Blue", "9.0", "7"]], mapping,
+      [header, ["Hero Guy", "Hero", "Blue", "9.0", "7", "Good"]], mapping,
     );
     expect(cards[0].snapshot.strength).toBe(9);
     expect(cards[0].snapshot.toughness).toBe(7);
-    const dashes = tableToCards([header, ["Art Guy", "Artifact", "—", "-", "-"]], mapping);
+    const dashes = tableToCards([header, ["Art Guy", "Artifact", "—", "-", "-", "Good"]], mapping);
     expect(dashes.cards[0].snapshot.brigades).toBeUndefined();
     expect(dashes.cards[0].snapshot.strength).toBeUndefined();
     expect(dashes.cards[0].warnings).toEqual([]);
   });
 
   it('maps "Dual-Alignment Enhancement" to GE + EE with no warning', () => {
-    const header = ["Name", "Type", "Alignment"];
+    const header = ["Name", "Type", "Brigade", "Alignment"];
     const { mapping } = detectColumns(header);
     const { cards } = tableToCards(
-      [header, ["Philosophy [RR2]", "Dual-Alignment Enhancement", "Good/Evil"]], mapping,
+      [header, ["Philosophy [RR2]", "Dual-Alignment Enhancement", "Purple/Crimson", "Good/Evil"]], mapping,
     );
     expect(cards[0].warnings).toEqual([]);
     expect(cards[0].snapshot.cardType).toEqual(["GE", "EE"]);
     expect(cards[0].snapshot.alignment).toBe("Good_Evil");
+    expect(cards[0].snapshot.brigades).toEqual(["Purple", "Crimson"]);
   });
 
   it('accepts paired dual-side stats like "6 (0)", normalized to "N (M)"', () => {
-    const header = ["Name", "Type", "Strength", "Toughness"];
+    const header = ["Name", "Type", "Brigade", "Strength", "Toughness"];
     const { mapping } = detectColumns(header);
     const { cards } = tableToCards([
       header,
-      ["Spiritual Warfare [RR2]", "Dual-Alignment Enhancement", "6 (0)", "0 (6)"],
-      ["Philosophy [RR2]", "Dual-Alignment Enhancement", "3(2)", "2(3)"],
+      ["Spiritual Warfare [RR2]", "Dual-Alignment Enhancement", "Purple", "6 (0)", "0 (6)"],
+      ["Philosophy [RR2]", "Dual-Alignment Enhancement", "Purple", "3(2)", "2(3)"],
     ], mapping);
     expect(cards[0].warnings).toEqual([]);
     expect(cards[0].snapshot.strength).toBe("6 (0)");
@@ -306,10 +341,10 @@ describe("tableToCards", () => {
   });
 
   it('accepts "X" as a valid variable strength/toughness (The Faithful Followers)', () => {
-    const header = ["Name", "Type", "Strength", "Toughness"];
+    const header = ["Name", "Type", "Brigade", "Strength", "Toughness"];
     const { mapping } = detectColumns(header);
     const { cards } = tableToCards(
-      [header, ["The Faithful Followers", "Hero", "X", "x"]], mapping,
+      [header, ["The Faithful Followers", "Hero", "Green", "X", "x"]], mapping,
     );
     expect(cards[0].warnings).toEqual([]);
     expect(cards[0].snapshot.strength).toBe("X");
@@ -357,6 +392,101 @@ describe("tableToCards", () => {
     const { cards } = tableToCards([header, ["A"], ["B"]], mapping);
     expect(cards.map((c) => c.rowIndex)).toEqual([2, 3]);
   });
+
+  it("derives alignment from card type when there is no Alignment column", () => {
+    const header = ["Name", "Type", "Brigade"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards([
+      header,
+      ["H1", "Hero", "Blue"],
+      ["H2", "GE", "Purple"],
+      ["H3", "Evil Character", "Black"],
+      ["H4", "EE", "Gray"],
+    ], mapping);
+    expect(cards.map((c) => c.snapshot.alignment)).toEqual(["Good", "Good", "Evil", "Evil"]);
+    expect(cards.every((c) => c.warnings.length === 0)).toBe(true);
+  });
+
+  it("leaves alignment unset and warns when the card type doesn't imply one", () => {
+    const header = ["Name", "Type", "Brigade"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards([header, ["Relic", "Artifact", "-"]], mapping);
+    expect(cards[0].snapshot.alignment).toBeUndefined();
+    expect(cards[0].warnings.join(" | ")).toMatch(/no alignment/);
+  });
+
+  it('resolves a bare "Gold" brigade from an explicit Alignment column', () => {
+    const header = ["Name", "Type", "Brigade", "Alignment"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards([
+      header,
+      ["Aaron", "Hero", "Gold", "Good"],
+      ["Pharaoh", "Evil Character", "Gold", "Evil"],
+    ], mapping);
+    expect(cards[0].snapshot.brigades).toEqual(["GoodGold"]);
+    expect(cards[0].warnings).toEqual([]);
+    expect(cards[1].snapshot.brigades).toEqual(["EvilGold"]);
+    expect(cards[1].warnings).toEqual([]);
+  });
+
+  it('resolves a bare "Gold" brigade from the derived card-type alignment', () => {
+    const header = ["Name", "Type", "Brigade"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards([header, ["Aaron", "Hero", "Gold"]], mapping);
+    expect(cards[0].snapshot.brigades).toEqual(["GoodGold"]);
+    expect(cards[0].warnings).toEqual([]);
+  });
+
+  it('warns on a "Gold" brigade with no alignment to resolve it', () => {
+    const header = ["Name", "Type", "Brigade"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards([header, ["Chorazin", "Site", "Gold"]], mapping);
+    expect(cards[0].snapshot.brigades).toBeUndefined();
+    expect(cards[0].warnings.join(" | ")).toMatch(/ambiguous brigade "Gold"/);
+  });
+
+  it("recognizes alignment-only header spellings for Good/Evil dual cards", () => {
+    const header = ["Name", "Type", "Alignment"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards([
+      header,
+      ["A", "Dominant", "G/E"],
+      ["B", "Dominant", "dual"],
+      ["C", "Dominant", "Good & Evil"],
+      ["D", "Dominant", "good-evil"],
+    ], mapping);
+    expect(cards.map((c) => c.snapshot.alignment)).toEqual(["Good_Evil", "Good_Evil", "Good_Evil", "Good_Evil"]);
+    expect(cards.every((c) => c.warnings.length === 0)).toBe(true);
+  });
+
+  it("splits a brigade cell on commas and ampersands as well as slashes", () => {
+    const header = ["Name", "Type", "Brigade", "Alignment"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards(
+      [header, ["Multi Guy", "Hero", "Purple, Crimson & Gray", "Good"]], mapping,
+    );
+    expect(cards[0].snapshot.brigades).toEqual(["Purple", "Crimson", "Gray"]);
+    expect(cards[0].warnings).toEqual([]);
+  });
+
+  it('warns instead of mapping "Multi" as a brigade', () => {
+    const header = ["Name", "Type", "Brigade", "Alignment"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards(
+      [header, ["Legion", "Evil Character", "Multi", "Evil"]], mapping,
+    );
+    expect(cards[0].snapshot.brigades).toBeUndefined();
+    expect(cards[0].warnings.join(" | ")).toMatch(/Multi/);
+  });
+
+  it("warns when a brigade-required type has no Brigade column", () => {
+    const header = ["Name", "Type", "Alignment"];
+    const { mapping } = detectColumns(header);
+    const { cards } = tableToCards(
+      [header, ["Nameless Hero", "Hero", "Good"]], mapping,
+    );
+    expect(cards[0].warnings.join(" | ")).toMatch(/no brigade/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -399,6 +529,26 @@ describe("auditLackeyRow", () => {
     expect(auditLackeyRow({ ...base, strength: "6 (0)", toughness: "X (6)" })).toEqual([]);
     expect(auditLackeyRow({ ...base, strength: "6 (a)" })).toHaveLength(1);
   });
+
+  it("warns when a brigade-required type's Brigade cell is empty or a dash", () => {
+    const warnings = auditLackeyRow({ ...base, type: "Hero", brigade: "-", alignment: "Good" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/no brigade/);
+  });
+
+  it("doesn't warn about a missing brigade for a type that doesn't require one", () => {
+    expect(auditLackeyRow({ ...base, type: "Dominant", brigade: "-", alignment: "Good" })).toEqual([]);
+  });
+
+  it("warns when a type's alignment can't be derived and none was given", () => {
+    const warnings = auditLackeyRow({ ...base, type: "Artifact" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/no alignment/);
+  });
+
+  it("is silent when brigade and derivable alignment are both present", () => {
+    expect(auditLackeyRow({ ...base, type: "Hero", brigade: "Blue" })).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -412,6 +562,8 @@ describe("findLooseImageEntry", () => {
     "nested/dir/226-Spreading-Mildew.JPG",
     "._227-Altar-of-Ahaz.png",
     "227-Altar-of-Ahaz.webp",
+    "228-End-of-Times.tif",
+    "229-Roots-Two.TIFF",
     "not-an-image.txt",
   ];
 
@@ -427,6 +579,11 @@ describe("findLooseImageEntry", () => {
 
   it("tolerates the column already including an extension", () => {
     expect(findLooseImageEntry("225-Kings-Sword.png", entries)).toBe("225-Kings-Sword.png");
+  });
+
+  it("matches TIFF entries (.tif and .tiff, case-insensitively)", () => {
+    expect(findLooseImageEntry("228-End-of-Times", entries)).toBe("228-End-of-Times.tif");
+    expect(findLooseImageEntry("229-Roots-Two", entries)).toBe("229-Roots-Two.TIFF");
   });
 
   it("never matches __MACOSX or AppleDouble entries, and returns null when absent", () => {

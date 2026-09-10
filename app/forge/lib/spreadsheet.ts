@@ -190,6 +190,9 @@ const HEADER_ALIASES: Record<string, MappableField> = {
   book: "book", chapter: "chapter", verse: "verse",
   alignment: "alignment", legality: "legality",
   artist: "artist", artistcredit: "artist",
+  brigadecolor: "brigade", brigadecolour: "brigade",
+  color: "brigade", colors: "brigade", colour: "brigade", colours: "brigade",
+  align: "alignment", side: "alignment", goodevil: "alignment", alignmentgoodevil: "alignment",
 };
 
 // Columns we recognize but deliberately don't import — not surprises worth flagging.
@@ -199,21 +202,35 @@ function normalizeHeader(h: string): string {
   return h.trim().toLowerCase().replace(/[^a-z0-9#]/g, "");
 }
 
+// Last resort before a header is called unrecognized: the two fields sheets spell most
+// creatively (#386).
+function fuzzyField(norm: string): MappableField | undefined {
+  if (norm.includes("brigade")) return "brigade";
+  if (norm.includes("align")) return "alignment";
+  return undefined;
+}
+
 /** Auto-detect which spreadsheet column feeds which card field. Both real-world
  *  conventions are handled: Lackey-style headers with trailing colons and a combined
  *  Reference, or split Book/Chapter/Verse plus Artist. `ignored` lists the indexes
- *  of non-empty headers we didn't recognize, for the wizard to surface. Pure. */
-export function detectColumns(header: string[]): { mapping: ColumnMapping; ignored: number[] } {
+ *  of non-empty headers we didn't recognize; `duplicates` lists a field's SECOND
+ *  matching column (the first one wins the mapping), for the wizard to surface. Pure. */
+export function detectColumns(header: string[]): {
+  mapping: ColumnMapping; ignored: number[]; duplicates: { field: MappableField; index: number }[];
+} {
   const mapping: ColumnMapping = {};
   const ignored: number[] = [];
+  const duplicates: { field: MappableField; index: number }[] = [];
   header.forEach((h, i) => {
     if (!h.trim()) return;
     const norm = normalizeHeader(h);
-    const field = HEADER_ALIASES[norm];
-    if (field !== undefined && mapping[field] === undefined) mapping[field] = i;
-    else if (!KNOWN_UNUSED.has(norm)) ignored.push(i);
+    if (KNOWN_UNUSED.has(norm)) return;
+    const field = HEADER_ALIASES[norm] ?? fuzzyField(norm);
+    if (field === undefined) { ignored.push(i); return; }
+    if (mapping[field] === undefined) mapping[field] = i;
+    else duplicates.push({ field, index: i }); // second column of a field: dropped, but said out loud
   });
-  return { mapping, ignored };
+  return { mapping, ignored, duplicates };
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +314,7 @@ export function tableToCards(rows: string[][], mapping: ColumnMapping): {
 // Images zip matching
 // ---------------------------------------------------------------------------
 
-const IMAGE_EXT_RE = /\.(jpe?g|png|webp)$/i;
+const IMAGE_EXT_RE = /\.(jpe?g|png|webp|tiff?)$/i;
 
 /** True for zip entries that are usable card images — not directories, macOS junk
  *  (__MACOSX/ trees, "._" AppleDouble files), or non-image files. Pure. */

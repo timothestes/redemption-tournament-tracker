@@ -19,6 +19,36 @@ describe("validateArtFile", () => {
   it("rejects a file over the size cap", () => {
     expect(validateArtFile({ type: "image/png", size: MAX_ART_BYTES + 1 })).toMatch(/too large/i);
   });
+
+  it("accepts a .tif with a proper image/tiff MIME type", () => {
+    expect(validateArtFile({ type: "image/tiff", size: 1024, name: "scan.tif" })).toBeNull();
+  });
+
+  it("accepts a .tiff with an empty MIME type (common browser behavior)", () => {
+    expect(validateArtFile({ type: "", size: 1024, name: "scan.tiff" })).toBeNull();
+  });
+
+  it("accepts a .tif with a generic application/octet-stream MIME type", () => {
+    expect(validateArtFile({ type: "application/octet-stream", size: 1024, name: "scan.tif" })).toBeNull();
+  });
+
+  it("still rejects a .png with an empty MIME type (extension fallback is TIFF-only)", () => {
+    expect(validateArtFile({ type: "", size: 1024, name: "scan.png" })).toMatch(/Invalid file type/);
+  });
+
+  it("still rejects a non-image file with a .tif-like name but no name field at all", () => {
+    expect(validateArtFile({ type: "application/octet-stream", size: 1024 })).toMatch(/Invalid file type/);
+  });
+
+  it("rejects a JPEG unchanged", () => {
+    expect(validateArtFile({ type: "image/jpeg", size: 1024 })).toBeNull();
+  });
+
+  it("enforces the same 15MB cap for TIFF, with a TIFF-specific message", () => {
+    const msg = validateArtFile({ type: "image/tiff", size: MAX_ART_BYTES + 1, name: "scan.tif" });
+    expect(msg).toMatch(/tiff/i);
+    expect(msg).toMatch(/15\s*MB/i);
+  });
 });
 
 const file = new File([new Uint8Array([1, 2, 3])], "art.png", { type: "image/png" });
