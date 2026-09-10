@@ -25,16 +25,27 @@ const forgeAuth: { token: string } | { storeId: string } =
 
 const ART_PREFIX = "forge-art/";
 const FINISHED_PREFIX = "forge-finished/";
-export const ALLOWED_ART_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export const ALLOWED_ART_TYPES = ["image/jpeg", "image/png", "image/webp", "image/tiff", "image/tif"] as const;
 export const MAX_ART_BYTES = 15 * 1024 * 1024; // 15MB
 
+const TIFF_NAME_RE = /\.tiff?$/i;
+// Browsers frequently report an empty (or generic) MIME type for .tif/.tiff files
+// rather than "image/tiff" — fall back to the extension ONLY for those generic types,
+// and ONLY for TIFF; jpeg/png/webp still require a correct MIME type.
+const GENERIC_MIME_TYPES = new Set(["", "application/octet-stream"]);
+
+function isTiffByExtension(file: { type: string; name?: string }): boolean {
+  return !!file.name && GENERIC_MIME_TYPES.has(file.type) && TIFF_NAME_RE.test(file.name);
+}
+
 /** Returns an error string if the file is unacceptable, or null if valid. Pure. */
-export function validateArtFile(file: { type: string; size: number }): string | null {
-  if (!ALLOWED_ART_TYPES.includes(file.type as (typeof ALLOWED_ART_TYPES)[number])) {
-    return "Invalid file type. Accepted: JPEG, PNG, WebP.";
+export function validateArtFile(file: { type: string; size: number; name?: string }): string | null {
+  const isTiff = file.type === "image/tiff" || file.type === "image/tif" || isTiffByExtension(file);
+  if (!isTiff && !ALLOWED_ART_TYPES.includes(file.type as (typeof ALLOWED_ART_TYPES)[number])) {
+    return "Invalid file type. Accepted: JPEG, PNG, WebP, TIFF.";
   }
   if (file.size > MAX_ART_BYTES) {
-    return "File too large. Maximum 15MB.";
+    return isTiff ? "TIFF file too large. Export at 15MB or smaller." : "File too large. Maximum 15MB.";
   }
   return null;
 }

@@ -28,6 +28,7 @@ export function mimeFor(entryName: string): string {
   const lower = entryName.toLowerCase();
   if (lower.endsWith(".png")) return "image/png";
   if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".tif") || lower.endsWith(".tiff")) return "image/tiff";
   return "image/jpeg";
 }
 

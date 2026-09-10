@@ -80,7 +80,7 @@ export default function SpreadsheetSourcePanel({
       });
       const imageCount = names.filter(isImageEntry).length;
       if (imageCount === 0) {
-        setZipError("No images (.jpg/.png/.webp) found in this zip.");
+        setZipError("No images (.jpg/.png/.webp/.tif/.tiff) found in this zip.");
         zipBytes.current = null;
         setZip(null);
         return;
