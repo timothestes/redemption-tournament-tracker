@@ -7,7 +7,34 @@
         "identifier": "Angel"
       },
       "note": "Not a prophet"
+    },
+    {
+      "name": "Jeremiah, the Weeper [T2C AB]",
+      "set": "T2C (AB)",
+      "fields": {
+        "specialAbility": "Paralyze Evil Characters with strength 5 or less this turn. While alone, reveal Reserve: May use green Enhancements from Reserve."
+      },
+      "note": "Eratta"
+    },
+    {
+      "name": "Jeremiah, the Weeper",
+      "set": "T2C",
+      "fields": {
+        "specialAbility": "Paralyze Evil Characters with strength 5 or less this turn. While alone, reveal Reserve: May use green Enhancements from Reserve."
+      },
+      "note": "Errata"
+    },
+    {
+      "name": "The Roman Jailer",
+      "set": "TEC",
+      "fields": {
+        "brigade": "Gray and Clay/Red"
+      },
+      "note": "Adding good brigades to match POC nebbie"
     }
   ],
-  "imageVersions": {}
+  "imageVersions": {
+    "036-Jeremiah-the-Weeper-R": 2,
+    "036-Jeremiah-the-Weeper-R-AB": 1
+  }
 }
