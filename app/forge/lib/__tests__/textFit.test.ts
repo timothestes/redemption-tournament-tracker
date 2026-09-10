@@ -99,8 +99,10 @@ describe("textFit", () => {
     expect(f.abilityLines).toBe(3);
     expect(f.verseLines).toHaveLength(4);
     expect(f.over).toBe(0);
-    expect(f.gradient.light).toBeCloseTo(f.verseTop - TEXT_METRICS.gradient.above, 5);
-    expect(f.gradient.dark).toBeCloseTo(f.gradient.light + TEXT_METRICS.gradient.span, 5);
+    // fully dark just above the first verse line, the transition in the span above that
+    expect(f.gradient.dark).toBeCloseTo(f.verseTop - TEXT_METRICS.gradient.above, 5);
+    expect(f.gradient.light).toBeCloseTo(f.gradient.dark - TEXT_METRICS.gradient.span, 5);
+    expect(f.gradient.dark).toBeLessThan(f.verseTop);
     expect(f.abilityBottom).toBeCloseTo(A.top + 3 * A.pitch, 5);
     expect(f.verseTop).toBeCloseTo(V.bottom - 4 * V.pitch, 5);
   });
@@ -111,6 +113,16 @@ describe("textFit", () => {
     expect(f.over).toBe(1);
     expect(textFit({ ...goat, rawText: long, scripture: "So she said, “The glory has departed from Israel, because the ark of God has been taken.”" }).over).toBe(0);
   });
+  it("the tightest printed card (I Am Patience: 4 ability lines in 2 paragraphs, 3 verse lines) still fits", () => {
+    const f = textFit({
+      rawText: "GE: Negate and shuffle an opponent's card. / A: You may convert an evil human. If you do, skip your next battle phase.",
+      scripture: "The Lord is not slow about His promise, as some count slowness, but is patient toward you, not willing for any to perish, but for all to come to repentance.",
+    });
+    expect(f.abilityLines).toBe(4);
+    expect(f.verseLines).toHaveLength(3);
+    expect(f.over).toBe(0);
+    expect(f.abilityBottom + TEXT_METRICS.minGap).toBeLessThanOrEqual(f.verseTop);
+  });
   it("dual-type halves are separate paragraphs and the gap counts", () => {
     const f = textFit({ rawText: "GE: Negate and shuffle an opponent's card. / A: You may convert an evil human. If you do, skip your next battle phase." });
     expect(f.paragraphs).toHaveLength(2);
@@ -120,7 +132,7 @@ describe("textFit", () => {
     const f = textFit({ rawText: "Draw 1." });
     expect(f.verseLines).toEqual([]);
     expect(f.verseTop).toBe(V.bottom);
-    expect(f.gradient.light).toBeCloseTo(V.bottom - TEXT_METRICS.gradient.above, 5);
+    expect(f.gradient.dark).toBeCloseTo(V.bottom - TEXT_METRICS.gradient.above, 5);
     expect(f.over).toBe(0);
     expect(textFit({}).abilityLines).toBe(0);
   });

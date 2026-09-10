@@ -235,7 +235,7 @@ canvas px relative to the top of `RECTS.textBox` (y 668, h 284, inset 570 wide):
 | Dual-type ability | each half its own paragraph (with a type icon) | paragraphs split at `/ A:`-style prefixes, 10 px gap; icons are still a follow-up |
 | Verse | Helvetica/Arimo Italic, justified, 23 px pitch, stacked upward from the reference | same: `TEXT_METRICS.verse` = 22.9 px / 23 px pitch, last line box ends at 257.5 |
 | Reference | bold, right-aligned, cap tops 256 px below the box top | same: 19 px, line box at 253.5 |
-| Gradient | light wash until ~12 px above the first verse line, fully dark ~37 px later; moves with the verse | `gradient.light = verseTop - 12`, `dark = light + 37` (the template's four fixed variants are no longer used) |
+| Gradient | Roots / IR ran the transition across the first verse row; Roots 2 onward are fully dark by the first verse line with the transition in the ~28 px above it; moves with the verse | `gradient.dark = verseTop - 2`, `light = dark - 28` (the template's four fixed variants are no longer used) |
 
 **Sizes come from line breaks, not cap heights.** Each printed break bounds the measure in
 ems from both sides (the line fits, the next word does not). For the bold ability the
@@ -249,7 +249,8 @@ Italic from `public/forge/fonts` into the generated `app/forge/lib/fontMetrics.t
 `app/forge/lib/textFit.ts` wraps text greedily the way the browser does (spaces, and after
 hyphens inside words; explicit newlines respected; runs of spaces collapse) and returns the
 wrapped ability paragraphs, the verse lines, the block edges, the gradient stops and `over`,
-the number of ability lines that collide with the verse (line boxes touching = fits). It is
+the number of ability lines that collide with the verse (`minGap` 18 px of room above the
+verse's first line box; the tightest printed card leaves 22). It is
 pure, so a set-wide pass can call it server-side. The renderer draws the ability with the
 lines `textFit` produced (`white-space: pre`, `font-kerning: none`) so the picture and the
 verdict cannot disagree; the verse flows naturally (justified) and is bottom-anchored on the
