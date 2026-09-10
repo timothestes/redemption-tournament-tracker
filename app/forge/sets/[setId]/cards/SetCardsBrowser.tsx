@@ -48,8 +48,9 @@ export default function SetCardsBrowser({ cards, setId, canCreate, commentCounts
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Default order: by card type alphabetically, then brigade, then title. Shared
-  // with the single-card detail view's prev/next arrows via sortSetCards.
+  // Default order: the design team's print order (compareCardsDefault — sections,
+  // multi-first brigade groups, strength). Shared with the single-card detail
+  // view's prev/next arrows via sortSetCards.
   const sorted = useMemo(() => sortSetCards(cards), [cards]);
 
   const filtered = useMemo(() => sorted.filter((c) => {
