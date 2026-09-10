@@ -94,6 +94,7 @@ export async function saveSetTargets(setId: string, targets: TargetCounts): Prom
   const { data, error } = await ctx.supabase.rpc("forge_save_set_targets", { p_set_id: setId, p_targets: targets });
   if (error) return { ok: false, error: "Could not save targets" };
   revalidatePath(`/forge/sets/${setId}/progress`);
+  revalidatePath(`/forge/sets/${setId}/settings`);
   return { ok: true, updatedAt: typeof data === "string" ? data : undefined };
 }
 
@@ -102,7 +103,7 @@ export async function addSetElder(setId: string, userId: string): Promise<Result
   if (!ctx) return { ok: false, error: "Not authorized" };
   const { error } = await ctx.supabase.rpc("forge_add_set_elder", { p_set_id: setId, p_user_id: userId });
   if (error) return { ok: false, error: "Could not add designer" };
-  revalidatePath(`/forge/sets/${setId}/progress`);
+  revalidatePath(`/forge/sets/${setId}/settings`);
   return { ok: true };
 }
 
@@ -111,7 +112,7 @@ export async function removeSetElder(setId: string, userId: string): Promise<Res
   if (!ctx) return { ok: false, error: "Not authorized" };
   const { error } = await ctx.supabase.rpc("forge_remove_set_elder", { p_set_id: setId, p_user_id: userId });
   if (error) return { ok: false, error: "Could not remove designer" };
-  revalidatePath(`/forge/sets/${setId}/progress`);
+  revalidatePath(`/forge/sets/${setId}/settings`);
   return { ok: true };
 }
 
@@ -152,7 +153,7 @@ export async function grantSet(setId: string, userId: string): Promise<Result> {
   if (!ctx) return { ok: false, error: "Not authorized" };
   const { error } = await ctx.supabase.rpc("forge_grant_set", { p_set_id: setId, p_user_id: userId });
   if (error) return { ok: false, error: "Could not grant access" };
-  revalidatePath(`/forge/sets/${setId}/progress`);
+  revalidatePath(`/forge/sets/${setId}/settings`);
   return { ok: true };
 }
 
@@ -161,7 +162,7 @@ export async function revokeSet(setId: string, userId: string): Promise<Result> 
   if (!ctx) return { ok: false, error: "Not authorized" };
   const { error } = await ctx.supabase.rpc("forge_revoke_set", { p_set_id: setId, p_user_id: userId });
   if (error) return { ok: false, error: "Could not revoke access" };
-  revalidatePath(`/forge/sets/${setId}/progress`);
+  revalidatePath(`/forge/sets/${setId}/settings`);
   return { ok: true };
 }
 
@@ -170,7 +171,7 @@ export async function setSetPrivacy(setId: string, isPrivate: boolean): Promise<
   if (!ctx) return { ok: false, error: "Not authorized" };
   const { error } = await ctx.supabase.rpc("forge_set_privacy", { p_set_id: setId, p_is_private: isPrivate });
   if (error) return { ok: false, error: "Could not change set privacy" };
-  revalidatePath(`/forge/sets/${setId}/progress`);
+  revalidatePath(`/forge/sets/${setId}/settings`);
   revalidatePath("/forge/sets");
   return { ok: true };
 }

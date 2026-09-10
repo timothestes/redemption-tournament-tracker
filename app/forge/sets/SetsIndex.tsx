@@ -141,8 +141,8 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
     if (!seed.ok) {
       // Set exists; don't strand the user — send them in, but tell them targets failed.
       setBusy(false);
-      setError("Set created but targets failed to save — set them from the Progress tab.");
-      router.push(`/forge/sets/${r.id}/progress`);
+      setError("Set created but targets failed to save — set them from the Settings tab.");
+      router.push(`/forge/sets/${r.id}/settings`);
       return;
     }
     // Keep `busy` true through navigation so the spinner shows until the next page loads.
@@ -329,7 +329,7 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
           <DialogHeader>
             <DialogTitle>New set</DialogTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Name the set and seed starting targets — you can refine them anytime from the Progress tab.
+              Name the set and seed starting targets — you can refine them anytime from the Settings tab.
             </p>
           </DialogHeader>
 
