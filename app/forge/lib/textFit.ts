@@ -20,9 +20,12 @@ export const TEXT_METRICS = {
   verse: { size: 22.9, pitch: 23, bottom: 257.5 },
   // Bold, right-aligned, fixed: cap tops 256 px below the box top (12 px above its bottom).
   reference: { size: 19, top: 253.5, pitch: 19 },
-  // The light-to-dark gradient follows the verse: prints leave the light wash until ~12 px
-  // above the first verse line and are fully dark ~37 px later.
-  gradient: { above: 12, span: 37 },
+  // The light-to-dark gradient sits BETWEEN the ability and the verse: recent sets (Roots 2
+  // onward) are fully dark by the first verse line, with the transition in the ~28 px above
+  // it — not across the first row as Roots / IR printed. `minGap` is the room the ability
+  // must leave above the verse (the tightest printed card leaves 22 px).
+  gradient: { above: 2, span: 28 },
+  minGap: 18,
 } as const;
 export const TEXT_WIDTH = RECTS.textInset.w;
 
@@ -81,7 +84,7 @@ export type TextFit = {
   abilityBottom: number;
   /** Top of the first verse line box (the verse floor when there is no verse). */
   verseTop: number;
-  /** Ability lines that collide with the verse; 0 means it fits as printed. */
+  /** Ability lines that collide with the verse (or its `minGap`); 0 means it fits as printed. */
   over: number;
   /** Where the box wash stops being light and where it is fully dark, offsets from the box top. */
   gradient: { light: number; dark: number };
@@ -94,7 +97,7 @@ export function textFit(card: DesignCard): TextFit {
   const abilityBottom = M.ability.top + abilityLines * M.ability.pitch + Math.max(0, paragraphs.length - 1) * M.ability.paragraphGap;
   const verseLines = wrapLines((card.scripture ?? "").trim(), "italic", M.verse.size, TEXT_WIDTH);
   const verseTop = M.verse.bottom - verseLines.length * M.verse.pitch;
-  const over = abilityLines ? Math.max(0, Math.ceil((abilityBottom - verseTop) / M.ability.pitch)) : 0;
-  const light = verseTop - M.gradient.above;
-  return { paragraphs, abilityLines, verseLines, abilityBottom, verseTop, over, gradient: { light, dark: light + M.gradient.span } };
+  const over = abilityLines ? Math.max(0, Math.ceil((abilityBottom + M.minGap - verseTop) / M.ability.pitch)) : 0;
+  const dark = verseTop - M.gradient.above;
+  return { paragraphs, abilityLines, verseLines, abilityBottom, verseTop, over, gradient: { light: dark - M.gradient.span, dark } };
 }
