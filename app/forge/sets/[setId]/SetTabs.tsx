@@ -10,6 +10,7 @@ export default function SetTabs({ setId, showPromote = false }: { setId: string;
     { href: `/forge/sets/${setId}/notes`, label: "Notes" },
     { href: `/forge/sets/${setId}/progress`, label: "Progress" },
     { href: `/forge/sets/${setId}/review`, label: "Review" },
+    { href: `/forge/sets/${setId}/settings`, label: "Settings" },
     ...(showPromote ? [{ href: `/forge/sets/${setId}/promote`, label: "Promote" }] : []),
   ];
   return (

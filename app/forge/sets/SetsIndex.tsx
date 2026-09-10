@@ -122,8 +122,8 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
       if (!seed.ok) {
         // Set exists; don't strand the user — send them in, but tell them the target failed.
         setBusy(false);
-        setError("Set created but the target count failed to save — set it from the Progress tab.");
-        router.push(`/forge/sets/${r.id}/progress`);
+        setError("Set created but the target count failed to save — set it from the Settings tab.");
+        router.push(`/forge/sets/${r.id}/settings`);
         return;
       }
     }
@@ -311,7 +311,7 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
           <DialogHeader>
             <DialogTitle>New set</DialogTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Name the set — you can set per-type targets anytime from the Progress tab.
+              Name the set — you can set per-type targets anytime from the Settings tab.
             </p>
           </DialogHeader>
 
