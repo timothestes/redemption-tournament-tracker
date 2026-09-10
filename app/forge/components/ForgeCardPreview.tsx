@@ -63,7 +63,9 @@ function IconBoxG({ id, box, rect, side, stat }: {
   const { x, y, w, h } = rect;
   const d = tabPath(rect, side);
   const split = y + h * 0.45;
-  const statSize = stat && stat.length > 7 ? 23 : stat && stat.length > 4 ? 28 : 34;
+  // Printed stats: one size whether "9/6" or "10/11" (digits ~27 px tall, tops 6 px below the
+  // box top, centred), no outline; only an unusually long value gives ground.
+  const statSize = stat && stat.length > 6 ? 30 : 41;
   return (
     <g>
       <clipPath id={id}><path d={d} /></clipPath>
@@ -78,10 +80,9 @@ function IconBoxG({ id, box, rect, side, stat }: {
       <path d={d} fill="none" stroke={INK} strokeWidth={4} />
       {stat && (
         <text
-          x={x + w / 2 + (side === "left" ? 4 : -4)} y={y + 43} textAnchor="middle"
+          x={x + w / 2 + (side === "left" ? -2 : 2)} y={y + 34} textAnchor="middle"
           fontFamily={STAT_FONT} fontSize={statSize}
-          fill={box.darkText ? INK : "#fff"} stroke={box.darkText ? "#fff" : INK} strokeWidth={2.6}
-          paintOrder="stroke" style={{ paintOrder: "stroke" }}
+          fill={box.darkText ? INK : "#fff"}
         >
           {stat}
         </text>

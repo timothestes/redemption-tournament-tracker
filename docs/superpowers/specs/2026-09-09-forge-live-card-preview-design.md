@@ -190,6 +190,12 @@ was checked by overlaying the template's numbers on printed Roots / RR2 / II / T
   an opaque rounded plate with the print's dark outline.
 - **Class icons** draw at the template's size (shield 89x104 canvas px) directly under the
   box, over the border, stacked shield(s) then territory.
+- **Stat numbers (2026-09-10, third pass):** printed stats have no outline. Measured on ten
+  Roots / Roots 2 / T2C cards, the digits' tops sit 6 px below the box top and their bottoms
+  at 33 px, centred (2 px left of the box centre), at ONE size whether the value is "9/6" or
+  "10/11" — 41 px on the canvas, which matches the printed widths of "11/9" (62 px) and
+  "10/11" (75 px). The preview had drawn them at 34 px (28 for five characters) with a
+  2.6 px outline, ten pixels lower. Dark digits on light boxes (white, silver) stay, outline gone.
 - **Fonts, for the record:** the printed title face is Symphony Black (Agfa/Monotype) and the
   printed stats face is Grail Light (SoftKey/WSI, "redistribution strictly prohibited"); both
   are proprietary and stay out of the repo. Arimo (OFL) is already the body face.
