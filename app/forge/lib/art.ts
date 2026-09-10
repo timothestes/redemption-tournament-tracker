@@ -116,6 +116,22 @@ export async function readForgeUpload(pathname: string): Promise<{ data: Buffer;
   return { data, contentType: blob.blob.contentType };
 }
 
+// The printed card faces (licensed, never committed) sit in the same private store under
+// fixed keys, uploaded by scripts/forge-upload-fonts.ts and streamed to members by
+// app/forge/api/fonts/[face]/route.ts.
+const FONT_PREFIX = "forge-fonts/";
+export const FORGE_FONT_FACES = ["title", "stat"] as const;
+export type ForgeFontFace = (typeof FORGE_FONT_FACES)[number];
+
+export function forgeFontKey(face: ForgeFontFace): string {
+  return `${FONT_PREFIX}${face}.ttf`;
+}
+
+/** Server-side read of a printed card face from the private store. */
+export function readForgeFont(face: ForgeFontFace): Promise<GetBlobResult | null> {
+  return get(forgeFontKey(face), { access: "private", ...forgeAuth });
+}
+
 /** Best-effort delete of a private art blob (used when art is replaced). Non-fatal on failure. */
 export async function deleteForgeArt(key: string): Promise<void> {
   try {

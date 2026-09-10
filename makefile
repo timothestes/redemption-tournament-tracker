@@ -37,6 +37,7 @@ help:
 	@echo "  make cards           - Alias for update-cards"
 	@echo "  make pull-forge-releases - Sync forge-released sets into the catalog overlay"
 	@echo "  make forge-frames    - Regenerate the Forge frame kit from the card template (.ai)"
+	@echo "  make forge-fonts     - Upload the printed card faces (tmp/) to the private Forge Blob store"
 	@echo "  make pull-card-overrides - Sync catalog admin edits into the overlay"
 	@echo ""
 
@@ -127,4 +128,11 @@ forge-frames:
 	@echo "🎨 Extracting the Forge frame kit from $(FORGE_TEMPLATE_AI)..."
 	@python3.11 scripts/forge-extract-template.py --ai "$(FORGE_TEMPLATE_AI)"
 
-.PHONY: all install run dev dev-windows build start stop setup clean fresh update-paragons paragons update-cards cards pull-forge-releases pull-card-overrides forge-frames
+# Upload the printed card faces (licensed, gitignored in tmp/) to the private Forge Blob store;
+# /forge/api/fonts/[face] streams them to members. Bump ?v= in app/forge/forge-fonts.css after.
+FORGE_FONTS_DIR ?= tmp
+forge-fonts:
+	@echo "🔤 Uploading the printed card faces from $(FORGE_FONTS_DIR)/ to the private Forge Blob store..."
+	@npx tsx scripts/forge-upload-fonts.ts "$(FORGE_FONTS_DIR)"
+
+.PHONY: all install run dev dev-windows build start stop setup clean fresh update-paragons paragons update-cards cards pull-forge-releases pull-card-overrides forge-frames forge-fonts

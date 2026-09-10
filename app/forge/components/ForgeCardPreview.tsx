@@ -21,10 +21,11 @@ const INK = "#231f20"; // the template's 100% K through its SWOP profile
 const COPYRIGHT_YEAR = new Date().getFullYear();
 const TITLE_FONT = "ForgeTitle, 'Trebuchet MS', 'Segoe UI', sans-serif";
 const STAT_FONT = "ForgeStat, Georgia, 'Times New Roman', serif";
-// ForgeTitle (Mukta ExtraBold) averages ~0.55em per character; used to size and squeeze titles.
+// ForgeTitle (Symphony Black from the private font route, cap height 0.73em) averages ~0.53em
+// per character; TITLE_EM adds a hair for the stroke and is used to size and squeeze titles.
 // Sizes are cap heights measured off printed cards (title ~26 px, stats ~22 px on the canvas).
-const TITLE_EM = 0.55;
-const TITLE_MAX = 40, TITLE_MIN = 28;
+const TITLE_EM = 0.57;
+const TITLE_MAX = 36, TITLE_MIN = 25;
 
 type Rect = { readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly r?: number };
 

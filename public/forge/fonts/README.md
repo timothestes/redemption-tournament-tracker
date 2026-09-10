@@ -1,8 +1,12 @@
 # Forge preview fonts — LIBRE ONLY
 
-The `<ForgeCardPreview>` renders with **freely-redistributable** fonts only.
-Do **NOT** add the original Figma-kit fonts here — they are proprietary and were
-removed to avoid redistribution/DMCA exposure in this public repo:
+Only **freely-redistributable** fonts live here. The printed title and stats faces
+(Symphony Black, Grail Light) are licensed, so they are never committed: `make forge-fonts`
+uploads them from gitignored `tmp/` to the private Forge Blob store and
+`/forge/api/fonts/[face]` streams them to forge members only. `forge-fonts.css` lists that
+route as the first `src` of `ForgeTitle` / `ForgeStat` and the files below as the browser's
+fallback. Do **NOT** add the original fonts here — they were removed to avoid
+redistribution/DMCA exposure in this public repo:
 
 | Removed (proprietary) | Owner | Replace with (libre) | License |
 |---|---|---|---|
@@ -12,5 +16,5 @@ removed to avoid redistribution/DMCA exposure in this public repo:
 
 Drop the chosen `.ttf`/`.woff2` files here and wire them via `@font-face` in
 `app/forge/forge-fonts.css` (`ForgeTitle`, `ForgeStat`, `ForgeBody`). A different substitute is a
-one-line swap there; the preview sizes titles assuming ~0.55em per character
-(`TITLE_EM` in `ForgeCardPreview.tsx`), so retune that if the face changes width.
+one-line swap there; the preview sizes titles for Symphony Black (~0.53em per character,
+`TITLE_EM` in `ForgeCardPreview.tsx`), so retune that if the primary face changes width.

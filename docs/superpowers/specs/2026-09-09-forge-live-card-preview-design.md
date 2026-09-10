@@ -64,7 +64,8 @@ public/forge/frames/
                           territory weapon warrior
   badges/<name>.webp      artifact good-dom evil-dom lamb reaper multi-good multi-evil
 ```
-`*` synthesized. Fonts stay in `public/forge/fonts` (Anton for Symphony Black, Arimo for Arial).
+`*` synthesized. OFL fallback fonts stay in `public/forge/fonts`; the printed title and stats faces
+stream from the private Blob store (see "Printed fonts" below).
 
 ## Geometry (artboard points, origin bottom-left)
 
@@ -155,7 +156,8 @@ Tim reviewed the first render against printed cards (Enoch CoW, Covenant with Da
   slanted t — the printed face is CG Symphony, a Syntax clone), stats in **PT Serif Bold**
   (the printed numerals are a bold serif). Anton (too condensed) and Archivo Black (too
   grotesque) were tried and rejected. Sizes are set from printed cap heights: title 40 px,
-  stats 34 px on the 750-wide canvas.
+  stats 34 px on the 750-wide canvas. (Superseded by "Printed fonts" below: members now get
+  the real faces, and these are the fallbacks.)
 - **Verification**: twelve recent printed cards rendered side by side with the preview fed
   their own catalog data and cropped art (dual-brigade Heroes and Evil Character, GE and EE
   with stats, Lost Soul, Artifact, Dominant, Fortress, dual-brigade Curse, two Covenants).
@@ -190,8 +192,27 @@ was checked by overlaying the template's numbers on printed Roots / RR2 / II / T
   box, over the border, stacked shield(s) then territory.
 - **Fonts, for the record:** the printed title face is Symphony Black (Agfa/Monotype) and the
   printed stats face is Grail Light (SoftKey/WSI, "redistribution strictly prohibited"); both
-  are proprietary and stay out of the repo. Mukta ExtraBold and PT Serif Bold remain the
-  shipped substitutes. Arimo (OFL) is already the body face.
+  are proprietary and stay out of the repo. Arimo (OFL) is already the body face.
+
+## Printed fonts (2026-09-10, private Blob)
+
+Tim holds the printed faces and wants members to see them without the app redistributing
+them, so they are served the same way private card art is:
+
+- `scripts/forge-upload-fonts.ts` (`make forge-fonts`) puts `tmp/SYMPHOBL.TTF` and
+  `tmp/grail.ttf` into the **private** forge Blob store under the fixed keys
+  `forge-fonts/title.ttf` and `forge-fonts/stat.ttf` (`forgeFontKey` in `app/forge/lib/art.ts`).
+  The files stay gitignored; nothing font-shaped is committed.
+- `app/forge/api/fonts/[face]/route.ts` streams a face to a forge member (`requireForge`) as
+  `font/ttf` with `Cache-Control: private, max-age=31536000, immutable`; everyone else gets the
+  same 404 as the rest of `/forge`. Unknown faces 404 before any store read.
+- `app/forge/forge-fonts.css` keeps the `ForgeTitle` / `ForgeStat` families but lists the route
+  URL (`?v=1`, bump after re-uploading) as the first `src` and the OFL file as the second: the
+  browser activates the substitute only when the route fails, so nothing else changes.
+- Metrics (parsed from the TTFs): Symphony Black cap height 0.73 em, ~0.53 em per title
+  character (Mukta ExtraBold: 0.63 / 0.47); Grail Light cap height 0.70 em, the same as PT
+  Serif Bold, and narrower. The title constants move to `TITLE_MAX` 36 / `TITLE_MIN` 25 /
+  `TITLE_EM` 0.57 to keep the printed ~26 px cap height; stat sizes are unchanged.
 - **Verification**: twelve printed cards | preview pairs plus four synthetic cases (3-brigade
   Evil Character on the foil, dual-brigade Covenant with a territory plate, Hero with both
   shields and a territory, Site).
