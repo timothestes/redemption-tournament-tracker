@@ -55,4 +55,27 @@ describe("computeProgress", () => {
   it("pct is 0 when target total is 0 or absent", () => {
     expect(computeProgress([card(["Hero"], ["Blue"])], {}).headline.pct).toBe(0);
   });
+
+  // New-set dialog now only ever writes a total (or nothing) — no more per-type seed.
+  it("total-only target (40) yields no per-type goal entries, no NaN, no divide-by-zero", () => {
+    const m = computeProgress([card(["Hero"], ["Blue"]), card(["LostSoul"], undefined)], { total: 40 });
+    expect(m.headline).toEqual({ actual: 2, target: 40, pct: 5 });
+    expect(m.checklist).toEqual([]);
+    for (const c of m.cells) {
+      expect(c.target).toBe(0);
+      expect(Number.isNaN(c.actual)).toBe(false);
+      expect(Number.isNaN(c.target)).toBe(false);
+    }
+  });
+
+  it("missing targets ({}, null, or undefined) yield no per-type goal entries, no NaN, no divide-by-zero", () => {
+    const cards = [card(["Hero"], ["Blue"]), card(["LostSoul"], undefined)];
+    for (const targets of [{}, null, undefined] as const) {
+      const m = computeProgress(cards, targets as any);
+      expect(m.headline.target).toBe(0);
+      expect(m.headline.pct).toBe(0);
+      expect(Number.isNaN(m.headline.pct)).toBe(false);
+      expect(m.checklist).toEqual([]);
+    }
+  });
 });
