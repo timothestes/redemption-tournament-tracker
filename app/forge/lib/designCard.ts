@@ -85,20 +85,21 @@ const NA: Record<FieldKey, Applicability> = {
 };
 
 // Per-type applicability, grounded in the real Redemption card pool (Site ~100%
-// brigade, Fortress ~6%). "stats" = strength+toughness (Hero/EvilCharacter only).
+// brigade, Fortress ~6%). "stats" = strength+toughness: required for Hero/EvilCharacter,
+// optional on GE/EE/Curse/Covenant (printed cards carry them when set).
 const MATRIX: Record<CardType, Partial<Record<FieldKey, Applicability>>> = {
   Hero:          { brigades: "required", stats: "required", class: "optional", icons: "optional", identifiers: "optional", specialAbility: "optional", reference: "optional" },
   EvilCharacter: { brigades: "required", stats: "required", class: "optional", icons: "optional", identifiers: "optional", specialAbility: "optional", reference: "optional" },
-  GE:            { brigades: "required", specialAbility: "required", reference: "optional" },
-  EE:            { brigades: "required", specialAbility: "required", reference: "optional" },
+  GE:            { brigades: "required", stats: "optional", specialAbility: "required", reference: "optional" },
+  EE:            { brigades: "required", stats: "optional", specialAbility: "required", reference: "optional" },
   LostSoul:      { specialAbility: "optional", reference: "optional", identifiers: "optional" },
   Artifact:      { specialAbility: "required", identifiers: "optional", reference: "optional" },
   Dominant:      { specialAbility: "required", identifiers: "optional", reference: "optional" },
   Fortress:      { brigades: "optional", specialAbility: "optional", reference: "optional" },
   Site:          { brigades: "required", specialAbility: "optional", reference: "optional" },
   City:          { brigades: "optional", specialAbility: "optional", reference: "optional" },
-  Curse:         { brigades: "optional", specialAbility: "optional", reference: "optional" },
-  Covenant:      { brigades: "optional", specialAbility: "optional", reference: "optional" },
+  Curse:         { brigades: "optional", stats: "optional", specialAbility: "optional", reference: "optional" },
+  Covenant:      { brigades: "optional", stats: "optional", specialAbility: "optional", reference: "optional" },
 };
 
 const RANK: Record<Applicability, number> = { na: 0, optional: 1, required: 2 };
