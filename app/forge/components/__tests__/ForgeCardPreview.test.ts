@@ -12,6 +12,22 @@ const statText = (html: string, stat: string) => {
   return m[1];
 };
 
+describe("ForgeCardPreview title", () => {
+  it("draws the name as a dark copy offset to the lower right under a white face with a hairline edge", () => {
+    const html = render({ name: "Michael, Dragon Slayer", cardType: ["Hero"], brigades: ["Silver"], strength: 12, toughness: 8 });
+    const texts = [...html.matchAll(/<text([^>]*)>Michael, Dragon Slayer<\/text>/g)].map((m) => m[1]);
+    expect(texts).toHaveLength(2);
+    const [shadow, face] = texts;
+    expect(shadow).toMatch(/fill="#231f20"/);
+    expect(shadow).toMatch(/transform="translate\(3 3\)"/);
+    expect(face).toMatch(/fill="#fff"/);
+    expect(face).not.toMatch(/transform=/);
+    // the old uniform 2.8 px outline is gone
+    expect(face).not.toMatch(/stroke-width="2.8"/);
+    expect(Number(face.match(/stroke-width="([\d.]+)"/)![1])).toBeLessThan(1.5);
+  });
+});
+
 describe("ForgeCardPreview stats", () => {
   it("prints stats without an outline, at one size, with digit tops just under the box top", () => {
     const hero = statText(render({ cardType: ["Hero"], brigades: ["Blue"], strength: 11, toughness: 9 }), "11/9");
