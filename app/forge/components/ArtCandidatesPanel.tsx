@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Trash2 } from "lucide-react";
+import { Link2, Loader2, Trash2 } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import FilePicker from "@/app/forge/components/FilePicker";
 import CropCandidateModal from "@/app/forge/components/CropCandidateModal";
+import SourceLinkDialog from "@/app/forge/components/SourceLinkDialog";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 import { addArtCandidate, deleteArtCandidate, type ArtCandidate } from "@/app/forge/lib/artCandidates";
 
@@ -25,6 +26,7 @@ export default function ArtCandidatesPanel({
   const [err, setErr] = useState<string | null>(null);
   const [cropping, setCropping] = useState<string | null>(null); // candidate id
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [editingSource, setEditingSource] = useState<string | null>(null); // candidate id
 
   async function onFiles(files: File[]) {
     setErr(null);
@@ -88,6 +90,11 @@ export default function ArtCandidatesPanel({
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               )}
+              <button type="button" aria-label={c.sourceUrl ? "Edit source link" : "Add source link"}
+                className={`absolute bottom-1 right-1 rounded-md border bg-background/85 p-1 text-muted-foreground transition-opacity hover:text-foreground focus:opacity-100 active:opacity-100 group-hover:opacity-100 ${c.sourceUrl ? "opacity-100" : "opacity-0"}`}
+                onClick={() => setEditingSource(c.id)}>
+                <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
             </li>
           ))}
           {/* One skeleton per not-yet-landed file: the active upload spins, queued
@@ -107,6 +114,13 @@ export default function ArtCandidatesPanel({
           imageUrl={candidateUrl(cardId, cropping)} cardName={cardName}
           onClose={() => setCropping(null)}
           onApplied={() => { setCropping(null); router.refresh(); }} />
+      )}
+
+      {editingSource && (
+        <SourceLinkDialog cardId={cardId} candidateId={editingSource}
+          sourceUrl={candidates.find((c) => c.id === editingSource)?.sourceUrl ?? null}
+          onClose={() => setEditingSource(null)}
+          onSaved={() => { setEditingSource(null); router.refresh(); }} />
       )}
 
       <ConfirmationDialog
