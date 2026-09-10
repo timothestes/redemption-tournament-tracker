@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
-import { validateArtFile, uploadForgeArt, uploadForgeFinished } from "@/app/forge/lib/art";
+import { validateArtFile, uploadForgeArt, uploadForgeFinished, readForgeUpload, deleteForgeArt } from "@/app/forge/lib/art";
 import type { DesignCard } from "@/app/forge/lib/designCard";
 
 export async function createCard(
@@ -35,22 +35,28 @@ export async function createCardInSet(
 
 export async function uploadArt(
   cardId: string,
-  formData: FormData
+  pathname: string
 ): Promise<{ ok: boolean; error?: string }> {
   const ctx = await requireElder();
   if (!ctx) return { ok: false, error: "Not authorized" };
+  if (!pathname.startsWith("forge-art-raw/")) return { ok: false, error: "Invalid upload" };
 
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "No file provided" };
-  const invalid = validateArtFile(file);
-  if (invalid) return { ok: false, error: invalid };
+  const raw = await readForgeUpload(pathname);
+  if (!raw) return { ok: false, error: "Could not read uploaded image" };
+  const invalid = validateArtFile({ type: raw.contentType, size: raw.data.length, name: pathname });
+  if (invalid) {
+    await deleteForgeArt(pathname);
+    return { ok: false, error: invalid };
+  }
 
   let key: string;
   try {
-    key = await uploadForgeArt(file);
+    key = await uploadForgeArt(raw.data);
   } catch {
+    await deleteForgeArt(pathname);
     return { ok: false, error: "Could not read image file." };
   }
+  await deleteForgeArt(pathname);
   // Art is normalized at upload (trim/resize/JPEG); original_key mirrors the stored key.
   const { error } = await ctx.supabase.rpc("forge_set_working_art", {
     p_card_id: cardId,
@@ -64,22 +70,28 @@ export async function uploadArt(
 
 export async function uploadFinished(
   cardId: string,
-  formData: FormData
+  pathname: string
 ): Promise<{ ok: boolean; error?: string }> {
   const ctx = await requireElder();
   if (!ctx) return { ok: false, error: "Not authorized" };
+  if (!pathname.startsWith("forge-art-raw/")) return { ok: false, error: "Invalid upload" };
 
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "No file provided" };
-  const invalid = validateArtFile(file);
-  if (invalid) return { ok: false, error: invalid };
+  const raw = await readForgeUpload(pathname);
+  if (!raw) return { ok: false, error: "Could not read uploaded image" };
+  const invalid = validateArtFile({ type: raw.contentType, size: raw.data.length, name: pathname });
+  if (invalid) {
+    await deleteForgeArt(pathname);
+    return { ok: false, error: invalid };
+  }
 
   let key: string;
   try {
-    key = await uploadForgeFinished(file);
+    key = await uploadForgeFinished(raw.data);
   } catch {
+    await deleteForgeArt(pathname);
     return { ok: false, error: "Could not read image file." };
   }
+  await deleteForgeArt(pathname);
   const { error } = await ctx.supabase.rpc("forge_set_working_finished", {
     p_card_id: cardId,
     p_key: key,

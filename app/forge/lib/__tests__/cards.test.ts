@@ -2,10 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/app/forge/lib/auth", () => ({ requireForge: vi.fn(), requireElder: vi.fn() }));
-vi.mock("@/app/forge/lib/art", () => ({ validateArtFile: vi.fn(), uploadForgeArt: vi.fn(), uploadForgeFinished: vi.fn() }));
+vi.mock("@/app/forge/lib/art", () => ({
+  validateArtFile: vi.fn(),
+  uploadForgeArt: vi.fn(),
+  uploadForgeFinished: vi.fn(),
+  readForgeUpload: vi.fn(),
+  deleteForgeArt: vi.fn(),
+}));
 
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
-import { validateArtFile, uploadForgeArt, uploadForgeFinished } from "@/app/forge/lib/art";
+import { validateArtFile, uploadForgeArt, uploadForgeFinished, readForgeUpload, deleteForgeArt } from "@/app/forge/lib/art";
 import { saveCard, getCard, listForgeCards, uploadArt, uploadFinished } from "../cards";
 
 function ctx(rpcImpl?: any, queryRows?: any[]) {
@@ -75,24 +81,93 @@ describe("getCard / listForgeCards", () => {
   });
 });
 
+describe("uploadArt", () => {
+  it("rejects when caller is not an elder", async () => {
+    (requireElder as any).mockResolvedValue(null);
+    const r = await uploadArt("c1", "forge-art-raw/x.png");
+    expect(r.ok).toBe(false);
+  });
+  it("rejects a pathname outside forge-art-raw/", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    const r = await uploadArt("c1", "forge-art/someone-elses-key");
+    expect(r).toEqual({ ok: false, error: "Invalid upload" });
+    expect(readForgeUpload).not.toHaveBeenCalled();
+  });
+  it("uploads and calls forge_set_working_art with the returned key", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
+    (validateArtFile as any).mockReturnValue(null);
+    (uploadForgeArt as any).mockResolvedValue("forge-art/abc");
+    const r = await uploadArt("c1", "forge-art-raw/x.png");
+    expect(r.ok).toBe(true);
+    expect(validateArtFile).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "image/png" }),
+    );
+    expect((c.supabase.rpc as any).mock.calls[0]).toEqual([
+      "forge_set_working_art", { p_card_id: "c1", p_key: "forge-art/abc", p_original_key: "forge-art/abc" },
+    ]);
+    expect(deleteForgeArt).toHaveBeenCalledWith("forge-art-raw/x.png");
+  });
+  it("returns the validation error and cleans up the raw upload when the file is invalid", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
+    (validateArtFile as any).mockReturnValue("File too large. Maximum 50MB.");
+    const r = await uploadArt("c1", "forge-art-raw/x.png");
+    expect(r).toEqual({ ok: false, error: "File too large. Maximum 50MB." });
+    expect(deleteForgeArt).toHaveBeenCalledWith("forge-art-raw/x.png");
+    expect(uploadForgeArt).not.toHaveBeenCalled();
+  });
+});
+
 describe("uploadFinished", () => {
   it("rejects when caller is not an elder", async () => {
     (requireElder as any).mockResolvedValue(null);
-    const r = await uploadFinished("c1", new FormData());
+    const r = await uploadFinished("c1", "forge-art-raw/x.png");
     expect(r.ok).toBe(false);
+  });
+  it("rejects a pathname outside forge-art-raw/", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    const r = await uploadFinished("c1", "forge-art/someone-elses-key");
+    expect(r).toEqual({ ok: false, error: "Invalid upload" });
+    expect(readForgeUpload).not.toHaveBeenCalled();
   });
   it("uploads and calls forge_set_working_finished with the returned key", async () => {
     const c = ctx();
     (requireElder as any).mockResolvedValue(c);
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
     (validateArtFile as any).mockReturnValue(null);
     (uploadForgeFinished as any).mockResolvedValue("forge-finished/abc");
-    const fd = new FormData();
-    fd.set("file", new File([new Uint8Array([1, 2, 3])], "c.png", { type: "image/png" }));
-    const r = await uploadFinished("c1", fd);
+    const r = await uploadFinished("c1", "forge-art-raw/x.png");
     expect(r.ok).toBe(true);
+    expect(validateArtFile).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "image/png" }),
+    );
     expect((c.supabase.rpc as any).mock.calls[0]).toEqual([
       "forge_set_working_finished", { p_card_id: "c1", p_key: "forge-finished/abc" },
     ]);
+    expect(deleteForgeArt).toHaveBeenCalledWith("forge-art-raw/x.png");
+  });
+  it("returns the validation error and cleans up the raw upload when the file is invalid", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
+    (validateArtFile as any).mockReturnValue("File too large. Maximum 50MB.");
+    const r = await uploadFinished("c1", "forge-art-raw/x.png");
+    expect(r).toEqual({ ok: false, error: "File too large. Maximum 50MB." });
+    expect(deleteForgeArt).toHaveBeenCalledWith("forge-art-raw/x.png");
+    expect(uploadForgeFinished).not.toHaveBeenCalled();
+  });
+  it("returns an error when the raw upload can't be read back", async () => {
+    const c = ctx();
+    (requireElder as any).mockResolvedValue(c);
+    (readForgeUpload as any).mockResolvedValue(null);
+    const r = await uploadFinished("c1", "forge-art-raw/gone.png");
+    expect(r).toEqual({ ok: false, error: "Could not read uploaded image" });
+    expect(uploadForgeFinished).not.toHaveBeenCalled();
   });
 });
 
@@ -108,20 +183,22 @@ describe("upload decode failures", () => {
   it("uploadArt returns a clear error when the image cannot be decoded", async () => {
     const c = ctx();
     (requireElder as any).mockResolvedValue(c);
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
     (validateArtFile as any).mockReturnValue(null);
     (uploadForgeArt as any).mockRejectedValue(new Error("unsupported image format"));
-    const fd = new FormData();
-    fd.set("file", new File([new Uint8Array([1, 2, 3])], "a.png", { type: "image/png" }));
-    expect(await uploadArt("c1", fd)).toEqual({ ok: false, error: "Could not read image file." });
+    const r = await uploadArt("c1", "forge-art-raw/a.png");
+    expect(r).toEqual({ ok: false, error: "Could not read image file." });
+    expect(deleteForgeArt).toHaveBeenCalledWith("forge-art-raw/a.png");
   });
 
   it("uploadFinished returns a clear error when the image cannot be decoded", async () => {
     const c = ctx();
     (requireElder as any).mockResolvedValue(c);
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
     (validateArtFile as any).mockReturnValue(null);
     (uploadForgeFinished as any).mockRejectedValue(new Error("unsupported image format"));
-    const fd = new FormData();
-    fd.set("file", new File([new Uint8Array([1, 2, 3])], "c.png", { type: "image/png" }));
-    expect(await uploadFinished("c1", fd)).toEqual({ ok: false, error: "Could not read image file." });
+    const r = await uploadFinished("c1", "forge-art-raw/c.png");
+    expect(r).toEqual({ ok: false, error: "Could not read image file." });
+    expect(deleteForgeArt).toHaveBeenCalledWith("forge-art-raw/c.png");
   });
 });

@@ -26,7 +26,10 @@ const forgeAuth: { token: string } | { storeId: string } =
 const ART_PREFIX = "forge-art/";
 const FINISHED_PREFIX = "forge-finished/";
 export const ALLOWED_ART_TYPES = ["image/jpeg", "image/png", "image/webp", "image/tiff", "image/tif"] as const;
-export const MAX_ART_BYTES = 15 * 1024 * 1024; // 15MB
+export const MAX_ART_BYTES = 50 * 1024 * 1024; // 50MB — was 15MB; raised because uploads now go
+// straight to Blob from the browser, bypassing Vercel's 4.5MB Function body cap that made the
+// old 15MB figure unreachable in practice for anything routed through a Server Action.
+const MAX_ART_MB = MAX_ART_BYTES / (1024 * 1024);
 
 const TIFF_NAME_RE = /\.tiff?$/i;
 // Browsers frequently report an empty (or generic) MIME type for .tif/.tiff files
@@ -45,7 +48,9 @@ export function validateArtFile(file: { type: string; size: number; name?: strin
     return "Invalid file type. Accepted: JPEG, PNG, WebP, TIFF.";
   }
   if (file.size > MAX_ART_BYTES) {
-    return isTiff ? "TIFF file too large. Export at 15MB or smaller." : "File too large. Maximum 15MB.";
+    return isTiff
+      ? `TIFF file too large. Export at ${MAX_ART_MB}MB or smaller.`
+      : `File too large. Maximum ${MAX_ART_MB}MB.`;
   }
   return null;
 }
@@ -55,8 +60,8 @@ export function validateArtFile(file: { type: string; size: number; name?: strin
  * and upload to the PRIVATE blob store under an unguessable UUID key.
  * Throws if the file cannot be decoded as an image. Returns the stored pathname.
  */
-export async function uploadForgeArt(file: File): Promise<string> {
-  const normalized = await normalizeCardImage(Buffer.from(await file.arrayBuffer()));
+export async function uploadForgeArt(input: Buffer): Promise<string> {
+  const normalized = await normalizeCardImage(input);
   const key = `${ART_PREFIX}${randomUUID()}`;
   const blob = await put(key, normalized.data, {
     access: "private",
@@ -68,8 +73,8 @@ export async function uploadForgeArt(file: File): Promise<string> {
 }
 
 /** Same normalization + upload for finished-card images under forge-finished/. */
-export async function uploadForgeFinished(file: File): Promise<string> {
-  const normalized = await normalizeCardImage(Buffer.from(await file.arrayBuffer()));
+export async function uploadForgeFinished(input: Buffer): Promise<string> {
+  const normalized = await normalizeCardImage(input);
   const key = `${FINISHED_PREFIX}${randomUUID()}`;
   const blob = await put(key, normalized.data, {
     access: "private",
@@ -97,6 +102,18 @@ export async function uploadForgeArtRaw(data: Buffer, contentType: string): Prom
 /** Server-side read of a private art blob by its stored key. */
 export function readForgeArt(key: string): Promise<GetBlobResult | null> {
   return get(key, { access: "private", ...forgeAuth });
+}
+
+/** Reads a raw client-uploaded blob back for the finalize step (private store — the
+ * client-upload flow puts the file straight into Blob, bypassing the 4.5MB Vercel
+ * Function body cap; this reads it back server-side so it can be normalized and
+ * moved into its permanent forge-art/ or forge-finished/ key). Returns null on a
+ * miss instead of throwing — callers treat that as "could not read uploaded image". */
+export async function readForgeUpload(pathname: string): Promise<{ data: Buffer; contentType: string } | null> {
+  const blob = await get(pathname, { access: "private", ...forgeAuth });
+  if (!blob || blob.statusCode !== 200) return null;
+  const data = Buffer.from(await new Response(blob.stream).arrayBuffer());
+  return { data, contentType: blob.blob.contentType };
 }
 
 /** Best-effort delete of a private art blob (used when art is replaced). Non-fatal on failure. */

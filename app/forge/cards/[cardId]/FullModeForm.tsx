@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 import { uploadArt, setPlaceholder, type ForgeCardFull } from "@/app/forge/lib/cards";
 import {
   CARD_TYPES, ALIGNMENTS, BRIGADES, LEGALITIES,
@@ -18,6 +19,7 @@ export default function FullModeForm({
 }: { card: ForgeCardFull; snapshot: DesignCard; update: (patch: Partial<DesignCard>) => void }) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const types = snapshot.cardType ?? [];
   const app = cardApplicability(types);
   const show = (k: keyof typeof app) => app[k] !== "na";
@@ -29,11 +31,22 @@ export default function FullModeForm({
 
   async function onUpload(file: File) {
     setErr(null);
-    const fd = new FormData();
-    fd.set("file", file);
-    const r = await uploadArt(card.id, fd);
-    if (!r.ok) setErr(r.error ?? "Upload failed");
-    else router.refresh();
+    setUploading(true);
+    try {
+      const blob = await upload(`forge-art-raw/${file.name}`, file, {
+        access: "private",
+        handleUploadUrl: "/forge/api/art/upload-token",
+      });
+      const r = await uploadArt(card.id, blob.pathname);
+      if (!r.ok) setErr(r.error ?? "Upload failed");
+      else router.refresh();
+    } catch (e) {
+      // Previously: no busy state and no catch at all — a failed upload just
+      // did nothing visible, no different from a hang from the user's side.
+      setErr(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -141,8 +154,10 @@ export default function FullModeForm({
       <fieldset className="rounded-md border p-3">
         <legend className="px-1 font-medium">Art</legend>
         <input type="file" accept="image/jpeg,image/png,image/webp,.tif,.tiff,image/tiff"
+          disabled={uploading}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }}
           className="block w-full text-xs" />
+        {uploading && <p className="mt-1 text-xs text-muted-foreground">Uploading…</p>}
         <label className="mt-3 flex items-start gap-2">
           <input type="checkbox" className="mt-0.5" checked={!!card.isPlaceholder}
             onChange={async () => { await setPlaceholder(card.id, !card.isPlaceholder); router.refresh(); }} />
