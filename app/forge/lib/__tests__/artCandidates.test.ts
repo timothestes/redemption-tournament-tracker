@@ -6,6 +6,8 @@ vi.mock("@/app/forge/lib/art", () => ({
   uploadForgeArt: vi.fn(),
   uploadForgeArtRaw: vi.fn(),
   readForgeArt: vi.fn(),
+  readForgeUpload: vi.fn(),
+  deleteForgeArt: vi.fn(),
 }));
 vi.mock("@/app/forge/lib/imageCrop", () => ({
   clampCropRect: vi.fn((r) => r),
@@ -14,7 +16,7 @@ vi.mock("@/app/forge/lib/imageCrop", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { requireElder } from "@/app/forge/lib/auth";
-import { uploadForgeArt, uploadForgeArtRaw, readForgeArt } from "@/app/forge/lib/art";
+import { uploadForgeArt, uploadForgeArtRaw, readForgeArt, readForgeUpload, deleteForgeArt } from "@/app/forge/lib/art";
 import { clampCropRect, cropCardImage } from "@/app/forge/lib/imageCrop";
 import { addArtCandidate, applyCrop, deleteArtCandidate } from "../artCandidates";
 
@@ -40,22 +42,22 @@ function mockCtx(opts: {
   return { from, rpc };
 }
 
-const fd = () => {
-  const f = new FormData();
-  f.set("file", new File([new Uint8Array([1])], "a.png", { type: "image/png" }));
-  return f;
-};
+const pathname = "forge-art-raw/a.png";
 
 describe("addArtCandidate", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (readForgeUpload as ReturnType<typeof vi.fn>).mockResolvedValue({ data: Buffer.from([1]), contentType: "image/png" });
+  });
 
   it("uploads, registers the candidate, and auto-activates on an art-less card", async () => {
     const { rpc } = mockCtx({ rows: { forge_cards: { working_art_key: null } } });
     (uploadForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue("forge-art/k1");
-    const r = await addArtCandidate("card1", fd());
+    const r = await addArtCandidate("card1", pathname);
     expect(r.ok).toBe(true);
     expect(rpc).toHaveBeenCalledWith("forge_add_art_candidate", { p_card_id: "card1", p_key: "forge-art/k1" });
     expect(rpc).toHaveBeenCalledWith("forge_set_working_art", { p_card_id: "card1", p_key: "forge-art/k1", p_original_key: "forge-art/k1" });
+    expect(deleteForgeArt).toHaveBeenCalledWith(pathname);
   });
 
   it("surfaces an auto-activate failure even though the candidate row was saved", async () => {
@@ -64,7 +66,7 @@ describe("addArtCandidate", () => {
       rpcResults: { forge_set_working_art: { error: { message: "boom" } } },
     });
     (uploadForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue("forge-art/k1");
-    const r = await addArtCandidate("card1", fd());
+    const r = await addArtCandidate("card1", pathname);
     expect(r.ok).toBe(false);
     expect(r.error).toBe("Image saved but could not be set as artwork");
   });
@@ -72,22 +74,30 @@ describe("addArtCandidate", () => {
   it("does not auto-activate when the card already has art", async () => {
     const { rpc } = mockCtx({ rows: { forge_cards: { working_art_key: "forge-art/existing" } } });
     (uploadForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue("forge-art/k2");
-    await addArtCandidate("card1", fd());
+    await addArtCandidate("card1", pathname);
     expect(rpc).not.toHaveBeenCalledWith("forge_set_working_art", expect.anything());
   });
 
   it("maps the cap error to friendly copy", async () => {
     mockCtx({ rpcResults: { forge_add_art_candidate: { error: { message: "candidate limit reached (12)" } } } });
     (uploadForgeArt as ReturnType<typeof vi.fn>).mockResolvedValue("forge-art/k3");
-    const r = await addArtCandidate("card1", fd());
+    const r = await addArtCandidate("card1", pathname);
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/12 images/);
   });
 
   it("refuses when not an elder", async () => {
     (requireElder as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-    const r = await addArtCandidate("card1", fd());
+    const r = await addArtCandidate("card1", pathname);
     expect(r.ok).toBe(false);
+    expect(uploadForgeArt).not.toHaveBeenCalled();
+  });
+
+  it("returns an error when the raw upload can't be read back", async () => {
+    mockCtx({});
+    (readForgeUpload as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    const r = await addArtCandidate("card1", pathname);
+    expect(r).toEqual({ ok: false, error: "Could not read uploaded image" });
     expect(uploadForgeArt).not.toHaveBeenCalled();
   });
 });
