@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
+import { upload } from "@vercel/blob/client";
 import FilePicker from "@/app/forge/components/FilePicker";
 import CropCandidateModal from "@/app/forge/components/CropCandidateModal";
 import ConfirmationDialog from "@/components/ui/confirmation-dialog";
@@ -30,13 +31,22 @@ export default function ArtCandidatesPanel({
     const errors: string[] = [];
     for (let i = 0; i < files.length; i++) {
       setProgress({ done: i, total: files.length, name: files[i].name });
-      const fd = new FormData();
-      fd.set("file", files[i]);
-      const r = await addArtCandidate(cardId, fd);
-      if (r.ok === false) errors.push(`${files[i].name}: ${r.error ?? "failed"}`);
-      // Refresh per file, not once per batch — each finished upload swaps its
-      // skeleton tile for the real thumbnail, so a slow batch never looks hung.
-      else router.refresh();
+      try {
+        const blob = await upload(`forge-art-raw/${files[i].name}`, files[i], {
+          access: "private",
+          handleUploadUrl: "/forge/api/art/upload-token",
+        });
+        const r = await addArtCandidate(cardId, blob.pathname);
+        if (r.ok === false) errors.push(`${files[i].name}: ${r.error ?? "failed"}`);
+        // Refresh per file, not once per batch — each finished upload swaps its
+        // skeleton tile for the real thumbnail, so a slow batch never looks hung.
+        else router.refresh();
+      } catch (e) {
+        // Previously an uncaught throw here (e.g. a 413 from an oversized file) left
+        // `progress` set forever — a permanent spinner. Catching it keeps the batch
+        // going and reports the failure like any other per-file error.
+        errors.push(`${files[i].name}: ${e instanceof Error ? e.message : "Upload failed"}`);
+      }
     }
     setProgress(null);
     if (errors.length > 0) setErr(errors.join(" · "));

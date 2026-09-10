@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { upload } from "@vercel/blob/client";
 import ForgeCardFace from "@/app/forge/components/ForgeCardFace";
 import ForgeBreadcrumbs from "@/app/forge/components/ForgeBreadcrumbs";
 import FilePicker from "@/app/forge/components/FilePicker";
@@ -125,11 +126,17 @@ export default function StudioEditor({
     setErr(null);
     setUploading(kind);
     try {
-      const fd = new FormData();
-      fd.set("file", file);
-      const r = await uploadFinished(card.id, fd);
+      const blob = await upload(`forge-art-raw/${file.name}`, file, {
+        access: "private",
+        handleUploadUrl: "/forge/api/art/upload-token",
+      });
+      const r = await uploadFinished(card.id, blob.pathname);
       if (r.ok === false) setErr(r.error ?? "Upload failed");
       else router.refresh();
+    } catch (e) {
+      // Previously uncaught: the spinner cleared (finally still ran) but nothing told
+      // the user it failed — a silent no-op. Now it does.
+      setErr(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setUploading(null);
     }
