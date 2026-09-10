@@ -2,11 +2,11 @@
 
 import { useId, type CSSProperties } from "react";
 import type { DesignCard, StatValue } from "@/app/forge/lib/designCard";
-import { cardRawText } from "@/app/forge/lib/designCard";
 import {
-  washPaths, iconBox, classIcons, gradientRows, isPreviewApproximate, type IconBox,
+  washPaths, iconBox, classIcons, isPreviewApproximate, type IconBox,
 } from "@/app/forge/lib/frameAssets";
-import { CANVAS, RECTS, GRADIENT_ROWS, BORDER_STROKE } from "@/app/forge/lib/frameGeometry";
+import { textFit, TEXT_METRICS as TM } from "@/app/forge/lib/textFit";
+import { CANVAS, RECTS, BORDER_STROKE } from "@/app/forge/lib/frameGeometry";
 
 // Rough rendered card: the design team's frame (washes / icons / badges from the kit,
 // chrome drawn as SVG from the template's geometry) around the live DesignCard. It is a
@@ -30,6 +30,7 @@ const TITLE_MAX = 36, TITLE_MIN = 25;
 type Rect = { readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly r?: number };
 
 const cqw = (px: number) => `${(px / CW) * 100}cqw`;
+const PILL: CSSProperties = { background: "rgba(0,0,0,.7)", color: "#fff", fontSize: `${(16 / CW) * 100}cqw`, padding: `${(2 / CW) * 100}cqw ${(8 / CW) * 100}cqw`, borderRadius: `${(6 / CW) * 100}cqw`, whiteSpace: "nowrap" };
 const pctX = (px: number) => `${(px / CW) * 100}%`;
 const pctY = (px: number) => `${(px / CH) * 100}%`;
 const place = (r: Rect): CSSProperties => ({
@@ -97,8 +98,7 @@ export default function ForgeCardPreview({
   const left = iconBox(card, "left");
   const right = iconBox(card, "right");
   const classes = classIcons(card);
-  const rows = gradientRows(card);
-  const { light, dark } = GRADIENT_ROWS[rows];
+  const fit = textFit(card);
   const approximate = isPreviewApproximate(card);
 
   const B = RECTS.border, A = RECTS.art, T = RECTS.textBox, I = RECTS.textInset;
@@ -112,10 +112,6 @@ export default function ForgeCardPreview({
   const titleWidth = (size: number) => name.length * size * TITLE_EM;
   const titleSize = titleWidth(TITLE_MAX) > titleAvail ? Math.max(TITLE_MIN, (TITLE_MAX * titleAvail) / titleWidth(TITLE_MAX)) : TITLE_MAX;
   const titleSqueeze = titleWidth(titleSize) > titleAvail;
-  const ability = cardRawText(card).trim();
-  const abilitySize = Math.max(19, Math.min(27, 27 - Math.max(0, ability.length - 110) * 0.03));
-  const abilityBottom = T.y + (T.h * light) / 100 - 6;
-  const scriptureTop = T.y + (T.h * dark) / 100 - 3;
   const ids = card.identifiers ?? [];
   const stat = left?.withStats ? statText(card.strength, card.toughness) : null;
 
@@ -157,8 +153,8 @@ export default function ForgeCardPreview({
         <defs>
           <linearGradient id={`${uid}g`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#fff" stopOpacity="0.8" />
-            <stop offset={light / 100} stopColor="#fff" stopOpacity="0.8" />
-            <stop offset={dark / 100} stopColor={INK} stopOpacity="1" />
+            <stop offset={fit.gradient.light / T.h} stopColor="#fff" stopOpacity="0.8" />
+            <stop offset={fit.gradient.dark / T.h} stopColor={INK} stopOpacity="1" />
             <stop offset="1" stopColor={INK} stopOpacity="1" />
           </linearGradient>
         </defs>
@@ -194,23 +190,31 @@ export default function ForgeCardPreview({
         </div>
       )}
 
-      {/* 5. ability text on the light part of the box */}
+      {/* 5. ability at the printed size, top-anchored and never shrunk: the lines are the ones
+            textFit wrapped, so the picture and the fit verdict agree. A long one runs into the
+            verse, and the pill at the bottom says by how much. */}
       <div style={{
-        position: "absolute", left: pctX(I.x), top: pctY(I.y), width: pctX(I.w), height: pctY(abilityBottom - I.y),
-        display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", overflow: "hidden",
-        fontWeight: 700, fontSize: cqw(abilitySize), lineHeight: 1.15, whiteSpace: "pre-wrap", padding: `0 ${cqw(4)}`, boxSizing: "border-box",
+        position: "absolute", left: pctX(I.x), top: pctY(T.y + TM.ability.top), width: pctX(I.w), textAlign: "center",
+        fontWeight: 700, fontSize: cqw(TM.ability.size), lineHeight: TM.ability.pitch / TM.ability.size, whiteSpace: "pre", fontKerning: "none",
       }}>
-        {ability}
+        {fit.paragraphs.map((lines, i) => (
+          <p key={i} style={{ margin: 0, marginTop: i ? cqw(TM.ability.paragraphGap) : 0 }}>{lines.join("\n")}</p>
+        ))}
       </div>
 
-      {/* 6. scripture + reference on the dark part */}
+      {/* 6. verse, justified and stacked up from the fixed reference line on the dark part */}
       <div style={{
-        position: "absolute", left: pctX(I.x), top: pctY(scriptureTop), width: pctX(I.w), height: pctY(I.y + I.h - scriptureTop),
-        display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden", color: "#f2efe4",
-        fontSize: cqw(18), lineHeight: 1.12, padding: `0 ${cqw(4)}`, boxSizing: "border-box",
+        position: "absolute", left: pctX(I.x), width: pctX(I.w), bottom: pctY(CH - (T.y + TM.verse.bottom)),
+        color: "#f2efe4", fontStyle: "italic", fontSize: cqw(TM.verse.size), lineHeight: TM.verse.pitch / TM.verse.size,
+        textAlign: "justify", whiteSpace: "pre-line", fontKerning: "none",
       }}>
-        <span style={{ fontStyle: "italic", overflow: "hidden" }}>{card.scripture ?? ""}</span>
-        <span style={{ textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}>{card.reference ?? ""}</span>
+        {card.scripture?.trim() ?? ""}
+      </div>
+      <div style={{
+        position: "absolute", left: pctX(I.x), width: pctX(I.w), top: pctY(T.y + TM.reference.top), height: pctY(TM.reference.pitch),
+        color: "#f2efe4", fontWeight: 700, fontSize: cqw(TM.reference.size), lineHeight: 1, textAlign: "right", whiteSpace: "nowrap",
+      }}>
+        {card.reference ?? ""}
       </div>
 
       {/* 7. credits */}
@@ -224,9 +228,14 @@ export default function ForgeCardPreview({
         <span style={{ fontSize: cqw(13) }}>© {COPYRIGHT_YEAR} Cactus Game Design, Inc.</span>
       </div>
 
-      {approximate && (
-        <div style={{ position: "absolute", left: "50%", bottom: "1.2%", transform: "translateX(-50%)", background: "rgba(0,0,0,.7)", color: "#fff", fontSize: cqw(16), padding: `${cqw(2)} ${cqw(8)}`, borderRadius: cqw(6), whiteSpace: "nowrap" }}>
-          preview approximate
+      {(fit.over > 0 || approximate) && (
+        <div style={{ position: "absolute", left: "2.5%", bottom: "1.2%", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: cqw(4) }}>
+          {fit.over > 0 && (
+            <div data-fit="over" style={{ ...PILL, background: "rgba(179,38,30,.92)" }}>
+              Ability doesn&apos;t fit · {fit.over} line{fit.over === 1 ? "" : "s"} over
+            </div>
+          )}
+          {approximate && <div style={PILL}>preview approximate</div>}
         </div>
       )}
     </div>

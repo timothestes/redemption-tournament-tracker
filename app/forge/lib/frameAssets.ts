@@ -14,7 +14,7 @@
 
 import type { Alignment, Brigade, CardType, DesignCard, StatValue } from "./designCard";
 import { cardApplicability } from "./designCard";
-import { BRIGADE_BOX_HEX, GRADIENT_ROWS, ICON_RECTS } from "./frameGeometry";
+import { BRIGADE_BOX_HEX, ICON_RECTS } from "./frameGeometry";
 
 const KIT = "/forge/frames";
 
@@ -168,15 +168,6 @@ export function classIcons(card: DesignCard): ClassIcon[] {
     next = rect.y + rect.h + 6;
     return { src: `${KIT}/icons/${s}.png`, rect };
   });
-}
-
-/** Ability-box gradient variant: the dark (scripture) region grows with the verse.
- *  Rows = estimated verse lines (~62 chars each at the preview's size) + the reference line. */
-export function gradientRows(card: DesignCard): keyof typeof GRADIENT_ROWS {
-  const verse = (card.scripture ?? "").trim();
-  if (!verse) return 2;
-  const lines = Math.ceil(verse.length / 62) + 1;
-  return Math.min(5, Math.max(2, lines)) as keyof typeof GRADIENT_ROWS;
 }
 
 export function isPreviewApproximate(card: DesignCard): boolean {
