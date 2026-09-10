@@ -213,6 +213,48 @@ them, so they are served the same way private card art is:
   character (Mukta ExtraBold: 0.63 / 0.47); Grail Light cap height 0.70 em, the same as PT
   Serif Bold, and narrower. The title constants move to `TITLE_MAX` 36 / `TITLE_MIN` 25 /
   `TITLE_EM` 0.57 to keep the printed ~26 px cap height; stat sizes are unchanged.
+
+## Text fit (2026-09-10, printed metrics + "doesn't fit")
+
+The design team's first pass on every set is finding abilities that don't fit the card. The
+preview used to shrink long abilities and centre them, which hides exactly that. It now sets
+the text box the way the cards are printed and says when the ability collides with the verse.
+
+**Measured off eight printed cards** (Roots, Roots 2, Israel's Inheritance, Times to Come),
+canvas px relative to the top of `RECTS.textBox` (y 668, h 284, inset 570 wide):
+
+| | Print | Preview now |
+|---|---|---|
+| Ability | Helvetica/Arimo Bold, fixed size regardless of length; cap tops 24 px below the box top; 31.6 px pitch; centred; full inset width | same: `TEXT_METRICS.ability` = 30.9 px / 31.6 px pitch / block top 19.6 |
+| Dual-type ability | each half its own paragraph (with a type icon) | paragraphs split at `/ A:`-style prefixes, 10 px gap; icons are still a follow-up |
+| Verse | Helvetica/Arimo Italic, justified, 23 px pitch, stacked upward from the reference | same: `TEXT_METRICS.verse` = 22.9 px / 23 px pitch, last line box ends at 257.5 |
+| Reference | bold, right-aligned, cap tops 256 px below the box top | same: 19 px, line box at 253.5 |
+| Gradient | light wash until ~12 px above the first verse line, fully dark ~37 px later; moves with the verse | `gradient.light = verseTop - 12`, `dark = light + 37` (the template's four fixed variants are no longer used) |
+
+**Sizes come from line breaks, not cap heights.** Each printed break bounds the measure in
+ems from both sides (the line fits, the next word does not). For the bold ability the
+eighteen breaks on six cards leave a single window, 30.80 < size <= 30.99 px at the 570 px
+inset, so 30.9 reproduces every one of them. The italic verse can't be pinned as tightly
+because the print kerns it and the width table cannot: 22.9 px reproduces seven of eight
+verses; the eighth differs by one word.
+
+**How it works.** `scripts/forge-font-metrics.py` reads the advance widths of Arimo Bold and
+Italic from `public/forge/fonts` into the generated `app/forge/lib/fontMetrics.ts`.
+`app/forge/lib/textFit.ts` wraps text greedily the way the browser does (spaces, and after
+hyphens inside words; explicit newlines respected; runs of spaces collapse) and returns the
+wrapped ability paragraphs, the verse lines, the block edges, the gradient stops and `over`,
+the number of ability lines that collide with the verse (line boxes touching = fits). It is
+pure, so a set-wide pass can call it server-side. The renderer draws the ability with the
+lines `textFit` produced (`white-space: pre`, `font-kerning: none`) so the picture and the
+verdict cannot disagree; the verse flows naturally (justified) and is bottom-anchored on the
+reference, so a wrap difference there only nudges the gradient. `over > 0` shows a red pill
+at the bottom left, "Ability doesn't fit · N lines over", next to the existing "preview
+approximate" pill, and the ability visibly runs into the verse.
+
+**Verification:** `textFit` tests pin the printed line breaks of six abilities and six
+verses; printed | preview pairs with the real verses typed in match line for line; synthetic
+cases cover 1 line over, 4 lines over, dual-type paragraphs and a card with no verse (the
+reference line is the floor).
 - **Verification**: twelve printed cards | preview pairs plus four synthetic cases (3-brigade
   Evil Character on the foil, dual-brigade Covenant with a territory plate, Hero with both
   shields and a territory, Site).

@@ -3,7 +3,7 @@
 (Arimo Bold for abilities, Arimo Italic for scripture) so the preview can wrap text the way
 the browser will and tell whether an ability fits its printed box. Stdlib only.
 
-    python3 scripts/forge-font-metrics.py
+    make forge-font-metrics   (= python3.11 scripts/forge-font-metrics.py)
 """
 import json
 import struct

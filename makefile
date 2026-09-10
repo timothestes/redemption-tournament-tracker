@@ -38,6 +38,7 @@ help:
 	@echo "  make pull-forge-releases - Sync forge-released sets into the catalog overlay"
 	@echo "  make forge-frames    - Regenerate the Forge frame kit from the card template (.ai)"
 	@echo "  make forge-fonts     - Upload the printed card faces (tmp/) to the private Forge Blob store"
+	@echo "  make forge-font-metrics - Regenerate the body-face advance widths for the preview's text-fit check"
 	@echo "  make pull-card-overrides - Sync catalog admin edits into the overlay"
 	@echo ""
 
@@ -135,4 +136,8 @@ forge-fonts:
 	@echo "🔤 Uploading the printed card faces from $(FORGE_FONTS_DIR)/ to the private Forge Blob store..."
 	@npx tsx scripts/forge-upload-fonts.ts "$(FORGE_FONTS_DIR)"
 
-.PHONY: all install run dev dev-windows build start stop setup clean fresh update-paragons paragons update-cards cards pull-forge-releases pull-card-overrides forge-frames forge-fonts
+# Regenerate app/forge/lib/fontMetrics.ts (Arimo Bold / Italic advance widths) from public/forge/fonts.
+forge-font-metrics:
+	@python3.11 scripts/forge-font-metrics.py
+
+.PHONY: all install run dev dev-windows build start stop setup clean fresh update-paragons paragons update-cards cards pull-forge-releases pull-card-overrides forge-frames forge-fonts forge-font-metrics
