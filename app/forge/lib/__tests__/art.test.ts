@@ -114,14 +114,16 @@ describe("uploadForgeArtRaw", () => {
 describe("readForgeUpload", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns the raw bytes when the blob is found", async () => {
+  it("returns the raw bytes and contentType when the blob is found", async () => {
     (get as ReturnType<typeof vi.fn>).mockResolvedValue({
       statusCode: 200,
       stream: new Blob([new Uint8Array([7, 8, 9])]).stream(),
+      blob: { contentType: "image/png" },
     });
-    const buf = await readForgeUpload("forge-art-raw/x.tif");
+    const result = await readForgeUpload("forge-art-raw/x.tif");
     expect(get).toHaveBeenCalledWith("forge-art-raw/x.tif", expect.objectContaining({ access: "private" }));
-    expect(Array.from(buf!)).toEqual([7, 8, 9]);
+    expect(Array.from(result!.data)).toEqual([7, 8, 9]);
+    expect(result!.contentType).toBe("image/png");
   });
 
   it("returns null when the blob is missing", async () => {

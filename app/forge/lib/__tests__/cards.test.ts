@@ -90,7 +90,7 @@ describe("uploadArt", () => {
   it("uploads and calls forge_set_working_art with the returned key", async () => {
     const c = ctx();
     (requireElder as any).mockResolvedValue(c);
-    (readForgeUpload as any).mockResolvedValue(Buffer.from([1, 2, 3]));
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
     (validateArtFile as any).mockReturnValue(null);
     (uploadForgeArt as any).mockResolvedValue("forge-art/abc");
     const r = await uploadArt("c1", "forge-art-raw/x.png");
@@ -111,7 +111,7 @@ describe("uploadFinished", () => {
   it("uploads and calls forge_set_working_finished with the returned key", async () => {
     const c = ctx();
     (requireElder as any).mockResolvedValue(c);
-    (readForgeUpload as any).mockResolvedValue(Buffer.from([1, 2, 3]));
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
     (validateArtFile as any).mockReturnValue(null);
     (uploadForgeFinished as any).mockResolvedValue("forge-finished/abc");
     const r = await uploadFinished("c1", "forge-art-raw/x.png");
@@ -143,7 +143,7 @@ describe("upload decode failures", () => {
   it("uploadArt returns a clear error when the image cannot be decoded", async () => {
     const c = ctx();
     (requireElder as any).mockResolvedValue(c);
-    (readForgeUpload as any).mockResolvedValue(Buffer.from([1, 2, 3]));
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
     (validateArtFile as any).mockReturnValue(null);
     (uploadForgeArt as any).mockRejectedValue(new Error("unsupported image format"));
     const r = await uploadArt("c1", "forge-art-raw/a.png");
@@ -154,7 +154,7 @@ describe("upload decode failures", () => {
   it("uploadFinished returns a clear error when the image cannot be decoded", async () => {
     const c = ctx();
     (requireElder as any).mockResolvedValue(c);
-    (readForgeUpload as any).mockResolvedValue(Buffer.from([1, 2, 3]));
+    (readForgeUpload as any).mockResolvedValue({ data: Buffer.from([1, 2, 3]), contentType: "image/png" });
     (validateArtFile as any).mockReturnValue(null);
     (uploadForgeFinished as any).mockRejectedValue(new Error("unsupported image format"));
     const r = await uploadFinished("c1", "forge-art-raw/c.png");

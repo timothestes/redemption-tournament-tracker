@@ -42,7 +42,7 @@ export async function uploadArt(
 
   const raw = await readForgeUpload(pathname);
   if (!raw) return { ok: false, error: "Could not read uploaded image" };
-  const invalid = validateArtFile({ type: "", size: raw.length, name: pathname });
+  const invalid = validateArtFile({ type: raw.contentType, size: raw.data.length, name: pathname });
   if (invalid) {
     await deleteForgeArt(pathname);
     return { ok: false, error: invalid };
@@ -50,7 +50,7 @@ export async function uploadArt(
 
   let key: string;
   try {
-    key = await uploadForgeArt(raw);
+    key = await uploadForgeArt(raw.data);
   } catch {
     await deleteForgeArt(pathname);
     return { ok: false, error: "Could not read image file." };
@@ -76,7 +76,7 @@ export async function uploadFinished(
 
   const raw = await readForgeUpload(pathname);
   if (!raw) return { ok: false, error: "Could not read uploaded image" };
-  const invalid = validateArtFile({ type: "", size: raw.length, name: pathname });
+  const invalid = validateArtFile({ type: raw.contentType, size: raw.data.length, name: pathname });
   if (invalid) {
     await deleteForgeArt(pathname);
     return { ok: false, error: invalid };
@@ -84,7 +84,7 @@ export async function uploadFinished(
 
   let key: string;
   try {
-    key = await uploadForgeFinished(raw);
+    key = await uploadForgeFinished(raw.data);
   } catch {
     await deleteForgeArt(pathname);
     return { ok: false, error: "Could not read image file." };

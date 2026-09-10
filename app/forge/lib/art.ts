@@ -109,10 +109,11 @@ export function readForgeArt(key: string): Promise<GetBlobResult | null> {
  * Function body cap; this reads it back server-side so it can be normalized and
  * moved into its permanent forge-art/ or forge-finished/ key). Returns null on a
  * miss instead of throwing — callers treat that as "could not read uploaded image". */
-export async function readForgeUpload(pathname: string): Promise<Buffer | null> {
+export async function readForgeUpload(pathname: string): Promise<{ data: Buffer; contentType: string } | null> {
   const blob = await get(pathname, { access: "private", ...forgeAuth });
   if (!blob || blob.statusCode !== 200) return null;
-  return Buffer.from(await new Response(blob.stream).arrayBuffer());
+  const data = Buffer.from(await new Response(blob.stream).arrayBuffer());
+  return { data, contentType: blob.blob.contentType };
 }
 
 /** Best-effort delete of a private art blob (used when art is replaced). Non-fatal on failure. */
