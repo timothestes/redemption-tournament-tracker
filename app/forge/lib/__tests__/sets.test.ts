@@ -4,7 +4,8 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/app/forge/lib/auth", () => ({ requireForge: vi.fn(), requireElder: vi.fn() }));
 
 import { requireForge, requireElder } from "@/app/forge/lib/auth";
-import { createSet, saveSetNotes, listSets, grantSet, revokeSet, bulkDeleteSets } from "../sets";
+import { revalidatePath } from "next/cache";
+import { createSet, saveSetNotes, listSets, grantSet, revokeSet, bulkDeleteSets, renameSet } from "../sets";
 
 function ctx(opts: { rpc?: any; rows?: any[] } = {}) {
   const order = vi.fn(async () => ({ data: opts.rows ?? [], error: null }));
@@ -43,6 +44,28 @@ describe("saveSetNotes", () => {
     const r = await saveSetNotes("set-1", "# themes");
     expect(r.ok).toBe(true);
     expect((c.supabase.rpc as any).mock.calls[0]).toEqual(["forge_save_set_notes", { p_set_id: "set-1", p_notes: "# themes" }]);
+  });
+});
+
+describe("renameSet", () => {
+  it("rejects a non-elder", async () => {
+    (requireElder as any).mockResolvedValue(null);
+    expect((await renameSet("s1", "New Name")).ok).toBe(false);
+  });
+
+  it("calls forge_rename_set and revalidates broadly", async () => {
+    const c = ctx({ rpc: async () => ({ data: null, error: null }) });
+    (requireElder as any).mockResolvedValue(c);
+    const r = await renameSet("s1", "New Name");
+    expect(r).toEqual({ ok: true });
+    expect(c.supabase.rpc).toHaveBeenCalledWith("forge_rename_set", { p_set_id: "s1", p_name: "New Name" });
+    expect(revalidatePath).toHaveBeenCalledWith("/forge", "layout");
+  });
+
+  it("surfaces an RPC error", async () => {
+    const c = ctx({ rpc: async () => ({ data: null, error: { message: "boom" } }) });
+    (requireElder as any).mockResolvedValue(c);
+    expect((await renameSet("s1", "New Name")).ok).toBe(false);
   });
 });
 
