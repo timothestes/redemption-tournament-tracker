@@ -12,7 +12,8 @@ import {
   type CommentRow,
 } from "@/app/forge/lib/comments";
 import { timeAgo } from "@/app/forge/lib/relativeTime";
-import { buildCommentEras } from "@/app/forge/lib/historyView";
+import { buildCommentEras, splitCommentEras, type CommentEraItem } from "@/app/forge/lib/historyView";
+import { useLocalStorageFlag } from "@/app/forge/lib/useLocalStorageFlag";
 
 function valueText(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -38,6 +39,7 @@ export default function CommentThread({
   const [value, setValue] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState("");
+  const [showOlder, setShowOlder] = useLocalStorageFlag(`forge:card:${cardId}:comments-expanded`);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) =>
     start(async () => {
@@ -51,6 +53,9 @@ export default function CommentThread({
   const cardComments = comments.filter((c) => c.proposalId === null);
   const top = cardComments.filter((c) => c.parentId === null);
   const repliesOf = (id: string) => cardComments.filter((c) => c.parentId === id);
+  const currentVersionNumber = versions.length
+    ? Math.max(...versions.map((v) => v.versionNumber))
+    : null;
 
   const submitTop = () =>
     run(
@@ -130,6 +135,23 @@ export default function CommentThread({
     </div>
   );
 
+  const renderItem = (item: CommentEraItem) => (
+    item.kind === "era" ? (
+      <div key={`era-${item.versionNumber}`} className="flex items-center gap-2 text-[10px] text-muted-foreground" aria-hidden>
+        <span className="h-px flex-1 bg-border" />
+        v{item.versionNumber} {item.status === "draft" ? "updated" : "released"} · {new Date(item.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    ) : (
+      <div key={item.comment.id} className="space-y-2">
+        <Comment c={item.comment} />
+        {repliesOf(item.comment.id).map((r) => (
+          <Comment key={r.id} c={r} isReply />
+        ))}
+      </div>
+    )
+  );
+
   return (
     <div className="space-y-3">
       {/* Compose */}
@@ -164,22 +186,31 @@ export default function CommentThread({
       </div>
 
       {top.length === 0 && <p className="text-xs text-muted-foreground">No comments yet.</p>}
-      {buildCommentEras(top, versions).map((item) =>
-        item.kind === "era" ? (
-          <div key={`era-${item.versionNumber}`} className="flex items-center gap-2 text-[10px] text-muted-foreground" aria-hidden>
-            <span className="h-px flex-1 bg-border" />
-            v{item.versionNumber} {item.status === "draft" ? "updated" : "released"} · {new Date(item.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-            <span className="h-px flex-1 bg-border" />
-          </div>
-        ) : (
-          <div key={item.comment.id} className="space-y-2">
-            <Comment c={item.comment} />
-            {repliesOf(item.comment.id).map((r) => (
-              <Comment key={r.id} c={r} isReply />
-            ))}
-          </div>
-        )
-      )}
+      {(() => {
+        const { older, recent, hiddenCommentCount } = splitCommentEras(
+          buildCommentEras(top, versions),
+          currentVersionNumber,
+          (id) => repliesOf(id).length
+        );
+        return (
+          <>
+            {older.length > 0 && (
+              <button
+                type="button"
+                aria-expanded={showOlder}
+                onClick={() => setShowOlder(!showOlder)}
+                className="cursor-pointer select-none text-xs text-muted-foreground hover:text-foreground"
+              >
+                {showOlder
+                  ? "Hide earlier comments"
+                  : `${hiddenCommentCount} comment${hiddenCommentCount === 1 ? "" : "s"} on earlier versions`}
+              </button>
+            )}
+            {showOlder && older.map(renderItem)}
+            {recent.map(renderItem)}
+          </>
+        );
+      })()}
     </div>
   );
 }
