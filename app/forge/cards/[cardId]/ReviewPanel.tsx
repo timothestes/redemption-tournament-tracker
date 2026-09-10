@@ -101,7 +101,7 @@ export default function ReviewPanel({
 
       <section>
         <h2 className="mb-2 text-sm font-semibold">History</h2>
-        <CardHistory history={history} />
+        <CardHistory history={history} cardId={card.id} />
       </section>
 
       <section>

@@ -110,3 +110,54 @@ export function buildCommentEras(
   }
   return out;
 }
+
+// The fold for History: the latest version (plus anything newer, plus anything
+// closed at the same instant — an accept freezes the version and closes its
+// proposal together) stays expanded; older entries go behind one disclosure.
+// `hiddenVersionCount` is 0 whenever nothing is folded, so the label can never
+// say "Show 0 earlier versions".
+export function splitHistoryForDisplay(events: HistoryEvent[]): {
+  recent: HistoryEvent[];
+  older: HistoryEvent[];
+  hiddenVersionCount: number;
+} {
+  const nothingFolded = { recent: events, older: [] as HistoryEvent[], hiddenVersionCount: 0 };
+  let latestIdx = -1;
+  let latestNumber = -Infinity;
+  events.forEach((e, i) => {
+    if (e.kind === "version" && e.version.versionNumber > latestNumber) {
+      latestNumber = e.version.versionNumber;
+      latestIdx = i;
+    }
+  });
+  if (latestIdx === -1) return nothingFolded;
+  // Keep same-instant siblings (accepted/superseded proposals) with their version.
+  const at = Date.parse(events[latestIdx].at);
+  let boundary = latestIdx;
+  while (boundary + 1 < events.length && Date.parse(events[boundary + 1].at) === at) boundary++;
+  const older = events.slice(boundary + 1);
+  const hiddenVersionCount = older.filter((e) => e.kind === "version").length;
+  if (hiddenVersionCount === 0) return nothingFolded;
+  return { recent: events.slice(0, boundary + 1), older, hiddenVersionCount };
+}
+
+// The fold for Comments: default to the current version's era. Everything
+// before its era divider collapses behind one disclosure. Replies render as
+// their own items, so they count toward the hidden total.
+export function splitCommentEras(
+  items: CommentEraItem[],
+  currentVersionNumber: number | null,
+  replyCount: (commentId: string) => number
+): { older: CommentEraItem[]; recent: CommentEraItem[]; hiddenCommentCount: number } {
+  if (currentVersionNumber === null) return { older: [], recent: items, hiddenCommentCount: 0 };
+  const idx = items.findIndex((i) => i.kind === "era" && i.versionNumber === currentVersionNumber);
+  // No divider for the current version = nobody has commented since it landed;
+  // every comment belongs to an earlier era.
+  const older = idx === -1 ? items : items.slice(0, idx);
+  const recent = idx === -1 ? [] : items.slice(idx);
+  const hiddenCommentCount = older.reduce(
+    (n, i) => (i.kind === "comment" ? n + 1 + replyCount(i.comment.id) : n),
+    0
+  );
+  return { older, recent, hiddenCommentCount };
+}

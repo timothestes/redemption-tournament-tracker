@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   deriveSupersededBy, buildHistory, buildCommentEras,
   EVENT_LABEL, VERSION_STATUS_LABEL, VERSION_PILL, versionVerb,
+  splitHistoryForDisplay, splitCommentEras,
 } from "../historyView";
 
 const prop = (over: any) => ({
@@ -115,5 +116,104 @@ describe("version rendering maps", () => {
     expect(versionVerb("published")).toBe("released");
     expect(versionVerb("approved")).toBe("released");
     expect(versionVerb("superseded")).toBe("released");
+  });
+});
+
+describe("splitHistoryForDisplay", () => {
+  const versions7 = Array.from({ length: 7 }, (_, i) => {
+    const n = i + 1;
+    return ver({ id: `v${n}`, versionNumber: n, createdAt: `2026-07-0${n}T00:00:00Z` });
+  });
+
+  it("keeps only the latest version expanded, folding the rest behind one count", () => {
+    const h = buildHistory(versions7, [], [], []);
+    const { recent, older, hiddenVersionCount } = splitHistoryForDisplay(h);
+    expect(recent.length).toBe(1);
+    expect((recent[0] as any).version.versionNumber).toBe(7);
+    expect(hiddenVersionCount).toBe(6);
+    expect(older.length).toBe(6);
+  });
+
+  it("keeps events newer than the latest version expanded alongside it", () => {
+    const v1 = ver({ id: "v1", versionNumber: 1, createdAt: "2026-07-01T00:00:00Z" });
+    const v2 = ver({ id: "v2", versionNumber: 2, createdAt: "2026-07-03T00:00:00Z" });
+    const ev = { id: 1, action: "card_approved", actor: "u1", actorName: "Tim", at: "2026-07-04T00:00:00Z" };
+    const h = buildHistory([v2, v1], [], [ev], []);
+    const { recent, hiddenVersionCount } = splitHistoryForDisplay(h);
+    expect(recent.map((e) => e.kind)).toEqual(["lifecycle", "version"]);
+    expect(hiddenVersionCount).toBe(1);
+  });
+
+  it("keeps a same-instant accepted proposal with the version it minted", () => {
+    const v1 = ver({ id: "v1", versionNumber: 1, createdAt: "2026-07-01T00:00:00Z" });
+    const v2 = ver({ id: "v2", versionNumber: 2, createdAt: "2026-07-03T00:00:00Z" });
+    const accepted = prop({ id: "p1", status: "accepted", closedAt: "2026-07-03T00:00:00Z", resultingVersionId: "v2" });
+    const h = buildHistory([v2, v1], [accepted], [], []);
+    const { recent, older, hiddenVersionCount } = splitHistoryForDisplay(h);
+    expect(recent.map((e) => e.kind)).toEqual(["version", "proposal"]);
+    expect(older.map((e) => e.kind)).toEqual(["version"]);
+    expect(hiddenVersionCount).toBe(1);
+  });
+
+  it("folds nothing when there are no version events", () => {
+    const ev1 = { id: 1, action: "card_approved", actor: "u1", actorName: "Tim", at: "2026-07-02T00:00:00Z" };
+    const ev2 = { id: 2, action: "card_archived", actor: "u1", actorName: "Tim", at: "2026-07-01T00:00:00Z" };
+    const h = buildHistory([], [], [ev1, ev2], []);
+    const { recent, older, hiddenVersionCount } = splitHistoryForDisplay(h);
+    expect(older).toEqual([]);
+    expect(hiddenVersionCount).toBe(0);
+    expect(recent).toEqual(h);
+  });
+
+  it("never folds down to \"Show 0 earlier versions\" (a lone version with an older denied proposal)", () => {
+    const v1 = ver({ id: "v1", versionNumber: 1, createdAt: "2026-07-03T00:00:00Z" });
+    const denied = prop({ id: "p1", status: "denied", closedAt: "2026-07-01T00:00:00Z" });
+    const h = buildHistory([v1], [denied], [], []);
+    const { older, hiddenVersionCount } = splitHistoryForDisplay(h);
+    expect(older).toEqual([]);
+    expect(hiddenVersionCount).toBe(0);
+  });
+});
+
+describe("splitCommentEras", () => {
+  const v1 = { versionNumber: 1, createdAt: "2026-07-01T00:00:00Z", status: "published" as const };
+  const v2 = { versionNumber: 2, createdAt: "2026-07-03T00:00:00Z", status: "published" as const };
+  const m1 = comment({ id: "m1", createdAt: "2026-07-02T00:00:00Z" });
+  const m2 = comment({ id: "m2", createdAt: "2026-07-04T00:00:00Z" });
+
+  it("defaults to the current version's era, folding earlier eras", () => {
+    const items = buildCommentEras([m1, m2], [v2, v1]);
+    const { recent, older, hiddenCommentCount } = splitCommentEras(items, 2, () => 0);
+    expect(recent.map((i) => (i.kind === "era" ? `v${i.versionNumber}` : i.comment.id))).toEqual(["v2", "m2"]);
+    expect(older.map((i) => (i.kind === "era" ? `v${i.versionNumber}` : i.comment.id))).toEqual(["v1", "m1"]);
+    expect(hiddenCommentCount).toBe(1);
+  });
+
+  it("counts replies toward the hidden total", () => {
+    const items = buildCommentEras([m1, m2], [v2, v1]);
+    const { hiddenCommentCount } = splitCommentEras(items, 2, (id) => (id === "m1" ? 2 : 0));
+    expect(hiddenCommentCount).toBe(3);
+  });
+
+  it("hides nothing when there are no versions", () => {
+    const items = buildCommentEras([m1], []);
+    const { older, hiddenCommentCount } = splitCommentEras(items, null, () => 0);
+    expect(older).toEqual([]);
+    expect(hiddenCommentCount).toBe(0);
+  });
+
+  it("folds everything when nobody has commented since the current version", () => {
+    const v2later = { versionNumber: 2, createdAt: "2026-07-05T00:00:00Z", status: "published" as const };
+    const items = buildCommentEras([m1], [v2later, v1]);
+    const { recent, hiddenCommentCount } = splitCommentEras(items, 2, () => 0);
+    expect(recent).toEqual([]);
+    expect(hiddenCommentCount).toBe(1);
+  });
+
+  it("folds nothing when every comment is in the current era", () => {
+    const items = buildCommentEras([m1], [v1]);
+    const { older, hiddenCommentCount } = splitCommentEras(items, 1, () => 0);
+    expect(older).toEqual([]);
+    expect(hiddenCommentCount).toBe(0);
   });
 });
