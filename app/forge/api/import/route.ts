@@ -95,7 +95,7 @@ export async function POST(req: Request): Promise<Response> {
         if (file) {
           let key: string;
           try {
-            key = await uploadForgeFinished(file);
+            key = await uploadForgeFinished(Buffer.from(await file.arrayBuffer()));
           } catch {
             return { name, ok: false, error: "Image upload failed" };
           }
@@ -120,7 +120,7 @@ export async function POST(req: Request): Promise<Response> {
       if (file) {
         let key: string;
         try {
-          key = await uploadForgeFinished(file);
+          key = await uploadForgeFinished(Buffer.from(await file.arrayBuffer()));
         } catch {
           return { name, ok: false, error: "Image upload failed" };
         }
