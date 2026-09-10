@@ -27,9 +27,13 @@
  * `compareCardsEndOfTimes` is a validated one-off for that single set (real
  * print numbers, not a generalizable rule — see app/forge/lib/cardOrder.ts
  * for where it's applied): it counts a leading "The" as a real word ("The
- * Book of Life" prints after "Letters to Thessalonica", not before) and
- * breaks same-strength ties by toughness ascending instead of descending
- * (Risen by Christ 2/3 prints before Stand Firm 2/5).
+ * Book of Life" prints after "Letters to Thessalonica", not before), and
+ * Good Enhancements specifically break same-strength ties by toughness
+ * ascending instead of descending (Risen by Christ 2/3 prints before Stand
+ * Firm 2/5) — this does NOT extend to Evil Enhancements (Great Feast 0/6
+ * still prints before Filled with Flesh 0/0), Heroes/Evil Characters (Seven
+ * Trumpet Sounders 7/7 prints before The Third Creature 7/5), or any other
+ * section — everything else keeps descending, same as compareCardsDefault.
  *
  * The comparator degrades gracefully: given only `name` + `type` it still
  * yields section order then alphabetical.
@@ -274,26 +278,33 @@ function dominantAlignmentRank(alignment: string | undefined): number {
 type SortKey = (string | number)[];
 
 // Covenants, Curses, Cities, Sites: brigade group (multi first), optionally
-// strength descending (Covenants/Curses carry power), then name.
+// strength descending (Covenants/Curses carry power), then name. Covenants
+// and Curses aren't characters or enhancements, so End of Times' ascending
+// toughness rule (see strengthKey) doesn't apply here — no evidence it does,
+// and reversing it broke nothing validated, so it stays descending.
 function brigadeGroupKey(section: number, card: SortableCard, byStrength: boolean, eot: boolean): SortKey {
   const { rank, tie } = brigadeRank(card.brigade, "any");
   return byStrength === true
-    ? [section, rank, tie, ...strengthKey(card.strength, card.toughness, eot), alphaKey(card.name, eot)]
+    ? [section, rank, tie, ...strengthKey(card.strength, card.toughness), alphaKey(card.name, eot)]
     : [section, rank, tie, alphaKey(card.name, eot)];
 }
 
 // Dual section: characters, then character+enhancement dual-types
-// (GE/Evil Character, Hero/EE), then enhancements — each strength descending.
+// (GE/Evil Character, Hero/EE), then enhancements — each strength
+// descending. End of Times' ascending exception is confirmed for plain GE
+// only (see strengthKey); no evidence it extends to a dual GE/EE pairing,
+// so this stays descending under eot too.
 function dualKey(card: SortableCard, parts: string[], eot: boolean): SortKey {
   const hasChar = parts.some((p) => GOOD_CHAR_TYPES.has(norm(p)) === true || EVIL_CHAR_TYPES.has(norm(p)) === true);
   const hasEnh = parts.some((p) => GOOD_ENH_TYPES.has(norm(p)) === true || EVIL_ENH_TYPES.has(norm(p)) === true);
   const group = hasChar === true && hasEnh === true ? 1 : hasChar === true ? 0 : 2;
-  return [SECTION_DUAL, group, ...strengthKey(card.strength, card.toughness, eot), alphaKey(card.name, eot)];
+  return [SECTION_DUAL, group, ...strengthKey(card.strength, card.toughness), alphaKey(card.name, eot)];
 }
 
 // `eot` bundles End of Times' validated deviations from every other set: a
-// literal (not ignored) leading "The", and toughness ties broken ascending
-// instead of descending. See compareCardsEndOfTimes and cardOrder.ts.
+// literal (not ignored) leading "The", and — for enhancements only, not
+// characters — toughness ties broken ascending instead of descending. See
+// compareCardsEndOfTimes and cardOrder.ts.
 function buildKey(card: SortableCard, eot: boolean): SortKey {
   const name = alphaKey(card.name, eot);
   const type = card.type ?? "";
@@ -330,12 +341,18 @@ function buildKey(card: SortableCard, eot: boolean): SortKey {
     const { rank, tie } = brigadeRank(card.brigade, side);
     const isCharacter =
       side === "good" ? GOOD_CHAR_TYPES.has(firstNorm) : EVIL_CHAR_TYPES.has(firstNorm);
+    // Under End of Times only Good Enhancements ascend (Risen by Christ 2/3
+    // before Stand Firm 2/5). Heroes and Evil Characters keep descending
+    // (Seven Trumpet Sounders 7/7 before The Third Creature 7/5), and so do
+    // Evil Enhancements (Great Feast 0/6 before Filled with Flesh 0/0) —
+    // this is a GE-only exception, not "enhancements" generally.
+    const toughnessAscending = eot === true && side === "good" && isCharacter === false;
     return [
       side === "good" ? SECTION_GOOD : SECTION_EVIL,
       rank,
       tie,
       isCharacter === true ? 0 : 1,
-      ...strengthKey(card.strength, card.toughness, eot),
+      ...strengthKey(card.strength, card.toughness, toughnessAscending),
       name,
     ];
   }
@@ -379,8 +396,9 @@ export function compareCardsDefault(a: SortableCard, b: SortableCard): number {
 }
 
 // One-off for End of Times (see module docstring) — counts a leading "The"
-// as a real word, and breaks same-strength ties by toughness ascending
-// instead of descending.
+// as a real word, and breaks same-strength Good Enhancement ties by
+// toughness ascending instead of descending (everything else, including
+// Evil Enhancements, keeps descending).
 export function compareCardsEndOfTimes(a: SortableCard, b: SortableCard): number {
   return compare(a, b, true);
 }

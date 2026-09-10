@@ -21,11 +21,12 @@ function toSortable(c: ForgeCardFull): SortableCard {
 
 // End of Times is a confirmed one-off, not a pattern to generalize: its
 // final numbering (a) counts a leading "The" as a real word and breaks
-// same-strength ties by toughness ascending, where every other validated
-// set does the opposite (see compareCardsEndOfTimes), and (b) hand-orders
-// its five Dominants in a sequence that doesn't reduce to any rule —
-// Beast's Mark deliberately prints last despite alphabetizing before
-// "Deceiving the Nations".
+// same-strength Good Enhancement ties by toughness ascending — everything
+// else (Evil Enhancements included) keeps descending, same as every other
+// validated set (see compareCardsEndOfTimes) — and (b) hand-orders its five
+// Dominants in a sequence that doesn't reduce to any rule — Beast's Mark
+// deliberately prints last despite alphabetizing before "Deceiving the
+// Nations".
 export const END_OF_TIMES_SET_ID = "908b4ce7-9bf8-474c-b3bf-ff957462f983";
 const END_OF_TIMES_DOMINANT_ORDER = [
   "Alpha and Omega", "Word of the Lord", "Armageddon", "Deceiving the Nations", "Beast's Mark",
