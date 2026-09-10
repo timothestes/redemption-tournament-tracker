@@ -79,7 +79,7 @@ export function distinctSets(rows: LackeyRow[]): { set: string; count: number }[
     .sort((a, b) => b.count - a.count || a.set.localeCompare(b.set));
 }
 
-const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp"];
+const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"];
 
 // Zip entries are prefixed by a variable root folder — match by path suffix.
 export function findImageEntry(row: LackeyRow, entryNames: string[]): string | null {

@@ -297,7 +297,7 @@ export function tableToCards(rows: string[][], mapping: ColumnMapping): {
 // Images zip matching
 // ---------------------------------------------------------------------------
 
-const IMAGE_EXT_RE = /\.(jpe?g|png|webp)$/i;
+const IMAGE_EXT_RE = /\.(jpe?g|png|webp|tiff?)$/i;
 
 /** True for zip entries that are usable card images — not directories, macOS junk
  *  (__MACOSX/ trees, "._" AppleDouble files), or non-image files. Pure. */

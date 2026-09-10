@@ -11,6 +11,26 @@ export type CardType = (typeof CARD_TYPES)[number];
 export const ALIGNMENTS = ["Good", "Evil", "Neutral", "Good_Evil"] as const;
 export type Alignment = (typeof ALIGNMENTS)[number];
 
+const GOOD_TYPES: readonly CardType[] = ["Hero", "GE"];
+const EVIL_TYPES: readonly CardType[] = ["EvilCharacter", "EE"];
+
+/**
+ * Derives the alignment implied by a card's selected types, for auto-filling the
+ * alignment field (still fully overridable — see CardDetailsFields). Returns null
+ * when the rule says "leave unchanged": no types selected, or only ambiguous types
+ * (Dominant/Fortress/Artifact/Site/City/Covenant/Curse/LostSoul) — those are
+ * ignored even alongside a good/evil type. Pure. Exported for the spreadsheet
+ * importer's alignment fallback (#386) — keep this name/path stable.
+ */
+export function deriveAlignmentFromTypes(types: CardType[]): Alignment | null {
+  const hasGood = types.some((t) => GOOD_TYPES.includes(t));
+  const hasEvil = types.some((t) => EVIL_TYPES.includes(t));
+  if (hasGood && hasEvil) return "Good_Evil";
+  if (hasGood) return "Good";
+  if (hasEvil) return "Evil";
+  return null;
+}
+
 // Resolved brigades only — no GoodMulti/EvilMulti sentinels (spec Decision #2).
 // The kit has no Red/Teal wash — those preview as solid BRIGADE_HEX; EvilGold
 // reuses the kit's single "gold" wash.

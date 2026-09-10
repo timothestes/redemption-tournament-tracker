@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createSet, saveSetTargets, bulkDeleteSets, type ForgeSetSummary } from "@/app/forge/lib/sets";
-import { defaultTargets } from "@/app/forge/lib/progress";
-import { CARD_TYPES } from "@/app/forge/lib/designCard";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,9 +26,6 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState<number>(100);
-  // Per-type counts shown in the preview. Recomputed from `total` only when the
-  // total changes (via the seed key), so manual per-type nudges aren't clobbered.
-  const [perType, setPerType] = useState<Record<string, number>>(() => seedPerType(100));
   const [isPrivate, setIsPrivate] = useState(false);
 
   const [selecting, setSelecting] = useState(false);
@@ -104,20 +99,10 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
     router.refresh();
   }
 
-  function seedTotal(next: number) {
-    setTotal(next);
-    setPerType(seedPerType(next));
-  }
-
-  const grandTotal = useMemo(
-    () => CARD_TYPES.reduce((sum, t) => sum + (perType[t] ?? 0), 0),
-    [perType],
-  );
-
   function openCreate() {
     setName("");
     setError(null);
-    seedTotal(100);
+    setTotal(100);
     setIsPrivate(false);
     setOpen(true);
   }
@@ -132,18 +117,15 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
       setError(r.error);
       return;
     }
-    // Build the seed from the (possibly tweaked) per-type preview, brigade-agnostic.
-    const cells: Record<string, Record<string, number>> = {};
-    for (const t of CARD_TYPES) {
-      if ((perType[t] ?? 0) > 0) cells[t] = { none: perType[t] };
-    }
-    const seed = await saveSetTargets(r.id, { total: total || undefined, cells });
-    if (!seed.ok) {
-      // Set exists; don't strand the user — send them in, but tell them targets failed.
-      setBusy(false);
-      setError("Set created but targets failed to save — set them from the Settings tab.");
-      router.push(`/forge/sets/${r.id}/settings`);
-      return;
+    if (total > 0) {
+      const seed = await saveSetTargets(r.id, { total });
+      if (!seed.ok) {
+        // Set exists; don't strand the user — send them in, but tell them the target failed.
+        setBusy(false);
+        setError("Set created but the target count failed to save — set it from the Settings tab.");
+        router.push(`/forge/sets/${r.id}/settings`);
+        return;
+      }
     }
     // Keep `busy` true through navigation so the spinner shows until the next page loads.
     router.push(`/forge/sets/${r.id}/cards`);
@@ -329,7 +311,7 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
           <DialogHeader>
             <DialogTitle>New set</DialogTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Name the set and seed starting targets — you can refine them anytime from the Settings tab.
+              Name the set — you can set per-type targets anytime from the Settings tab.
             </p>
           </DialogHeader>
 
@@ -371,32 +353,11 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
                 type="number"
                 min={0}
                 value={total}
-                onChange={(e) => seedTotal(Number(e.target.value))}
+                onChange={(e) => setTotal(Number(e.target.value))}
                 aria-label="Total cards"
                 className={`${inputClass} w-24`}
               />
             </label>
-
-            <div>
-              <p className="mb-2 text-xs text-muted-foreground">
-                Suggested per-type targets ({grandTotal} total) — nudge any value:
-              </p>
-              <ul className="divide-y divide-border">
-                {CARD_TYPES.map((t) => (
-                  <li key={t} className="flex items-center justify-between gap-2 py-1.5">
-                    <span className="text-sm">{t}</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={perType[t] ?? 0}
-                      onChange={(e) => setPerType((p) => ({ ...p, [t]: Number(e.target.value) }))}
-                      aria-label={`${t} target`}
-                      className={`${inputClass} w-20`}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
           </DialogBody>
@@ -420,13 +381,4 @@ export default function SetsIndex({ sets, canCreate }: { sets: ForgeSetSummary[]
       </Dialog>
     </div>
   );
-}
-
-// Per-type counts for a given grand total, derived from the centralized default
-// distribution in progress.ts.
-function seedPerType(total: number): Record<string, number> {
-  const seed: Record<string, number> = {};
-  const cells = defaultTargets(total).cells ?? {};
-  for (const t of CARD_TYPES) seed[t] = cells[t]?.none ?? 0;
-  return seed;
 }

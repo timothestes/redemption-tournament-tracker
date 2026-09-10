@@ -75,7 +75,9 @@ export async function renameSet(setId: string, name: string): Promise<Result> {
   if (!ctx) return { ok: false, error: "Not authorized" };
   const { error } = await ctx.supabase.rpc("forge_rename_set", { p_set_id: setId, p_name: name });
   if (error) return { ok: false, error: "Could not rename set" };
-  revalidatePath(`/forge/sets/${setId}`);
+  // The name shows in the set header/tabs, the sets index, and every card page
+  // for this set — refresh broadly, same as other cross-surface changes.
+  revalidatePath("/forge", "layout");
   return { ok: true };
 }
 
