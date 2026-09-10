@@ -214,7 +214,14 @@ export default function SpreadsheetSourcePanel({
     }
     return [...byCol.values()].filter((fields) => fields.length > 1);
   }, [mapping]);
-  const mappingSuspicious = mapping.name === undefined || nameLooksWrong || doubledColumns.length > 0;
+  // A sheet that never mapped Alignment or Brigade imports cards that look complete but lost both (#386).
+  const hasDataRows = (sheet?.rows.length ?? 0) > 1;
+  const unmappedFields = useMemo(
+    () => (hasDataRows ? (["alignment", "brigade"] as const).filter((f) => mapping[f] === undefined) : []),
+    [hasDataRows, mapping],
+  );
+  const mappingSuspicious = mapping.name === undefined || nameLooksWrong
+    || doubledColumns.length > 0 || detected.duplicates.length > 0 || unmappedFields.length > 0;
 
   function remap(field: MappableField, value: string) {
     const next: ColumnMapping = { ...mapping };
@@ -296,6 +303,19 @@ export default function SpreadsheetSourcePanel({
           {doubledColumns.map((fields) => (
             <p key={fields.join()} className="mb-2 text-xs text-amber-600 dark:text-amber-500">
               {fields.join(" and ")} are reading the same column.
+            </p>
+          ))}
+          {unmappedFields.length > 0 && (
+            <p className="mb-2 text-xs text-amber-600 dark:text-amber-500">
+              {`No ${unmappedFields.map((f) => `“${FIELD_LABELS[f]}”`).join(" or ")} column found — every `
+                + `card imports without it. Alignment is guessed from the card type where it can be; brigade `
+                + `can't be. Point the mapping below at the right column if the sheet has one.`}
+            </p>
+          )}
+          {!override && detected.duplicates.map(({ field, index }) => (
+            <p key={`${field}-${index}`} className="mb-2 text-xs text-amber-600 dark:text-amber-500">
+              {`Two columns look like ${FIELD_LABELS[field]} — reading `
+                + `“${(header[mapping[field]] ?? "").trim()}” and ignoring “${(header[index] ?? "").trim()}”.`}
             </p>
           ))}
           {ignoredHeaders.length > 0 && (

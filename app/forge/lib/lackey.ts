@@ -1,7 +1,10 @@
 // Pure LackeyCCG plugin-format helpers for the Forge set importer.
 // CLIENT-SAFE: no server-only imports. Column conventions mirror scripts/parse-carddata.js.
 
-import { cardRawText, parseStatInput, type Brigade, type CardType, type DesignCard } from "./designCard";
+import {
+  cardApplicability, cardRawText, deriveAlignmentFromTypes, parseStatInput,
+  type Alignment, type Brigade, type CardType, type DesignCard,
+} from "./designCard";
 
 export interface LackeyRow {
   name: string; set: string; imageFile: string; officialSet: string;
@@ -115,12 +118,19 @@ const BRIGADE_MAP: Record<string, Brigade> = {
   "gray": "Gray", "orange": "Orange", "pale green": "PaleGreen",
 };
 
+// "Gold" alone doesn't say which gold — resolved from the row's alignment, else its
+// card types; never guessed when both are silent.
+const AMBIGUOUS_BRIGADE_MAP: Record<string, { Good: Brigade; Evil: Brigade }> = {
+  gold: { Good: "GoodGold", Evil: "EvilGold" },
+};
+
 const LEGALITIES = ["Rotation", "Classic", "Scrolls", "Paragon", "Banned"];
 
 // "Purple (Crimson)" → Purple, Crimson; "Crimson/Orange/Pale Green" → three values.
+const MULTI_SEP = /\s*(?:[/,&]|\band\b)\s*/i;   // slash, comma, ampersand, or the word "and"
 function splitMulti(value: string): string[] {
-  const parens = [...value.matchAll(/\(([^)]+)\)/g)].flatMap((m) => m[1].split("/"));
-  const base = value.replace(/\([^)]*\)/g, " ").split("/");
+  const parens = [...value.matchAll(/\(([^)]+)\)/g)].flatMap((m) => m[1].split(MULTI_SEP));
+  const base = value.replace(/\([^)]*\)/g, " ").split(MULTI_SEP);
   return [...base, ...parens].map((s) => s.trim()).filter((s) => s && s !== "-");
 }
 
@@ -135,7 +145,48 @@ function parseStat(v: string): number | string | null {
 }
 
 const CLASS_TOKENS = new Set(["warrior", "weapon", "territory", "star", "cloud"]);
-const ALIGNMENT_TOKENS = new Set(["good", "evil", "neutral", "good/evil"]);
+
+// Keys are normalizeAlignment output: "Good/Evil", "good & evil", "good-evil", "G/E".
+const ALIGNMENT_ALIASES: Record<string, Alignment> = {
+  "good": "Good", "evil": "Evil", "neutral": "Neutral",
+  "good evil": "Good_Evil", "evil good": "Good_Evil", "good and evil": "Good_Evil",
+  "g e": "Good_Evil", "dual": "Good_Evil", "dual alignment": "Good_Evil", "both": "Good_Evil",
+};
+function normalizeAlignment(v: string): string {
+  return clean(v).toLowerCase().replace(/[^a-z]+/g, " ").trim();
+}
+
+function rowTypes(row: LackeyRow): CardType[] {
+  return [...new Set(splitMulti(row.type).flatMap((t) => TYPE_MAP[t.toLowerCase()] ?? []))] as CardType[];
+}
+// The Alignment cell when it spells one we know, else what the card types imply (#380).
+// An unrecognized spelling yields null — the audit reports it instead of guessing.
+function rowAlignment(row: LackeyRow, types: CardType[]): Alignment | null {
+  const norm = normalizeAlignment(row.alignment);
+  if (norm) return ALIGNMENT_ALIASES[norm] ?? null;
+  return deriveAlignmentFromTypes(types);
+}
+/** Brigade cell -> resolved brigades + one warning per token we couldn't place. The
+ *  mapper and the audit both call this, so they can never disagree. Pure. */
+function resolveBrigades(row: LackeyRow, types: CardType[], alignment: Alignment | null): {
+  brigades: Brigade[]; warnings: string[];
+} {
+  const side = alignment ?? deriveAlignmentFromTypes(types); // explicit cell wins, then card type
+  const brigades: Brigade[] = [];
+  const warnings: string[] = [];
+  for (const token of splitMulti(row.brigade)) {
+    const key = token.toLowerCase().replace(/\s+/g, " ");
+    const exact = BRIGADE_MAP[key];
+    if (exact) { brigades.push(exact); continue; }
+    const pair = AMBIGUOUS_BRIGADE_MAP[key];
+    if (pair && (side === "Good" || side === "Evil")) { brigades.push(pair[side]); continue; }
+    // "Multi" has no Brigade value (spec Decision #2) — warn so the designer lists the real ones.
+    warnings.push(pair
+      ? `ambiguous brigade "${token}" — use Good Gold or Evil Gold`
+      : `unrecognized brigade "${token}"`);
+  }
+  return { brigades: [...new Set(brigades)], warnings };
+}
 
 /** Data-quality audit: one warning per cell value that lackeyRowToDesignCard would
  *  silently drop (unknown type/brigade/class token, non-numeric stat, unknown
@@ -145,8 +196,11 @@ export function auditLackeyRow(row: LackeyRow): string[] {
   for (const t of splitMulti(row.type)) {
     if (!TYPE_MAP[t.toLowerCase()]) warnings.push(`unrecognized type "${t}"`);
   }
-  for (const b of splitMulti(row.brigade)) {
-    if (!BRIGADE_MAP[b.toLowerCase()]) warnings.push(`unrecognized brigade "${b}"`);
+  const types = rowTypes(row);
+  const alignment = rowAlignment(row, types);
+  warnings.push(...resolveBrigades(row, types, alignment).warnings);
+  if (!clean(row.brigade) && cardApplicability(types).brigades === "required") {
+    warnings.push("no brigade — this card type usually has one");
   }
   for (const c of splitMulti(row.class)) {
     if (!CLASS_TOKENS.has(c.toLowerCase())) warnings.push(`unrecognized class "${c}"`);
@@ -154,9 +208,11 @@ export function auditLackeyRow(row: LackeyRow): string[] {
   for (const [label, v] of [["strength", row.strength], ["toughness", row.toughness]] as const) {
     if (clean(v) && parseStat(v) === null) warnings.push(`non-numeric ${label} "${clean(v)}"`);
   }
-  const alignment = clean(row.alignment);
-  if (alignment && !ALIGNMENT_TOKENS.has(alignment.toLowerCase())) {
-    warnings.push(`unrecognized alignment "${alignment}"`);
+  const alignmentCell = normalizeAlignment(row.alignment);
+  if (alignmentCell && !ALIGNMENT_ALIASES[alignmentCell]) {
+    warnings.push(`unrecognized alignment "${clean(row.alignment)}"`);
+  } else if (!alignmentCell && alignment === null && types.length > 0) {
+    warnings.push("no alignment — the sheet has none and the card type doesn't imply one");
   }
   const legality = clean(row.legality);
   if (legality && !LEGALITIES.includes(legality)) warnings.push(`unrecognized legality "${legality}"`);
@@ -173,14 +229,11 @@ export function lackeyRowToDesignCard(row: LackeyRow): DesignCard {
     card.specialAbility = rawText; // legacy fallback field, kept in sync for older readers
   }
 
-  const types = [...new Set(
-    splitMulti(row.type).flatMap((t) => TYPE_MAP[t.toLowerCase()] ?? []),
-  )] as CardType[];
+  const types = rowTypes(row);
   if (types.length) card.cardType = types;
-
-  const brigades = [...new Set(
-    splitMulti(row.brigade).map((b) => BRIGADE_MAP[b.toLowerCase()]).filter(Boolean),
-  )] as Brigade[];
+  const alignment = rowAlignment(row, types);
+  if (alignment) card.alignment = alignment;
+  const { brigades } = resolveBrigades(row, types, alignment);
   if (brigades.length) card.brigades = brigades;
 
   const strength = parseStat(row.strength);
@@ -202,12 +255,6 @@ export function lackeyRowToDesignCard(row: LackeyRow): DesignCard {
     const ids = identifier.split(",").map((s) => s.trim()).filter(Boolean);
     if (ids.length) card.identifiers = ids;
   }
-
-  const alignment = clean(row.alignment).toLowerCase();
-  if (alignment === "good") card.alignment = "Good";
-  else if (alignment === "evil") card.alignment = "Evil";
-  else if (alignment === "neutral") card.alignment = "Neutral";
-  else if (alignment === "good/evil") card.alignment = "Good_Evil";
 
   const legality = clean(row.legality);
   if (LEGALITIES.includes(legality)) card.legality = legality as DesignCard["legality"];
