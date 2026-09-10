@@ -148,6 +148,30 @@ export async function deleteComment(
   return { ok: true };
 }
 
+export type SetCommentRow = CommentRow & { cardTitle: string | null };
+
+// Every comment on every card in a set, newest first, with card title + author name.
+// Filtered through forge_cards.set_id with an !inner embed: card_comments' RLS policy
+// is a security-definer check on card_id, so the join cannot widen or narrow it.
+export async function listSetComments(
+  setId: string,
+  opts?: { since?: string; limit?: number }
+): Promise<SetCommentRow[]> {
+  const ctx = await requireForge();
+  if (!ctx) return [];
+  let q = ctx.supabase
+    .from("card_comments")
+    .select(`${COLS}, card:forge_cards!inner(id, title)`)
+    .eq("card.set_id", setId)
+    .order("created_at", { ascending: false })
+    .limit(opts?.limit ?? 500); // PostgREST silently caps at 1000 with no error
+  if (opts?.since) q = q.gte("created_at", opts.since);
+  const { data } = await q;
+  const rows = (data ?? []).map((row: any) => ({ ...toComment(row), cardTitle: row.card?.title ?? null }));
+  // resolveAuthorNames spreads each row, so cardTitle survives; the cast restores the type.
+  return (await resolveAuthorNames(ctx, rows)) as SetCommentRow[];
+}
+
 // Per-card count of unresolved, card-level comments (proposal_id IS NULL) for a set
 // of card ids. Card-level only so the badge matches what the card-level thread shows.
 // Runs under the caller's RLS; only integer counts cross to the client, never bodies.
