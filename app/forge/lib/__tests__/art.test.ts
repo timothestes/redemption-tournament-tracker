@@ -3,9 +3,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@vercel/blob", () => ({ put: vi.fn(), get: vi.fn(), del: vi.fn() }));
 vi.mock("@/app/forge/lib/imageNormalize", () => ({ normalizeCardImage: vi.fn() }));
 
-import { put } from "@vercel/blob";
+import { put, get } from "@vercel/blob";
 import { normalizeCardImage } from "@/app/forge/lib/imageNormalize";
-import { validateArtFile, MAX_ART_BYTES, uploadForgeArt, uploadForgeFinished, uploadForgeArtRaw } from "../art";
+import {
+  validateArtFile, MAX_ART_BYTES, uploadForgeArt, uploadForgeFinished, uploadForgeArtRaw,
+  readForgeUpload,
+} from "../art";
 
 describe("validateArtFile", () => {
   it("accepts a normal PNG", () => {
@@ -44,14 +47,18 @@ describe("validateArtFile", () => {
     expect(validateArtFile({ type: "image/jpeg", size: 1024 })).toBeNull();
   });
 
-  it("enforces the same 15MB cap for TIFF, with a TIFF-specific message", () => {
+  it("enforces the same 50MB cap for TIFF, with a TIFF-specific message", () => {
     const msg = validateArtFile({ type: "image/tiff", size: MAX_ART_BYTES + 1, name: "scan.tif" });
     expect(msg).toMatch(/tiff/i);
-    expect(msg).toMatch(/15\s*MB/i);
+    expect(msg).toMatch(/50\s*MB/i);
+  });
+
+  it("names the cap 50MB, not a stale hardcoded number", () => {
+    expect(MAX_ART_BYTES).toBe(50 * 1024 * 1024);
   });
 });
 
-const file = new File([new Uint8Array([1, 2, 3])], "art.png", { type: "image/png" });
+const inputBuf = Buffer.from([1, 2, 3]);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -63,8 +70,9 @@ beforeEach(() => {
 });
 
 describe("uploadForgeArt / uploadForgeFinished", () => {
-  it("uploads the NORMALIZED bytes as image/jpeg, not the original file", async () => {
-    await uploadForgeArt(file);
+  it("uploads the NORMALIZED bytes as image/jpeg, not the original buffer", async () => {
+    await uploadForgeArt(inputBuf);
+    expect(normalizeCardImage).toHaveBeenCalledWith(inputBuf);
     const [key, body, opts] = (put as any).mock.calls[0];
     expect(String(key)).toMatch(/^forge-art\//);
     expect(Buffer.from(body).toString()).toBe("normalized");
@@ -73,7 +81,7 @@ describe("uploadForgeArt / uploadForgeFinished", () => {
 
   it("uploadForgeFinished stores under forge-finished/ with normalized bytes", async () => {
     (put as any).mockResolvedValue({ pathname: "forge-finished/some-key" });
-    await uploadForgeFinished(file);
+    await uploadForgeFinished(inputBuf);
     const [key, body, opts] = (put as any).mock.calls[0];
     expect(String(key)).toMatch(/^forge-finished\//);
     expect(Buffer.from(body).toString()).toBe("normalized");
@@ -82,7 +90,7 @@ describe("uploadForgeArt / uploadForgeFinished", () => {
 
   it("propagates decode failures without uploading anything", async () => {
     (normalizeCardImage as any).mockRejectedValue(new Error("unsupported image format"));
-    await expect(uploadForgeArt(file)).rejects.toThrow();
+    await expect(uploadForgeArt(inputBuf)).rejects.toThrow();
     expect(put).not.toHaveBeenCalled();
   });
 });
@@ -100,5 +108,29 @@ describe("uploadForgeArtRaw", () => {
     expect(putData).toBe(buf);
     expect(putOpts.contentType).toBe("image/jpeg");
     expect(putOpts.access).toBe("private");
+  });
+});
+
+describe("readForgeUpload", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns the raw bytes when the blob is found", async () => {
+    (get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      statusCode: 200,
+      stream: new Blob([new Uint8Array([7, 8, 9])]).stream(),
+    });
+    const buf = await readForgeUpload("forge-art-raw/x.tif");
+    expect(get).toHaveBeenCalledWith("forge-art-raw/x.tif", expect.objectContaining({ access: "private" }));
+    expect(Array.from(buf!)).toEqual([7, 8, 9]);
+  });
+
+  it("returns null when the blob is missing", async () => {
+    (get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    expect(await readForgeUpload("forge-art-raw/missing")).toBeNull();
+  });
+
+  it("returns null on a non-200 status", async () => {
+    (get as ReturnType<typeof vi.fn>).mockResolvedValue({ statusCode: 404 });
+    expect(await readForgeUpload("forge-art-raw/gone")).toBeNull();
   });
 });
