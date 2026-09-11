@@ -272,6 +272,45 @@ reference line is the floor).
   Evil Character on the foil, dual-brigade Covenant with a territory plate, Hero with both
   shields and a territory, Site).
 
+## All text on the canvas (2026-09-10, Safari page zoom)
+
+A forge member reported the ability text running off the text box in Safari; a hard refresh
+did not help, and it reproduced only when the page was zoomed. **WebKit multiplies
+container-query units by the page-zoom factor a second time.** Measured with Playwright
+(WebKit 2287 vs Chromium, `zoom` on the root element, the same code path as Safari's Cmd+ and
+its per-site zoom setting): at zoom Z, `width: 10cqw`, `padding: 10cqw` and `font-size: 10cqw`
+all come out Z times too large relative to their container (`getComputedStyle` font-size
+40px -> 60px at zoom 1.5), while `px`, `%`, `em`, `vw` and SVG `<text>` inside a `viewBox`
+are all correct. Chromium is right for every unit; Firefox zooms device pixels, so it cannot
+hit this at all. Safari remembers zoom per site, so a reader who pressed Cmd+ once, months
+ago, sees it on every visit and has no reason to connect the two.
+
+The preview sized its text in `cqw` and drew the ability at fixed printed line breaks
+(`white-space: pre`), so the lines could not re-wrap: they simply ran past the box. The fix
+is to stop using container units. The frame was already drawn in a `<svg viewBox="0 0 750
+1050">`, where the browser's own scaling is correct, so the ability, verse, reference,
+identifier bubble, credits, "NO ART" placeholder and the two annotation pills all moved into
+that canvas as SVG, and the three remaining `cqw` corner radii became percentages of their
+own box. `container-type` is gone from the component.
+
+Text that used to be laid out by CSS is now positioned arithmetically, so the printed metrics
+carry over unchanged: a CSS line box puts its baseline half-leading plus ascent below its
+top, which for Arimo (ascent 1854/2048, descent 434/2048) is `baselineIn()` in the renderer.
+Justification is explicit too -- every verse line but the last gets the `word-spacing` that
+spreads its measured width to the full 570 px, which is what print does and what
+`text-align: justify` did before. The pills are the one deliberate difference: they are set
+bold so their width can be measured with the same advance tables.
+
+**Verification:** old and new rendered side by side in Chromium at zoom 1 agree to within
+1 canvas px on 51 text runs (ability, verse, reference, identifier, "NO ART"); the frames are
+pixel-identical. The credits sit ~1.9 canvas px (0.9 screen px on a 340 px card) lower, which
+is Chromium snapping the old HTML baselines to whole device pixels while SVG places them
+exactly. In WebKit the widest text run held at 96.4% of the card at zoom 1, 1.1, 1.25, 1.5
+and 2, where the old build reached 125% and 163% with 5 of 6 cards overflowing. Unit tests
+assert the markup carries no container units, that each wrapped ability line is its own
+`<text>` exactly one printed pitch below the previous, and that the verse justifies every
+line but the last.
+
 ## Follow-ups (not in this change)
 
 - Inline ability icons, set symbol, card number, watermark.
