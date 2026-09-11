@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ForgeCardPreview from "@/app/forge/components/ForgeCardPreview";
 import { RECTS } from "@/app/forge/lib/frameGeometry";
 import { textFit, TEXT_METRICS } from "@/app/forge/lib/textFit";
+import type { DesignCard } from "@/app/forge/lib/designCard";
 
 const render = (card: Parameters<typeof ForgeCardPreview>[0]["card"]) =>
   renderToStaticMarkup(React.createElement(ForgeCardPreview, { card }));
@@ -14,18 +15,39 @@ const statText = (html: string, stat: string) => {
 };
 
 describe("ForgeCardPreview title", () => {
-  it("draws the name as a dark copy offset to the lower right under a white face with a hairline edge", () => {
+  const titleTexts = (html: string, name: string) =>
+    [...html.matchAll(new RegExp(`<text([^>]*)>${name}</text>`, "g"))].map((m) => m[1]);
+
+  it("draws the name as a dark copy offset to the lower right under a white face", () => {
     const html = render({ name: "Michael, Dragon Slayer", cardType: ["Hero"], brigades: ["Silver"], strength: 12, toughness: 8 });
-    const texts = [...html.matchAll(/<text([^>]*)>Michael, Dragon Slayer<\/text>/g)].map((m) => m[1]);
+    const texts = titleTexts(html, "Michael, Dragon Slayer");
     expect(texts).toHaveLength(2);
     const [shadow, face] = texts;
     expect(shadow).toMatch(/fill="#231f20"/);
     expect(shadow).toMatch(/transform="translate\(3 3\)"/);
     expect(face).toMatch(/fill="#fff"/);
     expect(face).not.toMatch(/transform=/);
-    // the old uniform 2.8 px outline is gone
-    expect(face).not.toMatch(/stroke-width="2.8"/);
-    expect(Number(face.match(/stroke-width="([\d.]+)"/)![1])).toBeLessThan(1.5);
+  });
+
+  // Printed names carry a black contour all the way around the letter as well as the shadow;
+  // a hairline is not enough to lift them off a busy wash.
+  it("gives the white face a black contour, painted under the fill so the letters keep their weight", () => {
+    const html = render({ name: "Michael, Dragon Slayer", cardType: ["Hero"], brigades: ["Silver"], strength: 12, toughness: 8 });
+    const [, face] = titleTexts(html, "Michael, Dragon Slayer");
+    expect(face).toMatch(/stroke="#231f20"/);
+    expect(face).toMatch(/paint-order="stroke"/);
+    expect(Number(face.match(/stroke-width="([\d.]+)"/)![1])).toBeGreaterThanOrEqual(3);
+  });
+
+  // The contour and the offset shadow both sit outside the glyphs, so the clip that keeps the
+  // title off the icon box has to stand off the text or the last letter comes out shaved.
+  it("leaves room for the contour and the shadow inside the title clip", () => {
+    const html = render({ name: "Michael, Dragon Slayer", cardType: ["Hero"], brigades: ["Silver"], strength: 12, toughness: 8 });
+    const clip = html.match(/<clipPath[^>]*><rect x="([-\d.]+)"[^>]*width="([\d.]+)"/)!;
+    const [x, w] = [Number(clip[1]), Number(clip[2])];
+    const stroke = Number(titleTexts(html, "Michael, Dragon Slayer")[1].match(/stroke-width="([\d.]+)"/)![1]);
+    expect(RECTS.title.x - x).toBeGreaterThanOrEqual(stroke / 2);
+    expect(x + w - (RECTS.title.x + RECTS.title.w)).toBeGreaterThanOrEqual(stroke / 2);
   });
 });
 
@@ -48,9 +70,9 @@ describe("ForgeCardPreview stats", () => {
 
 // A long ability and a verse, neither carrying a character React escapes, so the rendered
 // markup can be matched against the strings textFit wrapped.
-const WORDY = {
+const WORDY: DesignCard = {
   name: "As Rob Anderson Intended",
-  cardType: ["Artifact"] as const,
+  cardType: ["Artifact"],
   brigades: [],
   identifiers: ["Idol"],
   rawText: "All characters, enhancements and lost souls in play lose their abilities. All characters, enhancements, and lost souls played this turn lose their abilities. Limit 2 turns.",
