@@ -272,6 +272,31 @@ reference line is the floor).
   Evil Character on the foil, dual-brigade Covenant with a territory plate, Hero with both
   shields and a territory, Site).
 
+## Title contour (2026-09-10, second look at the printed names)
+
+The drop shadow from the title-shadow pass was right but incomplete: printed names also carry
+a **black contour all the way around each letter**, which is what actually lifts them off a
+busy wash. The preview's `TITLE_EDGE` was a 1.2 px hairline, effectively invisible; it is now
+**3 canvas px**, painted under the fill (`paint-order: stroke`) so the letters keep their
+weight, with the offset shadow unchanged behind it.
+
+The value was chosen against printed Israel's Inheritance cards on light washes (Joshua's
+Covenant, I Am Refuge, Israel Turned Away, Joab the General, Quake in Edom), rendered at the
+scans' own resolution -- 365 px wide, which is 750 canvas px at the scan's 2.055 px scale --
+and compared at 8x. **Render the ladder with the real Symphony Black** from the private font
+route, not the OFL fallback: Mukta ExtraBold is wider and heavier and reads a contour about
+half a pixel thinner than it is. Automatic measurement does not work here. A run-length read
+of the dark band above a letter gives 2-3 scan px on the printed cards but saturates at 1 px
+on every candidate, because the render is crisp and the thresholds only catch full black; the
+10-90% edge rise is 1 px on both, so there is no blur to compensate for either. Judge the
+crops by eye, as with the shadow. Across the five cards the printed contour brackets 2.5 and
+3.5 and sits nearest 3; a fixed-width stroke also explains why it reads heavier on the smaller
+type a long name shrinks to, which is what the printed cards show.
+
+The contour and the shadow both sit outside the glyphs, so the clip that keeps the title off
+the icon box now stands off the text by `TITLE_PAD` (4 px) -- without it the last letter of a
+title that fills the width comes out shaved.
+
 ## All text on the canvas (2026-09-10, Safari page zoom)
 
 A forge member reported the ability text running off the text box in Safari; a hard refresh

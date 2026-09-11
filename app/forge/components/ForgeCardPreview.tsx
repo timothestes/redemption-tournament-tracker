@@ -30,9 +30,13 @@ const BODY_FONT = "ForgeBody, system-ui, sans-serif";
 // Sizes are cap heights measured off printed cards (title ~26 px, stats ~22 px on the canvas).
 const TITLE_EM = 0.57;
 const TITLE_MAX = 36, TITLE_MIN = 25;
-// Printed titles: a hard shadow offset to the lower right (canvas px) and a hairline edge.
+// Printed titles: a black contour all the way around the letter, plus a hard shadow offset to
+// the lower right (canvas px). The contour is a fixed width in the print template, not a share
+// of the type size, so it reads heavier on the smaller type a long name shrinks to — which is
+// what the printed cards show. TITLE_PAD keeps the contour and the shadow out of the clip.
 const TITLE_SHADOW = { dx: 3, dy: 3, spread: 1.0 };
-const TITLE_EDGE = 1.2;
+const TITLE_EDGE = 3;
+const TITLE_PAD = 4;
 // Arimo's ascent and descent (hhea, per em). A CSS line box puts its baseline half-leading
 // plus ascent below its top; the printed text metrics were measured against line boxes laid
 // out that way, so the SVG lines use the same arithmetic to land where they always have.
@@ -243,9 +247,9 @@ export default function ForgeCardPreview({
         {classes.map((c) => (
           <image key={c.src} href={c.src} x={c.rect.x} y={c.rect.y} width={c.rect.w} height={c.rect.h} preserveAspectRatio="xMidYMid meet" />
         ))}
-        <clipPath id={`${uid}t`}><rect x={titleLeft} y={RECTS.title.y - 12} width={titleAvail} height={RECTS.title.h + 24} /></clipPath>
-        {/* Title: printed names carry a hard shadow to the lower right plus a hairline edge,
-              not a uniform outline — a dark copy offset behind the white face. */}
+        <clipPath id={`${uid}t`}><rect x={titleLeft - TITLE_PAD} y={RECTS.title.y - 12} width={titleAvail + 2 * TITLE_PAD} height={RECTS.title.h + 24} /></clipPath>
+        {/* Title: a white face carrying a black contour, over a dark copy of itself offset to
+              the lower right — the two things that make printed names read on any wash. */}
         {[TITLE_SHADOW, null].map((shadow, i) => (
           <text
             key={i}
