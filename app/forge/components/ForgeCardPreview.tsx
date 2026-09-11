@@ -5,22 +5,26 @@ import type { DesignCard, StatValue } from "@/app/forge/lib/designCard";
 import {
   washPaths, iconBox, classIcons, isPreviewApproximate, type IconBox,
 } from "@/app/forge/lib/frameAssets";
-import { textFit, TEXT_METRICS as TM } from "@/app/forge/lib/textFit";
+import { textFit, textWidth, TEXT_WIDTH, TEXT_METRICS as TM } from "@/app/forge/lib/textFit";
 import { CANVAS, RECTS, BORDER_STROKE } from "@/app/forge/lib/frameGeometry";
 
 // Rough rendered card: the design team's frame (washes / icons / badges from the kit,
 // chrome drawn as SVG from the template's geometry) around the live DesignCard. It is a
 // draft for designers, not the print graphic — see the 2026-09-09 live-preview spec.
 //
-// Coordinates: everything is laid out in the 750x1050 canvas from frameGeometry and
-// converted to container units, so the preview scales with its width. Plain <img> only
-// (never next/image — the forge-no-next-image guardrail; art stays on the authed proxy).
+// Coordinates: everything is laid out in the 750x1050 canvas from frameGeometry. The frame
+// and ALL of the text live in one <svg viewBox="0 0 750 1050">, which scales with the card
+// whatever the browser's page zoom is. Text must not be sized in container units (cqw):
+// WebKit multiplies those by the page-zoom factor a second time, so a Safari reader with a
+// remembered per-site zoom saw the ability run off the text box. Plain <img> only (never
+// next/image — the forge-no-next-image guardrail; art stays on the authed proxy).
 
 const { w: CW, h: CH } = CANVAS;
 const INK = "#231f20"; // the template's 100% K through its SWOP profile
 const COPYRIGHT_YEAR = new Date().getFullYear();
 const TITLE_FONT = "ForgeTitle, 'Trebuchet MS', 'Segoe UI', sans-serif";
 const STAT_FONT = "ForgeStat, Georgia, 'Times New Roman', serif";
+const BODY_FONT = "ForgeBody, system-ui, sans-serif";
 // ForgeTitle (Symphony Black from the private font route, cap height 0.73em) averages ~0.53em
 // per character; TITLE_EM adds a hair for the stroke and is used to size and squeeze titles.
 // Sizes are cap heights measured off printed cards (title ~26 px, stats ~22 px on the canvas).
@@ -29,16 +33,24 @@ const TITLE_MAX = 36, TITLE_MIN = 25;
 // Printed titles: a hard shadow offset to the lower right (canvas px) and a hairline edge.
 const TITLE_SHADOW = { dx: 3, dy: 3, spread: 1.0 };
 const TITLE_EDGE = 1.2;
+// Arimo's ascent and descent (hhea, per em). A CSS line box puts its baseline half-leading
+// plus ascent below its top; the printed text metrics were measured against line boxes laid
+// out that way, so the SVG lines use the same arithmetic to land where they always have.
+const FONT_ASC = 1854 / 2048, FONT_DESC = 434 / 2048;
+const baselineIn = (top: number, lineHeight: number, size: number) =>
+  top + (lineHeight - (FONT_ASC + FONT_DESC) * size) / 2 + FONT_ASC * size;
+// The fit / approximate annotations, which are ours and not on the printed card.
+const PILL = { size: 16, padX: 8, h: 22, gap: 4, r: 6, x: CW * 0.025, bottom: CH * 0.988 };
 
 type Rect = { readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly r?: number };
 
-const cqw = (px: number) => `${(px / CW) * 100}cqw`;
-const PILL: CSSProperties = { background: "rgba(0,0,0,.7)", color: "#fff", fontSize: `${(16 / CW) * 100}cqw`, padding: `${(2 / CW) * 100}cqw ${(8 / CW) * 100}cqw`, borderRadius: `${(6 / CW) * 100}cqw`, whiteSpace: "nowrap" };
 const pctX = (px: number) => `${(px / CW) * 100}%`;
 const pctY = (px: number) => `${(px / CH) * 100}%`;
 const place = (r: Rect): CSSProperties => ({
   position: "absolute", left: pctX(r.x), top: pctY(r.y), width: pctX(r.w), height: pctY(r.h),
 });
+/** A rect's corner radius as percentages of its own box, so it scales with the card. */
+const radius = (r: Rect) => `${((r.r ?? 0) / r.w) * 100}% / ${((r.r ?? 0) / r.h) * 100}%`;
 
 // eslint-disable-next-line @next/next/no-img-element
 const Img = (p: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt="" loading="lazy" decoding="async" {...p} />;
@@ -46,6 +58,14 @@ const Img = (p: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt="" loadin
 function statText(s: StatValue | undefined, t: StatValue | undefined): string {
   const f = (v: StatValue | undefined) => (v === null || v === undefined || v === "" ? "?" : String(v));
   return `${f(s)}/${f(t)}`;
+}
+
+/** Trim `text` to `width` with an ellipsis, the way `text-overflow: ellipsis` would. */
+function clampText(text: string, size: number, width: number): string {
+  if (textWidth(text, "bold", size) <= width) return text;
+  let s = text;
+  while (s && textWidth(`${s}…`, "bold", size) > width) s = s.slice(0, -1);
+  return `${s}…`;
 }
 
 // Icon box: a rounded tab in the frame corner, drawn over the border the way printed boxes
@@ -119,40 +139,90 @@ export default function ForgeCardPreview({
   const ids = card.identifiers ?? [];
   const stat = left?.withStats ? statText(card.strength, card.toughness) : null;
 
+  // Ability: the lines textFit wrapped, at the printed size, top-anchored and never shrunk,
+  // so the picture and the fit verdict agree. A long one runs into the verse, and the pill
+  // at the bottom says by how much.
+  const abilityRows: { text: string; y: number }[] = [];
+  let abilityTop = T.y + TM.ability.top;
+  fit.paragraphs.forEach((lines, p) => {
+    if (p) abilityTop += TM.ability.paragraphGap;
+    for (const text of lines) {
+      abilityRows.push({ text, y: baselineIn(abilityTop, TM.ability.pitch, TM.ability.size) });
+      abilityTop += TM.ability.pitch;
+    }
+  });
+
+  // Verse: stacked up from the fixed reference line on the dark part of the box, and
+  // justified the way print does it — every line but the last stretches its word spaces.
+  const verseRows = fit.verseLines.map((text, i) => {
+    const top = T.y + fit.verseTop + i * TM.verse.pitch;
+    const spaces = text.split(" ").length - 1;
+    const slack = TEXT_WIDTH - textWidth(text, "italic", TM.verse.size);
+    const last = i === fit.verseLines.length - 1;
+    return {
+      text,
+      y: baselineIn(top, TM.verse.pitch, TM.verse.size),
+      wordSpacing: !last && spaces > 0 && slack > 0 ? slack / spaces : 0,
+    };
+  });
+
+  // Credits: two right-aligned lines resting on the bottom of their slot.
+  const C = RECTS.credits;
+  const credits = [
+    { text: `Illus. ${card.artistCredit?.trim() || "Artist Unknown"}`, size: 15 },
+    { text: `© ${COPYRIGHT_YEAR} Cactus Game Design, Inc.`, size: 13 },
+  ];
+  let creditBottom = C.y + C.h;
+  const creditRows = credits
+    .slice()
+    .reverse()
+    .map(({ text, size }) => {
+      const lineHeight = size * 1.3;
+      creditBottom -= lineHeight;
+      return { text: clampText(text, size, C.w), size, y: baselineIn(creditBottom, lineHeight, size) };
+    })
+    .reverse();
+
+  // Identifier bubble — a pill straddling the art window and the text box.
+  const ID = RECTS.idBubble;
+  const idSize = 19, idPadX = 16;
+  const idText = ids.length ? clampText(ids.join(", "), idSize, ID.w - 2 * idPadX) : "";
+  const idW = idText ? Math.min(ID.w, textWidth(idText, "bold", idSize) + 2 * idPadX) : 0;
+
+  const pills = [
+    ...(fit.over > 0 ? [{ key: "over", text: `Ability doesn't fit · ${fit.over} line${fit.over === 1 ? "" : "s"} over`, fill: "rgba(179,38,30,.92)" }] : []),
+    ...(approximate ? [{ key: "approximate", text: "preview approximate", fill: "rgba(0,0,0,.7)" }] : []),
+  ];
+
   return (
     <div
       className={className}
       role="img"
       aria-label={card.name ? `Card preview: ${card.name}` : "Card preview"}
       style={{
-        position: "relative", aspectRatio: `${CW} / ${CH}`, width: "100%", containerType: "inline-size",
+        position: "relative", aspectRatio: `${CW} / ${CH}`, width: "100%",
         overflow: "hidden", borderRadius: "3.73% / 2.67%", background: "#fff", color: INK,
-        fontFamily: "ForgeBody, system-ui, sans-serif", userSelect: "none",
+        fontFamily: BODY_FONT, userSelect: "none",
       }}
     >
       {/* 1. wash(es) inside the border rect; a second brigade blends in from the bottom,
             matching the split of the icon box */}
-      {washes.length === 0 && <div style={{ ...place(B), borderRadius: cqw(B.r ?? 0), background: "#b9b3aa" }} />}
+      {washes.length === 0 && <div style={{ ...place(B), borderRadius: radius(B), background: "#b9b3aa" }} />}
       {washes.map((src, i) => (
         <Img key={src} src={src} style={{
-          ...place(B), borderRadius: cqw(B.r ?? 0), objectFit: "cover",
+          ...place(B), borderRadius: radius(B), objectFit: "cover",
           ...(i === 1 ? { WebkitMaskImage: "linear-gradient(to bottom, transparent 40%, #000 60%)", maskImage: "linear-gradient(to bottom, transparent 40%, #000 60%)" } : {}),
         }} />
       ))}
 
-      {/* 2. art window: uploaded art clipped to the window, or the template's empty white slot */}
-      <div style={{ ...place(A), borderRadius: cqw(A.r ?? 0), overflow: "hidden", background: "#fff" }}>
-        {artUrl ? (
-          <Img src={artUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#a9adc9", fontSize: cqw(26), letterSpacing: "0.14em", textAlign: "center", lineHeight: 1.4 }}>
-            NO ART
-          </div>
-        )}
+      {/* 2. art window: uploaded art clipped to the window, or the template's empty white slot
+            (the "NO ART" label is drawn with the rest of the text, in the canvas below) */}
+      <div style={{ ...place(A), borderRadius: radius(A), overflow: "hidden", background: "#fff" }}>
+        {artUrl && <Img src={artUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
       </div>
 
-      {/* 3. chrome: text box, window outline, frame border, then the icon boxes and class
-            icons over it (as printed), and the title */}
+      {/* 3. everything else, in canvas coordinates: chrome (text box, window outline, frame
+            border, icon boxes, class icons, title) and then the card's text over it */}
       <svg viewBox={`0 0 ${CW} ${CH}`} aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}>
         <defs>
           <linearGradient id={`${uid}g`} x1="0" y1="0" x2="0" y2="1">
@@ -161,6 +231,9 @@ export default function ForgeCardPreview({
             <stop offset={fit.gradient.dark / T.h} stopColor={INK} stopOpacity="1" />
             <stop offset="1" stopColor={INK} stopOpacity="1" />
           </linearGradient>
+          <filter id={`${uid}s`} x="-20%" y="-40%" width="140%" height="180%">
+            <feDropShadow dx="0" dy="2" stdDeviation="1" floodColor="#000" floodOpacity="0.8" />
+          </filter>
         </defs>
         <rect x={T.x} y={T.y} width={T.w} height={T.h} rx={T.r} fill={`url(#${uid}g)`} stroke={INK} strokeWidth={2.5} />
         <rect x={A.x} y={A.y} width={A.w} height={A.h} rx={A.r} fill="none" stroke={INK} strokeWidth={4} />
@@ -185,69 +258,83 @@ export default function ForgeCardPreview({
             {name}
           </text>
         ))}
-      </svg>
 
-      {/* 4. identifier bubble — straddles the art window and the text box */}
-      {ids.length > 0 && (
-        <div style={{ ...place(RECTS.idBubble), display: "flex", justifyContent: "center", alignItems: "stretch" }}>
-          <span style={{
-            maxWidth: "100%", boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: `0 ${cqw(16)}`,
-            borderRadius: "9999px", background: "rgba(0,0,0,0.75)", border: `${cqw(1.5)} solid ${INK}`,
-            color: "#fff", fontWeight: 700, fontSize: cqw(19), lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-          }}>
-            {ids.join(", ")}
-          </span>
-        </div>
-      )}
-
-      {/* 5. ability at the printed size, top-anchored and never shrunk: the lines are the ones
-            textFit wrapped, so the picture and the fit verdict agree. A long one runs into the
-            verse, and the pill at the bottom says by how much. */}
-      <div style={{
-        position: "absolute", left: pctX(I.x), top: pctY(T.y + TM.ability.top), width: pctX(I.w), textAlign: "center",
-        fontWeight: 700, fontSize: cqw(TM.ability.size), lineHeight: TM.ability.pitch / TM.ability.size, whiteSpace: "pre", fontKerning: "none",
-      }}>
-        {fit.paragraphs.map((lines, i) => (
-          <p key={i} style={{ margin: 0, marginTop: i ? cqw(TM.ability.paragraphGap) : 0 }}>{lines.join("\n")}</p>
-        ))}
-      </div>
-
-      {/* 6. verse, justified and stacked up from the fixed reference line on the dark part */}
-      <div style={{
-        position: "absolute", left: pctX(I.x), width: pctX(I.w), bottom: pctY(CH - (T.y + TM.verse.bottom)),
-        color: "#f2efe4", fontStyle: "italic", fontSize: cqw(TM.verse.size), lineHeight: TM.verse.pitch / TM.verse.size,
-        textAlign: "justify", whiteSpace: "pre-line", fontKerning: "none",
-      }}>
-        {card.scripture?.trim() ?? ""}
-      </div>
-      <div style={{
-        position: "absolute", left: pctX(I.x), width: pctX(I.w), top: pctY(T.y + TM.reference.top), height: pctY(TM.reference.pitch),
-        color: "#f2efe4", fontWeight: 700, fontSize: cqw(TM.reference.size), lineHeight: 1, textAlign: "right", whiteSpace: "nowrap",
-      }}>
-        {card.reference ?? ""}
-      </div>
-
-      {/* 7. credits */}
-      <div style={{
-        ...place(RECTS.credits), display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "flex-end",
-        color: "#fff", fontWeight: 700, lineHeight: 1.3, textShadow: `0 ${cqw(1)} ${cqw(2)} rgba(0,0,0,.8)`, whiteSpace: "nowrap",
-      }}>
-        <span style={{ fontSize: cqw(15), overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
-          Illus. {card.artistCredit?.trim() || "Artist Unknown"}
-        </span>
-        <span style={{ fontSize: cqw(13) }}>© {COPYRIGHT_YEAR} Cactus Game Design, Inc.</span>
-      </div>
-
-      {(fit.over > 0 || approximate) && (
-        <div style={{ position: "absolute", left: "2.5%", bottom: "1.2%", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: cqw(4) }}>
-          {fit.over > 0 && (
-            <div data-fit="over" style={{ ...PILL, background: "rgba(179,38,30,.92)" }}>
-              Ability doesn&apos;t fit · {fit.over} line{fit.over === 1 ? "" : "s"} over
-            </div>
+        <g fontFamily={BODY_FONT} style={{ fontKerning: "none" }}>
+          {!artUrl && (
+            <text
+              x={A.x + A.w / 2} y={baselineIn(A.y + (A.h - 26 * 1.4) / 2, 26 * 1.4, 26)} textAnchor="middle"
+              fontSize={26} letterSpacing={26 * 0.14} fill="#a9adc9"
+            >
+              NO ART
+            </text>
           )}
-          {approximate && <div style={PILL}>preview approximate</div>}
-        </div>
-      )}
+
+          {/* identifier bubble */}
+          {idText && (
+            <g>
+              <rect
+                x={ID.x + (ID.w - idW) / 2} y={ID.y} width={idW} height={ID.h} rx={ID.h / 2}
+                fill="rgba(0,0,0,0.75)" stroke={INK} strokeWidth={1.5}
+              />
+              <text
+                x={ID.x + ID.w / 2} y={baselineIn(ID.y + (ID.h - idSize) / 2, idSize, idSize)} textAnchor="middle"
+                fontSize={idSize} fontWeight={700} fill="#fff"
+              >
+                {idText}
+              </text>
+            </g>
+          )}
+
+          {/* ability */}
+          {abilityRows.map((row, i) => (
+            <text key={i} x={I.x + I.w / 2} y={row.y} textAnchor="middle" fontSize={TM.ability.size} fontWeight={700} fill={INK}>
+              {row.text}
+            </text>
+          ))}
+
+          {/* verse and its reference */}
+          {verseRows.map((row, i) => (
+            <text
+              key={i} x={I.x} y={row.y} fontSize={TM.verse.size} fontStyle="italic" fill="#f2efe4"
+              {...(row.wordSpacing ? { wordSpacing: row.wordSpacing } : {})}
+            >
+              {row.text}
+            </text>
+          ))}
+          {card.reference && (
+            <text
+              x={I.x + I.w} y={baselineIn(T.y + TM.reference.top, TM.reference.size, TM.reference.size)} textAnchor="end"
+              fontSize={TM.reference.size} fontWeight={700} fill="#f2efe4"
+            >
+              {card.reference}
+            </text>
+          )}
+
+          {/* credits */}
+          <g filter={`url(#${uid}s)`} fill="#fff" fontWeight={700}>
+            {creditRows.map((row, i) => (
+              <text key={i} x={C.x + C.w} y={row.y} textAnchor="end" fontSize={row.size}>{row.text}</text>
+            ))}
+          </g>
+
+          {/* our own annotations, stacked up from the bottom-left corner */}
+          {pills.map((pill, i) => {
+            const w = textWidth(pill.text, "bold", PILL.size) + 2 * PILL.padX;
+            const top = PILL.bottom - (pills.length - i) * PILL.h - (pills.length - 1 - i) * PILL.gap;
+            return (
+              <g key={pill.key} {...(pill.key === "over" ? { "data-fit": "over" } : {})}>
+                <rect x={PILL.x} y={top} width={w} height={PILL.h} rx={PILL.r} fill={pill.fill} />
+                <text
+                  x={PILL.x + PILL.padX} y={baselineIn(top, PILL.h, PILL.size)}
+                  fontSize={PILL.size} fontWeight={700} fill="#fff"
+                >
+                  {pill.text}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      </svg>
     </div>
   );
 }
