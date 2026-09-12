@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import ProposalDiff from "./ProposalDiff";
 import CommentThread from "./CommentThread";
 import CardHistory from "./CardHistory";
+import { useStudioSync } from "./StudioSyncContext";
+import FieldChanges from "./FieldChanges";
 import { Button } from "@/components/ui/button";
 import { buildHistory } from "@/app/forge/lib/historyView";
+import { diffCards } from "@/app/forge/lib/cardDiff";
+import { runProposeSubmit } from "@/app/forge/lib/proposeFlow";
+import {
+  PROPOSE_INTRO, PROPOSE_NEW_CARD, PROPOSE_SELF_ACCEPT, PROPOSE_ALREADY_UNDER_REVIEW,
+  proposeConsequence, proposeDiffCaption, proposeEmptyNote,
+} from "@/app/forge/lib/proposeCopy";
 import type { ForgeCardFull } from "@/app/forge/lib/cards";
 import { createProposal, type ProposalDiffData, type ProposalRow } from "@/app/forge/lib/proposals";
 import type { CommentRow } from "@/app/forge/lib/comments";
@@ -20,6 +28,7 @@ export default function ReviewPanel({
   versions,
   events,
   canReview,
+  alreadyUnderReview,
 }: {
   card: ForgeCardFull;
   openDiffs: ProposalDiffData[];
@@ -28,6 +37,10 @@ export default function ReviewPanel({
   versions: VersionRow[];
   events: CardEventRow[];
   canReview: boolean;
+  // An open proposal already holds exactly this draft (page.tsx compares with
+  // sameSnapshot). Advisory only — there is no server-side duplicate guard — so it
+  // hides the trigger rather than blocking a submit already in progress.
+  alreadyUnderReview?: boolean;
 }) {
   // Cache-buster: updated_at bumps on every image/snapshot write, mirroring the studio.
   const t = Date.parse(card.updatedAt) || 0;
@@ -38,6 +51,11 @@ export default function ReviewPanel({
   // Proposing lives beside the proposals it creates. The proposal freezes the
   // card's saved working draft server-side (see createProposal).
   const router = useRouter();
+  // The editor autosaves 700ms after a keystroke and createProposal freezes the
+  // SERVER’s working draft, so proposing inside that window would submit the
+  // pre-keystroke snapshot. Flush first, as CommentThread does before applying a
+  // suggestion — see StudioSyncContext.
+  const { flushPending } = useStudioSync();
   const [proposing, setProposing] = useState(false);
   const [summary, setSummary] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,7 +64,10 @@ export default function ReviewPanel({
     if (!summary.trim()) return;
     setErr(null);
     setBusy(true);
-    const r = await createProposal(card.id, summary);
+    const r = await runProposeSubmit({
+      flush: flushPending,
+      create: () => createProposal(card.id, summary),
+    });
     setBusy(false);
     if (r.ok === false) { setErr(r.error); return; }
     setProposing(false);
@@ -55,6 +76,13 @@ export default function ReviewPanel({
   };
   const canPropose = card.status === "draft" || card.status === "playtesting";
 
+  // What the reviewer will be asked to sign off on. listVersions orders
+  // version_number DESC, so versions[0] is the same row createProposal diffs
+  // against server-side. A preview, not a guarantee: submitting flushes the editor
+  // first, so the submission can include edits newer than this list.
+  const latestVersion = versions[0] ?? null;
+  const draftChanges = latestVersion ? diffCards(latestVersion.data, card.snapshot ?? {}) : [];
+
   // Card-level thread only, mirroring CommentThread's own filter.
   const cardComments = comments.filter((c) => c.proposalId === null);
   const unresolvedCount = cardComments.filter((c) => !c.resolved).length;
@@ -62,31 +90,65 @@ export default function ReviewPanel({
   return (
     <div className="space-y-8">
       <section>
-        <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold tracking-tight">
             Open proposals
             {openDiffs.length > 0 && (
               <span className="ml-1.5 font-normal text-muted-foreground">{openDiffs.length}</span>
             )}
           </h2>
-          {canPropose && !proposing && (
-            <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={() => setProposing(true)}>
+          {canPropose && !proposing && !alreadyUnderReview && (
+            <Button size="sm" variant="outline" onClick={() => setProposing(true)}>
               Propose changes
             </Button>
           )}
+          {canPropose && !proposing && alreadyUnderReview && (
+            <p className="text-xs text-muted-foreground">{PROPOSE_ALREADY_UNDER_REVIEW}</p>
+          )}
         </div>
+
+        {/* Outside the {proposing} block on purpose: "Propose changes" is the string
+            people misread, so the correction cannot live behind the button that
+            causes the confusion. */}
+        {canPropose && !proposing && (
+          <p className="mb-3 max-w-[70ch] text-xs leading-relaxed text-muted-foreground">{PROPOSE_INTRO}</p>
+        )}
+
         {proposing && (
-          <div className="mb-3 flex flex-col gap-1 text-xs">
-            <div className="flex items-start gap-1">
+          <div className="mb-3 space-y-3 rounded-md border bg-muted/30 p-3 text-xs">
+            {/* Lead with WHAT is being submitted. A first proposal gets no field list:
+                every field reads as an addition, which ProposalDiff already judged to
+                be noise rather than a diff. */}
+            {!latestVersion ? (
+              <p className="text-muted-foreground">{PROPOSE_NEW_CARD}</p>
+            ) : draftChanges.length === 0 ? (
+              <p role="status" className="text-muted-foreground">{proposeEmptyNote(latestVersion.versionNumber)}</p>
+            ) : (
+              <div className="space-y-1.5">
+                <p className="text-muted-foreground">{proposeDiffCaption(latestVersion.versionNumber)}</p>
+                <FieldChanges changes={draftChanges} />
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
               <textarea autoFocus value={summary} onChange={(e) => setSummary(e.target.value)}
-                placeholder="Summarize this change — what and why?" className="h-16 flex-1 rounded-md border bg-background px-2 py-1" />
-              <Button size="sm" className="h-7 px-3 text-xs" disabled={busy || !summary.trim()} onClick={submitProposal}>
-                Submit proposal
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setProposing(false); setErr(null); }}>Cancel</Button>
+                aria-describedby="propose-consequence"
+                placeholder="Summarize this change — what and why?"
+                className="h-16 w-full rounded-md border bg-background px-2 py-1 sm:flex-1" />
+              <div className="flex gap-2">
+                {/* Never gated on the diff above: artwork changes are invisible to
+                    diffCards, and this prop trails the keystroke by a refresh. The
+                    server guard in createProposal stays authoritative. */}
+                <Button size="sm" disabled={busy || !summary.trim()} onClick={submitProposal}>
+                  Submit proposal
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setProposing(false); setErr(null); }}>Cancel</Button>
+              </div>
             </div>
-            <p className="text-muted-foreground">Proposes the card’s current saved draft for another elder to accept or deny.</p>
-            {err && <p className="text-destructive">{err}</p>}
+
+            <p id="propose-consequence" className="text-muted-foreground">{proposeConsequence(card.status)}</p>
+            {canReview && <p className="text-muted-foreground">{PROPOSE_SELF_ACCEPT}</p>}
+            {err && <p role="alert" className="text-destructive">{err}</p>}
           </div>
         )}
         {openDiffs.length === 0 ? (
