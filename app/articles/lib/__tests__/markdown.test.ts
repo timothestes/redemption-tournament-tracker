@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { youtubeId, isAudioUrl, slugify, SLUG_RE, excerptFromMarkdown } from "../markdown";
+import { youtubeId, isAudioUrl, slugify, SLUG_RE, excerptFromMarkdown, opensCardPicker } from "../markdown";
 
 describe("youtubeId", () => {
   const ID = "dQw4w9WgXcQ";
@@ -64,4 +64,17 @@ describe("excerptFromMarkdown", () => {
     const out = excerptFromMarkdown("alpha beta gamma delta epsilon zeta", 17);
     expect(out).toBe("alpha beta gamma…");
   });
+});
+
+describe("opensCardPicker", () => {
+  // The caret sits right after the text the author just typed.
+  const at = (text: string, inputType = "insertText") => opensCardPicker(text, text.length, inputType);
+
+  it("fires on a fresh \"[[\"", () => expect(at("Play [[")).toBe(true));
+  it("fires at the very start of the box", () => expect(at("[[")).toBe(true));
+  it("ignores a single bracket", () => expect(at("Play [")).toBe(false));
+  it("ignores a third bracket before", () => expect(at("Play [[[")).toBe(false));
+  it("ignores a bracket after the caret", () => expect(opensCardPicker("[[[", 2)).toBe(false));
+  it("ignores undo, which leaves the brackets behind", () => expect(at("Play [[", "historyUndo")).toBe(false));
+  it("ignores a caret that is not after the brackets", () => expect(opensCardPicker("[[Son of God]]", 14)).toBe(false));
 });

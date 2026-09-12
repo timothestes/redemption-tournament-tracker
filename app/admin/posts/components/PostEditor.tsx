@@ -9,7 +9,7 @@ import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 import ToastNotification from "@/components/ui/toast-notification";
 import ArticleBody from "@/app/articles/components/ArticleBody";
 import { EMPTY_REFS, type ArticleRefs } from "@/app/articles/lib/refTypes";
-import { excerptFromMarkdown, slugify, youtubeId } from "@/app/articles/lib/markdown";
+import { excerptFromMarkdown, opensCardPicker, slugify, youtubeId } from "@/app/articles/lib/markdown";
 import {
   createDraftAction,
   updatePostAction,
@@ -18,6 +18,7 @@ import {
   deletePostAction,
   listTagsAction,
   resolveArticleRefsAction,
+  searchCardsAction,
   type PostRow,
 } from "../actions";
 import { ACCEPT, type UploadKind } from "../lib/media";
@@ -34,7 +35,7 @@ import {
 import { MAX_EXCERPT, MAX_TITLE } from "../lib/validate";
 import MarkdownToolbar, { type ToolbarAction } from "./MarkdownToolbar";
 import TagInput from "./TagInput";
-import CardPicker from "./CardPicker";
+import CardPicker from "@/components/ui/CardPicker";
 import DeckPicker from "./DeckPicker";
 
 type Toast = { message: string; type: "success" | "error" } | null;
@@ -176,6 +177,12 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
   // and cover pickers create the draft too, and a picker-created draft whose
   // slug was never reconciled made the next save fail with "That slug is
   // already taken" (or the slug regex, for the empty case).
+  // The picker takes names, not an ActionResult; a failure keeps the list showing.
+  const searchCards = useCallback(async (q: string) => {
+    const r = await searchCardsAction(q);
+    return r.success === false ? [] : r.cards;
+  }, []);
+
   const ensureId = useCallback((): Promise<{ id: string; slug: string } | null> => {
     if (idRef.current) return Promise.resolve({ id: idRef.current, slug: serverSlugRef.current ?? slugRef.current });
     if (creatingRef.current) return creatingRef.current;
@@ -618,15 +625,8 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
                     editVersion.current += 1;
                     setDirty(true);
                     // Typing "[[" opens the card picker; the pick replaces the brackets.
-                    // Not on undo: reverting a pick leaves "[[" behind and must not reopen it.
                     const caret = e.target.selectionStart;
-                    if (
-                      (e.nativeEvent as InputEvent).inputType !== "historyUndo" &&
-                      caret >= 2 &&
-                      v.slice(caret - 2, caret) === "[[" &&
-                      v[caret - 3] !== "[" &&
-                      v[caret] !== "["
-                    ) {
+                    if (opensCardPicker(v, caret, (e.nativeEvent as InputEvent).inputType)) {
                       setCardPicker({ open: true, query: "", from: caret - 2, to: caret });
                     }
                   }}
@@ -823,6 +823,7 @@ export default function PostEditor({ initial }: { initial: PostRow | null }) {
       <CardPicker
         open={cardPicker.open}
         initialQuery={cardPicker.query}
+        search={searchCards}
         onPick={onPickCard}
         onClose={() => {
           setCardPicker((p) => ({ ...p, open: false }));

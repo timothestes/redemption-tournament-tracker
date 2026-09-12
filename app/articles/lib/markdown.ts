@@ -116,6 +116,25 @@ export function extractCardMentions(md: string, max = 200): string[] {
   return out;
 }
 
+/**
+ * True when the edit that just landed completed a fresh `[[` at the caret, so
+ * the editor should open the card picker. Shared by the article editor and the
+ * deck-description editors.
+ *
+ * `inputType` is skipped for undo: reverting a pick leaves the "[[" behind and
+ * must not reopen the dialog. A third bracket on either side means the author
+ * is typing something else.
+ */
+export function opensCardPicker(value: string, caret: number, inputType?: string): boolean {
+  return (
+    inputType !== "historyUndo" &&
+    caret >= 2 &&
+    value.slice(caret - 2, caret) === "[[" &&
+    value[caret - 3] !== "[" &&
+    value[caret] !== "["
+  );
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Hosts whose /decklist/<uuid> links embed. Anything else stays a plain link.
 const DECK_HOSTS = [/(^|\.)landofredemption\.com$/, /(^|\.)redemptionccg\.app$/, /^localhost$/, /^127\.0\.0\.1$/, /\.vercel\.app$/];

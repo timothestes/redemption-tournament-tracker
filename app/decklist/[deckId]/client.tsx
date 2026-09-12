@@ -8,7 +8,6 @@ import { copyPublicDeckAction, updateDeckPreviewCardsAction, renameDeckAction, u
 import { createGlobalTagAction } from "../../admin/tags/actions";
 import { HexColorPicker } from "react-colorful";
 import { useIsAdmin } from "../../../hooks/useIsAdmin";
-import ReactMarkdown from "react-markdown";
 import { Card } from "../card-search/utils";
 import { CARD_BY_FULL_KEY } from "../card-search/data/cardIndex";
 import ModalWithClose from "../card-search/ModalWithClose";
@@ -26,6 +25,8 @@ import AodCountCard from "../card-search/components/AodCountCard";
 import { Deck as DeckType } from "../card-search/types/deck";
 import { generateDeckText } from "../card-search/utils/deckImportExport";
 import CardTile from "@/components/ui/CardTile";
+import CardMentionTextarea from "@/components/ui/CardMentionTextarea";
+import DeckDescription from "../components/DeckDescription";
 import { compareCardsByType, compareCardsDefault, compareTypeGroups, type SortableCard } from "@/lib/cards/defaultSort";
 import { prettifyTypeName, getGroupKey, getGroupDisplayName } from "@/lib/decks/typeGroups";
 import { getFormatDef } from "@/lib/formats";
@@ -1709,11 +1710,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         <div className="mt-8 mb-8">
           {isOwner && editingDescription ? (
             <div>
-              <textarea
-                ref={descriptionTextareaRef}
+              <CardMentionTextarea
+                textareaRef={descriptionTextareaRef}
                 autoFocus
                 value={descriptionInput}
-                onChange={(e) => setDescriptionInput(e.target.value)}
+                onChange={setDescriptionInput}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") { setDescriptionInput(description); setEditingDescription(false); }
                 }}
@@ -1734,19 +1735,23 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 >
                   Cancel
                 </button>
-                <span className="text-xs text-muted-foreground ml-auto">Markdown supported</span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Markdown supported {"\u00b7"} type{" "}
+                  <kbd className="rounded bg-muted px-1 font-mono text-[11px] text-foreground">[[</kbd> to mention a card
+                </span>
               </div>
             </div>
           ) : description ? (
             <div
               className={`rounded-lg border border-border bg-muted px-4 py-3 ${isOwner ? "cursor-pointer hover:border-primary/50 transition-colors" : ""}`}
-              onClick={isOwner ? () => { setDescriptionInput(description); setEditingDescription(true); } : undefined}
+              onClick={isOwner ? (e) => {
+                if ((e.target as HTMLElement).closest("button, a")) return;
+                setDescriptionInput(description); setEditingDescription(true);
+              } : undefined}
               title={isOwner ? "Click to edit description" : undefined}
             >
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Description</h3>
-              <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
-                <ReactMarkdown>{description}</ReactMarkdown>
-              </div>
+              <DeckDescription markdown={description} />
             </div>
           ) : isOwner ? (
             <button
