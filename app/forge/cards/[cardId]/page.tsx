@@ -67,20 +67,37 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
     .maybeSingle();
   const creator = { name: ownerRow?.display_name ?? "Forge member", at: card.createdAt };
 
+  // ReviewPanel is passed INTO the studio rather than rendered after it: a sticky element
+  // can only travel inside its own containing block, so while the review sat outside the
+  // studio's grid the card face stopped following you exactly when you reached it.
   return (
-    <>
-      <StudioEditor card={card} sets={sets} currentUser={currentUser} creator={creator} setId={card.setId ?? null} setName={set?.name ?? null} prevId={prevId} nextId={nextId} artCandidates={artCandidates} openProposals={openProposals} />
-      {inSet && (
-        <ReviewPanel
-          card={card}
-          openDiffs={openDiffs}
-          proposals={proposals}
-          comments={comments}
-          versions={versions}
-          events={events}
-          canReview={canReview}
-        />
-      )}
-    </>
+    <StudioEditor
+      card={card}
+      sets={sets}
+      currentUser={currentUser}
+      creator={creator}
+      setId={card.setId ?? null}
+      setName={set?.name ?? null}
+      prevId={prevId}
+      nextId={nextId}
+      artCandidates={artCandidates}
+      openProposals={openProposals}
+      review={
+        inSet ? (
+          // key: React validates this as a keyless list child once it crosses the
+          // server/client boundary as a named prop, and warns without one.
+          <ReviewPanel
+            key="review"
+            card={card}
+            openDiffs={openDiffs}
+            proposals={proposals}
+            comments={comments}
+            versions={versions}
+            events={events}
+            canReview={canReview}
+          />
+        ) : null
+      }
+    />
   );
 }
