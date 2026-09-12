@@ -5,6 +5,7 @@ import { deckIdFromUrl, isAudioUrl, mentionKey, youtubeId } from "../lib/markdow
 import remarkCardMentions from "../lib/remarkCardMentions";
 import { EMPTY_REFS, type ArticleRefs } from "../lib/refTypes";
 import CardMention from "./CardMention";
+import GlossaryMention from "./GlossaryMention";
 import DeckEmbed from "./DeckEmbed";
 
 // The ONE markdown renderer: public article page (server) and editor preview
@@ -103,6 +104,12 @@ function buildComponents(refs: ArticleRefs, draft: boolean): Components {
       const typed = typeof name === "string" ? name : "";
       const ref = refs.cards[mentionKey(typed)];
       const shown = typeof label === "string" ? label : typed;
+      // A card first, always. Community shorthand ("EC", "LoC") only gets a
+      // look when nothing in the catalog answered to the name.
+      if (!ref) {
+        const term = refs.terms?.[mentionKey(typed)];
+        if (term) return <GlossaryMention text={shown} entry={term} />;
+      }
       return <CardMention name={ref?.name ?? typed} label={shown} imgFile={ref?.imgFile} draft={draft} />;
     },
   } satisfies Components & { "card-mention": unknown };

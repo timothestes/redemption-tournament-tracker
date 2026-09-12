@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import ArticleBody from "@/app/articles/components/ArticleBody";
 import { resolveCardRefs } from "@/app/articles/lib/cardRefs";
+import { resolveGlossaryTerms } from "@/lib/glossary/terms";
 import { extractCardMentions } from "@/app/articles/lib/markdown";
 import type { ArticleRefs } from "@/app/articles/lib/refTypes";
 
@@ -26,9 +27,9 @@ export default function DeckDescription({
   draft?: boolean;
   className?: string;
 }) {
-  const refs: ArticleRefs = useMemo(
-    () => ({ cards: resolveCardRefs(extractCardMentions(markdown || "")), decks: {} }),
-    [markdown],
-  );
+  const refs: ArticleRefs = useMemo(() => {
+    const mentions = extractCardMentions(markdown || "");
+    return { cards: resolveCardRefs(mentions), decks: {}, terms: resolveGlossaryTerms(mentions) };
+  }, [markdown]);
   return <ArticleBody markdown={markdown} refs={refs} draft={draft} className={className} />;
 }
