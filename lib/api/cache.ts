@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { flattenCardMentions } from "@/app/articles/lib/markdown";
 import { createAnonClient as anonClient } from "@/utils/supabase/anon";
 import { normalizeFormat } from "@/lib/formats";
 
@@ -138,7 +139,8 @@ function rowToPayload(row: DeckRow, username: string | null): DeckPayload {
   return {
     id: row.id,
     name: row.name,
-    description: row.description,
+    // Consumers print this; card mentions go out as plain names.
+    description: row.description === null ? null : flattenCardMentions(row.description),
     format: row.format,
     paragon: row.paragon,
     card_count: row.card_count ?? 0,

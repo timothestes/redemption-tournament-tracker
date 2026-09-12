@@ -100,6 +100,14 @@ export const mentionKey = cardNameKey;
 const FENCE_RE = /```[\s\S]*?```/g;
 const INLINE_CODE_RE = /`[^`\n]*`/g;
 
+/**
+ * `[[Son of God]]` → `Son of God`, for the places a description is shown as
+ * plain text (meta/OG tags, the public API) where the brackets read as a typo.
+ */
+export function flattenCardMentions(text: string): string {
+  return text.replace(CARD_MENTION_RE, (_match, name: string) => name.replace(/\s+/g, " ").trim());
+}
+
 /** Distinct mention names (as typed) outside code, in document order, capped. */
 export function extractCardMentions(md: string, max = 200): string[] {
   const seen = new Set<string>();
