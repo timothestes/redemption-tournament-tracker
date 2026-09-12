@@ -20,7 +20,9 @@ const abOverridesPath = path.join(__dirname, 'data/ab-overrides.json');
 const forgeReleasedPath = path.join(__dirname, 'data/forge-released.json');
 const cardOverridesPath = path.join(__dirname, 'data/card-overrides.json');
 const imgVersionsPath = path.join(__dirname, '../lib/cards/generated/imgVersions.json');
+const cardAliasesPath = path.join(__dirname, '../lib/cards/generated/cardAliases.json');
 const { applyCardOverrides } = require('./lib/applyCardOverrides');
+const { applyCardAliases } = require('./lib/applyCardAliases');
 
 const raw = fs.readFileSync(txtPath, 'utf-8');
 const lines = raw.split('\n');
@@ -161,6 +163,23 @@ const cardsPrePatch = overrideCount > 0 ? cards.map((c) => ({ ...c })) : null;
   }
 }
 if (overrideCount > 0) console.log(`✏️  ${overrideCount} card override(s) applied`);
+
+// Card aliases (catalog editor) — short names like "LAFS" that `[[mentions]]`
+// fall back to. Checked against the FINAL patched rows, so the shadow check
+// sees any stem an override just moved. Validated HERE, with every other gate
+// and before the first write: aborting after abMap.json had been regenerated
+// would leave lib/cards/generated/ describing two different catalogs. The file
+// itself is written with the rest of them below.
+const cardAliases = (() => {
+  const { aliases, errors } = applyCardAliases(cards, overridesOverlay);
+  if (errors.length > 0) {
+    console.error(
+      `❌ card alias overlay failed validation:\n` + errors.map((e) => `   - ${e}`).join('\n')
+    );
+    process.exit(1);
+  }
+  return aliases;
+})();
 
 // Diff summary against previous generated data, if present
 function loadPreviousCards() {
@@ -343,6 +362,10 @@ for (const k of Object.keys(overridesOverlay.imageVersions || {}).sort()) {
 }
 fs.writeFileSync(imgVersionsPath, JSON.stringify(imgVersionsOut, null, 2) + '\n');
 console.log(`🖼️  ${path.relative(process.cwd(), imgVersionsPath)} — ${Object.keys(imgVersionsOut).length} versioned image(s)`);
+
+fs.writeFileSync(cardAliasesPath, JSON.stringify(cardAliases, null, 2) + '\n');
+console.log(`🔤 ${path.relative(process.cwd(), cardAliasesPath)} — ${cardAliases.length} card alias(es)`);
+
 
 // The card array lives in a .json file so TypeScript never has to type-check a
 // multi-megabyte inline literal (which OOMs the build). The lookup maps are

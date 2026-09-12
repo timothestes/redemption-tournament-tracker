@@ -33,6 +33,13 @@
       "note": "Adding good brigades to match POC nebbie"
     }
   ],
+  "aliases": [
+    {
+      "alias": "LAFS",
+      "name": "Love at First Sight (LoC)",
+      "set": "LoC"
+    }
+  ],
   "imageVersions": {
     "036-Jeremiah-the-Weeper-R": 2,
     "036-Jeremiah-the-Weeper-R-AB": 1

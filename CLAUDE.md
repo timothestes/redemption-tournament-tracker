@@ -51,6 +51,7 @@ make update-cards        # Download latest carddata.txt and regenerate TypeScrip
 | Design system | `prompt_context/design_system.md` |
 | Forge card versioning | `prompt_context/forge_versioning.md` — autosave vs proposals vs versions, who sees what, where the "why" lives |
 | Forge set promotion ("big red button") | `docs/superpowers/specs/2026-08-22-forge-public-set-release-design.md` + `app/forge/lib/promote.ts`; overlay `scripts/data/forge-released.json` via `make pull-forge-releases` |
+| Card aliases (`[[LAFS]]`) | `lib/cards/aliases.ts` + `app/admin/catalog/AliasEditor.tsx`; curated in /admin/catalog, baked into the overlay by `make pull-card-overrides` — an alias is live only after a deploy |
 | Catalog admin editor | `docs/superpowers/specs/2026-08-23-catalog-admin-editor-design.md` + `app/admin/catalog/`; overlay `scripts/data/card-overrides.json` via `make pull-card-overrides` |
 | Goldfish mode | `prompt_context/goldfish_practice_mode.md` |
 | Mobile touch support | `docs/superpowers/specs/2026-08-29-mobile-multiplayer-touch-design.md` + `app/shared/layout/camera.ts`; `npm run shots:mobile` for the screenshot matrix. Konva fires `tap` not `click` on touch — see the implementation notes. |

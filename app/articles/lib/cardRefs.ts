@@ -4,8 +4,12 @@
 import { CARDS, findCard, type CardData } from "@/lib/cards/lookup";
 import { cardIdentityKey, cardNameStem, representativeCard } from "@/lib/cards/cardIdentity";
 import { cardNameKey } from "@/lib/cards/nameKey";
+import { aliasTarget } from "@/lib/cards/aliases";
 import type { CardRef } from "./refTypes";
 
+// A mention resolves in three passes — exact printing, name stem, then a
+// curated alias ("LAFS") — each a strictly later fallback than the last.
+//
 // Most cards have no undecorated printing — "Son of God" exists only as
 // "Son of God (J)", "[K]", "(2019) (Promo)"… — so a plain typed name has to
 // match on the stem. Prefer a currently-legal printing, then the shortest name,
@@ -45,9 +49,14 @@ export function resolveCardRef(name: string): CardRef | undefined {
     if (card) return { name: card.name, imgFile: card.imgFile };
   }
   const byStem = getStemIndex().get(cardNameKey(name));
-  if (!byStem) return undefined;
-  const rep = representativeCard(cardIdentityKey(byStem)) ?? byStem;
-  return { name: rep.name, imgFile: rep.imgFile };
+  if (byStem) {
+    const rep = representativeCard(cardIdentityKey(byStem)) ?? byStem;
+    return { name: rep.name, imgFile: rep.imgFile };
+  }
+  // Curated aliases go last, so a real card always wins and an alias can never
+  // shadow the catalog. The editor and the codegen both refuse one that would.
+  const aliased = aliasTarget(name);
+  return aliased ? { name: aliased.name, imgFile: aliased.imgFile } : undefined;
 }
 
 export function resolveCardRefs(names: string[]): Record<string, CardRef> {
