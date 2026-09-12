@@ -117,11 +117,19 @@ function ResolvedMention({ name, src }: { name: string; src: string }) {
           hide();
           setOpen(true);
         }}
-        // Mid-sentence, so it can't be padded to 44px without wrecking the
-        // line. Grow the strike zone vertically instead: the inline box
-        // grows, the visual line height does not.
-        style={touch ? { padding: "6px 0", margin: "-6px 0" } : undefined}
-        className="card-mention inline cursor-pointer text-left align-baseline underline decoration-foreground/40 decoration-dotted decoration-[1.5px] underline-offset-[3px] outline-none hover:text-primary hover:decoration-primary focus-visible:text-primary focus-visible:decoration-primary"
+        className={[
+          // A chip, not an underline: a card reference has to be obvious at a
+          // glance in a wall of deck-tech prose. box-decoration-clone keeps the
+          // padding and border on BOTH halves when a name wraps across lines.
+          "card-mention box-decoration-clone inline cursor-pointer rounded-[3px] bg-foreground/[0.08] px-[0.32em]",
+          "text-left align-baseline font-medium ring-1 ring-inset ring-foreground/20 outline-none",
+          "hover:bg-primary/10 hover:text-primary hover:ring-primary/40",
+          "focus-visible:bg-primary/10 focus-visible:text-primary focus-visible:ring-primary/40",
+          // Mid-sentence, so it can't be padded to 44px without wrecking the
+          // line — and padding would now stretch the chip itself. An invisible
+          // overlay grows the strike zone instead, leaving the chip alone.
+          touch ? "relative before:absolute before:inset-x-0 before:-inset-y-[7px] before:content-['']" : "",
+        ].join(" ")}
       >
         {name}
       </button>
