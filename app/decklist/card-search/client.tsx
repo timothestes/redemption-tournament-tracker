@@ -2412,27 +2412,6 @@ export default function CardSearchClient({
         {/* Card grid */}
         {visibleCards.length > 0 ? (
           <>
-          {/* Hidden preloader: warms the raw-blob URL cache so that adding a
-              card to the deck panel (which uses plain <img> against the blob
-              URL, not next/image's /_next/image variant) doesn't briefly show
-              the bg-muted/animate-pulse placeholder. Mirrors the reserve-card
-              preloader in DeckBuilderPanel.tsx. */}
-          <div className="hidden" aria-hidden="true">
-            {visibleCards.map((c) => {
-              // Only URL-resolved cards can be preloaded; element-resolved
-              // (Forge) cards have no public URL and would just 404.
-              const r = config.resolveCardImage(c);
-              const url = r.kind === "url" ? r.url : null;
-              return url ? (
-                <img
-                  key={`search-preload-${c.dataLine}`}
-                  src={url}
-                  alt=""
-                  loading="eager"
-                />
-              ) : null;
-            })}
-          </div>
           {/* Sort + count bar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mt-2 sm:mt-4">
             {visibleCards.map((c, cardIndex) => {

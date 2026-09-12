@@ -3,6 +3,9 @@
 // 308s to it at the Vercel domain level, preserving path + query, so these rules
 // only need to run once, on the canonical host.
 const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
+// Exact Blob host for next/image. A wildcard here would let anyone run their
+// own Vercel Blob store's images through our optimizer at our expense.
+const blobHost = blobBase ? new URL(blobBase).hostname : null;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -38,13 +41,21 @@ const nextConfig = {
         port: '',
         pathname: '/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/setimages/general/**',
       },
-      {
-        protocol: 'https',
-        hostname: '*.public.blob.vercel-storage.com',
-      },
+      ...(blobHost
+        ? [{ protocol: 'https', hostname: blobHost }]
+        : [{ protocol: 'https', hostname: '*.public.blob.vercel-storage.com' }]),
     ],
     // Enable optimization for large amounts of images
     minimumCacheTTL: 31536000, // 1 year
+    // Every <Image> in the app renders at the default q=75. Leaving `qualities`
+    // unset makes all 100 quality values valid cache keys (and billable
+    // transformations) for anyone who edits the /_next/image query string.
+    qualities: [75],
+    // Card art is stored at 345x495 (app/forge/lib/catalogRow.ts), so the 2048
+    // and 3840 device widths only ever produced upscales. Trimmed from Next's
+    // 8+8 defaults to cut transformation cardinality per source image.
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [64, 96, 128, 256, 384],
     // Allow unoptimized images for API routes
     unoptimized: false,
   },

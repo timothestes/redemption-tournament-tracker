@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { loadPublicDeckAction } from "../actions";
 import { createClient } from "../../../utils/supabase/server";
@@ -10,9 +11,15 @@ interface PageProps {
   params: Promise<{ deckId: string }>;
 }
 
+// generateMetadata and the page body both need the deck. Without this memo the
+// whole query cascade — and the fire-and-forget view_count write inside it —
+// ran twice for every request. cache() is request-scoped, so the two callers
+// share one load.
+const loadDeck = cache((deckId: string) => loadPublicDeckAction(deckId));
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { deckId } = await params;
-  const result = await loadPublicDeckAction(deckId);
+  const result = await loadDeck(deckId);
 
   if (!result.success || !result.deck) {
     return { title: "Deck Not Found" };
@@ -64,7 +71,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function PublicDeckPage({ params }: PageProps) {
   const { deckId } = await params;
   const [result, { data: { user } }] = await Promise.all([
-    loadPublicDeckAction(deckId),
+    loadDeck(deckId),
     createClient().then((sb) => sb.auth.getUser()),
   ]);
 
