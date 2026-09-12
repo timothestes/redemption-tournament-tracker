@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { searchCardNames } from "../search";
 import { CARDS, findCard } from "../lookup";
 import { cardNameStem } from "../cardIdentity";
-import { CARD_ALIASES } from "../aliases";
+import { CARD_ALIASES, aliasTarget } from "../aliases";
+import { resolveCardRef } from "@/app/articles/lib/cardRefs";
 
 describe("searchCardNames", () => {
   it("returns nothing for a blank query", () => {
@@ -56,11 +57,17 @@ describe("searchCardNames + aliases", () => {
     }
   });
 
-  it("inserts the card's own name, never the alias", () => {
+  it("inserts text that resolves back to the printing the alias names", () => {
+    // Usually the printing's own name. Not always: "DR" names
+    // "Dragon Raid [RR2]", and brackets cannot appear inside `[[ ]]`, so the
+    // alias itself is inserted instead. Either way the round trip must hold —
+    // asserting the text is merely "a card name" would accept the wrong card.
     for (const entry of CARD_ALIASES) {
       const match = searchCardNames(entry.alias, 50).find((h) => h.alias === entry.alias)!;
-      const stemmed = CARDS.some((c) => cardNameStem(c.name, c.type) === match.name);
-      expect(findCard(match.name) !== undefined || stemmed, `"${match.name}" is not insertable`).toBe(true);
+      expect(match.name).not.toMatch(/[[\]|\n]/);
+      expect(resolveCardRef(match.name)?.imgFile, `"${match.name}" does not lead back to ${entry.alias}`).toBe(
+        aliasTarget(entry.alias)!.imgFile,
+      );
     }
   });
 
