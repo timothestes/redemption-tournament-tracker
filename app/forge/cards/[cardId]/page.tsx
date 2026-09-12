@@ -51,6 +51,9 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
   const idx = ordered.findIndex((c) => c.id === cardId);
   const prevId = idx > 0 ? ordered[idx - 1].id : null;
   const nextId = idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1].id : null;
+  // Shown under the face so walking a set tells you where you are, and so the ←/→
+  // shortcut is discoverable at all.
+  const position = idx >= 0 && ordered.length > 1 ? { index: idx + 1, total: ordered.length } : null;
 
   const { data: meRow } = await ctx.supabase
     .from("playtest_members")
@@ -80,6 +83,7 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
       setName={set?.name ?? null}
       prevId={prevId}
       nextId={nextId}
+      position={position}
       artCandidates={artCandidates}
       openProposals={openProposals}
       review={
