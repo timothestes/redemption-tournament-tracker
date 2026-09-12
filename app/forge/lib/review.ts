@@ -1,55 +1,50 @@
 "use server";
 
 import { requireForge } from "@/app/forge/lib/auth";
+import type { ReviewCardRow, ReviewOpenItem } from "@/app/forge/lib/reviewView";
 
-export type ReviewQueueItem = {
-  cardId: string;
-  title: string | null;
-  status: string;
-  openProposals: number;
-  openSuggestions: number;
-};
+export type SetReviewQueue = { cards: ReviewCardRow[]; items: ReviewOpenItem[] };
 
-// Cards in a set that have open proposals or unresolved field-anchored suggestions.
+// Open proposals and unresolved field-anchored suggestions on a set's cards.
 // (General unresolved comments are NOT counted — only suggestions with a value.)
-export async function getSetReviewQueue(setId: string): Promise<ReviewQueueItem[]> {
+// Returns the raw open items, with `cards` narrowed to those holding at least
+// one; buildReviewQueue() does the counting so the client can re-filter by date
+// or kind without another round trip.
+export async function getSetReviewQueue(setId: string): Promise<SetReviewQueue> {
   const ctx = await requireForge();
-  if (!ctx) return [];
+  if (!ctx) return { cards: [], items: [] };
   const { data: cards } = await ctx.supabase
     .from("forge_cards")
     .select("id, title, status")
     .eq("set_id", setId);
   const list = cards ?? [];
-  if (list.length === 0) return [];
+  if (list.length === 0) return { cards: [], items: [] };
   const ids = list.map((c: any) => c.id);
 
   const { data: props } = await ctx.supabase
     .from("card_proposals")
-    .select("card_id")
+    .select("card_id, created_at")
     .eq("status", "open")
     .in("card_id", ids);
 
   const { data: sugg } = await ctx.supabase
     .from("card_comments")
-    .select("card_id")
+    .select("card_id, created_at")
     .eq("resolved", false)
     .not("field", "is", null)
     .not("suggested_value", "is", null)
     .in("card_id", ids);
 
-  const pc = new Map<string, number>();
-  for (const p of props ?? []) pc.set(p.card_id, (pc.get(p.card_id) ?? 0) + 1);
-  const sc = new Map<string, number>();
-  for (const s of sugg ?? []) sc.set(s.card_id, (sc.get(s.card_id) ?? 0) + 1);
+  const items: ReviewOpenItem[] = [
+    ...(props ?? []).map((p: any) => ({ cardId: p.card_id, kind: "proposal" as const, createdAt: p.created_at })),
+    ...(sugg ?? []).map((s: any) => ({ cardId: s.card_id, kind: "suggestion" as const, createdAt: s.created_at })),
+  ];
+  const open = new Set(items.map((i) => i.cardId));
 
-  return list
-    .map((c: any) => ({
-      cardId: c.id,
-      title: c.title ?? null,
-      status: c.status,
-      openProposals: pc.get(c.id) ?? 0,
-      openSuggestions: sc.get(c.id) ?? 0,
-    }))
-    .filter((i) => i.openProposals > 0 || i.openSuggestions > 0)
-    .sort((a, b) => b.openProposals + b.openSuggestions - (a.openProposals + a.openSuggestions));
+  return {
+    cards: list
+      .filter((c: any) => open.has(c.id))
+      .map((c: any) => ({ id: c.id, title: c.title ?? null, status: c.status })),
+    items,
+  };
 }
