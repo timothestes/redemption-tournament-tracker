@@ -150,6 +150,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   } = useCollectionState({ enabled: isLoggedIn });
   const [viewMode, setViewMode] = useState<"normal" | "stacked">("normal");
   const [groupBy, setGroupBy] = useState<"type" | "alignment" | "none">("type");
+  // Maybeboard is a scratchpad, so it gets its own tab rather than trailing the
+  // real deck. The tab bar only appears when there is a maybeboard to show.
+  const [deckTab, setDeckTab] = useState<"deck" | "considering">("deck");
   const [showParagonModal, setShowParagonModal] = useState(false);
   const [paragonVisible, setParagonVisible] = useState(true);
 
@@ -414,17 +417,16 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
     return [...maybeboardCards].sort((a, b) => compareCardsByType(toSortable(a), toSortable(b)));
   }, [maybeboardCards]);
 
-  // Build flat list of Card objects for modal navigation (main + reserve + maybeboard)
+  // Build flat list of Card objects for modal navigation. Scoped to the visible
+  // tab so the modal's arrows never walk into cards that aren't on screen.
   const allCardsForNav = useMemo<Card[]>(() => {
-    const allEnriched = [
-      ...Object.values(groupedMainCards).flat(),
-      ...sortedReserveCards,
-      ...sortedMaybeboardCards,
-    ];
+    const allEnriched = deckTab === "considering"
+      ? sortedMaybeboardCards
+      : [...Object.values(groupedMainCards).flat(), ...sortedReserveCards];
     return allEnriched
       .filter((c) => c.fullCard)
       .map((c) => c.fullCard!);
-  }, [groupedMainCards, sortedReserveCards, sortedMaybeboardCards]);
+  }, [deckTab, groupedMainCards, sortedReserveCards, sortedMaybeboardCards]);
 
   async function handleCopyLink() {
     const url = `${window.location.origin}/decklist/${deck.id}`;
@@ -1483,201 +1485,165 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       {/* Deck cards — only render after card database is loaded */}
       {cardDatabase && <div className="lg:flex lg:gap-6">
       <div className="flex-1 min-w-0">
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          Main Deck
-          <span className="text-sm font-normal text-muted-foreground">
-            ({mainDeckCount} cards)
-          </span>
-        </h2>
+      {/* Deck / Considering tabs. The maybeboard is a scratchpad, so it lives
+          behind its own tab rather than trailing the real deck. */}
+      {maybeboardCount > 0 && (
+        <div
+          role="tablist"
+          aria-label="Deck sections"
+          className="flex w-full sm:w-fit gap-1 rounded-lg bg-muted/50 p-1 mb-6"
+        >
+          {([
+            { key: "deck" as const, label: "Deck", count: mainDeckCount + reserveCount },
+            { key: "considering" as const, label: "Considering", count: maybeboardCount },
+          ]).map((tab) => {
+            const isActive = tab.key === deckTab;
+            return (
+              <button
+                key={tab.key}
+                role="tab"
+                type="button"
+                aria-selected={isActive}
+                onClick={() => setDeckTab(tab.key)}
+                className={`flex-1 sm:flex-none whitespace-nowrap rounded-md px-3 sm:px-8 py-3 sm:py-2 text-sm transition-colors ${
+                  isActive
+                    ? "bg-card font-semibold text-foreground shadow-sm"
+                    : "font-medium text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}{" "}
+                <span className="font-normal text-muted-foreground">({tab.count})</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {deckTab === "deck" && (
+        <>
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            Main Deck
+            <span className="text-sm font-normal text-muted-foreground">
+              ({mainDeckCount} cards)
+            </span>
+          </h2>
 
-        {mainCards.length === 0 ? (
-          <p className="text-muted-foreground italic">No cards in main deck.</p>
-        ) : viewMode === "stacked" ? (
-          /* Stacked view — matches FullDeckView layout exactly */
-          <div className="flex gap-4 items-start flex-wrap">
-            {Object.entries(groupedMainCards).flatMap(([groupName, cards]) => {
-              const columns = splitGroup(cards);
-              return columns.map((col, colIndex) => (
-                <div key={`${groupName}-${colIndex}`} className="flex flex-col">
-                  {groupBy === "alignment" && colIndex === 0 && (
+          {mainCards.length === 0 ? (
+            <p className="text-muted-foreground italic">No cards in main deck.</p>
+          ) : viewMode === "stacked" ? (
+            /* Stacked view — matches FullDeckView layout exactly */
+            <div className="flex gap-4 items-start flex-wrap">
+              {Object.entries(groupedMainCards).flatMap(([groupName, cards]) => {
+                const columns = splitGroup(cards);
+                return columns.map((col, colIndex) => (
+                  <div key={`${groupName}-${colIndex}`} className="flex flex-col">
+                    {groupBy === "alignment" && colIndex === 0 && (
+                      <div className="mb-2 flex items-center gap-2">
+                        <h3 className="text-lg font-semibold text-muted-foreground">{groupName}</h3>
+                        <span className="text-xs text-muted-foreground">({cards.reduce((s, c) => s + c.quantity, 0)})</span>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-2 items-center">
+                      {col.flatMap((card) =>
+                        Array.from({ length: card.quantity }, (_, i) => (
+                          <StackedTile
+                            key={`${card.card_name}-${card.card_set}-${colIndex}-${i}`}
+                            card={card}
+                            ringClass="hover:ring-blue-500"
+                            onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                            onHover={setHoveredCard}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ));
+              })}
+
+              {/* Reserve columns */}
+              {sortedReserveCards.length > 0 && splitGroup(sortedReserveCards).map((col, colIndex) => (
+                <div key={`reserve-col-${colIndex}`} className="flex flex-col ml-4">
+                  {colIndex === 0 && (
                     <div className="mb-2 flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-muted-foreground">{groupName}</h3>
-                      <span className="text-xs text-muted-foreground">({cards.reduce((s, c) => s + c.quantity, 0)})</span>
+                      <h3 className="text-lg font-semibold text-purple-400">Reserve</h3>
+                      <span className="text-xs text-muted-foreground">({reserveCount})</span>
                     </div>
                   )}
                   <div className="flex flex-col gap-2 items-center">
                     {col.flatMap((card) =>
                       Array.from({ length: card.quantity }, (_, i) => (
-                        <div
-                          key={`${card.card_name}-${card.card_set}-${colIndex}-${i}`}
-                          className="group relative w-28 flex-shrink-0 cursor-pointer transition-all -mb-32 last:mb-0"
+                        <StackedTile
+                          key={`reserve-${card.card_name}-${card.card_set}-${colIndex}-${i}`}
+                          card={card}
+                          ringClass="hover:ring-blue-500"
                           onClick={() => card.fullCard && setModalCard(card.fullCard)}
-                          onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
-                          onMouseLeave={() => setHoveredCard(null)}
-                        >
-                          <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-muted hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
-                            <img
-                              src={getImageUrl(card.card_img_file || "")}
-                              alt={card.card_name}
-                              className="w-full h-full object-contain"
-                              loading="eager"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
-                              <div className="w-full p-1.5 text-white">
-                                <p className="text-xs font-semibold leading-tight truncate">{card.card_name}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                          onHover={setHoveredCard}
+                        />
                       ))
                     )}
                   </div>
                 </div>
-              ));
-            })}
+              ))}
+            </div>
+          ) : (
+            /* Normal view: compact grid with type group headers */
+            <div className="space-y-3">
+              {Object.entries(groupedMainCards).map(([groupName, cards]) => {
+                const groupCount = cards.reduce((sum, c) => sum + c.quantity, 0);
+                return (
+                  <div key={groupName}>
+                    {groupBy !== "none" && (
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                        {getGroupDisplayName(groupName)}
+                        <span className="ml-1.5 font-normal">({groupCount})</span>
+                      </h3>
+                    )}
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-7">
+                      {cards.map((card, index) => (
+                        <CardTile
+                          key={`main-${card.card_name}-${card.card_set}-${index}`}
+                          card={card}
+                          onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                          onHover={setHoveredCard}
+                          compact
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-            {/* Reserve columns */}
-            {sortedReserveCards.length > 0 && splitGroup(sortedReserveCards).map((col, colIndex) => (
-              <div key={`reserve-col-${colIndex}`} className="flex flex-col ml-4">
-                {colIndex === 0 && (
-                  <div className="mb-2 flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-purple-400">Reserve</h3>
-                    <span className="text-xs text-muted-foreground">({reserveCount})</span>
-                  </div>
-                )}
-                <div className="flex flex-col gap-2 items-center">
-                  {col.flatMap((card) =>
-                    Array.from({ length: card.quantity }, (_, i) => (
-                      <div
-                        key={`reserve-${card.card_name}-${card.card_set}-${colIndex}-${i}`}
-                        className="group relative w-28 flex-shrink-0 cursor-pointer transition-all -mb-32 last:mb-0"
-                        onClick={() => card.fullCard && setModalCard(card.fullCard)}
-                        onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
-                        onMouseLeave={() => setHoveredCard(null)}
-                      >
-                        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-muted hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
-                          <img
-                            src={getImageUrl(card.card_img_file || "")}
-                            alt={card.card_name}
-                            className="w-full h-full object-contain"
-                            loading="eager"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
-                            <div className="w-full p-1.5 text-white">
-                              <p className="text-xs font-semibold leading-tight truncate">{card.card_name}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Maybeboard ("Considering") columns — secondary, muted */}
-            {sortedMaybeboardCards.length > 0 && splitGroup(sortedMaybeboardCards).map((col, colIndex) => (
-              <div key={`maybeboard-col-${colIndex}`} className="flex flex-col ml-4 opacity-75">
-                {colIndex === 0 && (
-                  <div className="mb-2 flex items-center gap-2">
-                    <h3 className="text-lg font-semibold italic text-muted-foreground">Considering</h3>
-                    <span className="text-xs text-muted-foreground">({maybeboardCount})</span>
-                    <span
-                      title="A scratchpad — not part of the deck."
-                      className="w-4 h-4 rounded-full bg-muted text-muted-foreground text-[10px] font-bold flex items-center justify-center cursor-help"
-                    >
-                      ?
-                    </span>
-                  </div>
-                )}
-                <div className="flex flex-col gap-2 items-center">
-                  {col.flatMap((card) =>
-                    Array.from({ length: card.quantity }, (_, i) => (
-                      <div
-                        key={`maybeboard-${card.card_name}-${card.card_set}-${colIndex}-${i}`}
-                        className="group relative w-28 flex-shrink-0 cursor-pointer transition-all -mb-32 last:mb-0"
-                        onClick={() => card.fullCard && setModalCard(card.fullCard)}
-                        onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
-                        onMouseLeave={() => setHoveredCard(null)}
-                      >
-                        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-muted hover:ring-2 hover:ring-violet-500 transition-all cursor-pointer shadow-md">
-                          <img
-                            src={getImageUrl(card.card_img_file || "")}
-                            alt={card.card_name}
-                            className="w-full h-full object-contain"
-                            loading="eager"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
-                            <div className="w-full p-1.5 text-white">
-                              <p className="text-xs font-semibold leading-tight truncate">{card.card_name}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          /* Normal view: compact grid with type group headers */
-          <div className="space-y-3">
-            {Object.entries(groupedMainCards).map(([groupName, cards]) => {
-              const groupCount = cards.reduce((sum, c) => sum + c.quantity, 0);
-              return (
-                <div key={groupName}>
-                  {groupBy !== "none" && (
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                      {getGroupDisplayName(groupName)}
-                      <span className="ml-1.5 font-normal">({groupCount})</span>
-                    </h3>
-                  )}
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-7">
-                    {cards.map((card, index) => (
-                      <CardTile
-                        key={`main-${card.card_name}-${card.card_set}-${index}`}
-                        card={card}
-                        onClick={() => card.fullCard && setModalCard(card.fullCard)}
-                        onHover={setHoveredCard}
-                        compact
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+        {/* Reserve (normal view only — stacked view renders reserve inline above) */}
+        {viewMode === "normal" && sortedReserveCards.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              Reserve
+              <span className="text-sm font-normal text-muted-foreground">
+                ({reserveCount} cards)
+              </span>
+            </h2>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-7">
+              {sortedReserveCards.map((card, index) => (
+                <CardTile
+                  key={`reserve-${card.card_name}-${card.card_set}-${index}`}
+                  card={card}
+                  onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                  onHover={setHoveredCard}
+                  compact
+                />
+              ))}
+            </div>
           </div>
         )}
-      </div>
-
-      {/* Reserve (normal view only — stacked view renders reserve inline above) */}
-      {viewMode === "normal" && sortedReserveCards.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            Reserve
-            <span className="text-sm font-normal text-muted-foreground">
-              ({reserveCount} cards)
-            </span>
-          </h2>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-7">
-            {sortedReserveCards.map((card, index) => (
-              <CardTile
-                key={`reserve-${card.card_name}-${card.card_set}-${index}`}
-                card={card}
-                onClick={() => card.fullCard && setModalCard(card.fullCard)}
-                onHover={setHoveredCard}
-                compact
-              />
-            ))}
-          </div>
-        </div>
+        </>
       )}
 
-      {/* Maybeboard ("Considering") — normal view only; secondary, muted */}
-      {viewMode === "normal" && sortedMaybeboardCards.length > 0 && (
-        <div className="mb-8 opacity-80">
+      {/* Considering (maybeboard) tab panel */}
+      {deckTab === "considering" && (
+        <div className="mb-8">
           <h2 className="text-xl font-semibold italic text-muted-foreground mb-4 flex items-center gap-2">
             Considering
             <span className="text-sm font-normal text-muted-foreground not-italic">
@@ -1690,17 +1656,40 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               ?
             </span>
           </h2>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-7">
-            {sortedMaybeboardCards.map((card, index) => (
-              <CardTile
-                key={`maybeboard-${card.card_name}-${card.card_set}-${index}`}
-                card={card}
-                onClick={() => card.fullCard && setModalCard(card.fullCard)}
-                onHover={setHoveredCard}
-                compact
-              />
-            ))}
-          </div>
+
+          {viewMode === "stacked" ? (
+            <div className="flex gap-4 items-start flex-wrap">
+              {splitGroup(sortedMaybeboardCards).map((col, colIndex) => (
+                <div key={`maybeboard-col-${colIndex}`} className="flex flex-col">
+                  <div className="flex flex-col gap-2 items-center">
+                    {col.flatMap((card) =>
+                      Array.from({ length: card.quantity }, (_, i) => (
+                        <StackedTile
+                          key={`maybeboard-${card.card_name}-${card.card_set}-${colIndex}-${i}`}
+                          card={card}
+                          ringClass="hover:ring-violet-500"
+                          onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                          onHover={setHoveredCard}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-7">
+              {sortedMaybeboardCards.map((card, index) => (
+                <CardTile
+                  key={`maybeboard-${card.card_name}-${card.card_set}-${index}`}
+                  card={card}
+                  onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                  onHover={setHoveredCard}
+                  compact
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1855,6 +1844,47 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
  * Group cards and sort within each group.
  * Supports grouping by type, alignment, or no grouping.
  */
+type HoverTarget = { name: string; imgFile: string; set?: string; type?: string } | null;
+
+/**
+ * One card in the stacked (overlapping columns) layout — the main deck,
+ * Reserve and Considering columns all render the same tile.
+ */
+function StackedTile({
+  card,
+  ringClass,
+  onClick,
+  onHover,
+}: {
+  card: EnrichedCard;
+  ringClass: string;
+  onClick: () => void;
+  onHover: (target: HoverTarget) => void;
+}) {
+  return (
+    <div
+      className="group relative w-28 flex-shrink-0 cursor-pointer transition-all -mb-32 last:mb-0"
+      onClick={onClick}
+      onMouseEnter={() => onHover({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
+      onMouseLeave={() => onHover(null)}
+    >
+      <div className={`relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-muted hover:ring-2 ${ringClass} transition-all cursor-pointer shadow-md`}>
+        <img
+          src={getImageUrl(card.card_img_file || "")}
+          alt={card.card_name}
+          className="w-full h-full object-contain"
+          loading="eager"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
+          <div className="w-full p-1.5 text-white">
+            <p className="text-xs font-semibold leading-tight truncate">{card.card_name}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Split a group of cards into multiple columns when it exceeds maxPerColumn.
  * Matches FullDeckView splitTypeGroup logic.
