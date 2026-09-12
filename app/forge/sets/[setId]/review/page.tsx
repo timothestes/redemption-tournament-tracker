@@ -13,11 +13,11 @@ export default async function ReviewQueuePage({ params }: { params: Promise<{ se
   const { setId } = await params;
   const set = await getSet(setId);
   if (!set) notFound(); // RLS hides sets the caller can't see → 404
-  const items = await getSetReviewQueue(setId);
+  const { cards, items } = await getSetReviewQueue(setId);
   return (
     <div>
       <h2 className="mb-3 text-sm font-semibold">Review queue</h2>
-      <ReviewQueue items={items} />
+      <ReviewQueue setId={setId} cards={cards} items={items} />
     </div>
   );
 }
