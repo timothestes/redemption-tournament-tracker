@@ -1,3 +1,5 @@
+import { cardNameKey } from "@/lib/cards/nameKey";
+import { parseMention } from "@/app/articles/lib/markdown";
 /**
  * Wraps card names already written in a deck description in `[[ ]]`, so the
  * prose an author typed before mentions existed starts rendering card links.
@@ -39,6 +41,20 @@ const WORD_AFTER = /[A-Za-z0-9-]/;
 const WORD_BEFORE = /[A-Za-z0-9'’-]/;
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * A card name as people actually type it: either apostrophe, the comma
+ * optional ("Moses the Servant"), and Judgment spelled the British way. Case
+ * still matters — "mayhem" in a sentence is not the card.
+ */
+function pattern(name: string): RegExp {
+  const src = escapeRe(name)
+    .replace(/['\u2019]/g, "['\u2019]")
+    .replace(/,/g, ",?")
+    .replace(/ /g, "\\s+")
+    .replace(/([Jj])udgment/g, "$1udge?ment");
+  return new RegExp(src, "g");
+}
 
 /** How far either side to look for a longer card name swallowing the match. */
 const CONTEXT_WORDS = 5;
@@ -95,20 +111,31 @@ function overlaps(ranges: Array<[number, number]>, start: number, end: number): 
   return ranges.some(([a, b]) => start < b && end > a);
 }
 
+/** Targets already mentioned in this paragraph, so a second pass adds nothing. */
+function mentionedTargets(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of text.matchAll(/\[\[([^\[\]\n]+?)\]\]/g)) out.add(cardNameKey(parseMention(m[1]).target));
+  return out;
+}
+
 function linkParagraph(
   para: string,
-  candidates: string[],
+  candidates: Candidate[],
   added: string[],
   knownName: (candidate: string) => boolean,
+  resolvesTo: (written: string, target: string) => boolean,
 ): string {
   if (HEADING.test(para)) return para;
   let text = para;
-  for (const name of candidates) {
-    const re = new RegExp(escapeRe(name), "g");
+  const already = mentionedTargets(para);
+  for (const { name, target } of candidates) {
+    if (already.has(cardNameKey(target))) continue;
+    const re = pattern(name);
     const blocked = protectedRanges(text);
     for (const m of text.matchAll(re)) {
       const start = m.index!;
-      const end = start + name.length;
+      const written = m[0];
+      const end = start + written.length;
       if (WORD_BEFORE.test(text[start - 1] ?? "")) continue;
       if (WORD_AFTER.test(text[end] ?? "")) continue;
       if (overlaps(blocked, start, end)) continue;
@@ -117,32 +144,54 @@ function linkParagraph(
       // author's shorthand for a longer card name the index does not know.
       if (!name.includes(" ") && /^\s+of\b/i.test(text.slice(end, end + 5))) continue;
       if (insideLongerCardName(text, start, end, knownName)) continue;
-      text = `${text.slice(0, start)}[[${name}]]${text.slice(end)}`;
-      added.push(name);
+      // Keep the author's words on the page. They stand alone when they resolve
+      // to the right card; otherwise the mention carries the card as its target
+      // and the words as its label.
+      const mention =
+        written === target || resolvesTo(written, target) ? `[[${written}]]` : `[[${target}|${written}]]`;
+      text = `${text.slice(0, start)}${mention}${text.slice(end)}`;
+      added.push(target);
       break; // once per paragraph per card
     }
   }
   return text;
 }
 
+export interface Candidate {
+  /** The name to look for in the prose. */
+  name: string;
+  /** The card the mention points at — the deck's own printing when `name` is ambiguous. */
+  target: string;
+}
+
 export interface LinkResult {
   markdown: string;
-  /** Card names wrapped, in the order they were wrapped. */
+  /** Cards linked, in the order they were linked. */
   added: string[];
 }
 
 export interface LinkOptions {
   /** Tells the linker whether a stretch of text is itself a card name. */
   knownName?: (candidate: string) => boolean;
+  /** True when `[[written]]` on its own would land on the same card as `target`. */
+  resolvesTo?: (written: string, target: string) => boolean;
 }
 
-export function linkCardMentions(markdown: string, candidates: string[], options: LinkOptions = {}): LinkResult {
+export function linkCardMentions(
+  markdown: string,
+  candidates: Candidate[],
+  options: LinkOptions = {},
+): LinkResult {
   const knownName = options.knownName ?? (() => false);
-  const ordered = [...new Set(candidates)].sort((a, b) => b.length - a.length || a.localeCompare(b));
+  const resolvesTo = options.resolvesTo ?? (() => false);
+  const seen = new Set<string>();
+  const ordered = candidates
+    .filter((c) => (seen.has(`${c.name}|${c.target}`) ? false : seen.add(`${c.name}|${c.target}`)))
+    .sort((a, b) => b.name.length - a.name.length || a.name.localeCompare(b.name));
   const added: string[] = [];
   // Split on blank lines, keeping the separators so the text round-trips byte
   // for byte when nothing matches.
   const parts = markdown.split(/(\n[ \t]*\n)/);
-  const out = parts.map((p, i) => (i % 2 === 0 ? linkParagraph(p, ordered, added, knownName) : p));
+  const out = parts.map((p, i) => (i % 2 === 0 ? linkParagraph(p, ordered, added, knownName, resolvesTo) : p));
   return { markdown: out.join(""), added };
 }

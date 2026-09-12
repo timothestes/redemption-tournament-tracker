@@ -33,14 +33,19 @@ function placePreview(rect: DOMRect): Pos {
 
 export default function CardMention({
   name,
+  label,
   imgFile,
   draft,
 }: {
+  /** The card this points at — what had to resolve. */
   name: string;
+  /** The words on the page, when the author wrote something other than the card's name. */
+  label?: string;
   imgFile?: string | null;
   /** Editor preview: flag a mention that resolved to nothing so the author sees the typo. */
   draft?: boolean;
 }) {
+  const text = label ?? name;
   const src = imgFile ? getCardImageUrl(imgFile) : "";
   if (!src) {
     return draft ? (
@@ -48,16 +53,18 @@ export default function CardMention({
         className="underline decoration-destructive decoration-wavy underline-offset-2"
         title={`No card named “${name}”`}
       >
-        {name}
+        {text}
       </span>
     ) : (
-      <span>{name}</span>
+      <span>{text}</span>
     );
   }
-  return <ResolvedMention name={name} src={src} />;
+  // The caption under the enlarged card names the card; the page keeps the
+  // author's words.
+  return <ResolvedMention name={name} text={text} src={src} />;
 }
 
-function ResolvedMention({ name, src }: { name: string; src: string }) {
+function ResolvedMention({ name, text, src }: { name: string; text: string; src: string }) {
   const touch = useInputMode() === "touch";
   const anchor = useRef<HTMLButtonElement>(null);
   const timer = useRef<number | null>(null);
@@ -131,7 +138,7 @@ function ResolvedMention({ name, src }: { name: string; src: string }) {
           touch ? "relative before:absolute before:inset-x-0 before:-inset-y-[7px] before:content-['']" : "",
         ].join(" ")}
       >
-        {name}
+        {text}
       </button>
       {pos &&
         createPortal(

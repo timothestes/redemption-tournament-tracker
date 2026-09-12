@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { youtubeId, isAudioUrl, slugify, SLUG_RE, excerptFromMarkdown, opensCardPicker, flattenCardMentions } from "../markdown";
+import { youtubeId, isAudioUrl, slugify, SLUG_RE, excerptFromMarkdown, opensCardPicker, flattenCardMentions, parseMention, extractCardMentions } from "../markdown";
 
 describe("youtubeId", () => {
   const ID = "dQw4w9WgXcQ";
@@ -88,5 +88,35 @@ describe("flattenCardMentions", () => {
   });
   it("leaves text without mentions alone", () => {
     expect(flattenCardMentions("Plain [words] here.")).toBe("Plain [words] here.");
+  });
+});
+
+describe("parseMention", () => {
+  it("reads a plain mention", () => {
+    expect(parseMention("Son of God")).toEqual({ target: "Son of God", label: "Son of God" });
+  });
+  it("splits target from the words on the page", () => {
+    expect(parseMention("Jacob (FooF)|Jacob")).toEqual({ target: "Jacob (FooF)", label: "Jacob" });
+  });
+  it("tidies whitespace on both halves", () => {
+    expect(parseMention("  Moses, the Servant | Moses the Servant ")).toEqual({
+      target: "Moses, the Servant",
+      label: "Moses the Servant",
+    });
+  });
+  it("splits on the FIRST bar only", () => {
+    expect(parseMention("A|B|C")).toEqual({ target: "A", label: "B|C" });
+  });
+  it("falls back to the target when the label is empty", () => {
+    expect(parseMention("Son of God|")).toEqual({ target: "Son of God", label: "Son of God" });
+  });
+});
+
+describe("aliased mentions elsewhere", () => {
+  it("extracts the target, which is what has to resolve", () => {
+    expect(extractCardMentions("Play [[Jacob (FooF)|Jacob]] early.")).toEqual(["Jacob (FooF)"]);
+  });
+  it("flattens to the words the author wrote, not the target", () => {
+    expect(flattenCardMentions("Play [[Jacob (FooF)|Jacob]] early.")).toBe("Play Jacob early.");
   });
 });

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { linkCardMentions } from "../linkCards";
 
-const link = (md: string, names: string[]) => linkCardMentions(md, names).markdown;
+const cands = (names: string[]) => names.map((name) => ({ name, target: name }));
+const link = (md: string, names: string[]) => linkCardMentions(md, cands(names)).markdown;
 
 // Stands in for the real card index in the "longer card name" tests.
 const knows = (...names: string[]) => {
@@ -15,7 +16,7 @@ describe("linkCardMentions", () => {
   });
 
   it("reports what it wrapped", () => {
-    const out = linkCardMentions("Son of God and Mayhem.", ["Son of God", "Mayhem"]);
+    const out = linkCardMentions("Son of God and Mayhem.", cands(["Son of God", "Mayhem"]));
     expect(out.added).toEqual(["Son of God", "Mayhem"]);
   });
 
@@ -70,14 +71,14 @@ describe("linkCardMentions", () => {
   });
 
   it("does not wrap a name inside a name it already wrapped", () => {
-    const out = linkCardMentions("The Angel of the Lord is here.", ["The Angel of the Lord", "Angel"]);
+    const out = linkCardMentions("The Angel of the Lord is here.", cands(["The Angel of the Lord", "Angel"]));
     expect(out.markdown).toBe("[[The Angel of the Lord]] is here.");
     expect(out.added).toEqual(["The Angel of the Lord"]);
   });
 
   it("keeps a description with nothing to link byte-identical", () => {
     const md = "No cards named here.\n\nJust prose.";
-    const out = linkCardMentions(md, ["Mayhem"]);
+    const out = linkCardMentions(md, cands(["Mayhem"]));
     expect(out.markdown).toBe(md);
     expect(out.added).toEqual([]);
   });
@@ -86,35 +87,35 @@ describe("linkCardMentions", () => {
 describe("linkCardMentions: names inside longer card names", () => {
   it("leaves a short name that is part of a longer card the author meant", () => {
     const known = knows("Faith of Samuel");
-    expect(linkCardMentions("I cut Faith of Samuel late.", ["Faith"], { knownName: known }).markdown).toBe(
+    expect(linkCardMentions("I cut Faith of Samuel late.", cands(["Faith"]), { knownName: known }).markdown).toBe(
       "I cut Faith of Samuel late.",
     );
   });
 
   it("handles the possessive shape of a longer name", () => {
     const known = knows("Goliath's Curse");
-    expect(linkCardMentions("Goliath’s Curse underdecks it.", ["Goliath"], { knownName: known }).markdown).toBe(
+    expect(linkCardMentions("Goliath’s Curse underdecks it.", cands(["Goliath"]), { knownName: known }).markdown).toBe(
       "Goliath’s Curse underdecks it.",
     );
   });
 
   it("still links the short name where no longer card name surrounds it", () => {
     const known = knows("Faith of Samuel");
-    expect(linkCardMentions("Faith wins games.", ["Faith"], { knownName: known }).markdown).toBe(
+    expect(linkCardMentions("Faith wins games.", cands(["Faith"]), { knownName: known }).markdown).toBe(
       "[[Faith]] wins games.",
     );
   });
 
   it("links a later clean occurrence when the first is inside a longer name", () => {
     const known = knows("Amazing Faith");
-    expect(linkCardMentions("Amazing Faith is fine, but Faith is the tutor.", ["Faith"], { knownName: known }).markdown).toBe(
+    expect(linkCardMentions("Amazing Faith is fine, but Faith is the tutor.", cands(["Faith"]), { knownName: known }).markdown).toBe(
       "Amazing Faith is fine, but [[Faith]] is the tutor.",
     );
   });
 
   it("ignores trailing punctuation when testing the longer span", () => {
     const known = knows("Faith of Samuel");
-    expect(linkCardMentions("I run Faith of Samuel, mostly.", ["Faith"], { knownName: known }).markdown).toBe(
+    expect(linkCardMentions("I run Faith of Samuel, mostly.", cands(["Faith"]), { knownName: known }).markdown).toBe(
       "I run Faith of Samuel, mostly.",
     );
   });
@@ -141,5 +142,52 @@ describe("linkCardMentions: shorthand for a longer card", () => {
     expect(link("Angel of the Lord of course works.", ["Angel of the Lord"])).toBe(
       "[[Angel of the Lord]] of course works.",
     );
+  });
+});
+
+describe("linkCardMentions: how the author actually typed it", () => {
+  it("matches a curly apostrophe against a card stored with a straight one", () => {
+    // With no resolvesTo to vouch for the author's spelling, the mention carries
+    // the card as its target — safe, and the page still reads as written.
+    expect(link("I tutor with Crowd’s Choice.", ["Crowd's Choice"])).toBe(
+      "I tutor with [[Crowd's Choice|Crowd’s Choice]].",
+    );
+  });
+  it("matches when the author dropped the card's comma", () => {
+    expect(linkCardMentions("Moses the Servant blocks.", [{ name: "Moses, the Servant", target: "Moses, the Servant" }]).markdown).toBe(
+      "[[Moses, the Servant|Moses the Servant]] blocks.",
+    );
+  });
+  it("matches the British spelling of Judgment", () => {
+    expect(linkCardMentions("An Impartial Judgement of 7.", [{ name: "Impartial Judgment", target: "Impartial Judgment" }]).markdown).toBe(
+      "An [[Impartial Judgment|Impartial Judgement]] of 7.",
+    );
+  });
+  it("writes what the author wrote when that resolves on its own", () => {
+    const resolvesTo = (written: string, target: string) => written.replace(/’/g, "'") === target;
+    expect(
+      linkCardMentions("I tutor with Crowd’s Choice.", [{ name: "Crowd's Choice", target: "Crowd's Choice" }], { resolvesTo }).markdown,
+    ).toBe("I tutor with [[Crowd’s Choice]].");
+  });
+});
+
+describe("linkCardMentions: pointing at the deck's own printing", () => {
+  it("aliases when the plain name belongs to a different card", () => {
+    expect(linkCardMentions("Jacob draws.", [{ name: "Jacob", target: "Jacob (FooF)" }]).markdown).toBe(
+      "[[Jacob (FooF)|Jacob]] draws.",
+    );
+  });
+});
+
+describe("linkCardMentions: running it twice", () => {
+  it("leaves a paragraph that already mentions the card alone", () => {
+    const md = "I run [[Mayhem]] and later Mayhem again.";
+    const out = linkCardMentions(md, cands(["Mayhem"]));
+    expect(out.markdown).toBe(md);
+    expect(out.added).toEqual([]);
+  });
+  it("sees through an alias when checking what is already mentioned", () => {
+    const md = "[[Jacob (FooF)|Jacob]] and Jacob.";
+    expect(linkCardMentions(md, [{ name: "Jacob", target: "Jacob (FooF)" }]).markdown).toBe(md);
   });
 });

@@ -1,19 +1,22 @@
 /**
- * Which names a deck's description may have its text wrapped around.
+ * Which names a deck's description may have its text wrapped around, and what
+ * each one should point at.
  *
- * A deck card is stored as the printing the builder clicked ("Son of God (J)"),
- * while prose almost always says the stem ("Son of God"). Both are offered, but
- * only when the resulting `[[mention]]` resolves back to THAT card: `[[Aaron]]`
- * would point at whichever Aaron the index prefers, which may not be the one in
- * this deck, and a mention that renames someone's card is worse than no link.
+ * A deck card is stored as the printing the builder clicked ("Jacob (FooF)"),
+ * while prose says the plain name ("Jacob"). The plain name is preferred — it
+ * is what the author wrote — but only when it resolves back to THAT card. It
+ * often does not: `[[Jacob]]` lands on Jacob (Israel), `[[Simeon]]` on the
+ * Simeon who blessed Jesus. Rather than drop those, the mention points at the
+ * deck's own printing and carries the author's words as its label.
  */
 import { CARDS, findCard } from "@/lib/cards/lookup";
 import { cardIdentityKey, cardNameStem } from "@/lib/cards/cardIdentity";
 import { cardNameKey } from "@/lib/cards/nameKey";
 import { resolveCardRef } from "@/app/articles/lib/cardRefs";
+import type { Candidate } from "./linkCards";
 
 /** `[[Son of God [K]]]` does not parse — the mention syntax forbids brackets. */
-const UNMENTIONABLE = /[[\]\n]/;
+const UNMENTIONABLE = /[[\]\n|]/;
 
 let known: Set<string> | null = null;
 
@@ -32,20 +35,59 @@ export function isKnownCardName(text: string): boolean {
   return known.has(cardNameKey(text));
 }
 
-export function candidatesForDeck(deckCardNames: Iterable<string>): string[] {
-  const out = new Set<string>();
+/**
+ * A reprint whose printing name is unmentionable ("A New Beginning [RR2]") has
+ * no usable alias target, so the plain name is the only way to link it. Accept
+ * it when the two are the same card in everything but brigade — which is what a
+ * reprint changes, and what splits them into different identities in the index.
+ */
+function sameCardBarBrigade(plain: string, printing: string): boolean {
+  const a = resolveCardRef(plain);
+  const b = findCard(printing);
+  const card = a ? findCard(a.name) : undefined;
+  if (!card || !b) return false;
+  return (
+    cardNameKey(cardNameStem(card.name, card.type)) === cardNameKey(cardNameStem(b.name, b.type)) &&
+    card.type === b.type &&
+    card.alignment === b.alignment
+  );
+}
+
+/** The identity a bare `[[name]]` would land on, or undefined. */
+function identityOf(name: string): string | undefined {
+  const ref = resolveCardRef(name);
+  const card = ref ? findCard(ref.name) : undefined;
+  return card ? cardIdentityKey(card) : undefined;
+}
+
+/** True when writing `[[written]]` on its own reaches the same card as `target`. */
+export function resolvesTo(written: string, target: string): boolean {
+  const wanted = identityOf(target);
+  return !!wanted && identityOf(written) === wanted;
+}
+
+export function candidatesForDeck(deckCardNames: Iterable<string>): Candidate[] {
+  const out: Candidate[] = [];
+  const seen = new Set<string>();
   for (const printing of new Set(deckCardNames)) {
     const card = findCard(printing);
     if (!card) continue; // not in the public index (forge card, renamed printing)
     const identity = cardIdentityKey(card);
-    for (const candidate of [printing, cardNameStem(card.name, card.type)]) {
-      if (!candidate || UNMENTIONABLE.test(candidate)) continue;
-      const ref = resolveCardRef(candidate);
-      if (!ref) continue;
-      const target = findCard(ref.name);
-      if (!target || cardIdentityKey(target) !== identity) continue;
-      out.add(candidate);
+    const aliasTarget = UNMENTIONABLE.test(card.name) ? null : card.name;
+    for (const name of [printing, cardNameStem(card.name, card.type)]) {
+      if (!name || UNMENTIONABLE.test(name)) continue;
+      // The plain name if it lands on this very card, else the deck's printing,
+      // else — for a bracketed reprint — the plain name if it is the same card.
+      const target =
+        identityOf(name) === identity
+          ? name
+          : (aliasTarget ?? (sameCardBarBrigade(name, printing) ? name : null));
+      if (!target) continue;
+      const key = `${name}|${target}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ name, target });
     }
   }
-  return [...out];
+  return out;
 }

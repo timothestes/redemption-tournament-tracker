@@ -1,5 +1,5 @@
 import type { Root, Parent, Text, RootContent } from "mdast";
-import { CARD_MENTION_RE } from "./markdown";
+import { CARD_MENTION_RE, parseMention } from "./markdown";
 
 // Turns `[[Card Name]]` inside text nodes into a `card-mention` element that
 // ArticleBody maps to <CardMention>. Only `text` nodes are touched, so code
@@ -8,7 +8,7 @@ import { CARD_MENTION_RE } from "./markdown";
 
 interface CardMentionNode {
   type: "cardMention";
-  data: { hName: "card-mention"; hProperties: { name: string } };
+  data: { hName: "card-mention"; hProperties: { name: string; label: string } };
   children: never[];
 }
 
@@ -20,12 +20,12 @@ function split(text: Text): RootContent[] | null {
   const out: RootContent[] = [];
   let last = 0;
   for (const m of value.matchAll(CARD_MENTION_RE)) {
-    const name = m[1].replace(/\s+/g, " ").trim();
-    if (!name) continue;
+    const { target, label } = parseMention(m[1]);
+    if (!target) continue;
     if (m.index! > last) out.push({ type: "text", value: value.slice(last, m.index) });
     const node: CardMentionNode = {
       type: "cardMention",
-      data: { hName: "card-mention", hProperties: { name } },
+      data: { hName: "card-mention", hProperties: { name: target, label } },
       children: [],
     };
     out.push(node as unknown as RootContent);
