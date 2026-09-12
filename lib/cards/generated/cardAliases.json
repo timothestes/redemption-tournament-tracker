@@ -1,5 +1,10 @@
 [
   {
+    "alias": "Abom",
+    "name": "Abomination of Desolation [T2C]",
+    "set": "T2C"
+  },
+  {
     "alias": "AoC",
     "name": "Authority of Christ (GoC)",
     "set": "GoC"
@@ -65,9 +70,19 @@
     "set": "II"
   },
   {
+    "alias": "DMM",
+    "name": "David's Mighty Men",
+    "set": "FoOF"
+  },
+  {
     "alias": "DoN",
     "name": "Destruction of Nehushtan",
     "set": "Pat"
+  },
+  {
+    "alias": "DoU",
+    "name": "Death of Unrighteous (FoM)",
+    "set": "FoM"
   },
   {
     "alias": "DR",
@@ -170,6 +185,11 @@
     "set": "LoC"
   },
   {
+    "alias": "LCF",
+    "name": "Lost Child Found (GoC)",
+    "set": "GoC"
+  },
+  {
     "alias": "MPA",
     "name": "Mary's Prophetic Act",
     "set": "Pmo-P1"
@@ -203,6 +223,11 @@
     "alias": "PotW",
     "name": "Prince of this World (GoC)",
     "set": "GoC"
+  },
+  {
+    "alias": "PoZ",
+    "name": "The Priest of Zeus [RR2]",
+    "set": "RR2"
   },
   {
     "alias": "RBD",
@@ -273,6 +298,11 @@
     "alias": "TSA",
     "name": "The Strong Angel (RoJ)",
     "set": "RoJ"
+  },
+  {
+    "alias": "TSC",
+    "name": "The Second Coming",
+    "set": "CoW"
   },
   {
     "alias": "TToD",

@@ -8,13 +8,14 @@ import type { GlossaryTerm } from "@/lib/glossary/terms";
 // An inline `[[EC]]` — community shorthand that is not a card. Sibling of
 // CardMention: same chip geometry, so references read as one family, but the
 // popover is a line of text rather than a card, and there is no modal. The page
-// keeps the author's shorthand; the expansion is the way in for a newcomer.
+// keeps the author's shorthand; the expansion (and, for some terms, a short
+// explanation) is the way in for a newcomer.
 //
 // Quieter than a card mention on purpose (no ring, dotted underline): a card is
 // a thing you want to look at, a term is a thing you occasionally need defined.
 
 const GAP = 8;
-const MAX_W = 260;
+const MAX_W = 300;
 const HOVER_DELAY_MS = 150;
 
 interface Pos {
@@ -23,11 +24,12 @@ interface Pos {
   below: boolean;
 }
 
-function place(rect: DOMRect): Pos {
+function place(rect: DOMRect, roomAbove: number): Pos {
   const vw = window.innerWidth;
   const left = Math.min(Math.max(GAP, rect.left + rect.width / 2 - MAX_W / 2), Math.max(GAP, vw - MAX_W - GAP));
   // Above when there is room — a tooltip under the caret hides the next line.
-  const below = rect.top < 72;
+  // A term with a description needs several lines of room, not one.
+  const below = rect.top < roomAbove;
   return { left, top: below ? rect.bottom + GAP : rect.top - GAP, below };
 }
 
@@ -49,9 +51,9 @@ export default function GlossaryMention({ text, entry }: { text: string; entry: 
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       const el = anchor.current;
-      if (el) setPos(place(el.getBoundingClientRect()));
+      if (el) setPos(place(el.getBoundingClientRect(), entry.description ? 200 : 72));
     }, HOVER_DELAY_MS);
-  }, []);
+  }, [entry.description]);
 
   // Scroll and resize move the anchor out from under a fixed tooltip.
   useEffect(() => {
@@ -109,9 +111,15 @@ export default function GlossaryMention({ text, entry }: { text: string; entry: 
             }}
           >
             <span className="block font-medium">{entry.expansion}</span>
-            <span className="block text-xs text-muted-foreground">
-              {entry.kind === "set" ? "Set" : "Game term"}
-            </span>
+            {entry.description && (
+              <span className="mt-1 block text-xs leading-snug text-muted-foreground">{entry.description}</span>
+            )}
+            {/* Only sets are labelled: "game term" was wrong for a player's
+                screen name (RDT) or a tournament (TJC), and the expansion
+                already says what everything else is. */}
+            {entry.kind === "set" && (
+              <span className="mt-1 block text-[10px] uppercase tracking-wider text-muted-foreground">Set</span>
+            )}
           </div>,
           document.body,
         )}

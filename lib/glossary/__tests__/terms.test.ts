@@ -18,7 +18,9 @@ describe("findGlossaryTerm", () => {
   });
 
   it("carries the set codes as well as the game terms", () => {
-    expect(findGlossaryTerm("LoC")).toEqual({ term: "LoC", expansion: "The Lineage of Christ", kind: "set" });
+    // "Lineage of Christ", no article: what the second list and the catalog's
+    // officialSet both say.
+    expect(findGlossaryTerm("LoC")).toEqual({ term: "LoC", expansion: "Lineage of Christ", kind: "set" });
     expect(findGlossaryTerm("CBI")?.kind).toBe("term");
   });
 });
@@ -88,5 +90,42 @@ describe("a document mixing all four kinds of mention", () => {
     for (const key of Object.keys(cards)) expect(terms[key]).toBeUndefined();
     expect(cards["nnope"]).toBeUndefined();
     expect(terms["nnope"]).toBeUndefined();
+  });
+});
+
+describe("the second list (descriptions, alternate forms, parenthesised codes)", () => {
+  it("keeps every term writable inside [[ ]]", () => {
+    for (const t of GLOSSARY_TERMS) expect(t.term, t.term).not.toMatch(/[[\]|\n]/);
+  });
+
+  it("resolves a parenthesised set code through a real mention", () => {
+    const mentions = extractCardMentions("Played the [[CoW (AB)]] printing.");
+    expect(resolveGlossaryTerms(mentions)[cardNameKey("CoW (AB)")]?.expansion).toBe(
+      "Cloud of Witnesses (Alternate Border)",
+    );
+  });
+
+  it("gives alternate forms of one term the same expansion", () => {
+    expect(findGlossaryTerm("TCE")?.expansion).toBe(findGlossaryTerm("TC")?.expansion);
+    expect(findGlossaryTerm("TtC")?.expansion).toBe(findGlossaryTerm("T2C")?.expansion);
+    expect(findGlossaryTerm("TxP")?.expansion).toBe(findGlossaryTerm("TeXP")?.expansion);
+  });
+
+  it("spells Thesaurus ex Preteritus the way the catalog does", () => {
+    expect(findGlossaryTerm("TxP")?.expansion).toBe("Thesaurus ex Preteritus");
+  });
+
+  it("carries the longer explanations the list gives", () => {
+    expect(findGlossaryTerm("RDT")?.description).toMatch(/John Earley/);
+    expect(findGlossaryTerm("BtN")?.description).toMatch(/strength\/toughness/);
+    expect(findGlossaryTerm("LoB")?.description).toMatch(/Lost Souls/);
+  });
+
+  it("never uses a description to repeat the expansion", () => {
+    for (const t of GLOSSARY_TERMS) {
+      if (t.description === undefined) continue;
+      expect(t.description.trim(), t.term).toBeTruthy();
+      expect(cardNameKey(t.description)).not.toBe(cardNameKey(t.expansion));
+    }
   });
 });
