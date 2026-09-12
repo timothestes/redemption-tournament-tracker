@@ -48,7 +48,8 @@ import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import { useBuilderConfig } from "../builderConfig";
 import { CardThumb } from "./CardThumb";
-import ReactMarkdown from "react-markdown";
+import CardMentionTextarea from "@/components/ui/CardMentionTextarea";
+import DeckDescription from "../../components/DeckDescription";
 import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
 import CollectionCheckModal from "./CollectionCheckModal";
 import { aggregateOwnedByName } from "../utils/collectionCheck";
@@ -458,6 +459,7 @@ export default function DeckBuilderPanel({
   const [tagFilter, setTagFilter] = useState("");
   const [savingTags, setSavingTags] = useState(false);
   const tagPickerRef = useRef<HTMLDivElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [tagsBarContainer, setTagsBarContainer] = useState<HTMLDivElement | null>(null);
   const [createMode, setCreateMode] = useState(false);
   const [createName, setCreateName] = useState("");
@@ -3146,20 +3148,23 @@ export default function DeckBuilderPanel({
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                Add notes or strategy for your deck (supports Markdown).
+                Add notes or strategy for your deck (supports Markdown). Type{" "}
+                <kbd className="rounded bg-muted px-1 font-mono text-[11px] text-foreground">[[</kbd> to mention a card.
               </p>
               {descriptionPreview ? (
-                <div className="w-full min-h-[16rem] p-3 text-sm border border-border rounded-lg bg-card text-card-foreground overflow-auto prose prose-sm dark:prose-invert max-w-none">
+                <div className="w-full min-h-[16rem] p-3 text-sm border border-border rounded-lg bg-card text-card-foreground overflow-auto">
                   {deck.description ? (
-                    <ReactMarkdown>{deck.description}</ReactMarkdown>
+                    /* draft: an author mid-edit should see which mentions found no card. */
+                    <DeckDescription markdown={deck.description} draft />
                   ) : (
                     <p className="text-muted-foreground italic">No description yet</p>
                   )}
                 </div>
               ) : (
-                <textarea
+                <CardMentionTextarea
+                  textareaRef={descriptionRef}
                   value={deck.description || ""}
-                  onChange={(e) => onDescriptionChange?.(e.target.value)}
+                  onChange={(v) => onDescriptionChange?.(v)}
                   placeholder="Deck strategy, card choices, matchup notes..."
                   className="w-full h-64 min-h-[16rem] p-3 text-sm border border-border rounded-lg bg-card text-card-foreground placeholder-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                 />

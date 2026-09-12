@@ -3,23 +3,29 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getCardImageUrl } from "@/app/shared/utils/cardImageUrl";
-import { searchCardsAction } from "../actions";
 import type { CardSearchHit } from "@/lib/cards/search";
 
 // Search-and-pick for `[[Card Name]]`. Opened by the toolbar button or by
 // typing "[[" in the body. Stays mounted in the editor; the Dialog unmounts
 // its children when closed, so state is reset on every open.
+//
+// Where the names come from is the caller's business: the article editor goes
+// through a poster-gated server action, the deck-description editors search the
+// card index they already have in the browser.
 
 const MIN_QUERY = 2;
 
 export default function CardPicker({
   open,
   initialQuery,
+  search,
   onPick,
   onClose,
 }: {
   open: boolean;
   initialQuery: string;
+  /** Name search; may reject or return [] — whatever list is showing then stays. */
+  search: (query: string) => Promise<CardSearchHit[]>;
   onPick: (name: string) => void;
   onClose: () => void;
 }) {
@@ -28,6 +34,10 @@ export default function CardPicker({
   const [active, setActive] = useState(0);
   const [loading, setLoading] = useState(false);
   const seq = useRef(0);
+  // Held in a ref so an inline arrow from the caller does not restart the
+  // debounce on every render.
+  const searchRef = useRef(search);
+  searchRef.current = search;
 
   // Reset on the render that opens the dialog — not in an effect, which
   // commits a frame late and let a fast typist append to the previous query.
@@ -53,12 +63,10 @@ export default function CardPicker({
     setLoading(true);
     const t = window.setTimeout(async () => {
       try {
-        const r = await searchCardsAction(q);
+        const cards = await searchRef.current(q);
         if (id !== seq.current) return;
-        if (r.success !== false) {
-          setHits(r.cards);
-          setActive(0);
-        }
+        setHits(cards);
+        setActive(0);
       } catch {
         // Keep whatever list is showing.
       } finally {

@@ -104,15 +104,19 @@ export default function ArticleBody({
   markdown,
   refs = EMPTY_REFS,
   draft = false,
+  className = "article-body prose prose-neutral max-w-none sm:prose-lg",
 }: {
   markdown: string;
   /** Resolved card mentions and deck embeds; see app/articles/lib/refs.ts. */
   refs?: ArticleRefs;
   /** Editor preview: mark mentions that resolved to nothing. */
   draft?: boolean;
+  /** Wrapper classes. Deck descriptions render the same markdown in a smaller,
+      non-article voice; everything else keeps the article typography. */
+  className?: string;
 }) {
   return (
-    <div className="article-body prose prose-neutral max-w-none sm:prose-lg">
+    <div className={className}>
       <ReactMarkdown remarkPlugins={[remarkGfm, remarkCardMentions]} components={buildComponents(refs, draft)}>
         {markdown}
       </ReactMarkdown>
