@@ -7,6 +7,7 @@ import { findCard } from "@/lib/cards/lookup";
 import { buildDeckEmbed, type DeckEmbedData } from "@/lib/decks/embed";
 import { extractCardMentions, extractDeckIds } from "./markdown";
 import { resolveCardRefs } from "./cardRefs";
+import { resolveGlossaryTerms } from "@/lib/glossary/terms";
 import type { ArticleRefs } from "./refTypes";
 
 /** null = not viewable (private, deleted, unknown id). Reads through the anon client, so RLS decides. */
@@ -16,7 +17,11 @@ export async function resolveDeckEmbed(id: string): Promise<DeckEmbedData | null
 }
 
 export async function resolveArticleRefs(markdown: string): Promise<ArticleRefs> {
-  const cards = resolveCardRefs(extractCardMentions(markdown));
+  const mentions = extractCardMentions(markdown);
+  const cards = resolveCardRefs(mentions);
+  // Shorthand that is not a card ("EC", "LoC"). Resolved after cards so a card
+  // always wins; a test asserts the two lists cannot overlap anyway.
+  const terms = resolveGlossaryTerms(mentions);
   const decks: ArticleRefs["decks"] = {};
   await Promise.all(
     extractDeckIds(markdown).map(async (id) => {
@@ -29,5 +34,5 @@ export async function resolveArticleRefs(markdown: string): Promise<ArticleRefs>
       }
     }),
   );
-  return { cards, decks };
+  return { cards, decks, terms };
 }

@@ -37,14 +37,18 @@ describe("card mentions", () => {
   });
 
   it("render as an interactive button when resolved", () => {
-    const refs: ArticleRefs = { cards: { "son of god": { name: "Son of God (J)", imgFile: "Son_of_God_(J)" } }, decks: {} };
+    const refs: ArticleRefs = {
+      cards: { "son of god": { name: "Son of God (J)", imgFile: "Son_of_God_(J)" } },
+      decks: {},
+      terms: {},
+    };
     const html = render("Play [[ son of god ]] early.", refs);
     expect(html).toMatch(/<button[^>]*class="card-mention[^"]*"[^>]*>son of god<\/button>/);
     expect(html).not.toContain("[[");
   });
 
   it("work inside emphasis and list items, not inside code or links", () => {
-    const refs: ArticleRefs = { cards: { x: { name: "X", imgFile: "X" } }, decks: {} };
+    const refs: ArticleRefs = { cards: { x: { name: "X", imgFile: "X" } }, decks: {}, terms: {} };
     const html = render("**[[X]]**\n\n- [[X]]\n\n`[[X]]`\n\n[[[X]]](https://example.com)", refs);
     expect(html.match(/<button/g)?.length).toBe(2);
     expect(html).toContain("<code>[[X]]</code>");
@@ -67,7 +71,7 @@ describe("deck embeds", () => {
   });
 
   it("render the grouped deck when resolved", () => {
-    const html = render(`Intro.\n\n${url}\n\nOutro.`, { cards: {}, decks: { [ID]: DECK } });
+    const html = render(`Intro.\n\n${url}\n\nOutro.`, { cards: {}, decks: { [ID]: DECK }, terms: {} });
     expect(html).toContain("<figure");
     expect(html).not.toMatch(/<p[^>]*>\s*<figure/);
     expect(html).toContain("Throne Room Control");
@@ -79,13 +83,13 @@ describe("deck embeds", () => {
   });
 
   it("explain an unavailable deck instead of showing a bare link", () => {
-    const html = render(url, { cards: {}, decks: { [ID]: null } });
+    const html = render(url, { cards: {}, decks: { [ID]: null }, terms: {} });
     expect(html).toContain("This deck isn’t available");
     expect(html).toContain(`href="/decklist/${ID}"`);
   });
 
   it("leave a deck link inside a sentence as a link", () => {
-    const html = render(`See ${url} for the list.`, { cards: {}, decks: { [ID]: DECK } });
+    const html = render(`See ${url} for the list.`, { cards: {}, decks: { [ID]: DECK }, terms: {} });
     expect(html).not.toContain("<figure");
     expect(html).toContain(`href="${url}"`);
   });
