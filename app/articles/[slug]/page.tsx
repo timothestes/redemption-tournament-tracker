@@ -19,6 +19,16 @@ import EditLink from "./EditLink";
 
 export const revalidate = 3600;
 
+// Without generateStaticParams a dynamic segment is server-rendered on every
+// request and never enters the ISR cache, so each of the ~1,300 article URLs
+// cost a function invocation per crawler hit. Returning [] opts the route into
+// static generation with dynamicParams (the default): nothing is prerendered
+// at build time, and each slug is rendered once on first request and then
+// served from the CDN until revalidated.
+export function generateStaticParams() {
+  return [];
+}
+
 interface PageProps {
   params: Promise<{ slug: string }>;
 }

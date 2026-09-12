@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { createClient } from "@/utils/supabase/server";
+import { createAnonClient } from "@/utils/supabase/anon";
 
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
@@ -9,8 +9,12 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000";
 
+// Cookie-free (createAnonClient), so this can be prerendered and revalidated
+// instead of re-querying every post and deck on each crawler fetch.
+export const revalidate = 3600;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const supabase = await createClient();
+  const supabase = createAnonClient();
 
   // Static public routes
   const staticRoutes: MetadataRoute.Sitemap = [

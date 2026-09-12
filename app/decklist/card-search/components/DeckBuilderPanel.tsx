@@ -3648,23 +3648,6 @@ export default function DeckBuilderPanel({
         />
       )}
 
-      {/* Hidden image preloader for reserve cards. Only URL-resolved cards can
-          be preloaded; element-resolved (Forge) cards have no public URL. */}
-      <div className="hidden" aria-hidden="true">
-        {reserveCards.map((deckCard) => {
-          const resolved = builderConfig.resolveCardImage(deckCard.card);
-          const imageUrl = resolved.kind === "url" ? getImageUrl(deckCard.card.imgFile || "") : null;
-          return imageUrl ? (
-            <img
-              key={`preload-${deckCard.card.name}-${deckCard.card.set}`}
-              src={imageUrl}
-              alt=""
-              loading="eager"
-            />
-          ) : null;
-        })}
-      </div>
-
       {/* Mobile Full Deck View Overlay — portaled to body to escape stacking contexts */}
       {showMobileFullDeckView && createPortal(
         <div className="md:hidden fixed inset-0 z-[100] bg-background flex flex-col pt-[env(safe-area-inset-top)]">
