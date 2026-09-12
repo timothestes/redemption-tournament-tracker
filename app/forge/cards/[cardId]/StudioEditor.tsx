@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Download, ChevronLeft, ChevronRight, Loader2, Check, AlertTriangle } from "lucide-react";
@@ -16,12 +16,14 @@ import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 import { cn } from "@/lib/utils";
 import { saveCard, uploadFinished, setPlaceholder, type ForgeCardFull } from "@/app/forge/lib/cards";
 import { cardRawText, type DesignCard } from "@/app/forge/lib/designCard";
+import { sameSnapshot } from "@/app/forge/lib/cardDiff";
 import type { ArtCandidate } from "@/app/forge/lib/artCandidates";
 import LifecycleControls from "./LifecycleControls";
 import type { ForgeSetSummary } from "@/app/forge/lib/sets";
 import { forgeCardTopic } from "@/app/forge/lib/realtime";
 import { useForgeCardChannel } from "@/app/forge/lib/useForgeRealtime";
 import PresenceBar from "./PresenceBar";
+import { StudioSyncProvider } from "./StudioSyncContext";
 import CardDetailsFields from "./CardDetailsFields";
 
 // DESCOPE (2026-07-03): the structured template (FullModeForm) was removed from the
@@ -58,6 +60,9 @@ export default function StudioEditor({
   const [snapshot, setSnapshot] = useState<DesignCard>(card.snapshot ?? {});
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [dirty, setDirty] = useState(false);
+  // A write from elsewhere arrived while this session had an unsaved edit, so adopting it
+  // would have thrown that edit away. Offered as a choice instead.
+  const [stale, setStale] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstRender = useRef(true);
@@ -78,6 +83,9 @@ export default function StudioEditor({
   useEffect(() => {
     latest.current = snapshot;
     if (firstRender.current) { firstRender.current = false; return; }
+    // Content, not identity: update() always builds a new object, and an adopted snapshot
+    // must not be echoed straight back to the server.
+    if (sameSnapshot(snapshot, lastSaved.current)) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       setSaved("saving");
@@ -90,12 +98,27 @@ export default function StudioEditor({
 
   useEffect(() => { savedRef.current = saved; }, [saved]);
 
+  // `snapshot` is seeded from props once; router.refresh() re-renders WITHOUT remounting,
+  // so every server-side write to working_snapshot — Apply suggestion, Accept proposal,
+  // another elder saving — used to be invisible here, and the next keystroke autosaved the
+  // stale copy back over it. Compared by content: revalidatePath means card.updatedAt
+  // changes on every autosave, so a timestamp guard would fire every 700ms.
+  useEffect(() => {
+    const incoming = card.snapshot ?? {};
+    if (sameSnapshot(incoming, lastSaved.current)) return;   // nothing new, or our own write
+    if (!sameSnapshot(latest.current, lastSaved.current)) { setStale(true); return; }
+    lastSaved.current = incoming;
+    latest.current = incoming;
+    setSnapshot(incoming);
+    setStale(false);
+  }, [card.snapshot]);
+
   // Clicking a nav link within the debounce window unmounts this editor before the
   // timer fires — flush the pending edit so it isn't silently dropped. A hard
   // unload (close tab, reload) gets the browser's leave prompt instead.
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (latest.current !== lastSaved.current || savedRef.current === "saving") {
+      if (!sameSnapshot(latest.current, lastSaved.current) || savedRef.current === "saving") {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -103,7 +126,7 @@ export default function StudioEditor({
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
-      if (latest.current !== lastSaved.current) void saveCard(card.id, latest.current);
+      if (!sameSnapshot(latest.current, lastSaved.current)) void saveCard(card.id, latest.current);
     };
   }, [card.id]);
 
@@ -140,6 +163,32 @@ export default function StudioEditor({
     setSaved(r.ok ? "saved" : "error");
   };
 
+  // Handed to the review column so Apply/Accept can land on top of this session's edits
+  // instead of racing the 700ms debounce. See StudioSyncContext for why it must be context.
+  const flushPending = useCallback(async () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    const pending = latest.current;
+    if (sameSnapshot(pending, lastSaved.current)) return;
+    setSaved("saving");
+    const r = await saveCard(card.id, pending);
+    if (r.ok) { lastSaved.current = pending; setDirty(false); }
+    setSaved(r.ok ? "saved" : "error");
+  }, [card.id]);
+
+  // Memoized: a fresh value object would force every context consumer to re-render on
+  // each keystroke, which is exactly the re-render the stable `review` element avoids.
+  const syncValue = useMemo(() => ({ flushPending }), [flushPending]);
+
+  // Adopt the version written elsewhere, discarding this session's unsaved edit.
+  const adoptIncoming = () => {
+    const incoming = card.snapshot ?? {};
+    lastSaved.current = incoming;
+    latest.current = incoming;
+    setSnapshot(incoming);
+    setStale(false);
+    setDirty(false);
+  };
+
   async function onUpload(file: File, kind: "finished") {
     setErr(null);
     setUploading(kind);
@@ -168,6 +217,17 @@ export default function StudioEditor({
   return (
     <div className="mx-auto max-w-5xl p-4">
       <PresenceBar others={others} />
+      {stale && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <span>
+            This card changed elsewhere while you were editing. Your unsaved edit is still here —
+            saving keeps yours.
+          </span>
+          <Button variant="outline" className="ml-auto h-6 px-2 text-[11px]" onClick={adoptIncoming}>
+            Load their version
+          </Button>
+        </div>
+      )}
       {/* Pinned under the Forge chrome: on a card with real history this page runs past
           3000px, and which set/card you are in — plus whether your edit saved — are
           exactly what you need while you are down in the comments. Must be a direct child
@@ -335,7 +395,7 @@ export default function StudioEditor({
               )}
             </fieldset>
           </div>
-          {review}
+          <StudioSyncProvider value={syncValue}>{review}</StudioSyncProvider>
         </div>
       </div>
 

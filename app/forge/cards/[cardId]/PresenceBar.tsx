@@ -2,7 +2,8 @@
 
 import type { ForgePresenceMeta } from "@/app/forge/lib/useForgeRealtime";
 
-function initials(name: string | null): string {
+// Also used by the comment thread's avatars — playtest_members has no photo field.
+export function initials(name: string | null): string {
   if (!name) return "?";
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
