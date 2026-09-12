@@ -55,11 +55,20 @@ export default function ReviewPanel({
   };
   const canPropose = card.status === "draft" || card.status === "playtesting";
 
+  // Card-level thread only, mirroring CommentThread's own filter.
+  const cardComments = comments.filter((c) => c.proposalId === null);
+  const unresolvedCount = cardComments.filter((c) => !c.resolved).length;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <section>
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">Open proposals</h2>
+          <h2 className="text-base font-semibold tracking-tight">
+            Open proposals
+            {openDiffs.length > 0 && (
+              <span className="ml-1.5 font-normal text-muted-foreground">{openDiffs.length}</span>
+            )}
+          </h2>
           {canPropose && !proposing && (
             <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={() => setProposing(true)}>
               Propose changes
@@ -81,7 +90,9 @@ export default function ReviewPanel({
           </div>
         )}
         {openDiffs.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No open proposals.</p>
+          <p className="rounded-md border border-dashed border-muted-foreground/30 bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
+            No open proposals.
+          </p>
         ) : (
           <div className="space-y-3">
             {openDiffs.map((d) => (
@@ -99,19 +110,33 @@ export default function ReviewPanel({
         )}
       </section>
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">History</h2>
-        <CardHistory history={history} cardId={card.id} />
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">Comments &amp; suggestions</h2>
+      {/* scroll-mt so a #comments deep link doesn't land under the sticky chrome. */}
+      <section id="comments" className="scroll-mt-[calc(var(--forge-chrome)+4rem)]">
+        <h2 className="mb-2 text-base font-semibold tracking-tight">
+          Comments &amp; suggestions
+          {cardComments.length > 0 && (
+            <span className="ml-1.5 font-normal text-muted-foreground">
+              {cardComments.length}
+              {unresolvedCount > 0 && ` · ${unresolvedCount} unresolved`}
+            </span>
+          )}
+        </h2>
         <CommentThread
           cardId={card.id}
           comments={comments}
           canApply={canReview}
           versions={versions.map((v) => ({ versionNumber: v.versionNumber, createdAt: v.createdAt, status: v.status }))}
         />
+      </section>
+
+      <section id="history" className="scroll-mt-[calc(var(--forge-chrome)+4rem)]">
+        <h2 className="mb-2 text-base font-semibold tracking-tight">
+          History
+          {versions.length > 0 && (
+            <span className="ml-1.5 font-normal text-muted-foreground">{versions.length} versions</span>
+          )}
+        </h2>
+        <CardHistory history={history} cardId={card.id} />
       </section>
     </div>
   );
