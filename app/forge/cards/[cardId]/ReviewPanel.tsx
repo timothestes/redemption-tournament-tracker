@@ -56,7 +56,7 @@ export default function ReviewPanel({
   const canPropose = card.status === "draft" || card.status === "playtesting";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 pt-0">
+    <div className="space-y-6">
       <section>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">Open proposals</h2>

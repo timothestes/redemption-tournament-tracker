@@ -34,7 +34,10 @@ export default function ForgeNav({ role }: { role: ForgeRole }) {
         ];
 
   return (
-    <div className="sticky top-16 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    // top-[65px], not top-16: TopNav is 65px tall (h-16 + its bottom border), so top-16
+    // left a 1px seam that page content showed through. Opaque, not a translucent blur —
+    // with a sticky row beneath it, the blur smeared that row's text as it passed under.
+    <div className="sticky top-[65px] z-40 border-b bg-background">
       <div className="mx-auto flex max-w-full items-center gap-1 px-4">
         <Link
           href="/forge"
