@@ -140,7 +140,15 @@ export default function CardPicker({
                       className="h-[45px] w-8 shrink-0 rounded-sm bg-muted object-cover"
                     />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-foreground">{h.label}</span>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-sm font-medium text-foreground">{h.label}</span>
+                        {/* Why this row matched a query that is not its name. */}
+                        {h.alias && (
+                          <span className="flex-shrink-0 rounded bg-muted px-1 py-px font-mono text-[10px] text-muted-foreground">
+                            {h.alias}
+                          </span>
+                        )}
+                      </span>
                       <span className="block truncate text-xs text-muted-foreground">
                         {[h.type, h.brigade, h.set].filter(Boolean).join(" · ")}
                       </span>

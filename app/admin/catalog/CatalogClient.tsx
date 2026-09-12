@@ -5,6 +5,7 @@ import TopNav from "../../../components/top-nav";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { CARDS, type CardData } from "@/lib/cards/lookup";
+import { cardNameKey } from "@/lib/cards/nameKey";
 import { getCardImageUrl } from "@/app/shared/utils/cardImageUrl";
 import {
   CARD_IMAGE_WIDTH,
@@ -21,7 +22,9 @@ import {
   deleteOverride,
   type OverrideRow,
   type ImageVersionRow,
+  type AliasRow,
 } from "./actions";
+import AliasEditor from "./AliasEditor";
 import bundledOverlay from "@/scripts/data/card-overrides.json";
 
 /* ------------------------------------------------------------------ */
@@ -83,12 +86,18 @@ function PendingKindBadge({ kind }: { kind: PendingItem["kind"] }) {
     "override-changed": "bg-accent text-accent-foreground",
     "override-removed": "bg-destructive/10 text-destructive",
     "image-bump": "bg-secondary text-secondary-foreground",
+    "alias-new": "bg-secondary text-secondary-foreground",
+    "alias-changed": "bg-accent text-accent-foreground",
+    "alias-removed": "bg-destructive/10 text-destructive",
   };
   const labels: Record<PendingItem["kind"], string> = {
     "override-new": "New",
     "override-changed": "Changed",
     "override-removed": "Removed",
     "image-bump": "Image",
+    "alias-new": "Alias",
+    "alias-changed": "Alias",
+    "alias-removed": "Alias",
   };
   return (
     <span
@@ -138,11 +147,12 @@ function ImageFramePreview({ src, transform }: { src: string; transform: Release
 export default function CatalogClient({
   initial,
 }: {
-  initial: { overrides: OverrideRow[]; imageVersions: ImageVersionRow[] };
+  initial: { overrides: OverrideRow[]; imageVersions: ImageVersionRow[]; aliases: AliasRow[] };
 }) {
   const [tab, setTab] = useState<Tab>("edit");
   const [dbOverrides, setDbOverrides] = useState<OverrideRow[]>(initial.overrides);
   const [dbImageVersions, setDbImageVersions] = useState<ImageVersionRow[]>(initial.imageVersions);
+  const [dbAliases, setDbAliases] = useState<AliasRow[]>(initial.aliases);
 
   // Search (edit tab)
   const [query, setQuery] = useState("");
@@ -237,10 +247,18 @@ export default function CatalogClient({
             fields: o.fields,
           })),
           imageVersions: Object.fromEntries(dbImageVersions.map((r) => [r.img_file, r.version])),
+          aliases: dbAliases.map((a) => ({ alias: a.alias, card_name: a.card_name, set_code: a.set_code })),
         },
         bundledOverlay as BundledOverlay
       ),
-    [dbOverrides, dbImageVersions]
+    [dbOverrides, dbImageVersions, dbAliases]
+  );
+
+  // Which aliases the running deploy does not serve yet, so a chip can say so
+  // without the curator having to remember the Pending tab exists.
+  const pendingAliasKeys = useMemo(
+    () => new Set(pending.filter((i) => i.kind.startsWith("alias-")).map((i) => cardNameKey(i.key))),
+    [pending]
   );
 
   function selectCard(card: CardData) {
@@ -619,6 +637,16 @@ export default function CatalogClient({
                         )}
                       </div>
                     </div>
+
+                    <AliasEditor
+                      // Remount per card: a half-typed draft and its error must
+                      // not read as a claim about the next card selected.
+                      key={`${selectedCard.name}|${selectedCard.set}`}
+                      card={selectedCard}
+                      aliases={dbAliases}
+                      pending={pendingAliasKeys}
+                      onChange={setDbAliases}
+                    />
                   </div>
 
                   {/* Image panel (Task 11, spec §6/§7 F2) */}

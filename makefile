@@ -115,7 +115,7 @@ pull-forge-releases:
 	@echo "📥 Syncing forge releases from Supabase..."
 	@node scripts/pull-forge-releases.js
 
-# Sync catalog admin edits (card_overrides + card_image_versions) into the
+# Sync catalog admin edits (card_overrides + card_aliases + card_image_versions) into the
 # overlay + regenerate the catalog. Needs .env.local (service key).
 pull-card-overrides:
 	@echo "📥 Syncing card overrides from Supabase..."

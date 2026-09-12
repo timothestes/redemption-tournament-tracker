@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { searchCardNames } from "../search";
 import { CARDS, findCard } from "../lookup";
 import { cardNameStem } from "../cardIdentity";
+import { CARD_ALIASES } from "../aliases";
 
 describe("searchCardNames", () => {
   it("returns nothing for a blank query", () => {
@@ -42,5 +43,41 @@ describe("searchCardNames", () => {
       expect(h.set).toBeTruthy();
       expect(h.type).toBeTruthy();
     }
+  });
+});
+
+describe("searchCardNames + aliases", () => {
+  it("finds a card by a curated alias", () => {
+    for (const entry of CARD_ALIASES) {
+      const hits = searchCardNames(entry.alias, 50);
+      const match = hits.find((h) => h.alias === entry.alias);
+      expect(match, `alias "${entry.alias}" is not searchable`).toBeDefined();
+      expect(match!.imgFile).toBeTruthy();
+    }
+  });
+
+  it("inserts the card's own name, never the alias", () => {
+    for (const entry of CARD_ALIASES) {
+      const match = searchCardNames(entry.alias, 50).find((h) => h.alias === entry.alias)!;
+      const stemmed = CARDS.some((c) => cardNameStem(c.name, c.type) === match.name);
+      expect(findCard(match.name) !== undefined || stemmed, `"${match.name}" is not insertable`).toBe(true);
+    }
+  });
+
+  it("ranks an alias match above substring matches", () => {
+    for (const entry of CARD_ALIASES) {
+      expect(searchCardNames(entry.alias, 50)[0]?.alias).toBe(entry.alias);
+    }
+  });
+
+  it("returns one row per card even when the alias and the name both match", () => {
+    for (const entry of CARD_ALIASES) {
+      const hits = searchCardNames(entry.alias, 50);
+      expect(new Set(hits.map((h) => `${h.name}|${h.set}`)).size).toBe(hits.length);
+    }
+  });
+
+  it("leaves alias unset on an ordinary name match", () => {
+    expect(searchCardNames("son of god")[0].alias).toBeUndefined();
   });
 });

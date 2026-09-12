@@ -92,12 +92,18 @@ function buildComponents(refs: ArticleRefs, draft: boolean): Components {
     ),
     // Produced by remarkCardMentions: `name` is the card the mention points at,
     // `label` the words that stand on the page (they differ for `[[a|b]]`).
+    //
+    // The card's RESOLVED name goes to CardMention, not the text that was
+    // typed: `[[LAFS]]` reaches its card through an alias, and the enlarge
+    // modal's caption and the image's alt text are the one place a reader can
+    // find out what "LAFS" actually stands for. The page still shows the words
+    // the author wrote. Falls back to the typed text when nothing resolved, so
+    // the draft editor's "No card named …" still names what was typed.
     "card-mention": ({ name, label }: { name?: string; label?: string }) => {
       const typed = typeof name === "string" ? name : "";
       const ref = refs.cards[mentionKey(typed)];
-      return (
-        <CardMention name={typed} label={typeof label === "string" ? label : undefined} imgFile={ref?.imgFile} draft={draft} />
-      );
+      const shown = typeof label === "string" ? label : typed;
+      return <CardMention name={ref?.name ?? typed} label={shown} imgFile={ref?.imgFile} draft={draft} />;
     },
   } satisfies Components & { "card-mention": unknown };
   return components as Components;

@@ -570,6 +570,7 @@ export async function setReleaseImageTransform(
  * orphan error (parse-carddata, spec §5.2) is the backstop that names the
  * recovery path.
  */
+/** Cards in this release carrying a catalog edit — an override or an alias. */
 export async function listReleaseOverrides(releaseId: string): Promise<string[]> {
   const ctx = await requireSuperuser();
   if (!ctx) return [];
@@ -586,11 +587,19 @@ export async function listReleaseOverrides(releaseId: string): Promise<string[]>
   const names = new Set((cards ?? []).map((c) => c.name as string));
   if (names.size === 0) return [];
   // No .in() with card names — quoted names corrupt PostgREST in-lists (#290).
-  const { data: overrides } = await ctx.supabase
-    .from("card_overrides")
-    .select("card_name")
-    .eq("set_code", release.set_code);
-  return ((overrides ?? []).map((o) => o.card_name as string)).filter((n) => names.has(n));
+  //
+  // Aliases count too: applyCardAliases errors on an orphan exactly the way
+  // applyCardOverrides does, so an alias on a card this release is about to
+  // withdraw blocks the catalog codegen just as hard.
+  const [{ data: overrides }, { data: aliases }] = await Promise.all([
+    ctx.supabase.from("card_overrides").select("card_name").eq("set_code", release.set_code),
+    ctx.supabase.from("card_aliases").select("card_name").eq("set_code", release.set_code),
+  ]);
+  const edited = [
+    ...(overrides ?? []).map((o) => o.card_name as string),
+    ...(aliases ?? []).map((a) => a.card_name as string),
+  ];
+  return [...new Set(edited.filter((n) => names.has(n)))];
 }
 
 export async function abortRelease(

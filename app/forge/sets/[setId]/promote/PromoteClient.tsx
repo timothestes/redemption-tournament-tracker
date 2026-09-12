@@ -406,7 +406,7 @@ function AbortButton({ release, onChanged }: { release: ReleaseState; onChanged:
     let message =
       "Abort this release?\n\nUploaded public images are deleted, the manifest is removed, and every card returns to approved. Use this to fix a mistake before anything merges.";
     if (affected.length > 0) {
-      message += `\n\n⚠️ ${affected.length} card(s) in this release have catalog-editor overrides (${affected.slice(0, 5).join(", ")}${affected.length > 5 ? ", …" : ""}). If the overlay was already pulled, aborting strands them as codegen-blocking orphans — delete those overrides in /admin/catalog and land a \`make pull-card-overrides\` refresh first (or be ready to deploy with CATALOG_PREBUILD=0).`;
+      message += `\n\n⚠️ ${affected.length} card(s) in this release have catalog-editor overrides or aliases (${affected.slice(0, 5).join(", ")}${affected.length > 5 ? ", …" : ""}). If the overlay was already pulled, aborting strands them as codegen-blocking orphans — delete those edits in /admin/catalog and land a \`make pull-card-overrides\` refresh first (or be ready to deploy with CATALOG_PREBUILD=0).`;
     }
     if (!window.confirm(message)) {
       setBusy(false);
