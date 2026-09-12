@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { youtubeId, isAudioUrl, slugify, SLUG_RE, excerptFromMarkdown, opensCardPicker } from "../markdown";
+import { youtubeId, isAudioUrl, slugify, SLUG_RE, excerptFromMarkdown, opensCardPicker, flattenCardMentions } from "../markdown";
 
 describe("youtubeId", () => {
   const ID = "dQw4w9WgXcQ";
@@ -77,4 +77,16 @@ describe("opensCardPicker", () => {
   it("ignores a bracket after the caret", () => expect(opensCardPicker("[[[", 2)).toBe(false));
   it("ignores undo, which leaves the brackets behind", () => expect(at("Play [[", "historyUndo")).toBe(false));
   it("ignores a caret that is not after the brackets", () => expect(opensCardPicker("[[Son of God]]", 14)).toBe(false));
+});
+
+describe("flattenCardMentions", () => {
+  it("drops the brackets and keeps the name", () => {
+    expect(flattenCardMentions("Run [[Son of God]] and [[Mayhem]].")).toBe("Run Son of God and Mayhem.");
+  });
+  it("tidies whitespace inside the brackets", () => {
+    expect(flattenCardMentions("[[  Son  of God ]]")).toBe("Son of God");
+  });
+  it("leaves text without mentions alone", () => {
+    expect(flattenCardMentions("Plain [words] here.")).toBe("Plain [words] here.");
+  });
 });

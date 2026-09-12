@@ -117,3 +117,5 @@ nationals-history-source.html
 
 # WordPress import artifacts (scripts/import-wxr.ts)
 scripts/output/wxr/
+# Backfill report: a full copy of every deck description it would rewrite.
+scripts/output/deck-mentions-backfill.json

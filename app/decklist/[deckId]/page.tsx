@@ -4,6 +4,7 @@ import { loadPublicDeckAction } from "../actions";
 import { createClient } from "../../../utils/supabase/server";
 import PublicDeckClient from "./client";
 import { getCardImageUrlOrNull } from "../../shared/utils/cardImageUrl";
+import { flattenCardMentions } from "@/app/articles/lib/markdown";
 
 interface PageProps {
   params: Promise<{ deckId: string }>;
@@ -26,7 +27,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description = [
     `${format} deck with ${cardCount} cards`,
     reserveCount > 0 ? `+ ${reserveCount} reserve` : "",
-    deck.description || "",
+    // Meta tags are plain text: `[[Son of God]]` would reach every link unfurl.
+    flattenCardMentions(deck.description || ""),
   ].filter(Boolean).join(" · ");
 
   // Pick an OG image: use stored preview card, fall back to first card
