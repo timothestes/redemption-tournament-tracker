@@ -171,10 +171,15 @@ async function main() {
     return;
   }
 
-  // Backup first: the table is the revert path, so a failure here must stop the run.
+  // Backup first: the table is the revert path, so a failure here must stop the
+  // run. A deck already in the table keeps its original row — on a second pass
+  // `before` is whatever is in the database now, which may already be linked.
   const { error: backupError } = await supabase
     .from(BACKUP_TABLE)
-    .upsert(changes.map((c) => ({ deck_id: c.id, description: c.before })), { onConflict: "deck_id" });
+    .upsert(changes.map((c) => ({ deck_id: c.id, description: c.before })), {
+      onConflict: "deck_id",
+      ignoreDuplicates: true,
+    });
   if (backupError) throw new Error(`backup failed, nothing written: ${backupError.message}`);
   console.log(`backed up ${changes.length} descriptions to ${BACKUP_TABLE}`);
 
