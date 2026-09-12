@@ -1,7 +1,312 @@
 [
   {
+    "alias": "AoC",
+    "name": "Authority of Christ (GoC)",
+    "set": "GoC"
+  },
+  {
+    "alias": "AoC(P)",
+    "name": "Authority of Christ (Promo)",
+    "set": "Pmo-P1"
+  },
+  {
+    "alias": "AoCP",
+    "name": "Authority of Christ (Promo)",
+    "set": "Pmo-P1"
+  },
+  {
+    "alias": "AoTL",
+    "name": "Angel of the Lord (I)",
+    "set": "I"
+  },
+  {
+    "alias": "ASP",
+    "name": "A Soldier's Prayer",
+    "set": "TxP"
+  },
+  {
+    "alias": "AtC",
+    "name": "Ambush the City",
+    "set": "Ki"
+  },
+  {
+    "alias": "BftE",
+    "name": "Beast from the Earth (RoJ)",
+    "set": "RoJ"
+  },
+  {
+    "alias": "BftS",
+    "name": "Beast from the Sea (RoJ)",
+    "set": "RoJ"
+  },
+  {
+    "alias": "BotC",
+    "name": "Book of the Covenant",
+    "set": "Pmo-P1"
+  },
+  {
+    "alias": "BS",
+    "name": "Burial Shroud",
+    "set": "Ap"
+  },
+  {
+    "alias": "CoA",
+    "name": "Chamber of Angels",
+    "set": "AW"
+  },
+  {
+    "alias": "CoF",
+    "name": "Chariot of Fire",
+    "set": "PoC"
+  },
+  {
+    "alias": "CotH",
+    "name": "Captain of the Host [II]",
+    "set": "II"
+  },
+  {
+    "alias": "DoN",
+    "name": "Destruction of Nehushtan",
+    "set": "Pat"
+  },
+  {
+    "alias": "DR",
+    "name": "Dragon Raid [RR2]",
+    "set": "RR2"
+  },
+  {
+    "alias": "EMS",
+    "name": "Every Man's Sword",
+    "set": "Ki"
+  },
+  {
+    "alias": "EotE",
+    "name": "The Ends of the Earth",
+    "set": "AW"
+  },
+  {
+    "alias": "ET",
+    "name": "Ethiopian Treasurer (EC)",
+    "set": "TEC"
+  },
+  {
+    "alias": "FA",
+    "name": "Falling Away",
+    "set": "Wom"
+  },
+  {
+    "alias": "FSP",
+    "name": "Faithful Servant (Promo)",
+    "set": "Pmo-P1"
+  },
+  {
+    "alias": "GotL",
+    "name": "Glory of the Lord (Promo)",
+    "set": "Pmo-P2"
+  },
+  {
+    "alias": "GoYS",
+    "name": "Guardian Of Your Souls",
+    "set": "Ap"
+  },
+  {
+    "alias": "HHI",
+    "name": "Household Idols",
+    "set": "Ap"
+  },
+  {
+    "alias": "HoH",
+    "name": "Holy of Holies (Roots)",
+    "set": "RR"
+  },
+  {
+    "alias": "HP",
+    "name": "Haman's Plot",
+    "set": "Pat"
+  },
+  {
+    "alias": "HT",
+    "name": "Herod's Temple (GoC)",
+    "set": "GoC"
+  },
+  {
+    "alias": "IAC",
+    "name": "I am Creator",
+    "set": "AW"
+  },
+  {
+    "alias": "IoJ",
+    "name": "Image of Jealousy (Pr)",
+    "set": "Prp"
+  },
+  {
+    "alias": "JiP",
+    "name": "Joseph in Prison",
+    "set": "Pat"
+  },
+  {
+    "alias": "JS",
+    "name": "Judge's Seat",
+    "set": "RoA"
+  },
+  {
+    "alias": "JT",
+    "name": "Jerusalem Tower",
+    "set": "Pat"
+  },
+  {
+    "alias": "KoT",
+    "name": "King of Tyrus",
+    "set": "PoC"
+  },
+  {
+    "alias": "KotW",
+    "name": "Kingdoms of the World (GoC)",
+    "set": "GoC"
+  },
+  {
     "alias": "LAFS",
     "name": "Love at First Sight (LoC)",
     "set": "LoC"
+  },
+  {
+    "alias": "MPA",
+    "name": "Mary's Prophetic Act",
+    "set": "Pmo-P1"
+  },
+  {
+    "alias": "MtM",
+    "name": "Meeting the Messiah",
+    "set": "TxP"
+  },
+  {
+    "alias": "NJ",
+    "name": "New Jerusalem (I/J+)",
+    "set": "I/J+"
+  },
+  {
+    "alias": "NotL",
+    "name": "The Name of the Lord",
+    "set": "AW"
+  },
+  {
+    "alias": "PD",
+    "name": "Panic Demon (Gold)",
+    "set": "AW"
+  },
+  {
+    "alias": "PO",
+    "name": "Primary Objective",
+    "set": "AW"
+  },
+  {
+    "alias": "PotW",
+    "name": "Prince of this World (GoC)",
+    "set": "GoC"
+  },
+  {
+    "alias": "RBD",
+    "name": "Rain Becomes Dust",
+    "set": "Pri"
+  },
+  {
+    "alias": "RD",
+    "name": "Red Dragon (RoJ)",
+    "set": "RoJ"
+  },
+  {
+    "alias": "RoD",
+    "name": "Reach of Desperation (GoC)",
+    "set": "GoC"
+  },
+  {
+    "alias": "S3",
+    "name": "Suicidal Swine Stampede",
+    "set": "Di"
+  },
+  {
+    "alias": "SH",
+    "name": "Storehouse",
+    "set": "Pat"
+  },
+  {
+    "alias": "SoG",
+    "name": "Son of God (I)",
+    "set": "I"
+  },
+  {
+    "alias": "SS",
+    "name": "Samson's Sacrifice",
+    "set": "FoOF"
+  },
+  {
+    "alias": "SSoS",
+    "name": "Seven Sons of Sceva",
+    "set": "Pri"
+  },
+  {
+    "alias": "SSS",
+    "name": "Suicidal Swine Stampede",
+    "set": "Di"
+  },
+  {
+    "alias": "SWS",
+    "name": "Seven Wicked Spirits",
+    "set": "FoOF"
+  },
+  {
+    "alias": "TAS",
+    "name": "The Amalekites' Slave",
+    "set": "RoA"
+  },
+  {
+    "alias": "TGT",
+    "name": "The Garden Tomb",
+    "set": "RoA"
+  },
+  {
+    "alias": "TotL",
+    "name": "Tables of the Law",
+    "set": "FoM"
+  },
+  {
+    "alias": "TSA",
+    "name": "The Strong Angel (RoJ)",
+    "set": "RoJ"
+  },
+  {
+    "alias": "TToD",
+    "name": "The Throne of David",
+    "set": "RoA"
+  },
+  {
+    "alias": "U&T",
+    "name": "Urim and Thummim",
+    "set": "Pri"
+  },
+  {
+    "alias": "UN",
+    "name": "Unknown Nation (PoC)",
+    "set": "PoC"
+  },
+  {
+    "alias": "WoE",
+    "name": "Words of Encouragement (Ki)",
+    "set": "Ki"
+  },
+  {
+    "alias": "WoP",
+    "name": "Wall of Protection",
+    "set": "Ap"
+  },
+  {
+    "alias": "WoS",
+    "name": "Wrath of Satan",
+    "set": "War"
+  },
+  {
+    "alias": "WoW",
+    "name": "Walking on Water (I)",
+    "set": "I"
   }
 ]
