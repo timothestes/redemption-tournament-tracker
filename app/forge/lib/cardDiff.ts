@@ -47,6 +47,18 @@ export const SUGGESTABLE_FIELDS: (keyof DesignCard)[] = [
 // Deliberately NOT `diffCards(a, b).length === 0`: DIFF_FIELDS omits
 // specialAbility/legality/artistCredit/cardFrame, so a diff-based
 // compare would call two genuinely different snapshots equal.
+// A body/verse change (or any value with a newline) is unreadable as a single inline
+// strikethrough — stack the before/after as pre-wrapped blocks instead. Shared so the
+// card history and the open-proposal diff render the same change the same way.
+export function isBlockChange(c: FieldChange): boolean {
+  return (
+    c.field === "rawText" ||
+    c.field === "scripture" ||
+    (c.before?.includes("\n") ?? false) ||
+    (c.after?.includes("\n") ?? false)
+  );
+}
+
 export function sameSnapshot(a: DesignCard, b: DesignCard): boolean {
   return canonicalJson(a) === canonicalJson(b);
 }

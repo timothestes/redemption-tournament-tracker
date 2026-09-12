@@ -13,21 +13,11 @@ import {
   DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { diffCards, summarizeDiff, type FieldChange } from "@/app/forge/lib/cardDiff";
+import { diffCards, summarizeDiff } from "@/app/forge/lib/cardDiff";
 import { acceptProposal, denyProposal, type ProposalRow } from "@/app/forge/lib/proposals";
 import { addComment } from "@/app/forge/lib/comments";
 import { cardRawText, type DesignCard } from "@/app/forge/lib/designCard";
-
-// A body/verse change (or any value with a newline) is unreadable inline — stack
-// the before/after as pre-wrapped blocks instead of a single strikethrough line.
-function isBlockChange(c: FieldChange): boolean {
-  return (
-    c.field === "rawText" ||
-    c.field === "scripture" ||
-    (c.before?.includes("\n") ?? false) ||
-    (c.after?.includes("\n") ?? false)
-  );
-}
+import FieldChanges from "./FieldChanges";
 
 export default function ProposalDiff({
   proposal,
@@ -100,39 +90,9 @@ export default function ProposalDiff({
       )}
 
       {changes.length > 0 && (
-        <ul className="mt-2 space-y-1 text-xs">
-          {changes.map((c) =>
-            isNewCard ? (
-              isBlockChange(c) ? (
-                <li key={c.field as string} className="space-y-1">
-                  <span className="font-medium">{c.label}</span>
-                  <div className="whitespace-pre-wrap rounded bg-muted/60 px-2 py-1">{c.after ?? "—"}</div>
-                </li>
-              ) : (
-                <li key={c.field as string}>
-                  <span className="font-medium">{c.label}:</span> {c.after ?? "—"}
-                </li>
-              )
-            ) : isBlockChange(c) ? (
-              <li key={c.field as string} className="space-y-1">
-                <span className="font-medium">{c.label}</span>
-                {c.before !== null && (
-                  <div className="whitespace-pre-wrap rounded bg-destructive/10 px-2 py-1 text-destructive">{c.before}</div>
-                )}
-                {c.after !== null && (
-                  <div className="whitespace-pre-wrap rounded bg-primary/10 px-2 py-1">{c.after}</div>
-                )}
-              </li>
-            ) : (
-              <li key={c.field as string}>
-                <span className="font-medium">{c.label}:</span>{" "}
-                <span className="text-destructive line-through">{c.before ?? "—"}</span>
-                {" → "}
-                <span className="text-primary">{c.after ?? "—"}</span>
-              </li>
-            )
-          )}
-        </ul>
+        <div className="mt-2">
+          <FieldChanges changes={changes} isNewCard={isNewCard} />
+        </div>
       )}
 
       {/* The field diff above carries the change; the paired faces are collapsed by

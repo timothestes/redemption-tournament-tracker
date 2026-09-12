@@ -38,7 +38,7 @@ const arrowClass =
   "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border bg-background/70 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-background hover:text-foreground";
 
 export default function StudioEditor({
-  card, sets, currentUser, creator, setId, setName, prevId, nextId, artCandidates, openProposals, review,
+  card, sets, currentUser, creator, setId, setName, prevId, nextId, position, artCandidates, openProposals, review,
 }: {
   card: ForgeCardFull;
   sets: ForgeSetSummary[];
@@ -49,6 +49,8 @@ export default function StudioEditor({
   setName: string | null;
   prevId?: string | null;
   nextId?: string | null;
+  // Where this card sits in the set's grid order, when there is more than one.
+  position?: { index: number; total: number } | null;
   artCandidates: ArtCandidate[];
   // Passed straight to LifecycleControls for the release dialog's heads-up.
   openProposals?: { count: number; hasMatch: boolean };
@@ -136,8 +138,13 @@ export default function StudioEditor({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const el = document.activeElement as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (e.repeat) return;                                   // holding an arrow is not 30 cards
+      if (document.querySelector('[role="dialog"]')) return;  // Radix mounts this only while open
+      // Only walk the set when focus is nowhere in particular. The old blocklist missed
+      // <summary> and <button>, so a stray ArrowRight while a Resolve button had focus
+      // navigated off the card.
+      const el = document.activeElement;
+      if (el && el !== document.body && el !== document.documentElement) return;
       const dest = e.key === "ArrowLeft" ? prevId : nextId;
       if (!dest) return;
       e.preventDefault();
@@ -327,6 +334,12 @@ export default function StudioEditor({
               </Link>
             )}
           </div>
+          {position && (
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              {position.index} of {position.total}
+              <span className="hidden lg:inline"> · ← → to move</span>
+            </p>
+          )}
         </div>
 
         {/* Form + review in one column, so the sticky face travels past the review too.
@@ -336,12 +349,12 @@ export default function StudioEditor({
           <div className="space-y-4" onFocusCapture={() => setEditing(true)} onBlurCapture={() => setEditing(false)}>
             {err && <p className="text-sm text-destructive">{err}</p>}
 
-            <input autoFocus value={snapshot.name ?? ""} onChange={(e) => update({ name: e.target.value })}
+            <input autoFocus={!card.title?.trim()} value={snapshot.name ?? ""} onChange={(e) => update({ name: e.target.value })}
               placeholder="Name your card…" className="w-full rounded-md border bg-background px-3 py-2 text-lg" />
 
             <textarea value={snapshot.rawText ?? ""} onChange={(e) => update({ rawText: e.target.value })}
               placeholder="Type the card's special ability."
-              className="h-64 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+              className="max-h-[60vh] min-h-40 w-full rounded-md border bg-background px-3 py-2 text-sm [field-sizing:content]" />
 
             <CardDetailsFields snapshot={snapshot} update={update} />
 
