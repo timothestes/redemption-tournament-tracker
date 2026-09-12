@@ -97,23 +97,28 @@ export default function ProposalDiff({
 
       {/* The field diff above carries the change; the paired faces are collapsed by
           default (a proposal never changes the art/finished image, so for those cards
-          the two previews are identical). Available on demand. */}
+          the two previews are identical). Available on demand. A first proposal has no
+          released version to put in the "Current" slot, and an empty face there renders
+          as the art plus "Untitled" and no body text — which reads as a wiped card
+          rather than as "nothing yet". So a new card shows one face on its own. */}
       <details className="mt-3">
         <summary className="cursor-pointer select-none text-xs text-muted-foreground hover:text-foreground">
           Show card preview
         </summary>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {!isNewCard && (
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">Current</p>
+              <ForgeCardFace
+                name={current.name ?? null}
+                rawText={cardRawText(current)}
+                finishedUrl={finishedUrl}
+                artUrl={artUrl}
+              />
+            </div>
+          )}
           <div>
-            <p className="mb-1 text-xs text-muted-foreground">Current</p>
-            <ForgeCardFace
-              name={current.name ?? null}
-              rawText={cardRawText(current)}
-              finishedUrl={finishedUrl}
-              artUrl={artUrl}
-            />
-          </div>
-          <div>
-            <p className="mb-1 text-xs text-muted-foreground">Proposed</p>
+            <p className="mb-1 text-xs text-muted-foreground">{isNewCard ? "Card preview" : "Proposed"}</p>
             <ForgeCardFace
               name={proposed.name ?? null}
               rawText={cardRawText(proposed)}

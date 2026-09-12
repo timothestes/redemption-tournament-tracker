@@ -175,11 +175,12 @@ export default function StudioEditor({
   const flushPending = useCallback(async () => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     const pending = latest.current;
-    if (sameSnapshot(pending, lastSaved.current)) return;
+    if (sameSnapshot(pending, lastSaved.current)) return { ok: true };
     setSaved("saving");
     const r = await saveCard(card.id, pending);
     if (r.ok) { lastSaved.current = pending; setDirty(false); }
     setSaved(r.ok ? "saved" : "error");
+    return { ok: !!r.ok };
   }, [card.id]);
 
   // Memoized: a fresh value object would force every context consumer to re-render on

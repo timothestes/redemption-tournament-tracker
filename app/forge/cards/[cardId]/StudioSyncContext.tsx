@@ -12,11 +12,14 @@ import { createContext, useContext } from "react";
 // with the comment already marked resolved and no record the suggestion was ever applied.
 // Anything in the review column that writes the snapshot server-side must flush first.
 export type StudioSync = {
-  /** Write any pending local edit now, and resolve once the server has it. */
-  flushPending: () => Promise<void>;
+  /** Write any pending local edit now, and resolve once the server has it.
+   *  `ok: false` means the save FAILED, so the server still holds the previous
+   *  snapshot — a caller that goes on to build from it would produce exactly the
+   *  stale write this flush exists to prevent. Callers must bail. */
+  flushPending: () => Promise<{ ok: boolean }>;
 };
 
-const StudioSyncContext = createContext<StudioSync>({ flushPending: async () => {} });
+const StudioSyncContext = createContext<StudioSync>({ flushPending: async () => ({ ok: true }) });
 
 export const StudioSyncProvider = StudioSyncContext.Provider;
 

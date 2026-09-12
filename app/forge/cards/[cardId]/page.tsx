@@ -99,6 +99,7 @@ export default async function StudioPage({ params }: { params: Promise<{ cardId:
             versions={versions}
             events={events}
             canReview={canReview}
+            alreadyUnderReview={openProposals.hasMatch}
           />
         ) : null
       }

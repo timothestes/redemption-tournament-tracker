@@ -261,8 +261,10 @@ export default function CommentThread({
     onApply: () =>
       run(c.id, async () => {
         // Flush first: forge_apply_suggestion builds the new snapshot from the server's
-        // copy, so a pending autosave landing afterwards would silently undo it.
-        await flushPending();
+        // copy, so a pending autosave landing afterwards would silently undo it. A failed
+        // flush leaves that copy stale, so applying would drop the suggestion outright.
+        const flushed = await flushPending();
+        if (flushed.ok === false) return { ok: false, error: "Couldn’t save your latest edits — nothing was applied." };
         return applySuggestion(c.id, cardId);
       }),
     onDelete: () => setConfirmDelete(c),
