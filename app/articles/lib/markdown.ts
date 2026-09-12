@@ -97,6 +97,23 @@ export const CARD_MENTION_RE = /\[\[([^\[\]\n]+?)\]\]/g;
 /** Lookup key for a mention — the shared loose card-name key. */
 export const mentionKey = cardNameKey;
 
+/**
+ * `[[Card Name]]`, or `[[Card Name|as written]]` when the words on the page are
+ * not the card's name — an author's shorthand, or a name like "Jacob" that the
+ * index would resolve to somebody else's Jacob.
+ */
+export function parseMention(inner: string): { target: string; label: string } {
+  const bar = inner.indexOf("|");
+  const tidy = (s: string) => s.replace(/\s+/g, " ").trim();
+  if (bar < 0) {
+    const target = tidy(inner);
+    return { target, label: target };
+  }
+  const target = tidy(inner.slice(0, bar));
+  const label = tidy(inner.slice(bar + 1));
+  return { target, label: label || target };
+}
+
 const FENCE_RE = /```[\s\S]*?```/g;
 const INLINE_CODE_RE = /`[^`\n]*`/g;
 
@@ -105,7 +122,7 @@ const INLINE_CODE_RE = /`[^`\n]*`/g;
  * plain text (meta/OG tags, the public API) where the brackets read as a typo.
  */
 export function flattenCardMentions(text: string): string {
-  return text.replace(CARD_MENTION_RE, (_match, name: string) => name.replace(/\s+/g, " ").trim());
+  return text.replace(CARD_MENTION_RE, (_match, inner: string) => parseMention(inner).label);
 }
 
 /** Distinct mention names (as typed) outside code, in document order, capped. */
@@ -114,7 +131,7 @@ export function extractCardMentions(md: string, max = 200): string[] {
   const out: string[] = [];
   const text = md.replace(FENCE_RE, " ").replace(INLINE_CODE_RE, " ");
   for (const m of text.matchAll(CARD_MENTION_RE)) {
-    const name = m[1].replace(/\s+/g, " ").trim();
+    const name = parseMention(m[1]).target;
     const key = mentionKey(name);
     if (!name || seen.has(key)) continue;
     seen.add(key);

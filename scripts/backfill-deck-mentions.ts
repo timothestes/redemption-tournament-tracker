@@ -19,10 +19,11 @@ config({ path: ".env.local" });
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { candidatesForDeck, isKnownCardName } from "./lib/deckMentions/candidates";
+import { candidatesForDeck, isKnownCardName, resolvesTo } from "./lib/deckMentions/candidates";
 import { linkCardMentions } from "./lib/deckMentions/linkCards";
-import { extractCardMentions } from "@/app/articles/lib/markdown";
+import { extractCardMentions, flattenCardMentions } from "@/app/articles/lib/markdown";
 import { resolveCardRef } from "@/app/articles/lib/cardRefs";
+import { cardNameKey } from "@/lib/cards/nameKey";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -118,18 +119,22 @@ async function main() {
     if (names.length === 0) continue;
     const { markdown, added } = linkCardMentions(deck.description, candidatesForDeck(names), {
       knownName: isKnownCardName,
+      resolvesTo,
     });
     if (!added.length) continue;
     // Nothing is written that the renderer would not turn back into a card: a
     // mention that fails to parse or resolve would leave visible brackets in
     // someone's description.
-    const parsed = new Set(extractCardMentions(markdown, 10_000).map((n) => n.toLowerCase()));
+    // cardNameKey, not toLowerCase: the author's apostrophe may be curly where
+    // the card's is straight, and the resolver treats those as one name.
+    const parsed = new Set(extractCardMentions(markdown, 10_000).map(cardNameKey));
     for (const name of new Set(added)) {
-      if (!parsed.has(name.toLowerCase())) throw new Error(`${deck.id}: "${name}" did not survive parsing`);
+      if (!parsed.has(cardNameKey(name))) throw new Error(`${deck.id}: "${name}" did not survive parsing`);
       if (!resolveCardRef(name)) throw new Error(`${deck.id}: "${name}" does not resolve to a card`);
     }
-    if (markdown.replace(/\[\[|\]\]/g, "") !== deck.description) {
-      throw new Error(`${deck.id}: the backfill changed more than brackets`);
+    // Only brackets (and an alias target ahead of a "|") may have appeared.
+    if (flattenCardMentions(markdown) !== flattenCardMentions(deck.description)) {
+      throw new Error(`${deck.id}: the backfill changed the words on the page`);
     }
     for (const n of added) perName.set(n, (perName.get(n) ?? 0) + 1);
     changes.push({

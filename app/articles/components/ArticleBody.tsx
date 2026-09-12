@@ -90,11 +90,14 @@ function buildComponents(refs: ArticleRefs, draft: boolean): Components {
         {...props}
       />
     ),
-    // Produced by remarkCardMentions; `name` is the text between the brackets.
-    "card-mention": ({ name }: { name?: string }) => {
+    // Produced by remarkCardMentions: `name` is the card the mention points at,
+    // `label` the words that stand on the page (they differ for `[[a|b]]`).
+    "card-mention": ({ name, label }: { name?: string; label?: string }) => {
       const typed = typeof name === "string" ? name : "";
       const ref = refs.cards[mentionKey(typed)];
-      return <CardMention name={typed} imgFile={ref?.imgFile} draft={draft} />;
+      return (
+        <CardMention name={typed} label={typeof label === "string" ? label : undefined} imgFile={ref?.imgFile} draft={draft} />
+      );
     },
   } satisfies Components & { "card-mention": unknown };
   return components as Components;
